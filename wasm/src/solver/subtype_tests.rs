@@ -12050,3 +12050,1480 @@ fn test_tuple_labeled_mixed() {
     assert!(checker.is_subtype_of(mixed, all_unlabeled));
     assert!(checker.is_subtype_of(all_unlabeled, mixed));
 }
+
+// =============================================================================
+// CLASS INHERITANCE HIERARCHY TESTS
+// =============================================================================
+
+#[test]
+fn test_class_inheritance_derived_extends_base() {
+    // class Base { base: string }
+    // class Derived extends Base { derived: number }
+    // Derived <: Base
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let base_prop = interner.intern_string("base");
+    let derived_prop = interner.intern_string("derived");
+
+    let base = interner.object(vec![PropertyInfo {
+        name: base_prop,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let derived = interner.object(vec![
+        PropertyInfo {
+            name: base_prop,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: derived_prop,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Derived is subtype of Base (has all base properties)
+    assert!(checker.is_subtype_of(derived, base));
+    // Base is not subtype of Derived (missing derived property)
+    assert!(!checker.is_subtype_of(base, derived));
+}
+
+#[test]
+fn test_class_inheritance_multi_level() {
+    // class A { a: string }
+    // class B extends A { b: number }
+    // class C extends B { c: boolean }
+    // C <: B <: A
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a_prop = interner.intern_string("a");
+    let b_prop = interner.intern_string("b");
+    let c_prop = interner.intern_string("c");
+
+    let class_a = interner.object(vec![PropertyInfo {
+        name: a_prop,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let class_b = interner.object(vec![
+        PropertyInfo {
+            name: a_prop,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: b_prop,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let class_c = interner.object(vec![
+        PropertyInfo {
+            name: a_prop,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: b_prop,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: c_prop,
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Transitive inheritance
+    assert!(checker.is_subtype_of(class_c, class_b));
+    assert!(checker.is_subtype_of(class_b, class_a));
+    assert!(checker.is_subtype_of(class_c, class_a));
+
+    // Not the reverse
+    assert!(!checker.is_subtype_of(class_a, class_b));
+    assert!(!checker.is_subtype_of(class_b, class_c));
+}
+
+#[test]
+fn test_class_inheritance_method_override() {
+    // class Base { method(): string }
+    // class Derived extends Base { method(): "hello" }
+    // Derived <: Base (covariant return)
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let method_name = interner.intern_string("method");
+    let hello = interner.literal_string("hello");
+
+    let base_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let derived_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: hello,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let base = interner.object(vec![PropertyInfo {
+        name: method_name,
+        type_id: base_method,
+        write_type: base_method,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let derived = interner.object(vec![PropertyInfo {
+        name: method_name,
+        type_id: derived_method,
+        write_type: derived_method,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    // Derived with narrower return type is subtype
+    assert!(checker.is_subtype_of(derived, base));
+}
+
+#[test]
+fn test_class_inheritance_same_structure() {
+    // Two classes with identical structure are structurally equivalent
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let prop = interner.intern_string("value");
+
+    let class1 = interner.object(vec![PropertyInfo {
+        name: prop,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let class2 = interner.object(vec![PropertyInfo {
+        name: prop,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Structurally identical
+    assert!(checker.is_subtype_of(class1, class2));
+    assert!(checker.is_subtype_of(class2, class1));
+}
+
+#[test]
+fn test_class_inheritance_property_type_mismatch() {
+    // class Base { value: string }
+    // class Other { value: number }
+    // Neither is subtype of the other
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let prop = interner.intern_string("value");
+
+    let class1 = interner.object(vec![PropertyInfo {
+        name: prop,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let class2 = interner.object(vec![PropertyInfo {
+        name: prop,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Property types don't match
+    assert!(!checker.is_subtype_of(class1, class2));
+    assert!(!checker.is_subtype_of(class2, class1));
+}
+
+#[test]
+fn test_class_inheritance_with_constructor() {
+    // class with constructor modeled as object with properties
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let name_prop = interner.intern_string("name");
+    let age_prop = interner.intern_string("age");
+
+    let person = interner.object(vec![
+        PropertyInfo {
+            name: name_prop,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: age_prop,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let employee = interner.object(vec![
+        PropertyInfo {
+            name: name_prop,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: age_prop,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("employeeId"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Employee extends Person structurally
+    assert!(checker.is_subtype_of(employee, person));
+    assert!(!checker.is_subtype_of(person, employee));
+}
+
+#[test]
+fn test_class_inheritance_diamond() {
+    // Diamond inheritance: D extends B, C which both extend A
+    // D should be subtype of A
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a_prop = interner.intern_string("a");
+    let b_prop = interner.intern_string("b");
+    let c_prop = interner.intern_string("c");
+    let d_prop = interner.intern_string("d");
+
+    let class_a = interner.object(vec![PropertyInfo {
+        name: a_prop,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // D has all properties from the diamond
+    let class_d = interner.object(vec![
+        PropertyInfo {
+            name: a_prop,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: b_prop,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: c_prop,
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: d_prop,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // D is subtype of A (has all A properties)
+    assert!(checker.is_subtype_of(class_d, class_a));
+}
+
+// =============================================================================
+// IMPLEMENTS CLAUSE CHECKING TESTS
+// =============================================================================
+
+#[test]
+fn test_implements_simple_interface() {
+    // interface IGreeter { greet(): string }
+    // class Greeter implements IGreeter { greet() { return "hello"; } }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let greet = interner.intern_string("greet");
+
+    let greet_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let interface = interner.object(vec![PropertyInfo {
+        name: greet,
+        type_id: greet_method,
+        write_type: greet_method,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    // Class has additional property
+    let class_impl = interner.object(vec![
+        PropertyInfo {
+            name: greet,
+            type_id: greet_method,
+            write_type: greet_method,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+        PropertyInfo {
+            name: interner.intern_string("name"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Class implements interface
+    assert!(checker.is_subtype_of(class_impl, interface));
+}
+
+#[test]
+fn test_implements_multiple_interfaces() {
+    // interface A { a(): void }
+    // interface B { b(): void }
+    // class C implements A, B
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a_method_name = interner.intern_string("a");
+    let b_method_name = interner.intern_string("b");
+
+    let void_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let interface_a = interner.object(vec![PropertyInfo {
+        name: a_method_name,
+        type_id: void_method,
+        write_type: void_method,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let interface_b = interner.object(vec![PropertyInfo {
+        name: b_method_name,
+        type_id: void_method,
+        write_type: void_method,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let class_c = interner.object(vec![
+        PropertyInfo {
+            name: a_method_name,
+            type_id: void_method,
+            write_type: void_method,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+        PropertyInfo {
+            name: b_method_name,
+            type_id: void_method,
+            write_type: void_method,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+    ]);
+
+    // Class implements both interfaces
+    assert!(checker.is_subtype_of(class_c, interface_a));
+    assert!(checker.is_subtype_of(class_c, interface_b));
+}
+
+#[test]
+fn test_implements_missing_method() {
+    // interface I { required(): void }
+    // class C {} - missing required method
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let required = interner.intern_string("required");
+
+    let void_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let interface = interner.object(vec![PropertyInfo {
+        name: required,
+        type_id: void_method,
+        write_type: void_method,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    // Empty class
+    let class_c = interner.object(vec![]);
+
+    // Class does not implement interface
+    assert!(!checker.is_subtype_of(class_c, interface));
+}
+
+#[test]
+fn test_implements_optional_method() {
+    // interface I { optional?(): void }
+    // class C {} - OK, optional is optional
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let optional = interner.intern_string("optional");
+
+    let void_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let interface = interner.object(vec![PropertyInfo {
+        name: optional,
+        type_id: void_method,
+        write_type: void_method,
+        optional: true,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    // Empty class
+    let class_c = interner.object(vec![]);
+
+    // Class implements interface (optional method not required)
+    assert!(checker.is_subtype_of(class_c, interface));
+}
+
+#[test]
+fn test_implements_wrong_signature() {
+    // interface I { method(x: string): void }
+    // class C { method(x: number): void } - wrong signature
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let method_name = interner.intern_string("method");
+
+    let interface_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let class_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::NUMBER,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let interface = interner.object(vec![PropertyInfo {
+        name: method_name,
+        type_id: interface_method,
+        write_type: interface_method,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let class_c = interner.object(vec![PropertyInfo {
+        name: method_name,
+        type_id: class_method,
+        write_type: class_method,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    // Class does not implement interface (param type mismatch)
+    assert!(!checker.is_subtype_of(class_c, interface));
+}
+
+#[test]
+fn test_implements_interface_extends_interface() {
+    // interface A { a: string }
+    // interface B extends A { b: number }
+    // class C implements B
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a_prop = interner.intern_string("a");
+    let b_prop = interner.intern_string("b");
+
+    let interface_a = interner.object(vec![PropertyInfo {
+        name: a_prop,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let interface_b = interner.object(vec![
+        PropertyInfo {
+            name: a_prop,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: b_prop,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let class_c = interner.object(vec![
+        PropertyInfo {
+            name: a_prop,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: b_prop,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Class implements both interfaces
+    assert!(checker.is_subtype_of(class_c, interface_a));
+    assert!(checker.is_subtype_of(class_c, interface_b));
+}
+
+#[test]
+fn test_implements_property_with_getter() {
+    // interface I { readonly value: string }
+    // class C { get value(): string }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let value = interner.intern_string("value");
+
+    let interface = interner.object(vec![PropertyInfo {
+        name: value,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    let class_c = interner.object(vec![PropertyInfo {
+        name: value,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    // Class implements readonly property
+    assert!(checker.is_subtype_of(class_c, interface));
+}
+
+// =============================================================================
+// ABSTRACT CLASS HANDLING TESTS
+// =============================================================================
+
+#[test]
+fn test_abstract_class_with_abstract_method() {
+    // abstract class Base { abstract method(): void }
+    // class Derived extends Base { method() {} }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let method_name = interner.intern_string("method");
+
+    let void_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // Abstract base class structure
+    let abstract_base = interner.object(vec![PropertyInfo {
+        name: method_name,
+        type_id: void_method,
+        write_type: void_method,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    // Concrete derived class
+    let derived = interner.object(vec![PropertyInfo {
+        name: method_name,
+        type_id: void_method,
+        write_type: void_method,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    // Derived is subtype of abstract base
+    assert!(checker.is_subtype_of(derived, abstract_base));
+}
+
+#[test]
+fn test_abstract_class_with_concrete_method() {
+    // abstract class Base { concrete(): string { return ""; } abstract abs(): void }
+    // class Derived extends Base { abs() {} }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let concrete_name = interner.intern_string("concrete");
+    let abstract_name = interner.intern_string("abs");
+
+    let string_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let void_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let abstract_base = interner.object(vec![
+        PropertyInfo {
+            name: concrete_name,
+            type_id: string_method,
+            write_type: string_method,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+        PropertyInfo {
+            name: abstract_name,
+            type_id: void_method,
+            write_type: void_method,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+    ]);
+
+    let derived = interner.object(vec![
+        PropertyInfo {
+            name: concrete_name,
+            type_id: string_method,
+            write_type: string_method,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+        PropertyInfo {
+            name: abstract_name,
+            type_id: void_method,
+            write_type: void_method,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+    ]);
+
+    // Derived is subtype of abstract base
+    assert!(checker.is_subtype_of(derived, abstract_base));
+}
+
+#[test]
+fn test_abstract_class_to_abstract_class() {
+    // abstract class A { abstract a(): void }
+    // abstract class B extends A { abstract b(): void }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a_method = interner.intern_string("a");
+    let b_method = interner.intern_string("b");
+
+    let void_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let abstract_a = interner.object(vec![PropertyInfo {
+        name: a_method,
+        type_id: void_method,
+        write_type: void_method,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let abstract_b = interner.object(vec![
+        PropertyInfo {
+            name: a_method,
+            type_id: void_method,
+            write_type: void_method,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+        PropertyInfo {
+            name: b_method,
+            type_id: void_method,
+            write_type: void_method,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+    ]);
+
+    // B extends A
+    assert!(checker.is_subtype_of(abstract_b, abstract_a));
+    assert!(!checker.is_subtype_of(abstract_a, abstract_b));
+}
+
+#[test]
+fn test_abstract_class_with_property() {
+    // abstract class Base { abstract value: string }
+    // class Derived extends Base { value = "hello" }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let value = interner.intern_string("value");
+
+    let abstract_base = interner.object(vec![PropertyInfo {
+        name: value,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let hello = interner.literal_string("hello");
+    let derived = interner.object(vec![PropertyInfo {
+        name: value,
+        type_id: hello,
+        write_type: hello,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Derived with literal type is subtype
+    assert!(checker.is_subtype_of(derived, abstract_base));
+}
+
+#[test]
+fn test_abstract_class_generic_method() {
+    // abstract class Base<T> { abstract process(x: T): T }
+    // Modeled as concrete instantiation
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let process = interner.intern_string("process");
+
+    // Instantiated with string
+    let string_process = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // Instantiated with number
+    let number_process = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::NUMBER,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::NUMBER,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let base_string = interner.object(vec![PropertyInfo {
+        name: process,
+        type_id: string_process,
+        write_type: string_process,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let base_number = interner.object(vec![PropertyInfo {
+        name: process,
+        type_id: number_process,
+        write_type: number_process,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    // Different instantiations are not subtypes
+    assert!(!checker.is_subtype_of(base_string, base_number));
+    assert!(!checker.is_subtype_of(base_number, base_string));
+}
+
+#[test]
+fn test_abstract_class_missing_implementation() {
+    // abstract class Base { abstract method(): void; concrete(): string }
+    // class Incomplete { concrete(): string } - missing method
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let method_name = interner.intern_string("method");
+    let concrete_name = interner.intern_string("concrete");
+
+    let void_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let string_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let abstract_base = interner.object(vec![
+        PropertyInfo {
+            name: method_name,
+            type_id: void_method,
+            write_type: void_method,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+        PropertyInfo {
+            name: concrete_name,
+            type_id: string_method,
+            write_type: string_method,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+    ]);
+
+    // Incomplete - missing abstract method
+    let incomplete = interner.object(vec![PropertyInfo {
+        name: concrete_name,
+        type_id: string_method,
+        write_type: string_method,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    // Incomplete is not subtype (missing method)
+    assert!(!checker.is_subtype_of(incomplete, abstract_base));
+}
+
+#[test]
+fn test_abstract_class_protected_member() {
+    // abstract class Base { protected value: string }
+    // Modeled as regular property (protected is access control, not type)
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let value = interner.intern_string("value");
+
+    let base = interner.object(vec![PropertyInfo {
+        name: value,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let derived = interner.object(vec![PropertyInfo {
+        name: value,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Structurally equivalent
+    assert!(checker.is_subtype_of(derived, base));
+    assert!(checker.is_subtype_of(base, derived));
+}
+
+// =============================================================================
+// PRIVATE MEMBER CHECKING TESTS
+// =============================================================================
+
+#[test]
+fn test_private_member_brand_pattern() {
+    // class A { private __brand_a: void }
+    // class B { private __brand_b: void }
+    // Even with same structure, different brands make them incompatible
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let brand_a = interner.intern_string("__brand_a");
+    let brand_b = interner.intern_string("__brand_b");
+    let value = interner.intern_string("value");
+
+    let class_a = interner.object(vec![
+        PropertyInfo {
+            name: brand_a,
+            type_id: TypeId::VOID,
+            write_type: TypeId::VOID,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: value,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let class_b = interner.object(vec![
+        PropertyInfo {
+            name: brand_b,
+            type_id: TypeId::VOID,
+            write_type: TypeId::VOID,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: value,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Different brands - not subtypes
+    assert!(!checker.is_subtype_of(class_a, class_b));
+    assert!(!checker.is_subtype_of(class_b, class_a));
+}
+
+#[test]
+fn test_private_member_same_brand() {
+    // Same brand property makes classes equivalent
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let brand = interner.intern_string("__brand");
+    let value = interner.intern_string("value");
+
+    let class1 = interner.object(vec![
+        PropertyInfo {
+            name: brand,
+            type_id: TypeId::VOID,
+            write_type: TypeId::VOID,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: value,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let class2 = interner.object(vec![
+        PropertyInfo {
+            name: brand,
+            type_id: TypeId::VOID,
+            write_type: TypeId::VOID,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: value,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Same brand - subtypes of each other
+    assert!(checker.is_subtype_of(class1, class2));
+    assert!(checker.is_subtype_of(class2, class1));
+}
+
+#[test]
+fn test_private_member_derived_inherits_brand() {
+    // class Base { private __brand: void }
+    // class Derived extends Base { extra: number }
+    // Derived has the brand too
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let brand = interner.intern_string("__brand");
+    let value = interner.intern_string("value");
+    let extra = interner.intern_string("extra");
+
+    let base = interner.object(vec![
+        PropertyInfo {
+            name: brand,
+            type_id: TypeId::VOID,
+            write_type: TypeId::VOID,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: value,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let derived = interner.object(vec![
+        PropertyInfo {
+            name: brand,
+            type_id: TypeId::VOID,
+            write_type: TypeId::VOID,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: value,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: extra,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Derived is subtype of Base (has brand)
+    assert!(checker.is_subtype_of(derived, base));
+    // Base is not subtype of Derived (missing extra)
+    assert!(!checker.is_subtype_of(base, derived));
+}
+
+#[test]
+fn test_private_member_missing_brand() {
+    // class A { private __brand: void; value: string }
+    // Plain object { value: string } - no brand
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let brand = interner.intern_string("__brand");
+    let value = interner.intern_string("value");
+
+    let class_a = interner.object(vec![
+        PropertyInfo {
+            name: brand,
+            type_id: TypeId::VOID,
+            write_type: TypeId::VOID,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: value,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let plain_object = interner.object(vec![PropertyInfo {
+        name: value,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Class is subtype of plain (has all plain properties)
+    assert!(checker.is_subtype_of(class_a, plain_object));
+    // Plain is not subtype of class (missing brand)
+    assert!(!checker.is_subtype_of(plain_object, class_a));
+}
+
+#[test]
+fn test_private_member_unique_symbol_brand() {
+    // Using literal types as brands (simulating unique symbol)
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let brand = interner.intern_string("__brand");
+    let value = interner.intern_string("value");
+
+    let brand_a_type = interner.literal_string("brand_a");
+    let brand_b_type = interner.literal_string("brand_b");
+
+    let class_a = interner.object(vec![
+        PropertyInfo {
+            name: brand,
+            type_id: brand_a_type,
+            write_type: brand_a_type,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: value,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let class_b = interner.object(vec![
+        PropertyInfo {
+            name: brand,
+            type_id: brand_b_type,
+            write_type: brand_b_type,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: value,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Different brand values - not subtypes
+    assert!(!checker.is_subtype_of(class_a, class_b));
+    assert!(!checker.is_subtype_of(class_b, class_a));
+}
+
+#[test]
+fn test_private_member_readonly_brand() {
+    // readonly brand still works for nominal-like typing
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let brand = interner.intern_string("__brand");
+    let value = interner.intern_string("value");
+
+    let class_readonly = interner.object(vec![
+        PropertyInfo {
+            name: brand,
+            type_id: TypeId::VOID,
+            write_type: TypeId::VOID,
+            optional: false,
+            readonly: true,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: value,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let class_writable = interner.object(vec![
+        PropertyInfo {
+            name: brand,
+            type_id: TypeId::VOID,
+            write_type: TypeId::VOID,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: value,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Writable is subtype of readonly (can narrow to readonly)
+    assert!(checker.is_subtype_of(class_writable, class_readonly));
+}
+
+#[test]
+fn test_private_multiple_brands() {
+    // Class with multiple brand properties
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let brand1 = interner.intern_string("__brand1");
+    let brand2 = interner.intern_string("__brand2");
+    let value = interner.intern_string("value");
+
+    let class_both = interner.object(vec![
+        PropertyInfo {
+            name: brand1,
+            type_id: TypeId::VOID,
+            write_type: TypeId::VOID,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: brand2,
+            type_id: TypeId::VOID,
+            write_type: TypeId::VOID,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: value,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let class_one = interner.object(vec![
+        PropertyInfo {
+            name: brand1,
+            type_id: TypeId::VOID,
+            write_type: TypeId::VOID,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: value,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Class with both brands is subtype of class with one
+    assert!(checker.is_subtype_of(class_both, class_one));
+    // Not the reverse
+    assert!(!checker.is_subtype_of(class_one, class_both));
+}
+
+#[test]
+fn test_private_member_method_brand() {
+    // Using a method as part of the class identity
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let brand_method = interner.intern_string("__isFoo");
+
+    let true_return = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::BOOLEAN,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let class_foo = interner.object(vec![PropertyInfo {
+        name: brand_method,
+        type_id: true_return,
+        write_type: true_return,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let class_bar = interner.object(vec![]);
+
+    // Foo has the brand method, Bar doesn't
+    assert!(!checker.is_subtype_of(class_bar, class_foo));
+    // Foo is subtype of empty
+    assert!(checker.is_subtype_of(class_foo, class_bar));
+}
