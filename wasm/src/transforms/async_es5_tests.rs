@@ -12460,3 +12460,104 @@ fn test_async_batch_ignores_nested_async() {
     );
     assert!(!result, "Should not detect await inside nested async batch handler");
 }
+
+// ============================================================================
+// ASYNC RETRY PATTERN TESTS
+// Tests for retry patterns: exponential backoff, jitter, circuit breaker
+// ============================================================================
+
+#[test]
+fn test_async_retry_exponential_backoff() {
+    let result = async_error_propagation_contains_await(
+        "async function retry(fn) { await delay(Math.pow(2, attempt) * base); return await fn(); }",
+    );
+    assert!(result, "Should detect await in exponential backoff");
+}
+
+#[test]
+fn test_async_retry_linear_backoff() {
+    let result = async_error_propagation_contains_await(
+        "async function retry(fn) { await delay(attempt * interval); return await fn(); }",
+    );
+    assert!(result, "Should detect await in linear backoff");
+}
+
+#[test]
+fn test_async_retry_jitter() {
+    let result = async_error_propagation_contains_await(
+        "async function retry(fn) { await delay(base + Math.random() * jitter); return await fn(); }",
+    );
+    assert!(result, "Should detect await in jitter pattern");
+}
+
+#[test]
+fn test_async_retry_circuit_breaker() {
+    let result = async_error_propagation_contains_await(
+        "async function call(fn) { if (state === 'open') throw new Error('circuit open'); return await fn(); }",
+    );
+    assert!(result, "Should detect await in circuit breaker");
+}
+
+#[test]
+fn test_async_retry_max_attempts() {
+    let result = async_error_propagation_contains_await(
+        "async function retry(fn) { while (attempts < max) { try { return await fn(); } catch { attempts++; } } }",
+    );
+    assert!(result, "Should detect await in max attempts retry");
+}
+
+#[test]
+fn test_async_retry_conditional() {
+    let result = async_error_propagation_contains_await(
+        "async function retry(fn) { try { return await fn(); } catch (e) { if (isRetryable(e)) await retry(fn); } }",
+    );
+    assert!(result, "Should detect await in conditional retry");
+}
+
+#[test]
+fn test_async_retry_fallback() {
+    let result = async_error_propagation_contains_await(
+        "async function withFallback(fn) { try { return await fn(); } catch { return await fallback(); } }",
+    );
+    assert!(result, "Should detect await in retry with fallback");
+}
+
+#[test]
+fn test_async_retry_timeout() {
+    let result = async_error_propagation_contains_await(
+        "async function retry(fn) { return await Promise.race([fn(), timeout(ms)]); }",
+    );
+    assert!(result, "Should detect await in retry with timeout");
+}
+
+#[test]
+fn test_async_retry_reset() {
+    let result = async_error_propagation_contains_await(
+        "async function reset() { failures = 0; await recover(); state = 'closed'; }",
+    );
+    assert!(result, "Should detect await in circuit reset");
+}
+
+#[test]
+fn test_async_retry_half_open() {
+    let result = async_error_propagation_contains_await(
+        "async function probe() { state = 'half-open'; try { await test(); state = 'closed'; } catch { state = 'open'; } }",
+    );
+    assert!(result, "Should detect await in half-open state probe");
+}
+
+#[test]
+fn test_async_retry_no_await() {
+    let result = async_error_propagation_contains_await(
+        "async function syncRetry(fn) { if (attempts < max) { attempts++; return fn(); } }",
+    );
+    assert!(!result, "Should not detect await when retry is sync");
+}
+
+#[test]
+fn test_async_retry_ignores_nested_async() {
+    let result = async_error_propagation_contains_await(
+        "async function outer() { const retrier = async (fn) => await fn(); }",
+    );
+    assert!(!result, "Should not detect await inside nested async retry handler");
+}
