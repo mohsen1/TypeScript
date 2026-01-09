@@ -625,6 +625,12 @@ impl<'a> ThinCheckerState<'a> {
     }
 
     fn class_instance_type_from_symbol(&mut self, sym_id: SymbolId) -> Option<TypeId> {
+        // Check for circular reference to prevent infinite recursion with
+        // self-referential types like `method(): cls`
+        if self.ctx.symbol_resolution_set.contains(&sym_id) {
+            return None;
+        }
+
         let symbol = self.ctx.binder.get_symbol(sym_id)?;
         let decl_idx = if !symbol.value_declaration.is_none() {
             symbol.value_declaration
@@ -636,9 +642,17 @@ impl<'a> ThinCheckerState<'a> {
         }
         let node = self.ctx.arena.get(decl_idx)?;
         let class = self.ctx.arena.get_class(node)?;
+
+        // Mark this symbol as being resolved
+        self.ctx.symbol_resolution_set.insert(sym_id);
+
         let (_params, updates) = self.push_type_parameters(&class.type_parameters);
         let instance_type = self.get_class_instance_type(decl_idx, class);
         self.pop_type_parameters(updates);
+
+        // Remove from resolution set
+        self.ctx.symbol_resolution_set.remove(&sym_id);
+
         Some(instance_type)
     }
 
