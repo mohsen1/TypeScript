@@ -69,14 +69,21 @@ After abstract constructor type fix:
 - `mixinAbstractClasses.ts` - Parser errors eliminated (0 → remaining TS2339 are type inference issues)
 - `mixinClassesAnonymous.ts` - Parser errors eliminated (remaining TS2339 are type inference issues)
 
-### Remaining Issues
+### Conformance Test Results
 
-The mixin class tests still have TS2339 errors, but these are now **type inference issues** (not parser issues):
-- Complex generic type parameter inference with constraints
-- Intersection types with callable signatures
-- Class extends via call expressions (`extends Mixin(ConcreteBase)`)
+After WASM package rebuild with all parser fixes:
+- **Exact Match: 577 (29.0%)** - up from ~97 (19.5%)
+- **Same Error Count: 669 (33.6%)** - up from ~116 (23.3%)
 
-These require deeper checker work beyond the scope of basic TS2339 false positive fixes.
+### Remaining TS2339 Issues
+
+38 tests still have extra TS2339 errors, primarily in complex areas:
+- **Mixin classes** - complex generic type inference with abstract constraints
+- **Control flow analysis** - type narrowing issues
+- **Enum merging** - declaration merging
+- **Symbol properties** - ES6 symbol handling
+
+These require deeper checker work beyond basic property access fixes.
 
 TSC correctly finds `name` by walking up the inheritance chain.
 
