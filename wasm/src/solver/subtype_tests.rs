@@ -7437,17 +7437,19 @@ fn test_boolean_literal_types() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
 
-    // Note: TypeId::TRUE and TypeId::FALSE might be constants
-    // If not, we need to use literal_boolean or similar
-    // For now, test that boolean is handled
-    assert!(checker.is_subtype_of(TypeId::TRUE, TypeId::BOOLEAN));
-    assert!(checker.is_subtype_of(TypeId::FALSE, TypeId::BOOLEAN));
+    // Use literal_boolean to create true/false literal types
+    let type_true = interner.literal_boolean(true);
+    let type_false = interner.literal_boolean(false);
+
+    // true and false literal types are subtypes of boolean
+    assert!(checker.is_subtype_of(type_true, TypeId::BOOLEAN));
+    assert!(checker.is_subtype_of(type_false, TypeId::BOOLEAN));
 
     // true and false are not subtypes of each other
-    assert!(!checker.is_subtype_of(TypeId::TRUE, TypeId::FALSE));
-    assert!(!checker.is_subtype_of(TypeId::FALSE, TypeId::TRUE));
+    assert!(!checker.is_subtype_of(type_true, type_false));
+    assert!(!checker.is_subtype_of(type_false, type_true));
 
     // boolean is not subtype of true or false
-    assert!(!checker.is_subtype_of(TypeId::BOOLEAN, TypeId::TRUE));
-    assert!(!checker.is_subtype_of(TypeId::BOOLEAN, TypeId::FALSE));
+    assert!(!checker.is_subtype_of(TypeId::BOOLEAN, type_true));
+    assert!(!checker.is_subtype_of(TypeId::BOOLEAN, type_false));
 }
