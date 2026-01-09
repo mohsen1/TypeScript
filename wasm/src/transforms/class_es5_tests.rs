@@ -28812,3 +28812,606 @@ class PrimitiveHandler {
         output
     );
 }
+
+/// Test: Partial mapped type
+/// Verifies that classes using Partial<T> mapped type transform correctly to ES5
+#[test]
+fn test_class_es5_partial_mapped_type() {
+    let source = r#"
+interface User {
+    name: string;
+    email: string;
+    age: number;
+}
+
+class UserUpdater {
+    private user: User;
+
+    constructor(user: User) {
+        this.user = user;
+    }
+
+    update(changes: Partial<User>): User {
+        if (changes.name !== undefined) {
+            this.user.name = changes.name;
+        }
+        if (changes.email !== undefined) {
+            this.user.email = changes.email;
+        }
+        if (changes.age !== undefined) {
+            this.user.age = changes.age;
+        }
+        return this.user;
+    }
+
+    patch(field: keyof User, value: string | number): void {
+        this.user[field] = value as any;
+    }
+
+    getUser(): User {
+        return this.user;
+    }
+}
+
+class PartialBuilder<T> {
+    private data: Partial<T>;
+
+    constructor() {
+        this.data = {};
+    }
+
+    set<K extends keyof T>(key: K, value: T[K]): this {
+        this.data[key] = value;
+        return this;
+    }
+
+    getData(): Partial<T> {
+        return this.data;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function UserUpdater"),
+        "Expected UserUpdater function: {}",
+        output
+    );
+    assert!(
+        output.contains("UserUpdater.prototype.update") && output.contains("UserUpdater.prototype.patch"),
+        "Expected update and patch methods: {}",
+        output
+    );
+    assert!(
+        output.contains("UserUpdater.prototype.getUser"),
+        "Expected getUser method: {}",
+        output
+    );
+    assert!(
+        output.contains("function PartialBuilder"),
+        "Expected PartialBuilder function: {}",
+        output
+    );
+    assert!(
+        output.contains("PartialBuilder.prototype.set") && output.contains("PartialBuilder.prototype.getData"),
+        "Expected set and getData methods: {}",
+        output
+    );
+}
+
+/// Test: Required mapped type
+/// Verifies that classes using Required<T> mapped type transform correctly to ES5
+#[test]
+fn test_class_es5_required_mapped_type() {
+    let source = r#"
+interface Config {
+    host?: string;
+    port?: number;
+    timeout?: number;
+}
+
+class ConfigValidator {
+    validate(config: Config): Required<Config> {
+        var result = {
+            host: config.host || "localhost",
+            port: config.port || 8080,
+            timeout: config.timeout || 30000
+        };
+        return result;
+    }
+
+    isComplete(config: Config): boolean {
+        return config.host !== undefined && config.port !== undefined && config.timeout !== undefined;
+    }
+
+    fillDefaults(config: Config): Required<Config> {
+        return {
+            host: config.host !== undefined ? config.host : "localhost",
+            port: config.port !== undefined ? config.port : 8080,
+            timeout: config.timeout !== undefined ? config.timeout : 30000
+        };
+    }
+}
+
+class RequiredWrapper<T> {
+    private data: Required<T>;
+
+    constructor(data: Required<T>) {
+        this.data = data;
+    }
+
+    get<K extends keyof T>(key: K): T[K] {
+        return this.data[key];
+    }
+
+    getData(): Required<T> {
+        return this.data;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function ConfigValidator"),
+        "Expected ConfigValidator function: {}",
+        output
+    );
+    assert!(
+        output.contains("ConfigValidator.prototype.validate") && output.contains("ConfigValidator.prototype.isComplete"),
+        "Expected validate and isComplete methods: {}",
+        output
+    );
+    assert!(
+        output.contains("ConfigValidator.prototype.fillDefaults"),
+        "Expected fillDefaults method: {}",
+        output
+    );
+    assert!(
+        output.contains("function RequiredWrapper"),
+        "Expected RequiredWrapper function: {}",
+        output
+    );
+    assert!(
+        output.contains("RequiredWrapper.prototype.get") && output.contains("RequiredWrapper.prototype.getData"),
+        "Expected get and getData methods: {}",
+        output
+    );
+}
+
+/// Test: Readonly mapped type
+/// Verifies that classes using Readonly<T> mapped type transform correctly to ES5
+#[test]
+fn test_class_es5_readonly_mapped_type() {
+    let source = r#"
+interface State {
+    count: number;
+    items: string[];
+    active: boolean;
+}
+
+class StateManager {
+    private state: Readonly<State>;
+
+    constructor(initial: State) {
+        this.state = initial;
+    }
+
+    getState(): Readonly<State> {
+        return this.state;
+    }
+
+    getCount(): number {
+        return this.state.count;
+    }
+
+    createSnapshot(): Readonly<State> {
+        return {
+            count: this.state.count,
+            items: this.state.items.slice(),
+            active: this.state.active
+        };
+    }
+}
+
+class ImmutableWrapper<T> {
+    private data: Readonly<T>;
+
+    constructor(data: T) {
+        this.data = data;
+    }
+
+    get<K extends keyof T>(key: K): T[K] {
+        return this.data[key];
+    }
+
+    clone(): Readonly<T> {
+        return this.data;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function StateManager"),
+        "Expected StateManager function: {}",
+        output
+    );
+    assert!(
+        output.contains("StateManager.prototype.getState") && output.contains("StateManager.prototype.getCount"),
+        "Expected getState and getCount methods: {}",
+        output
+    );
+    assert!(
+        output.contains("StateManager.prototype.createSnapshot"),
+        "Expected createSnapshot method: {}",
+        output
+    );
+    assert!(
+        output.contains("function ImmutableWrapper"),
+        "Expected ImmutableWrapper function: {}",
+        output
+    );
+    assert!(
+        output.contains("ImmutableWrapper.prototype.get") && output.contains("ImmutableWrapper.prototype.clone"),
+        "Expected get and clone methods: {}",
+        output
+    );
+}
+
+/// Test: Pick mapped type
+/// Verifies that classes using Pick<T, K> mapped type transform correctly to ES5
+#[test]
+fn test_class_es5_pick_mapped_type() {
+    let source = r#"
+interface Person {
+    id: number;
+    name: string;
+    email: string;
+    phone: string;
+    address: string;
+}
+
+type ContactInfo = Pick<Person, "email" | "phone">;
+type PersonSummary = Pick<Person, "id" | "name">;
+
+class PersonService {
+    private people: Person[];
+
+    constructor() {
+        this.people = [];
+    }
+
+    add(person: Person): void {
+        this.people.push(person);
+    }
+
+    getContactInfo(id: number): ContactInfo | null {
+        var person = this.findById(id);
+        if (person === null) return null;
+        return { email: person.email, phone: person.phone };
+    }
+
+    getSummary(id: number): PersonSummary | null {
+        var person = this.findById(id);
+        if (person === null) return null;
+        return { id: person.id, name: person.name };
+    }
+
+    findById(id: number): Person | null {
+        for (var i = 0; i < this.people.length; i++) {
+            if (this.people[i].id === id) {
+                return this.people[i];
+            }
+        }
+        return null;
+    }
+}
+
+class PickHelper<T, K extends keyof T> {
+    private source: T;
+
+    constructor(source: T) {
+        this.source = source;
+    }
+
+    pick(key: K): T[K] {
+        return this.source[key];
+    }
+
+    getSource(): T {
+        return this.source;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function PersonService"),
+        "Expected PersonService function: {}",
+        output
+    );
+    assert!(
+        output.contains("PersonService.prototype.add") && output.contains("PersonService.prototype.getContactInfo"),
+        "Expected add and getContactInfo methods: {}",
+        output
+    );
+    assert!(
+        output.contains("PersonService.prototype.getSummary") && output.contains("PersonService.prototype.findById"),
+        "Expected getSummary and findById methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function PickHelper"),
+        "Expected PickHelper function: {}",
+        output
+    );
+    assert!(
+        output.contains("PickHelper.prototype.pick") && output.contains("PickHelper.prototype.getSource"),
+        "Expected pick and getSource methods: {}",
+        output
+    );
+}
+
+/// Test: Omit mapped type
+/// Verifies that classes using Omit<T, K> mapped type transform correctly to ES5
+#[test]
+fn test_class_es5_omit_mapped_type() {
+    let source = r#"
+interface Entity {
+    id: number;
+    createdAt: Date;
+    updatedAt: Date;
+    name: string;
+    data: object;
+}
+
+type CreateEntity = Omit<Entity, "id" | "createdAt" | "updatedAt">;
+type PublicEntity = Omit<Entity, "data">;
+
+class EntityFactory {
+    private nextId: number;
+
+    constructor() {
+        this.nextId = 1;
+    }
+
+    create(input: CreateEntity): Entity {
+        var now = new Date();
+        return {
+            id: this.nextId++,
+            createdAt: now,
+            updatedAt: now,
+            name: input.name,
+            data: input.data
+        };
+    }
+
+    toPublic(entity: Entity): PublicEntity {
+        return {
+            id: entity.id,
+            createdAt: entity.createdAt,
+            updatedAt: entity.updatedAt,
+            name: entity.name
+        };
+    }
+
+    getNextId(): number {
+        return this.nextId;
+    }
+}
+
+class OmitHelper<T, K extends keyof T> {
+    private source: T;
+    private excluded: K[];
+
+    constructor(source: T, excluded: K[]) {
+        this.source = source;
+        this.excluded = excluded;
+    }
+
+    isExcluded(key: K): boolean {
+        return this.excluded.indexOf(key) >= 0;
+    }
+
+    getSource(): T {
+        return this.source;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function EntityFactory"),
+        "Expected EntityFactory function: {}",
+        output
+    );
+    assert!(
+        output.contains("EntityFactory.prototype.create") && output.contains("EntityFactory.prototype.toPublic"),
+        "Expected create and toPublic methods: {}",
+        output
+    );
+    assert!(
+        output.contains("EntityFactory.prototype.getNextId"),
+        "Expected getNextId method: {}",
+        output
+    );
+    assert!(
+        output.contains("function OmitHelper"),
+        "Expected OmitHelper function: {}",
+        output
+    );
+    assert!(
+        output.contains("OmitHelper.prototype.isExcluded") && output.contains("OmitHelper.prototype.getSource"),
+        "Expected isExcluded and getSource methods: {}",
+        output
+    );
+}
+
+/// Test: Record mapped type
+/// Verifies that classes using Record<K, V> mapped type transform correctly to ES5
+#[test]
+fn test_class_es5_record_mapped_type() {
+    let source = r#"
+type StatusCode = "ok" | "error" | "pending";
+type StatusInfo = { message: string; timestamp: number };
+
+class StatusRegistry {
+    private statuses: Record<StatusCode, StatusInfo>;
+
+    constructor() {
+        var now = Date.now();
+        this.statuses = {
+            ok: { message: "Success", timestamp: now },
+            error: { message: "Failed", timestamp: now },
+            pending: { message: "In progress", timestamp: now }
+        };
+    }
+
+    getStatus(code: StatusCode): StatusInfo {
+        return this.statuses[code];
+    }
+
+    updateStatus(code: StatusCode, message: string): void {
+        this.statuses[code] = { message: message, timestamp: Date.now() };
+    }
+
+    getAllStatuses(): Record<StatusCode, StatusInfo> {
+        return this.statuses;
+    }
+}
+
+class RecordStore<K extends string, V> {
+    private data: Record<K, V>;
+
+    constructor(initial: Record<K, V>) {
+        this.data = initial;
+    }
+
+    get(key: K): V {
+        return this.data[key];
+    }
+
+    set(key: K, value: V): void {
+        this.data[key] = value;
+    }
+
+    has(key: K): boolean {
+        return key in this.data;
+    }
+
+    getData(): Record<K, V> {
+        return this.data;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function StatusRegistry"),
+        "Expected StatusRegistry function: {}",
+        output
+    );
+    assert!(
+        output.contains("StatusRegistry.prototype.getStatus") && output.contains("StatusRegistry.prototype.updateStatus"),
+        "Expected getStatus and updateStatus methods: {}",
+        output
+    );
+    assert!(
+        output.contains("StatusRegistry.prototype.getAllStatuses"),
+        "Expected getAllStatuses method: {}",
+        output
+    );
+    assert!(
+        output.contains("function RecordStore"),
+        "Expected RecordStore function: {}",
+        output
+    );
+    assert!(
+        output.contains("RecordStore.prototype.get") && output.contains("RecordStore.prototype.set"),
+        "Expected get and set methods: {}",
+        output
+    );
+    assert!(
+        output.contains("RecordStore.prototype.has") && output.contains("RecordStore.prototype.getData"),
+        "Expected has and getData methods: {}",
+        output
+    );
+}
