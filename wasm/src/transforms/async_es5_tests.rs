@@ -7162,3 +7162,203 @@ fn test_async_method_decorator_conditional() {
         output
     );
 }
+
+// ============================================================================
+// Async class method tests (additional)
+// ============================================================================
+
+fn parse_and_emit_async_class_method_extra(source: &str) -> String {
+    use crate::parser::syntax_kind_ext;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            for &stmt_idx in &source_file.statements.nodes {
+                if let Some(stmt_node) = parser.arena.get(stmt_idx) {
+                    if stmt_node.kind == syntax_kind_ext::CLASS_DECLARATION {
+                        if let Some(class_data) = parser.arena.get_class(stmt_node) {
+                            for &member_idx in &class_data.members.nodes {
+                                if let Some(member_node) = parser.arena.get(member_idx) {
+                                    if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
+                                        if let Some(method_data) = parser.arena.get_method_decl(member_node) {
+                                            let emitter = AsyncES5Emitter::new(&parser.arena);
+                                            let has_await = emitter.body_contains_await(method_data.body);
+                                            let mut emitter = AsyncES5Emitter::new(&parser.arena);
+                                            if has_await {
+                                                return emitter.emit_generator_body_with_await(method_data.body);
+                                            } else {
+                                                return emitter.emit_simple_generator_body(method_data.body);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    String::new()
+}
+
+fn async_class_method_extra_contains_await(source: &str) -> bool {
+    use crate::parser::syntax_kind_ext;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            for &stmt_idx in &source_file.statements.nodes {
+                if let Some(stmt_node) = parser.arena.get(stmt_idx) {
+                    if stmt_node.kind == syntax_kind_ext::CLASS_DECLARATION {
+                        if let Some(class_data) = parser.arena.get_class(stmt_node) {
+                            for &member_idx in &class_data.members.nodes {
+                                if let Some(member_node) = parser.arena.get(member_idx) {
+                                    if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
+                                        if let Some(method_data) = parser.arena.get_method_decl(member_node) {
+                                            let emitter = AsyncES5Emitter::new(&parser.arena);
+                                            return emitter.body_contains_await(method_data.body);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
+#[test]
+fn test_async_class_method_private() {
+    let output = parse_and_emit_async_class_method_extra(
+        "class Foo { async #privateMethod() { await process(); } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Private async method should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_class_method_with_this() {
+    let output = parse_and_emit_async_class_method_extra(
+        "class Foo { value = 1; async bar() { await init(); return this.value; } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Async method with this access should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_class_method_multiple_returns() {
+    let output = parse_and_emit_async_class_method_extra(
+        "class Foo { async bar(cond: boolean) { if (cond) { return await getA(); } return await getB(); } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Async method with multiple returns should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_class_method_body_contains_await_extra() {
+    let result = async_class_method_extra_contains_await(
+        "class Foo { async bar() { await getData(); } }",
+    );
+    assert!(result, "Should detect await in async class method");
+}
+
+#[test]
+fn test_async_class_method_body_no_await_extra() {
+    let result = async_class_method_extra_contains_await(
+        "class Foo { async bar() { return 42; } }",
+    );
+    assert!(!result, "Should not detect await in async class method without await");
+}
+
+#[test]
+fn test_async_class_method_ignores_nested_async_extra() {
+    let result = async_class_method_extra_contains_await(
+        "class Foo { async bar() { const inner = async () => { await x; }; return 1; } }",
+    );
+    assert!(!result, "Should not detect await inside nested async in class method");
+}
+
+#[test]
+fn test_async_class_method_with_super() {
+    let output = parse_and_emit_async_class_method_extra(
+        "class Foo extends Base { async bar() { await super.init(); return 1; } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Async method with super call should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_class_method_generic() {
+    let output = parse_and_emit_async_class_method_extra(
+        "class Foo<T> { async bar(): Promise<T> { return await fetchData<T>(); } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Generic async method should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_class_method_with_finally() {
+    let output = parse_and_emit_async_class_method_extra(
+        "class Foo { async bar() { try { await process(); } finally { cleanup(); } } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Async method with finally should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_class_method_static_extra() {
+    let output = parse_and_emit_async_class_method_extra(
+        "class Foo { static async create() { await init(); return new Foo(); } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Static async method should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_class_method_while_loop() {
+    let output = parse_and_emit_async_class_method_extra(
+        "class Foo { async bar() { while (true) { await tick(); } } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Async method with while loop should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_class_method_conditional_extra() {
+    let output = parse_and_emit_async_class_method_extra(
+        "class Foo { async bar(flag: boolean) { if (flag) { await process(); } return 1; } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Conditional async class method should have switch or yield: {}",
+        output
+    );
+}
