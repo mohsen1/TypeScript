@@ -6,7 +6,7 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-- [ ] (empty - awaiting next task)
+- [ ] Add ES5 tests for Promise patterns (Promise.all, Promise.race, Promise.allSettled, Promise.any, promise chaining in class methods) in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
 
 ## Task Queue
 - [ ] (empty)
