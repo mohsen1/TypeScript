@@ -18241,3 +18241,545 @@ class Schema {
         output
     );
 }
+
+// ============================================================================
+// Class Method Decorator Pattern Tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_method_decorator_factory_pattern() {
+    // Method decorator factory with configurable options
+    let source = r#"
+function timeout(ms: number) {
+    return function(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+        const originalMethod = descriptor.value;
+        descriptor.value = async function(...args: any[]) {
+            return Promise.race([
+                originalMethod.apply(this, args),
+                new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error(`${propertyKey} timed out`)), ms)
+                )
+            ]);
+        };
+        return descriptor;
+    };
+}
+
+function retry(attempts: number, delay: number = 1000) {
+    return function(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+        const originalMethod = descriptor.value;
+        descriptor.value = async function(...args: any[]) {
+            for (let i = 0; i < attempts; i++) {
+                try {
+                    return await originalMethod.apply(this, args);
+                } catch (e) {
+                    if (i === attempts - 1) throw e;
+                    await new Promise(r => setTimeout(r, delay));
+                }
+            }
+        };
+        return descriptor;
+    };
+}
+
+class ApiClient {
+    @timeout(5000)
+    async fetchData(url: string): Promise<any> {
+        const response = await fetch(url);
+        return response.json();
+    }
+
+    @retry(3, 500)
+    async postData(url: string, data: any): Promise<any> {
+        const response = await fetch(url, {
+            method: 'POST',
+            body: JSON.stringify(data)
+        });
+        return response.json();
+    }
+
+    @timeout(10000)
+    @retry(2)
+    async uploadFile(url: string, file: File): Promise<any> {
+        const formData = new FormData();
+        formData.append('file', file);
+        const response = await fetch(url, { method: 'POST', body: formData });
+        return response.json();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function ApiClient") || output.contains("ApiClient"),
+        "Expected ApiClient class: {}",
+        output
+    );
+
+    // Decorator factories should be present
+    assert!(
+        output.contains("timeout") && output.contains("retry"),
+        "Expected decorator factories: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("fetchData") && output.contains("postData") && output.contains("uploadFile"),
+        "Expected API methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_method_decorator_stacked() {
+    // Stacked method decorators executed in order
+    let source = r#"
+function log(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    const original = descriptor.value;
+    descriptor.value = function(...args: any[]) {
+        console.log(`Calling ${propertyKey} with`, args);
+        const result = original.apply(this, args);
+        console.log(`${propertyKey} returned`, result);
+        return result;
+    };
+    return descriptor;
+}
+
+function validate(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    const original = descriptor.value;
+    descriptor.value = function(...args: any[]) {
+        if (args.some(arg => arg === undefined || arg === null)) {
+            throw new Error(`${propertyKey}: Invalid arguments`);
+        }
+        return original.apply(this, args);
+    };
+    return descriptor;
+}
+
+function memoize(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    const cache = new Map<string, any>();
+    const original = descriptor.value;
+    descriptor.value = function(...args: any[]) {
+        const key = JSON.stringify(args);
+        if (cache.has(key)) return cache.get(key);
+        const result = original.apply(this, args);
+        cache.set(key, result);
+        return result;
+    };
+    return descriptor;
+}
+
+function benchmark(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    const original = descriptor.value;
+    descriptor.value = function(...args: any[]) {
+        const start = performance.now();
+        const result = original.apply(this, args);
+        console.log(`${propertyKey} took ${performance.now() - start}ms`);
+        return result;
+    };
+    return descriptor;
+}
+
+class Calculator {
+    @log
+    @validate
+    @memoize
+    @benchmark
+    compute(a: number, b: number, operation: string): number {
+        switch (operation) {
+            case 'add': return a + b;
+            case 'subtract': return a - b;
+            case 'multiply': return a * b;
+            case 'divide': return a / b;
+            default: throw new Error('Unknown operation');
+        }
+    }
+
+    @log
+    @validate
+    factorial(n: number): number {
+        if (n <= 1) return 1;
+        return n * this.factorial(n - 1);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function Calculator") || output.contains("Calculator"),
+        "Expected Calculator class: {}",
+        output
+    );
+
+    // Decorator functions should be present
+    assert!(
+        output.contains("log") && output.contains("validate") && output.contains("memoize"),
+        "Expected decorator functions: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("compute") && output.contains("factorial"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_method_decorator_async() {
+    // Async method decorators
+    let source = r#"
+function asyncLog(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    const original = descriptor.value;
+    descriptor.value = async function(...args: any[]) {
+        console.log(`[${new Date().toISOString()}] Starting ${propertyKey}`);
+        try {
+            const result = await original.apply(this, args);
+            console.log(`[${new Date().toISOString()}] Completed ${propertyKey}`);
+            return result;
+        } catch (error) {
+            console.error(`[${new Date().toISOString()}] Failed ${propertyKey}:`, error);
+            throw error;
+        }
+    };
+    return descriptor;
+}
+
+function measure(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    const original = descriptor.value;
+    descriptor.value = async function(...args: any[]) {
+        const start = Date.now();
+        const result = await original.apply(this, args);
+        console.log(`${propertyKey} execution time: ${Date.now() - start}ms`);
+        return result;
+    };
+    return descriptor;
+}
+
+function cache(ttlMs: number) {
+    return function(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+        const cacheMap = new Map<string, { value: any; expires: number }>();
+        const original = descriptor.value;
+        descriptor.value = async function(...args: any[]) {
+            const key = JSON.stringify(args);
+            const cached = cacheMap.get(key);
+            if (cached && cached.expires > Date.now()) {
+                return cached.value;
+            }
+            const result = await original.apply(this, args);
+            cacheMap.set(key, { value: result, expires: Date.now() + ttlMs });
+            return result;
+        };
+        return descriptor;
+    };
+}
+
+class DataService {
+    @asyncLog
+    @measure
+    async fetchUsers(): Promise<any[]> {
+        const response = await fetch('/api/users');
+        return response.json();
+    }
+
+    @cache(60000)
+    @asyncLog
+    async getUser(id: string): Promise<any> {
+        const response = await fetch(`/api/users/${id}`);
+        return response.json();
+    }
+
+    @asyncLog
+    @measure
+    async saveUser(user: any): Promise<void> {
+        await fetch('/api/users', {
+            method: 'POST',
+            body: JSON.stringify(user)
+        });
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function DataService") || output.contains("DataService"),
+        "Expected DataService class: {}",
+        output
+    );
+
+    // Decorator functions should be present
+    assert!(
+        output.contains("asyncLog") && output.contains("measure"),
+        "Expected async decorator functions: {}",
+        output
+    );
+
+    // Async methods should be present
+    assert!(
+        output.contains("fetchUsers") && output.contains("getUser") && output.contains("saveUser"),
+        "Expected async methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_method_decorator_static() {
+    // Static method decorators
+    let source = r#"
+function singleton(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    let instance: any = null;
+    const original = descriptor.value;
+    descriptor.value = function(...args: any[]) {
+        if (instance === null) {
+            instance = original.apply(this, args);
+        }
+        return instance;
+    };
+    return descriptor;
+}
+
+function deprecated(message: string) {
+    return function(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+        const original = descriptor.value;
+        descriptor.value = function(...args: any[]) {
+            console.warn(`DEPRECATED: ${propertyKey} - ${message}`);
+            return original.apply(this, args);
+        };
+        return descriptor;
+    };
+}
+
+function authorize(roles: string[]) {
+    return function(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+        const original = descriptor.value;
+        descriptor.value = function(...args: any[]) {
+            const currentUser = (this as any).getCurrentUser?.() || {};
+            if (!roles.some(role => currentUser.roles?.includes(role))) {
+                throw new Error('Unauthorized');
+            }
+            return original.apply(this, args);
+        };
+        return descriptor;
+    };
+}
+
+class ServiceFactory {
+    private static instances = new Map<string, any>();
+
+    @singleton
+    static createDatabase(): any {
+        console.log('Creating database connection');
+        return { type: 'database', connected: true };
+    }
+
+    @singleton
+    static createCache(): any {
+        console.log('Creating cache instance');
+        return { type: 'cache', entries: new Map() };
+    }
+
+    @deprecated('Use createDatabase instead')
+    static getDbConnection(): any {
+        return ServiceFactory.createDatabase();
+    }
+
+    @authorize(['admin'])
+    static resetAll(): void {
+        ServiceFactory.instances.clear();
+        console.log('All instances reset');
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function ServiceFactory") || output.contains("ServiceFactory"),
+        "Expected ServiceFactory class: {}",
+        output
+    );
+
+    // Decorator functions should be present
+    assert!(
+        output.contains("singleton") && output.contains("deprecated"),
+        "Expected static decorator functions: {}",
+        output
+    );
+
+    // Static methods should be present
+    assert!(
+        output.contains("createDatabase") && output.contains("createCache"),
+        "Expected static factory methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_method_decorator_combined() {
+    // Combined method and accessor decorators
+    let source = r#"
+function readonly(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    descriptor.writable = false;
+    return descriptor;
+}
+
+function enumerable(value: boolean) {
+    return function(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+        descriptor.enumerable = value;
+        return descriptor;
+    };
+}
+
+function bound(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    const original = descriptor.value;
+    return {
+        configurable: true,
+        get() {
+            const boundFn = original.bind(this);
+            Object.defineProperty(this, propertyKey, {
+                value: boundFn,
+                configurable: true,
+                writable: true
+            });
+            return boundFn;
+        }
+    };
+}
+
+function throttle(ms: number) {
+    return function(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+        let lastCall = 0;
+        const original = descriptor.value;
+        descriptor.value = function(...args: any[]) {
+            const now = Date.now();
+            if (now - lastCall >= ms) {
+                lastCall = now;
+                return original.apply(this, args);
+            }
+        };
+        return descriptor;
+    };
+}
+
+class EventHandler {
+    private events: string[] = [];
+
+    @bound
+    @throttle(100)
+    handleClick(event: any): void {
+        this.events.push('click');
+        console.log('Click handled');
+    }
+
+    @bound
+    @throttle(50)
+    handleScroll(event: any): void {
+        this.events.push('scroll');
+        console.log('Scroll handled');
+    }
+
+    @readonly
+    @enumerable(false)
+    getEventCount(): number {
+        return this.events.length;
+    }
+
+    @enumerable(true)
+    getEvents(): string[] {
+        return [...this.events];
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function EventHandler") || output.contains("EventHandler"),
+        "Expected EventHandler class: {}",
+        output
+    );
+
+    // Decorator functions should be present
+    assert!(
+        output.contains("bound") && output.contains("throttle"),
+        "Expected combined decorator functions: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("handleClick") && output.contains("handleScroll"),
+        "Expected event handler methods: {}",
+        output
+    );
+}
