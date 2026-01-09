@@ -7,7 +7,7 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- (awaiting assignment)
+- [ ] Add decorator ES5 source map tests (class decorators, method decorators, property decorators, parameter decorators, decorator factories) in `wasm/src/source_map_tests.rs`. Run `./wasm/test.sh source_map`.
 
 ## Task Queue
 - [ ] (empty)
