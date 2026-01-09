@@ -2452,6 +2452,14 @@ impl ThinBinderState {
 
             // Enter module scope
             self.enter_scope(ContainerKind::Module, idx);
+
+            // Also register the MODULE_BLOCK body node with the same scope
+            // so that identifiers inside the namespace can find their enclosing scope
+            // when walking up through the parent chain (identifier -> ... -> MODULE_BLOCK -> MODULE_DECLARATION)
+            if !module.body.is_none() {
+                self.node_scope_ids.insert(module.body.0, self.current_scope_id);
+            }
+
             self.bind_node(arena, module.body);
             self.exit_scope();
         }

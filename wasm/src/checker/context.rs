@@ -173,6 +173,19 @@ pub struct CheckerContext<'a> {
     /// All arenas for cross-file resolution (indexed by file_idx from Symbol.decl_file_idx).
     /// Set during multi-file type checking to allow resolving declarations across files.
     pub all_arenas: Option<Vec<Arc<ThinNodeArena>>>,
+
+    /// Lib file contexts for global type resolution (lib.es5.d.ts, lib.dom.d.ts, etc.).
+    /// Each entry is a (arena, binder) pair from a pre-parsed lib file.
+    /// Used as a fallback when resolving type references not found in the main file.
+    pub lib_contexts: Vec<LibContext>,
+}
+
+/// Context for a lib file (arena + binder) for global type resolution.
+pub struct LibContext {
+    /// The AST arena for this lib file.
+    pub arena: Arc<ThinNodeArena>,
+    /// The binder state with symbols from this lib file.
+    pub binder: Arc<ThinBinderState>,
 }
 
 impl<'a> CheckerContext<'a> {
@@ -208,6 +221,7 @@ impl<'a> CheckerContext<'a> {
             enclosing_class: None,
             type_env: RefCell::new(TypeEnvironment::new()),
             all_arenas: None,
+            lib_contexts: Vec::new(),
         }
     }
 
@@ -245,7 +259,13 @@ impl<'a> CheckerContext<'a> {
             enclosing_class: None,
             type_env: RefCell::new(TypeEnvironment::new()),
             all_arenas: None,
+            lib_contexts: Vec::new(),
         }
+    }
+
+    /// Set lib contexts for global type resolution.
+    pub fn set_lib_contexts(&mut self, lib_contexts: Vec<LibContext>) {
+        self.lib_contexts = lib_contexts;
     }
 
     /// Set all arenas for cross-file resolution.

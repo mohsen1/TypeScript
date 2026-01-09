@@ -138,7 +138,7 @@ const ARRAY_METHODS_RETURN_NUMBER: &[&str] = &[
     "push",
     "unshift",
 ];
-const ARRAY_METHODS_RETURN_UNDEFINED: &[&str] = &["forEach", "copyWithin", "fill"];
+const ARRAY_METHODS_RETURN_VOID: &[&str] = &["forEach", "copyWithin", "fill"];
 const ARRAY_METHODS_RETURN_STRING: &[&str] = &["join", "toLocaleString", "toString"];
 
 fn is_member(name: &str, list: &[&str]) -> bool {
@@ -1311,7 +1311,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         for &name in ARRAY_METHODS_RETURN_NUMBER {
             keys.push(self.interner.literal_string(name));
         }
-        for &name in ARRAY_METHODS_RETURN_UNDEFINED {
+        for &name in ARRAY_METHODS_RETURN_VOID {
             keys.push(self.interner.literal_string(name));
         }
         for &name in ARRAY_METHODS_RETURN_STRING {
@@ -1445,8 +1445,8 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         if is_member(name, ARRAY_METHODS_RETURN_NUMBER) {
             return Some(ApparentMemberKind::Method(TypeId::NUMBER));
         }
-        if is_member(name, ARRAY_METHODS_RETURN_UNDEFINED) {
-            return Some(ApparentMemberKind::Method(TypeId::UNDEFINED));
+        if is_member(name, ARRAY_METHODS_RETURN_VOID) {
+            return Some(ApparentMemberKind::Method(TypeId::VOID));
         }
         if is_member(name, ARRAY_METHODS_RETURN_STRING) {
             return Some(ApparentMemberKind::Method(TypeId::STRING));

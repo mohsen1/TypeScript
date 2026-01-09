@@ -128,6 +128,7 @@ pub fn create_binder() -> binder::BinderState {
 // ThinParser WASM Interface (High-Performance Parser)
 // =============================================================================
 
+use std::sync::Arc;
 use crate::emit_context::EmitContext;
 use crate::lowering_pass::LoweringPass;
 use crate::thin_parser::ThinParserState;
@@ -138,6 +139,8 @@ use crate::transform_context::TransformContext;
 use crate::solver::TypeInterner;
 use crate::lsp::position::{LineMap, Position, Range};
 use crate::lsp::resolver::ScopeCache;
+use crate::checker::context::LibContext;
+use crate::parser::thin_node::ThinNodeArena;
 use crate::lsp::{
     GoToDefinition, FindReferences, Completions, HoverProvider, SignatureHelpProvider,
     DocumentSymbolProvider, RenameProvider, SemanticTokensProvider, CodeActionProvider,
@@ -221,6 +224,20 @@ pub struct ThinParser {
     /// Persistent cache for scope resolution across LSP queries.
     /// Invalidated when the file changes.
     scope_cache: ScopeCache,
+    /// Pre-loaded lib files (parsed and bound) for global type resolution
+    lib_files: Vec<LibFile>,
+}
+
+/// Represents a pre-loaded lib file with its AST and symbols
+struct LibFile {
+    #[allow(dead_code)]
+    file_name: String,
+    /// The arena (shared via Arc for use in LibContext)
+    arena: Arc<ThinNodeArena>,
+    /// The binder state (shared via Arc for use in LibContext)
+    binder: Arc<ThinBinderState>,
+    #[allow(dead_code)]
+    source_file_idx: parser::NodeIndex,
 }
 
 #[wasm_bindgen]
@@ -236,7 +253,35 @@ impl ThinParser {
             line_map: None,
             type_cache: None,
             scope_cache: ScopeCache::default(),
+            lib_files: Vec::new(),
         }
+    }
+
+    /// Add a lib file (e.g., lib.es5.d.ts) for global type resolution.
+    /// The lib file will be parsed and bound, and its global symbols will be
+    /// available during type checking.
+    #[wasm_bindgen(js_name = addLibFile)]
+    pub fn add_lib_file(&mut self, file_name: String, source_text: String) {
+        let mut lib_parser = ThinParserState::new(file_name.clone(), source_text);
+        let source_file_idx = lib_parser.parse_source_file();
+
+        let mut lib_binder = ThinBinderState::new();
+        lib_binder.bind_source_file(lib_parser.get_arena(), source_file_idx);
+
+        // Wrap in Arc for sharing with LibContext during type checking
+        let arena = Arc::new(lib_parser.into_arena());
+        let binder = Arc::new(lib_binder);
+
+        self.lib_files.push(LibFile {
+            file_name,
+            arena,
+            binder,
+            source_file_idx,
+        });
+
+        // Invalidate binder since we have new global symbols
+        self.binder = None;
+        self.type_cache = None;
     }
 
     /// Parse the source file and return the root node index.
@@ -326,6 +371,17 @@ impl ThinParser {
                     file_name,
                 )
             };
+
+            // Set up lib contexts for global type resolution (Object, Array, etc.)
+            if !self.lib_files.is_empty() {
+                let lib_contexts: Vec<LibContext> = self.lib_files.iter().map(|lib| {
+                    LibContext {
+                        arena: Arc::clone(&lib.arena),
+                        binder: Arc::clone(&lib.binder),
+                    }
+                }).collect();
+                checker.ctx.set_lib_contexts(lib_contexts);
+            }
 
             // Full source file type checking - traverse all statements
             checker.check_source_file(root_idx);
@@ -627,6 +683,159 @@ impl ThinParser {
         } else {
             result.join("\n")
         }
+    }
+
+    /// Debug namespace scoping - dump scope info for all scopes
+    #[wasm_bindgen(js_name = debugScopes)]
+    pub fn debug_scopes(&self) -> String {
+        let Some(binder) = &self.binder else {
+            return "Binder not initialized. Call parseSourceFile and bindSourceFile first.".to_string();
+        };
+
+        let mut result = Vec::new();
+        result.push(format!("=== Persistent Scopes ({}) ===", binder.scopes.len()));
+
+        for (i, scope) in binder.scopes.iter().enumerate() {
+            result.push(format!("\nScope {} (parent: {:?}, kind: {:?}):", i, scope.parent, scope.kind));
+            result.push(format!("  table entries: {}", scope.table.len()));
+            for (name, sym_id) in scope.table.iter() {
+                if let Some(sym) = binder.symbols.get(*sym_id) {
+                    result.push(format!("    '{}' -> SymbolId({}) [flags: 0x{:x}]", name, sym_id.0, sym.flags));
+                } else {
+                    result.push(format!("    '{}' -> SymbolId({}) [MISSING SYMBOL]", name, sym_id.0));
+                }
+            }
+        }
+
+        result.push(format!("\n=== Node -> Scope Mappings ({}) ===", binder.node_scope_ids.len()));
+        for (&node_idx, &scope_id) in binder.node_scope_ids.iter() {
+            result.push(format!("  NodeIndex({}) -> ScopeId({})", node_idx, scope_id.0));
+        }
+
+        result.push(format!("\n=== File Locals ({}) ===", binder.file_locals.len()));
+        for (name, sym_id) in binder.file_locals.iter() {
+            result.push(format!("  '{}' -> SymbolId({})", name, sym_id.0));
+        }
+
+        result.join("\n")
+    }
+
+    /// Trace the parent chain for a node at a given position
+    #[wasm_bindgen(js_name = traceParentChain)]
+    pub fn trace_parent_chain(&self, pos: u32) -> String {
+        const IDENTIFIER_KIND: u16 = 80; // SyntaxKind::Identifier
+        let arena = self.parser.get_arena();
+        let binder = match &self.binder {
+            Some(b) => b,
+            None => return "Binder not initialized".to_string(),
+        };
+
+        let mut result = Vec::new();
+        result.push(format!("=== Tracing parent chain for position {} ===", pos));
+
+        // Find node at position
+        let mut target_node = None;
+        for i in 0..arena.len() {
+            let idx = parser::NodeIndex(i as u32);
+            if let Some(node) = arena.get(idx) {
+                if node.pos <= pos && pos < node.end && node.kind == IDENTIFIER_KIND {
+                    target_node = Some(idx);
+                    // Don't break - prefer smaller range
+                }
+            }
+        }
+
+        let start_idx = match target_node {
+            Some(idx) => idx,
+            None => return format!("No identifier node found at position {}", pos),
+        };
+
+        result.push(format!("Starting node: {:?}", start_idx));
+
+        let mut current = start_idx;
+        let mut depth = 0;
+        while !current.is_none() && depth < 20 {
+            if let Some(node) = arena.get(current) {
+                let kind_name = format!("kind={}", node.kind);
+                let scope_info = if let Some(&scope_id) = binder.node_scope_ids.get(&current.0) {
+                    format!(" -> ScopeId({})", scope_id.0)
+                } else {
+                    String::new()
+                };
+                result.push(format!("  [{}] NodeIndex({}) {} [pos:{}-{}]{}",
+                    depth, current.0, kind_name, node.pos, node.end, scope_info));
+            }
+
+            if let Some(ext) = arena.get_extended(current) {
+                if ext.parent.is_none() {
+                    result.push(format!("  [{}] Parent is NodeIndex::NONE", depth + 1));
+                    break;
+                }
+                current = ext.parent;
+            } else {
+                result.push(format!("  [{}] No extended info for NodeIndex({})", depth + 1, current.0));
+                break;
+            }
+            depth += 1;
+        }
+
+        result.join("\n")
+    }
+
+    /// Dump variable declaration info for debugging
+    #[wasm_bindgen(js_name = dumpVarDecl)]
+    pub fn dump_var_decl(&self, var_decl_idx: u32) -> String {
+        let arena = self.parser.get_arena();
+        let idx = parser::NodeIndex(var_decl_idx);
+
+        let Some(node) = arena.get(idx) else {
+            return format!("NodeIndex({}) not found", var_decl_idx);
+        };
+
+        let Some(var_decl) = arena.get_variable_declaration(node) else {
+            return format!("NodeIndex({}) is not a VARIABLE_DECLARATION (kind={})", var_decl_idx, node.kind);
+        };
+
+        format!(
+            "VariableDeclaration({}):\n  name: NodeIndex({})\n  type_annotation: NodeIndex({}) (is_none={})\n  initializer: NodeIndex({})",
+            var_decl_idx,
+            var_decl.name.0,
+            var_decl.type_annotation.0,
+            var_decl.type_annotation.is_none(),
+            var_decl.initializer.0
+        )
+    }
+
+    /// Dump all nodes for debugging
+    #[wasm_bindgen(js_name = dumpAllNodes)]
+    pub fn dump_all_nodes(&self, start: u32, count: u32) -> String {
+        let arena = self.parser.get_arena();
+        let mut result = Vec::new();
+
+        for i in start..(start + count).min(arena.len() as u32) {
+            let idx = parser::NodeIndex(i);
+            if let Some(node) = arena.get(idx) {
+                let parent_str = if let Some(ext) = arena.get_extended(idx) {
+                    if ext.parent.is_none() {
+                        "parent:NONE".to_string()
+                    } else {
+                        format!("parent:{}", ext.parent.0)
+                    }
+                } else {
+                    "no-ext".to_string()
+                };
+                // Add identifier text if available
+                let extra = if let Some(ident) = arena.get_identifier(node) {
+                    format!(" \"{}\"", ident.escaped_text)
+                } else {
+                    String::new()
+                };
+                result.push(format!("  NodeIndex({}) kind={} [pos:{}-{}] {}{}",
+                    i, node.kind, node.pos, node.end, parent_str, extra));
+            }
+        }
+
+        result.join("\n")
     }
 
     // =========================================================================
@@ -1012,6 +1221,265 @@ impl ThinParser {
 #[wasm_bindgen(js_name = createThinParser)]
 pub fn create_thin_parser(file_name: String, source_text: String) -> ThinParser {
     ThinParser::new(file_name, source_text)
+}
+
+// =============================================================================
+// WasmProgram - Multi-file TypeScript Program Support
+// =============================================================================
+
+use crate::parallel::{parse_and_bind_parallel, merge_bind_results, MergedProgram, check_functions_parallel};
+
+/// Result of checking a single file in a multi-file program
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FileCheckResultJson {
+    file_name: String,
+    parse_diagnostics: Vec<ParseDiagnosticJson>,
+    check_diagnostics: Vec<CheckDiagnosticJson>,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ParseDiagnosticJson {
+    message: String,
+    start: u32,
+    length: u32,
+    code: u32,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CheckDiagnosticJson {
+    message_text: String,
+    code: u32,
+    start: u32,
+    length: u32,
+    category: String,
+}
+
+/// Multi-file TypeScript program for cross-file type checking.
+///
+/// This struct provides an API for compiling multiple TypeScript files together,
+/// enabling proper module resolution and cross-file type checking.
+///
+/// # Example (JavaScript)
+/// ```javascript
+/// const program = new WasmProgram();
+/// program.addFile("a.ts", "export const x = 1;");
+/// program.addFile("b.ts", "import { x } from './a'; const y = x + 1;");
+/// const result = program.checkAll();
+/// console.log(result);
+/// ```
+#[wasm_bindgen]
+pub struct WasmProgram {
+    /// Accumulated files before compilation
+    files: Vec<(String, String)>,
+    /// Merged program state after compilation (lazy)
+    merged: Option<MergedProgram>,
+    /// Bind results (kept for diagnostics access)
+    bind_results: Option<Vec<BindResult>>,
+}
+
+#[wasm_bindgen]
+impl WasmProgram {
+    /// Create a new empty program.
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> WasmProgram {
+        WasmProgram {
+            files: Vec::new(),
+            merged: None,
+            bind_results: None,
+        }
+    }
+
+    /// Add a file to the program.
+    ///
+    /// Files are accumulated and compiled together when `checkAll` is called.
+    /// The file_name should be a relative path like "src/a.ts".
+    #[wasm_bindgen(js_name = addFile)]
+    pub fn add_file(&mut self, file_name: String, source_text: String) {
+        // Invalidate any previous compilation
+        self.merged = None;
+        self.bind_results = None;
+        self.files.push((file_name, source_text));
+    }
+
+    /// Get the number of files in the program.
+    #[wasm_bindgen(js_name = getFileCount)]
+    pub fn get_file_count(&self) -> usize {
+        self.files.len()
+    }
+
+    /// Clear all files and reset the program state.
+    #[wasm_bindgen]
+    pub fn clear(&mut self) {
+        self.files.clear();
+        self.merged = None;
+        self.bind_results = None;
+    }
+
+    /// Compile all files and return diagnostics as JSON.
+    ///
+    /// This performs:
+    /// 1. Parallel parsing of all files
+    /// 2. Parallel binding of all files
+    /// 3. Symbol merging (sequential)
+    /// 4. Parallel type checking
+    ///
+    /// Returns a JSON object with diagnostics per file.
+    #[wasm_bindgen(js_name = checkAll)]
+    pub fn check_all(&mut self) -> String {
+        if self.files.is_empty() {
+            return r#"{"files":[],"stats":{"totalFiles":0,"totalDiagnostics":0}}"#.to_string();
+        }
+
+        // Parse and bind all files in parallel
+        let bind_results = parse_and_bind_parallel(self.files.clone());
+
+        // Collect parse diagnostics before merging
+        let parse_diags: Vec<Vec<_>> = bind_results.iter()
+            .map(|r| r.parse_diagnostics.clone())
+            .collect();
+        let file_names: Vec<String> = bind_results.iter()
+            .map(|r| r.file_name.clone())
+            .collect();
+
+        // Merge bind results into unified program
+        let merged = merge_bind_results(bind_results);
+
+        // Type check all files in parallel
+        let check_result = check_functions_parallel(&merged);
+
+        // Build JSON result
+        let mut file_results: Vec<FileCheckResultJson> = Vec::new();
+        let mut total_diagnostics = 0;
+
+        for (i, file_name) in file_names.iter().enumerate() {
+            let parse_diagnostics: Vec<ParseDiagnosticJson> = parse_diags[i].iter()
+                .map(|d| ParseDiagnosticJson {
+                    message: d.message.clone(),
+                    start: d.start,
+                    length: d.length,
+                    code: d.code,
+                })
+                .collect();
+
+            // Find check diagnostics for this file
+            let check_diagnostics: Vec<CheckDiagnosticJson> = check_result.file_results
+                .iter()
+                .find(|r| &r.file_name == file_name)
+                .map(|r| r.diagnostics.iter().map(|d| CheckDiagnosticJson {
+                    message_text: d.message_text.clone(),
+                    code: d.code,
+                    start: d.start,
+                    length: d.length,
+                    category: format!("{:?}", d.category),
+                }).collect())
+                .unwrap_or_default();
+
+            total_diagnostics += parse_diagnostics.len() + check_diagnostics.len();
+
+            file_results.push(FileCheckResultJson {
+                file_name: file_name.clone(),
+                parse_diagnostics,
+                check_diagnostics,
+            });
+        }
+
+        // Store merged program for potential future queries
+        self.merged = Some(merged);
+
+        let result = serde_json::json!({
+            "files": file_results,
+            "stats": {
+                "totalFiles": file_names.len(),
+                "totalDiagnostics": total_diagnostics,
+            }
+        });
+
+        serde_json::to_string(&result).unwrap_or_else(|_| "{}".to_string())
+    }
+
+    /// Get diagnostic codes for all files (for conformance testing).
+    ///
+    /// Returns a JSON object mapping file names to arrays of error codes.
+    #[wasm_bindgen(js_name = getDiagnosticCodes)]
+    pub fn get_diagnostic_codes(&mut self) -> String {
+        if self.files.is_empty() {
+            return "{}".to_string();
+        }
+
+        // Parse and bind all files in parallel
+        let bind_results = parse_and_bind_parallel(self.files.clone());
+
+        // Collect parse diagnostic codes
+        let mut file_codes: std::collections::HashMap<String, Vec<u32>> = std::collections::HashMap::new();
+        for result in &bind_results {
+            let codes: Vec<u32> = result.parse_diagnostics.iter().map(|d| d.code).collect();
+            file_codes.insert(result.file_name.clone(), codes);
+        }
+
+        // Merge and check
+        let merged = merge_bind_results(bind_results);
+        let check_result = check_functions_parallel(&merged);
+
+        // Add check diagnostic codes
+        for file_result in &check_result.file_results {
+            let entry = file_codes.entry(file_result.file_name.clone()).or_default();
+            for diag in &file_result.diagnostics {
+                entry.push(diag.code);
+            }
+        }
+
+        // Store merged program
+        self.merged = Some(merged);
+
+        serde_json::to_string(&file_codes).unwrap_or_else(|_| "{}".to_string())
+    }
+
+    /// Get all diagnostic codes as a flat array (for simple conformance comparison).
+    ///
+    /// This combines all parse and check diagnostics from all files into a single
+    /// array of error codes, which can be compared against tsc output.
+    #[wasm_bindgen(js_name = getAllDiagnosticCodes)]
+    pub fn get_all_diagnostic_codes(&mut self) -> Vec<u32> {
+        if self.files.is_empty() {
+            return Vec::new();
+        }
+
+        // Parse and bind all files in parallel
+        let bind_results = parse_and_bind_parallel(self.files.clone());
+
+        // Collect all parse diagnostic codes
+        let mut all_codes: Vec<u32> = Vec::new();
+        for result in &bind_results {
+            for diag in &result.parse_diagnostics {
+                all_codes.push(diag.code);
+            }
+        }
+
+        // Merge and check
+        let merged = merge_bind_results(bind_results);
+        let check_result = check_functions_parallel(&merged);
+
+        // Add all check diagnostic codes
+        for file_result in &check_result.file_results {
+            for diag in &file_result.diagnostics {
+                all_codes.push(diag.code);
+            }
+        }
+
+        // Store merged program
+        self.merged = Some(merged);
+
+        all_codes
+    }
+}
+
+/// Create a new multi-file program.
+#[wasm_bindgen(js_name = createProgram)]
+pub fn create_program() -> WasmProgram {
+    WasmProgram::new()
 }
 
 // =============================================================================

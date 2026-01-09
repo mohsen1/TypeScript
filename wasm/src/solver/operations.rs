@@ -2002,9 +2002,9 @@ impl<'a> PropertyAccessEvaluator<'a> {
                         let callback = self.array_callback_type(
                             element_type,
                             array_of_element,
-                            TypeId::UNDEFINED,
+                            TypeId::VOID,
                         );
-                        (vec![self.param(callback, false, false), self.param(TypeId::ANY, true, false)], TypeId::UNDEFINED)
+                        (vec![self.param(callback, false, false), self.param(TypeId::ANY, true, false)], TypeId::VOID)
                     }
                     "copyWithin" => (
                         vec![

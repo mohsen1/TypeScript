@@ -7820,6 +7820,12 @@ impl ThinParserState {
         &self.arena
     }
 
+    /// Consume the parser and return the arena.
+    /// This is used for lib files where we need to store the arena in an Arc.
+    pub fn into_arena(self) -> ThinNodeArena {
+        self.arena
+    }
+
     /// Get node count
     pub fn get_node_count(&self) -> usize {
         self.arena.len()
