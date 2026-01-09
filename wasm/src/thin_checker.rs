@@ -4582,7 +4582,6 @@ impl<'a> ThinCheckerState<'a> {
     /// Get type of function declaration/expression/arrow.
     fn get_type_of_function(&mut self, idx: NodeIndex) -> TypeId {
         use crate::solver::{FunctionShape, ParamInfo};
-        use std::sync::Arc;
 
         let Some(node) = self.ctx.arena.get(idx) else {
             return TypeId::ANY;
@@ -4591,6 +4590,9 @@ impl<'a> ThinCheckerState<'a> {
         let Some(func) = self.ctx.arena.get_function(node) else {
             return TypeId::ANY;
         };
+
+        // Function declarations don't report implicit any for parameters (handled by check_statement)
+        let is_function_declaration = node.kind == syntax_kind_ext::FUNCTION_DECLARATION;
 
         let (type_params, type_param_updates) = self.push_type_parameters(&func.type_parameters);
 
