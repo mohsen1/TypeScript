@@ -38307,3 +38307,794 @@ class ManagedResourcePool extends ResourcePool {
         output
     );
 }
+
+// =============================================================================
+// SUPER() ORDERING EDGE CASES IN DERIVED CONSTRUCTORS
+// =============================================================================
+
+/// Test super() with field initializers before and after in derived class
+#[test]
+fn test_class_es5_super_with_field_initializers() {
+    let source = r#"
+class Base {
+    baseValue: number;
+    constructor(value: number) {
+        this.baseValue = value;
+    }
+    getBaseValue(): number {
+        return this.baseValue;
+    }
+}
+
+class Derived extends Base {
+    derivedBefore: string = "before";
+    derivedAfter: string;
+
+    constructor(value: number, after: string) {
+        super(value);
+        this.derivedAfter = after;
+    }
+
+    getValues(): { before: string; after: string; base: number } {
+        return {
+            before: this.derivedBefore,
+            after: this.derivedAfter,
+            base: this.baseValue
+        };
+    }
+}
+
+class MultiFieldDerived extends Base {
+    field1: number = 1;
+    field2: number = 2;
+    field3: number = 3;
+    computed: number;
+
+    constructor(value: number) {
+        super(value);
+        this.computed = this.field1 + this.field2 + this.field3;
+    }
+
+    getSum(): number {
+        return this.field1 + this.field2 + this.field3 + this.computed;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Base class should be ES5 constructor
+    assert!(
+        output.contains("function Base"),
+        "Expected ES5 Base class: {}",
+        output
+    );
+
+    // Derived class should be ES5 constructor
+    assert!(
+        output.contains("function Derived"),
+        "Expected ES5 Derived class: {}",
+        output
+    );
+
+    // MultiFieldDerived class should be ES5 constructor
+    assert!(
+        output.contains("function MultiFieldDerived"),
+        "Expected ES5 MultiFieldDerived class: {}",
+        output
+    );
+
+    // Should have _super call pattern
+    assert!(
+        output.contains("_super.call(this"),
+        "Expected _super.call(this) pattern: {}",
+        output
+    );
+
+    // Field initializers should be present
+    assert!(
+        output.contains("\"before\""),
+        "Expected field initializer 'before': {}",
+        output
+    );
+}
+
+/// Test super() with parameter properties in derived class
+#[test]
+fn test_class_es5_super_with_parameter_properties() {
+    let source = r#"
+class Animal {
+    name: string;
+    constructor(name: string) {
+        this.name = name;
+    }
+    speak(): string {
+        return this.name + " makes a sound";
+    }
+}
+
+class Dog extends Animal {
+    constructor(name: string, public breed: string, private age: number) {
+        super(name);
+    }
+
+    getBreed(): string {
+        return this.breed;
+    }
+
+    getAge(): number {
+        return this.age;
+    }
+
+    describe(): string {
+        return `${this.name} is a ${this.breed} aged ${this.age}`;
+    }
+}
+
+class Cat extends Animal {
+    constructor(
+        name: string,
+        public readonly color: string,
+        protected weight: number,
+        private indoor: boolean = true
+    ) {
+        super(name);
+    }
+
+    getColor(): string {
+        return this.color;
+    }
+
+    isIndoor(): boolean {
+        return this.indoor;
+    }
+
+    getWeight(): number {
+        return this.weight;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Animal class should be ES5 constructor
+    assert!(
+        output.contains("function Animal"),
+        "Expected ES5 Animal class: {}",
+        output
+    );
+
+    // Dog class should be ES5 constructor
+    assert!(
+        output.contains("function Dog"),
+        "Expected ES5 Dog class: {}",
+        output
+    );
+
+    // Cat class should be ES5 constructor
+    assert!(
+        output.contains("function Cat"),
+        "Expected ES5 Cat class: {}",
+        output
+    );
+
+    // Parameter properties should be assigned in constructor
+    assert!(
+        output.contains("this.breed") || output.contains(".breed ="),
+        "Expected breed parameter property: {}",
+        output
+    );
+
+    // Methods should be on prototype
+    assert!(
+        output.contains("getBreed") && output.contains("getAge") && output.contains("describe"),
+        "Expected Dog methods: {}",
+        output
+    );
+}
+
+/// Test super() with private field initialization in derived class
+#[test]
+fn test_class_es5_super_with_private_fields() {
+    let source = r#"
+class SecureBase {
+    protected id: string;
+
+    constructor(id: string) {
+        this.id = id;
+    }
+
+    getId(): string {
+        return this.id;
+    }
+}
+
+class SecureDerived extends SecureBase {
+    #secret: string = "hidden";
+    #token: string;
+
+    constructor(id: string, token: string) {
+        super(id);
+        this.#token = token;
+    }
+
+    getSecret(): string {
+        return this.#secret;
+    }
+
+    getToken(): string {
+        return this.#token;
+    }
+
+    validate(): boolean {
+        return this.#token.length > 0 && this.#secret.length > 0;
+    }
+}
+
+class MultiPrivateDerived extends SecureBase {
+    #field1: number = 1;
+    #field2: number = 2;
+    #computed: number;
+
+    constructor(id: string) {
+        super(id);
+        this.#computed = this.#field1 + this.#field2;
+    }
+
+    getComputed(): number {
+        return this.#computed;
+    }
+
+    updateFields(a: number, b: number): void {
+        this.#field1 = a;
+        this.#field2 = b;
+        this.#computed = a + b;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // SecureBase class should be ES5 constructor
+    assert!(
+        output.contains("function SecureBase"),
+        "Expected ES5 SecureBase class: {}",
+        output
+    );
+
+    // SecureDerived class should be ES5 constructor
+    assert!(
+        output.contains("function SecureDerived"),
+        "Expected ES5 SecureDerived class: {}",
+        output
+    );
+
+    // MultiPrivateDerived class should be ES5 constructor
+    assert!(
+        output.contains("function MultiPrivateDerived"),
+        "Expected ES5 MultiPrivateDerived class: {}",
+        output
+    );
+
+    // Private field helpers should be present
+    assert!(
+        output.contains("__classPrivateFieldSet") || output.contains("__classPrivateFieldGet") || output.contains("_secret") || output.contains("_token"),
+        "Expected private field handling: {}",
+        output
+    );
+
+    // Methods should be on prototype
+    assert!(
+        output.contains("getSecret") && output.contains("getToken") && output.contains("validate"),
+        "Expected SecureDerived methods: {}",
+        output
+    );
+}
+
+/// Test super() inside try/catch block in derived constructor
+#[test]
+fn test_class_es5_super_try_catch_ordering() {
+    let source = r#"
+class RiskyBase {
+    value: number;
+
+    constructor(value: number) {
+        if (value < 0) {
+            throw new Error("Negative value");
+        }
+        this.value = value;
+    }
+
+    getValue(): number {
+        return this.value;
+    }
+}
+
+class SafeDerived extends RiskyBase {
+    fallbackValue: number;
+    initialized: boolean = false;
+
+    constructor(value: number, fallback: number) {
+        try {
+            super(value);
+            this.initialized = true;
+        } catch (e) {
+            super(fallback);
+            this.fallbackValue = fallback;
+        }
+    }
+
+    wasSuccessful(): boolean {
+        return this.initialized;
+    }
+
+    getFallback(): number {
+        return this.fallbackValue;
+    }
+}
+
+class NestedTryCatchDerived extends RiskyBase {
+    status: string = "pending";
+    errorCount: number = 0;
+
+    constructor(value: number) {
+        try {
+            try {
+                super(value);
+                this.status = "success";
+            } catch (innerError) {
+                this.errorCount++;
+                throw innerError;
+            }
+        } catch (outerError) {
+            super(0);
+            this.status = "fallback";
+            this.errorCount++;
+        }
+    }
+
+    getStatus(): string {
+        return this.status;
+    }
+
+    getErrorCount(): number {
+        return this.errorCount;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // RiskyBase class should be ES5 constructor
+    assert!(
+        output.contains("function RiskyBase"),
+        "Expected ES5 RiskyBase class: {}",
+        output
+    );
+
+    // SafeDerived class should be ES5 constructor
+    assert!(
+        output.contains("function SafeDerived"),
+        "Expected ES5 SafeDerived class: {}",
+        output
+    );
+
+    // NestedTryCatchDerived class should be ES5 constructor
+    assert!(
+        output.contains("function NestedTryCatchDerived"),
+        "Expected ES5 NestedTryCatchDerived class: {}",
+        output
+    );
+
+    // Should have _super call pattern
+    assert!(
+        output.contains("_super.call(this") || output.contains("_this"),
+        "Expected _super or _this pattern: {}",
+        output
+    );
+
+    // Methods should be on prototype
+    assert!(
+        output.contains("wasSuccessful") && output.contains("getFallback"),
+        "Expected SafeDerived methods: {}",
+        output
+    );
+}
+
+/// Test super() with conditional field initialization in derived constructor
+#[test]
+fn test_class_es5_super_with_conditional_fields() {
+    let source = r#"
+class ConfigBase {
+    mode: string;
+
+    constructor(mode: string) {
+        this.mode = mode;
+    }
+
+    getMode(): string {
+        return this.mode;
+    }
+}
+
+class ConditionalDerived extends ConfigBase {
+    debugEnabled: boolean;
+    logLevel: string;
+    maxRetries: number;
+
+    constructor(mode: string, debug?: boolean) {
+        super(mode);
+        this.debugEnabled = debug ?? false;
+        this.logLevel = this.debugEnabled ? "debug" : "info";
+        this.maxRetries = mode === "production" ? 3 : 10;
+    }
+
+    isDebug(): boolean {
+        return this.debugEnabled;
+    }
+
+    getLogLevel(): string {
+        return this.logLevel;
+    }
+
+    getMaxRetries(): number {
+        return this.maxRetries;
+    }
+}
+
+class TernaryFieldDerived extends ConfigBase {
+    timeout: number;
+    bufferSize: number;
+    enableCache: boolean;
+
+    constructor(mode: string, options?: { timeout?: number; buffer?: number }) {
+        super(mode);
+        this.timeout = options?.timeout ?? (mode === "fast" ? 1000 : 5000);
+        this.bufferSize = options?.buffer ?? 1024;
+        this.enableCache = mode !== "debug";
+    }
+
+    getTimeout(): number {
+        return this.timeout;
+    }
+
+    getBufferSize(): number {
+        return this.bufferSize;
+    }
+
+    isCacheEnabled(): boolean {
+        return this.enableCache;
+    }
+
+    configure(timeout: number, buffer: number): void {
+        this.timeout = timeout;
+        this.bufferSize = buffer;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // ConfigBase class should be ES5 constructor
+    assert!(
+        output.contains("function ConfigBase"),
+        "Expected ES5 ConfigBase class: {}",
+        output
+    );
+
+    // ConditionalDerived class should be ES5 constructor
+    assert!(
+        output.contains("function ConditionalDerived"),
+        "Expected ES5 ConditionalDerived class: {}",
+        output
+    );
+
+    // TernaryFieldDerived class should be ES5 constructor
+    assert!(
+        output.contains("function TernaryFieldDerived"),
+        "Expected ES5 TernaryFieldDerived class: {}",
+        output
+    );
+
+    // Methods should be on prototype
+    assert!(
+        output.contains("isDebug") && output.contains("getLogLevel") && output.contains("getMaxRetries"),
+        "Expected ConditionalDerived methods: {}",
+        output
+    );
+
+    // TernaryFieldDerived methods
+    assert!(
+        output.contains("getTimeout") && output.contains("getBufferSize") && output.contains("configure"),
+        "Expected TernaryFieldDerived methods: {}",
+        output
+    );
+}
+
+/// Test combined super() ordering patterns with multiple inheritance levels
+#[test]
+fn test_class_es5_super_combined_patterns() {
+    let source = r#"
+class Entity {
+    id: string;
+    createdAt: Date;
+
+    constructor(id: string) {
+        this.id = id;
+        this.createdAt = new Date();
+    }
+
+    getId(): string {
+        return this.id;
+    }
+
+    getCreatedAt(): Date {
+        return this.createdAt;
+    }
+}
+
+class NamedEntity extends Entity {
+    name: string;
+    displayName: string;
+
+    constructor(id: string, name: string) {
+        super(id);
+        this.name = name;
+        this.displayName = name.toUpperCase();
+    }
+
+    getName(): string {
+        return this.name;
+    }
+
+    getDisplayName(): string {
+        return this.displayName;
+    }
+
+    rename(newName: string): void {
+        this.name = newName;
+        this.displayName = newName.toUpperCase();
+    }
+}
+
+class User extends NamedEntity {
+    #password: string;
+    email: string;
+    role: string = "user";
+    active: boolean = true;
+    loginCount: number = 0;
+
+    constructor(id: string, name: string, email: string, password: string) {
+        super(id, name);
+        this.email = email;
+        this.#password = password;
+    }
+
+    getEmail(): string {
+        return this.email;
+    }
+
+    getRole(): string {
+        return this.role;
+    }
+
+    isActive(): boolean {
+        return this.active;
+    }
+
+    setRole(role: string): void {
+        this.role = role;
+    }
+
+    deactivate(): void {
+        this.active = false;
+    }
+
+    login(): void {
+        this.loginCount++;
+    }
+
+    getLoginCount(): number {
+        return this.loginCount;
+    }
+
+    validatePassword(input: string): boolean {
+        return this.#password === input;
+    }
+}
+
+class Admin extends User {
+    permissions: string[] = [];
+    level: number;
+    department: string;
+
+    constructor(
+        id: string,
+        name: string,
+        email: string,
+        password: string,
+        public adminCode: string,
+        level: number = 1
+    ) {
+        super(id, name, email, password);
+        this.role = "admin";
+        this.level = level;
+        this.department = "IT";
+    }
+
+    getPermissions(): string[] {
+        return this.permissions;
+    }
+
+    addPermission(permission: string): void {
+        this.permissions.push(permission);
+    }
+
+    getLevel(): number {
+        return this.level;
+    }
+
+    getDepartment(): string {
+        return this.department;
+    }
+
+    setDepartment(dept: string): void {
+        this.department = dept;
+    }
+
+    getAdminCode(): string {
+        return this.adminCode;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Entity class should be ES5 constructor
+    assert!(
+        output.contains("function Entity"),
+        "Expected ES5 Entity class: {}",
+        output
+    );
+
+    // NamedEntity class should be ES5 constructor
+    assert!(
+        output.contains("function NamedEntity"),
+        "Expected ES5 NamedEntity class: {}",
+        output
+    );
+
+    // User class should be ES5 constructor
+    assert!(
+        output.contains("function User"),
+        "Expected ES5 User class: {}",
+        output
+    );
+
+    // Admin class should be ES5 constructor
+    assert!(
+        output.contains("function Admin"),
+        "Expected ES5 Admin class: {}",
+        output
+    );
+
+    // Should have _super call pattern in derived classes
+    assert!(
+        output.contains("_super.call(this"),
+        "Expected _super.call(this) pattern: {}",
+        output
+    );
+
+    // Entity methods
+    assert!(
+        output.contains("getId") && output.contains("getCreatedAt"),
+        "Expected Entity methods: {}",
+        output
+    );
+
+    // NamedEntity methods
+    assert!(
+        output.contains("getName") && output.contains("getDisplayName") && output.contains("rename"),
+        "Expected NamedEntity methods: {}",
+        output
+    );
+
+    // User methods
+    assert!(
+        output.contains("getEmail") && output.contains("getRole") && output.contains("login") && output.contains("validatePassword"),
+        "Expected User methods: {}",
+        output
+    );
+
+    // Admin methods
+    assert!(
+        output.contains("getPermissions") && output.contains("addPermission") && output.contains("getLevel") && output.contains("getAdminCode"),
+        "Expected Admin methods: {}",
+        output
+    );
+
+    // Field initializers should be present
+    assert!(
+        output.contains("\"user\"") && output.contains("\"admin\""),
+        "Expected role field initializers: {}",
+        output
+    );
+}
