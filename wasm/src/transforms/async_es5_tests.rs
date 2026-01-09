@@ -13268,3 +13268,104 @@ fn test_async_super_computed_ignores_nested() {
     );
     assert!(!result, "Should not detect await inside nested async with super[key]");
 }
+
+// ============================================================================
+// ASYNC PRIVATE FIELD ACCESS PATTERN TESTS
+// Tests for private field access in async methods: #field, #method
+// ============================================================================
+
+#[test]
+fn test_async_privfield_read() {
+    let result = async_error_propagation_contains_await(
+        "async function readPrivate() { return await this.#field; }",
+    );
+    assert!(result, "Should detect await in async method reading #privateField");
+}
+
+#[test]
+fn test_async_privfield_write() {
+    let result = async_error_propagation_contains_await(
+        "async function writePrivate() { this.#field = await getValue(); }",
+    );
+    assert!(result, "Should detect await in async method writing #privateField");
+}
+
+#[test]
+fn test_async_privfield_method_call() {
+    let result = async_error_propagation_contains_await(
+        "async function callPrivate() { return await this.#privateMethod(); }",
+    );
+    assert!(result, "Should detect await in async method with #privateMethod call");
+}
+
+#[test]
+fn test_async_privfield_static() {
+    let result = async_error_propagation_contains_await(
+        "async function staticPrivate() { return await this.#staticPrivate; }",
+    );
+    assert!(result, "Should detect await in async static with #staticPrivate");
+}
+
+#[test]
+fn test_async_privfield_arrow_capture() {
+    let result = async_error_propagation_contains_await(
+        "async function arrowCapture() { const fn = () => this.#field; return await process(fn()); }",
+    );
+    assert!(result, "Should detect await in async arrow with private field capture");
+}
+
+#[test]
+fn test_async_privfield_accessor() {
+    let result = async_error_propagation_contains_await(
+        "async function accessor() { return await this.#getter; }",
+    );
+    assert!(result, "Should detect await in async with private accessor");
+}
+
+#[test]
+fn test_async_privfield_try_catch() {
+    let result = async_error_propagation_contains_await(
+        "async function tryCatch() { try { return await this.#field; } catch { return null; } }",
+    );
+    assert!(result, "Should detect await in private field in try/catch async");
+}
+
+#[test]
+fn test_async_privfield_multiple() {
+    let result = async_error_propagation_contains_await(
+        "async function multiple() { await this.#field1; await this.#field2; }",
+    );
+    assert!(result, "Should detect await in multiple private fields in async");
+}
+
+#[test]
+fn test_async_privfield_increment() {
+    let result = async_error_propagation_contains_await(
+        "async function increment() { this.#count++; return await this.#save(); }",
+    );
+    assert!(result, "Should detect await in private field increment in async");
+}
+
+#[test]
+fn test_async_privfield_compound() {
+    let result = async_error_propagation_contains_await(
+        "async function compound() { this.#value += await getDelta(); }",
+    );
+    assert!(result, "Should detect await in private field compound assignment");
+}
+
+#[test]
+fn test_async_privfield_no_await() {
+    let result = async_error_propagation_contains_await(
+        "async function syncPrivate() { return this.#field; }",
+    );
+    assert!(!result, "Should not detect await when private field access is sync");
+}
+
+#[test]
+fn test_async_privfield_ignores_nested() {
+    let result = async_error_propagation_contains_await(
+        "async function outer() { const fn = async () => await this.#field; }",
+    );
+    assert!(!result, "Should not detect await inside nested async with private field");
+}

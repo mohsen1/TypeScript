@@ -7,34 +7,14 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-Add async ES5 tests for private field access in async methods
-
-Per GOALS.md Objective 1: ES5 downleveling correctness
-
-Steps:
-1. Add 12 async private field tests to `wasm/src/transforms/async_es5_tests.rs`:
-   - async method reading #privateField
-   - async method writing #privateField
-   - async method with #privateMethod call
-   - async static with #staticPrivate
-   - async arrow with private field capture
-   - async with private accessor
-   - private field in try/catch async
-   - multiple private fields in async
-   - private field increment in async
-   - body_contains_await tests for private patterns
-   - ignores nested async patterns
-   - Combined private field async patterns
-2. Run `./wasm/test.sh async_es5_tests` to verify all tests pass
-3. Commit with message: `[wasm] async_es5: add private field access tests`
-4. Push to `origin/worker/anvil-5`
-5. Update this plan file and push
+None - awaiting new task
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)
 
 
 ## Completed
+- [x] Added 12 async private field access tests (read, write, method_call, static, arrow_capture, accessor, try_catch, multiple, increment, compound, no await, ignores nested) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (1000 tests PASS).
 - [x] Added 12 async computed super property access tests (computed_key, computed_call, string_key, symbol, computed_read, computed_write, try_catch, chain, conditional, template, no await, ignores nested) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (988 tests PASS).
 - [x] Added 12 async derived class edge case tests (field_initializer, arrow_after_super, super_method, static_this, nested_arrow_this, param_property, generator, multiple_fields, computed_field, super_property, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (976 tests PASS).
 - [x] Added 12 async transaction pattern tests (begin, commit, rollback, savepoint, nested, timeout, try_catch, conditional, isolation, execute, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (964 tests PASS).
