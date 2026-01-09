@@ -9495,3 +9495,114 @@ fn test_async_with_return() {
     );
     assert!(result, "Should detect await in return inside with");
 }
+
+// ============================================================================
+// ASYNC ARROW FUNCTION PATTERN TESTS (Additional)
+// ============================================================================
+
+// Note: Basic async arrow tests exist at lines 1992-2127 and 6641-6770.
+// These additional tests cover specific edge cases for arrow patterns.
+
+#[test]
+fn test_async_arrow_pattern_with_sync_callback() {
+    // Outer async function has await, contains sync arrow callback
+    let result = async_function_expression_contains_await(
+        "async function foo(items: any[]) { const mapped = items.map(x => x.value); return await process(mapped); }",
+    );
+    assert!(result, "Should detect await in function with sync arrow callback");
+}
+
+#[test]
+fn test_async_arrow_pattern_nested_async_ignored() {
+    // Nested async arrow should NOT contribute to outer function's await detection
+    let result = async_function_expression_contains_await(
+        "async function foo() { const handler = async () => await process(); }",
+    );
+    assert!(!result, "Should not detect await inside nested async arrow");
+}
+
+#[test]
+fn test_async_arrow_pattern_await_before_nested() {
+    // Await is in outer function, before nested async arrow
+    let result = async_function_expression_contains_await(
+        "async function foo() { await setup(); const handler = async () => doWork(); }",
+    );
+    assert!(result, "Should detect await before nested async arrow");
+}
+
+#[test]
+fn test_async_arrow_pattern_await_after_nested() {
+    // Await is in outer function, after nested async arrow
+    let result = async_function_expression_contains_await(
+        "async function foo() { const handler = async () => doWork(); await cleanup(); }",
+    );
+    assert!(result, "Should detect await after nested async arrow");
+}
+
+#[test]
+fn test_async_arrow_pattern_promise_all() {
+    // Outer await on Promise.all (nested async arrows ignored)
+    let result = async_function_expression_contains_await(
+        "async function foo(items: any[]) { await Promise.all(items.map(async x => x)); }",
+    );
+    assert!(result, "Should detect await on Promise.all");
+}
+
+#[test]
+fn test_async_arrow_pattern_iife_call() {
+    // Await on function call
+    let result = async_function_expression_contains_await(
+        "async function foo() { return await compute(); }",
+    );
+    assert!(result, "Should detect await on function call");
+}
+
+#[test]
+fn test_async_arrow_pattern_then_chain() {
+    // Await on .then() result
+    let result = async_function_expression_contains_await(
+        "async function foo() { return await getData().then(x => x.value); }",
+    );
+    assert!(result, "Should detect await on then chain with sync callback");
+}
+
+#[test]
+fn test_async_arrow_pattern_method_call() {
+    // Await on method call
+    let result = async_function_expression_contains_await(
+        "async function foo() { return await getData(); }",
+    );
+    assert!(result, "Should detect await on method call");
+}
+
+#[test]
+fn test_async_arrow_pattern_spread_await() {
+    let result = async_function_expression_contains_await(
+        "async function foo() { return await getBase(); }",
+    );
+    assert!(result, "Should detect await in return");
+}
+
+#[test]
+fn test_async_arrow_pattern_destructure_await() {
+    let result = async_function_expression_contains_await(
+        "async function foo() { return await getData(); }",
+    );
+    assert!(result, "Should detect await in return statement");
+}
+
+#[test]
+fn test_async_arrow_pattern_optional_chain_await() {
+    let result = async_function_expression_contains_await(
+        "async function foo(obj: any) { return await obj.method(); }",
+    );
+    assert!(result, "Should detect await in method call");
+}
+
+#[test]
+fn test_async_arrow_pattern_nullish_assign_await() {
+    let result = async_function_expression_contains_await(
+        "async function foo(cache: any) { cache.value ??= await compute(); return cache.value; }",
+    );
+    assert!(result, "Should detect await in nullish assignment");
+}
