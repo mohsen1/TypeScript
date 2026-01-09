@@ -14534,3 +14534,601 @@ fn test_infer_function_overload_selection() {
     let result = ctx.resolve_with_constraints(var_t).unwrap();
     assert_eq!(result, TypeId::STRING);
 }
+
+// =============================================================================
+// Circular Constraint Edge Case Tests
+// =============================================================================
+// These tests cover additional edge cases for circular constraints including
+// deep cycles, mutual recursion, intersection/union constraints, and complex
+// type relationships.
+
+#[test]
+fn test_circular_constraint_five_way_cycle() {
+    // Test: A extends B, B extends C, C extends D, D extends E, E extends A
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let a_name = interner.intern_string("A");
+    let b_name = interner.intern_string("B");
+    let c_name = interner.intern_string("C");
+    let d_name = interner.intern_string("D");
+    let e_name = interner.intern_string("E");
+
+    let var_a = ctx.fresh_type_param(a_name);
+    let var_b = ctx.fresh_type_param(b_name);
+    let var_c = ctx.fresh_type_param(c_name);
+    let var_d = ctx.fresh_type_param(d_name);
+    let var_e = ctx.fresh_type_param(e_name);
+
+    // Create the 5-way cycle
+    ctx.add_upper_bound(var_a, var_b);
+    ctx.add_upper_bound(var_b, var_c);
+    ctx.add_upper_bound(var_c, var_d);
+    ctx.add_upper_bound(var_d, var_e);
+    ctx.add_upper_bound(var_e, var_a);
+
+    // Give one a concrete lower bound
+    ctx.add_lower_bound(var_c, TypeId::NUMBER);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+    assert_eq!(results.len(), 5);
+    // All should resolve to number due to cycle
+    for (_, resolved) in &results {
+        assert_eq!(*resolved, TypeId::NUMBER);
+    }
+}
+
+#[test]
+fn test_circular_constraint_diamond_pattern() {
+    // Test: T extends A & B, A extends Base, B extends Base
+    // Diamond inheritance pattern
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let t_name = interner.intern_string("T");
+    let a_name = interner.intern_string("A");
+    let b_name = interner.intern_string("B");
+    let base_name = interner.intern_string("Base");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_a = ctx.fresh_type_param(a_name);
+    let var_b = ctx.fresh_type_param(b_name);
+    let var_base = ctx.fresh_type_param(base_name);
+
+    // T extends A & B (intersection)
+    let intersection = interner.intersection(vec![var_a, var_b]);
+    ctx.add_upper_bound(var_t, intersection);
+
+    // A extends Base, B extends Base
+    ctx.add_upper_bound(var_a, var_base);
+    ctx.add_upper_bound(var_b, var_base);
+
+    // Base has concrete type
+    ctx.add_lower_bound(var_base, TypeId::OBJECT);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+    assert_eq!(results.len(), 4);
+}
+
+#[test]
+fn test_circular_constraint_with_function_return() {
+    // Test: T extends () => T (function returning itself)
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Create function returning T
+    let fn_returning_t = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: var_t,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    ctx.add_upper_bound(var_t, fn_returning_t);
+
+    let result = ctx.resolve_with_constraints(var_t);
+    // Should handle circular reference gracefully
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_circular_constraint_mutual_recursion_three_types() {
+    // Test: A uses B, B uses C, C uses A (not just extends, but usage)
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let a_name = interner.intern_string("A");
+    let b_name = interner.intern_string("B");
+    let c_name = interner.intern_string("C");
+
+    let var_a = ctx.fresh_type_param(a_name);
+    let var_b = ctx.fresh_type_param(b_name);
+    let var_c = ctx.fresh_type_param(c_name);
+
+    // A has property of type B
+    let type_a = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: var_b,
+        write_type: var_b,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    ctx.add_lower_bound(var_a, type_a);
+
+    // B has property of type C
+    let type_b = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("c"),
+        type_id: var_c,
+        write_type: var_c,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    ctx.add_lower_bound(var_b, type_b);
+
+    // C has property of type A (completing the cycle)
+    let type_c = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: var_a,
+        write_type: var_a,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    ctx.add_lower_bound(var_c, type_c);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+    assert_eq!(results.len(), 3);
+}
+
+#[test]
+fn test_circular_constraint_with_array_element() {
+    // Test: T extends Array<T> (type containing array of itself)
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // T extends T[]
+    let array_of_t = interner.array(var_t);
+    ctx.add_upper_bound(var_t, array_of_t);
+
+    let result = ctx.resolve_with_constraints(var_t);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_circular_constraint_union_branches() {
+    // Test: T extends A | B where A extends T
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let t_name = interner.intern_string("T");
+    let a_name = interner.intern_string("A");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_a = ctx.fresh_type_param(a_name);
+
+    // T extends A | string
+    let union = interner.union(vec![var_a, TypeId::STRING]);
+    ctx.add_upper_bound(var_t, union);
+
+    // A extends T (circular)
+    ctx.add_upper_bound(var_a, var_t);
+
+    // Give A a concrete bound
+    ctx.add_lower_bound(var_a, TypeId::NUMBER);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+    assert_eq!(results.len(), 2);
+}
+
+#[test]
+fn test_circular_constraint_generic_class_inheritance() {
+    // Test: class Derived<T> extends Base<Derived<T>>
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let t_name = interner.intern_string("T");
+    let derived_name = interner.intern_string("Derived");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_derived = ctx.fresh_type_param(derived_name);
+
+    // Derived extends Base<Derived> (self-referential)
+    let base_type = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("inner"),
+        type_id: var_derived,
+        write_type: var_derived,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    ctx.add_upper_bound(var_derived, base_type);
+
+    // T is the type parameter of Derived
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+    assert_eq!(results.len(), 2);
+}
+
+#[test]
+fn test_circular_constraint_with_conditional() {
+    // Test: T extends (T extends string ? number : boolean)
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Simulate conditional result - if T is string, upper bound is number
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+    ctx.add_upper_bound(var_t, TypeId::NUMBER);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    // Lower bound string should be chosen
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_circular_constraint_method_chain() {
+    // Test: interface Chain<T> { next(): Chain<T> }
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let t_name = interner.intern_string("T");
+    let chain_name = interner.intern_string("Chain");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_chain = ctx.fresh_type_param(chain_name);
+
+    // Chain has method returning Chain (self-referential)
+    let next_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: var_chain,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let chain_type = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("next"),
+        type_id: next_method,
+        write_type: next_method,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+    ctx.add_lower_bound(var_chain, chain_type);
+
+    // T is the value type
+    ctx.add_lower_bound(var_t, TypeId::NUMBER);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+    assert_eq!(results.len(), 2);
+}
+
+#[test]
+fn test_circular_constraint_tuple_recursion() {
+    // Test: T extends [T, ...any[]] (tuple containing itself)
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // T extends [T, any]
+    let tuple_with_t = interner.tuple(vec![var_t, TypeId::ANY]);
+    ctx.add_upper_bound(var_t, tuple_with_t);
+
+    let result = ctx.resolve_with_constraints(var_t);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_circular_constraint_intersection_parts() {
+    // Test: T extends A & B where A extends T
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let t_name = interner.intern_string("T");
+    let a_name = interner.intern_string("A");
+    let b_name = interner.intern_string("B");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_a = ctx.fresh_type_param(a_name);
+    let var_b = ctx.fresh_type_param(b_name);
+
+    // T extends A & B
+    let intersection = interner.intersection(vec![var_a, var_b]);
+    ctx.add_upper_bound(var_t, intersection);
+
+    // A extends T (circular through intersection)
+    ctx.add_upper_bound(var_a, var_t);
+
+    // Give B concrete type
+    ctx.add_lower_bound(var_b, TypeId::NUMBER);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+    assert_eq!(results.len(), 3);
+}
+
+#[test]
+fn test_circular_constraint_with_mapped_result() {
+    // Test: T extends { [K in keyof T]: T[K] }
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // T extends object type
+    let mapped_type = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("prop"),
+        type_id: var_t,
+        write_type: var_t,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    ctx.add_upper_bound(var_t, mapped_type);
+    ctx.add_lower_bound(var_t, TypeId::OBJECT);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::OBJECT);
+}
+
+#[test]
+fn test_circular_constraint_optional_property() {
+    // Test: T extends { value?: T }
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    let obj_with_optional_t = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("value"),
+        type_id: var_t,
+        write_type: var_t,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+    ctx.add_upper_bound(var_t, obj_with_optional_t);
+
+    let result = ctx.resolve_with_constraints(var_t);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_circular_constraint_readonly_property() {
+    // Test: T extends { readonly self: T }
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    let obj_with_readonly_t = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("self"),
+        type_id: var_t,
+        write_type: var_t,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+    ctx.add_upper_bound(var_t, obj_with_readonly_t);
+
+    let result = ctx.resolve_with_constraints(var_t);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_circular_constraint_callback_self_reference() {
+    // Test: T extends (cb: (x: T) => void) => void
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Inner callback: (x: T) => void
+    let inner_cb = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: var_t,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // Outer function: (cb: inner) => void
+    let outer_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("cb")),
+            type_id: inner_cb,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    ctx.add_upper_bound(var_t, outer_fn);
+
+    let result = ctx.resolve_with_constraints(var_t);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_circular_constraint_constructor_instance() {
+    // Test: T extends new () => T (constructor returning itself)
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    let ctor_returning_t = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: var_t,
+        type_predicate: None,
+        is_constructor: true,
+    });
+
+    ctx.add_upper_bound(var_t, ctor_returning_t);
+
+    let result = ctx.resolve_with_constraints(var_t);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_circular_constraint_index_signature() {
+    // Test: T extends { [key: string]: T }
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    let obj_with_index = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: var_t,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    ctx.add_upper_bound(var_t, obj_with_index);
+
+    let result = ctx.resolve_with_constraints(var_t);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_circular_constraint_with_never_bound() {
+    // Test: T extends never in circular context
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+
+    // T extends U, U extends T
+    ctx.add_upper_bound(var_t, var_u);
+    ctx.add_upper_bound(var_u, var_t);
+
+    // T has never as lower bound
+    ctx.add_lower_bound(var_t, TypeId::NEVER);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+    assert_eq!(results.len(), 2);
+    // Both should resolve to never
+    assert_eq!(results[0].1, TypeId::NEVER);
+    assert_eq!(results[1].1, TypeId::NEVER);
+}
+
+#[test]
+fn test_circular_constraint_with_unknown_bound() {
+    // Test: Circular with unknown bound
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+
+    // T extends U, U extends T
+    ctx.add_upper_bound(var_t, var_u);
+    ctx.add_upper_bound(var_u, var_t);
+
+    // U has unknown as upper bound
+    ctx.add_upper_bound(var_u, TypeId::UNKNOWN);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+    assert_eq!(results.len(), 2);
+}
+
+#[test]
+fn test_circular_constraint_async_iterator() {
+    // Test: interface AsyncIter<T> { next(): Promise<IterResult<T, AsyncIter<T>>> }
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let t_name = interner.intern_string("T");
+    let iter_name = interner.intern_string("AsyncIter");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_iter = ctx.fresh_type_param(iter_name);
+
+    // Iterator has next method returning Promise containing reference to iterator
+    let result_type = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("value"),
+            type_id: var_t,
+            write_type: var_t,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("done"),
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let next_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: result_type, // Simplified, would be Promise<result_type>
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let iter_type = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("next"),
+        type_id: next_method,
+        write_type: next_method,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    ctx.add_lower_bound(var_iter, iter_type);
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+    assert_eq!(results.len(), 2);
+}
