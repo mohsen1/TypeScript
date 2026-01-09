@@ -3679,7 +3679,8 @@ impl<'a> ThinCheckerState<'a> {
         let name = &ident.escaped_text;
 
         // Resolve via binder persistent scopes for stateless lookup.
-        if let Some(sym_id) = self.resolve_identifier_symbol(idx) {
+        let sym_id_opt = self.resolve_identifier_symbol(idx);
+        if let Some(sym_id) = sym_id_opt {
             if self.alias_resolves_to_type_only(sym_id) {
                 self.error_type_only_value_at(name, idx);
                 return TypeId::ERROR;
@@ -3692,9 +3693,9 @@ impl<'a> ThinCheckerState<'a> {
                 return TypeId::ERROR;
             }
             let declared_type = self.get_type_of_symbol(sym_id);
-            if self.should_check_definite_assignment(sym_id, idx)
-                && !self.is_definitely_assigned_at(idx)
-            {
+            let should_check = self.should_check_definite_assignment(sym_id, idx);
+            let is_assigned = self.is_definitely_assigned_at(idx);
+            if should_check && !is_assigned {
                 self.error_variable_used_before_assigned_at(name, idx);
             }
             return self.apply_flow_narrowing(idx, declared_type);
@@ -4695,13 +4696,17 @@ impl<'a> ThinCheckerState<'a> {
         // Get the type of the callee
         let callee_type = self.get_type_of_node(call.expression);
 
-        // Check if callee is any/error (don't report for those)
-        if callee_type == TypeId::ANY || callee_type == TypeId::ERROR {
-            return TypeId::ANY;
-        }
-
         // Get arguments list (may be None for calls without arguments)
         let args = call.arguments.as_ref().map(|a| &a.nodes).map(|n| n.as_slice()).unwrap_or(&[]);
+
+        // Check if callee is any/error (don't report for those)
+        // Still process arguments to trigger definite assignment checks (TS2454) even if callee is any
+        if callee_type == TypeId::ANY || callee_type == TypeId::ERROR {
+            for &arg_idx in args {
+                self.get_type_of_node(arg_idx);
+            }
+            return TypeId::ANY;
+        }
 
         let overload_signatures = match self.ctx.types.lookup(callee_type) {
             Some(TypeKey::Callable(shape_id)) => {

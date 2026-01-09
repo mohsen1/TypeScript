@@ -12922,3 +12922,129 @@ x.type;
     let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
     checker.check_source_file(root);
 }
+
+// =============================================================================
+// TS2454 Variable Used Before Assignment Tests
+// =============================================================================
+
+/// Test that using a let variable before assignment emits TS2454
+#[test]
+fn test_ts2454_variable_used_before_assigned() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let x: number;
+console.log(x);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2454).count();
+    assert_eq!(
+        count,
+        1,
+        "Expected TS2454 for unassigned variable, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// Test that assigned variable doesn't emit TS2454
+#[test]
+fn test_ts2454_assigned_variable_no_error() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let x: number;
+x = 42;
+console.log(x);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2454).count();
+    assert_eq!(
+        count,
+        0,
+        "Expected no TS2454 for assigned variable, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// Test that variable with initializer doesn't emit TS2454
+#[test]
+fn test_ts2454_initialized_variable_no_error() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let x: number = 42;
+console.log(x);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2454).count();
+    assert_eq!(
+        count,
+        0,
+        "Expected no TS2454 for initialized variable, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// Test that parameter doesn't emit TS2454
+#[test]
+fn test_ts2454_parameter_no_error() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+function foo(x: number) {
+    console.log(x);
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2454).count();
+    assert_eq!(
+        count,
+        0,
+        "Expected no TS2454 for function parameter, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
