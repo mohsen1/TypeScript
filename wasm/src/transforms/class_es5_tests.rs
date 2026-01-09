@@ -30928,3 +30928,323 @@ class MetadataReader {
         output
     );
 }
+
+// ============================================================================
+// CLASS STATIC BLOCK PATTERN TESTS
+// ============================================================================
+
+/// Test ES5 class downleveling with static block initialization order
+#[test]
+fn test_class_es5_static_block_initialization_order() {
+    let source = r#"
+class Database {
+    static connectionString: string;
+    static pool: any;
+    static initialized: boolean = false;
+
+    static {
+        // First static block: set up connection string
+        Database.connectionString = "postgres://localhost:5432/db";
+        console.log("Connection string configured");
+    }
+
+    static maxConnections: number = 10;
+
+    static {
+        // Second static block: initialize pool after maxConnections is set
+        Database.pool = { size: Database.maxConnections };
+        Database.initialized = true;
+        console.log("Pool initialized with size:", Database.maxConnections);
+    }
+
+    constructor() {
+        if (!Database.initialized) {
+            throw new Error("Database not initialized");
+        }
+    }
+
+    query(sql: string): Promise<any[]> {
+        return Promise.resolve([]);
+    }
+}
+
+class Cache {
+    static instance: Cache;
+    static config: { ttl: number; maxSize: number };
+
+    static {
+        Cache.config = { ttl: 3600, maxSize: 1000 };
+    }
+
+    static {
+        Cache.instance = new Cache();
+    }
+
+    private store: Map<string, any> = new Map();
+
+    get(key: string): any {
+        return this.store.get(key);
+    }
+
+    set(key: string, value: any): void {
+        this.store.set(key, value);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("Database") && output.contains("Cache"),
+        "Expected static block initialization classes: {}",
+        output
+    );
+
+    // Methods should be preserved
+    assert!(
+        output.contains("query") && output.contains("get") && output.contains("set"),
+        "Expected methods: {}",
+        output
+    );
+
+    // Static properties should be initialized
+    assert!(
+        output.contains("connectionString") && output.contains("maxConnections"),
+        "Expected static properties: {}",
+        output
+    );
+}
+
+/// Test ES5 class downleveling with multiple static blocks chained
+#[test]
+fn test_class_es5_static_block_multiple_chained() {
+    let source = r#"
+class ConfigManager {
+    static defaults: Record<string, any>;
+    static overrides: Record<string, any>;
+    static merged: Record<string, any>;
+
+    static {
+        // Block 1: Set defaults
+        ConfigManager.defaults = {
+            timeout: 5000,
+            retries: 3,
+            debug: false
+        };
+    }
+
+    static {
+        // Block 2: Set overrides from environment
+        ConfigManager.overrides = {
+            debug: true
+        };
+    }
+
+    static {
+        // Block 3: Merge configs
+        ConfigManager.merged = {
+            ...ConfigManager.defaults,
+            ...ConfigManager.overrides
+        };
+    }
+
+    static get(key: string): any {
+        return ConfigManager.merged[key];
+    }
+
+    static set(key: string, value: any): void {
+        ConfigManager.merged[key] = value;
+    }
+}
+
+class PluginRegistry {
+    static plugins: Map<string, Function> = new Map();
+    static initialized: boolean = false;
+
+    static {
+        // Register core plugins
+        PluginRegistry.plugins.set("logger", function() { console.log("logging"); });
+    }
+
+    static {
+        // Register additional plugins
+        PluginRegistry.plugins.set("metrics", function() { console.log("metrics"); });
+        PluginRegistry.plugins.set("tracing", function() { console.log("tracing"); });
+    }
+
+    static {
+        // Mark as initialized
+        PluginRegistry.initialized = true;
+    }
+
+    static register(name: string, plugin: Function): void {
+        PluginRegistry.plugins.set(name, plugin);
+    }
+
+    static execute(name: string): void {
+        const plugin = PluginRegistry.plugins.get(name);
+        if (plugin) plugin();
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("ConfigManager") && output.contains("PluginRegistry"),
+        "Expected multiple static block classes: {}",
+        output
+    );
+
+    // Static methods should be preserved
+    assert!(
+        output.contains("register") && output.contains("execute"),
+        "Expected PluginRegistry methods: {}",
+        output
+    );
+
+    // Config properties referenced
+    assert!(
+        output.contains("defaults") && output.contains("overrides") && output.contains("merged"),
+        "Expected config properties: {}",
+        output
+    );
+}
+
+/// Test ES5 class downleveling with static blocks and private static access
+#[test]
+fn test_class_es5_static_block_private_static_access() {
+    let source = r#"
+class SecureVault {
+    static #encryptionKey: string;
+    static #initialized: boolean = false;
+
+    static {
+        // Initialize private static fields in static block
+        SecureVault.#encryptionKey = "secret-key-12345";
+        SecureVault.#initialized = true;
+    }
+
+    static encrypt(data: string): string {
+        if (!SecureVault.#initialized) {
+            throw new Error("Vault not initialized");
+        }
+        return data + SecureVault.#encryptionKey;
+    }
+
+    static decrypt(encrypted: string): string {
+        return encrypted.replace(SecureVault.#encryptionKey, "");
+    }
+}
+
+class Singleton {
+    static #instance: Singleton | null = null;
+
+    static {
+        // Eagerly create instance in static block
+        Singleton.#instance = new Singleton();
+    }
+
+    private constructor() {}
+
+    static getInstance(): Singleton {
+        return Singleton.#instance!;
+    }
+
+    doSomething(): void {
+        console.log("Singleton doing something");
+    }
+}
+
+class LazyLoader {
+    static #loaders: Map<string, Function> = new Map();
+    static #cache: Map<string, any> = new Map();
+
+    static {
+        LazyLoader.#loaders.set("config", () => ({ env: "production" }));
+        LazyLoader.#loaders.set("user", () => ({ name: "guest" }));
+    }
+
+    static load(key: string): any {
+        if (LazyLoader.#cache.has(key)) {
+            return LazyLoader.#cache.get(key);
+        }
+        const loader = LazyLoader.#loaders.get(key);
+        if (loader) {
+            const value = loader();
+            LazyLoader.#cache.set(key, value);
+            return value;
+        }
+        return null;
+    }
+
+    static clear(): void {
+        LazyLoader.#cache.clear();
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("SecureVault") && output.contains("Singleton") && output.contains("LazyLoader"),
+        "Expected static block private access classes: {}",
+        output
+    );
+
+    // Methods should be preserved
+    assert!(
+        output.contains("encrypt") && output.contains("decrypt") && output.contains("getInstance"),
+        "Expected SecureVault and Singleton methods: {}",
+        output
+    );
+
+    // LazyLoader methods
+    assert!(
+        output.contains("load") && output.contains("clear"),
+        "Expected LazyLoader methods: {}",
+        output
+    );
+}
