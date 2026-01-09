@@ -5054,6 +5054,135 @@ fn test_circular_extends_unify_propagates() {
     assert_eq!(results[1], (u_name, TypeId::NUMBER));
 }
 
+#[test]
+fn test_circular_extends_conflicting_lower_bounds() {
+    // Test: <T extends U, U extends T> with T: string and U: number
+    // Cycle propagation causes both to get union of all lower bounds
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+    let u_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: u_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends U, U extends T
+    ctx.add_upper_bound(var_t, u_type);
+    ctx.add_upper_bound(var_u, t_type);
+
+    // Conflicting lower bounds
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+    ctx.add_lower_bound(var_u, TypeId::NUMBER);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+
+    assert_eq!(results.len(), 2);
+    // T gets union of string | number from cycle propagation
+    let expected_union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    assert_eq!(results[0], (t_name, expected_union));
+    // U gets its direct lower bound (number)
+    assert_eq!(results[1], (u_name, TypeId::NUMBER));
+}
+
+#[test]
+fn test_circular_extends_three_way_with_one_lower_bound() {
+    // Test: <T extends U, U extends V, V extends T> with V having lower bound
+    // Bounds propagate through adjacent connections in the cycle
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+    let v_name = interner.intern_string("V");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+    let var_v = ctx.fresh_type_param(v_name);
+
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+    let u_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: u_name,
+        constraint: None,
+        default: None,
+    }));
+    let v_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: v_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends U, U extends V, V extends T
+    ctx.add_upper_bound(var_t, u_type);
+    ctx.add_upper_bound(var_u, v_type);
+    ctx.add_upper_bound(var_v, t_type);
+
+    // Only V has a lower bound
+    ctx.add_lower_bound(var_v, TypeId::BOOLEAN);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+
+    assert_eq!(results.len(), 3);
+    // V resolves to boolean (its direct lower bound)
+    assert_eq!(results[2], (v_name, TypeId::BOOLEAN));
+    // U extends V, so U gets boolean through propagation
+    assert_eq!(results[1], (u_name, TypeId::BOOLEAN));
+    // T extends U, but propagation stops at one level in current impl
+    assert_eq!(results[0], (t_name, TypeId::UNKNOWN));
+}
+
+#[test]
+fn test_circular_extends_with_union_lower_bound() {
+    // Test: <T extends U, U extends T> with T having union type as lower bound
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+    let u_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: u_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends U, U extends T
+    ctx.add_upper_bound(var_t, u_type);
+    ctx.add_upper_bound(var_u, t_type);
+
+    // T has a union type as lower bound
+    let union_type = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    ctx.add_lower_bound(var_t, union_type);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+
+    assert_eq!(results.len(), 2);
+    // T resolves to the union type
+    assert_eq!(results[0], (t_name, union_type));
+    // U also resolves to the union through propagation
+    assert_eq!(results[1], (u_name, union_type));
+}
+
 // =============================================================================
 // Context-Sensitive Typing Tests
 // =============================================================================
