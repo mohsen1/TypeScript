@@ -6682,3 +6682,182 @@ fn test_parity_es5_namespace_with_enum() {
         output
     );
 }
+
+/// Parity test for ES5 enum with explicit numeric values.
+/// Enum with explicit numeric values should be lowered properly.
+#[test]
+fn test_parity_es5_enum_explicit_values() {
+    let source = r#"enum HttpStatus {
+    OK = 200,
+    Created = 201,
+    BadRequest = 400,
+    NotFound = 404,
+    ServerError = 500
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify enum exists
+    assert!(
+        output.contains("HttpStatus"),
+        "Output should define HttpStatus enum: {}",
+        output
+    );
+    // Should have the explicit values
+    assert!(
+        output.contains("200") && output.contains("404") && output.contains("500"),
+        "ES5 output should have explicit numeric values: {}",
+        output
+    );
+    // No enum keyword
+    assert!(
+        !output.contains("enum HttpStatus"),
+        "ES5 output should not contain enum keyword: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 const enum.
+/// Const enum should be inlined at usage sites.
+#[test]
+fn test_parity_es5_enum_const() {
+    let source = r#"const enum Flags {
+    None = 0,
+    Read = 1,
+    Write = 2,
+    Execute = 4
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Const enums may be completely erased or emitted based on settings
+    // No const enum keyword should appear
+    assert!(
+        !output.contains("const enum"),
+        "ES5 output should not contain const enum keyword: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 enum with computed member.
+/// Enum with computed values should be lowered properly.
+#[test]
+fn test_parity_es5_enum_computed() {
+    let source = r#"enum FileAccess {
+    None,
+    Read = 1 << 1,
+    Write = 1 << 2,
+    ReadWrite = Read | Write
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify enum exists
+    assert!(
+        output.contains("FileAccess"),
+        "Output should define FileAccess enum: {}",
+        output
+    );
+    // No enum keyword
+    assert!(
+        !output.contains("enum FileAccess"),
+        "ES5 output should not contain enum keyword: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 heterogeneous enum.
+/// Enum with mixed string and numeric values should be lowered properly.
+#[test]
+fn test_parity_es5_enum_heterogeneous() {
+    let source = r#"enum Mixed {
+    No = 0,
+    Yes = "YES",
+    Maybe = 1
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify enum exists
+    assert!(
+        output.contains("Mixed"),
+        "Output should define Mixed enum: {}",
+        output
+    );
+    // Should contain the string value
+    assert!(
+        output.contains("YES"),
+        "ES5 output should contain string value: {}",
+        output
+    );
+    // No enum keyword
+    assert!(
+        !output.contains("enum Mixed"),
+        "ES5 output should not contain enum keyword: {}",
+        output
+    );
+}
