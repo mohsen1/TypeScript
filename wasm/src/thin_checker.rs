@@ -9933,7 +9933,7 @@ impl<'a> ThinCheckerState<'a> {
             syntax_kind_ext::LABELED_STATEMENT => self
                 .ctx
                 .arena
-                .get_labeled(node)
+                .get_labeled_statement(node)
                 .map(|labeled| self.contains_break_statement(labeled.statement))
                 .unwrap_or(false),
             _ => false,
