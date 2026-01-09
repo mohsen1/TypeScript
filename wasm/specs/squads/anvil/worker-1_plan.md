@@ -8,12 +8,13 @@ Priority: 1
 Blocked: Awaiting next EM-Anvil assignment.
 
 ## Current Assignment
-- [ ] Add ES5 class tests for Object.entries/Object.values patterns in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
+- [ ] (none - awaiting next EM-Anvil assignment)
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added ES5 tests for Object.entries/Object.values patterns (6 tests): entries basic, values basic, entries with type, static methods, in constructor, combined. Ran `./wasm/test.sh class_es5_tests` (all 233 pass).
 - [x] Added ES5 tests for String.raw template patterns (6 tests): basic, with expressions, escape sequences, static property, in constructor, multiline. Ran `./wasm/test.sh class_es5_tests` (all 222 pass).
 - [x] Added ES5 tests for Map/Set collection patterns (6 tests): Map basic, Map iteration, Set basic, WeakMap usage, WeakSet usage, combined Graph class. Ran `./wasm/test.sh class_es5_tests` (all 216 pass).
 - [x] Added ES5 tests for Array.from patterns (6 tests): basic, map function, array-like, collections, generator, length. Ran `./wasm/test.sh class_es5_tests` (all 210 pass).
