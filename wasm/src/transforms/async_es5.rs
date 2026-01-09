@@ -290,6 +290,69 @@ impl<'a> AsyncES5Emitter<'a> {
             }
         }
 
+        // Check array/object literals (including computed property names and spreads)
+        if node.kind == syntax_kind_ext::ARRAY_LITERAL_EXPRESSION
+            || node.kind == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION
+        {
+            if let Some(literal) = self.arena.get_literal_expr(node) {
+                for &elem_idx in &literal.elements.nodes {
+                    let Some(elem_node) = self.arena.get(elem_idx) else {
+                        continue;
+                    };
+
+                    match elem_node.kind {
+                        syntax_kind_ext::PROPERTY_ASSIGNMENT => {
+                            if let Some(prop) = self.arena.get_property_assignment(elem_node) {
+                                if self.computed_name_contains_await(prop.name) {
+                                    return true;
+                                }
+                                if self.contains_await_recursive(prop.initializer) {
+                                    return true;
+                                }
+                            }
+                        }
+                        syntax_kind_ext::SHORTHAND_PROPERTY_ASSIGNMENT => {
+                            if let Some(prop) = self.arena.get_shorthand_property(elem_node) {
+                                if self.computed_name_contains_await(prop.name) {
+                                    return true;
+                                }
+                                if self.contains_await_recursive(prop.object_assignment_initializer) {
+                                    return true;
+                                }
+                            }
+                        }
+                        syntax_kind_ext::SPREAD_ELEMENT => {
+                            if let Some(spread) = self.arena.get_unary_expr_ex(elem_node) {
+                                if self.contains_await_recursive(spread.expression) {
+                                    return true;
+                                }
+                            }
+                        }
+                        syntax_kind_ext::METHOD_DECLARATION => {
+                            if let Some(method) = self.arena.get_method_decl(elem_node) {
+                                if self.computed_name_contains_await(method.name) {
+                                    return true;
+                                }
+                            }
+                        }
+                        syntax_kind_ext::GET_ACCESSOR | syntax_kind_ext::SET_ACCESSOR => {
+                            if let Some(accessor) = self.arena.get_accessor(elem_node) {
+                                if self.computed_name_contains_await(accessor.name) {
+                                    return true;
+                                }
+                            }
+                        }
+                        _ => {
+                            if self.contains_await_recursive(elem_idx) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
         // Check conditional expressions
         if node.kind == syntax_kind_ext::CONDITIONAL_EXPRESSION {
             if let Some(cond) = self.arena.get_conditional_expr(node) {
@@ -445,6 +508,20 @@ impl<'a> AsyncES5Emitter<'a> {
                 if self.contains_await_recursive(with_data.then_statement) {
                     return true;
                 }
+            }
+        }
+
+        false
+    }
+
+    fn computed_name_contains_await(&self, name_idx: NodeIndex) -> bool {
+        let Some(name_node) = self.arena.get(name_idx) else {
+            return false;
+        };
+
+        if name_node.kind == syntax_kind_ext::COMPUTED_PROPERTY_NAME {
+            if let Some(computed) = self.arena.get_computed_property(name_node) {
+                return self.contains_await_recursive(computed.expression);
             }
         }
 
