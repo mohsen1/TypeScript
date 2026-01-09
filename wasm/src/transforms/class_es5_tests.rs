@@ -26892,3 +26892,708 @@ class PipelineBuilder<T extends unknown[]> {
         output
     );
 }
+
+// =============================================================================
+// RECURSIVE TYPE PATTERNS - ES5 TRANSFORMATION TESTS
+// =============================================================================
+
+/// Test: recursive type aliases
+/// Verifies that classes using recursive type aliases transform correctly to ES5
+#[test]
+fn test_class_es5_recursive_type_aliases() {
+    let source = r#"
+type NestedArray<T> = T | NestedArray<T>[];
+type DeepPartial<T> = T extends object ? { [P in keyof T]?: DeepPartial<T[P]> } : T;
+type DeepReadonly<T> = T extends object ? { readonly [P in keyof T]: DeepReadonly<T[P]> } : T;
+
+class NestedArrayHandler<T> {
+    flatten(nested: NestedArray<T>): T[] {
+        if (Array.isArray(nested)) {
+            return nested.flatMap(item => this.flatten(item));
+        }
+        return [nested];
+    }
+
+    depth(nested: NestedArray<T>): number {
+        if (Array.isArray(nested)) {
+            if (nested.length === 0) return 1;
+            return 1 + Math.max(...nested.map(item => this.depth(item)));
+        }
+        return 0;
+    }
+
+    wrap(value: T, levels: number): NestedArray<T> {
+        let result: NestedArray<T> = value;
+        for (let i = 0; i < levels; i++) {
+            result = [result];
+        }
+        return result;
+    }
+}
+
+class DeepTransformHandler {
+    makeDeepPartial<T extends object>(obj: T): DeepPartial<T> {
+        const result: any = {};
+        for (const key of Object.keys(obj)) {
+            const value = (obj as any)[key];
+            if (value && typeof value === "object" && !Array.isArray(value)) {
+                result[key] = this.makeDeepPartial(value);
+            } else {
+                result[key] = value;
+            }
+        }
+        return result;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function NestedArrayHandler"),
+        "Expected NestedArrayHandler function: {}",
+        output
+    );
+    assert!(
+        output.contains("NestedArrayHandler.prototype.flatten"),
+        "Expected flatten method: {}",
+        output
+    );
+    assert!(
+        output.contains("NestedArrayHandler.prototype.depth") && output.contains("NestedArrayHandler.prototype.wrap"),
+        "Expected depth and wrap methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function DeepTransformHandler"),
+        "Expected DeepTransformHandler function: {}",
+        output
+    );
+    assert!(
+        output.contains("DeepTransformHandler.prototype.makeDeepPartial"),
+        "Expected makeDeepPartial method: {}",
+        output
+    );
+}
+
+/// Test: tree structure types
+/// Verifies that classes using tree structure types transform correctly to ES5
+#[test]
+fn test_class_es5_tree_structure_types() {
+    let source = r#"
+interface TreeNode<T> {
+    value: T;
+    children: TreeNode<T>[];
+}
+
+interface BinaryNode<T> {
+    value: T;
+    left: BinaryNode<T> | null;
+    right: BinaryNode<T> | null;
+}
+
+class TreeBuilder<T> {
+    createNode(value: T, children: TreeNode<T>[] = []): TreeNode<T> {
+        return { value, children };
+    }
+
+    addChild(parent: TreeNode<T>, child: TreeNode<T>): void {
+        parent.children.push(child);
+    }
+
+    traverse(node: TreeNode<T>, callback: (value: T) => void): void {
+        callback(node.value);
+        for (const child of node.children) {
+            this.traverse(child, callback);
+        }
+    }
+
+    find(node: TreeNode<T>, predicate: (value: T) => boolean): TreeNode<T> | null {
+        if (predicate(node.value)) {
+            return node;
+        }
+        for (const child of node.children) {
+            const found = this.find(child, predicate);
+            if (found) return found;
+        }
+        return null;
+    }
+}
+
+class BinaryTreeBuilder<T> {
+    createNode(value: T): BinaryNode<T> {
+        return { value, left: null, right: null };
+    }
+
+    insert(root: BinaryNode<number>, value: number): void {
+        if (value < root.value) {
+            if (root.left === null) {
+                root.left = this.createNode(value) as any;
+            } else {
+                this.insert(root.left as any, value);
+            }
+        } else {
+            if (root.right === null) {
+                root.right = this.createNode(value) as any;
+            } else {
+                this.insert(root.right as any, value);
+            }
+        }
+    }
+
+    inOrder(node: BinaryNode<T> | null, result: T[] = []): T[] {
+        if (node === null) return result;
+        this.inOrder(node.left, result);
+        result.push(node.value);
+        this.inOrder(node.right, result);
+        return result;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function TreeBuilder"),
+        "Expected TreeBuilder function: {}",
+        output
+    );
+    assert!(
+        output.contains("TreeBuilder.prototype.createNode") && output.contains("TreeBuilder.prototype.addChild"),
+        "Expected createNode and addChild methods: {}",
+        output
+    );
+    assert!(
+        output.contains("TreeBuilder.prototype.traverse") && output.contains("TreeBuilder.prototype.find"),
+        "Expected traverse and find methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function BinaryTreeBuilder"),
+        "Expected BinaryTreeBuilder function: {}",
+        output
+    );
+    assert!(
+        output.contains("BinaryTreeBuilder.prototype.insert") && output.contains("BinaryTreeBuilder.prototype.inOrder"),
+        "Expected insert and inOrder methods: {}",
+        output
+    );
+}
+
+/// Test: linked list types
+/// Verifies that classes using linked list types transform correctly to ES5
+#[test]
+fn test_class_es5_linked_list_types() {
+    let source = r#"
+interface ListNode<T> {
+    value: T;
+    next: ListNode<T> | null;
+}
+
+interface DoublyLinkedNode<T> {
+    value: T;
+    prev: DoublyLinkedNode<T> | null;
+    next: DoublyLinkedNode<T> | null;
+}
+
+class LinkedList<T> {
+    private head: ListNode<T> | null = null;
+    private tail: ListNode<T> | null = null;
+
+    append(value: T): void {
+        const node: ListNode<T> = { value, next: null };
+        if (this.tail === null) {
+            this.head = node;
+            this.tail = node;
+        } else {
+            this.tail.next = node;
+            this.tail = node;
+        }
+    }
+
+    prepend(value: T): void {
+        const node: ListNode<T> = { value, next: this.head };
+        this.head = node;
+        if (this.tail === null) {
+            this.tail = node;
+        }
+    }
+
+    toArray(): T[] {
+        const result: T[] = [];
+        let current = this.head;
+        while (current !== null) {
+            result.push(current.value);
+            current = current.next;
+        }
+        return result;
+    }
+
+    find(predicate: (value: T) => boolean): T | undefined {
+        let current = this.head;
+        while (current !== null) {
+            if (predicate(current.value)) {
+                return current.value;
+            }
+            current = current.next;
+        }
+        return undefined;
+    }
+}
+
+class DoublyLinkedList<T> {
+    private head: DoublyLinkedNode<T> | null = null;
+    private tail: DoublyLinkedNode<T> | null = null;
+
+    append(value: T): void {
+        const node: DoublyLinkedNode<T> = { value, prev: this.tail, next: null };
+        if (this.tail !== null) {
+            this.tail.next = node;
+        }
+        this.tail = node;
+        if (this.head === null) {
+            this.head = node;
+        }
+    }
+
+    reverse(): T[] {
+        const result: T[] = [];
+        let current = this.tail;
+        while (current !== null) {
+            result.push(current.value);
+            current = current.prev;
+        }
+        return result;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function LinkedList"),
+        "Expected LinkedList function: {}",
+        output
+    );
+    assert!(
+        output.contains("LinkedList.prototype.append") && output.contains("LinkedList.prototype.prepend"),
+        "Expected append and prepend methods: {}",
+        output
+    );
+    assert!(
+        output.contains("LinkedList.prototype.toArray") && output.contains("LinkedList.prototype.find"),
+        "Expected toArray and find methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function DoublyLinkedList"),
+        "Expected DoublyLinkedList function: {}",
+        output
+    );
+    assert!(
+        output.contains("DoublyLinkedList.prototype.append") && output.contains("DoublyLinkedList.prototype.reverse"),
+        "Expected DoublyLinkedList methods: {}",
+        output
+    );
+}
+
+/// Test: JSON-like recursive types
+/// Verifies that classes using JSON-like recursive types transform correctly to ES5
+#[test]
+fn test_class_es5_json_recursive_types() {
+    let source = r#"
+type JSONValue = string | number | boolean | null | JSONObject | JSONArray;
+interface JSONObject { [key: string]: JSONValue }
+interface JSONArray extends Array<JSONValue> {}
+
+type DeepJSON<T> = T extends object
+    ? { [K in keyof T]: DeepJSON<T[K]> }
+    : T;
+
+class JSONProcessor {
+    stringify(value: JSONValue): string {
+        return JSON.stringify(value);
+    }
+
+    parse(text: string): JSONValue {
+        return JSON.parse(text);
+    }
+
+    deepClone(value: JSONValue): JSONValue {
+        if (value === null || typeof value !== "object") {
+            return value;
+        }
+        if (Array.isArray(value)) {
+            return value.map(item => this.deepClone(item));
+        }
+        const result: JSONObject = {};
+        for (const key of Object.keys(value)) {
+            result[key] = this.deepClone(value[key]);
+        }
+        return result;
+    }
+
+    merge(target: JSONObject, source: JSONObject): JSONObject {
+        const result: JSONObject = { ...target };
+        for (const key of Object.keys(source)) {
+            const targetVal = target[key];
+            const sourceVal = source[key];
+            if (
+                targetVal && typeof targetVal === "object" && !Array.isArray(targetVal) &&
+                sourceVal && typeof sourceVal === "object" && !Array.isArray(sourceVal)
+            ) {
+                result[key] = this.merge(targetVal as JSONObject, sourceVal as JSONObject);
+            } else {
+                result[key] = sourceVal;
+            }
+        }
+        return result;
+    }
+}
+
+class JSONValidator {
+    isValidJSON(value: unknown): value is JSONValue {
+        if (value === null) return true;
+        const type = typeof value;
+        if (type === "string" || type === "number" || type === "boolean") return true;
+        if (Array.isArray(value)) {
+            return value.every(item => this.isValidJSON(item));
+        }
+        if (type === "object") {
+            return Object.values(value as object).every(v => this.isValidJSON(v));
+        }
+        return false;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function JSONProcessor"),
+        "Expected JSONProcessor function: {}",
+        output
+    );
+    assert!(
+        output.contains("JSONProcessor.prototype.stringify") && output.contains("JSONProcessor.prototype.parse"),
+        "Expected stringify and parse methods: {}",
+        output
+    );
+    assert!(
+        output.contains("JSONProcessor.prototype.deepClone") && output.contains("JSONProcessor.prototype.merge"),
+        "Expected deepClone and merge methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function JSONValidator"),
+        "Expected JSONValidator function: {}",
+        output
+    );
+    assert!(
+        output.contains("JSONValidator.prototype.isValidJSON"),
+        "Expected isValidJSON method: {}",
+        output
+    );
+}
+
+/// Test: nested object recursive types
+/// Verifies that classes using nested object types transform correctly to ES5
+#[test]
+fn test_class_es5_nested_object_types() {
+    let source = r#"
+type NestedRecord<T> = {
+    [key: string]: T | NestedRecord<T>;
+};
+
+type PathValue<T, P extends string> = P extends `${infer K}.${infer R}`
+    ? K extends keyof T
+        ? PathValue<T[K], R>
+        : never
+    : P extends keyof T
+        ? T[P]
+        : never;
+
+class NestedObjectHandler<T> {
+    private data: NestedRecord<T>;
+
+    constructor(data: NestedRecord<T>) {
+        this.data = data;
+    }
+
+    get(path: string): T | NestedRecord<T> | undefined {
+        const parts = path.split(".");
+        let current: any = this.data;
+        for (const part of parts) {
+            if (current === undefined || current === null) return undefined;
+            current = current[part];
+        }
+        return current;
+    }
+
+    set(path: string, value: T): void {
+        const parts = path.split(".");
+        let current: any = this.data;
+        for (let i = 0; i < parts.length - 1; i++) {
+            const part = parts[i];
+            if (!(part in current)) {
+                current[part] = {};
+            }
+            current = current[part];
+        }
+        current[parts[parts.length - 1]] = value;
+    }
+
+    flatten(prefix: string = ""): Record<string, T> {
+        const result: Record<string, T> = {};
+        const flatten = (obj: NestedRecord<T>, path: string) => {
+            for (const key of Object.keys(obj)) {
+                const fullPath = path ? path + "." + key : key;
+                const value = obj[key];
+                if (value && typeof value === "object" && !Array.isArray(value)) {
+                    flatten(value as NestedRecord<T>, fullPath);
+                } else {
+                    result[fullPath] = value as T;
+                }
+            }
+        };
+        flatten(this.data, prefix);
+        return result;
+    }
+}
+
+class PathAccessor {
+    getPath<T, P extends string>(obj: T, path: P): unknown {
+        const parts = (path as string).split(".");
+        let current: any = obj;
+        for (const part of parts) {
+            if (current === undefined) return undefined;
+            current = current[part];
+        }
+        return current;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function NestedObjectHandler"),
+        "Expected NestedObjectHandler function: {}",
+        output
+    );
+    assert!(
+        output.contains("this.data = data"),
+        "Expected constructor assignment: {}",
+        output
+    );
+    assert!(
+        output.contains("NestedObjectHandler.prototype.get") && output.contains("NestedObjectHandler.prototype.set"),
+        "Expected get and set methods: {}",
+        output
+    );
+    assert!(
+        output.contains("NestedObjectHandler.prototype.flatten"),
+        "Expected flatten method: {}",
+        output
+    );
+    assert!(
+        output.contains("function PathAccessor"),
+        "Expected PathAccessor function: {}",
+        output
+    );
+    assert!(
+        output.contains("PathAccessor.prototype.getPath"),
+        "Expected getPath method: {}",
+        output
+    );
+}
+
+/// Test: combined recursive type patterns
+/// Verifies that classes using multiple recursive type patterns together transform correctly to ES5
+#[test]
+fn test_class_es5_combined_recursive_patterns() {
+    let source = r#"
+interface FileSystemNode {
+    name: string;
+    type: "file" | "directory";
+    children?: FileSystemNode[];
+    size?: number;
+}
+
+type DeepMutable<T> = {
+    -readonly [P in keyof T]: DeepMutable<T[P]>;
+};
+
+type Flatten<T> = T extends Array<infer U> ? Flatten<U> : T;
+
+class FileSystem {
+    private root: FileSystemNode;
+
+    constructor() {
+        this.root = { name: "/", type: "directory", children: [] };
+    }
+
+    createFile(path: string, size: number): void {
+        const parts = path.split("/").filter(p => p);
+        let current = this.root;
+        for (let i = 0; i < parts.length - 1; i++) {
+            const dir = current.children?.find(c => c.name === parts[i] && c.type === "directory");
+            if (!dir) throw new Error("Directory not found");
+            current = dir;
+        }
+        current.children = current.children || [];
+        current.children.push({ name: parts[parts.length - 1], type: "file", size });
+    }
+
+    createDirectory(path: string): void {
+        const parts = path.split("/").filter(p => p);
+        let current = this.root;
+        for (const part of parts) {
+            let dir = current.children?.find(c => c.name === part && c.type === "directory");
+            if (!dir) {
+                dir = { name: part, type: "directory", children: [] };
+                current.children = current.children || [];
+                current.children.push(dir);
+            }
+            current = dir;
+        }
+    }
+
+    getTotalSize(node: FileSystemNode = this.root): number {
+        if (node.type === "file") {
+            return node.size || 0;
+        }
+        return (node.children || []).reduce((sum, child) => sum + this.getTotalSize(child), 0);
+    }
+
+    listAll(node: FileSystemNode = this.root, path: string = ""): string[] {
+        const currentPath = path + "/" + node.name;
+        if (node.type === "file") {
+            return [currentPath];
+        }
+        const files: string[] = [];
+        for (const child of node.children || []) {
+            files.push(...this.listAll(child, currentPath));
+        }
+        return files;
+    }
+}
+
+class RecursiveFlattener {
+    flattenDeep<T>(arr: T[]): Flatten<T>[] {
+        const result: any[] = [];
+        const flatten = (items: any[]) => {
+            for (const item of items) {
+                if (Array.isArray(item)) {
+                    flatten(item);
+                } else {
+                    result.push(item);
+                }
+            }
+        };
+        flatten(arr);
+        return result;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function FileSystem"),
+        "Expected FileSystem function: {}",
+        output
+    );
+    assert!(
+        output.contains("FileSystem.prototype.createFile") && output.contains("FileSystem.prototype.createDirectory"),
+        "Expected createFile and createDirectory methods: {}",
+        output
+    );
+    assert!(
+        output.contains("FileSystem.prototype.getTotalSize") && output.contains("FileSystem.prototype.listAll"),
+        "Expected getTotalSize and listAll methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function RecursiveFlattener"),
+        "Expected RecursiveFlattener function: {}",
+        output
+    );
+    assert!(
+        output.contains("RecursiveFlattener.prototype.flattenDeep"),
+        "Expected flattenDeep method: {}",
+        output
+    );
+}
