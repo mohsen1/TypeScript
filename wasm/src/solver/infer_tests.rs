@@ -16904,3 +16904,775 @@ fn test_variadic_tuple_with_union_elements() {
 
     assert!(matches!(interner.lookup(tuple), Some(TypeKey::Tuple(_))));
 }
+
+// =============================================================================
+// Rest Parameter Inference Tests
+// =============================================================================
+
+#[test]
+fn test_rest_param_basic_array_inference() {
+    // function foo(...args: number[]): void
+    // foo(1, 2, 3) -> args: number[]
+    let interner = TypeInterner::new();
+
+    let fn_type = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: interner.array(TypeId::NUMBER),
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    if let Some(TypeKey::Function(shape)) = interner.lookup(fn_type) {
+        assert_eq!(shape.params.len(), 1);
+        assert!(shape.params[0].rest);
+    } else {
+        panic!("Expected function type");
+    }
+}
+
+#[test]
+fn test_rest_param_generic_inference() {
+    // function foo<T>(...args: T[]): T[]
+    // foo(1, 2, 3) -> T = number
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // All args are numbers
+    ctx.add_lower_bound(var_t, TypeId::NUMBER);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
+fn test_rest_param_mixed_types_union() {
+    // function foo<T>(...args: T[]): T
+    // foo(1, "hello", true) -> T = number | string | boolean
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Multiple different types
+    ctx.add_lower_bound(var_t, TypeId::NUMBER);
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+    ctx.add_lower_bound(var_t, TypeId::BOOLEAN);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    let expected = interner.union(vec![TypeId::NUMBER, TypeId::STRING, TypeId::BOOLEAN]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_rest_param_with_leading_fixed_params() {
+    // function foo<T>(first: string, ...rest: T[]): T
+    // foo("hi", 1, 2, 3) -> T = number
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // first is string (fixed), rest are numbers
+    ctx.add_lower_bound(var_t, TypeId::NUMBER);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
+fn test_rest_param_tuple_spread() {
+    // function foo<T extends any[]>(...args: T): T
+    // foo(1, "hello") -> T = [number, string]
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    let tuple_type = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+    ]);
+
+    ctx.add_lower_bound(var_t, tuple_type);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, tuple_type);
+}
+
+#[test]
+fn test_rest_param_spread_array_into_call() {
+    // const arr = [1, 2, 3];
+    // function foo(...args: number[]): void
+    // foo(...arr) -> valid
+    let interner = TypeInterner::new();
+
+    let number_array = interner.array(TypeId::NUMBER);
+
+    let fn_type = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: number_array,
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    assert!(matches!(interner.lookup(fn_type), Some(TypeKey::Function(_))));
+}
+
+#[test]
+fn test_rest_param_callback_inference() {
+    // function apply<T extends any[]>(fn: (...args: T) => void, ...args: T): void
+    // apply((a, b) => {}, 1, "hello") -> a: number, b: string
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    let args_tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+    ]);
+
+    ctx.add_lower_bound(var_t, args_tuple);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, args_tuple);
+}
+
+#[test]
+fn test_rest_param_constraint_extends_array() {
+    // function foo<T extends string[]>(...args: T): T
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    let string_array = interner.array(TypeId::STRING);
+    ctx.add_upper_bound(var_t, string_array);
+
+    let hello = interner.literal_string("hello");
+    let world = interner.literal_string("world");
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: hello, name: None, optional: false, rest: false },
+        TupleElement { type_id: world, name: None, optional: false, rest: false },
+    ]);
+    ctx.add_lower_bound(var_t, tuple);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, tuple);
+}
+
+#[test]
+fn test_rest_param_empty_call() {
+    // function foo<T extends any[]>(...args: T): T["length"]
+    // foo() -> T = [], length = 0
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    let empty_tuple = interner.tuple(vec![]);
+    ctx.add_lower_bound(var_t, empty_tuple);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, empty_tuple);
+}
+
+#[test]
+fn test_rest_param_with_optional_before() {
+    // function foo(a: string, b?: number, ...rest: boolean[]): void
+    let interner = TypeInterner::new();
+
+    let fn_type = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo {
+                name: Some(interner.intern_string("a")),
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("b")),
+                type_id: TypeId::NUMBER,
+                optional: true,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("rest")),
+                type_id: interner.array(TypeId::BOOLEAN),
+                optional: false,
+                rest: true,
+            },
+        ],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    if let Some(TypeKey::Function(shape)) = interner.lookup(fn_type) {
+        assert_eq!(shape.params.len(), 3);
+        assert!(!shape.params[0].optional);
+        assert!(shape.params[1].optional);
+        assert!(shape.params[2].rest);
+    } else {
+        panic!("Expected function type");
+    }
+}
+
+#[test]
+fn test_rest_param_infer_from_parameters_utility() {
+    // type Parameters<T> = T extends (...args: infer P) => any ? P : never
+    // Parameters<(a: string, ...rest: number[]) => void> = [string, ...number[]]
+    let interner = TypeInterner::new();
+
+    let infer_name = interner.intern_string("P");
+    let infer_p = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // Function with rest param
+    let fn_with_rest = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo {
+                name: Some(interner.intern_string("a")),
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("rest")),
+                type_id: interner.array(TypeId::NUMBER),
+                optional: false,
+                rest: true,
+            },
+        ],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // Pattern: (...args: infer P) => any
+    let pattern = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: infer_p,
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: TypeId::ANY,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let cond = ConditionalType {
+        check_type: fn_with_rest,
+        extends_type: pattern,
+        true_type: infer_p,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // Should extract parameter tuple
+    assert!(result != TypeId::NEVER);
+}
+
+#[test]
+fn test_rest_param_bind_pattern() {
+    // function bind<T, A extends any[], R>(fn: (this: T, ...args: A) => R, thisArg: T): (...args: A) => R
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let t_name = interner.intern_string("T");
+    let a_name = interner.intern_string("A");
+    let r_name = interner.intern_string("R");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_a = ctx.fresh_type_param(a_name);
+    let var_r = ctx.fresh_type_param(r_name);
+
+    // fn: (this: Window, a: string, b: number) => boolean
+    let window_type = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("location"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    ctx.add_lower_bound(var_t, window_type);
+
+    let args = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+    ctx.add_lower_bound(var_a, args);
+    ctx.add_lower_bound(var_r, TypeId::BOOLEAN);
+
+    let result_t = ctx.resolve_with_constraints(var_t).unwrap();
+    let result_a = ctx.resolve_with_constraints(var_a).unwrap();
+    let result_r = ctx.resolve_with_constraints(var_r).unwrap();
+
+    assert_eq!(result_t, window_type);
+    assert_eq!(result_a, args);
+    assert_eq!(result_r, TypeId::BOOLEAN);
+}
+
+#[test]
+fn test_rest_param_call_pattern() {
+    // function call<T, A extends any[], R>(fn: (this: T, ...args: A) => R, thisArg: T, ...args: A): R
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let a_name = interner.intern_string("A");
+    let r_name = interner.intern_string("R");
+
+    let var_a = ctx.fresh_type_param(a_name);
+    let var_r = ctx.fresh_type_param(r_name);
+
+    // call(fn, thisArg, "hello", 42)
+    let args = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+    ctx.add_lower_bound(var_a, args);
+    ctx.add_lower_bound(var_r, TypeId::BOOLEAN);
+
+    let result_a = ctx.resolve_with_constraints(var_a).unwrap();
+    let result_r = ctx.resolve_with_constraints(var_r).unwrap();
+
+    assert_eq!(result_a, args);
+    assert_eq!(result_r, TypeId::BOOLEAN);
+}
+
+#[test]
+fn test_rest_param_concat_signatures() {
+    // function concat<T extends any[], U extends any[]>(...a: T, ...b: U): [...T, ...U]
+    // TypeScript doesn't allow this directly, but we test tuple concat result
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+
+    let t_tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+    ]);
+    let u_tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+
+    ctx.add_lower_bound(var_t, t_tuple);
+    ctx.add_lower_bound(var_u, u_tuple);
+
+    let result_t = ctx.resolve_with_constraints(var_t).unwrap();
+    let result_u = ctx.resolve_with_constraints(var_u).unwrap();
+
+    assert_eq!(result_t, t_tuple);
+    assert_eq!(result_u, u_tuple);
+}
+
+#[test]
+fn test_rest_param_event_handler() {
+    // function on<E extends string, A extends any[]>(event: E, handler: (...args: A) => void): void
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let e_name = interner.intern_string("E");
+    let a_name = interner.intern_string("A");
+
+    let var_e = ctx.fresh_type_param(e_name);
+    let var_a = ctx.fresh_type_param(a_name);
+
+    let click_event = interner.literal_string("click");
+    ctx.add_lower_bound(var_e, click_event);
+
+    // Handler args: (event: MouseEvent, x: number, y: number)
+    let mouse_event = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("clientX"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let handler_args = interner.tuple(vec![
+        TupleElement { type_id: mouse_event, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+    ctx.add_lower_bound(var_a, handler_args);
+
+    let result_e = ctx.resolve_with_constraints(var_e).unwrap();
+    let result_a = ctx.resolve_with_constraints(var_a).unwrap();
+
+    assert_eq!(result_e, click_event);
+    assert_eq!(result_a, handler_args);
+}
+
+#[test]
+fn test_rest_param_compose_functions() {
+    // function compose<A extends any[], B, C>(f: (b: B) => C, g: (...args: A) => B): (...args: A) => C
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let a_name = interner.intern_string("A");
+    let b_name = interner.intern_string("B");
+    let c_name = interner.intern_string("C");
+
+    let var_a = ctx.fresh_type_param(a_name);
+    let var_b = ctx.fresh_type_param(b_name);
+    let var_c = ctx.fresh_type_param(c_name);
+
+    // g: (x: string, y: number) => boolean
+    let g_args = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+    ctx.add_lower_bound(var_a, g_args);
+    ctx.add_lower_bound(var_b, TypeId::BOOLEAN);
+
+    // f: (b: boolean) => string
+    ctx.add_lower_bound(var_c, TypeId::STRING);
+
+    let result_a = ctx.resolve_with_constraints(var_a).unwrap();
+    let result_b = ctx.resolve_with_constraints(var_b).unwrap();
+    let result_c = ctx.resolve_with_constraints(var_c).unwrap();
+
+    assert_eq!(result_a, g_args);
+    assert_eq!(result_b, TypeId::BOOLEAN);
+    assert_eq!(result_c, TypeId::STRING);
+}
+
+#[test]
+fn test_rest_param_partial_application() {
+    // function partial<T, A extends any[], B extends any[], R>(
+    //   fn: (...args: [...A, ...B]) => R,
+    //   ...args: A
+    // ): (...args: B) => R
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let a_name = interner.intern_string("A");
+    let b_name = interner.intern_string("B");
+    let r_name = interner.intern_string("R");
+
+    let var_a = ctx.fresh_type_param(a_name);
+    let var_b = ctx.fresh_type_param(b_name);
+    let var_r = ctx.fresh_type_param(r_name);
+
+    // partial(fn, "hello") where fn: (a: string, b: number, c: boolean) => string
+    // A = [string], B = [number, boolean], R = string
+    let a_tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+    ]);
+    let b_tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+    ]);
+
+    ctx.add_lower_bound(var_a, a_tuple);
+    ctx.add_lower_bound(var_b, b_tuple);
+    ctx.add_lower_bound(var_r, TypeId::STRING);
+
+    let result_a = ctx.resolve_with_constraints(var_a).unwrap();
+    let result_b = ctx.resolve_with_constraints(var_b).unwrap();
+    let result_r = ctx.resolve_with_constraints(var_r).unwrap();
+
+    assert_eq!(result_a, a_tuple);
+    assert_eq!(result_b, b_tuple);
+    assert_eq!(result_r, TypeId::STRING);
+}
+
+#[test]
+fn test_rest_param_promisify_pattern() {
+    // function promisify<A extends any[], R>(fn: (...args: [...A, (err: Error, result: R) => void]) => void): (...args: A) => Promise<R>
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let a_name = interner.intern_string("A");
+    let r_name = interner.intern_string("R");
+
+    let var_a = ctx.fresh_type_param(a_name);
+    let var_r = ctx.fresh_type_param(r_name);
+
+    // Node-style callback: fs.readFile(path, (err, data) => {})
+    // A = [string], R = Buffer
+    let a_tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+    ]);
+    let buffer_type = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("length"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    ctx.add_lower_bound(var_a, a_tuple);
+    ctx.add_lower_bound(var_r, buffer_type);
+
+    let result_a = ctx.resolve_with_constraints(var_a).unwrap();
+    let result_r = ctx.resolve_with_constraints(var_r).unwrap();
+
+    assert_eq!(result_a, a_tuple);
+    assert_eq!(result_r, buffer_type);
+}
+
+#[test]
+fn test_rest_param_curry_inference() {
+    // Curry: (a, b, c) => d becomes (a) => (b) => (c) => d
+    // Infer argument types from curried call
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let a_name = interner.intern_string("A");
+    let b_name = interner.intern_string("B");
+    let c_name = interner.intern_string("C");
+
+    let var_a = ctx.fresh_type_param(a_name);
+    let var_b = ctx.fresh_type_param(b_name);
+    let var_c = ctx.fresh_type_param(c_name);
+
+    ctx.add_lower_bound(var_a, TypeId::STRING);
+    ctx.add_lower_bound(var_b, TypeId::NUMBER);
+    ctx.add_lower_bound(var_c, TypeId::BOOLEAN);
+
+    let result_a = ctx.resolve_with_constraints(var_a).unwrap();
+    let result_b = ctx.resolve_with_constraints(var_b).unwrap();
+    let result_c = ctx.resolve_with_constraints(var_c).unwrap();
+
+    assert_eq!(result_a, TypeId::STRING);
+    assert_eq!(result_b, TypeId::NUMBER);
+    assert_eq!(result_c, TypeId::BOOLEAN);
+}
+
+#[test]
+fn test_rest_param_variadic_middleware() {
+    // function compose<T>(...fns: ((x: T) => T)[]): (x: T) => T
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // All middleware work on same type
+    let state_type = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("count"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    ctx.add_lower_bound(var_t, state_type);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, state_type);
+}
+
+#[test]
+fn test_rest_param_zip_with() {
+    // function zipWith<A, B, C>(fn: (a: A, b: B) => C, as: A[], bs: B[]): C[]
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let a_name = interner.intern_string("A");
+    let b_name = interner.intern_string("B");
+    let c_name = interner.intern_string("C");
+
+    let var_a = ctx.fresh_type_param(a_name);
+    let var_b = ctx.fresh_type_param(b_name);
+    let var_c = ctx.fresh_type_param(c_name);
+
+    // zipWith((a, b) => a + b, [1, 2], ["a", "b"])
+    ctx.add_lower_bound(var_a, TypeId::NUMBER);
+    ctx.add_lower_bound(var_b, TypeId::STRING);
+    ctx.add_lower_bound(var_c, TypeId::STRING); // result of number + string
+
+    let result_a = ctx.resolve_with_constraints(var_a).unwrap();
+    let result_b = ctx.resolve_with_constraints(var_b).unwrap();
+    let result_c = ctx.resolve_with_constraints(var_c).unwrap();
+
+    assert_eq!(result_a, TypeId::NUMBER);
+    assert_eq!(result_b, TypeId::STRING);
+    assert_eq!(result_c, TypeId::STRING);
+}
+
+#[test]
+fn test_rest_param_reduce_with_initial() {
+    // function reduce<T, U>(arr: T[], fn: (acc: U, val: T) => U, initial: U): U
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+
+    // reduce([1, 2, 3], (acc, val) => acc + val, 0)
+    ctx.add_lower_bound(var_t, TypeId::NUMBER);
+    ctx.add_lower_bound(var_u, TypeId::NUMBER);
+
+    let result_t = ctx.resolve_with_constraints(var_t).unwrap();
+    let result_u = ctx.resolve_with_constraints(var_u).unwrap();
+
+    assert_eq!(result_t, TypeId::NUMBER);
+    assert_eq!(result_u, TypeId::NUMBER);
+}
+
+#[test]
+fn test_rest_param_spread_into_new() {
+    // new Constructor(...args)
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    let args = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+
+    ctx.add_lower_bound(var_t, args);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, args);
+}
+
+#[test]
+fn test_rest_param_method_decorator_args() {
+    // Decorator: function log<T extends any[], R>(target: any, key: string, descriptor: { value: (...args: T) => R }): void
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let t_name = interner.intern_string("T");
+    let r_name = interner.intern_string("R");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_r = ctx.fresh_type_param(r_name);
+
+    // Method: (name: string, age: number) => string
+    let method_args = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+
+    ctx.add_lower_bound(var_t, method_args);
+    ctx.add_lower_bound(var_r, TypeId::STRING);
+
+    let result_t = ctx.resolve_with_constraints(var_t).unwrap();
+    let result_r = ctx.resolve_with_constraints(var_r).unwrap();
+
+    assert_eq!(result_t, method_args);
+    assert_eq!(result_r, TypeId::STRING);
+}
+
+#[test]
+fn test_rest_param_array_method_inference() {
+    // Array.prototype.push<T>(...items: T[]): number
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // arr.push(1, 2, 3) -> T = number
+    ctx.add_lower_bound(var_t, TypeId::NUMBER);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
+fn test_rest_param_object_assign() {
+    // Object.assign<T, U, V>(target: T, source1: U, source2: V): T & U & V
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+    let v_name = interner.intern_string("V");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+    let var_v = ctx.fresh_type_param(v_name);
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_c = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("c"),
+        type_id: TypeId::BOOLEAN,
+        write_type: TypeId::BOOLEAN,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    ctx.add_lower_bound(var_t, obj_a);
+    ctx.add_lower_bound(var_u, obj_b);
+    ctx.add_lower_bound(var_v, obj_c);
+
+    let result_t = ctx.resolve_with_constraints(var_t).unwrap();
+    let result_u = ctx.resolve_with_constraints(var_u).unwrap();
+    let result_v = ctx.resolve_with_constraints(var_v).unwrap();
+
+    assert_eq!(result_t, obj_a);
+    assert_eq!(result_u, obj_b);
+    assert_eq!(result_v, obj_c);
+}
