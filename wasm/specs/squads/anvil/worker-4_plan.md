@@ -7,10 +7,10 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-None - awaiting assignment from EM-Anvil
+Add ES5 class tests for conditional type patterns: Exclude, Extract, NonNullable. Tests: `./wasm/test.sh class_es5_tests`
 
 ## Task Queue
-- [ ] Add ES5 class tests for conditional type patterns: Exclude, Extract, NonNullable
+- [ ] Add ES5 class tests for template literal type patterns: Uppercase, Lowercase, Capitalize
 
 ## Completed
 - [x] Add ES5 class tests for mapped type patterns: Partial, Required, Readonly. Tests: `./wasm/test.sh class_es5_tests`
