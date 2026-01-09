@@ -14507,3 +14507,370 @@ class ImmutableConfig {
         output
     );
 }
+
+// ============================================================================
+// Symbol.for / Symbol.keyFor Tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_symbol_for_basic() {
+    // Basic Symbol.for usage for global symbol registry
+    let source = r#"
+class SymbolRegistry {
+    private static readonly TYPE_KEY = Symbol.for("type");
+    private static readonly ID_KEY = Symbol.for("id");
+
+    private data: Map<symbol, unknown> = new Map();
+
+    setType(value: string): void {
+        this.data.set(SymbolRegistry.TYPE_KEY, value);
+    }
+
+    getType(): string | undefined {
+        return this.data.get(SymbolRegistry.TYPE_KEY) as string | undefined;
+    }
+
+    setId(value: number): void {
+        this.data.set(SymbolRegistry.ID_KEY, value);
+    }
+
+    getId(): number | undefined {
+        return this.data.get(SymbolRegistry.ID_KEY) as number | undefined;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function SymbolRegistry"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Symbol.for should be present
+    assert!(
+        output.contains("Symbol.for"),
+        "Expected Symbol.for call: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("setType") && output.contains("getType"),
+        "Expected type methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_keyfor_basic() {
+    // Symbol.keyFor to retrieve key from global registry
+    let source = r#"
+class SymbolInspector {
+    private symbols: symbol[] = [];
+
+    register(key: string): symbol {
+        const sym = Symbol.for(key);
+        this.symbols.push(sym);
+        return sym;
+    }
+
+    getKey(sym: symbol): string | undefined {
+        return Symbol.keyFor(sym);
+    }
+
+    getAllKeys(): (string | undefined)[] {
+        return this.symbols.map(sym => Symbol.keyFor(sym));
+    }
+
+    isGlobal(sym: symbol): boolean {
+        return Symbol.keyFor(sym) !== undefined;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function SymbolInspector"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Symbol.for and Symbol.keyFor should be present
+    assert!(
+        output.contains("Symbol.for") && output.contains("Symbol.keyFor"),
+        "Expected Symbol.for and Symbol.keyFor calls: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("register") && output.contains("getKey") && output.contains("isGlobal"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_for_computed_property() {
+    // Using Symbol.for for computed property keys
+    let source = r#"
+const METADATA_KEY = Symbol.for("metadata");
+const VERSION_KEY = Symbol.for("version");
+
+class Annotated {
+    [METADATA_KEY]: Record<string, unknown> = {};
+    [VERSION_KEY]: string = "1.0.0";
+
+    setMeta(key: string, value: unknown): void {
+        this[METADATA_KEY][key] = value;
+    }
+
+    getMeta(key: string): unknown {
+        return this[METADATA_KEY][key];
+    }
+
+    getVersion(): string {
+        return this[VERSION_KEY];
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function Annotated"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Symbol.for should be present for constants
+    assert!(
+        output.contains("Symbol.for"),
+        "Expected Symbol.for call: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("setMeta") && output.contains("getMeta") && output.contains("getVersion"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_for_with_inheritance() {
+    // Symbol.for with class inheritance
+    let source = r#"
+class BaseEntity {
+    protected static readonly ID_SYMBOL = Symbol.for("entity.id");
+    protected static readonly TYPE_SYMBOL = Symbol.for("entity.type");
+
+    protected [BaseEntity.ID_SYMBOL]: string;
+
+    constructor(id: string) {
+        this[BaseEntity.ID_SYMBOL] = id;
+    }
+
+    getId(): string {
+        return this[BaseEntity.ID_SYMBOL];
+    }
+
+    static getIdKey(): string | undefined {
+        return Symbol.keyFor(BaseEntity.ID_SYMBOL);
+    }
+}
+
+class User extends BaseEntity {
+    private name: string;
+
+    constructor(id: string, name: string) {
+        super(id);
+        this.name = name;
+    }
+
+    getName(): string {
+        return this.name;
+    }
+
+    toJSON(): object {
+        return {
+            id: this.getId(),
+            name: this.name
+        };
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Both classes should be converted
+    assert!(
+        output.contains("function BaseEntity"),
+        "Expected BaseEntity function: {}",
+        output
+    );
+    assert!(
+        output.contains("function User"),
+        "Expected User function: {}",
+        output
+    );
+
+    // Inheritance should be set up
+    assert!(
+        output.contains("__extends") || output.contains("extends"),
+        "Expected inheritance: {}",
+        output
+    );
+
+    // Symbol.for should be present
+    assert!(
+        output.contains("Symbol.for"),
+        "Expected Symbol.for call: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_for_registry_pattern() {
+    // Complete registry pattern using Symbol.for/keyFor
+    let source = r#"
+class PluginRegistry {
+    private static plugins: Map<symbol, unknown> = new Map();
+
+    static register<T>(name: string, plugin: T): symbol {
+        const key = Symbol.for("plugin." + name);
+        this.plugins.set(key, plugin);
+        return key;
+    }
+
+    static get<T>(key: symbol): T | undefined {
+        return this.plugins.get(key) as T | undefined;
+    }
+
+    static getByName<T>(name: string): T | undefined {
+        const key = Symbol.for("plugin." + name);
+        return this.plugins.get(key) as T | undefined;
+    }
+
+    static has(key: symbol): boolean {
+        return this.plugins.has(key);
+    }
+
+    static getName(key: symbol): string | undefined {
+        const fullKey = Symbol.keyFor(key);
+        if (fullKey && fullKey.startsWith("plugin.")) {
+            return fullKey.substring(7);
+        }
+        return undefined;
+    }
+
+    static list(): string[] {
+        const names: string[] = [];
+        for (const key of this.plugins.keys()) {
+            const name = this.getName(key);
+            if (name) {
+                names.push(name);
+            }
+        }
+        return names;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function PluginRegistry"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Symbol.for and Symbol.keyFor should be present
+    assert!(
+        output.contains("Symbol.for") && output.contains("Symbol.keyFor"),
+        "Expected Symbol.for and Symbol.keyFor calls: {}",
+        output
+    );
+
+    // Static methods should be present
+    assert!(
+        output.contains("register") && output.contains("getByName") && output.contains("getName"),
+        "Expected static methods: {}",
+        output
+    );
+
+    // list method should be present
+    assert!(
+        output.contains("list"),
+        "Expected list method: {}",
+        output
+    );
+}
