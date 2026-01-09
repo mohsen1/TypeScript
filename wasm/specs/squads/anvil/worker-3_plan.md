@@ -7,10 +7,10 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-(none)
+- [ ] Add ES5 source map tests for class static block patterns: multiple blocks, init order, private access, super access. Tests: `./wasm/test.sh source_map`
 
 ## Task Queue
-(empty)
+- [ ] Add ES5 source map tests for decorator composition patterns: chained, factory, metadata
 
 ## Completed
 - [x] Added template literal ES5 source map tests (basic, expression, nested, tagged, multiline, function call, method chain, conditional, complex expressions, comprehensive); 777 tests pass.
