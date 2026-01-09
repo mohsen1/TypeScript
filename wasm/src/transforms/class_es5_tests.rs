@@ -33427,3 +33427,385 @@ class ArrayProcessor<T extends any[]> {
         output
     );
 }
+
+// ============================================================================
+// TYPE ALIAS PATTERN TESTS
+// ============================================================================
+
+/// Test ES5 class downleveling with union type alias patterns
+#[test]
+fn test_class_es5_type_alias_union() {
+    let source = r#"
+type StringOrNumber = string | number;
+type Primitive = string | number | boolean | null | undefined;
+type Result<T> = T | Error;
+type AsyncResult<T> = T | Promise<T>;
+
+class ValueHolder<T extends StringOrNumber> {
+    private value: T;
+
+    constructor(value: T) {
+        this.value = value;
+    }
+
+    getValue(): T {
+        return this.value;
+    }
+
+    isString(): boolean {
+        return typeof this.value === "string";
+    }
+
+    isNumber(): boolean {
+        return typeof this.value === "number";
+    }
+
+    toString(): string {
+        return String(this.value);
+    }
+}
+
+class ResultHandler<T> {
+    private result: Result<T>;
+
+    constructor(result: Result<T>) {
+        this.result = result;
+    }
+
+    isError(): boolean {
+        return this.result instanceof Error;
+    }
+
+    getValue(): T | null {
+        if (this.result instanceof Error) {
+            return null;
+        }
+        return this.result;
+    }
+
+    getError(): Error | null {
+        if (this.result instanceof Error) {
+            return this.result;
+        }
+        return null;
+    }
+
+    map<U>(fn: (value: T) => U): ResultHandler<U> {
+        if (this.result instanceof Error) {
+            return new ResultHandler<U>(this.result);
+        }
+        return new ResultHandler<U>(fn(this.result));
+    }
+}
+
+class PrimitiveParser {
+    parse(value: Primitive): string {
+        if (value === null) return "null";
+        if (value === undefined) return "undefined";
+        return String(value);
+    }
+
+    parseAll(values: Primitive[]): string[] {
+        return values.map(v => this.parse(v));
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("ValueHolder") && output.contains("ResultHandler") && output.contains("PrimitiveParser"),
+        "Expected union type alias classes: {}",
+        output
+    );
+
+    // ValueHolder methods
+    assert!(
+        output.contains("getValue") && output.contains("isString") && output.contains("isNumber"),
+        "Expected ValueHolder methods: {}",
+        output
+    );
+
+    // ResultHandler methods
+    assert!(
+        output.contains("isError") && output.contains("getError"),
+        "Expected ResultHandler methods: {}",
+        output
+    );
+
+    // PrimitiveParser methods
+    assert!(
+        output.contains("parse") && output.contains("parseAll"),
+        "Expected PrimitiveParser methods: {}",
+        output
+    );
+}
+
+/// Test ES5 class downleveling with intersection type alias patterns
+#[test]
+fn test_class_es5_type_alias_intersection() {
+    let source = r#"
+type Named = { name: string };
+type Aged = { age: number };
+type Identified = { id: string };
+
+type Person = Named & Aged;
+type IdentifiedPerson = Person & Identified;
+type Timestamped = { createdAt: Date; updatedAt: Date };
+type Entity = Identified & Timestamped;
+
+class PersonBuilder {
+    private data: Partial<IdentifiedPerson> = {};
+
+    setId(id: string): this {
+        this.data.id = id;
+        return this;
+    }
+
+    setName(name: string): this {
+        this.data.name = name;
+        return this;
+    }
+
+    setAge(age: number): this {
+        this.data.age = age;
+        return this;
+    }
+
+    build(): IdentifiedPerson {
+        return this.data as IdentifiedPerson;
+    }
+
+    reset(): void {
+        this.data = {};
+    }
+}
+
+class EntityManager<T extends Entity> {
+    private entities: Map<string, T> = new Map();
+
+    add(entity: T): void {
+        this.entities.set(entity.id, entity);
+    }
+
+    get(id: string): T | undefined {
+        return this.entities.get(id);
+    }
+
+    getAll(): T[] {
+        return Array.from(this.entities.values());
+    }
+
+    findByDateRange(start: Date, end: Date): T[] {
+        return this.getAll().filter(
+            e => e.createdAt >= start && e.createdAt <= end
+        );
+    }
+}
+
+class MixinApplier<T extends object> {
+    private base: T;
+
+    constructor(base: T) {
+        this.base = base;
+    }
+
+    with<U extends object>(mixin: U): T & U {
+        return { ...this.base, ...mixin };
+    }
+
+    withAll<U extends object[]>(...mixins: U): T {
+        return Object.assign({}, this.base, ...mixins);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("PersonBuilder") && output.contains("EntityManager") && output.contains("MixinApplier"),
+        "Expected intersection type alias classes: {}",
+        output
+    );
+
+    // PersonBuilder methods
+    assert!(
+        output.contains("setId") && output.contains("setName") && output.contains("setAge") && output.contains("build"),
+        "Expected PersonBuilder methods: {}",
+        output
+    );
+
+    // EntityManager methods
+    assert!(
+        output.contains("add") && output.contains("getAll") && output.contains("findByDateRange"),
+        "Expected EntityManager methods: {}",
+        output
+    );
+
+    // MixinApplier methods
+    assert!(
+        output.contains("withAll"),
+        "Expected MixinApplier methods: {}",
+        output
+    );
+}
+
+/// Test ES5 class downleveling with conditional type alias patterns
+#[test]
+fn test_class_es5_type_alias_conditional() {
+    let source = r#"
+type NonNullable<T> = T extends null | undefined ? never : T;
+type ExtractArray<T> = T extends (infer U)[] ? U : T;
+type ReturnType<T> = T extends (...args: any[]) => infer R ? R : never;
+type PromiseValue<T> = T extends Promise<infer V> ? V : T;
+
+class NullableHandler<T> {
+    private value: T | null | undefined;
+
+    constructor(value: T | null | undefined) {
+        this.value = value;
+    }
+
+    isNull(): boolean {
+        return this.value === null;
+    }
+
+    isUndefined(): boolean {
+        return this.value === undefined;
+    }
+
+    isDefined(): boolean {
+        return this.value !== null && this.value !== undefined;
+    }
+
+    getOrDefault(defaultValue: T): T {
+        if (this.value === null || this.value === undefined) {
+            return defaultValue;
+        }
+        return this.value;
+    }
+
+    map<U>(fn: (value: T) => U): NullableHandler<U> {
+        if (this.value === null || this.value === undefined) {
+            return new NullableHandler<U>(null);
+        }
+        return new NullableHandler<U>(fn(this.value));
+    }
+}
+
+class ArrayExtractor<T> {
+    private array: T[];
+
+    constructor(array: T[]) {
+        this.array = array;
+    }
+
+    extract(): T[] {
+        return [...this.array];
+    }
+
+    head(): T | undefined {
+        return this.array[0];
+    }
+
+    tail(): T[] {
+        return this.array.slice(1);
+    }
+
+    flatten<U>(this: ArrayExtractor<U[]>): U[] {
+        return this.array.flat();
+    }
+}
+
+class FunctionAnalyzer<T extends (...args: any[]) => any> {
+    private fn: T;
+
+    constructor(fn: T) {
+        this.fn = fn;
+    }
+
+    call(...args: Parameters<T>): ReturnType<T> {
+        return this.fn(...args);
+    }
+
+    bind<U>(thisArg: U): (...args: Parameters<T>) => ReturnType<T> {
+        return this.fn.bind(thisArg);
+    }
+
+    getArity(): number {
+        return this.fn.length;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("NullableHandler") && output.contains("ArrayExtractor") && output.contains("FunctionAnalyzer"),
+        "Expected conditional type alias classes: {}",
+        output
+    );
+
+    // NullableHandler methods
+    assert!(
+        output.contains("isNull") && output.contains("isUndefined") && output.contains("isDefined") && output.contains("getOrDefault"),
+        "Expected NullableHandler methods: {}",
+        output
+    );
+
+    // ArrayExtractor methods
+    assert!(
+        output.contains("extract") && output.contains("head") && output.contains("tail"),
+        "Expected ArrayExtractor methods: {}",
+        output
+    );
+
+    // FunctionAnalyzer methods
+    assert!(
+        output.contains("call") && output.contains("bind") && output.contains("getArity"),
+        "Expected FunctionAnalyzer methods: {}",
+        output
+    );
+}
