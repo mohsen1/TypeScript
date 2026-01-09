@@ -7,10 +7,10 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- [ ] (awaiting assignment)
+- [ ] Add ES5 source map tests for private field patterns: private instance field access, private static field access, private method calls, private accessor patterns, private field in derived class, private field with WeakMap polyfill output. Tests: `./wasm/test.sh source_map`
 
 ## Task Queue
-- [ ] (empty)
+- [ ] Add ES5 source map tests for Symbol-keyed member patterns: Symbol.iterator, Symbol.asyncIterator, computed Symbol methods
 
 ## Completed
 - [x] Added class inheritance ES5 source map tests (extends clause, super calls, method overrides, multi-level inheritance, mixin pattern, super property access, static inheritance, abstract class, interface implementation, comprehensive); 643 tests pass.
