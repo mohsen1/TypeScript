@@ -17988,3 +17988,205 @@ fn test_parity_es5_private_accessor_validation() {
         output
     );
 }
+
+/// Parity test for ES5 static block with complex initialization order.
+/// Static blocks initializing dependent static properties.
+#[test]
+fn test_parity_es5_static_block_complex_init_order() {
+    let source = r#"class Config {
+    static readonly BASE_URL: string = 'https://api.example.com';
+    static readonly API_VERSION: string;
+    static readonly FULL_URL: string;
+    static readonly ENDPOINTS: Record<string, string>;
+
+    static {
+        Config.API_VERSION = 'v2';
+    }
+
+    static {
+        Config.FULL_URL = `${Config.BASE_URL}/${Config.API_VERSION}`;
+    }
+
+    static {
+        Config.ENDPOINTS = {
+            users: `${Config.FULL_URL}/users`,
+            posts: `${Config.FULL_URL}/posts`,
+            comments: `${Config.FULL_URL}/comments`
+        };
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Class should be present
+    assert!(
+        output.contains("Config"),
+        "Output should contain class: {}",
+        output
+    );
+    // Static properties should be present
+    assert!(
+        output.contains("BASE_URL") && output.contains("API_VERSION") && output.contains("FULL_URL"),
+        "Output should contain static properties: {}",
+        output
+    );
+    // No static block syntax in ES5
+    assert!(
+        !output.contains("static {"),
+        "ES5 output should not contain static block syntax: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 static blocks interleaved with static fields.
+/// Multiple static blocks between static field declarations.
+#[test]
+fn test_parity_es5_static_block_interleaved() {
+    let source = r#"class Registry {
+    static items: string[] = [];
+
+    static {
+        Registry.items.push('first');
+    }
+
+    static count: number = 0;
+
+    static {
+        Registry.count = Registry.items.length;
+        Registry.items.push('second');
+    }
+
+    static metadata: { count: number; items: string[] };
+
+    static {
+        Registry.metadata = {
+            count: Registry.count,
+            items: [...Registry.items]
+        };
+    }
+
+    static getAll(): string[] {
+        return Registry.items;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Class and method should be present
+    assert!(
+        output.contains("Registry") && output.contains("getAll"),
+        "Output should contain class and method: {}",
+        output
+    );
+    // Static fields should be referenced
+    assert!(
+        output.contains("items") && output.contains("count") && output.contains("metadata"),
+        "Output should contain static fields: {}",
+        output
+    );
+    // No static block syntax in ES5
+    assert!(
+        !output.contains("static {"),
+        "ES5 output should not contain static block syntax: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 static block with async initialization pattern.
+/// Static blocks setting up async-related configurations.
+#[test]
+fn test_parity_es5_static_block_async_pattern() {
+    let source = r#"class AsyncService {
+    static #initPromise: Promise<void>;
+    static #initialized: boolean = false;
+    static #config: Record<string, any> = {};
+
+    static {
+        AsyncService.#initPromise = (async () => {
+            await new Promise(resolve => setTimeout(resolve, 0));
+            AsyncService.#config = { ready: true };
+            AsyncService.#initialized = true;
+        })();
+    }
+
+    static async waitForInit(): Promise<void> {
+        await AsyncService.#initPromise;
+    }
+
+    static isReady(): boolean {
+        return AsyncService.#initialized;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Class and methods should be present
+    assert!(
+        output.contains("AsyncService") && output.contains("waitForInit") && output.contains("isReady"),
+        "Output should contain class and methods: {}",
+        output
+    );
+    // Should have async helper
+    assert!(
+        output.contains("__awaiter"),
+        "ES5 output should use __awaiter helper: {}",
+        output
+    );
+    // No static block syntax in ES5
+    assert!(
+        !output.contains("static {"),
+        "ES5 output should not contain static block syntax: {}",
+        output
+    );
+}
