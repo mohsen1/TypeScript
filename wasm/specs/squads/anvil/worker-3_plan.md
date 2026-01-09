@@ -7,29 +7,19 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-Add ES5 source map tests for decorator metadata patterns: reflect, design types
+Awaiting new assignment.
 
-**IMPORTANT**: Do NOT sync with origin/rust - it has corruption. Instead sync with squad/anvil:
-```
-git fetch origin && git checkout worker/anvil-3 && git reset --hard origin/squad/anvil
-```
+Previous assignments (decorator metadata patterns, private field patterns) were already completed in prior sessions:
+- Decorator metadata tests: 8 tests at lines 45350-46079 (reflect_metadata, parameter_decorators, property_descriptors, method_descriptors, accessor_descriptors, class_constructor, design_type, comprehensive)
+- Private field tests: 9 tests at lines 43628-44367 (instance_field_access, static_field_access, private_method_calls, accessor_patterns, derived_class, weakmap_polyfill, in_check, static_method, comprehensive)
 
-Steps:
-1. Reset your branch to squad/anvil (NOT origin/rust)
-2. Add 6 ES5 source map tests for decorator metadata patterns to `wasm/src/source_map_tests.rs`:
-   - Reflect.metadata usage
-   - Design type metadata (design:type, design:paramtypes, design:returntype)
-   - Class decorator with metadata
-   - Method decorator with metadata
-   - Parameter decorator with metadata
-   - Combined decorator metadata patterns
-3. Run `./wasm/test.sh source_map` to verify all tests pass
-4. Commit with message: `[wasm] source_map: add decorator metadata pattern tests`
-5. Push to `origin/worker/anvil-3`
-6. Update this plan file and push
+**Sync instructions**: Use squad/anvil (not origin/rust):
+```
+git fetch origin && git reset --hard origin/squad/anvil
+```
 
 ## Task Queue
-- [ ] Add ES5 source map tests for private field patterns: WeakMap polyfill, accessor
+(empty - awaiting new assignments)
 
 ## Completed
 - [x] Added class static block ES5 source map tests (basic, init order, multiple, private field access, private method access, static field init, computed props, async patterns, error handling, comprehensive); 857 tests pass.
