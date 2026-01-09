@@ -7,12 +7,13 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [ ] Add ES5 class tests for satisfies expression patterns: object satisfies, array satisfies, nested satisfies, generic satisfies. Tests: `./wasm/test.sh class_es5_tests`
+(none)
 
 ## Task Queue
 - [ ] Add ES5 class tests for const type parameter patterns: const generics, readonly inference
 
 ## Completed
+- [x] Add ES5 class tests for satisfies expression patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for explicit resource management. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for accessor keyword patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for using declarations patterns. Tests: `./wasm/test.sh class_es5_tests`
