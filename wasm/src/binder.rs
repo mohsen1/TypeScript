@@ -1067,6 +1067,8 @@ impl BinderState {
     /// Check if two symbol flag sets can be merged.
     /// TypeScript allows merging:
     /// - Interface + Interface
+    /// - Interface + Class (declaration merging)
+    /// - Interface + Value
     /// - Namespace + Namespace
     /// - Namespace + Class/Function/Enum
     /// - Function + Function (overloads)
@@ -1078,7 +1080,7 @@ impl BinderState {
             return true;
         }
 
-        // Interface can merge with class
+        // Interface can merge with class (declaration merging)
         if (existing_flags & symbol_flags::INTERFACE) != 0
             && (new_flags & symbol_flags::CLASS) != 0
         {
@@ -1090,7 +1092,7 @@ impl BinderState {
             return true;
         }
 
-        // Interface can merge with value
+        // Interface can merge with value (function, variable, etc.)
         let existing_is_interface = (existing_flags & symbol_flags::INTERFACE) != 0;
         let new_is_interface = (new_flags & symbol_flags::INTERFACE) != 0;
         let existing_is_value = (existing_flags & symbol_flags::VALUE) != 0;

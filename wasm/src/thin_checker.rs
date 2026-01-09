@@ -878,8 +878,8 @@ impl<'a> ThinCheckerState<'a> {
             call_signatures: shape.call_signatures.clone(),
             construct_signatures: shape.construct_signatures.clone(),
             properties,
-            string_index: None,
-            number_index: None,
+            string_index: shape.string_index.clone(),
+            number_index: shape.number_index.clone(),
         })
     }
 
@@ -2265,8 +2265,8 @@ impl<'a> ThinCheckerState<'a> {
                     call_signatures: derived_shape.call_signatures.clone(),
                     construct_signatures: derived_shape.construct_signatures.clone(),
                     properties,
-                    string_index: None,
-                    number_index: None,
+                    string_index: derived_shape.string_index.clone(),
+                    number_index: derived_shape.number_index.clone(),
                 })
             }
             (Some(TypeKey::Callable(derived_shape_id)), Some(TypeKey::ObjectWithIndex(base_shape_id))) => {
@@ -2277,8 +2277,8 @@ impl<'a> ThinCheckerState<'a> {
                     call_signatures: derived_shape.call_signatures.clone(),
                     construct_signatures: derived_shape.construct_signatures.clone(),
                     properties,
-                    string_index: None,
-                    number_index: None,
+                    string_index: derived_shape.string_index.clone(),
+                    number_index: derived_shape.number_index.clone(),
                 })
             }
             (Some(TypeKey::Object(derived_shape_id)), Some(TypeKey::Callable(base_shape_id))) => {
@@ -2289,8 +2289,8 @@ impl<'a> ThinCheckerState<'a> {
                     call_signatures: base_shape.call_signatures.clone(),
                     construct_signatures: base_shape.construct_signatures.clone(),
                     properties,
-                    string_index: None,
-                    number_index: None,
+                    string_index: base_shape.string_index.clone(),
+                    number_index: base_shape.number_index.clone(),
                 })
             }
             (Some(TypeKey::ObjectWithIndex(derived_shape_id)), Some(TypeKey::Callable(base_shape_id))) => {
@@ -2301,8 +2301,8 @@ impl<'a> ThinCheckerState<'a> {
                     call_signatures: base_shape.call_signatures.clone(),
                     construct_signatures: base_shape.construct_signatures.clone(),
                     properties,
-                    string_index: None,
-                    number_index: None,
+                    string_index: base_shape.string_index.clone(),
+                    number_index: base_shape.number_index.clone(),
                 })
             }
             (Some(TypeKey::Object(derived_shape_id)), Some(TypeKey::Object(base_shape_id))) => {
