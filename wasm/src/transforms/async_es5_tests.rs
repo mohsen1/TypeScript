@@ -13865,3 +13865,53 @@ fn test_async_weakref_combined() {
     );
     assert!(result, "Should detect await in combined async WeakRef patterns");
 }
+
+// ASYNC PROXY/REFLECT PATTERN TESTS
+
+#[test]
+fn test_async_proxy_handler() {
+    let result = async_error_propagation_contains_await(
+        "async function handle() { return await proxy.get(target, prop); }",
+    );
+    assert!(result, "Should detect await in async Proxy handler get/set");
+}
+
+#[test]
+fn test_async_reflect_apply() {
+    let result = async_error_propagation_contains_await(
+        "async function call() { return await Reflect.apply(fn, thisArg, args); }",
+    );
+    assert!(result, "Should detect await in async Reflect.apply");
+}
+
+#[test]
+fn test_async_proxy_revocable() {
+    let result = async_error_propagation_contains_await(
+        "async function revoke() { const { proxy } = Proxy.revocable(target, handler); return await proxy.action(); }",
+    );
+    assert!(result, "Should detect await in async Proxy with revocable");
+}
+
+#[test]
+fn test_async_reflect_construct() {
+    let result = async_error_propagation_contains_await(
+        "async function create() { return await Reflect.construct(Cls, args); }",
+    );
+    assert!(result, "Should detect await in async Reflect.construct");
+}
+
+#[test]
+fn test_async_proxy_trap_chain() {
+    let result = async_error_propagation_contains_await(
+        "async function chain() { return await proxy.step1().step2(); }",
+    );
+    assert!(result, "Should detect await in async Proxy trap chain");
+}
+
+#[test]
+fn test_async_proxy_reflect_combined() {
+    let result = async_error_propagation_contains_await(
+        "async function combined() { const val = await Reflect.get(proxy, key); return await process(val); }",
+    );
+    assert!(result, "Should detect await in combined async Proxy/Reflect patterns");
+}
