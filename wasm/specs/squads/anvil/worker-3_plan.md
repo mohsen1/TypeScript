@@ -7,12 +7,15 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- [ ] Add class inheritance ES5 source map tests (extends clause, super calls, method overrides, multi-level inheritance, mixin patterns) in `wasm/src/source_map_tests.rs`. Run `./wasm/test.sh source_map`.
+- [ ] Add ES5 source map tests for decorator metadata patterns: reflect-metadata, parameter decorators, property descriptors, method descriptors, accessor descriptors, class constructor metadata. Tests: `./wasm/test.sh source_map`
 
 ## Task Queue
-- [ ] (empty)
+- [ ] Add ES5 source map tests for module bundling patterns: CommonJS require, dynamic import, re-exports
 
 ## Completed
+- [x] Added Symbol-keyed member ES5 source map tests (Symbol.iterator, Symbol.asyncIterator, computed Symbol methods, Symbol.toStringTag, Symbol.hasInstance, Symbol.species, Symbol.toPrimitive, Symbol.isConcatSpreadable, comprehensive); 661 tests pass.
+- [x] Added private field ES5 source map tests (instance field access, static field access, private method calls, accessor patterns, derived class, WeakMap polyfill, in-check, static method, comprehensive); 652 tests pass.
+- [x] Added class inheritance ES5 source map tests (extends clause, super calls, method overrides, multi-level inheritance, mixin pattern, super property access, static inheritance, abstract class, interface implementation, comprehensive); 643 tests pass.
 - [x] Added generator ES5 source map tests (control flow, state machine, finally, composition, iterator protocol, default params, object yielding, recursion, lazy evaluation, comprehensive); 633 tests pass.
 - [x] Added async/await ES5 source map tests (Promise.all, Promise.race, error handling, sequential vs parallel, closure capture, inheritance, factory pattern, queue processing, event emitter, comprehensive); 623 tests pass.
 - [x] Added decorator ES5 source map tests (class with metadata, method with descriptor, property validation, parameter injection, factory chain, accessor readonly, abstract class, static members, conditional, comprehensive); 613 tests pass.

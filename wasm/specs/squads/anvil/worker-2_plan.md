@@ -7,12 +7,16 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- [ ] Add ES5 destructuring parity tests (object destructuring, array destructuring, nested destructuring, default values, rest patterns) in `wasm/src/emitter_parity_tests.rs`. Run `./wasm/test.sh emitter_parity`.
+- [ ] Add ES5 parity tests for for-await-of patterns: async iteration with destructuring, async iteration in class, error handling. Tests: `./wasm/test.sh emitter_parity`
 
 ## Task Queue
-- [ ] (empty)
+(empty)
 
 ## Completed
+- [x] Added ES5 generator function patterns parity tests (typed-yields, delegation, async-await, class-method-this, try-finally, complex-return) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (263 tests).
+- [x] Added ES5 async/await complex patterns parity tests (try-finally, promise-all-destructure, iife, nested-arrows) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (257 tests).
+- [x] Added ES5 arrow function parameter pattern parity tests (typed-params-inference, defaults-complex, rest-tuple, generic, nested-destructuring, arrow-returning-arrow) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (253 tests).
+- [x] Added ES5 destructuring parity tests (object-typed, array-tuple, nested-deep, defaults-typed, rest-typed) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (247 tests).
 - [x] Added ES5 array spread parity tests (literal-typed, function-call, new-expression, mixed-complex) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (242 tests).
 - [x] Added ES5 object spread parity tests (typed, multiple, overrides, nested-deep, computed) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (238 tests).
 - [x] Added ES5 accessor parity tests (getter-inheritance, setter-validation, pair-caching, static, computed) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (233 tests).

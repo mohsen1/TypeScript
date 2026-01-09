@@ -7,12 +7,15 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [ ] Add ES5 class tests for class decorator patterns: class decorator basic, class decorator with metadata, class decorator factory, multiple class decorators, class decorator with inheritance, class decorator with static members. Tests: `./wasm/test.sh class_es5_tests`
+- [ ] Add ES5 class tests for TypeScript-specific patterns: namespace merging with class, module augmentation, declaration merging, ambient declarations, triple-slash directives, const assertions. Tests: `./wasm/test.sh class_es5_tests`
 
 ## Task Queue
-- [ ] Add ES5 class tests for accessor decorator patterns: accessor decorator basic, accessor decorator with metadata, static accessor decorators
+- [ ] Add ES5 class tests for generic constraint patterns: extends constraints, keyof constraints, conditional types
 
 ## Completed
+- [x] Add ES5 class tests for mixed decorator patterns. Tests: `./wasm/test.sh class_es5_tests`
+- [x] Add ES5 class tests for accessor decorator patterns. Tests: `./wasm/test.sh class_es5_tests`
+- [x] Add ES5 class tests for class decorator patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for property decorator patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for parameter decorator patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for method decorator patterns. Tests: `./wasm/test.sh class_es5_tests`
