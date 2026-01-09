@@ -11905,3 +11905,365 @@ fn test_param_inference_void_callback() {
     let result = ctx.resolve_with_constraints(var_t).unwrap();
     assert_eq!(result, TypeId::STRING);
 }
+
+// ----------------------------------------------------------------------------
+// F-bounded polymorphism and advanced extends clause patterns
+// ----------------------------------------------------------------------------
+
+#[test]
+fn test_f_bounded_comparable() {
+    // Test: interface Comparable<T extends Comparable<T>> { compareTo(other: T): number }
+    // This is the classic F-bounded polymorphism pattern
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // compareTo method
+    let compare_to_fn = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("other")),
+            type_id: TypeId::OBJECT,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::NUMBER,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let comparable_type = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("compareTo"),
+        type_id: compare_to_fn,
+        write_type: compare_to_fn,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    ctx.add_lower_bound(var_t, comparable_type);
+    ctx.add_upper_bound(var_t, TypeId::OBJECT);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, comparable_type);
+}
+
+#[test]
+fn test_f_bounded_builder_pattern() {
+    // Test: class Builder<T extends Builder<T>> { build(): T }
+    // The builder pattern with fluent interface
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    let build_fn = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: Vec::new(),
+        this_type: None,
+        return_type: TypeId::OBJECT, // Returns T (self-referential)
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let set_fn = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("key")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::OBJECT, // Returns this
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let builder_type = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("build"),
+            type_id: build_fn,
+            write_type: build_fn,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+        PropertyInfo {
+            name: interner.intern_string("set"),
+            type_id: set_fn,
+            write_type: set_fn,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+    ]);
+
+    ctx.add_lower_bound(var_t, builder_type);
+    ctx.add_upper_bound(var_t, TypeId::OBJECT);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, builder_type);
+}
+
+#[test]
+fn test_f_bounded_tree_node() {
+    // Test: interface TreeNode<T extends TreeNode<T>> { children: T[] }
+    // Self-referential tree structure
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Children is array of self-type
+    let children_array = interner.array(TypeId::OBJECT);
+
+    let tree_node_type = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("value"),
+            type_id: TypeId::UNKNOWN,
+            write_type: TypeId::UNKNOWN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("children"),
+            type_id: children_array,
+            write_type: children_array,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("parent"),
+            type_id: TypeId::OBJECT,
+            write_type: TypeId::OBJECT,
+            optional: true,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    ctx.add_lower_bound(var_t, tree_node_type);
+    ctx.add_upper_bound(var_t, TypeId::OBJECT);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, tree_node_type);
+}
+
+#[test]
+fn test_f_bounded_cloneable() {
+    // Test: interface Cloneable<T extends Cloneable<T>> { clone(): T }
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    let clone_fn = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: Vec::new(),
+        this_type: None,
+        return_type: TypeId::OBJECT,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let cloneable_type = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("clone"),
+        type_id: clone_fn,
+        write_type: clone_fn,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    ctx.add_lower_bound(var_t, cloneable_type);
+    ctx.add_upper_bound(var_t, TypeId::OBJECT);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, cloneable_type);
+}
+
+#[test]
+fn test_f_bounded_with_additional_constraint() {
+    // Test: T extends Comparable<T> & Serializable
+    // F-bounded with intersection constraint
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    let compare_fn = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("other")),
+            type_id: TypeId::OBJECT,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::NUMBER,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let serialize_fn = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: Vec::new(),
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // Combined type with both Comparable and Serializable methods
+    let combined_type = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("compareTo"),
+            type_id: compare_fn,
+            write_type: compare_fn,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+        PropertyInfo {
+            name: interner.intern_string("serialize"),
+            type_id: serialize_fn,
+            write_type: serialize_fn,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+    ]);
+
+    ctx.add_lower_bound(var_t, combined_type);
+    ctx.add_upper_bound(var_t, TypeId::OBJECT);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, combined_type);
+}
+
+#[test]
+fn test_mutually_recursive_constraints() {
+    // Test: interface A<T extends B<T>>, interface B<T extends A<T>>
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+
+    let type_a = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let type_b = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    ctx.add_lower_bound(var_t, type_a);
+    ctx.add_lower_bound(var_u, type_b);
+    ctx.add_upper_bound(var_t, TypeId::OBJECT);
+    ctx.add_upper_bound(var_u, TypeId::OBJECT);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+    assert_eq!(results.len(), 2);
+}
+
+#[test]
+fn test_extends_clause_with_keyof() {
+    // Test: T extends keyof SomeType
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // keyof SomeType = "a" | "b" | "c"
+    let key_union = interner.union(vec![
+        interner.literal_string("a"),
+        interner.literal_string("b"),
+        interner.literal_string("c"),
+    ]);
+
+    ctx.add_upper_bound(var_t, key_union);
+    ctx.add_lower_bound(var_t, interner.literal_string("a"));
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, interner.literal_string("a"));
+}
+
+#[test]
+fn test_extends_clause_with_mapped_type_key() {
+    // Test: K extends keyof T (common in mapped types)
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let k_name = interner.intern_string("K");
+
+    let var_k = ctx.fresh_type_param(k_name);
+
+    // Simulating keyof T where T = { name: string, age: number }
+    let keys = interner.union(vec![
+        interner.literal_string("name"),
+        interner.literal_string("age"),
+    ]);
+
+    ctx.add_upper_bound(var_k, keys);
+    ctx.add_lower_bound(var_k, interner.literal_string("name"));
+
+    let result = ctx.resolve_with_constraints(var_k).unwrap();
+    assert_eq!(result, interner.literal_string("name"));
+}
+
+#[test]
+fn test_extends_clause_conditional_constraint() {
+    // Test: T extends U ? X : Y pattern constraint
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // T extends string
+    ctx.add_upper_bound(var_t, TypeId::STRING);
+    ctx.add_lower_bound(var_t, interner.literal_string("hello"));
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, interner.literal_string("hello"));
+}
+
+#[test]
+fn test_extends_clause_array_constraint() {
+    // Test: T extends Array<infer U>
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    let string_array = interner.array(TypeId::STRING);
+    ctx.add_lower_bound(var_t, string_array);
+    ctx.add_upper_bound(var_t, TypeId::OBJECT);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, string_array);
+}
