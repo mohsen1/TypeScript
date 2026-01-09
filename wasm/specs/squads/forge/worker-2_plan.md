@@ -15,12 +15,32 @@ Priority: 2
 - [x] Rest parameter inference tests
 - [x] Type guard tests (is, asserts, narrowing)
 - [x] Discriminated union tests (type narrowing, exhaustiveness)
+- [x] Never type tests (impossible values, exhaustiveness)
 
 ## Task Queue
 - [ ] Implement TypeResolver for TypeEvaluator to resolve Refs inside Mapped/Conditional types
 - [ ] This would enable full evaluation of complex patterns like `{ [K in keyof R]: ExtractAction<R[K]> }[keyof R]`
 
 ## Completed
+- [x] Added 30 never type tests including:
+  - Basic never identity and type key lookup
+  - Never in union (absorption) and intersection (domination)
+  - Never function return types (throw, infinite loop)
+  - Never function parameters (assertNever pattern)
+  - Never in arrays, tuples, object properties
+  - Never inference for exhaustive checks
+  - Never in conditional types (true/false branches)
+  - Distributive filtering with never
+  - Empty union = never, all-never union = never
+  - Never generic constraints and defaults
+  - Never in mapped types (no keys = empty object)
+  - Promise<never>, readonly never[]
+  - Switch exhaustiveness patterns
+  - keyof never, never[K] indexed access
+  - Never rest parameters and callbacks
+  - Template literals with never
+  - Overload resolution with never
+  - Methods returning never in classes
 - [x] Added 22 discriminated union tests including:
   - String, number, boolean literal discriminants
   - Multiple discriminant properties
@@ -141,6 +161,7 @@ Worker 2 branch now contains:
 - 26 rest parameter inference tests
 - 26 type guard tests (is, asserts, narrowing)
 - 22 discriminated union tests (type narrowing, exhaustiveness)
+- 30 never type tests (impossible values, exhaustiveness)
 - No modifications to evaluate.rs or other core files
 - Pure test additions that can be safely merged
 
