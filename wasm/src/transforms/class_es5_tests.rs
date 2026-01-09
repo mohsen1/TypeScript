@@ -26893,96 +26893,57 @@ class PipelineBuilder<T extends unknown[]> {
     );
 }
 
-// ============================================================================
-// USING DECLARATIONS PATTERN TESTS
-// ============================================================================
+// =============================================================================
+// RECURSIVE TYPE PATTERNS - ES5 TRANSFORMATION TESTS
+// =============================================================================
 
-/// Test ES5 class with sync using declarations
+/// Test: recursive type aliases
+/// Verifies that classes using recursive type aliases transform correctly to ES5
 #[test]
-fn test_class_es5_using_sync() {
+fn test_class_es5_recursive_type_aliases() {
     let source = r#"
-// Sync using declarations
-class FileHandle {
-    private path: string;
-    private isOpen = true;
+type NestedArray<T> = T | NestedArray<T>[];
+type DeepPartial<T> = T extends object ? { [P in keyof T]?: DeepPartial<T[P]> } : T;
+type DeepReadonly<T> = T extends object ? { readonly [P in keyof T]: DeepReadonly<T[P]> } : T;
 
-    constructor(path: string) {
-        this.path = path;
-        console.log(`Opening file: ${path}`);
-    }
-
-    read(): string {
-        if (!this.isOpen) throw new Error("File is closed");
-        return `Contents of ${this.path}`;
-    }
-
-    write(content: string): void {
-        if (!this.isOpen) throw new Error("File is closed");
-        console.log(`Writing to ${this.path}: ${content}`);
-    }
-
-    [Symbol.dispose](): void {
-        if (this.isOpen) {
-            console.log(`Closing file: ${this.path}`);
-            this.isOpen = false;
+class NestedArrayHandler<T> {
+    flatten(nested: NestedArray<T>): T[] {
+        if (Array.isArray(nested)) {
+            return nested.flatMap(item => this.flatten(item));
         }
-    }
-}
-
-class DatabaseConnection {
-    private connectionString: string;
-    private connected = true;
-
-    constructor(connectionString: string) {
-        this.connectionString = connectionString;
-        console.log(`Connecting to: ${connectionString}`);
+        return [nested];
     }
 
-    query(sql: string): any[] {
-        if (!this.connected) throw new Error("Not connected");
-        return [{ result: sql }];
-    }
-
-    [Symbol.dispose](): void {
-        if (this.connected) {
-            console.log(`Disconnecting from: ${this.connectionString}`);
-            this.connected = false;
+    depth(nested: NestedArray<T>): number {
+        if (Array.isArray(nested)) {
+            if (nested.length === 0) return 1;
+            return 1 + Math.max(...nested.map(item => this.depth(item)));
         }
-    }
-}
-
-class LockManager {
-    private resource: string;
-    private locked = true;
-
-    constructor(resource: string) {
-        this.resource = resource;
-        console.log(`Acquiring lock on: ${resource}`);
+        return 0;
     }
 
-    execute<T>(fn: () => T): T {
-        if (!this.locked) throw new Error("Lock released");
-        return fn();
-    }
-
-    [Symbol.dispose](): void {
-        if (this.locked) {
-            console.log(`Releasing lock on: ${this.resource}`);
-            this.locked = false;
+    wrap(value: T, levels: number): NestedArray<T> {
+        let result: NestedArray<T> = value;
+        for (let i = 0; i < levels; i++) {
+            result = [result];
         }
+        return result;
     }
 }
 
-function processFiles() {
-    using file = new FileHandle("/tmp/test.txt");
-    file.write("Hello");
-    return file.read();
-}
-
-function transactionalQuery() {
-    using db = new DatabaseConnection("postgres://localhost/test");
-    using lock = new LockManager("users_table");
-    return lock.execute(() => db.query("SELECT * FROM users"));
+class DeepTransformHandler {
+    makeDeepPartial<T extends object>(obj: T): DeepPartial<T> {
+        const result: any = {};
+        for (const key of Object.keys(obj)) {
+            const value = (obj as any)[key];
+            if (value && typeof value === "object" && !Array.isArray(value)) {
+                result[key] = this.makeDeepPartial(value);
+            } else {
+                result[key] = value;
+            }
+        }
+        return result;
+    }
 }
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -27000,273 +26961,105 @@ function transactionalQuery() {
 
     let output = printer.get_output().to_string();
 
-    // Classes should be converted
     assert!(
-        output.contains("FileHandle") && output.contains("DatabaseConnection") && output.contains("LockManager"),
-        "Expected sync using declaration classes: {}",
+        output.contains("function NestedArrayHandler"),
+        "Expected NestedArrayHandler function: {}",
         output
     );
-
-    // Functions with using should be present
     assert!(
-        output.contains("processFiles") && output.contains("transactionalQuery"),
-        "Expected functions with using declarations: {}",
+        output.contains("NestedArrayHandler.prototype.flatten"),
+        "Expected flatten method: {}",
         output
     );
-
-    // Symbol.dispose should be present in output
     assert!(
-        output.contains("Symbol.dispose") || output.contains("dispose"),
-        "Expected Symbol.dispose pattern: {}",
+        output.contains("NestedArrayHandler.prototype.depth") && output.contains("NestedArrayHandler.prototype.wrap"),
+        "Expected depth and wrap methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function DeepTransformHandler"),
+        "Expected DeepTransformHandler function: {}",
+        output
+    );
+    assert!(
+        output.contains("DeepTransformHandler.prototype.makeDeepPartial"),
+        "Expected makeDeepPartial method: {}",
         output
     );
 }
 
-/// Test ES5 class with async using declarations
+/// Test: tree structure types
+/// Verifies that classes using tree structure types transform correctly to ES5
 #[test]
-fn test_class_es5_using_async() {
+fn test_class_es5_tree_structure_types() {
     let source = r#"
-// Async using declarations
-class AsyncFileHandle {
-    private path: string;
-    private isOpen = true;
-
-    constructor(path: string) {
-        this.path = path;
-    }
-
-    static async open(path: string): Promise<AsyncFileHandle> {
-        await new Promise(r => setTimeout(r, 10));
-        console.log(`Async opening file: ${path}`);
-        return new AsyncFileHandle(path);
-    }
-
-    async read(): Promise<string> {
-        if (!this.isOpen) throw new Error("File is closed");
-        await new Promise(r => setTimeout(r, 10));
-        return `Contents of ${this.path}`;
-    }
-
-    async write(content: string): Promise<void> {
-        if (!this.isOpen) throw new Error("File is closed");
-        await new Promise(r => setTimeout(r, 10));
-        console.log(`Async writing to ${this.path}: ${content}`);
-    }
-
-    async [Symbol.asyncDispose](): Promise<void> {
-        if (this.isOpen) {
-            await new Promise(r => setTimeout(r, 10));
-            console.log(`Async closing file: ${this.path}`);
-            this.isOpen = false;
-        }
-    }
+interface TreeNode<T> {
+    value: T;
+    children: TreeNode<T>[];
 }
 
-class AsyncDatabaseConnection {
-    private connectionString: string;
-    private connected = true;
-
-    private constructor(connectionString: string) {
-        this.connectionString = connectionString;
-    }
-
-    static async connect(connectionString: string): Promise<AsyncDatabaseConnection> {
-        await new Promise(r => setTimeout(r, 50));
-        console.log(`Async connecting to: ${connectionString}`);
-        return new AsyncDatabaseConnection(connectionString);
-    }
-
-    async query(sql: string): Promise<any[]> {
-        if (!this.connected) throw new Error("Not connected");
-        await new Promise(r => setTimeout(r, 20));
-        return [{ result: sql }];
-    }
-
-    async [Symbol.asyncDispose](): Promise<void> {
-        if (this.connected) {
-            await new Promise(r => setTimeout(r, 30));
-            console.log(`Async disconnecting from: ${this.connectionString}`);
-            this.connected = false;
-        }
-    }
+interface BinaryNode<T> {
+    value: T;
+    left: BinaryNode<T> | null;
+    right: BinaryNode<T> | null;
 }
 
-class AsyncTransaction {
-    private db: AsyncDatabaseConnection;
-    private committed = false;
-    private rolledBack = false;
-
-    constructor(db: AsyncDatabaseConnection) {
-        this.db = db;
+class TreeBuilder<T> {
+    createNode(value: T, children: TreeNode<T>[] = []): TreeNode<T> {
+        return { value, children };
     }
 
-    async commit(): Promise<void> {
-        await new Promise(r => setTimeout(r, 10));
-        this.committed = true;
-        console.log("Transaction committed");
+    addChild(parent: TreeNode<T>, child: TreeNode<T>): void {
+        parent.children.push(child);
     }
 
-    async rollback(): Promise<void> {
-        await new Promise(r => setTimeout(r, 10));
-        this.rolledBack = true;
-        console.log("Transaction rolled back");
-    }
-
-    async [Symbol.asyncDispose](): Promise<void> {
-        if (!this.committed && !this.rolledBack) {
-            await this.rollback();
-        }
-    }
-}
-
-async function asyncProcessFiles() {
-    await using file = await AsyncFileHandle.open("/tmp/async.txt");
-    await file.write("Async Hello");
-    return await file.read();
-}
-
-async function asyncTransactionalQuery() {
-    await using db = await AsyncDatabaseConnection.connect("postgres://localhost/test");
-    await using tx = new AsyncTransaction(db);
-    const result = await db.query("SELECT * FROM users");
-    await tx.commit();
-    return result;
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Classes should be converted
-    assert!(
-        output.contains("AsyncFileHandle") && output.contains("AsyncDatabaseConnection") && output.contains("AsyncTransaction"),
-        "Expected async using declaration classes: {}",
-        output
-    );
-
-    // Async functions should be present
-    assert!(
-        output.contains("asyncProcessFiles") && output.contains("asyncTransactionalQuery"),
-        "Expected async functions: {}",
-        output
-    );
-}
-
-/// Test ES5 class with dispose patterns
-#[test]
-fn test_class_es5_using_dispose_patterns() {
-    let source = r#"
-// Dispose patterns
-interface Disposable {
-    [Symbol.dispose](): void;
-}
-
-interface AsyncDisposable {
-    [Symbol.asyncDispose](): Promise<void>;
-}
-
-class ResourcePool<T extends Disposable> {
-    private resources: T[] = [];
-    private available: T[] = [];
-
-    constructor(private factory: () => T, private maxSize: number) {
-        for (let i = 0; i < maxSize; i++) {
-            const resource = factory();
-            this.resources.push(resource);
-            this.available.push(resource);
+    traverse(node: TreeNode<T>, callback: (value: T) => void): void {
+        callback(node.value);
+        for (const child of node.children) {
+            this.traverse(child, callback);
         }
     }
 
-    acquire(): T {
-        const resource = this.available.pop();
-        if (!resource) throw new Error("No available resources");
-        return resource;
-    }
-
-    release(resource: T): void {
-        if (this.resources.includes(resource)) {
-            this.available.push(resource);
+    find(node: TreeNode<T>, predicate: (value: T) => boolean): TreeNode<T> | null {
+        if (predicate(node.value)) {
+            return node;
         }
-    }
-
-    [Symbol.dispose](): void {
-        for (const resource of this.resources) {
-            resource[Symbol.dispose]();
+        for (const child of node.children) {
+            const found = this.find(child, predicate);
+            if (found) return found;
         }
-        this.resources = [];
-        this.available = [];
+        return null;
     }
 }
 
-class DisposableStack {
-    private stack: Disposable[] = [];
-
-    use<T extends Disposable>(resource: T): T {
-        this.stack.push(resource);
-        return resource;
+class BinaryTreeBuilder<T> {
+    createNode(value: T): BinaryNode<T> {
+        return { value, left: null, right: null };
     }
 
-    defer(fn: () => void): void {
-        this.stack.push({ [Symbol.dispose]: fn });
-    }
-
-    [Symbol.dispose](): void {
-        while (this.stack.length > 0) {
-            const resource = this.stack.pop()!;
-            try {
-                resource[Symbol.dispose]();
-            } catch (e) {
-                console.error("Error during disposal:", e);
+    insert(root: BinaryNode<number>, value: number): void {
+        if (value < root.value) {
+            if (root.left === null) {
+                root.left = this.createNode(value) as any;
+            } else {
+                this.insert(root.left as any, value);
+            }
+        } else {
+            if (root.right === null) {
+                root.right = this.createNode(value) as any;
+            } else {
+                this.insert(root.right as any, value);
             }
         }
     }
-}
 
-class Timer implements Disposable {
-    private startTime: number;
-    private name: string;
-
-    constructor(name: string) {
-        this.name = name;
-        this.startTime = Date.now();
-        console.log(`Timer '${name}' started`);
+    inOrder(node: BinaryNode<T> | null, result: T[] = []): T[] {
+        if (node === null) return result;
+        this.inOrder(node.left, result);
+        result.push(node.value);
+        this.inOrder(node.right, result);
+        return result;
     }
-
-    elapsed(): number {
-        return Date.now() - this.startTime;
-    }
-
-    [Symbol.dispose](): void {
-        console.log(`Timer '${this.name}' stopped: ${this.elapsed()}ms`);
-    }
-}
-
-function timedOperation() {
-    using timer = new Timer("operation");
-    using stack = new DisposableStack();
-
-    stack.defer(() => console.log("Cleanup 1"));
-    stack.defer(() => console.log("Cleanup 2"));
-
-    // Do some work
-    let sum = 0;
-    for (let i = 0; i < 1000; i++) {
-        sum += i;
-    }
-
-    console.log(`Operation completed: ${timer.elapsed()}ms`);
-    return sum;
 }
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -27284,136 +27077,118 @@ function timedOperation() {
 
     let output = printer.get_output().to_string();
 
-    // Classes should be converted
     assert!(
-        output.contains("ResourcePool") && output.contains("DisposableStack") && output.contains("Timer"),
-        "Expected dispose pattern classes: {}",
+        output.contains("function TreeBuilder"),
+        "Expected TreeBuilder function: {}",
         output
     );
-
-    // Function should be present
     assert!(
-        output.contains("timedOperation"),
-        "Expected timedOperation function: {}",
+        output.contains("TreeBuilder.prototype.createNode") && output.contains("TreeBuilder.prototype.addChild"),
+        "Expected createNode and addChild methods: {}",
         output
     );
-
-    // Interfaces should be stripped
     assert!(
-        !output.contains("interface Disposable") && !output.contains("interface AsyncDisposable"),
-        "Expected interfaces to be stripped: {}",
+        output.contains("TreeBuilder.prototype.traverse") && output.contains("TreeBuilder.prototype.find"),
+        "Expected traverse and find methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function BinaryTreeBuilder"),
+        "Expected BinaryTreeBuilder function: {}",
+        output
+    );
+    assert!(
+        output.contains("BinaryTreeBuilder.prototype.insert") && output.contains("BinaryTreeBuilder.prototype.inOrder"),
+        "Expected insert and inOrder methods: {}",
         output
     );
 }
 
-/// Test ES5 class with Symbol.dispose implementation
+/// Test: linked list types
+/// Verifies that classes using linked list types transform correctly to ES5
 #[test]
-fn test_class_es5_using_symbol_dispose() {
+fn test_class_es5_linked_list_types() {
     let source = r#"
-// Symbol.dispose implementation patterns
-class ManagedBuffer {
-    private buffer: ArrayBuffer;
-    private view: DataView;
-    private disposed = false;
-
-    constructor(size: number) {
-        this.buffer = new ArrayBuffer(size);
-        this.view = new DataView(this.buffer);
-        console.log(`Allocated ${size} bytes`);
-    }
-
-    write(offset: number, value: number): void {
-        if (this.disposed) throw new Error("Buffer disposed");
-        this.view.setInt32(offset, value);
-    }
-
-    read(offset: number): number {
-        if (this.disposed) throw new Error("Buffer disposed");
-        return this.view.getInt32(offset);
-    }
-
-    get size(): number {
-        return this.buffer.byteLength;
-    }
-
-    [Symbol.dispose](): void {
-        if (!this.disposed) {
-            console.log(`Freeing ${this.size} bytes`);
-            this.disposed = true;
-        }
-    }
+interface ListNode<T> {
+    value: T;
+    next: ListNode<T> | null;
 }
 
-class EventSubscription {
-    private target: EventTarget;
-    private type: string;
-    private handler: EventListener;
-    private active = true;
-
-    constructor(target: EventTarget, type: string, handler: EventListener) {
-        this.target = target;
-        this.type = type;
-        this.handler = handler;
-        target.addEventListener(type, handler);
-    }
-
-    [Symbol.dispose](): void {
-        if (this.active) {
-            this.target.removeEventListener(this.type, this.handler);
-            this.active = false;
-        }
-    }
+interface DoublyLinkedNode<T> {
+    value: T;
+    prev: DoublyLinkedNode<T> | null;
+    next: DoublyLinkedNode<T> | null;
 }
 
-class IntervalHandle {
-    private id: number;
-    private active = true;
+class LinkedList<T> {
+    private head: ListNode<T> | null = null;
+    private tail: ListNode<T> | null = null;
 
-    constructor(callback: () => void, ms: number) {
-        this.id = setInterval(callback, ms) as unknown as number;
-    }
-
-    [Symbol.dispose](): void {
-        if (this.active) {
-            clearInterval(this.id);
-            this.active = false;
-        }
-    }
-}
-
-class TimeoutHandle {
-    private id: number;
-    private active = true;
-
-    constructor(callback: () => void, ms: number) {
-        this.id = setTimeout(callback, ms) as unknown as number;
-    }
-
-    cancel(): void {
-        if (this.active) {
-            clearTimeout(this.id);
-            this.active = false;
+    append(value: T): void {
+        const node: ListNode<T> = { value, next: null };
+        if (this.tail === null) {
+            this.head = node;
+            this.tail = node;
+        } else {
+            this.tail.next = node;
+            this.tail = node;
         }
     }
 
-    [Symbol.dispose](): void {
-        this.cancel();
+    prepend(value: T): void {
+        const node: ListNode<T> = { value, next: this.head };
+        this.head = node;
+        if (this.tail === null) {
+            this.tail = node;
+        }
+    }
+
+    toArray(): T[] {
+        const result: T[] = [];
+        let current = this.head;
+        while (current !== null) {
+            result.push(current.value);
+            current = current.next;
+        }
+        return result;
+    }
+
+    find(predicate: (value: T) => boolean): T | undefined {
+        let current = this.head;
+        while (current !== null) {
+            if (predicate(current.value)) {
+                return current.value;
+            }
+            current = current.next;
+        }
+        return undefined;
     }
 }
 
-function managedBufferDemo() {
-    using buffer = new ManagedBuffer(1024);
-    buffer.write(0, 42);
-    buffer.write(4, 100);
-    return buffer.read(0) + buffer.read(4);
-}
+class DoublyLinkedList<T> {
+    private head: DoublyLinkedNode<T> | null = null;
+    private tail: DoublyLinkedNode<T> | null = null;
 
-function intervalDemo(callback: () => void) {
-    using interval = new IntervalHandle(callback, 100);
-    using timeout = new TimeoutHandle(() => {
-        console.log("Timeout completed");
-    }, 500);
-    // The handles will be disposed when the function returns
+    append(value: T): void {
+        const node: DoublyLinkedNode<T> = { value, prev: this.tail, next: null };
+        if (this.tail !== null) {
+            this.tail.next = node;
+        }
+        this.tail = node;
+        if (this.head === null) {
+            this.head = node;
+        }
+    }
+
+    reverse(): T[] {
+        const result: T[] = [];
+        let current = this.tail;
+        while (current !== null) {
+            result.push(current.value);
+            current = current.prev;
+        }
+        return result;
+    }
 }
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -27431,24 +27206,394 @@ function intervalDemo(callback: () => void) {
 
     let output = printer.get_output().to_string();
 
-    // Classes should be converted
     assert!(
-        output.contains("ManagedBuffer") && output.contains("EventSubscription") && output.contains("IntervalHandle"),
-        "Expected Symbol.dispose classes: {}",
+        output.contains("function LinkedList"),
+        "Expected LinkedList function: {}",
         output
     );
-
-    // TimeoutHandle should be present
     assert!(
-        output.contains("TimeoutHandle"),
-        "Expected TimeoutHandle class: {}",
+        output.contains("LinkedList.prototype.append") && output.contains("LinkedList.prototype.prepend"),
+        "Expected append and prepend methods: {}",
         output
     );
-
-    // Functions should be present
     assert!(
-        output.contains("managedBufferDemo") && output.contains("intervalDemo"),
-        "Expected demo functions: {}",
+        output.contains("LinkedList.prototype.toArray") && output.contains("LinkedList.prototype.find"),
+        "Expected toArray and find methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function DoublyLinkedList"),
+        "Expected DoublyLinkedList function: {}",
+        output
+    );
+    assert!(
+        output.contains("DoublyLinkedList.prototype.append") && output.contains("DoublyLinkedList.prototype.reverse"),
+        "Expected DoublyLinkedList methods: {}",
+        output
+    );
+}
+
+/// Test: JSON-like recursive types
+/// Verifies that classes using JSON-like recursive types transform correctly to ES5
+#[test]
+fn test_class_es5_json_recursive_types() {
+    let source = r#"
+type JSONValue = string | number | boolean | null | JSONObject | JSONArray;
+interface JSONObject { [key: string]: JSONValue }
+interface JSONArray extends Array<JSONValue> {}
+
+type DeepJSON<T> = T extends object
+    ? { [K in keyof T]: DeepJSON<T[K]> }
+    : T;
+
+class JSONProcessor {
+    stringify(value: JSONValue): string {
+        return JSON.stringify(value);
+    }
+
+    parse(text: string): JSONValue {
+        return JSON.parse(text);
+    }
+
+    deepClone(value: JSONValue): JSONValue {
+        if (value === null || typeof value !== "object") {
+            return value;
+        }
+        if (Array.isArray(value)) {
+            return value.map(item => this.deepClone(item));
+        }
+        const result: JSONObject = {};
+        for (const key of Object.keys(value)) {
+            result[key] = this.deepClone(value[key]);
+        }
+        return result;
+    }
+
+    merge(target: JSONObject, source: JSONObject): JSONObject {
+        const result: JSONObject = { ...target };
+        for (const key of Object.keys(source)) {
+            const targetVal = target[key];
+            const sourceVal = source[key];
+            if (
+                targetVal && typeof targetVal === "object" && !Array.isArray(targetVal) &&
+                sourceVal && typeof sourceVal === "object" && !Array.isArray(sourceVal)
+            ) {
+                result[key] = this.merge(targetVal as JSONObject, sourceVal as JSONObject);
+            } else {
+                result[key] = sourceVal;
+            }
+        }
+        return result;
+    }
+}
+
+class JSONValidator {
+    isValidJSON(value: unknown): value is JSONValue {
+        if (value === null) return true;
+        const type = typeof value;
+        if (type === "string" || type === "number" || type === "boolean") return true;
+        if (Array.isArray(value)) {
+            return value.every(item => this.isValidJSON(item));
+        }
+        if (type === "object") {
+            return Object.values(value as object).every(v => this.isValidJSON(v));
+        }
+        return false;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function JSONProcessor"),
+        "Expected JSONProcessor function: {}",
+        output
+    );
+    assert!(
+        output.contains("JSONProcessor.prototype.stringify") && output.contains("JSONProcessor.prototype.parse"),
+        "Expected stringify and parse methods: {}",
+        output
+    );
+    assert!(
+        output.contains("JSONProcessor.prototype.deepClone") && output.contains("JSONProcessor.prototype.merge"),
+        "Expected deepClone and merge methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function JSONValidator"),
+        "Expected JSONValidator function: {}",
+        output
+    );
+    assert!(
+        output.contains("JSONValidator.prototype.isValidJSON"),
+        "Expected isValidJSON method: {}",
+        output
+    );
+}
+
+/// Test: nested object recursive types
+/// Verifies that classes using nested object types transform correctly to ES5
+#[test]
+fn test_class_es5_nested_object_types() {
+    let source = r#"
+type NestedRecord<T> = {
+    [key: string]: T | NestedRecord<T>;
+};
+
+type PathValue<T, P extends string> = P extends `${infer K}.${infer R}`
+    ? K extends keyof T
+        ? PathValue<T[K], R>
+        : never
+    : P extends keyof T
+        ? T[P]
+        : never;
+
+class NestedObjectHandler<T> {
+    private data: NestedRecord<T>;
+
+    constructor(data: NestedRecord<T>) {
+        this.data = data;
+    }
+
+    get(path: string): T | NestedRecord<T> | undefined {
+        const parts = path.split(".");
+        let current: any = this.data;
+        for (const part of parts) {
+            if (current === undefined || current === null) return undefined;
+            current = current[part];
+        }
+        return current;
+    }
+
+    set(path: string, value: T): void {
+        const parts = path.split(".");
+        let current: any = this.data;
+        for (let i = 0; i < parts.length - 1; i++) {
+            const part = parts[i];
+            if (!(part in current)) {
+                current[part] = {};
+            }
+            current = current[part];
+        }
+        current[parts[parts.length - 1]] = value;
+    }
+
+    flatten(prefix: string = ""): Record<string, T> {
+        const result: Record<string, T> = {};
+        const flatten = (obj: NestedRecord<T>, path: string) => {
+            for (const key of Object.keys(obj)) {
+                const fullPath = path ? path + "." + key : key;
+                const value = obj[key];
+                if (value && typeof value === "object" && !Array.isArray(value)) {
+                    flatten(value as NestedRecord<T>, fullPath);
+                } else {
+                    result[fullPath] = value as T;
+                }
+            }
+        };
+        flatten(this.data, prefix);
+        return result;
+    }
+}
+
+class PathAccessor {
+    getPath<T, P extends string>(obj: T, path: P): unknown {
+        const parts = (path as string).split(".");
+        let current: any = obj;
+        for (const part of parts) {
+            if (current === undefined) return undefined;
+            current = current[part];
+        }
+        return current;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function NestedObjectHandler"),
+        "Expected NestedObjectHandler function: {}",
+        output
+    );
+    assert!(
+        output.contains("this.data = data"),
+        "Expected constructor assignment: {}",
+        output
+    );
+    assert!(
+        output.contains("NestedObjectHandler.prototype.get") && output.contains("NestedObjectHandler.prototype.set"),
+        "Expected get and set methods: {}",
+        output
+    );
+    assert!(
+        output.contains("NestedObjectHandler.prototype.flatten"),
+        "Expected flatten method: {}",
+        output
+    );
+    assert!(
+        output.contains("function PathAccessor"),
+        "Expected PathAccessor function: {}",
+        output
+    );
+    assert!(
+        output.contains("PathAccessor.prototype.getPath"),
+        "Expected getPath method: {}",
+        output
+    );
+}
+
+/// Test: combined recursive type patterns
+/// Verifies that classes using multiple recursive type patterns together transform correctly to ES5
+#[test]
+fn test_class_es5_combined_recursive_patterns() {
+    let source = r#"
+interface FileSystemNode {
+    name: string;
+    type: "file" | "directory";
+    children?: FileSystemNode[];
+    size?: number;
+}
+
+type DeepMutable<T> = {
+    -readonly [P in keyof T]: DeepMutable<T[P]>;
+};
+
+type Flatten<T> = T extends Array<infer U> ? Flatten<U> : T;
+
+class FileSystem {
+    private root: FileSystemNode;
+
+    constructor() {
+        this.root = { name: "/", type: "directory", children: [] };
+    }
+
+    createFile(path: string, size: number): void {
+        const parts = path.split("/").filter(p => p);
+        let current = this.root;
+        for (let i = 0; i < parts.length - 1; i++) {
+            const dir = current.children?.find(c => c.name === parts[i] && c.type === "directory");
+            if (!dir) throw new Error("Directory not found");
+            current = dir;
+        }
+        current.children = current.children || [];
+        current.children.push({ name: parts[parts.length - 1], type: "file", size });
+    }
+
+    createDirectory(path: string): void {
+        const parts = path.split("/").filter(p => p);
+        let current = this.root;
+        for (const part of parts) {
+            let dir = current.children?.find(c => c.name === part && c.type === "directory");
+            if (!dir) {
+                dir = { name: part, type: "directory", children: [] };
+                current.children = current.children || [];
+                current.children.push(dir);
+            }
+            current = dir;
+        }
+    }
+
+    getTotalSize(node: FileSystemNode = this.root): number {
+        if (node.type === "file") {
+            return node.size || 0;
+        }
+        return (node.children || []).reduce((sum, child) => sum + this.getTotalSize(child), 0);
+    }
+
+    listAll(node: FileSystemNode = this.root, path: string = ""): string[] {
+        const currentPath = path + "/" + node.name;
+        if (node.type === "file") {
+            return [currentPath];
+        }
+        const files: string[] = [];
+        for (const child of node.children || []) {
+            files.push(...this.listAll(child, currentPath));
+        }
+        return files;
+    }
+}
+
+class RecursiveFlattener {
+    flattenDeep<T>(arr: T[]): Flatten<T>[] {
+        const result: any[] = [];
+        const flatten = (items: any[]) => {
+            for (const item of items) {
+                if (Array.isArray(item)) {
+                    flatten(item);
+                } else {
+                    result.push(item);
+                }
+            }
+        };
+        flatten(arr);
+        return result;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function FileSystem"),
+        "Expected FileSystem function: {}",
+        output
+    );
+    assert!(
+        output.contains("FileSystem.prototype.createFile") && output.contains("FileSystem.prototype.createDirectory"),
+        "Expected createFile and createDirectory methods: {}",
+        output
+    );
+    assert!(
+        output.contains("FileSystem.prototype.getTotalSize") && output.contains("FileSystem.prototype.listAll"),
+        "Expected getTotalSize and listAll methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function RecursiveFlattener"),
+        "Expected RecursiveFlattener function: {}",
+        output
+    );
+    assert!(
+        output.contains("RecursiveFlattener.prototype.flattenDeep"),
+        "Expected flattenDeep method: {}",
         output
     );
 }
