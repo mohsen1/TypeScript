@@ -7,7 +7,22 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-Awaiting new assignment.
+Add ES5 conditional type expression source map tests
+
+Per GOALS.md Objective 2: Source map validation
+
+Steps:
+1. Add 6 ES5 conditional type expression source map tests to `wasm/src/source_map_tests.rs`:
+   - Conditional type with infer
+   - Distributive conditional type
+   - Nested conditional types
+   - Conditional type in function return
+   - Conditional type with union
+   - Combined conditional patterns
+2. Run `./wasm/test.sh source_map` to verify all tests pass
+3. Commit with message: `[wasm] source_map: add conditional type expression tests`
+4. Push to `origin/worker/anvil-3`
+5. Update this plan file and push
 
 **Sync instructions**: Use squad/anvil (not origin/rust):
 ```
@@ -15,9 +30,11 @@ git fetch origin && git reset --hard origin/squad/anvil
 ```
 
 ## Task Queue
-(empty - awaiting new assignments from EM)
+(empty - will receive new tasks from EM after completing current assignment)
 
 ## Completed
+- [x] Added type parameter constraint ES5 source map tests (generic function, generic class, generic interface, multiple params, union constraints, comprehensive); 881 tests pass.
+- [x] Added private class features ES5 source map tests (private field read, private field write, private method call, private accessor, private static members, comprehensive); 875 tests pass.
 - [x] Added generator transform ES5 source map tests (basic yield mapping, multiple yields, yield* delegation, class method, try/finally cleanup, comprehensive); 869 tests pass.
 - [x] Added async/class integration ES5 source map tests (derived class super call, async arrow field initializer, static this capture, generator method, constructor simulation, comprehensive); 863 tests pass.
 - [x] Added class static block ES5 source map tests (basic, init order, multiple, private field access, private method access, static field init, computed props, async patterns, error handling, comprehensive); 857 tests pass.
