@@ -7,7 +7,28 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-None - awaiting new task
+Add async ES5 tests for class decorator async method patterns
+
+Per GOALS.md Objective 1: ES5 downleveling correctness
+
+Steps:
+1. Add 12 async class decorator tests to `wasm/src/transforms/async_es5_tests.rs`:
+   - Decorated async method basic
+   - Multiple decorators on async method
+   - Decorator factory with async
+   - Static async decorated method
+   - Async accessor decorator
+   - Decorated async with super call
+   - Parameter decorator in async method
+   - Async method with class decorator
+   - Decorator with async body
+   - body_contains_await in decorators
+   - ignores nested async patterns
+   - Combined decorator async patterns
+2. Run `./wasm/test.sh async_es5_tests` to verify all tests pass
+3. Commit with message: `[wasm] async_es5: add class decorator async method tests`
+4. Push to `origin/worker/anvil-5`
+5. Update this plan file and push
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)
