@@ -7,9 +7,10 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-None - awaiting next task assignment.
+- [ ] Add async ES5 tests for async error handling patterns: try/catch, finally, error propagation. Tests: `./wasm/test.sh async_es5_tests`
 
 ## Task Queue
+- [ ] Add async ES5 tests for async cancellation patterns: AbortController, signal, cancel token
 
 
 ## Completed
