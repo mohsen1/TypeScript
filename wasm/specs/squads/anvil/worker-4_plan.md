@@ -126,8 +126,13 @@ node wasm/differential-test/conformance-runner.mjs --max=200 -v 2>&1 | grep -E "
 
 Target: Reduce TS1005+TS1068 false positives from 60 to <20.
 
+## Progress
+- Updated `wasm/src/thin_parser.rs` to allow `var` as a class member name and to broaden angle-bracket type assertion detection.
+- Added parser regression tests in `wasm/src/thin_parser_tests.rs` for arrow functions in object literals, angle-bracket type assertions (including literal types), TSX generic arrows with trailing commas, and class members named `var`.
+- Pending: run conformance runner; push to origin blocked by SSH permission (git@github.com: Permission denied).
+
 ## Status
-Active
+Active (changes committed; push blocked)
 
 ## Notes
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`

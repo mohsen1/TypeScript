@@ -22384,10 +22384,7 @@ fn test_this_type_with_promise() {
     let interner = TypeInterner::new();
 
     let this_type = interner.intern(TypeKey::ThisType);
-    let promise_this = interner.intern(TypeKey::Application {
-        target: interner.reference(SymbolRef(100)), // Promise
-        args: vec![this_type],
-    });
+    let promise_this = interner.application(interner.reference(SymbolRef(100)), vec![this_type]);
 
     let async_method = interner.function(FunctionShape {
         type_params: vec![],
@@ -22459,10 +22456,7 @@ fn test_this_type_with_readonly() {
     let this_type = interner.intern(TypeKey::ThisType);
 
     // Simulated Readonly<this> as application
-    let readonly_this = interner.intern(TypeKey::Application {
-        target: interner.reference(SymbolRef(100)), // Readonly
-        args: vec![this_type],
-    });
+    let readonly_this = interner.application(interner.reference(SymbolRef(100)), vec![this_type]);
 
     assert!(readonly_this != TypeId::ERROR);
 }
@@ -22474,10 +22468,7 @@ fn test_this_type_partial() {
 
     let this_type = interner.intern(TypeKey::ThisType);
 
-    let partial_this = interner.intern(TypeKey::Application {
-        target: interner.reference(SymbolRef(101)), // Partial
-        args: vec![this_type],
-    });
+    let partial_this = interner.application(interner.reference(SymbolRef(101)), vec![this_type]);
 
     assert!(partial_this != TypeId::ERROR);
 }
@@ -22501,10 +22492,7 @@ fn test_this_type_indexed_access() {
     let this_type = interner.intern(TypeKey::ThisType);
     let k_ref = interner.reference(SymbolRef(50));
 
-    let indexed = interner.intern(TypeKey::IndexedAccess {
-        object_type: this_type,
-        index_type: k_ref,
-    });
+    let indexed = interner.intern(TypeKey::IndexAccess(this_type, k_ref));
 
     assert!(indexed != TypeId::ERROR);
 }
@@ -22823,10 +22811,7 @@ fn test_this_type_query_builder() {
 
     let this_type = interner.intern(TypeKey::ThisType);
     let result_array = interner.array(interner.reference(SymbolRef(100)));
-    let promise_results = interner.intern(TypeKey::Application {
-        target: interner.reference(SymbolRef(101)), // Promise
-        args: vec![result_array],
-    });
+    let promise_results = interner.application(interner.reference(SymbolRef(101)), vec![result_array]);
 
     let where_method = interner.function(FunctionShape {
         type_params: vec![],

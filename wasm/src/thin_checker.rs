@@ -18,7 +18,7 @@ use crate::parser::NodeIndex;
 use crate::parser::thin_node::ThinNodeArena;
 use crate::parser::syntax_kind_ext;
 use crate::scanner::SyntaxKind;
-use crate::binder::{ScopeId, SymbolId, symbol_flags};
+use crate::binder::{ContainerKind, ScopeId, SymbolId, symbol_flags};
 use crate::thin_binder::ThinBinderState;
 use crate::solver::{TypeId, TypeInterner, ContextualTypeContext};
 use crate::checker::types::diagnostics::{
@@ -248,18 +248,31 @@ impl<'a> ThinCheckerState<'a> {
         let name = self.ctx.arena.get_identifier(node)?.escaped_text.as_str();
 
         if let Some(mut scope_id) = self.find_enclosing_scope(idx) {
+            let mut require_export = false;
             while !scope_id.is_none() {
                 if let Some(scope) = self.ctx.binder.scopes.get(scope_id.0 as usize) {
                     if let Some(sym_id) = scope.table.get(name) {
                         if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
-                            if !Self::is_class_member_symbol(symbol.flags) {
+                            let export_ok = !require_export
+                                || scope.kind != ContainerKind::Module
+                                || symbol.is_exported
+                                || (symbol.flags & symbol_flags::EXPORT_VALUE) != 0;
+                            if export_ok && !Self::is_class_member_symbol(symbol.flags) {
                                 return Some(sym_id);
                             }
-                        } else {
+                        } else if !require_export || scope.kind != ContainerKind::Module {
                             return Some(sym_id);
                         }
                     }
-                    scope_id = scope.parent;
+                    let parent_id = scope.parent;
+                    if scope.kind == ContainerKind::Module {
+                        if let Some(parent_scope) = self.ctx.binder.scopes.get(parent_id.0 as usize) {
+                            require_export = parent_scope.kind == ContainerKind::Module;
+                        } else {
+                            require_export = false;
+                        }
+                    }
+                    scope_id = parent_id;
                 } else {
                     break;
                 }
@@ -3037,6 +3050,11 @@ impl<'a> ThinCheckerState<'a> {
                 return TypeId::ERROR;
             }
             let declared_type = self.get_type_of_symbol(sym_id);
+            if self.should_check_definite_assignment(sym_id, idx)
+                && !self.is_definitely_assigned_at(idx)
+            {
+                self.error_variable_used_before_assigned_at(name, idx);
+            }
             return self.apply_flow_narrowing(idx, declared_type);
         }
 
@@ -3152,6 +3170,218 @@ impl<'a> ThinCheckerState<'a> {
         // Could also check for types that include null/undefined
         // For now, only narrow unions
         false
+    }
+
+    fn should_check_definite_assignment(&self, sym_id: SymbolId, idx: NodeIndex) -> bool {
+        let Some(symbol) = self.ctx.binder.get_symbol(sym_id) else {
+            return false;
+        };
+
+        if (symbol.flags & symbol_flags::VARIABLE) == 0 {
+            return false;
+        }
+
+        if self.symbol_is_parameter(sym_id) {
+            return false;
+        }
+
+        if self.symbol_has_definite_assignment_assertion(sym_id) {
+            return false;
+        }
+
+        if self.is_for_in_of_assignment_target(idx) {
+            return false;
+        }
+
+        // Skip if the variable declaration has an initializer
+        if self.symbol_has_initializer(sym_id) {
+            return false;
+        }
+
+        // Skip if the variable is in an ambient context (declare var x: T)
+        if self.symbol_is_in_ambient_context(sym_id) {
+            return false;
+        }
+
+        true
+    }
+
+    /// Check if a variable symbol is in an ambient context (declared with `declare`).
+    fn symbol_is_in_ambient_context(&self, sym_id: SymbolId) -> bool {
+        let Some(symbol) = self.ctx.binder.get_symbol(sym_id) else {
+            return false;
+        };
+
+        for &decl_idx in &symbol.declarations {
+            // Check if the variable statement has a declare modifier
+            if let Some(var_stmt_idx) = self.find_enclosing_variable_statement(decl_idx) {
+                if let Some(var_stmt_node) = self.ctx.arena.get(var_stmt_idx) {
+                    if let Some(var_stmt) = self.ctx.arena.get_variable(var_stmt_node) {
+                        if self.has_declare_modifier(&var_stmt.modifiers) {
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            // Also check node flags for AMBIENT
+            if let Some(node) = self.ctx.arena.get(decl_idx) {
+                if (node.flags as u32) & crate::parser::node_flags::AMBIENT != 0 {
+                    return true;
+                }
+            }
+        }
+
+        false
+    }
+
+    /// Find the enclosing variable statement for a node.
+    fn find_enclosing_variable_statement(&self, idx: NodeIndex) -> Option<NodeIndex> {
+        let mut current = idx;
+        while !current.is_none() {
+            if let Some(node) = self.ctx.arena.get(current) {
+                if node.kind == syntax_kind_ext::VARIABLE_STATEMENT {
+                    return Some(current);
+                }
+            }
+            let ext = self.ctx.arena.get_extended(current)?;
+            if ext.parent.is_none() {
+                return None;
+            }
+            current = ext.parent;
+        }
+        None
+    }
+
+    /// Check if a variable symbol's declaration has an initializer.
+    fn symbol_has_initializer(&self, sym_id: SymbolId) -> bool {
+        let Some(symbol) = self.ctx.binder.get_symbol(sym_id) else {
+            return false;
+        };
+
+        for &decl_idx in &symbol.declarations {
+            let Some(var_decl_idx) = self.find_enclosing_variable_declaration(decl_idx) else {
+                continue;
+            };
+            let Some(var_decl_node) = self.ctx.arena.get(var_decl_idx) else {
+                continue;
+            };
+            let Some(var_decl) = self.ctx.arena.get_variable_declaration(var_decl_node) else {
+                continue;
+            };
+            // Variable has an initializer - it's definitely assigned at declaration
+            if !var_decl.initializer.is_none() {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    fn is_definitely_assigned_at(&self, idx: NodeIndex) -> bool {
+        let flow_node = match self.ctx.binder.get_node_flow(idx) {
+            Some(flow) => flow,
+            None => return true,
+        };
+        let analyzer = FlowAnalyzer::new(self.ctx.arena, self.ctx.binder, self.ctx.types);
+        analyzer.is_definitely_assigned(idx, flow_node)
+    }
+
+    fn symbol_is_parameter(&self, sym_id: SymbolId) -> bool {
+        let Some(symbol) = self.ctx.binder.get_symbol(sym_id) else {
+            return false;
+        };
+
+        symbol
+            .declarations
+            .iter()
+            .any(|&decl_idx| self.node_is_or_within_kind(decl_idx, syntax_kind_ext::PARAMETER))
+    }
+
+    fn symbol_has_definite_assignment_assertion(&self, sym_id: SymbolId) -> bool {
+        let Some(symbol) = self.ctx.binder.get_symbol(sym_id) else {
+            return false;
+        };
+
+        for &decl_idx in &symbol.declarations {
+            let Some(var_decl_idx) = self.find_enclosing_variable_declaration(decl_idx) else {
+                continue;
+            };
+            let Some(var_decl_node) = self.ctx.arena.get(var_decl_idx) else {
+                continue;
+            };
+            let Some(var_decl) = self.ctx.arena.get_variable_declaration(var_decl_node) else {
+                continue;
+            };
+            if var_decl.exclamation_token {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    fn find_enclosing_variable_declaration(&self, idx: NodeIndex) -> Option<NodeIndex> {
+        let mut current = idx;
+        loop {
+            let node = self.ctx.arena.get(current)?;
+            if node.kind == syntax_kind_ext::VARIABLE_DECLARATION {
+                return Some(current);
+            }
+            let ext = self.ctx.arena.get_extended(current)?;
+            if ext.parent.is_none() {
+                return None;
+            }
+            current = ext.parent;
+        }
+    }
+
+    fn node_is_or_within_kind(&self, idx: NodeIndex, kind: u16) -> bool {
+        let mut current = idx;
+        loop {
+            let node = match self.ctx.arena.get(current) {
+                Some(node) => node,
+                None => return false,
+            };
+            if node.kind == kind {
+                return true;
+            }
+            let ext = match self.ctx.arena.get_extended(current) {
+                Some(ext) => ext,
+                None => return false,
+            };
+            if ext.parent.is_none() {
+                return false;
+            }
+            current = ext.parent;
+        }
+    }
+
+    fn is_for_in_of_assignment_target(&self, idx: NodeIndex) -> bool {
+        let mut current = idx;
+        loop {
+            let ext = match self.ctx.arena.get_extended(current) {
+                Some(ext) => ext,
+                None => return false,
+            };
+            if ext.parent.is_none() {
+                return false;
+            }
+            let parent = ext.parent;
+            let parent_node = match self.ctx.arena.get(parent) {
+                Some(node) => node,
+                None => return false,
+            };
+            if parent_node.kind == syntax_kind_ext::FOR_IN_STATEMENT
+                || parent_node.kind == syntax_kind_ext::FOR_OF_STATEMENT
+            {
+                if let Some(for_data) = self.ctx.arena.get_for_in_of(parent_node) {
+                    let analyzer = FlowAnalyzer::new(self.ctx.arena, self.ctx.binder, self.ctx.types);
+                    return analyzer.assignment_targets_reference(for_data.initializer, idx);
+                }
+            }
+            current = parent;
+        }
     }
 
     /// Get type of a symbol.
@@ -3579,7 +3809,7 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Get type of call expression.
     fn get_type_of_call_expression(&mut self, idx: NodeIndex) -> TypeId {
-        use crate::solver::{CallEvaluator, CallResult, CompatChecker};
+        use crate::solver::{CallEvaluator, CallResult, CompatChecker, TypeKey};
 
         let Some(node) = self.ctx.arena.get(idx) else {
             return TypeId::ANY;
@@ -3600,38 +3830,32 @@ impl<'a> ThinCheckerState<'a> {
         // Get arguments list (may be None for calls without arguments)
         let args = call.arguments.as_ref().map(|a| &a.nodes).map(|n| n.as_slice()).unwrap_or(&[]);
 
-        // Prepare for contextual typing of arguments
-        let mut arg_types = Vec::with_capacity(args.len());
+        let overload_signatures = match self.ctx.types.lookup(callee_type) {
+            Some(TypeKey::Callable(shape_id)) => {
+                let shape = self.ctx.types.callable_shape(shape_id);
+                if shape.call_signatures.len() > 1 {
+                    Some(shape.call_signatures.clone())
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        };
+
+        // Overload candidates need signature-specific contextual typing.
+        if let Some(signatures) = overload_signatures.as_deref() {
+            if let Some(return_type) = self.resolve_overloaded_call_with_signatures(args, signatures) {
+                return return_type;
+            }
+        }
 
         // Create contextual context from callee type
         let ctx_helper = ContextualTypeContext::with_expected(self.ctx.types, callee_type);
-
-        let arg_count = args.len();
-        for (i, &arg_idx) in args.iter().enumerate() {
-            // Determine expected type for this argument
-            let expected_type = ctx_helper.get_parameter_type_for_call(i, arg_count);
-
-            // Set contextual type for the argument
-            let prev_context = self.ctx.contextual_type;
-            self.ctx.contextual_type = expected_type;
-
-            // Check the argument with context
-            let arg_type = self.get_type_of_node(arg_idx);
-            arg_types.push(arg_type);
-
-            if let Some(expected) = expected_type {
-                if expected != TypeId::ANY && expected != TypeId::UNKNOWN {
-                    if let Some(arg_node) = self.ctx.arena.get(arg_idx) {
-                        if arg_node.kind == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION {
-                            self.check_object_literal_excess_properties(arg_type, expected, arg_idx);
-                        }
-                    }
-                }
-            }
-
-            // Restore previous context
-            self.ctx.contextual_type = prev_context;
-        }
+        let arg_types = self.collect_call_argument_types_with_context(
+            args,
+            |i, arg_count| ctx_helper.get_parameter_type_for_call(i, arg_count),
+            overload_signatures.is_none(),
+        );
 
         // Use CallEvaluator to resolve the call
         let mut checker = CompatChecker::new(self.ctx.types);
@@ -3665,6 +3889,177 @@ impl<'a> ThinCheckerState<'a> {
                 TypeId::ERROR
             }
         }
+    }
+
+    fn collect_call_argument_types_with_context<F>(
+        &mut self,
+        args: &[NodeIndex],
+        mut expected_for_index: F,
+        check_excess_properties: bool,
+    ) -> Vec<TypeId>
+    where
+        F: FnMut(usize, usize) -> Option<TypeId>,
+    {
+        use crate::solver::TypeKey;
+
+        // First pass: count expanded arguments (spreads of tuple types expand to multiple args)
+        let mut expanded_count = 0usize;
+        for &arg_idx in args.iter() {
+            if let Some(arg_node) = self.ctx.arena.get(arg_idx) {
+                if arg_node.kind == syntax_kind_ext::SPREAD_ELEMENT {
+                    if let Some(spread_data) = self.ctx.arena.get_spread(arg_node) {
+                        let spread_type = self.get_type_of_node(spread_data.expression);
+                        if let Some(TypeKey::Tuple(elems_id)) = self.ctx.types.lookup(spread_type) {
+                            let elems = self.ctx.types.tuple_list(elems_id);
+                            expanded_count += elems.len();
+                            continue;
+                        }
+                    }
+                }
+            }
+            expanded_count += 1;
+        }
+
+        let mut arg_types = Vec::with_capacity(expanded_count);
+        let mut effective_index = 0usize;
+
+        for &arg_idx in args.iter() {
+            if let Some(arg_node) = self.ctx.arena.get(arg_idx) {
+                // Handle spread elements specially - expand tuple types
+                if arg_node.kind == syntax_kind_ext::SPREAD_ELEMENT {
+                    if let Some(spread_data) = self.ctx.arena.get_spread(arg_node) {
+                        let spread_type = self.get_type_of_node(spread_data.expression);
+
+                        // If it's a tuple type, expand its elements
+                        if let Some(TypeKey::Tuple(elems_id)) = self.ctx.types.lookup(spread_type) {
+                            let elems = self.ctx.types.tuple_list(elems_id);
+                            for elem in elems.iter() {
+                                arg_types.push(elem.type_id);
+                                effective_index += 1;
+                            }
+                            continue;
+                        }
+
+                        // If it's an array type, push the element type (variadic handling)
+                        if let Some(TypeKey::Array(elem_type)) = self.ctx.types.lookup(spread_type) {
+                            arg_types.push(elem_type);
+                            effective_index += 1;
+                            continue;
+                        }
+
+                        // Otherwise just push the spread type as-is
+                        arg_types.push(spread_type);
+                        effective_index += 1;
+                        continue;
+                    }
+                }
+            }
+
+            // Regular (non-spread) argument
+            let expected_type = expected_for_index(effective_index, expanded_count);
+
+            let prev_context = self.ctx.contextual_type;
+            self.ctx.contextual_type = expected_type;
+
+            let arg_type = self.get_type_of_node(arg_idx);
+            arg_types.push(arg_type);
+
+            if check_excess_properties {
+                if let Some(expected) = expected_type {
+                    if expected != TypeId::ANY && expected != TypeId::UNKNOWN {
+                        if let Some(arg_node) = self.ctx.arena.get(arg_idx) {
+                            if arg_node.kind == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION {
+                                self.check_object_literal_excess_properties(arg_type, expected, arg_idx);
+                            }
+                        }
+                    }
+                }
+            }
+
+            self.ctx.contextual_type = prev_context;
+            effective_index += 1;
+        }
+
+        arg_types
+    }
+
+    fn check_call_argument_excess_properties<F>(
+        &mut self,
+        args: &[NodeIndex],
+        arg_types: &[TypeId],
+        mut expected_for_index: F,
+    ) where
+        F: FnMut(usize, usize) -> Option<TypeId>,
+    {
+        let arg_count = args.len();
+        for (i, &arg_idx) in args.iter().enumerate() {
+            let expected = expected_for_index(i, arg_count);
+            if let Some(expected) = expected {
+                if expected != TypeId::ANY && expected != TypeId::UNKNOWN {
+                    if let Some(arg_node) = self.ctx.arena.get(arg_idx) {
+                        if arg_node.kind == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION {
+                            let arg_type = arg_types.get(i).copied().unwrap_or(TypeId::ANY);
+                            self.check_object_literal_excess_properties(arg_type, expected, arg_idx);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn resolve_overloaded_call_with_signatures(
+        &mut self,
+        args: &[NodeIndex],
+        signatures: &[crate::solver::CallSignature],
+    ) -> Option<TypeId> {
+        use crate::solver::{CallEvaluator, CallResult, CompatChecker, FunctionShape};
+
+        if signatures.is_empty() {
+            return None;
+        }
+
+        let mut checker = CompatChecker::new(self.ctx.types);
+        let mut evaluator = CallEvaluator::new(self.ctx.types, &mut checker);
+        let mut original_node_types = std::mem::take(&mut self.ctx.node_types);
+
+        for sig in signatures {
+            let func_shape = FunctionShape {
+                params: sig.params.clone(),
+                this_type: sig.this_type,
+                return_type: sig.return_type,
+                type_params: sig.type_params.clone(),
+                type_predicate: sig.type_predicate.clone(),
+                is_constructor: false,
+            };
+            let func_type = self.ctx.types.function(func_shape);
+            let ctx_helper = ContextualTypeContext::with_expected(self.ctx.types, func_type);
+
+            self.ctx.node_types = Default::default();
+            let arg_types = self.collect_call_argument_types_with_context(
+                args,
+                |i, arg_count| ctx_helper.get_parameter_type_for_call(i, arg_count),
+                false,
+            );
+            let temp_node_types = std::mem::take(&mut self.ctx.node_types);
+
+            self.ctx.node_types = std::mem::take(&mut original_node_types);
+            let result = evaluator.resolve_call(func_type, &arg_types);
+
+            if let CallResult::Success(return_type) = result {
+                self.ctx.node_types.extend(temp_node_types);
+                self.check_call_argument_excess_properties(
+                    args,
+                    &arg_types,
+                    |i, arg_count| ctx_helper.get_parameter_type_for_call(i, arg_count),
+                );
+                return Some(return_type);
+            }
+
+            original_node_types = std::mem::take(&mut self.ctx.node_types);
+        }
+
+        self.ctx.node_types = original_node_types;
+        None
     }
 
     /// Get type of new expression.
@@ -3751,31 +4146,31 @@ impl<'a> ThinCheckerState<'a> {
         };
 
         let args = new_expr.arguments.as_ref().map(|a| &a.nodes).map(|n| n.as_slice()).unwrap_or(&[]);
-        let mut arg_types = Vec::with_capacity(args.len());
-        let ctx_helper = ContextualTypeContext::with_expected(self.ctx.types, construct_type);
-        let arg_count = args.len();
 
-        for (i, &arg_idx) in args.iter().enumerate() {
-            let expected_type = ctx_helper.get_parameter_type_for_call(i, arg_count);
-
-            let prev_context = self.ctx.contextual_type;
-            self.ctx.contextual_type = expected_type;
-
-            let arg_type = self.get_type_of_node(arg_idx);
-            arg_types.push(arg_type);
-
-            if let Some(expected) = expected_type {
-                if expected != TypeId::ANY && expected != TypeId::UNKNOWN {
-                    if let Some(arg_node) = self.ctx.arena.get(arg_idx) {
-                        if arg_node.kind == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION {
-                            self.check_object_literal_excess_properties(arg_type, expected, arg_idx);
-                        }
-                    }
+        let overload_signatures = match self.ctx.types.lookup(construct_type) {
+            Some(TypeKey::Callable(shape_id)) => {
+                let shape = self.ctx.types.callable_shape(shape_id);
+                if shape.call_signatures.len() > 1 {
+                    Some(shape.call_signatures.clone())
+                } else {
+                    None
                 }
             }
+            _ => None,
+        };
 
-            self.ctx.contextual_type = prev_context;
+        if let Some(signatures) = overload_signatures.as_deref() {
+            if let Some(return_type) = self.resolve_overloaded_call_with_signatures(args, signatures) {
+                return return_type;
+            }
         }
+
+        let ctx_helper = ContextualTypeContext::with_expected(self.ctx.types, construct_type);
+        let arg_types = self.collect_call_argument_types_with_context(
+            args,
+            |i, arg_count| ctx_helper.get_parameter_type_for_call(i, arg_count),
+            overload_signatures.is_none(),
+        );
 
         let mut checker = CompatChecker::new(self.ctx.types);
         let mut evaluator = CallEvaluator::new(self.ctx.types, &mut checker);
@@ -6305,6 +6700,27 @@ impl<'a> ThinCheckerState<'a> {
             );
             self.ctx.diagnostics.push(Diagnostic {
                 code: diagnostic_codes::ONLY_REFERS_TO_A_TYPE_BUT_IS_BEING_USED_AS_A_VALUE_HERE,
+                category: DiagnosticCategory::Error,
+                message_text: message,
+                start: loc.start,
+                length: loc.length(),
+                file: self.ctx.file_name.clone(),
+                related_information: Vec::new(),
+            });
+        }
+    }
+
+    /// Report TS2454: Variable is used before being assigned.
+    pub fn error_variable_used_before_assigned_at(&mut self, name: &str, idx: NodeIndex) {
+        use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages, format_message};
+
+        if let Some(loc) = self.get_source_location(idx) {
+            let message = format_message(
+                diagnostic_messages::VARIABLE_USED_BEFORE_ASSIGNED,
+                &[name],
+            );
+            self.ctx.diagnostics.push(Diagnostic {
+                code: diagnostic_codes::VARIABLE_USED_BEFORE_ASSIGNED,
                 category: DiagnosticCategory::Error,
                 message_text: message,
                 start: loc.start,
@@ -9211,6 +9627,9 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
 
+        // Push type parameters (like <U> in `fn<U>(id: U)`) before checking types
+        let (_type_params, type_param_updates) = self.push_type_parameters(&method.type_parameters);
+
         // Get declared return type
         let return_type = if !method.type_annotation.is_none() {
             self.get_type_from_type_node(method.type_annotation)
@@ -9247,6 +9666,7 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         self.pop_return_type();
+        self.pop_type_parameters(type_param_updates);
     }
 
     /// Check a constructor declaration.

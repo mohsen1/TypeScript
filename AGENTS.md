@@ -98,6 +98,34 @@ Commit frequently and atomically
 7. **Signal readiness**: After pushing, set `Ready for Merge: Yes` in your plan so EM knows to merge.
 8. **NEVER edit management files**: Do not touch `AGENTS.md`, `STRUCTURE.md`, `GOALS.md`, other workers' plan files, or anything in `orchestrator/`. These are human-owned and orchestrator-managed.
 
+## 🔔 Notification System (CRITICAL)
+
+**After completing ANY significant work, you MUST notify your manager using the notification script.**
+
+This replaces the old time-based system. Your manager will NOT know you need attention unless you notify them.
+
+```bash
+# When you complete a task and are ready for review
+.notify/notify.sh ready "Completed: <brief description>"
+
+# When you need a new task
+.notify/notify.sh task "Ready for assignment"
+
+# When you're blocked and need help
+.notify/notify.sh blocked "Issue: <what's blocking you>"
+
+# After pushing and ready for merge
+.notify/notify.sh merge "Pushed to worker/$SQUAD_NAME-$WORKER_NUM, ready for merge"
+```
+
+**ALWAYS notify after:**
+1. Completing any task (ready or merge)
+2. Being idle with no assignment (task)
+3. Encountering a blocker (blocked)
+4. Starting work on a new task (status update is optional but helpful)
+
+The notification file is at `.notify/notify.sh` in the repository root.
+
 ## 🎯 If Blocked
 
 - Dirty worktree? `git stash` and continue.
@@ -106,6 +134,7 @@ Commit frequently and atomically
 - Build error? Fix it.
 - Merge conflict? Resolve it.
 - Wrong branch? Switch to the right one.
+- **Always notify**: `.notify/notify.sh blocked "what's wrong"`
 
 ## 💡 Exploration is OK
 
