@@ -27978,3 +27978,427 @@ class FeatureFlags {
         output
     );
 }
+
+/// Test ES5 class with await using declarations
+#[test]
+fn test_class_es5_explicit_resource_await_using() {
+    let source = r#"
+// Async disposable resource
+class AsyncFileHandle {
+    private handle: number;
+
+    constructor(path: string) {
+        this.handle = 0;
+    }
+
+    async [Symbol.asyncDispose](): Promise<void> {
+        await this.close();
+    }
+
+    async close(): Promise<void> {
+        console.log("Closing async handle");
+    }
+
+    async read(): Promise<string> {
+        return "data";
+    }
+}
+
+// Database connection with async dispose
+class DatabaseConnection {
+    private connectionString: string;
+    private isOpen: boolean = false;
+
+    constructor(connectionString: string) {
+        this.connectionString = connectionString;
+    }
+
+    async [Symbol.asyncDispose](): Promise<void> {
+        if (this.isOpen) {
+            await this.disconnect();
+        }
+    }
+
+    async connect(): Promise<void> {
+        this.isOpen = true;
+    }
+
+    async disconnect(): Promise<void> {
+        this.isOpen = false;
+    }
+
+    async query(sql: string): Promise<any[]> {
+        return [];
+    }
+}
+
+// Stream with async disposal
+class AsyncStream {
+    private buffer: Uint8Array[] = [];
+
+    async [Symbol.asyncDispose](): Promise<void> {
+        await this.flush();
+        this.buffer = [];
+    }
+
+    async write(data: Uint8Array): Promise<void> {
+        this.buffer.push(data);
+    }
+
+    async flush(): Promise<void> {
+        console.log("Flushing buffer");
+    }
+}
+
+// Usage with await using
+async function processFiles() {
+    await using file = new AsyncFileHandle("/path/to/file");
+    const data = await file.read();
+    return data;
+}
+
+async function queryDatabase() {
+    await using db = new DatabaseConnection("postgres://localhost");
+    await db.connect();
+    const results = await db.query("SELECT * FROM users");
+    return results;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("AsyncFileHandle") && output.contains("DatabaseConnection") && output.contains("AsyncStream"),
+        "Expected async disposable classes: {}",
+        output
+    );
+
+    // Symbol.asyncDispose methods should be present
+    assert!(
+        output.contains("Symbol.asyncDispose"),
+        "Expected Symbol.asyncDispose: {}",
+        output
+    );
+
+    // Async functions should be preserved
+    assert!(
+        output.contains("processFiles") && output.contains("queryDatabase"),
+        "Expected async functions: {}",
+        output
+    );
+}
+
+/// Test ES5 class with Symbol.dispose (sync disposal)
+#[test]
+fn test_class_es5_explicit_resource_symbol_dispose() {
+    let source = r#"
+// Sync disposable resource
+class FileHandle {
+    private fd: number;
+
+    constructor(path: string) {
+        this.fd = 0;
+    }
+
+    [Symbol.dispose](): void {
+        this.close();
+    }
+
+    close(): void {
+        console.log("Closing handle");
+    }
+
+    read(): string {
+        return "data";
+    }
+}
+
+// Lock with dispose
+class Lock {
+    private isLocked: boolean = false;
+    private name: string;
+
+    constructor(name: string) {
+        this.name = name;
+    }
+
+    [Symbol.dispose](): void {
+        this.unlock();
+    }
+
+    acquire(): void {
+        this.isLocked = true;
+    }
+
+    unlock(): void {
+        this.isLocked = false;
+    }
+}
+
+// Timer with dispose
+class Timer {
+    private id: number | null = null;
+
+    [Symbol.dispose](): void {
+        if (this.id !== null) {
+            clearInterval(this.id);
+            this.id = null;
+        }
+    }
+
+    start(callback: () => void, interval: number): void {
+        this.id = setInterval(callback, interval) as any;
+    }
+}
+
+// Memory pool with dispose
+class MemoryPool {
+    private blocks: ArrayBuffer[] = [];
+    private size: number;
+
+    constructor(size: number) {
+        this.size = size;
+    }
+
+    [Symbol.dispose](): void {
+        this.blocks = [];
+    }
+
+    allocate(): ArrayBuffer {
+        const block = new ArrayBuffer(this.size);
+        this.blocks.push(block);
+        return block;
+    }
+}
+
+// Usage with using
+function processFile() {
+    using file = new FileHandle("/path/to/file");
+    const data = file.read();
+    return data;
+}
+
+function withLock() {
+    using lock = new Lock("resource");
+    lock.acquire();
+    // Do work
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("FileHandle") && output.contains("Lock") && output.contains("Timer"),
+        "Expected disposable classes: {}",
+        output
+    );
+
+    // Symbol.dispose should be present
+    assert!(
+        output.contains("Symbol.dispose"),
+        "Expected Symbol.dispose: {}",
+        output
+    );
+
+    // MemoryPool should be present
+    assert!(
+        output.contains("MemoryPool"),
+        "Expected MemoryPool class: {}",
+        output
+    );
+
+    // Functions should be preserved
+    assert!(
+        output.contains("processFile") && output.contains("withLock"),
+        "Expected usage functions: {}",
+        output
+    );
+}
+
+/// Test ES5 class with mixed disposal patterns
+#[test]
+fn test_class_es5_explicit_resource_mixed_disposal() {
+    let source = r#"
+// Class with both sync and async dispose
+class DualDisposable {
+    private syncResource: string;
+    private asyncResource: Promise<string>;
+
+    constructor() {
+        this.syncResource = "sync";
+        this.asyncResource = Promise.resolve("async");
+    }
+
+    [Symbol.dispose](): void {
+        console.log("Sync cleanup");
+    }
+
+    async [Symbol.asyncDispose](): Promise<void> {
+        await this.asyncResource;
+        console.log("Async cleanup");
+    }
+}
+
+// Disposable with inheritance
+class BaseResource {
+    protected name: string;
+
+    constructor(name: string) {
+        this.name = name;
+    }
+
+    [Symbol.dispose](): void {
+        console.log(`Disposing ${this.name}`);
+    }
+}
+
+class DerivedResource extends BaseResource {
+    private extra: number;
+
+    constructor(name: string, extra: number) {
+        super(name);
+        this.extra = extra;
+    }
+
+    [Symbol.dispose](): void {
+        console.log(`Extra cleanup: ${this.extra}`);
+        super[Symbol.dispose]();
+    }
+}
+
+// Generic disposable
+class DisposableContainer<T> {
+    private value: T;
+    private disposed: boolean = false;
+
+    constructor(value: T) {
+        this.value = value;
+    }
+
+    [Symbol.dispose](): void {
+        this.disposed = true;
+    }
+
+    get(): T {
+        if (this.disposed) {
+            throw new Error("Already disposed");
+        }
+        return this.value;
+    }
+}
+
+// Static dispose method
+class StaticDisposable {
+    private static instances: StaticDisposable[] = [];
+
+    constructor() {
+        StaticDisposable.instances.push(this);
+    }
+
+    [Symbol.dispose](): void {
+        const index = StaticDisposable.instances.indexOf(this);
+        if (index > -1) {
+            StaticDisposable.instances.splice(index, 1);
+        }
+    }
+
+    static disposeAll(): void {
+        for (const instance of StaticDisposable.instances) {
+            instance[Symbol.dispose]();
+        }
+    }
+}
+
+// Multiple resources in one block
+function multipleResources() {
+    using a = new BaseResource("a");
+    using b = new DerivedResource("b", 42);
+    using c = new DisposableContainer<number>(100);
+    return c.get();
+}
+
+async function mixedResources() {
+    using sync = new BaseResource("sync");
+    await using dual = new DualDisposable();
+    return "done";
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("DualDisposable") && output.contains("BaseResource") && output.contains("DerivedResource"),
+        "Expected mixed disposal classes: {}",
+        output
+    );
+
+    // Generic disposable should be present
+    assert!(
+        output.contains("DisposableContainer"),
+        "Expected DisposableContainer class: {}",
+        output
+    );
+
+    // Static disposable should be present
+    assert!(
+        output.contains("StaticDisposable") && output.contains("disposeAll"),
+        "Expected StaticDisposable with disposeAll: {}",
+        output
+    );
+
+    // Both Symbol.dispose and Symbol.asyncDispose should be present
+    assert!(
+        output.contains("Symbol.dispose") && output.contains("Symbol.asyncDispose"),
+        "Expected both dispose symbols: {}",
+        output
+    );
+
+    // Functions should be preserved
+    assert!(
+        output.contains("multipleResources") && output.contains("mixedResources"),
+        "Expected usage functions: {}",
+        output
+    );
+}
