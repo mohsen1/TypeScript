@@ -7,10 +7,10 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-None - awaiting next task
+- [ ] Add async ES5 tests for async error handling patterns: try/catch/finally, Promise rejection, async stack traces, nested try blocks, rethrow patterns, finally with return. Tests: `./wasm/test.sh async_es5_tests`
 
 ## Task Queue
-- [ ] Add async ES5 tests for async error handling patterns: try/catch/finally, Promise rejection, async stack traces
+- [ ] Add async ES5 tests for async iteration patterns: for-await-of with generators, async from sync iterables
 
 ## Completed
 - [x] Added 12 async method pattern tests (getter simulation, static basic, static factory, super call, super property, private field read, private field write, class factory, chaining, no await, ignores nested async, multiple awaits) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (568 tests PASS).
