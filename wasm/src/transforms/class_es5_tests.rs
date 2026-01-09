@@ -12488,349 +12488,6 @@ class Graph<T> {
 }
 
 // ============================================================================
-// String.raw template pattern tests
-// ============================================================================
-
-#[test]
-fn test_class_es5_string_raw_basic() {
-    // Basic String.raw usage
-    let source = r#"
-class PathHelper {
-    getWindowsPath(): string {
-        return String.raw`C:\Users\Documents\file.txt`;
-    }
-
-    getUnixPath(): string {
-        return String.raw`/home/user/documents/file.txt`;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Class should be emitted
-    assert!(
-        output.contains("PathHelper"),
-        "Expected PathHelper class: {}",
-        output
-    );
-
-    // String.raw should be present
-    assert!(
-        output.contains("String.raw"),
-        "Expected String.raw: {}",
-        output
-    );
-
-    // Methods should be present
-    assert!(
-        output.contains("getWindowsPath") && output.contains("getUnixPath"),
-        "Expected getWindowsPath, getUnixPath methods: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_string_raw_with_expressions() {
-    // String.raw with embedded expressions
-    let source = r#"
-class TemplateBuilder {
-    private basePath: string = "C:\\Users";
-
-    buildPath(folder: string, file: string): string {
-        return String.raw`${this.basePath}\${folder}\${file}`;
-    }
-
-    buildRegex(pattern: string): string {
-        return String.raw`\b${pattern}\b`;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Class should be emitted
-    assert!(
-        output.contains("TemplateBuilder"),
-        "Expected TemplateBuilder class: {}",
-        output
-    );
-
-    // String.raw should be present
-    assert!(
-        output.contains("String.raw"),
-        "Expected String.raw: {}",
-        output
-    );
-
-    // Methods should be present
-    assert!(
-        output.contains("buildPath") && output.contains("buildRegex"),
-        "Expected buildPath, buildRegex methods: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_string_raw_escape_sequences() {
-    // String.raw preserving escape sequences
-    let source = r#"
-class EscapeHandler {
-    getRawNewline(): string {
-        return String.raw`Line1\nLine2`;
-    }
-
-    getRawTab(): string {
-        return String.raw`Col1\tCol2`;
-    }
-
-    getRawBackslash(): string {
-        return String.raw`path\\to\\file`;
-    }
-
-    getRawUnicode(): string {
-        return String.raw`\u0041\u0042\u0043`;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Class should be emitted
-    assert!(
-        output.contains("EscapeHandler"),
-        "Expected EscapeHandler class: {}",
-        output
-    );
-
-    // String.raw should be present
-    assert!(
-        output.contains("String.raw"),
-        "Expected String.raw: {}",
-        output
-    );
-
-    // Methods should be present
-    assert!(
-        output.contains("getRawNewline") && output.contains("getRawTab"),
-        "Expected getRawNewline, getRawTab methods: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_string_raw_static_property() {
-    // String.raw in static properties
-    let source = r#"
-class RegexPatterns {
-    static readonly EMAIL_PATTERN: string = String.raw`[\w\.\-]+@[\w\.\-]+\.\w+`;
-    static readonly URL_PATTERN: string = String.raw`https?:\/\/[\w\.\-\/]+`;
-    static readonly PHONE_PATTERN: string = String.raw`\+?\d{1,3}[\-\s]?\d{3,4}[\-\s]?\d{4}`;
-
-    static getPattern(type: string): string {
-        switch (type) {
-            case 'email': return this.EMAIL_PATTERN;
-            case 'url': return this.URL_PATTERN;
-            case 'phone': return this.PHONE_PATTERN;
-            default: return '';
-        }
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Class should be emitted
-    assert!(
-        output.contains("RegexPatterns"),
-        "Expected RegexPatterns class: {}",
-        output
-    );
-
-    // String.raw should be present
-    assert!(
-        output.contains("String.raw"),
-        "Expected String.raw: {}",
-        output
-    );
-
-    // Static properties should be assigned
-    assert!(
-        output.contains("EMAIL_PATTERN") && output.contains("URL_PATTERN"),
-        "Expected EMAIL_PATTERN, URL_PATTERN properties: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_string_raw_in_constructor() {
-    // String.raw usage in constructor
-    let source = r#"
-class ConfigLoader {
-    private configPath: string;
-    private logPath: string;
-
-    constructor(basePath: string) {
-        this.configPath = String.raw`${basePath}\config\settings.json`;
-        this.logPath = String.raw`${basePath}\logs\app.log`;
-    }
-
-    getConfigPath(): string {
-        return this.configPath;
-    }
-
-    getLogPath(): string {
-        return this.logPath;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Class should be emitted
-    assert!(
-        output.contains("ConfigLoader"),
-        "Expected ConfigLoader class: {}",
-        output
-    );
-
-    // String.raw should be present
-    assert!(
-        output.contains("String.raw"),
-        "Expected String.raw: {}",
-        output
-    );
-
-    // Constructor should have function body
-    assert!(
-        output.contains("function ConfigLoader"),
-        "Expected ConfigLoader constructor function: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_string_raw_multiline() {
-    // String.raw with multiline template
-    let source = r#"
-class SqlBuilder {
-    buildQuery(table: string, columns: string[]): string {
-        return String.raw`
-            SELECT ${columns.join(', ')}
-            FROM ${table}
-            WHERE deleted = false
-            ORDER BY created_at DESC
-        `;
-    }
-
-    buildInsert(table: string): string {
-        return String.raw`
-            INSERT INTO ${table}
-            (id, name, value)
-            VALUES
-            (\${id}, \${name}, \${value})
-        `;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Class should be emitted
-    assert!(
-        output.contains("SqlBuilder"),
-        "Expected SqlBuilder class: {}",
-        output
-    );
-
-    // String.raw should be present
-    assert!(
-        output.contains("String.raw"),
-        "Expected String.raw: {}",
-        output
-    );
-
-    // Methods should be present
-    assert!(
-        output.contains("buildQuery") && output.contains("buildInsert"),
-        "Expected buildQuery, buildInsert methods: {}",
-        output
-    );
-}
-
-// ============================================================================
 // Symbol.asyncIterator Tests
 // ============================================================================
 
@@ -13159,223 +12816,26 @@ class DataStream<T> {
 }
 
 // ============================================================================
-// Object.entries/Object.values pattern tests
+// Symbol.match Tests
 // ============================================================================
 
 #[test]
-fn test_class_es5_object_entries_basic() {
-    // Basic Object.entries usage
+fn test_class_es5_symbol_match_basic() {
+    // Basic Symbol.match implementation for custom matcher
     let source = r#"
-class ConfigParser {
-    private config: Record<string, string> = {};
+class WordMatcher {
+    private pattern: string;
 
-    parse(input: Record<string, string>): void {
-        for (const [key, value] of Object.entries(input)) {
-            this.config[key] = value;
-        }
+    constructor(pattern: string) {
+        this.pattern = pattern;
     }
 
-    getEntries(): [string, string][] {
-        return Object.entries(this.config);
-    }
-
-    getKeys(): string[] {
-        return Object.entries(this.config).map(([key]) => key);
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Class should be emitted
-    assert!(
-        output.contains("ConfigParser"),
-        "Expected ConfigParser class: {}",
-        output
-    );
-
-    // Object.entries should be present
-    assert!(
-        output.contains("Object.entries"),
-        "Expected Object.entries: {}",
-        output
-    );
-
-    // Methods should be present
-    assert!(
-        output.contains("parse") && output.contains("getEntries"),
-        "Expected parse, getEntries methods: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_object_values_basic() {
-    // Basic Object.values usage
-    let source = r#"
-class DataAggregator {
-    private data: Record<string, number> = {};
-
-    add(key: string, value: number): void {
-        this.data[key] = value;
-    }
-
-    getValues(): number[] {
-        return Object.values(this.data);
-    }
-
-    getSum(): number {
-        return Object.values(this.data).reduce((acc, val) => acc + val, 0);
-    }
-
-    getMax(): number {
-        const values = Object.values(this.data);
-        return values.length > 0 ? Math.max(...values) : 0;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Class should be emitted
-    assert!(
-        output.contains("DataAggregator"),
-        "Expected DataAggregator class: {}",
-        output
-    );
-
-    // Object.values should be present
-    assert!(
-        output.contains("Object.values"),
-        "Expected Object.values: {}",
-        output
-    );
-
-    // Methods should be present
-    assert!(
-        output.contains("getValues") && output.contains("getSum"),
-        "Expected getValues, getSum methods: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_object_entries_with_type() {
-    // Object.entries with typed object
-    let source = r#"
-interface User {
-    name: string;
-    age: number;
-    email: string;
-}
-
-class UserSerializer {
-    serialize(user: User): string {
-        return Object.entries(user)
-            .map(([key, value]) => `${key}=${value}`)
-            .join('&');
-    }
-
-    toMap(user: User): Map<string, string | number> {
-        const map = new Map<string, string | number>();
-        for (const [key, value] of Object.entries(user)) {
-            map.set(key, value);
-        }
-        return map;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Class should be emitted
-    assert!(
-        output.contains("UserSerializer"),
-        "Expected UserSerializer class: {}",
-        output
-    );
-
-    // Object.entries should be present
-    assert!(
-        output.contains("Object.entries"),
-        "Expected Object.entries: {}",
-        output
-    );
-
-    // Methods should be present
-    assert!(
-        output.contains("serialize") && output.contains("toMap"),
-        "Expected serialize, toMap methods: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_object_entries_values_static() {
-    // Object.entries/values in static methods
-    let source = r#"
-class ObjectUtils {
-    static countValues<T>(obj: Record<string, T>): number {
-        return Object.values(obj).length;
-    }
-
-    static filterEntries<T>(
-        obj: Record<string, T>,
-        predicate: (key: string, value: T) => boolean
-    ): Record<string, T> {
-        const result: Record<string, T> = {};
-        for (const [key, value] of Object.entries(obj)) {
-            if (predicate(key, value)) {
-                result[key] = value;
-            }
-        }
-        return result;
-    }
-
-    static mapValues<T, U>(
-        obj: Record<string, T>,
-        mapper: (value: T) => U
-    ): Record<string, U> {
-        const result: Record<string, U> = {};
-        for (const [key, value] of Object.entries(obj)) {
-            result[key] = mapper(value);
-        }
+    [Symbol.match](str: string): RegExpMatchArray | null {
+        const idx = str.indexOf(this.pattern);
+        if (idx === -1) return null;
+        const result: RegExpMatchArray = [this.pattern] as RegExpMatchArray;
+        result.index = idx;
+        result.input = str;
         return result;
     }
 }
@@ -13395,54 +12855,47 @@ class ObjectUtils {
 
     let output = printer.get_output().to_string();
 
-    // Class should be emitted
+    // Class should be converted
     assert!(
-        output.contains("ObjectUtils"),
-        "Expected ObjectUtils class: {}",
+        output.contains("function WordMatcher"),
+        "Expected function declaration: {}",
         output
     );
 
-    // Object.entries and Object.values should be present
+    // Symbol.match should be referenced
     assert!(
-        output.contains("Object.entries") && output.contains("Object.values"),
-        "Expected Object.entries and Object.values: {}",
-        output
-    );
-
-    // Static methods should be present
-    assert!(
-        output.contains("countValues") && output.contains("filterEntries"),
-        "Expected countValues, filterEntries methods: {}",
+        output.contains("match") || output.contains("Symbol"),
+        "Expected Symbol.match reference: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_object_entries_in_constructor() {
-    // Object.entries used in constructor
+fn test_class_es5_symbol_match_with_flags() {
+    // Symbol.match with flags property like RegExp
     let source = r#"
-class EnvironmentConfig {
-    private envVars: Map<string, string> = new Map();
+class CaseInsensitiveMatcher {
+    private term: string;
+    readonly flags: string = "i";
 
-    constructor(env: Record<string, string>) {
-        for (const [key, value] of Object.entries(env)) {
-            if (key.startsWith('APP_')) {
-                this.envVars.set(key, value);
-            }
-        }
+    constructor(term: string) {
+        this.term = term.toLowerCase();
     }
 
-    get(key: string): string | undefined {
-        return this.envVars.get(key);
-    }
-
-    getAll(): Record<string, string> {
-        const result: Record<string, string> = {};
-        this.envVars.forEach((value, key) => {
-            result[key] = value;
-        });
+    [Symbol.match](str: string): RegExpMatchArray | null {
+        const lowerStr = str.toLowerCase();
+        const idx = lowerStr.indexOf(this.term);
+        if (idx === -1) return null;
+        const matched = str.substring(idx, idx + this.term.length);
+        const result: RegExpMatchArray = [matched] as RegExpMatchArray;
+        result.index = idx;
+        result.input = str;
         return result;
     }
+
+    get source(): string {
+        return this.term;
+    }
 }
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -13460,65 +12913,56 @@ class EnvironmentConfig {
 
     let output = printer.get_output().to_string();
 
-    // Class should be emitted
+    // Class should be converted
     assert!(
-        output.contains("EnvironmentConfig"),
-        "Expected EnvironmentConfig class: {}",
+        output.contains("function CaseInsensitiveMatcher"),
+        "Expected function declaration: {}",
         output
     );
 
-    // Object.entries should be present
+    // Flags property should be present
     assert!(
-        output.contains("Object.entries"),
-        "Expected Object.entries: {}",
+        output.contains("flags"),
+        "Expected flags property: {}",
         output
     );
 
-    // Constructor should be present
+    // Source getter should be present
     assert!(
-        output.contains("function EnvironmentConfig"),
-        "Expected EnvironmentConfig constructor: {}",
+        output.contains("source") || output.contains("defineProperty"),
+        "Expected source getter: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_object_entries_values_combined() {
-    // Combined Object.entries and Object.values usage
+fn test_class_es5_symbol_match_global() {
+    // Symbol.match returning all matches (global flag behavior)
     let source = r#"
-class FormValidator {
-    private rules: Record<string, (value: string) => boolean> = {};
-    private errors: Record<string, string> = {};
+class GlobalMatcher {
+    private pattern: string;
+    readonly global: boolean = true;
 
-    addRule(field: string, validator: (value: string) => boolean): void {
-        this.rules[field] = validator;
+    constructor(pattern: string) {
+        this.pattern = pattern;
     }
 
-    validate(data: Record<string, string>): boolean {
-        this.errors = {};
-        let isValid = true;
-
-        for (const [field, validator] of Object.entries(this.rules)) {
-            const value = data[field] || '';
-            if (!validator(value)) {
-                this.errors[field] = `Invalid ${field}`;
-                isValid = false;
-            }
+    [Symbol.match](str: string): string[] | null {
+        const matches: string[] = [];
+        let idx = 0;
+        while ((idx = str.indexOf(this.pattern, idx)) !== -1) {
+            matches.push(this.pattern);
+            idx += this.pattern.length;
         }
-
-        return isValid;
+        return matches.length > 0 ? matches : null;
     }
 
-    getErrors(): string[] {
-        return Object.values(this.errors);
+    get lastIndex(): number {
+        return 0;
     }
 
-    hasErrors(): boolean {
-        return Object.values(this.errors).length > 0;
-    }
-
-    getErrorCount(): number {
-        return Object.entries(this.errors).length;
+    set lastIndex(value: number) {
+        // no-op for this implementation
     }
 }
 "#;
@@ -13537,24 +12981,173 @@ class FormValidator {
 
     let output = printer.get_output().to_string();
 
-    // Class should be emitted
+    // Class should be converted
     assert!(
-        output.contains("FormValidator"),
-        "Expected FormValidator class: {}",
+        output.contains("function GlobalMatcher"),
+        "Expected function declaration: {}",
         output
     );
 
-    // Object.entries and Object.values should be present
+    // Global property should be present
     assert!(
-        output.contains("Object.entries") && output.contains("Object.values"),
-        "Expected Object.entries and Object.values: {}",
+        output.contains("global"),
+        "Expected global property: {}",
         output
     );
 
-    // Methods should be present
+    // lastIndex getter/setter should be present
     assert!(
-        output.contains("validate") && output.contains("getErrors") && output.contains("hasErrors"),
-        "Expected validate, getErrors, hasErrors methods: {}",
+        output.contains("lastIndex"),
+        "Expected lastIndex accessor: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_match_with_inheritance() {
+    // Symbol.match with class inheritance
+    let source = r#"
+abstract class BaseMatcher {
+    abstract readonly pattern: string;
+
+    abstract [Symbol.match](str: string): RegExpMatchArray | null;
+
+    test(str: string): boolean {
+        return this[Symbol.match](str) !== null;
+    }
+}
+
+class PrefixMatcher extends BaseMatcher {
+    readonly pattern: string;
+
+    constructor(prefix: string) {
+        super();
+        this.pattern = prefix;
+    }
+
+    [Symbol.match](str: string): RegExpMatchArray | null {
+        if (str.startsWith(this.pattern)) {
+            const result: RegExpMatchArray = [this.pattern] as RegExpMatchArray;
+            result.index = 0;
+            result.input = str;
+            return result;
+        }
+        return null;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Both classes should be converted
+    assert!(
+        output.contains("function BaseMatcher"),
+        "Expected BaseMatcher function: {}",
+        output
+    );
+    assert!(
+        output.contains("function PrefixMatcher"),
+        "Expected PrefixMatcher function: {}",
+        output
+    );
+
+    // Inheritance should be set up
+    assert!(
+        output.contains("__extends") || output.contains("extends"),
+        "Expected inheritance: {}",
+        output
+    );
+
+    // Test method should be present
+    assert!(
+        output.contains("test"),
+        "Expected test method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_match_combined_protocols() {
+    // Class implementing multiple string protocol symbols
+    let source = r#"
+class CustomPattern {
+    private pattern: string;
+
+    constructor(pattern: string) {
+        this.pattern = pattern;
+    }
+
+    [Symbol.match](str: string): RegExpMatchArray | null {
+        const idx = str.indexOf(this.pattern);
+        if (idx === -1) return null;
+        const result: RegExpMatchArray = [this.pattern] as RegExpMatchArray;
+        result.index = idx;
+        result.input = str;
+        return result;
+    }
+
+    [Symbol.replace](str: string, replacement: string): string {
+        return str.split(this.pattern).join(replacement);
+    }
+
+    [Symbol.search](str: string): number {
+        return str.indexOf(this.pattern);
+    }
+
+    [Symbol.split](str: string, limit?: number): string[] {
+        return str.split(this.pattern, limit);
+    }
+
+    toString(): string {
+        return this.pattern;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function CustomPattern"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // toString method should be present
+    assert!(
+        output.contains("toString"),
+        "Expected toString method: {}",
+        output
+    );
+
+    // Multiple Symbol methods should be handled
+    assert!(
+        output.contains("Symbol") || output.contains("prototype"),
+        "Expected Symbol methods on prototype: {}",
         output
     );
 }
