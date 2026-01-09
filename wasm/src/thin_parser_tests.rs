@@ -350,6 +350,18 @@ fn test_thin_parser_class_with_constructor() {
 }
 
 #[test]
+fn test_thin_parser_class_member_named_var() {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "class Foo { var() { return 1; } }".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    assert!(!root.is_none());
+    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+}
+
+#[test]
 fn test_thin_parser_class_extends() {
     let mut parser = ThinParserState::new(
         "test.ts".to_string(),
@@ -684,6 +696,42 @@ fn test_thin_parser_arrow_function_no_params() {
     let mut parser = ThinParserState::new(
         "test.ts".to_string(),
         "const getTime = () => Date.now();".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    assert!(!root.is_none());
+    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+}
+
+#[test]
+fn test_thin_parser_arrow_function_in_object_literal() {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "const obj = { handler: () => { }, value: 1 };".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    assert!(!root.is_none());
+    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+}
+
+#[test]
+fn test_thin_parser_type_assertion_angle_bracket() {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "const value = <number>someValue;".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    assert!(!root.is_none());
+    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+}
+
+#[test]
+fn test_thin_parser_literal_type_assertion_angle_bracket() {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "const value = <\"ok\">someValue;".to_string(),
     );
     let root = parser.parse_source_file();
 
@@ -1075,6 +1123,18 @@ fn test_thin_parser_generic_arrow_simple() {
     let mut parser = ThinParserState::new(
         "test.ts".to_string(),
         "const identity = <T>(x: T) => x;".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    assert!(!root.is_none());
+    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+}
+
+#[test]
+fn test_thin_parser_generic_arrow_tsx_trailing_comma() {
+    let mut parser = ThinParserState::new(
+        "test.tsx".to_string(),
+        "const id = <T,>(x: T): T => x;".to_string(),
     );
     let root = parser.parse_source_file();
 
