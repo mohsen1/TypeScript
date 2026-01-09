@@ -13151,3 +13151,995 @@ class CustomPattern {
         output
     );
 }
+
+// ============================================================================
+// Symbol.replace Tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_symbol_replace_basic() {
+    // Basic Symbol.replace implementation for custom replacer
+    let source = r#"
+class SimpleReplacer {
+    private searchValue: string;
+    private replaceValue: string;
+
+    constructor(search: string, replace: string) {
+        this.searchValue = search;
+        this.replaceValue = replace;
+    }
+
+    [Symbol.replace](str: string): string {
+        return str.split(this.searchValue).join(this.replaceValue);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function SimpleReplacer"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Symbol.replace should be referenced
+    assert!(
+        output.contains("replace") || output.contains("Symbol"),
+        "Expected Symbol.replace reference: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_replace_with_function() {
+    // Symbol.replace with replacer function parameter
+    let source = r#"
+class FunctionReplacer {
+    private pattern: string;
+
+    constructor(pattern: string) {
+        this.pattern = pattern;
+    }
+
+    [Symbol.replace](str: string, replacer: (match: string, offset: number, original: string) => string): string {
+        let result = str;
+        let idx = 0;
+        while ((idx = result.indexOf(this.pattern, idx)) !== -1) {
+            const replacement = replacer(this.pattern, idx, str);
+            result = result.substring(0, idx) + replacement + result.substring(idx + this.pattern.length);
+            idx += replacement.length;
+        }
+        return result;
+    }
+
+    get source(): string {
+        return this.pattern;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function FunctionReplacer"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Source getter should be present
+    assert!(
+        output.contains("source") || output.contains("defineProperty"),
+        "Expected source getter: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_replace_global() {
+    // Symbol.replace with global flag behavior
+    let source = r#"
+class GlobalReplacer {
+    private pattern: string;
+    readonly global: boolean = true;
+    readonly flags: string = "g";
+
+    constructor(pattern: string) {
+        this.pattern = pattern;
+    }
+
+    [Symbol.replace](str: string, replacement: string): string {
+        return str.split(this.pattern).join(replacement);
+    }
+
+    get lastIndex(): number {
+        return 0;
+    }
+
+    set lastIndex(value: number) {
+        // Reset behavior
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function GlobalReplacer"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Global and flags properties should be present
+    assert!(
+        output.contains("global") && output.contains("flags"),
+        "Expected global and flags properties: {}",
+        output
+    );
+
+    // lastIndex accessor should be present
+    assert!(
+        output.contains("lastIndex"),
+        "Expected lastIndex accessor: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_replace_with_inheritance() {
+    // Symbol.replace with class inheritance
+    let source = r#"
+abstract class BaseReplacer {
+    abstract readonly pattern: string;
+
+    abstract [Symbol.replace](str: string, replacement: string): string;
+
+    replaceAll(str: string, replacement: string): string {
+        let result = str;
+        let prev = "";
+        while (result !== prev) {
+            prev = result;
+            result = this[Symbol.replace](result, replacement);
+        }
+        return result;
+    }
+}
+
+class CasePreservingReplacer extends BaseReplacer {
+    readonly pattern: string;
+
+    constructor(pattern: string) {
+        super();
+        this.pattern = pattern;
+    }
+
+    [Symbol.replace](str: string, replacement: string): string {
+        const idx = str.toLowerCase().indexOf(this.pattern.toLowerCase());
+        if (idx === -1) return str;
+        const original = str.substring(idx, idx + this.pattern.length);
+        const preserved = this.preserveCase(original, replacement);
+        return str.substring(0, idx) + preserved + str.substring(idx + this.pattern.length);
+    }
+
+    private preserveCase(original: string, replacement: string): string {
+        if (original === original.toUpperCase()) {
+            return replacement.toUpperCase();
+        }
+        if (original[0] === original[0].toUpperCase()) {
+            return replacement[0].toUpperCase() + replacement.slice(1);
+        }
+        return replacement;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Both classes should be converted
+    assert!(
+        output.contains("function BaseReplacer"),
+        "Expected BaseReplacer function: {}",
+        output
+    );
+    assert!(
+        output.contains("function CasePreservingReplacer"),
+        "Expected CasePreservingReplacer function: {}",
+        output
+    );
+
+    // Inheritance should be set up
+    assert!(
+        output.contains("__extends") || output.contains("extends"),
+        "Expected inheritance: {}",
+        output
+    );
+
+    // replaceAll method should be present
+    assert!(
+        output.contains("replaceAll"),
+        "Expected replaceAll method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_replace_template() {
+    // Symbol.replace with template string support
+    let source = r#"
+class TemplateReplacer {
+    private pattern: string;
+    private captureGroups: Map<string, string> = new Map();
+
+    constructor(pattern: string) {
+        this.pattern = pattern;
+    }
+
+    [Symbol.replace](str: string, template: string): string {
+        const idx = str.indexOf(this.pattern);
+        if (idx === -1) return str;
+
+        let result = template;
+        result = result.replace("$&", this.pattern);
+        result = result.replace("$\`", str.substring(0, idx));
+        result = result.replace("$'", str.substring(idx + this.pattern.length));
+
+        return str.substring(0, idx) + result + str.substring(idx + this.pattern.length);
+    }
+
+    addCapture(name: string, value: string): void {
+        this.captureGroups.set(name, value);
+    }
+
+    getCapture(name: string): string | undefined {
+        return this.captureGroups.get(name);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function TemplateReplacer"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Helper methods should be present
+    assert!(
+        output.contains("addCapture") && output.contains("getCapture"),
+        "Expected capture methods: {}",
+        output
+    );
+
+    // Map usage should be preserved
+    assert!(
+        output.contains("Map"),
+        "Expected Map usage: {}",
+        output
+    );
+}
+
+// ============================================================================
+// Symbol.search Tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_symbol_search_basic() {
+    // Basic Symbol.search implementation for custom searcher
+    let source = r#"
+class SubstringSearcher {
+    private needle: string;
+
+    constructor(needle: string) {
+        this.needle = needle;
+    }
+
+    [Symbol.search](str: string): number {
+        return str.indexOf(this.needle);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function SubstringSearcher"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Symbol.search should be referenced
+    assert!(
+        output.contains("search") || output.contains("Symbol"),
+        "Expected Symbol.search reference: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_search_case_insensitive() {
+    // Symbol.search with case-insensitive matching
+    let source = r#"
+class CaseInsensitiveSearcher {
+    private pattern: string;
+    readonly flags: string = "i";
+
+    constructor(pattern: string) {
+        this.pattern = pattern.toLowerCase();
+    }
+
+    [Symbol.search](str: string): number {
+        return str.toLowerCase().indexOf(this.pattern);
+    }
+
+    get source(): string {
+        return this.pattern;
+    }
+
+    get ignoreCase(): boolean {
+        return true;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function CaseInsensitiveSearcher"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Flags property should be present
+    assert!(
+        output.contains("flags"),
+        "Expected flags property: {}",
+        output
+    );
+
+    // Getters should be present
+    assert!(
+        output.contains("source") && output.contains("ignoreCase"),
+        "Expected source and ignoreCase getters: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_search_last_index() {
+    // Symbol.search returning last occurrence
+    let source = r#"
+class LastIndexSearcher {
+    private pattern: string;
+
+    constructor(pattern: string) {
+        this.pattern = pattern;
+    }
+
+    [Symbol.search](str: string): number {
+        return str.lastIndexOf(this.pattern);
+    }
+
+    searchFirst(str: string): number {
+        return str.indexOf(this.pattern);
+    }
+
+    searchAll(str: string): number[] {
+        const indices: number[] = [];
+        let idx = 0;
+        while ((idx = str.indexOf(this.pattern, idx)) !== -1) {
+            indices.push(idx);
+            idx += 1;
+        }
+        return indices;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function LastIndexSearcher"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Helper methods should be present
+    assert!(
+        output.contains("searchFirst") && output.contains("searchAll"),
+        "Expected helper methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_search_with_inheritance() {
+    // Symbol.search with class inheritance
+    let source = r#"
+abstract class BaseSearcher {
+    abstract readonly pattern: string;
+
+    abstract [Symbol.search](str: string): number;
+
+    contains(str: string): boolean {
+        return this[Symbol.search](str) !== -1;
+    }
+
+    startsWith(str: string): boolean {
+        return this[Symbol.search](str) === 0;
+    }
+}
+
+class WordBoundarySearcher extends BaseSearcher {
+    readonly pattern: string;
+
+    constructor(word: string) {
+        super();
+        this.pattern = word;
+    }
+
+    [Symbol.search](str: string): number {
+        const words = str.split(/\s+/);
+        let position = 0;
+        for (const word of words) {
+            if (word === this.pattern) {
+                return position;
+            }
+            position += word.length + 1;
+        }
+        return -1;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Both classes should be converted
+    assert!(
+        output.contains("function BaseSearcher"),
+        "Expected BaseSearcher function: {}",
+        output
+    );
+    assert!(
+        output.contains("function WordBoundarySearcher"),
+        "Expected WordBoundarySearcher function: {}",
+        output
+    );
+
+    // Inheritance should be set up
+    assert!(
+        output.contains("__extends") || output.contains("extends"),
+        "Expected inheritance: {}",
+        output
+    );
+
+    // Helper methods should be present
+    assert!(
+        output.contains("contains") && output.contains("startsWith"),
+        "Expected helper methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_search_multiple_patterns() {
+    // Symbol.search with multiple pattern support
+    let source = r#"
+class MultiPatternSearcher {
+    private patterns: string[];
+
+    constructor(...patterns: string[]) {
+        this.patterns = patterns;
+    }
+
+    [Symbol.search](str: string): number {
+        let earliest = -1;
+        for (const pattern of this.patterns) {
+            const idx = str.indexOf(pattern);
+            if (idx !== -1 && (earliest === -1 || idx < earliest)) {
+                earliest = idx;
+            }
+        }
+        return earliest;
+    }
+
+    addPattern(pattern: string): void {
+        this.patterns.push(pattern);
+    }
+
+    removePattern(pattern: string): boolean {
+        const idx = this.patterns.indexOf(pattern);
+        if (idx !== -1) {
+            this.patterns.splice(idx, 1);
+            return true;
+        }
+        return false;
+    }
+
+    get patternCount(): number {
+        return this.patterns.length;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function MultiPatternSearcher"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Helper methods should be present
+    assert!(
+        output.contains("addPattern") && output.contains("removePattern"),
+        "Expected pattern management methods: {}",
+        output
+    );
+
+    // patternCount getter should be present
+    assert!(
+        output.contains("patternCount"),
+        "Expected patternCount getter: {}",
+        output
+    );
+}
+
+// ============================================================================
+// Symbol.split Tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_symbol_split_basic() {
+    // Basic Symbol.split implementation for custom splitter
+    let source = r#"
+class SimpleSplitter {
+    private delimiter: string;
+
+    constructor(delimiter: string) {
+        this.delimiter = delimiter;
+    }
+
+    [Symbol.split](str: string, limit?: number): string[] {
+        return str.split(this.delimiter, limit);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function SimpleSplitter"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Symbol.split should be referenced
+    assert!(
+        output.contains("split") || output.contains("Symbol"),
+        "Expected Symbol.split reference: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_split_with_limit() {
+    // Symbol.split respecting limit parameter
+    let source = r#"
+class LimitedSplitter {
+    private separator: string;
+    readonly flags: string = "";
+
+    constructor(separator: string) {
+        this.separator = separator;
+    }
+
+    [Symbol.split](str: string, limit?: number): string[] {
+        const parts = str.split(this.separator);
+        if (limit !== undefined && limit >= 0) {
+            return parts.slice(0, limit);
+        }
+        return parts;
+    }
+
+    get source(): string {
+        return this.separator;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function LimitedSplitter"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Flags and source should be present
+    assert!(
+        output.contains("flags") && output.contains("source"),
+        "Expected flags and source properties: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_split_preserve_separators() {
+    // Symbol.split that preserves separators in output
+    let source = r#"
+class PreservingSplitter {
+    private separator: string;
+
+    constructor(separator: string) {
+        this.separator = separator;
+    }
+
+    [Symbol.split](str: string, limit?: number): string[] {
+        const result: string[] = [];
+        let lastIndex = 0;
+        let idx = 0;
+
+        while ((idx = str.indexOf(this.separator, lastIndex)) !== -1) {
+            result.push(str.substring(lastIndex, idx));
+            result.push(this.separator);
+            lastIndex = idx + this.separator.length;
+
+            if (limit !== undefined && result.length >= limit) {
+                return result.slice(0, limit);
+            }
+        }
+
+        result.push(str.substring(lastIndex));
+        return limit !== undefined ? result.slice(0, limit) : result;
+    }
+
+    getSeparator(): string {
+        return this.separator;
+    }
+
+    setSeparator(sep: string): void {
+        this.separator = sep;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function PreservingSplitter"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Helper methods should be present
+    assert!(
+        output.contains("getSeparator") && output.contains("setSeparator"),
+        "Expected getter and setter methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_split_with_inheritance() {
+    // Symbol.split with class inheritance
+    let source = r#"
+abstract class BaseSplitter {
+    abstract readonly separator: string;
+
+    abstract [Symbol.split](str: string, limit?: number): string[];
+
+    splitAndTrim(str: string): string[] {
+        return this[Symbol.split](str).map(s => s.trim());
+    }
+
+    splitAndFilter(str: string): string[] {
+        return this[Symbol.split](str).filter(s => s.length > 0);
+    }
+}
+
+class WhitespaceSplitter extends BaseSplitter {
+    readonly separator: string = " ";
+
+    [Symbol.split](str: string, limit?: number): string[] {
+        const parts = str.split(/\s+/);
+        return limit !== undefined ? parts.slice(0, limit) : parts;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Both classes should be converted
+    assert!(
+        output.contains("function BaseSplitter"),
+        "Expected BaseSplitter function: {}",
+        output
+    );
+    assert!(
+        output.contains("function WhitespaceSplitter"),
+        "Expected WhitespaceSplitter function: {}",
+        output
+    );
+
+    // Inheritance should be set up
+    assert!(
+        output.contains("__extends") || output.contains("extends"),
+        "Expected inheritance: {}",
+        output
+    );
+
+    // Helper methods should be present
+    assert!(
+        output.contains("splitAndTrim") && output.contains("splitAndFilter"),
+        "Expected helper methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_split_csv_parser() {
+    // Symbol.split for CSV-like parsing
+    let source = r#"
+class CSVSplitter {
+    private delimiter: string;
+    private quote: string;
+
+    constructor(delimiter: string = ",", quote: string = "\"") {
+        this.delimiter = delimiter;
+        this.quote = quote;
+    }
+
+    [Symbol.split](str: string, limit?: number): string[] {
+        const result: string[] = [];
+        let current = "";
+        let inQuotes = false;
+
+        for (let i = 0; i < str.length; i++) {
+            const char = str[i];
+
+            if (char === this.quote) {
+                inQuotes = !inQuotes;
+            } else if (char === this.delimiter && !inQuotes) {
+                result.push(current);
+                current = "";
+                if (limit !== undefined && result.length >= limit) {
+                    return result;
+                }
+            } else {
+                current += char;
+            }
+        }
+
+        result.push(current);
+        return limit !== undefined ? result.slice(0, limit) : result;
+    }
+
+    get delimiterChar(): string {
+        return this.delimiter;
+    }
+
+    get quoteChar(): string {
+        return this.quote;
+    }
+
+    parseRow(row: string): string[] {
+        return this[Symbol.split](row);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function CSVSplitter"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Getters should be present
+    assert!(
+        output.contains("delimiterChar") && output.contains("quoteChar"),
+        "Expected delimiter and quote getters: {}",
+        output
+    );
+
+    // parseRow method should be present
+    assert!(
+        output.contains("parseRow"),
+        "Expected parseRow method: {}",
+        output
+    );
+}

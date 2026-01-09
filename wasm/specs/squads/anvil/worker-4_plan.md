@@ -6,32 +6,28 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 4
 
----
-## 📢 DIRECTIVE: CONFORMANCE HARNESS (Operation Crucible)
-
-**⛔ STOP writing manual parity tests.** Build the conformance harness instead.
-
-Your assignment: **Read `tests/cases/compiler/*.ts`, parse test directives**
-
-Test files contain directives like:
-```typescript
-// @target: ES5
-// @module: commonjs
-// @lib: es2015
-// @strict: true
-```
-
-Build a parser that extracts these directives and configures the compiler accordingly.
-
----
-
 ## Current Assignment
-- [ ] Build test directive parser in `wasm/src/conformance_harness.rs` to read `@target`, `@module`, `@lib`, etc. from test files. Run `./wasm/test.sh conformance_harness`.
+- [ ] (none)
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Add ES5 class tests for Symbol.split patterns. Tests: `./wasm/test.sh class_es5_tests`
+- [x] Add ES5 class tests for Symbol.search patterns. Tests: `./wasm/test.sh class_es5_tests`
+- [x] Add ES5 class tests for Symbol.replace patterns. Tests: `./wasm/test.sh class_es5_tests`
+- [x] Add ES5 class tests for Symbol.match patterns. Tests: `./wasm/test.sh class_es5_tests`
+- [x] Add ES5 class tests for Symbol.asyncIterator. Tests: `./wasm/test.sh class_es5_tests`
+- [x] Add ES5 class tests for Symbol.species. Tests: `./wasm/test.sh class_es5_tests`
+- [x] Add ES5 class tests for Symbol.isConcatSpreadable. Tests: `./wasm/test.sh class_es5_tests`
+- [x] Add ES5 class tests for Symbol.toPrimitive. Tests: `./wasm/test.sh class_es5_tests`
+- [x] Add ES5 class tests for Symbol.hasInstance. Tests: `./wasm/test.sh class_es5_tests`
+- [x] Add ES5 class tests for Symbol.toStringTag. Tests: `./wasm/test.sh class_es5_tests`
+- [x] Add ES5 class tests for iterator protocol. Tests: `./wasm/test.sh class_es5_tests`
+- [x] Add ES5 class tests for static initialization order. Tests: `./wasm/test.sh class_es5_tests`
+- [x] Add ES5 class tests for WeakMap/WeakSet private field polyfill. Tests: `./wasm/test.sh class_es5_tests`
+- [x] Add ES5 class tests for private static methods. Tests: `./wasm/test.sh class_es5_tests`
+- [x] Add ES5 class tests for class expressions with generics. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for namespace merging. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for auto-accessor. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for using declarations. Tests: `./wasm/test.sh class_es5_tests`

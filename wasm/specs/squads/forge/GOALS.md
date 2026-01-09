@@ -5,16 +5,6 @@ Updated: 2026-01-09
 Priority: 1
 
 ---
-## 🚨 URGENT: EM-FORGE ACTION REQUIRED
-
-**⛔ DROP ALL REDUX/LODASH WORK IMMEDIATELY**
-
-If any worker is currently working on Redux/Lodash issues:
-1. **Send ESC key** to stop active work
-2. Reassign to tasks below
-3. We have senior staff handling Redux/Lodash - your team must focus elsewhere
-
----
 ## 📢 EM-FORGE: DIRECTIVE UPDATE
 
 **Redux/Lodash blocker is handled by senior staff. DO NOT work on it.**
@@ -99,19 +89,18 @@ Per Project Direction: **Autocratic Scheduling + Bisect-on-Merge**
 - Last EM Report: 2026-01-09 - EM session active
 - Redux Baseline: **2 diagnostics** (improved from 4, target: 0)
 - Workers Active: 5/5
-- Current Focus: Generic Inference + Conditional Types + Fix failing tests
-- Direction: Solver hardening per new directive
+- Current Focus: Generic Inference + Conditional Types
+- Direction: Solver hardening per directive
 - Session Merges:
   - forge-3: try_expand_type_arg fix
   - forge-3: generic class type expansion fix
   - forge-3: InferSubstitutor Function type support (Redux 4→2!)
-  - forge-5-track: 33 edge case tests for evaluate
 - Blocked Commits:
   - forge-2: Removes Ref/TypeQuery handling (regression)
-  - forge-5: Large diff with 25k deletions, risky
+  - forge-5: Large diff with merge conflicts
 - Worker Assignments:
-  - W1/Pane3: Inference from usage patterns (infer.rs)
-  - W2/Pane4: test_conditional_infer_function_optional_param_distributive
-  - W3/Pane5: test_conditional_infer_function_optional_param_non_distributive_union_input
-  - W4/Pane6: Fix match_infer_pattern for function parameter inference
-  - W5/Pane7: Distributive conditional type stress tests
+  - W1/Pane3: Template literal type inference
+  - W2/Pane4: ReturnType/Parameters edge cases
+  - W3/Pane5: Function parameter inference tests
+  - W4/Pane6: Circular constraints in extends clauses
+  - W5/Pane7: Distributive conditional stress tests
