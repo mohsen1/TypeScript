@@ -7,10 +7,10 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-None - awaiting assignment from EM-Anvil.
+- [ ] Add ES5 class tests for mixin factory patterns: base class mixins, trait composition, constrained mixins, parameterized mixins. Tests: `./wasm/test.sh class_es5_tests`
 
 ## Task Queue
-- [ ] Add ES5 class tests for mixin factory patterns: base class mixins, trait composition, constrained mixins
+- [ ] Add ES5 class tests for decorator factory patterns: decorator with parameters, composed decorators
 
 ## Completed
 - [x] Add ES5 class tests for branded type patterns. Tests: `./wasm/test.sh class_es5_tests`
