@@ -7,13 +7,13 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- [ ] Add async ES5 tests for async queue patterns: enqueue, dequeue, peek, drain, priority. Tests: `./wasm/test.sh async_es5_tests`
+- [ ] Add async ES5 tests for async timeout patterns: timeout, deadline, cancel. Tests: `./wasm/test.sh async_es5_tests`
 
 ## Task Queue
-- [ ] Add async ES5 tests for async timeout patterns: timeout, deadline, cancel
 
 
 ## Completed
+- [x] Added 12 async queue operations pattern tests (enqueue, dequeue, peek, drain, priority, size, clear, contains, iterator, batch, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (808 tests PASS).
 - [x] Added 12 async event emitter pattern tests (on, off, once, emit, wait, remove all, listeners, prepend, error, pipe, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (796 tests PASS).
 - [x] Added 12 async scheduler pattern tests (priority, delay, throttle, debounce, schedule, cancel, interval, cron, immediate, next tick, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (784 tests PASS).
 - [x] Added 12 async pool pattern tests (worker pool, task pool, connection pool, release, resize, drain, shutdown, health check, evict, batch, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (772 tests PASS).
