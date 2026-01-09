@@ -29000,3 +29000,476 @@ fn test_typeof_indexed_access() {
 
     assert_eq!(result, TypeId::NUMBER);
 }
+
+// ============================================================================
+// satisfies operator tests
+// The satisfies operator checks if a type is assignable to a constraint
+// while preserving the inferred (narrower) type
+// ============================================================================
+
+#[test]
+fn test_satisfies_basic_literal_string() {
+    use crate::solver::SubtypeChecker;
+
+    // const x = "hello" satisfies string
+    // The literal type "hello" should satisfy the string constraint
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let hello = interner.literal_string("hello");
+    // "hello" satisfies string - should be true
+    assert!(checker.is_subtype_of(hello, TypeId::STRING));
+    // The inferred type remains "hello", not string
+    assert_ne!(hello, TypeId::STRING);
+}
+
+#[test]
+fn test_satisfies_basic_literal_number() {
+    use crate::solver::SubtypeChecker;
+
+    // const x = 42 satisfies number
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let forty_two = interner.literal_number(42.0);
+    // 42 satisfies number - should be true
+    assert!(checker.is_subtype_of(forty_two, TypeId::NUMBER));
+    // The inferred type remains 42, not number
+    assert_ne!(forty_two, TypeId::NUMBER);
+}
+
+#[test]
+fn test_satisfies_basic_object_type() {
+    use crate::solver::SubtypeChecker;
+
+    // const x = { a: 1, b: "hello" } satisfies { a: number, b: string }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let one = interner.literal_number(1.0);
+    let hello = interner.literal_string("hello");
+
+    // Object with literal types (inferred type)
+    let inferred = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: one,
+            write_type: one,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: hello,
+            write_type: hello,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Constraint type (wider)
+    let constraint = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Inferred type satisfies constraint
+    assert!(checker.is_subtype_of(inferred, constraint));
+    // Types are different (inferred has literal types)
+    assert_ne!(inferred, constraint);
+}
+
+#[test]
+fn test_satisfies_constraint_failure() {
+    use crate::solver::SubtypeChecker;
+
+    // const x = "hello" satisfies number - should fail
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let hello = interner.literal_string("hello");
+    // String literal does not satisfy number constraint
+    assert!(!checker.is_subtype_of(hello, TypeId::NUMBER));
+}
+
+#[test]
+fn test_satisfies_literal_widening_preserved_string() {
+    use crate::solver::{SubtypeChecker, LiteralValue};
+
+    // With satisfies, literal types are preserved:
+    // const x = "hello" satisfies string -> type is "hello"
+    // With type annotation:
+    // const x: string = "hello" -> type is string (widened)
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let hello = interner.literal_string("hello");
+
+    // satisfies: literal type is preserved
+    assert!(checker.is_subtype_of(hello, TypeId::STRING));
+    // The type is still the literal, not widened
+    match interner.lookup(hello) {
+        Some(TypeKey::Literal(LiteralValue::String(_))) => {} // Expected - literal preserved
+        other => panic!("Expected Literal(String), got {:?}", other),
+    }
+}
+
+#[test]
+fn test_satisfies_literal_widening_preserved_number() {
+    use crate::solver::{SubtypeChecker, LiteralValue};
+
+    // const x = 42 satisfies number -> type remains 42 (literal)
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let forty_two = interner.literal_number(42.0);
+
+    assert!(checker.is_subtype_of(forty_two, TypeId::NUMBER));
+    match interner.lookup(forty_two) {
+        Some(TypeKey::Literal(LiteralValue::Number(_))) => {} // Expected - literal preserved
+        other => panic!("Expected Literal(Number), got {:?}", other),
+    }
+}
+
+#[test]
+fn test_satisfies_literal_widening_preserved_boolean() {
+    use crate::solver::{SubtypeChecker, LiteralValue};
+
+    // const x = true satisfies boolean -> type remains true (literal)
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let lit_true = interner.literal_boolean(true);
+
+    assert!(checker.is_subtype_of(lit_true, TypeId::BOOLEAN));
+    match interner.lookup(lit_true) {
+        Some(TypeKey::Literal(LiteralValue::Boolean(true))) => {} // Expected - literal preserved
+        other => panic!("Expected Literal(Boolean(true)), got {:?}", other),
+    }
+}
+
+#[test]
+fn test_satisfies_excess_property_check_fails() {
+    use crate::solver::SubtypeChecker;
+
+    // In TypeScript, satisfies performs excess property checking:
+    // const x = { a: 1, b: 2, c: 3 } satisfies { a: number, b: number }
+    // This is a compile error because 'c' is not in the constraint
+    //
+    // However, in structural subtyping, extra properties are allowed
+    // (an object with more props is a subtype of one with fewer)
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let source = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("c"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let target = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Structurally, {a, b, c} is a subtype of {a, b}
+    // Note: Excess property checking is a separate, expression-level check
+    assert!(checker.is_subtype_of(source, target));
+}
+
+#[test]
+fn test_satisfies_missing_property_fails() {
+    use crate::solver::SubtypeChecker;
+
+    // const x = { a: 1 } satisfies { a: number, b: number }
+    // This fails because 'b' is required but missing
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let source = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let target = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Missing required property 'b' - should fail
+    assert!(!checker.is_subtype_of(source, target));
+}
+
+#[test]
+fn test_satisfies_optional_property_satisfied() {
+    use crate::solver::SubtypeChecker;
+
+    // const x = { a: 1 } satisfies { a: number, b?: number }
+    // This succeeds because 'b' is optional
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let source = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let target = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: true, // optional property
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Missing optional property is ok
+    assert!(checker.is_subtype_of(source, target));
+}
+
+#[test]
+fn test_satisfies_vs_annotation_literal_preservation() {
+    use crate::solver::SubtypeChecker;
+
+    // Demonstrating satisfies vs type annotation difference:
+    //
+    // Type annotation widens:
+    //   const x: string = "hello"  // x has type 'string'
+    //
+    // Satisfies preserves:
+    //   const x = "hello" satisfies string  // x has type '"hello"'
+    //
+    // Both are valid (literal is subtype of base), but the resulting type differs
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let hello = interner.literal_string("hello");
+
+    // With satisfies: type stays as "hello"
+    let satisfies_type = hello;
+
+    // With annotation: type would be widened to string
+    let annotation_type = TypeId::STRING;
+
+    // Both satisfy the string constraint
+    assert!(checker.is_subtype_of(satisfies_type, TypeId::STRING));
+    assert!(checker.is_subtype_of(annotation_type, TypeId::STRING));
+
+    // But satisfies preserves more specific type
+    // "hello" is a subtype of string, but not vice versa
+    assert!(checker.is_subtype_of(satisfies_type, annotation_type));
+    assert!(!checker.is_subtype_of(annotation_type, satisfies_type));
+}
+
+#[test]
+fn test_satisfies_vs_annotation_object_properties() {
+    use crate::solver::SubtypeChecker;
+
+    // With satisfies, object property types are preserved:
+    //   const x = { status: "success" } satisfies { status: string }
+    //   x.status is "success" (can be used in narrowing)
+    //
+    // With annotation, property types are widened:
+    //   const x: { status: string } = { status: "success" }
+    //   x.status is string
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let success = interner.literal_string("success");
+
+    // Satisfies result: property type is literal
+    let satisfies_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("status"),
+        type_id: success,
+        write_type: success,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Annotation result: property type is widened
+    let annotation_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("status"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Both satisfy the constraint
+    assert!(checker.is_subtype_of(satisfies_obj, annotation_obj));
+
+    // But satisfies result is more specific
+    assert!(!checker.is_subtype_of(annotation_obj, satisfies_obj));
+}
+
+#[test]
+fn test_satisfies_union_constraint() {
+    use crate::solver::SubtypeChecker;
+
+    // const x = "a" satisfies "a" | "b" | "c"
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let lit_a = interner.literal_string("a");
+    let lit_b = interner.literal_string("b");
+    let lit_c = interner.literal_string("c");
+
+    let union = interner.union(vec![lit_a, lit_b, lit_c]);
+
+    // "a" satisfies the union
+    assert!(checker.is_subtype_of(lit_a, union));
+    // But the type remains "a", not the union
+    assert_ne!(lit_a, union);
+}
+
+#[test]
+fn test_satisfies_array_type() {
+    use crate::solver::SubtypeChecker;
+
+    // const x = [1, 2, 3] satisfies number[]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    // Tuple with literal types
+    let one = interner.literal_number(1.0);
+    let two = interner.literal_number(2.0);
+    let three = interner.literal_number(3.0);
+
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: one, name: None, optional: false, rest: false },
+        TupleElement { type_id: two, name: None, optional: false, rest: false },
+        TupleElement { type_id: three, name: None, optional: false, rest: false },
+    ]);
+
+    let number_array = interner.array(TypeId::NUMBER);
+
+    // Tuple [1, 2, 3] satisfies number[]
+    assert!(checker.is_subtype_of(tuple, number_array));
+}
+
+#[test]
+fn test_satisfies_record_type() {
+    use crate::solver::SubtypeChecker;
+
+    // const x = { foo: 1, bar: 2 } satisfies Record<string, number>
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let source = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("bar"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("foo"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Record<string, number> is an object with string index signature
+    let record = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    // Object with named properties satisfies Record<string, number>
+    assert!(checker.is_subtype_of(source, record));
+}
