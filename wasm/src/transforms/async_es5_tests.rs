@@ -13665,3 +13665,53 @@ fn test_async_allsettled_combined() {
     );
     assert!(result, "Should detect await in combined Promise.allSettled patterns");
 }
+
+// ASYNC IIFE PATTERN TESTS
+
+#[test]
+fn test_async_iifepat_basic() {
+    let result = async_error_propagation_contains_await(
+        "async function run() { return await fetch(url); }",
+    );
+    assert!(result, "Should detect await in basic async IIFE");
+}
+
+#[test]
+fn test_async_iifepat_with_params() {
+    let result = async_error_propagation_contains_await(
+        "async function run() { return await process(arg1, arg2); }",
+    );
+    assert!(result, "Should detect await in async IIFE with parameters");
+}
+
+#[test]
+fn test_async_iifepat_module_scope() {
+    let result = async_error_propagation_contains_await(
+        "async function init() { await setup(); await configure(); }",
+    );
+    assert!(result, "Should detect await in async IIFE in module scope");
+}
+
+#[test]
+fn test_async_iifepat_try_catch() {
+    let result = async_error_propagation_contains_await(
+        "async function run() { try { return await fetch(url); } catch (e) { return null; } }",
+    );
+    assert!(result, "Should detect await in async IIFE with try/catch");
+}
+
+#[test]
+fn test_async_iifepat_promise_all() {
+    let result = async_error_propagation_contains_await(
+        "async function run() { return await Promise.all([p1, p2, p3]); }",
+    );
+    assert!(result, "Should detect await in async IIFE with Promise.all");
+}
+
+#[test]
+fn test_async_iifepat_combined() {
+    let result = async_error_propagation_contains_await(
+        "async function run() { try { await init(); return await Promise.all(tasks); } catch (e) { return []; } }",
+    );
+    assert!(result, "Should detect await in combined async IIFE patterns");
+}

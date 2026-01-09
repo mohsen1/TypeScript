@@ -7,28 +7,14 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-Add ES5 async tests for async IIFE patterns
-
-Per GOALS.md Objective 1: ES5 downleveling correctness
-
-Steps:
-1. Add 6 ES5 async tests for async IIFE patterns to `wasm/src/transforms/async_es5_tests.rs`:
-   - Basic async IIFE
-   - Async IIFE with parameters
-   - Async IIFE in module scope
-   - Async IIFE with try/catch
-   - Async IIFE with Promise.all
-   - Combined async IIFE patterns
-2. Run `./wasm/test.sh async_es5_tests` to verify all tests pass
-3. Commit with message: `[wasm] async_es5: add async IIFE pattern tests`
-4. Push to `origin/worker/anvil-5`
-5. Update this plan file and push
+(none - awaiting new task from EM)
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)
 
 
 ## Completed
+- [x] Added 6 async IIFE pattern tests (basic, with_params, module_scope, try_catch, promise_all, combined) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (1042 tests PASS).
 - [x] Added 6 Promise.allSettled pattern tests (basic, error_handling, mixed_results, class_method, destructuring, combined) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (1036 tests PASS).
 - [x] Added 6 for-await-of edge case tests (break, continue, return, nested, try_catch, combined) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (1030 tests PASS).
 - [x] Added 12 async generator yield delegation tests (basic, async_iterable, return_value, try_catch, await_before, await_after, nested, loop, class, combined, no_await, ignores_nested) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (1024 tests PASS).
