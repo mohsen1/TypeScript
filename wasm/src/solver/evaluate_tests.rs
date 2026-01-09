@@ -36353,7 +36353,7 @@ fn test_return_type_async_promise_unwrapping() {
     let promise_string = interner.object(vec![PropertyInfo {
         name: interner.intern_string("then"),
         type_id: TypeId::ANY,
-        write_type: None,
+        write_type: TypeId::ANY,
         optional: false,
         readonly: false,
         is_method: true,
@@ -36527,7 +36527,7 @@ fn test_return_type_constructor_signature() {
     let instance_type = interner.object(vec![PropertyInfo {
         name: interner.intern_string("value"),
         type_id: TypeId::STRING,
-        write_type: None,
+        write_type: TypeId::STRING,
         optional: false,
         readonly: false,
         is_method: false,
@@ -36569,7 +36569,7 @@ fn test_parameters_this_parameter() {
     let window_type = interner.object(vec![PropertyInfo {
         name: interner.intern_string("location"),
         type_id: TypeId::STRING,
-        write_type: None,
+        write_type: TypeId::STRING,
         optional: false,
         readonly: false,
         is_method: false,
@@ -37057,9 +37057,10 @@ fn test_return_type_mapped_type_method() {
         default: None,
     }));
 
+    let keyof_t = interner.intern(TypeKey::KeyOf(t_param));
     let k_param_info = TypeParamInfo {
         name: k_name,
-        constraint: Some(interner.keyof(t_param)),
+        constraint: Some(keyof_t),
         default: None,
     };
     let k_param = interner.intern(TypeKey::TypeParameter(k_param_info.clone()));
@@ -37070,7 +37071,7 @@ fn test_return_type_mapped_type_method() {
     // Mapped type that transforms each property
     let mapped = MappedType {
         type_param: k_param_info,
-        constraint: interner.keyof(t_param),
+        constraint: keyof_t,
         name_type: None,
         template: index_access, // Each property uses T[K]
         readonly_modifier: None,
@@ -37091,7 +37092,7 @@ fn test_this_parameter_type_extraction() {
         PropertyInfo {
             name: interner.intern_string("document"),
             type_id: TypeId::ANY,
-            write_type: None,
+            write_type: TypeId::ANY,
             optional: false,
             readonly: true,
             is_method: false,
@@ -37099,7 +37100,7 @@ fn test_this_parameter_type_extraction() {
         PropertyInfo {
             name: interner.intern_string("location"),
             type_id: TypeId::STRING,
-            write_type: None,
+            write_type: TypeId::STRING,
             optional: false,
             readonly: false,
             is_method: false,
@@ -37133,7 +37134,7 @@ fn test_omit_this_parameter() {
     let window_type = interner.object(vec![PropertyInfo {
         name: interner.intern_string("location"),
         type_id: TypeId::STRING,
-        write_type: None,
+        write_type: TypeId::STRING,
         optional: false,
         readonly: false,
         is_method: false,
@@ -37194,26 +37195,27 @@ fn test_instance_type_from_constructor() {
     let interner = TypeInterner::new();
 
     // Instance type has 'value' property
+    let get_value_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
     let instance_type = interner.object(vec![
         PropertyInfo {
             name: interner.intern_string("value"),
             type_id: TypeId::STRING,
-            write_type: None,
+            write_type: TypeId::STRING,
             optional: false,
             readonly: false,
             is_method: false,
         },
         PropertyInfo {
             name: interner.intern_string("getValue"),
-            type_id: interner.function(FunctionShape {
-                type_params: vec![],
-                params: vec![],
-                this_type: None,
-                return_type: TypeId::STRING,
-                type_predicate: None,
-                is_constructor: false,
-            }),
-            write_type: None,
+            type_id: get_value_method,
+            write_type: get_value_method,
             optional: false,
             readonly: false,
             is_method: true,
@@ -37265,7 +37267,7 @@ fn test_constructor_parameters_with_generics() {
     let container = interner.object(vec![PropertyInfo {
         name: interner.intern_string("value"),
         type_id: t_param,
-        write_type: None,
+        write_type: t_param,
         optional: false,
         readonly: false,
         is_method: false,
@@ -37315,33 +37317,35 @@ fn test_awaited_with_nested_promises() {
 
     // We model Promise<T> as an object with 'then' method
     // For deeply nested, we just verify the structure
+    let inner_then = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
     let inner_promise = interner.object(vec![PropertyInfo {
         name: interner.intern_string("then"),
-        type_id: interner.function(FunctionShape {
-            type_params: vec![],
-            params: vec![],
-            this_type: None,
-            return_type: TypeId::STRING,
-            type_predicate: None,
-            is_constructor: false,
-        }),
-        write_type: None,
+        type_id: inner_then,
+        write_type: inner_then,
         optional: false,
         readonly: false,
         is_method: true,
     }]);
 
+    let outer_then = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: inner_promise,
+        type_predicate: None,
+        is_constructor: false,
+    });
     let outer_promise = interner.object(vec![PropertyInfo {
         name: interner.intern_string("then"),
-        type_id: interner.function(FunctionShape {
-            type_params: vec![],
-            params: vec![],
-            this_type: None,
-            return_type: inner_promise,
-            type_predicate: None,
-            is_constructor: false,
-        }),
-        write_type: None,
+        type_id: outer_then,
+        write_type: outer_then,
         optional: false,
         readonly: false,
         is_method: true,
