@@ -765,6 +765,245 @@ fn test_parity_es5_for_await_of_destructuring() {
     );
 }
 
+/// Parity test for ES5 for-await-of in class method.
+/// Async iteration inside a class method with typed stream.
+#[test]
+fn test_parity_es5_for_await_of_class_method() {
+    let source = r#"
+interface DataItem { id: number; payload: string }
+class StreamProcessor {
+    private results: DataItem[] = [];
+
+    async processStream(stream: AsyncIterable<DataItem>): Promise<void> {
+        for await (const item of stream) {
+            this.results.push(item);
+        }
+    }
+
+    getResults(): DataItem[] {
+        return this.results;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain class name
+    assert!(
+        output.contains("StreamProcessor"),
+        "ES5 output should contain StreamProcessor class: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface"),
+        "ES5 output should erase interface: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": DataItem") && !output.contains("AsyncIterable<") && !output.contains("Promise<void>"),
+        "ES5 output should erase type annotations: {}",
+        output
+    );
+    // Private modifier should be erased
+    assert!(
+        !output.contains("private"),
+        "ES5 output should erase private modifier: {}",
+        output
+    );
+    // No async method syntax
+    assert!(
+        !output.contains("async processStream"),
+        "ES5 output should not contain async method syntax: {}",
+        output
+    );
+    // No for await syntax
+    assert!(
+        !output.contains("for await"),
+        "ES5 output should not contain for await syntax: {}",
+        output
+    );
+    // Should reference this
+    assert!(
+        output.contains("this.results"),
+        "ES5 output should preserve this references: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 for-await-of with error handling.
+/// Async iteration with try/catch/finally for error handling.
+#[test]
+fn test_parity_es5_for_await_of_error_handling() {
+    let source = r#"
+interface StreamError { code: number; message: string }
+async function safeIterate<T>(stream: AsyncIterable<T>): Promise<T[]> {
+    const results: T[] = [];
+    try {
+        for await (const item of stream) {
+            results.push(item);
+        }
+    } catch (error) {
+        console.error("Stream error:", error);
+        throw error;
+    } finally {
+        console.log("Stream processing complete");
+    }
+    return results;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain function name
+    assert!(
+        output.contains("safeIterate"),
+        "ES5 output should contain safeIterate function: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface"),
+        "ES5 output should erase interface: {}",
+        output
+    );
+    // Generic type parameters should be erased
+    assert!(
+        !output.contains("<T>"),
+        "ES5 output should erase generic type parameters: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains("AsyncIterable<T>") && !output.contains("Promise<T[]>") && !output.contains(": T[]"),
+        "ES5 output should erase type annotations: {}",
+        output
+    );
+    // No async function syntax
+    assert!(
+        !output.contains("async function"),
+        "ES5 output should not contain async function syntax: {}",
+        output
+    );
+    // No for await syntax
+    assert!(
+        !output.contains("for await"),
+        "ES5 output should not contain for await syntax: {}",
+        output
+    );
+    // try/catch/finally structure should be preserved
+    assert!(
+        output.contains("try") && output.contains("catch") && output.contains("finally"),
+        "ES5 output should preserve try/catch/finally structure: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 for-await-of with nested destructuring.
+/// Async iteration with complex nested destructuring patterns.
+#[test]
+fn test_parity_es5_for_await_of_nested_destructuring() {
+    let source = r#"
+interface NestedData { outer: { inner: { value: number } }; meta: string }
+async function extractValues(stream: AsyncIterable<NestedData>): Promise<number[]> {
+    const values: number[] = [];
+    for await (const { outer: { inner: { value } }, meta } of stream) {
+        console.log(meta);
+        values.push(value);
+    }
+    return values;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain function name
+    assert!(
+        output.contains("extractValues"),
+        "ES5 output should contain extractValues function: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface"),
+        "ES5 output should erase interface: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains("AsyncIterable<") && !output.contains("Promise<number[]>") && !output.contains(": number[]"),
+        "ES5 output should erase type annotations: {}",
+        output
+    );
+    // No async function syntax
+    assert!(
+        !output.contains("async function"),
+        "ES5 output should not contain async function syntax: {}",
+        output
+    );
+    // No for await syntax
+    assert!(
+        !output.contains("for await"),
+        "ES5 output should not contain for await syntax: {}",
+        output
+    );
+    // Should use __awaiter and __generator helpers
+    assert!(
+        output.contains("__awaiter") && output.contains("__generator"),
+        "ES5 output should use awaiter/generator helpers: {}",
+        output
+    );
+}
+
 /// Parity test for ES5 template literals.
 /// Template literals should be downleveled to string concatenation.
 #[test]
@@ -10922,6 +11161,283 @@ class Child extends Parent {
     assert!(
         !output.contains(": number"),
         "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 static block with async IIFE.
+/// Static block containing async immediately-invoked function expression.
+#[test]
+fn test_parity_es5_static_block_async() {
+    let source = r#"
+interface Config { endpoint: string; timeout: number }
+class ApiClient {
+    static config: Config;
+
+    static {
+        (async () => {
+            const response = await fetch("/config");
+            ApiClient.config = await response.json();
+        })();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain class name
+    assert!(
+        output.contains("ApiClient"),
+        "Output should contain ApiClient class: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface"),
+        "ES5 output should erase interface: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": Config"),
+        "ES5 output should erase Config type annotation: {}",
+        output
+    );
+    // No async arrow syntax in ES5
+    assert!(
+        !output.contains("async ()"),
+        "ES5 output should not contain async arrow syntax: {}",
+        output
+    );
+    // No static block syntax
+    assert!(
+        !output.contains("static {"),
+        "ES5 output should not contain static block syntax: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 static block with private field access.
+/// Static block accessing private static fields.
+#[test]
+fn test_parity_es5_static_block_private_access() {
+    let source = r#"
+class Counter {
+    static #count: number = 0;
+    static #instances: Counter[] = [];
+
+    static {
+        Counter.#count = 0;
+        Counter.#instances = [];
+        console.log("Counter initialized");
+    }
+
+    static getCount(): number {
+        return Counter.#count;
+    }
+
+    constructor() {
+        Counter.#count++;
+        Counter.#instances.push(this);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain class name
+    assert!(
+        output.contains("Counter"),
+        "Output should contain Counter class: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number") && !output.contains(": Counter[]"),
+        "ES5 output should erase type annotations: {}",
+        output
+    );
+    // No static block syntax
+    assert!(
+        !output.contains("static {"),
+        "ES5 output should not contain static block syntax: {}",
+        output
+    );
+    // Should use __classPrivateFieldGet/Set helpers
+    assert!(
+        output.contains("__classPrivateFieldGet") || output.contains("__classPrivateFieldSet"),
+        "ES5 output should use private field helpers: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 static block initialization order.
+/// Multiple static blocks verifying initialization order.
+#[test]
+fn test_parity_es5_static_block_init_order() {
+    let source = r#"
+class OrderTest {
+    static first: string = "initialized first";
+
+    static {
+        console.log("First static block:", OrderTest.first);
+    }
+
+    static second: string = "initialized second";
+
+    static {
+        console.log("Second static block:", OrderTest.second);
+    }
+
+    static third: string;
+
+    static {
+        OrderTest.third = OrderTest.first + " and " + OrderTest.second;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain class name
+    assert!(
+        output.contains("OrderTest"),
+        "Output should contain OrderTest class: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string"),
+        "ES5 output should erase type annotations: {}",
+        output
+    );
+    // No static block syntax
+    assert!(
+        !output.contains("static {"),
+        "ES5 output should not contain static block syntax: {}",
+        output
+    );
+    // Static property values should be present
+    assert!(
+        output.contains("first") && output.contains("second") && output.contains("third"),
+        "ES5 output should preserve static property names: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 static block with super access.
+/// Static block in derived class accessing parent static members via super.
+#[test]
+fn test_parity_es5_static_block_super() {
+    let source = r#"
+class BaseConfig {
+    static baseUrl: string = "https://api.example.com";
+    static version: number = 1;
+
+    static getFullUrl(): string {
+        return BaseConfig.baseUrl + "/v" + BaseConfig.version;
+    }
+}
+
+class DerivedConfig extends BaseConfig {
+    static apiKey: string;
+    static fullEndpoint: string;
+
+    static {
+        DerivedConfig.apiKey = "secret-key";
+        DerivedConfig.fullEndpoint = super.getFullUrl() + "/resource";
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain both class names
+    assert!(
+        output.contains("BaseConfig") && output.contains("DerivedConfig"),
+        "Output should contain BaseConfig and DerivedConfig classes: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string") && !output.contains(": number"),
+        "ES5 output should erase type annotations: {}",
+        output
+    );
+    // No static block syntax
+    assert!(
+        !output.contains("static {"),
+        "ES5 output should not contain static block syntax: {}",
+        output
+    );
+    // Static property values should be present
+    assert!(
+        output.contains("apiKey") && output.contains("fullEndpoint"),
+        "ES5 output should preserve static property names: {}",
         output
     );
 }
