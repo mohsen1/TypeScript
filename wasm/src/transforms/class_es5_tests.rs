@@ -14143,3 +14143,367 @@ class CSVSplitter {
         output
     );
 }
+
+// ============================================================================
+// Symbol.unscopables Tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_symbol_unscopables_basic() {
+    // Basic Symbol.unscopables static getter
+    let source = r#"
+class CustomArray<T> {
+    private items: T[] = [];
+
+    static get [Symbol.unscopables](): Record<string, boolean> {
+        return {
+            copyWithin: true,
+            entries: true,
+            fill: true,
+            find: true,
+            findIndex: true,
+            keys: true,
+            values: true
+        };
+    }
+
+    push(item: T): number {
+        return this.items.push(item);
+    }
+
+    pop(): T | undefined {
+        return this.items.pop();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function CustomArray"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("push") && output.contains("pop"),
+        "Expected push and pop methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_unscopables_with_methods() {
+    // Symbol.unscopables excluding specific methods from with scope
+    let source = r#"
+class Collection<T> {
+    private data: T[] = [];
+
+    static get [Symbol.unscopables](): { [key: string]: boolean } {
+        return {
+            at: true,
+            findLast: true,
+            findLastIndex: true,
+            toReversed: true,
+            toSorted: true,
+            toSpliced: true
+        };
+    }
+
+    at(index: number): T | undefined {
+        return this.data[index >= 0 ? index : this.data.length + index];
+    }
+
+    findLast(predicate: (item: T) => boolean): T | undefined {
+        for (let i = this.data.length - 1; i >= 0; i--) {
+            if (predicate(this.data[i])) {
+                return this.data[i];
+            }
+        }
+        return undefined;
+    }
+
+    get length(): number {
+        return this.data.length;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function Collection"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("at") && output.contains("findLast"),
+        "Expected at and findLast methods: {}",
+        output
+    );
+
+    // Length getter should be present
+    assert!(
+        output.contains("length"),
+        "Expected length getter: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_unscopables_computed() {
+    // Symbol.unscopables with computed property values
+    let source = r#"
+class DynamicUnscopables {
+    private excluded: string[];
+
+    constructor(excluded: string[]) {
+        this.excluded = excluded;
+    }
+
+    static get [Symbol.unscopables](): Record<string, boolean> {
+        const result: Record<string, boolean> = {};
+        const defaultExcluded = ["values", "keys", "entries"];
+        for (const key of defaultExcluded) {
+            result[key] = true;
+        }
+        return result;
+    }
+
+    values(): string[] {
+        return [...this.excluded];
+    }
+
+    keys(): number[] {
+        return this.excluded.map((_, i) => i);
+    }
+
+    entries(): [number, string][] {
+        return this.excluded.map((v, i) => [i, v]);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function DynamicUnscopables"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Iterator-like methods should be present
+    assert!(
+        output.contains("values") && output.contains("keys") && output.contains("entries"),
+        "Expected values, keys, entries methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_unscopables_with_inheritance() {
+    // Symbol.unscopables with class inheritance
+    let source = r#"
+class BaseContainer<T> {
+    protected items: T[] = [];
+
+    static get [Symbol.unscopables](): Record<string, boolean> {
+        return {
+            flat: true,
+            flatMap: true,
+            includes: true
+        };
+    }
+
+    includes(item: T): boolean {
+        return this.items.indexOf(item) !== -1;
+    }
+}
+
+class ExtendedContainer<T> extends BaseContainer<T> {
+    static get [Symbol.unscopables](): Record<string, boolean> {
+        return {
+            ...BaseContainer[Symbol.unscopables],
+            at: true,
+            with: true
+        };
+    }
+
+    at(index: number): T | undefined {
+        return this.items[index];
+    }
+
+    add(item: T): void {
+        this.items.push(item);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Both classes should be converted
+    assert!(
+        output.contains("function BaseContainer"),
+        "Expected BaseContainer function: {}",
+        output
+    );
+    assert!(
+        output.contains("function ExtendedContainer"),
+        "Expected ExtendedContainer function: {}",
+        output
+    );
+
+    // Inheritance should be set up
+    assert!(
+        output.contains("__extends") || output.contains("extends"),
+        "Expected inheritance: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("includes") && output.contains("at") && output.contains("add"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_unscopables_frozen() {
+    // Symbol.unscopables returning frozen object
+    let source = r#"
+class ImmutableConfig {
+    private config: Map<string, unknown> = new Map();
+
+    static get [Symbol.unscopables](): Readonly<Record<string, boolean>> {
+        return Object.freeze({
+            get: true,
+            set: true,
+            has: true,
+            delete: true,
+            clear: true
+        });
+    }
+
+    get(key: string): unknown {
+        return this.config.get(key);
+    }
+
+    set(key: string, value: unknown): void {
+        this.config.set(key, value);
+    }
+
+    has(key: string): boolean {
+        return this.config.has(key);
+    }
+
+    delete(key: string): boolean {
+        return this.config.delete(key);
+    }
+
+    clear(): void {
+        this.config.clear();
+    }
+
+    get size(): number {
+        return this.config.size;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function ImmutableConfig"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Map-like methods should be present
+    assert!(
+        output.contains("get") && output.contains("set") && output.contains("has"),
+        "Expected get, set, has methods: {}",
+        output
+    );
+
+    // Object.freeze should be preserved
+    assert!(
+        output.contains("Object.freeze"),
+        "Expected Object.freeze call: {}",
+        output
+    );
+
+    // size getter should be present
+    assert!(
+        output.contains("size"),
+        "Expected size getter: {}",
+        output
+    );
+}
