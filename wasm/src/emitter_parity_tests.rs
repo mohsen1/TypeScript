@@ -5464,3 +5464,219 @@ class DerivedService extends BaseService {
         output
     );
 }
+
+/// Parity test for ES5 multiple method decorators.
+/// Multiple decorators on a method should be lowered without decorator syntax.
+#[test]
+fn test_parity_es5_method_decorator_multiple() {
+    let source = r#"function log(target: any, key: string, desc: PropertyDescriptor) {}
+function validate(target: any, key: string, desc: PropertyDescriptor) {}
+function cache(target: any, key: string, desc: PropertyDescriptor) {}
+
+class DataService {
+    @log
+    @validate
+    @cache
+    fetchData(id: number): string {
+        return "data";
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify class and method exist
+    assert!(
+        output.contains("DataService") && output.contains("fetchData"),
+        "Output should define DataService with fetchData: {}",
+        output
+    );
+    // No decorator syntax in ES5
+    assert!(
+        !output.contains("@log") && !output.contains("@validate") && !output.contains("@cache"),
+        "ES5 output should not contain decorator syntax: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number") && !output.contains(": string") && !output.contains("PropertyDescriptor"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 method decorator factory.
+/// Decorator factories with arguments should be lowered properly.
+#[test]
+fn test_parity_es5_method_decorator_factory() {
+    let source = r#"function throttle(ms: number) {
+    return function(target: any, key: string, desc: PropertyDescriptor) {};
+}
+
+class SearchController {
+    @throttle(300)
+    search(query: string): void {
+        console.log(query);
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify class and method exist
+    assert!(
+        output.contains("SearchController") && output.contains("search"),
+        "Output should define SearchController with search: {}",
+        output
+    );
+    // No decorator syntax in ES5
+    assert!(
+        !output.contains("@throttle"),
+        "ES5 output should not contain @throttle decorator syntax: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number") && !output.contains(": string") && !output.contains(": void") && !output.contains("PropertyDescriptor"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 static method decorator.
+/// Decorators on static methods should be lowered properly.
+#[test]
+fn test_parity_es5_method_decorator_static() {
+    let source = r#"function memoize(target: any, key: string, desc: PropertyDescriptor) {}
+
+class MathUtils {
+    @memoize
+    static factorial(n: number): number {
+        return n <= 1 ? 1 : n * MathUtils.factorial(n - 1);
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify class and static method exist
+    assert!(
+        output.contains("MathUtils") && output.contains("factorial"),
+        "Output should define MathUtils with factorial: {}",
+        output
+    );
+    // No decorator syntax in ES5
+    assert!(
+        !output.contains("@memoize"),
+        "ES5 output should not contain @memoize decorator syntax: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number") && !output.contains("PropertyDescriptor"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 async method decorator.
+/// Decorators on async methods should be lowered with async transform.
+#[test]
+fn test_parity_es5_method_decorator_async() {
+    let source = r#"function retry(target: any, key: string, desc: PropertyDescriptor) {}
+
+class ApiClient {
+    @retry
+    async fetchUser(id: number): Promise<string> {
+        return "user";
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify class and method exist
+    assert!(
+        output.contains("ApiClient") && output.contains("fetchUser"),
+        "Output should define ApiClient with fetchUser: {}",
+        output
+    );
+    // No decorator syntax in ES5
+    assert!(
+        !output.contains("@retry"),
+        "ES5 output should not contain @retry decorator syntax: {}",
+        output
+    );
+    // Async should be transformed (no async keyword in ES5)
+    assert!(
+        !output.contains("async fetchUser"),
+        "ES5 output should not contain async method: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number") && !output.contains("Promise<string>") && !output.contains("PropertyDescriptor"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
