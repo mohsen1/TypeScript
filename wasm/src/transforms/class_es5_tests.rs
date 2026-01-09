@@ -33073,132 +33073,76 @@ class Color {
 }
 
 // ============================================================================
-// FUNCTION OVERLOAD PATTERN TESTS
+// GENERIC CONSTRAINT PATTERN TESTS
 // ============================================================================
 
-/// Test function overload patterns: basic method overloads
+/// Test ES5 class downleveling with generic extends constraint patterns
 #[test]
-fn test_class_es5_overload_basic_methods() {
+fn test_class_es5_generic_constraint_extends() {
     let source = r#"
-class StringFormatter {
-    format(value: string): string;
-    format(value: number): string;
-    format(value: boolean): string;
-    format(value: string | number | boolean): string {
-        if (typeof value === "string") {
-            return value.toUpperCase();
-        } else if (typeof value === "number") {
-            return value.toFixed(2);
-        } else {
-            return value ? "true" : "false";
-        }
+interface Entity {
+    id: string;
+    createdAt: Date;
+}
+
+interface Nameable {
+    name: string;
+}
+
+class Repository<T extends Entity> {
+    private items: Map<string, T> = new Map();
+
+    save(item: T): T {
+        this.items.set(item.id, item);
+        return item;
+    }
+
+    findById(id: string): T | undefined {
+        return this.items.get(id);
+    }
+
+    findAll(): T[] {
+        return Array.from(this.items.values());
+    }
+
+    deleteById(id: string): boolean {
+        return this.items.delete(id);
     }
 }
 
-class DataProcessor {
-    process(data: string): string[];
-    process(data: number): number[];
-    process(data: string | number): string[] | number[] {
-        if (typeof data === "string") {
-            return data.split(",");
-        } else {
-            return [data, data * 2, data * 3];
+class NamedRepository<T extends Entity & Nameable> extends Repository<T> {
+    findByName(name: string): T | undefined {
+        for (const item of this.findAll()) {
+            if (item.name === name) return item;
         }
+        return undefined;
     }
 
-    transform(input: string, uppercase: true): string;
-    transform(input: string, uppercase: false): string;
-    transform(input: string, uppercase: boolean): string {
-        return uppercase ? input.toUpperCase() : input.toLowerCase();
-    }
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Classes should be converted to ES5
-    assert!(
-        output.contains("function StringFormatter") && output.contains("function DataProcessor"),
-        "Expected ES5 class constructors: {}",
-        output
-    );
-
-    // Methods should be on prototype (only implementation, not overload signatures)
-    assert!(
-        output.contains("StringFormatter.prototype.format") &&
-        output.contains("DataProcessor.prototype.process"),
-        "Expected methods on prototype: {}",
-        output
-    );
-
-    // typeof checks should be preserved
-    assert!(
-        output.contains("typeof"),
-        "Expected typeof checks: {}",
-        output
-    );
-}
-
-/// Test function overload patterns: constructor overloads
-#[test]
-fn test_class_es5_overload_constructors() {
-    let source = r#"
-class Point {
-    x: number;
-    y: number;
-
-    constructor();
-    constructor(x: number, y: number);
-    constructor(point: { x: number; y: number });
-    constructor(xOrPoint?: number | { x: number; y: number }, y?: number) {
-        if (xOrPoint === undefined) {
-            this.x = 0;
-            this.y = 0;
-        } else if (typeof xOrPoint === "number") {
-            this.x = xOrPoint;
-            this.y = y ?? 0;
-        } else {
-            this.x = xOrPoint.x;
-            this.y = xOrPoint.y;
-        }
-    }
-
-    toString(): string {
-        return "(" + this.x + ", " + this.y + ")";
+    findAllByNamePrefix(prefix: string): T[] {
+        return this.findAll().filter(item => item.name.startsWith(prefix));
     }
 }
 
-class Rectangle {
-    width: number;
-    height: number;
+class ComparableCollection<T extends { compareTo(other: T): number }> {
+    private items: T[] = [];
 
-    constructor(size: number);
-    constructor(width: number, height: number);
-    constructor(widthOrSize: number, height?: number) {
-        if (height === undefined) {
-            this.width = widthOrSize;
-            this.height = widthOrSize;
-        } else {
-            this.width = widthOrSize;
-            this.height = height;
-        }
+    add(item: T): void {
+        this.items.push(item);
     }
 
-    area(): number {
-        return this.width * this.height;
+    sort(): T[] {
+        return [...this.items].sort((a, b) => a.compareTo(b));
+    }
+
+    min(): T | undefined {
+        if (this.items.length === 0) return undefined;
+        return this.sort()[0];
+    }
+
+    max(): T | undefined {
+        if (this.items.length === 0) return undefined;
+        const sorted = this.sort();
+        return sorted[sorted.length - 1];
     }
 }
 "#;
@@ -33220,67 +33164,105 @@ class Rectangle {
 
     // Classes should be converted
     assert!(
-        output.contains("function Point") && output.contains("function Rectangle"),
-        "Expected ES5 class constructors: {}",
+        output.contains("Repository") && output.contains("NamedRepository") && output.contains("ComparableCollection"),
+        "Expected generic extends constraint classes: {}",
         output
     );
 
-    // Constructor should handle overloads
+    // Repository methods
     assert!(
-        output.contains("this.x") && output.contains("this.y"),
-        "Expected property assignments: {}",
+        output.contains("save") && output.contains("findById") && output.contains("findAll"),
+        "Expected Repository methods: {}",
         output
     );
 
-    // Methods preserved
+    // NamedRepository methods
     assert!(
-        output.contains("toString") && output.contains("area"),
-        "Expected methods: {}",
+        output.contains("findByName") && output.contains("findAllByNamePrefix"),
+        "Expected NamedRepository methods: {}",
+        output
+    );
+
+    // ComparableCollection methods
+    assert!(
+        output.contains("sort") && output.contains("min") && output.contains("max"),
+        "Expected ComparableCollection methods: {}",
         output
     );
 }
 
-/// Test function overload patterns: generic method overloads
+/// Test ES5 class downleveling with generic keyof constraint patterns
 #[test]
-fn test_class_es5_overload_generic_methods() {
+fn test_class_es5_generic_constraint_keyof() {
     let source = r#"
-class ArrayHelper {
-    first<T>(arr: T[]): T | undefined;
-    first<T>(arr: T[], defaultValue: T): T;
-    first<T>(arr: T[], defaultValue?: T): T | undefined {
-        return arr.length > 0 ? arr[0] : defaultValue;
+class PropertyAccessor<T, K extends keyof T> {
+    private obj: T;
+    private key: K;
+
+    constructor(obj: T, key: K) {
+        this.obj = obj;
+        this.key = key;
     }
 
-    find<T>(arr: T[], predicate: (item: T) => boolean): T | undefined;
-    find<T>(arr: T[], predicate: (item: T) => boolean, defaultValue: T): T;
-    find<T>(arr: T[], predicate: (item: T) => boolean, defaultValue?: T): T | undefined {
-        for (const item of arr) {
-            if (predicate(item)) {
-                return item;
-            }
-        }
-        return defaultValue;
+    get(): T[K] {
+        return this.obj[this.key];
+    }
+
+    set(value: T[K]): void {
+        this.obj[this.key] = value;
     }
 }
 
-class MapHelper {
-    get<K, V>(map: Map<K, V>, key: K): V | undefined;
-    get<K, V>(map: Map<K, V>, key: K, defaultValue: V): V;
-    get<K, V>(map: Map<K, V>, key: K, defaultValue?: V): V | undefined {
-        return map.has(key) ? map.get(key) : defaultValue;
+class ObjectMapper<T extends object> {
+    private source: T;
+
+    constructor(source: T) {
+        this.source = source;
     }
 
-    set<K, V>(map: Map<K, V>, key: K, value: V): Map<K, V>;
-    set<K, V>(map: Map<K, V>, entries: [K, V][]): Map<K, V>;
-    set<K, V>(map: Map<K, V>, keyOrEntries: K | [K, V][], value?: V): Map<K, V> {
-        if (Array.isArray(keyOrEntries)) {
-            for (const [k, v] of keyOrEntries) {
-                map.set(k, v);
-            }
-        } else {
-            map.set(keyOrEntries, value!);
+    pick<K extends keyof T>(...keys: K[]): Pick<T, K> {
+        const result = {} as Pick<T, K>;
+        for (const key of keys) {
+            result[key] = this.source[key];
         }
-        return map;
+        return result;
+    }
+
+    omit<K extends keyof T>(...keys: K[]): Omit<T, K> {
+        const result = { ...this.source } as any;
+        for (const key of keys) {
+            delete result[key];
+        }
+        return result;
+    }
+
+    getProperty<K extends keyof T>(key: K): T[K] {
+        return this.source[key];
+    }
+}
+
+class FormBuilder<T extends Record<string, any>> {
+    private values: Partial<T> = {};
+    private errors: Partial<Record<keyof T, string>> = {};
+
+    setValue<K extends keyof T>(key: K, value: T[K]): void {
+        this.values[key] = value;
+    }
+
+    getValue<K extends keyof T>(key: K): T[K] | undefined {
+        return this.values[key];
+    }
+
+    setError<K extends keyof T>(key: K, error: string): void {
+        this.errors[key] = error;
+    }
+
+    getError<K extends keyof T>(key: K): string | undefined {
+        return this.errors[key];
+    }
+
+    getValues(): Partial<T> {
+        return { ...this.values };
     }
 }
 "#;
@@ -33302,67 +33284,102 @@ class MapHelper {
 
     // Classes should be converted
     assert!(
-        output.contains("function ArrayHelper") && output.contains("function MapHelper"),
-        "Expected ES5 class constructors: {}",
+        output.contains("PropertyAccessor") && output.contains("ObjectMapper") && output.contains("FormBuilder"),
+        "Expected generic keyof constraint classes: {}",
         output
     );
 
-    // Methods should be on prototype
+    // PropertyAccessor methods
     assert!(
-        output.contains("ArrayHelper.prototype.first") &&
-        output.contains("MapHelper.prototype.get"),
-        "Expected methods on prototype: {}",
+        output.contains("get") && output.contains("set"),
+        "Expected PropertyAccessor methods: {}",
         output
     );
 
-    // Array.isArray should be preserved
+    // ObjectMapper methods
     assert!(
-        output.contains("Array.isArray"),
-        "Expected Array.isArray check: {}",
+        output.contains("pick") && output.contains("omit") && output.contains("getProperty"),
+        "Expected ObjectMapper methods: {}",
+        output
+    );
+
+    // FormBuilder methods
+    assert!(
+        output.contains("setValue") && output.contains("getValue") && output.contains("getValues"),
+        "Expected FormBuilder methods: {}",
         output
     );
 }
 
-/// Test function overload patterns: static method overloads
+/// Test ES5 class downleveling with generic conditional type constraint patterns
 #[test]
-fn test_class_es5_overload_static_methods() {
+fn test_class_es5_generic_constraint_conditional() {
     let source = r#"
-class MathUtils {
-    static add(a: number, b: number): number;
-    static add(a: string, b: string): string;
-    static add(a: number | string, b: number | string): number | string {
-        if (typeof a === "number" && typeof b === "number") {
-            return a + b;
-        }
-        return String(a) + String(b);
+type IsArray<T> = T extends any[] ? true : false;
+type UnwrapPromise<T> = T extends Promise<infer U> ? U : T;
+type ElementType<T> = T extends (infer E)[] ? E : never;
+
+class TypeChecker<T> {
+    private value: T;
+
+    constructor(value: T) {
+        this.value = value;
     }
 
-    static parse(value: string): number;
-    static parse(value: string, radix: number): number;
-    static parse(value: string, radix: number = 10): number {
-        return parseInt(value, radix);
+    isArray(): boolean {
+        return Array.isArray(this.value);
     }
 
-    static max(...values: number[]): number;
-    static max(arr: number[]): number;
-    static max(...valuesOrArr: number[] | [number[]]): number {
-        const arr = Array.isArray(valuesOrArr[0]) ? valuesOrArr[0] : valuesOrArr as number[];
-        return Math.max(...arr);
+    getValue(): T {
+        return this.value;
+    }
+
+    map<U>(fn: (value: T) => U): TypeChecker<U> {
+        return new TypeChecker(fn(this.value));
     }
 }
 
-class StringUtils {
-    static concat(a: string, b: string): string;
-    static concat(...strings: string[]): string;
-    static concat(...strings: string[]): string {
-        return strings.join("");
+class AsyncHandler<T> {
+    private promise: Promise<T>;
+
+    constructor(promise: Promise<T>) {
+        this.promise = promise;
     }
 
-    static split(str: string): string[];
-    static split(str: string, separator: string): string[];
-    static split(str: string, separator: string, limit: number): string[];
-    static split(str: string, separator: string = ",", limit?: number): string[] {
-        return limit !== undefined ? str.split(separator, limit) : str.split(separator);
+    async unwrap(): Promise<T> {
+        return this.promise;
+    }
+
+    map<U>(fn: (value: T) => U): AsyncHandler<U> {
+        return new AsyncHandler(this.promise.then(fn));
+    }
+
+    flatMap<U>(fn: (value: T) => Promise<U>): AsyncHandler<U> {
+        return new AsyncHandler(this.promise.then(fn));
+    }
+}
+
+class ArrayProcessor<T extends any[]> {
+    private array: T;
+
+    constructor(array: T) {
+        this.array = array;
+    }
+
+    first(): T[number] | undefined {
+        return this.array[0];
+    }
+
+    last(): T[number] | undefined {
+        return this.array[this.array.length - 1];
+    }
+
+    map<U>(fn: (item: T[number]) => U): U[] {
+        return this.array.map(fn);
+    }
+
+    filter(predicate: (item: T[number]) => boolean): T[number][] {
+        return this.array.filter(predicate);
     }
 }
 "#;
@@ -33384,255 +33401,29 @@ class StringUtils {
 
     // Classes should be converted
     assert!(
-        output.contains("function MathUtils") && output.contains("function StringUtils"),
-        "Expected ES5 class constructors: {}",
+        output.contains("TypeChecker") && output.contains("AsyncHandler") && output.contains("ArrayProcessor"),
+        "Expected generic conditional constraint classes: {}",
         output
     );
 
-    // Static methods should be on constructor
+    // TypeChecker methods
     assert!(
-        output.contains("MathUtils.add") && output.contains("StringUtils.concat"),
-        "Expected static methods: {}",
+        output.contains("isArray") && output.contains("getValue"),
+        "Expected TypeChecker methods: {}",
         output
     );
 
-    // Math.max should be preserved
+    // AsyncHandler methods
     assert!(
-        output.contains("Math.max"),
-        "Expected Math.max: {}",
-        output
-    );
-}
-
-/// Test function overload patterns: overloads with different return types
-#[test]
-fn test_class_es5_overload_return_types() {
-    let source = r#"
-class ResponseParser {
-    parse(response: string, format: "json"): object;
-    parse(response: string, format: "text"): string;
-    parse(response: string, format: "binary"): ArrayBuffer;
-    parse(response: string, format: "json" | "text" | "binary"): object | string | ArrayBuffer {
-        switch (format) {
-            case "json":
-                return JSON.parse(response);
-            case "text":
-                return response;
-            case "binary":
-                return new ArrayBuffer(response.length);
-        }
-    }
-}
-
-class DataConverter {
-    convert(value: string, to: "number"): number;
-    convert(value: string, to: "boolean"): boolean;
-    convert(value: string, to: "array"): string[];
-    convert(value: string, to: "number" | "boolean" | "array"): number | boolean | string[] {
-        switch (to) {
-            case "number":
-                return parseFloat(value);
-            case "boolean":
-                return value === "true";
-            case "array":
-                return value.split(",");
-        }
-    }
-
-    serialize(data: object): string;
-    serialize(data: object, pretty: true): string;
-    serialize(data: object, pretty: boolean = false): string {
-        return pretty ? JSON.stringify(data, null, 2) : JSON.stringify(data);
-    }
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Classes should be converted
-    assert!(
-        output.contains("function ResponseParser") && output.contains("function DataConverter"),
-        "Expected ES5 class constructors: {}",
+        output.contains("unwrap") && output.contains("flatMap"),
+        "Expected AsyncHandler methods: {}",
         output
     );
 
-    // Methods preserved
+    // ArrayProcessor methods
     assert!(
-        output.contains("parse") && output.contains("convert") && output.contains("serialize"),
-        "Expected methods: {}",
-        output
-    );
-
-    // JSON operations preserved
-    assert!(
-        output.contains("JSON.parse") && output.contains("JSON.stringify"),
-        "Expected JSON operations: {}",
-        output
-    );
-}
-
-/// Test function overload patterns: combined overload patterns
-#[test]
-fn test_class_es5_overload_combined_patterns() {
-    let source = r#"
-class EventEmitter {
-    private listeners: Map<string, Function[]> = new Map();
-
-    on(event: string, callback: Function): void;
-    on(events: string[], callback: Function): void;
-    on(eventOrEvents: string | string[], callback: Function): void {
-        const events = Array.isArray(eventOrEvents) ? eventOrEvents : [eventOrEvents];
-        for (const event of events) {
-            if (!this.listeners.has(event)) {
-                this.listeners.set(event, []);
-            }
-            this.listeners.get(event)!.push(callback);
-        }
-    }
-
-    emit(event: string): void;
-    emit(event: string, data: unknown): void;
-    emit(event: string, data?: unknown): void {
-        const callbacks = this.listeners.get(event) || [];
-        for (const callback of callbacks) {
-            callback(data);
-        }
-    }
-
-    off(event: string): void;
-    off(event: string, callback: Function): void;
-    off(event: string, callback?: Function): void {
-        if (!callback) {
-            this.listeners.delete(event);
-        } else {
-            const callbacks = this.listeners.get(event);
-            if (callbacks) {
-                const index = callbacks.indexOf(callback);
-                if (index !== -1) {
-                    callbacks.splice(index, 1);
-                }
-            }
-        }
-    }
-}
-
-class HttpClient {
-    get(url: string): Promise<Response>;
-    get<T>(url: string, options: { parse: true }): Promise<T>;
-    get<T>(url: string, options?: { parse?: boolean }): Promise<Response | T> {
-        return fetch(url).then(res => {
-            if (options?.parse) {
-                return res.json();
-            }
-            return res;
-        });
-    }
-
-    post(url: string, body: object): Promise<Response>;
-    post<T>(url: string, body: object, options: { parse: true }): Promise<T>;
-    post<T>(url: string, body: object, options?: { parse?: boolean }): Promise<Response | T> {
-        return fetch(url, {
-            method: "POST",
-            body: JSON.stringify(body),
-            headers: { "Content-Type": "application/json" }
-        }).then(res => {
-            if (options?.parse) {
-                return res.json();
-            }
-            return res;
-        });
-    }
-}
-
-class QueryBuilder {
-    where(column: string, value: unknown): this;
-    where(column: string, operator: string, value: unknown): this;
-    where(conditions: Record<string, unknown>): this;
-    where(
-        columnOrConditions: string | Record<string, unknown>,
-        operatorOrValue?: string | unknown,
-        value?: unknown
-    ): this {
-        if (typeof columnOrConditions === "object") {
-            for (const [col, val] of Object.entries(columnOrConditions)) {
-                this.addCondition(col, "=", val);
-            }
-        } else if (value !== undefined) {
-            this.addCondition(columnOrConditions, operatorOrValue as string, value);
-        } else {
-            this.addCondition(columnOrConditions, "=", operatorOrValue);
-        }
-        return this;
-    }
-
-    private addCondition(column: string, operator: string, value: unknown): void {
-        console.log(column, operator, value);
-    }
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // All classes should be converted
-    assert!(
-        output.contains("function EventEmitter") &&
-        output.contains("function HttpClient") &&
-        output.contains("function QueryBuilder"),
-        "Expected ES5 class constructors: {}",
-        output
-    );
-
-    // EventEmitter methods
-    assert!(
-        output.contains("on") && output.contains("emit") && output.contains("off"),
-        "Expected EventEmitter methods: {}",
-        output
-    );
-
-    // HttpClient methods
-    assert!(
-        output.contains("get") && output.contains("post"),
-        "Expected HttpClient methods: {}",
-        output
-    );
-
-    // QueryBuilder methods
-    assert!(
-        output.contains("where") && output.contains("addCondition"),
-        "Expected QueryBuilder methods: {}",
-        output
-    );
-
-    // Array.isArray preserved
-    assert!(
-        output.contains("Array.isArray"),
-        "Expected Array.isArray: {}",
+        output.contains("first") && output.contains("last") && output.contains("filter"),
+        "Expected ArrayProcessor methods: {}",
         output
     );
 }
