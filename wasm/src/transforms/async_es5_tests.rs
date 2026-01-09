@@ -9711,3 +9711,106 @@ fn test_async_method_pattern_multiple_awaits() {
     );
     assert!(result, "Should detect multiple awaits in method");
 }
+
+// ============================================================================
+// ASYNC ERROR HANDLING PATTERN TESTS
+// ============================================================================
+
+// Tests for async error handling patterns: try/catch/finally, Promise rejection,
+// async stack traces, nested try blocks, rethrow patterns, finally with return.
+
+#[test]
+fn test_async_error_pattern_try_catch_basic() {
+    let result = async_error_propagation_contains_await(
+        "async function foo() { try { await doWork(); } catch (e) { console.log(e); } }",
+    );
+    assert!(result, "Should detect await in try block of try/catch");
+}
+
+#[test]
+fn test_async_error_pattern_try_finally_basic() {
+    let result = async_error_propagation_contains_await(
+        "async function foo() { try { await doWork(); } finally { cleanup(); } }",
+    );
+    assert!(result, "Should detect await in try block of try/finally");
+}
+
+#[test]
+fn test_async_error_pattern_try_catch_finally() {
+    let result = async_error_propagation_contains_await(
+        "async function foo() { try { await doWork(); } catch (e) { log(e); } finally { cleanup(); } }",
+    );
+    assert!(result, "Should detect await in try/catch/finally");
+}
+
+#[test]
+fn test_async_error_pattern_await_in_catch() {
+    let result = async_error_propagation_contains_await(
+        "async function foo() { try { throw new Error(); } catch (e) { await handleError(e); } }",
+    );
+    assert!(result, "Should detect await in catch block");
+}
+
+#[test]
+fn test_async_error_pattern_await_in_finally() {
+    let result = async_error_propagation_contains_await(
+        "async function foo() { try { doWork(); } finally { await cleanup(); } }",
+    );
+    assert!(result, "Should detect await in finally block");
+}
+
+#[test]
+fn test_async_error_pattern_nested_try() {
+    let result = async_error_propagation_contains_await(
+        "async function foo() { try { try { await inner(); } catch (e1) { throw e1; } } catch (e2) { log(e2); } }",
+    );
+    assert!(result, "Should detect await in nested try block");
+}
+
+#[test]
+fn test_async_error_pattern_rethrow() {
+    let result = async_error_propagation_contains_await(
+        "async function foo() { try { await doWork(); } catch (e) { throw e; } }",
+    );
+    assert!(result, "Should detect await with rethrow pattern");
+}
+
+#[test]
+fn test_async_error_pattern_rethrow_wrapped() {
+    let result = async_error_propagation_contains_await(
+        "async function foo() { try { await doWork(); } catch (e) { throw new Error('Wrapped: ' + e.message); } }",
+    );
+    assert!(result, "Should detect await with wrapped rethrow");
+}
+
+#[test]
+fn test_async_error_pattern_finally_with_return() {
+    let result = async_error_propagation_contains_await(
+        "async function foo() { try { await doWork(); return 'done'; } finally { return 'finally'; } }",
+    );
+    assert!(result, "Should detect await with finally return");
+}
+
+#[test]
+fn test_async_error_pattern_promise_reject() {
+    let result = async_error_propagation_contains_await(
+        "async function foo() { await Promise.reject(new Error('test')); }",
+    );
+    assert!(result, "Should detect await on Promise.reject");
+}
+
+#[test]
+fn test_async_error_pattern_no_await() {
+    let result = async_error_propagation_contains_await(
+        "async function foo() { try { doWork(); } catch (e) { log(e); } }",
+    );
+    assert!(!result, "Should not detect await when try/catch has no await");
+}
+
+#[test]
+fn test_async_error_pattern_ignores_nested_async() {
+    let result = async_error_propagation_contains_await(
+        "async function foo() { try { const handler = async () => await inner(); } catch (e) { } }",
+    );
+    assert!(!result, "Should not detect await inside nested async in error handling");
+}
