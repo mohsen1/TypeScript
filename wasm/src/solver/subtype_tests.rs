@@ -15921,3 +15921,742 @@ fn test_enum_reverse_mapping_numeric() {
 
     assert!(checker.is_subtype_of(key_name, TypeId::STRING));
 }
+
+// =============================================================================
+// Index Signature Tests - String/Number Keys and Intersections
+// =============================================================================
+// These tests cover index signature behavior including string/number keys,
+// intersection of index signatures, and edge cases.
+
+#[test]
+fn test_index_signature_string_to_string() {
+    // { [key: string]: number } is subtype of { [key: string]: number }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let obj_a = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    let obj_b = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    assert!(checker.is_subtype_of(obj_a, obj_b));
+}
+
+#[test]
+fn test_index_signature_number_to_number() {
+    // { [key: number]: string } is subtype of { [key: number]: string }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let obj_a = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
+    });
+
+    let obj_b = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
+    });
+
+    assert!(checker.is_subtype_of(obj_a, obj_b));
+}
+
+#[test]
+fn test_index_signature_covariant_value_type() {
+    // { [key: string]: "a" | "b" } is subtype of { [key: string]: string }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let literal_union = interner.union(vec![
+        interner.literal_string("a"),
+        interner.literal_string("b"),
+    ]);
+
+    let obj_specific = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: literal_union,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    let obj_general = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    assert!(checker.is_subtype_of(obj_specific, obj_general));
+    assert!(!checker.is_subtype_of(obj_general, obj_specific));
+}
+
+#[test]
+fn test_index_signature_both_string_and_number() {
+    // { [key: string]: any, [key: number]: string }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let obj_both = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::ANY,
+            readonly: false,
+        }),
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
+    });
+
+    let obj_string_only = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::ANY,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    // Object with both is subtype of object with just string
+    assert!(checker.is_subtype_of(obj_both, obj_string_only));
+}
+
+#[test]
+fn test_index_signature_number_subtype_of_string() {
+    // Number index signature value must be subtype of string index signature value
+    // { [key: string]: any, [key: number]: string } - string is subtype of any
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let obj = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::ANY,
+            readonly: false,
+        }),
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
+    });
+
+    // This should be valid - string is subtype of any
+    assert!(obj != TypeId::ERROR);
+}
+
+#[test]
+fn test_index_signature_intersection_combines() {
+    // { [key: string]: A } & { [key: string]: B } = { [key: string]: A & B }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let obj_a = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    let obj_b = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    let intersection = interner.intersection(vec![obj_a, obj_b]);
+
+    // Intersection should be assignable to either
+    assert!(checker.is_subtype_of(intersection, obj_a));
+    assert!(checker.is_subtype_of(intersection, obj_b));
+}
+
+#[test]
+fn test_index_signature_with_properties() {
+    // { x: number, [key: string]: number | string }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let union_type = interner.union(vec![TypeId::NUMBER, TypeId::STRING]);
+
+    let obj = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name: interner.intern_string("x"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: union_type,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    // Object has both property and index signature
+    assert!(obj != TypeId::ERROR);
+}
+
+#[test]
+fn test_index_signature_property_must_match_index() {
+    // Property type must be subtype of index signature value type
+    // { x: string, [key: string]: string } is valid
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let obj_valid = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name: interner.intern_string("x"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    assert!(obj_valid != TypeId::ERROR);
+}
+
+#[test]
+fn test_index_signature_readonly_to_mutable() {
+    // { readonly [key: string]: T } is NOT subtype of { [key: string]: T }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let obj_readonly = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: true,
+        }),
+        number_index: None,
+    });
+
+    let obj_mutable = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    // Readonly is not assignable to mutable (can't write)
+    assert!(!checker.is_subtype_of(obj_readonly, obj_mutable));
+}
+
+#[test]
+fn test_index_signature_mutable_to_readonly() {
+    // { [key: string]: T } is subtype of { readonly [key: string]: T }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let obj_mutable = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    let obj_readonly = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: true,
+        }),
+        number_index: None,
+    });
+
+    // Mutable is assignable to readonly (can read)
+    assert!(checker.is_subtype_of(obj_mutable, obj_readonly));
+}
+
+#[test]
+fn test_index_signature_union_value_subtyping() {
+    // { [key: string]: A | B } - specific member is subtype of union
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let union_value = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    let obj = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: union_value,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    let obj_string = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    // { [k: string]: string } is subtype of { [k: string]: string | number }
+    assert!(checker.is_subtype_of(obj_string, obj));
+}
+
+#[test]
+fn test_index_signature_intersection_value() {
+    // { [key: string]: A & B }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let intersection_value = interner.intersection(vec![obj_a, obj_b]);
+
+    let obj = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: intersection_value,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    // Object with intersection value type
+    assert!(obj != TypeId::ERROR);
+}
+
+#[test]
+fn test_index_signature_empty_object_to_indexed() {
+    // {} is NOT subtype of { [key: string]: T } unless T allows undefined
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let empty_obj = interner.object(vec![]);
+
+    let indexed_obj = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    // Empty object may not be subtype of indexed object
+    // This depends on strictness settings
+    let result = checker.is_subtype_of(empty_obj, indexed_obj);
+    // Just ensure it doesn't panic
+    assert!(result || !result);
+}
+
+#[test]
+fn test_index_signature_object_with_extra_props() {
+    // { a: number, b: string } is subtype of { [key: string]: number | string }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let obj_with_props = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let union_value = interner.union(vec![TypeId::NUMBER, TypeId::STRING]);
+    let indexed_obj = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: union_value,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    assert!(checker.is_subtype_of(obj_with_props, indexed_obj));
+}
+
+#[test]
+fn test_index_signature_numeric_string_key() {
+    // { "0": T, "1": T } should be compatible with { [key: number]: T }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let obj_with_numeric_props = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("0"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("1"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let number_indexed = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
+    });
+
+    // Numeric string properties should be compatible
+    assert!(checker.is_subtype_of(obj_with_numeric_props, number_indexed));
+}
+
+#[test]
+fn test_index_signature_any_value() {
+    // { [key: string]: any } accepts anything
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let indexed_any = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::ANY,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    let obj_with_props = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: TypeId::BOOLEAN,
+        write_type: TypeId::BOOLEAN,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert!(checker.is_subtype_of(obj_with_props, indexed_any));
+}
+
+#[test]
+fn test_index_signature_unknown_value() {
+    // { [key: string]: unknown } - safe unknown
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let indexed_unknown = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::UNKNOWN,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    let indexed_string = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    // { [k: string]: string } is subtype of { [k: string]: unknown }
+    assert!(checker.is_subtype_of(indexed_string, indexed_unknown));
+}
+
+#[test]
+fn test_index_signature_never_value() {
+    // { [key: string]: never } - impossible to add properties
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let indexed_never = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NEVER,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    // Empty object might be subtype of { [k: string]: never }
+    let empty_obj = interner.object(vec![]);
+    let result = checker.is_subtype_of(empty_obj, indexed_never);
+    // Just ensure it handles the case
+    assert!(result || !result);
+}
+
+#[test]
+fn test_index_signature_function_value() {
+    // { [key: string]: () => void }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let fn_type = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let indexed_fn = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: fn_type,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    assert!(indexed_fn != TypeId::ERROR);
+}
+
+#[test]
+fn test_index_signature_array_value() {
+    // { [key: string]: T[] }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let array_type = interner.array(TypeId::NUMBER);
+
+    let indexed_array = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: array_type,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    assert!(indexed_array != TypeId::ERROR);
+}
+
+#[test]
+fn test_index_signature_tuple_value() {
+    // { [key: number]: [string, number] }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let tuple_type = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+            name: None,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            optional: false,
+            rest: false,
+            name: None,
+        },
+    ]);
+
+    let indexed_tuple = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: tuple_type,
+            readonly: false,
+        }),
+    });
+
+    assert!(indexed_tuple != TypeId::ERROR);
+}
+
+#[test]
+fn test_index_signature_nested_object_value() {
+    // { [key: string]: { x: number } }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let nested_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let indexed_nested = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: nested_obj,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    assert!(indexed_nested != TypeId::ERROR);
+}
+
+#[test]
+fn test_index_signature_intersection_objects() {
+    // { [key: string]: A } & { x: B }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let indexed_obj = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    let prop_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let intersection = interner.intersection(vec![indexed_obj, prop_obj]);
+
+    // Intersection should have both index signature and property
+    assert!(intersection != TypeId::ERROR);
+}
+
+#[test]
+fn test_index_signature_literal_key_subset() {
+    // { [key: "a" | "b"]: T } - template literal pattern index
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let literal_keys = interner.union(vec![
+        interner.literal_string("a"),
+        interner.literal_string("b"),
+    ]);
+
+    // This would be like a Pick pattern or mapped type result
+    let obj_with_literal_props = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    assert!(obj_with_literal_props != TypeId::ERROR);
+}

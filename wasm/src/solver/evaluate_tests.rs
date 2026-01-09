@@ -38824,7 +38824,7 @@ fn test_distributive_large_union() {
 }
 
 #[test]
-fn test_distributive_exclude_utility() {
+fn test_distributive_exclude_utility_stress() {
     // Exclude<T, U> = T extends U ? never : T
     // Exclude<string | number | boolean, string> = number | boolean
     let interner = TypeInterner::new();
@@ -38845,7 +38845,7 @@ fn test_distributive_exclude_utility() {
 }
 
 #[test]
-fn test_distributive_extract_utility() {
+fn test_distributive_extract_utility_stress() {
     // Extract<T, U> = T extends U ? T : never
     // Extract<string | number | boolean, string | number> = string | number
     let interner = TypeInterner::new();

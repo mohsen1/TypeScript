@@ -1,5 +1,5 @@
 use super::*;
-use crate::solver::{AssignabilityChecker, CompatChecker, infer_generic_function};
+use crate::solver::{AssignabilityChecker, CompatChecker, infer_generic_function, evaluate_conditional, ConditionalType};
 
 #[test]
 fn test_inference_basic() {
@@ -15132,7 +15132,6 @@ fn test_circular_constraint_async_iterator() {
     let results = ctx.resolve_all_with_constraints().unwrap();
     assert_eq!(results.len(), 2);
 }
-use crate::solver::{AssignabilityChecker, CompatChecker, infer_generic_function, evaluate_conditional, ConditionalType};
 
 // =============================================================================
 // Function Return Type Inference with Conditional Types
