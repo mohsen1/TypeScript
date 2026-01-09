@@ -31950,3 +31950,378 @@ class LazyLoader {
         output
     );
 }
+
+// ============================================================================
+// ABSTRACT CLASS IMPLEMENTATION PATTERN TESTS
+// ============================================================================
+
+/// Test ES5 class downleveling with abstract method implementation patterns
+#[test]
+fn test_class_es5_abstract_implementation_methods() {
+    let source = r#"
+abstract class DataSource {
+    abstract connect(): Promise<void>;
+    abstract disconnect(): Promise<void>;
+    abstract query(sql: string): Promise<any[]>;
+    abstract execute(sql: string): Promise<number>;
+
+    async transaction<T>(callback: () => Promise<T>): Promise<T> {
+        await this.execute("BEGIN");
+        try {
+            const result = await callback();
+            await this.execute("COMMIT");
+            return result;
+        } catch (error) {
+            await this.execute("ROLLBACK");
+            throw error;
+        }
+    }
+}
+
+class PostgresDataSource extends DataSource {
+    private connectionString: string;
+    private connected: boolean = false;
+
+    constructor(connectionString: string) {
+        super();
+        this.connectionString = connectionString;
+    }
+
+    async connect(): Promise<void> {
+        console.log("Connecting to:", this.connectionString);
+        this.connected = true;
+    }
+
+    async disconnect(): Promise<void> {
+        this.connected = false;
+    }
+
+    async query(sql: string): Promise<any[]> {
+        if (!this.connected) throw new Error("Not connected");
+        return [];
+    }
+
+    async execute(sql: string): Promise<number> {
+        if (!this.connected) throw new Error("Not connected");
+        return 1;
+    }
+}
+
+class MySqlDataSource extends DataSource {
+    private pool: any;
+
+    constructor(config: { host: string; port: number }) {
+        super();
+        this.pool = config;
+    }
+
+    async connect(): Promise<void> {
+        console.log("MySQL connecting");
+    }
+
+    async disconnect(): Promise<void> {
+        console.log("MySQL disconnecting");
+    }
+
+    async query(sql: string): Promise<any[]> {
+        return [{ id: 1 }];
+    }
+
+    async execute(sql: string): Promise<number> {
+        return 0;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("DataSource") && output.contains("PostgresDataSource") && output.contains("MySqlDataSource"),
+        "Expected abstract implementation classes: {}",
+        output
+    );
+
+    // Implemented methods should be present
+    assert!(
+        output.contains("connect") && output.contains("disconnect") && output.contains("query") && output.contains("execute"),
+        "Expected implemented methods: {}",
+        output
+    );
+
+    // Base class method should be present
+    assert!(
+        output.contains("transaction"),
+        "Expected base class transaction method: {}",
+        output
+    );
+}
+
+/// Test ES5 class downleveling with abstract property implementation patterns
+#[test]
+fn test_class_es5_abstract_implementation_properties() {
+    let source = r#"
+abstract class Component {
+    abstract readonly tagName: string;
+    abstract template: string;
+    abstract styles: string[];
+
+    render(): string {
+        return "<" + this.tagName + ">" + this.template + "</" + this.tagName + ">";
+    }
+
+    getStyles(): string {
+        return this.styles.join("\n");
+    }
+}
+
+class Button extends Component {
+    readonly tagName: string = "button";
+    template: string = "<span>Click me</span>";
+    styles: string[] = ["button { padding: 10px; }", "button:hover { opacity: 0.8; }"];
+
+    private onClick: Function | null = null;
+
+    setClickHandler(handler: Function): void {
+        this.onClick = handler;
+    }
+}
+
+class Card extends Component {
+    readonly tagName: string = "div";
+    template: string;
+    styles: string[];
+
+    constructor(content: string) {
+        super();
+        this.template = "<div class='card-body'>" + content + "</div>";
+        this.styles = ["div.card { border: 1px solid gray; }", "div.card-body { padding: 16px; }"];
+    }
+
+    setContent(content: string): void {
+        this.template = "<div class='card-body'>" + content + "</div>";
+    }
+}
+
+abstract class FormField {
+    abstract name: string;
+    abstract value: any;
+    abstract validate(): boolean;
+
+    abstract get isValid(): boolean;
+    abstract set disabled(value: boolean);
+
+    reset(): void {
+        this.value = null;
+    }
+}
+
+class TextField extends FormField {
+    name: string;
+    value: string = "";
+    private _disabled: boolean = false;
+
+    constructor(name: string) {
+        super();
+        this.name = name;
+    }
+
+    validate(): boolean {
+        return this.value.length > 0;
+    }
+
+    get isValid(): boolean {
+        return this.validate();
+    }
+
+    set disabled(value: boolean) {
+        this._disabled = value;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("Component") && output.contains("Button") && output.contains("Card"),
+        "Expected abstract property implementation classes: {}",
+        output
+    );
+
+    // FormField hierarchy
+    assert!(
+        output.contains("FormField") && output.contains("TextField"),
+        "Expected FormField classes: {}",
+        output
+    );
+
+    // Methods should be preserved
+    assert!(
+        output.contains("render") && output.contains("getStyles") && output.contains("validate"),
+        "Expected methods: {}",
+        output
+    );
+
+    // Properties should be referenced
+    assert!(
+        output.contains("tagName") && output.contains("template") && output.contains("styles"),
+        "Expected properties: {}",
+        output
+    );
+}
+
+/// Test ES5 class downleveling with abstract generic implementation patterns
+#[test]
+fn test_class_es5_abstract_implementation_generic() {
+    let source = r#"
+abstract class Repository<T, ID> {
+    abstract findById(id: ID): Promise<T | null>;
+    abstract findAll(): Promise<T[]>;
+    abstract save(entity: T): Promise<T>;
+    abstract delete(id: ID): Promise<boolean>;
+
+    async exists(id: ID): Promise<boolean> {
+        const entity = await this.findById(id);
+        return entity !== null;
+    }
+}
+
+interface User {
+    id: number;
+    name: string;
+    email: string;
+}
+
+class UserRepository extends Repository<User, number> {
+    private users: Map<number, User> = new Map();
+
+    async findById(id: number): Promise<User | null> {
+        return this.users.get(id) || null;
+    }
+
+    async findAll(): Promise<User[]> {
+        return Array.from(this.users.values());
+    }
+
+    async save(entity: User): Promise<User> {
+        this.users.set(entity.id, entity);
+        return entity;
+    }
+
+    async delete(id: number): Promise<boolean> {
+        return this.users.delete(id);
+    }
+
+    async findByEmail(email: string): Promise<User | null> {
+        for (const user of this.users.values()) {
+            if (user.email === email) return user;
+        }
+        return null;
+    }
+}
+
+abstract class Service<T> {
+    protected abstract repository: Repository<T, any>;
+
+    abstract validate(entity: T): boolean;
+
+    async create(entity: T): Promise<T> {
+        if (!this.validate(entity)) {
+            throw new Error("Validation failed");
+        }
+        return this.repository.save(entity);
+    }
+
+    async getAll(): Promise<T[]> {
+        return this.repository.findAll();
+    }
+}
+
+class UserService extends Service<User> {
+    protected repository: UserRepository;
+
+    constructor(repository: UserRepository) {
+        super();
+        this.repository = repository;
+    }
+
+    validate(entity: User): boolean {
+        return entity.name.length > 0 && entity.email.includes("@");
+    }
+
+    async findByEmail(email: string): Promise<User | null> {
+        return this.repository.findByEmail(email);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("Repository") && output.contains("UserRepository"),
+        "Expected Repository classes: {}",
+        output
+    );
+
+    // Service classes
+    assert!(
+        output.contains("Service") && output.contains("UserService"),
+        "Expected Service classes: {}",
+        output
+    );
+
+    // Repository methods
+    assert!(
+        output.contains("findById") && output.contains("findAll") && output.contains("save"),
+        "Expected Repository methods: {}",
+        output
+    );
+
+    // Service methods
+    assert!(
+        output.contains("validate") && output.contains("create") && output.contains("getAll"),
+        "Expected Service methods: {}",
+        output
+    );
+}

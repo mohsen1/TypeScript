@@ -7,12 +7,13 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [ ] Add ES5 class tests for abstract class implementation patterns: abstract methods, properties. Tests: `./wasm/test.sh class_es5_tests`
+None - ready for next task.
 
 ## Task Queue
 - [ ] Add ES5 class tests for interface implementation patterns: implements clause, multiple interfaces
 
 ## Completed
+- [x] Add ES5 class tests for abstract class implementation patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for class static block patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for decorator metadata patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for import assertion patterns. Tests: `./wasm/test.sh class_es5_tests`
