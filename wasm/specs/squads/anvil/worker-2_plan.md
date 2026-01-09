@@ -7,10 +7,10 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- [ ] (awaiting assignment)
+- [ ] Add ES5 parity tests for arrow function parameter patterns: typed params with inference, defaults with complex types, rest with tuple types, generic arrow functions, arrow with nested destructuring, arrow returning arrow. Tests: `./wasm/test.sh emitter_parity`
 
 ## Task Queue
-- [ ] (empty)
+- [ ] Add ES5 parity tests for async/await complex patterns: async with try/finally, async with Promise.all destructure, async IIFE, nested async arrows
 
 ## Completed
 - [x] Added ES5 destructuring parity tests (object-typed, array-tuple, nested-deep, defaults-typed, rest-typed) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (247 tests).
