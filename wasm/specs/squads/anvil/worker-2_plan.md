@@ -7,12 +7,15 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- [ ] Add ES5 shorthand method parity tests (method definitions, computed methods, async shorthand, generator shorthand) in `wasm/src/emitter_parity_tests.rs`. Run `./wasm/test.sh emitter_parity`.
+- [ ] Add ES5 array spread parity tests (array literal spread, function call spread, new expression spread, mixed with elements) in `wasm/src/emitter_parity_tests.rs`. Run `./wasm/test.sh emitter_parity`.
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added ES5 object spread parity tests (typed, multiple, overrides, nested-deep, computed) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (238 tests).
+- [x] Added ES5 accessor parity tests (getter-inheritance, setter-validation, pair-caching, static, computed) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (233 tests).
+- [x] Added ES5 shorthand method parity tests (definitions, computed, async, generator) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (228 tests).
 - [x] Added ES5 computed property parity tests (template, binary, nested, conditional) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (224 tests).
 - [x] Added ES5 static field parity tests (computed, methods, inheritance, generic) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (220 tests).
 - [x] Added ES5 private method parity tests (this-binding, generic, derived, callback) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (216 tests).

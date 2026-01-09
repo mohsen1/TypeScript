@@ -17819,3 +17819,1833 @@ class DataProcessor {
         output
     );
 }
+
+// ============================================================================
+// Class Field Decorators Pattern Tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_field_decorator_observable_pattern() {
+    // Observable field decorator pattern
+    let source = r#"
+function observable(target: any, propertyKey: string) {
+    let value: any;
+    Object.defineProperty(target, propertyKey, {
+        get() { return value; },
+        set(newValue) {
+            console.log(`Setting ${propertyKey} to ${newValue}`);
+            value = newValue;
+        },
+        enumerable: true,
+        configurable: true
+    });
+}
+
+class User {
+    @observable
+    name: string = "";
+
+    @observable
+    email: string = "";
+
+    constructor(name: string, email: string) {
+        this.name = name;
+        this.email = email;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function User") || output.contains("User"),
+        "Expected User class: {}",
+        output
+    );
+
+    // Decorator function should be present
+    assert!(
+        output.contains("observable"),
+        "Expected observable decorator: {}",
+        output
+    );
+
+    // Fields should be present
+    assert!(
+        output.contains("name") && output.contains("email"),
+        "Expected field names: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_field_decorator_stacked_pattern() {
+    // Stacked decorators on fields pattern
+    let source = r#"
+function validate(target: any, propertyKey: string) {
+    console.log(`Validating ${propertyKey}`);
+}
+
+function log(target: any, propertyKey: string) {
+    console.log(`Logging ${propertyKey}`);
+}
+
+function required(target: any, propertyKey: string) {
+    console.log(`Required ${propertyKey}`);
+}
+
+class FormData {
+    @validate
+    @log
+    @required
+    username: string = "";
+
+    @validate
+    @required
+    password: string = "";
+
+    @log
+    rememberMe: boolean = false;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function FormData") || output.contains("FormData"),
+        "Expected FormData class: {}",
+        output
+    );
+
+    // Decorator functions should be present
+    assert!(
+        output.contains("validate") && output.contains("log") && output.contains("required"),
+        "Expected decorator functions: {}",
+        output
+    );
+
+    // Fields should be present
+    assert!(
+        output.contains("username") && output.contains("password"),
+        "Expected field names: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_field_decorator_factory_pattern() {
+    // Field decorator with arguments (decorator factory)
+    let source = r#"
+function minLength(min: number) {
+    return function(target: any, propertyKey: string) {
+        let value: string = "";
+        Object.defineProperty(target, propertyKey, {
+            get() { return value; },
+            set(newValue: string) {
+                if (newValue.length < min) {
+                    throw new Error(`${propertyKey} must be at least ${min} characters`);
+                }
+                value = newValue;
+            }
+        });
+    };
+}
+
+function maxLength(max: number) {
+    return function(target: any, propertyKey: string) {
+        let value: string = "";
+        Object.defineProperty(target, propertyKey, {
+            get() { return value; },
+            set(newValue: string) {
+                if (newValue.length > max) {
+                    throw new Error(`${propertyKey} must be at most ${max} characters`);
+                }
+                value = newValue;
+            }
+        });
+    };
+}
+
+function range(min: number, max: number) {
+    return function(target: any, propertyKey: string) {
+        let value: number = min;
+        Object.defineProperty(target, propertyKey, {
+            get() { return value; },
+            set(newValue: number) {
+                if (newValue < min || newValue > max) {
+                    throw new Error(`${propertyKey} must be between ${min} and ${max}`);
+                }
+                value = newValue;
+            }
+        });
+    };
+}
+
+class Product {
+    @minLength(3)
+    @maxLength(100)
+    name: string = "";
+
+    @minLength(10)
+    description: string = "";
+
+    @range(0, 10000)
+    price: number = 0;
+
+    @range(0, 1000)
+    quantity: number = 0;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function Product") || output.contains("Product"),
+        "Expected Product class: {}",
+        output
+    );
+
+    // Decorator factory functions should be present
+    assert!(
+        output.contains("minLength") && output.contains("maxLength"),
+        "Expected decorator factories: {}",
+        output
+    );
+
+    // Fields should be present
+    assert!(
+        output.contains("name") && output.contains("price"),
+        "Expected field names: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_field_decorator_deep_inheritance() {
+    // Field decorators with deep inheritance chain
+    let source = r#"
+function tracked(target: any, propertyKey: string) {
+    console.log(`Tracking ${propertyKey}`);
+}
+
+function serializable(target: any, propertyKey: string) {
+    console.log(`Serializable ${propertyKey}`);
+}
+
+class BaseEntity {
+    @tracked
+    id: string = "";
+
+    @tracked
+    createdAt: Date = new Date();
+
+    @tracked
+    updatedAt: Date = new Date();
+}
+
+class Document extends BaseEntity {
+    @tracked
+    @serializable
+    title: string = "";
+
+    @tracked
+    @serializable
+    content: string = "";
+
+    @tracked
+    author: string = "";
+}
+
+class Article extends Document {
+    @tracked
+    @serializable
+    category: string = "";
+
+    @tracked
+    tags: string[] = [];
+
+    @serializable
+    publishedAt: Date | null = null;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("BaseEntity") || output.contains("function BaseEntity"),
+        "Expected BaseEntity class: {}",
+        output
+    );
+    assert!(
+        output.contains("Document") || output.contains("function Document"),
+        "Expected Document class: {}",
+        output
+    );
+    assert!(
+        output.contains("Article") || output.contains("function Article"),
+        "Expected Article class: {}",
+        output
+    );
+
+    // Decorator functions should be present
+    assert!(
+        output.contains("tracked") && output.contains("serializable"),
+        "Expected decorator functions: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_field_decorator_metadata() {
+    // Field decorators with metadata pattern
+    let source = r#"
+const METADATA_KEY = Symbol("metadata");
+
+function type(typeName: string) {
+    return function(target: any, propertyKey: string) {
+        const metadata = target[METADATA_KEY] || {};
+        metadata[propertyKey] = { ...metadata[propertyKey], type: typeName };
+        target[METADATA_KEY] = metadata;
+    };
+}
+
+function defaultValue(value: any) {
+    return function(target: any, propertyKey: string) {
+        const metadata = target[METADATA_KEY] || {};
+        metadata[propertyKey] = { ...metadata[propertyKey], default: value };
+        target[METADATA_KEY] = metadata;
+    };
+}
+
+function nullable(target: any, propertyKey: string) {
+    const metadata = target[METADATA_KEY] || {};
+    metadata[propertyKey] = { ...metadata[propertyKey], nullable: true };
+    target[METADATA_KEY] = metadata;
+}
+
+class Schema {
+    @type("string")
+    @defaultValue("")
+    name: string = "";
+
+    @type("number")
+    @defaultValue(0)
+    age: number = 0;
+
+    @type("string")
+    @nullable
+    @defaultValue(null)
+    nickname: string | null = null;
+
+    @type("boolean")
+    @defaultValue(true)
+    active: boolean = true;
+
+    static getMetadata(): Record<string, any> {
+        return (Schema.prototype as any)[METADATA_KEY] || {};
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function Schema") || output.contains("Schema"),
+        "Expected Schema class: {}",
+        output
+    );
+
+    // Decorator factory functions should be present
+    assert!(
+        output.contains("type") && output.contains("defaultValue"),
+        "Expected decorator factories: {}",
+        output
+    );
+
+    // Static method should be present
+    assert!(
+        output.contains("getMetadata"),
+        "Expected getMetadata method: {}",
+        output
+    );
+
+    // Symbol should be present
+    assert!(
+        output.contains("METADATA_KEY") || output.contains("Symbol"),
+        "Expected metadata symbol: {}",
+        output
+    );
+}
+
+// ============================================================================
+// Class Method Decorator Pattern Tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_method_decorator_factory_pattern() {
+    // Method decorator factory with configurable options
+    let source = r#"
+function timeout(ms: number) {
+    return function(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+        const originalMethod = descriptor.value;
+        descriptor.value = async function(...args: any[]) {
+            return Promise.race([
+                originalMethod.apply(this, args),
+                new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error(`${propertyKey} timed out`)), ms)
+                )
+            ]);
+        };
+        return descriptor;
+    };
+}
+
+function retry(attempts: number, delay: number = 1000) {
+    return function(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+        const originalMethod = descriptor.value;
+        descriptor.value = async function(...args: any[]) {
+            for (let i = 0; i < attempts; i++) {
+                try {
+                    return await originalMethod.apply(this, args);
+                } catch (e) {
+                    if (i === attempts - 1) throw e;
+                    await new Promise(r => setTimeout(r, delay));
+                }
+            }
+        };
+        return descriptor;
+    };
+}
+
+class ApiClient {
+    @timeout(5000)
+    async fetchData(url: string): Promise<any> {
+        const response = await fetch(url);
+        return response.json();
+    }
+
+    @retry(3, 500)
+    async postData(url: string, data: any): Promise<any> {
+        const response = await fetch(url, {
+            method: 'POST',
+            body: JSON.stringify(data)
+        });
+        return response.json();
+    }
+
+    @timeout(10000)
+    @retry(2)
+    async uploadFile(url: string, file: File): Promise<any> {
+        const formData = new FormData();
+        formData.append('file', file);
+        const response = await fetch(url, { method: 'POST', body: formData });
+        return response.json();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function ApiClient") || output.contains("ApiClient"),
+        "Expected ApiClient class: {}",
+        output
+    );
+
+    // Decorator factories should be present
+    assert!(
+        output.contains("timeout") && output.contains("retry"),
+        "Expected decorator factories: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("fetchData") && output.contains("postData") && output.contains("uploadFile"),
+        "Expected API methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_method_decorator_stacked() {
+    // Stacked method decorators executed in order
+    let source = r#"
+function log(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    const original = descriptor.value;
+    descriptor.value = function(...args: any[]) {
+        console.log(`Calling ${propertyKey} with`, args);
+        const result = original.apply(this, args);
+        console.log(`${propertyKey} returned`, result);
+        return result;
+    };
+    return descriptor;
+}
+
+function validate(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    const original = descriptor.value;
+    descriptor.value = function(...args: any[]) {
+        if (args.some(arg => arg === undefined || arg === null)) {
+            throw new Error(`${propertyKey}: Invalid arguments`);
+        }
+        return original.apply(this, args);
+    };
+    return descriptor;
+}
+
+function memoize(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    const cache = new Map<string, any>();
+    const original = descriptor.value;
+    descriptor.value = function(...args: any[]) {
+        const key = JSON.stringify(args);
+        if (cache.has(key)) return cache.get(key);
+        const result = original.apply(this, args);
+        cache.set(key, result);
+        return result;
+    };
+    return descriptor;
+}
+
+function benchmark(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    const original = descriptor.value;
+    descriptor.value = function(...args: any[]) {
+        const start = performance.now();
+        const result = original.apply(this, args);
+        console.log(`${propertyKey} took ${performance.now() - start}ms`);
+        return result;
+    };
+    return descriptor;
+}
+
+class Calculator {
+    @log
+    @validate
+    @memoize
+    @benchmark
+    compute(a: number, b: number, operation: string): number {
+        switch (operation) {
+            case 'add': return a + b;
+            case 'subtract': return a - b;
+            case 'multiply': return a * b;
+            case 'divide': return a / b;
+            default: throw new Error('Unknown operation');
+        }
+    }
+
+    @log
+    @validate
+    factorial(n: number): number {
+        if (n <= 1) return 1;
+        return n * this.factorial(n - 1);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function Calculator") || output.contains("Calculator"),
+        "Expected Calculator class: {}",
+        output
+    );
+
+    // Decorator functions should be present
+    assert!(
+        output.contains("log") && output.contains("validate") && output.contains("memoize"),
+        "Expected decorator functions: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("compute") && output.contains("factorial"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_method_decorator_async() {
+    // Async method decorators
+    let source = r#"
+function asyncLog(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    const original = descriptor.value;
+    descriptor.value = async function(...args: any[]) {
+        console.log(`[${new Date().toISOString()}] Starting ${propertyKey}`);
+        try {
+            const result = await original.apply(this, args);
+            console.log(`[${new Date().toISOString()}] Completed ${propertyKey}`);
+            return result;
+        } catch (error) {
+            console.error(`[${new Date().toISOString()}] Failed ${propertyKey}:`, error);
+            throw error;
+        }
+    };
+    return descriptor;
+}
+
+function measure(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    const original = descriptor.value;
+    descriptor.value = async function(...args: any[]) {
+        const start = Date.now();
+        const result = await original.apply(this, args);
+        console.log(`${propertyKey} execution time: ${Date.now() - start}ms`);
+        return result;
+    };
+    return descriptor;
+}
+
+function cache(ttlMs: number) {
+    return function(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+        const cacheMap = new Map<string, { value: any; expires: number }>();
+        const original = descriptor.value;
+        descriptor.value = async function(...args: any[]) {
+            const key = JSON.stringify(args);
+            const cached = cacheMap.get(key);
+            if (cached && cached.expires > Date.now()) {
+                return cached.value;
+            }
+            const result = await original.apply(this, args);
+            cacheMap.set(key, { value: result, expires: Date.now() + ttlMs });
+            return result;
+        };
+        return descriptor;
+    };
+}
+
+class DataService {
+    @asyncLog
+    @measure
+    async fetchUsers(): Promise<any[]> {
+        const response = await fetch('/api/users');
+        return response.json();
+    }
+
+    @cache(60000)
+    @asyncLog
+    async getUser(id: string): Promise<any> {
+        const response = await fetch(`/api/users/${id}`);
+        return response.json();
+    }
+
+    @asyncLog
+    @measure
+    async saveUser(user: any): Promise<void> {
+        await fetch('/api/users', {
+            method: 'POST',
+            body: JSON.stringify(user)
+        });
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function DataService") || output.contains("DataService"),
+        "Expected DataService class: {}",
+        output
+    );
+
+    // Decorator functions should be present
+    assert!(
+        output.contains("asyncLog") && output.contains("measure"),
+        "Expected async decorator functions: {}",
+        output
+    );
+
+    // Async methods should be present
+    assert!(
+        output.contains("fetchUsers") && output.contains("getUser") && output.contains("saveUser"),
+        "Expected async methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_method_decorator_static() {
+    // Static method decorators
+    let source = r#"
+function singleton(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    let instance: any = null;
+    const original = descriptor.value;
+    descriptor.value = function(...args: any[]) {
+        if (instance === null) {
+            instance = original.apply(this, args);
+        }
+        return instance;
+    };
+    return descriptor;
+}
+
+function deprecated(message: string) {
+    return function(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+        const original = descriptor.value;
+        descriptor.value = function(...args: any[]) {
+            console.warn(`DEPRECATED: ${propertyKey} - ${message}`);
+            return original.apply(this, args);
+        };
+        return descriptor;
+    };
+}
+
+function authorize(roles: string[]) {
+    return function(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+        const original = descriptor.value;
+        descriptor.value = function(...args: any[]) {
+            const currentUser = (this as any).getCurrentUser?.() || {};
+            if (!roles.some(role => currentUser.roles?.includes(role))) {
+                throw new Error('Unauthorized');
+            }
+            return original.apply(this, args);
+        };
+        return descriptor;
+    };
+}
+
+class ServiceFactory {
+    private static instances = new Map<string, any>();
+
+    @singleton
+    static createDatabase(): any {
+        console.log('Creating database connection');
+        return { type: 'database', connected: true };
+    }
+
+    @singleton
+    static createCache(): any {
+        console.log('Creating cache instance');
+        return { type: 'cache', entries: new Map() };
+    }
+
+    @deprecated('Use createDatabase instead')
+    static getDbConnection(): any {
+        return ServiceFactory.createDatabase();
+    }
+
+    @authorize(['admin'])
+    static resetAll(): void {
+        ServiceFactory.instances.clear();
+        console.log('All instances reset');
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function ServiceFactory") || output.contains("ServiceFactory"),
+        "Expected ServiceFactory class: {}",
+        output
+    );
+
+    // Decorator functions should be present
+    assert!(
+        output.contains("singleton") && output.contains("deprecated"),
+        "Expected static decorator functions: {}",
+        output
+    );
+
+    // Static methods should be present
+    assert!(
+        output.contains("createDatabase") && output.contains("createCache"),
+        "Expected static factory methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_method_decorator_combined() {
+    // Combined method and accessor decorators
+    let source = r#"
+function readonly(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    descriptor.writable = false;
+    return descriptor;
+}
+
+function enumerable(value: boolean) {
+    return function(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+        descriptor.enumerable = value;
+        return descriptor;
+    };
+}
+
+function bound(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    const original = descriptor.value;
+    return {
+        configurable: true,
+        get() {
+            const boundFn = original.bind(this);
+            Object.defineProperty(this, propertyKey, {
+                value: boundFn,
+                configurable: true,
+                writable: true
+            });
+            return boundFn;
+        }
+    };
+}
+
+function throttle(ms: number) {
+    return function(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+        let lastCall = 0;
+        const original = descriptor.value;
+        descriptor.value = function(...args: any[]) {
+            const now = Date.now();
+            if (now - lastCall >= ms) {
+                lastCall = now;
+                return original.apply(this, args);
+            }
+        };
+        return descriptor;
+    };
+}
+
+class EventHandler {
+    private events: string[] = [];
+
+    @bound
+    @throttle(100)
+    handleClick(event: any): void {
+        this.events.push('click');
+        console.log('Click handled');
+    }
+
+    @bound
+    @throttle(50)
+    handleScroll(event: any): void {
+        this.events.push('scroll');
+        console.log('Scroll handled');
+    }
+
+    @readonly
+    @enumerable(false)
+    getEventCount(): number {
+        return this.events.length;
+    }
+
+    @enumerable(true)
+    getEvents(): string[] {
+        return [...this.events];
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function EventHandler") || output.contains("EventHandler"),
+        "Expected EventHandler class: {}",
+        output
+    );
+
+    // Decorator functions should be present
+    assert!(
+        output.contains("bound") && output.contains("throttle"),
+        "Expected combined decorator functions: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("handleClick") && output.contains("handleScroll"),
+        "Expected event handler methods: {}",
+        output
+    );
+}
+
+// ============================================================================
+// AsyncIterator/AsyncIterable pattern tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_async_iterator_basic() {
+    // Basic async iterator with Symbol.asyncIterator
+    let source = r#"
+class AsyncRange {
+    private start: number;
+    private end: number;
+    private delay: number;
+
+    constructor(start: number, end: number, delay: number = 100) {
+        this.start = start;
+        this.end = end;
+        this.delay = delay;
+    }
+
+    async *[Symbol.asyncIterator](): AsyncIterator<number> {
+        for (let i = this.start; i <= this.end; i++) {
+            await this.sleep(this.delay);
+            yield i;
+        }
+    }
+
+    private sleep(ms: number): Promise<void> {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function AsyncRange"),
+        "Expected AsyncRange function: {}",
+        output
+    );
+    assert!(
+        output.contains("Symbol.asyncIterator"),
+        "Expected Symbol.asyncIterator: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_for_await_of_pattern() {
+    // Class using for-await-of with async iterables
+    let source = r#"
+class AsyncDataProcessor<T> {
+    private source: AsyncIterable<T>;
+
+    constructor(source: AsyncIterable<T>) {
+        this.source = source;
+    }
+
+    async collectAll(): Promise<T[]> {
+        const result: T[] = [];
+        for await (const item of this.source) {
+            result.push(item);
+        }
+        return result;
+    }
+
+    async processEach(processor: (item: T) => Promise<void>): Promise<void> {
+        for await (const item of this.source) {
+            await processor(item);
+        }
+    }
+
+    async find(predicate: (item: T) => boolean): Promise<T | undefined> {
+        for await (const item of this.source) {
+            if (predicate(item)) {
+                return item;
+            }
+        }
+        return undefined;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function AsyncDataProcessor"),
+        "Expected AsyncDataProcessor function: {}",
+        output
+    );
+    assert!(
+        output.contains("collectAll") && output.contains("processEach"),
+        "Expected async methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_async_generator_iterable() {
+    // Async generator as iterable class
+    let source = r#"
+class AsyncQueue<T> {
+    private items: T[] = [];
+    private resolvers: ((value: T) => void)[] = [];
+
+    enqueue(item: T): void {
+        if (this.resolvers.length > 0) {
+            const resolve = this.resolvers.shift()!;
+            resolve(item);
+        } else {
+            this.items.push(item);
+        }
+    }
+
+    private dequeue(): Promise<T> {
+        if (this.items.length > 0) {
+            return Promise.resolve(this.items.shift()!);
+        }
+        return new Promise(resolve => this.resolvers.push(resolve));
+    }
+
+    async *[Symbol.asyncIterator](): AsyncIterator<T> {
+        while (true) {
+            yield await this.dequeue();
+        }
+    }
+
+    async take(count: number): Promise<T[]> {
+        const result: T[] = [];
+        let i = 0;
+        for await (const item of this) {
+            result.push(item);
+            i++;
+            if (i >= count) break;
+        }
+        return result;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function AsyncQueue"),
+        "Expected AsyncQueue function: {}",
+        output
+    );
+    assert!(
+        output.contains("Symbol.asyncIterator"),
+        "Expected Symbol.asyncIterator: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_async_iterator_protocol() {
+    // Manual async iterator protocol implementation
+    let source = r#"
+class PaginatedFetcher<T> {
+    private baseUrl: string;
+    private pageSize: number;
+
+    constructor(baseUrl: string, pageSize: number = 10) {
+        this.baseUrl = baseUrl;
+        this.pageSize = pageSize;
+    }
+
+    [Symbol.asyncIterator](): AsyncIterator<T[]> {
+        let page = 0;
+        const self = this;
+
+        return {
+            async next(): Promise<IteratorResult<T[]>> {
+                const data = await self.fetchPage(page);
+                if (data.length === 0) {
+                    return { done: true, value: undefined };
+                }
+                page++;
+                return { done: false, value: data };
+            }
+        };
+    }
+
+    private async fetchPage(page: number): Promise<T[]> {
+        const response = await fetch(`${this.baseUrl}?page=${page}&size=${this.pageSize}`);
+        return response.json();
+    }
+
+    async getAllPages(): Promise<T[][]> {
+        const pages: T[][] = [];
+        for await (const page of this) {
+            pages.push(page);
+        }
+        return pages;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function PaginatedFetcher"),
+        "Expected PaginatedFetcher function: {}",
+        output
+    );
+    assert!(
+        output.contains("Symbol.asyncIterator"),
+        "Expected Symbol.asyncIterator: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_async_iterator_in_constructor() {
+    // Async iterator patterns used in constructor and methods
+    let source = r#"
+class AsyncStreamProcessor {
+    private stream: AsyncIterable<string>;
+    private buffer: string[] = [];
+
+    constructor(stream: AsyncIterable<string>) {
+        this.stream = stream;
+    }
+
+    async *[Symbol.asyncIterator](): AsyncIterator<string> {
+        for await (const chunk of this.stream) {
+            yield chunk.toUpperCase();
+        }
+    }
+
+    async bufferAll(): Promise<string[]> {
+        for await (const item of this) {
+            this.buffer.push(item);
+        }
+        return this.buffer;
+    }
+
+    async *filter(predicate: (s: string) => boolean): AsyncIterator<string> {
+        for await (const item of this) {
+            if (predicate(item)) {
+                yield item;
+            }
+        }
+    }
+
+    async *map<U>(fn: (s: string) => U): AsyncIterator<U> {
+        for await (const item of this) {
+            yield fn(item);
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function AsyncStreamProcessor"),
+        "Expected AsyncStreamProcessor function: {}",
+        output
+    );
+    assert!(
+        output.contains("Symbol.asyncIterator"),
+        "Expected Symbol.asyncIterator: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_async_iterator_combined() {
+    // Combined async iterator patterns with multiple generators
+    let source = r#"
+class AsyncEventStream<T> {
+    private listeners: Set<(event: T) => void> = new Set();
+    private queue: T[] = [];
+    private waiters: ((event: T) => void)[] = [];
+
+    emit(event: T): void {
+        for (const listener of this.listeners) {
+            listener(event);
+        }
+        if (this.waiters.length > 0) {
+            const waiter = this.waiters.shift()!;
+            waiter(event);
+        } else {
+            this.queue.push(event);
+        }
+    }
+
+    private nextEvent(): Promise<T> {
+        if (this.queue.length > 0) {
+            return Promise.resolve(this.queue.shift()!);
+        }
+        return new Promise(resolve => this.waiters.push(resolve));
+    }
+
+    async *[Symbol.asyncIterator](): AsyncIterator<T> {
+        while (true) {
+            yield await this.nextEvent();
+        }
+    }
+
+    async *takeUntil(predicate: (event: T) => boolean): AsyncIterator<T> {
+        for await (const event of this) {
+            yield event;
+            if (predicate(event)) {
+                break;
+            }
+        }
+    }
+
+    async *debounce(ms: number): AsyncIterator<T> {
+        let lastEvent: T | undefined;
+        let timeout: any;
+
+        for await (const event of this) {
+            lastEvent = event;
+            clearTimeout(timeout);
+            await new Promise<void>(resolve => {
+                timeout = setTimeout(resolve, ms);
+            });
+            if (lastEvent === event) {
+                yield event;
+            }
+        }
+    }
+
+    static create<U>(): AsyncEventStream<U> {
+        return new AsyncEventStream<U>();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function AsyncEventStream"),
+        "Expected AsyncEventStream function: {}",
+        output
+    );
+    assert!(
+        output.contains("Symbol.asyncIterator"),
+        "Expected Symbol.asyncIterator: {}",
+        output
+    );
+    assert!(
+        output.contains("takeUntil") && output.contains("debounce"),
+        "Expected async generator methods: {}",
+        output
+    );
+    assert!(
+        output.contains("create"),
+        "Expected create static method: {}",
+        output
+    );
+}
+
+// ============================================================================
+// Generator/yield pattern tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_generator_basic() {
+    // Basic generator function in class
+    let source = r#"
+class NumberSequence {
+    private start: number;
+    private end: number;
+
+    constructor(start: number, end: number) {
+        this.start = start;
+        this.end = end;
+    }
+
+    *generate(): Generator<number> {
+        for (let i = this.start; i <= this.end; i++) {
+            yield i;
+        }
+    }
+
+    *generateEven(): Generator<number> {
+        for (let i = this.start; i <= this.end; i++) {
+            if (i % 2 === 0) {
+                yield i;
+            }
+        }
+    }
+
+    *generateOdd(): Generator<number> {
+        for (let i = this.start; i <= this.end; i++) {
+            if (i % 2 !== 0) {
+                yield i;
+            }
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function NumberSequence"),
+        "Expected NumberSequence function: {}",
+        output
+    );
+    assert!(
+        output.contains("generate") && output.contains("generateEven") && output.contains("generateOdd"),
+        "Expected generator methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_yield_expressions() {
+    // Yield expressions with values
+    let source = r#"
+class MessageProducer {
+    private messages: string[];
+
+    constructor(messages: string[]) {
+        this.messages = messages;
+    }
+
+    *produceMessages(): Generator<string, void, unknown> {
+        for (const message of this.messages) {
+            yield message;
+        }
+    }
+
+    *produceWithIndex(): Generator<[number, string], void, unknown> {
+        for (let i = 0; i < this.messages.length; i++) {
+            yield [i, this.messages[i]];
+        }
+    }
+
+    *produceTransformed(transform: (s: string) => string): Generator<string> {
+        for (const message of this.messages) {
+            yield transform(message);
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function MessageProducer"),
+        "Expected MessageProducer function: {}",
+        output
+    );
+    assert!(
+        output.contains("produceMessages") && output.contains("produceWithIndex"),
+        "Expected generator methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_yield_delegation() {
+    // Yield delegation with yield*
+    let source = r#"
+class CompositeIterator<T> {
+    private sources: Iterable<T>[];
+
+    constructor(...sources: Iterable<T>[]) {
+        this.sources = sources;
+    }
+
+    *iterate(): Generator<T> {
+        for (const source of this.sources) {
+            yield* source;
+        }
+    }
+
+    *iterateWithSeparator(separator: T): Generator<T> {
+        let first = true;
+        for (const source of this.sources) {
+            if (!first) {
+                yield separator;
+            }
+            yield* source;
+            first = false;
+        }
+    }
+
+    *flatMap<U>(fn: (item: T) => Iterable<U>): Generator<U> {
+        for (const source of this.sources) {
+            for (const item of source) {
+                yield* fn(item);
+            }
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function CompositeIterator"),
+        "Expected CompositeIterator function: {}",
+        output
+    );
+    assert!(
+        output.contains("iterate") && output.contains("flatMap"),
+        "Expected generator methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_generator_with_state() {
+    // Generator with internal state management
+    let source = r#"
+class StatefulGenerator {
+    private counter: number = 0;
+    private paused: boolean = false;
+
+    *countUp(limit: number): Generator<number, string, boolean | undefined> {
+        while (this.counter < limit) {
+            const shouldStop = yield this.counter;
+            if (shouldStop) {
+                return "Stopped early";
+            }
+            this.counter++;
+        }
+        return "Completed";
+    }
+
+    *countWithPause(limit: number): Generator<number> {
+        for (let i = 0; i < limit; i++) {
+            if (this.paused) {
+                return;
+            }
+            yield i;
+        }
+    }
+
+    pause(): void {
+        this.paused = true;
+    }
+
+    resume(): void {
+        this.paused = false;
+    }
+
+    reset(): void {
+        this.counter = 0;
+        this.paused = false;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function StatefulGenerator"),
+        "Expected StatefulGenerator function: {}",
+        output
+    );
+    assert!(
+        output.contains("countUp") && output.contains("countWithPause"),
+        "Expected generator methods: {}",
+        output
+    );
+    assert!(
+        output.contains("pause") && output.contains("resume") && output.contains("reset"),
+        "Expected control methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_async_generator_class() {
+    // Async generator patterns in class
+    let source = r#"
+class AsyncDataFetcher {
+    private urls: string[];
+    private delay: number;
+
+    constructor(urls: string[], delay: number = 100) {
+        this.urls = urls;
+        this.delay = delay;
+    }
+
+    async *fetchAll(): AsyncGenerator<Response> {
+        for (const url of this.urls) {
+            await this.sleep(this.delay);
+            const response = await fetch(url);
+            yield response;
+        }
+    }
+
+    async *fetchWithRetry(retries: number = 3): AsyncGenerator<Response> {
+        for (const url of this.urls) {
+            let lastError: Error | undefined;
+            for (let attempt = 0; attempt < retries; attempt++) {
+                try {
+                    const response = await fetch(url);
+                    yield response;
+                    break;
+                } catch (e) {
+                    lastError = e as Error;
+                    await this.sleep(this.delay * (attempt + 1));
+                }
+            }
+        }
+    }
+
+    private sleep(ms: number): Promise<void> {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function AsyncDataFetcher"),
+        "Expected AsyncDataFetcher function: {}",
+        output
+    );
+    assert!(
+        output.contains("fetchAll") && output.contains("fetchWithRetry"),
+        "Expected async generator methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_generator_combined() {
+    // Combined generator patterns
+    let source = r#"
+class Pipeline<T> {
+    private source: Iterable<T>;
+
+    constructor(source: Iterable<T>) {
+        this.source = source;
+    }
+
+    *filter(predicate: (item: T) => boolean): Generator<T> {
+        for (const item of this.source) {
+            if (predicate(item)) {
+                yield item;
+            }
+        }
+    }
+
+    *map<U>(fn: (item: T) => U): Generator<U> {
+        for (const item of this.source) {
+            yield fn(item);
+        }
+    }
+
+    *take(count: number): Generator<T> {
+        let i = 0;
+        for (const item of this.source) {
+            if (i >= count) break;
+            yield item;
+            i++;
+        }
+    }
+
+    *skip(count: number): Generator<T> {
+        let i = 0;
+        for (const item of this.source) {
+            if (i >= count) {
+                yield item;
+            }
+            i++;
+        }
+    }
+
+    *chunk(size: number): Generator<T[]> {
+        let chunk: T[] = [];
+        for (const item of this.source) {
+            chunk.push(item);
+            if (chunk.length === size) {
+                yield chunk;
+                chunk = [];
+            }
+        }
+        if (chunk.length > 0) {
+            yield chunk;
+        }
+    }
+
+    static *range(start: number, end: number): Generator<number> {
+        for (let i = start; i <= end; i++) {
+            yield i;
+        }
+    }
+
+    static *repeat<U>(value: U, count: number): Generator<U> {
+        for (let i = 0; i < count; i++) {
+            yield value;
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function Pipeline"),
+        "Expected Pipeline function: {}",
+        output
+    );
+    assert!(
+        output.contains("filter") && output.contains("map") && output.contains("take"),
+        "Expected generator methods: {}",
+        output
+    );
+    assert!(
+        output.contains("chunk") && output.contains("skip"),
+        "Expected more generator methods: {}",
+        output
+    );
+    assert!(
+        output.contains("range") && output.contains("repeat"),
+        "Expected static generator methods: {}",
+        output
+    );
+}

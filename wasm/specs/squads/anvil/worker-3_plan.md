@@ -7,12 +7,15 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- [ ] Add class field ES5 source map tests (public fields, private fields, static fields, computed fields, field initializers) in `wasm/src/source_map_tests.rs`. Run `./wasm/test.sh source_map`.
+- [ ] Add generator ES5 source map tests (yield expressions, yield delegation, generator methods, async generators, generator with return) in `wasm/src/source_map_tests.rs`. Run `./wasm/test.sh source_map`.
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added async/await ES5 source map tests (Promise.all, Promise.race, error handling, sequential vs parallel, closure capture, inheritance, factory pattern, queue processing, event emitter, comprehensive); 623 tests pass.
+- [x] Added decorator ES5 source map tests (class with metadata, method with descriptor, property validation, parameter injection, factory chain, accessor readonly, abstract class, static members, conditional, comprehensive); 613 tests pass.
+- [x] Added class field ES5 source map tests (public basic, public initializers, static basic, static initializers, computed, private ES5, static private, readonly, with accessors, combined); 603 tests pass.
 - [x] Added extended enum ES5 source map tests (bitwise flags, explicit numeric, expression initializers, ambient declare, member as type, keyof typeof, nested in module, with interface, function parameter, advanced combined); 593 tests pass.
 - [x] Added more interface ES5 source map tests (nested types, tuple types, literal types, never/unknown types, this type, overloaded methods, async methods, accessor signatures, symbol properties, complex combined); `./wasm/test.sh source_map` passes.
 - [x] Added additional interface ES5 source map tests (optional properties, readonly properties, index signatures, call signatures, construct signatures, interface merging, function types, class implements, hybrid types, advanced combined); `./wasm/test.sh source_map` passes.
