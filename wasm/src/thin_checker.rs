@@ -7492,13 +7492,17 @@ impl<'a> ThinCheckerState<'a> {
             // Check for variable redeclaration in the current scope (TS2403).
             // Note: This applies specifically to 'var' merging where types must match.
             // let/const duplicates are caught earlier by the binder (TS2451).
-            if let Some(prev_type) = self.ctx.symbol_types.get(&sym_id).copied() {
+            if let Some(prev_type) = self.ctx.var_decl_types.get(&sym_id).copied() {
                 if let Some(ref name) = var_name {
                     if !self.are_types_identical(final_type, prev_type) {
                         self.error_subsequent_variable_declaration(name, prev_type, final_type, decl_idx);
                     }
                 }
             } else {
+                self.ctx.var_decl_types.insert(sym_id, final_type);
+            }
+
+            if !self.ctx.symbol_types.contains_key(&sym_id) {
                 self.cache_symbol_type(sym_id, final_type);
             }
         } else {
@@ -11875,21 +11879,21 @@ impl<'a> ThinCheckerState<'a> {
         visited.push(type_id);
 
         match self.ctx.types.lookup(type_id) {
-            Some(TypeKey::Array(elem)) => self.type_contains_any_inner(*elem, visited),
+            Some(TypeKey::Array(elem)) => self.type_contains_any_inner(elem, visited),
             Some(TypeKey::Tuple(list_id)) => self
                 .ctx
                 .types
-                .tuple_list(*list_id)
+                .tuple_list(list_id)
                 .iter()
                 .any(|elem| self.type_contains_any_inner(elem.type_id, visited)),
             Some(TypeKey::Union(list_id)) | Some(TypeKey::Intersection(list_id)) => self
                 .ctx
                 .types
-                .type_list(*list_id)
+                .type_list(list_id)
                 .iter()
                 .any(|&member| self.type_contains_any_inner(member, visited)),
             Some(TypeKey::Object(shape_id)) | Some(TypeKey::ObjectWithIndex(shape_id)) => {
-                let shape = self.ctx.types.object_shape(*shape_id);
+                let shape = self.ctx.types.object_shape(shape_id);
                 if shape
                     .properties
                     .iter()
@@ -11910,11 +11914,11 @@ impl<'a> ThinCheckerState<'a> {
                 false
             }
             Some(TypeKey::Function(shape_id)) => {
-                let shape = self.ctx.types.function_shape(*shape_id);
+                let shape = self.ctx.types.function_shape(shape_id);
                 self.type_contains_any_inner(shape.return_type, visited)
             }
             Some(TypeKey::Callable(shape_id)) => {
-                let shape = self.ctx.types.callable_shape(*shape_id);
+                let shape = self.ctx.types.callable_shape(shape_id);
                 if shape
                     .call_signatures
                     .iter()
@@ -11935,7 +11939,7 @@ impl<'a> ThinCheckerState<'a> {
                     .any(|prop| self.type_contains_any_inner(prop.type_id, visited))
             }
             Some(TypeKey::Application(app_id)) => {
-                let app = self.ctx.types.type_application(*app_id);
+                let app = self.ctx.types.type_application(app_id);
                 if self.type_contains_any_inner(app.base, visited) {
                     return true;
                 }
@@ -11944,14 +11948,14 @@ impl<'a> ThinCheckerState<'a> {
                     .any(|&arg| self.type_contains_any_inner(arg, visited))
             }
             Some(TypeKey::Conditional(cond_id)) => {
-                let cond = self.ctx.types.conditional_type(*cond_id);
+                let cond = self.ctx.types.conditional_type(cond_id);
                 self.type_contains_any_inner(cond.check_type, visited)
                     || self.type_contains_any_inner(cond.extends_type, visited)
                     || self.type_contains_any_inner(cond.true_type, visited)
                     || self.type_contains_any_inner(cond.false_type, visited)
             }
             Some(TypeKey::Mapped(mapped_id)) => {
-                let mapped = self.ctx.types.mapped_type(*mapped_id);
+                let mapped = self.ctx.types.mapped_type(mapped_id);
                 if self.type_contains_any_inner(mapped.constraint, visited) {
                     return true;
                 }
@@ -11963,20 +11967,20 @@ impl<'a> ThinCheckerState<'a> {
                 self.type_contains_any_inner(mapped.template, visited)
             }
             Some(TypeKey::IndexAccess(base, index)) => {
-                self.type_contains_any_inner(*base, visited)
-                    || self.type_contains_any_inner(*index, visited)
+                self.type_contains_any_inner(base, visited)
+                    || self.type_contains_any_inner(index, visited)
             }
             Some(TypeKey::TemplateLiteral(template_id)) => self
                 .ctx
                 .types
-                .template_list(*template_id)
+                .template_list(template_id)
                 .iter()
                 .any(|span| match span {
                     TemplateSpan::Type(span_type) => self.type_contains_any_inner(*span_type, visited),
                     _ => false,
                 }),
             Some(TypeKey::KeyOf(inner)) | Some(TypeKey::ReadonlyType(inner)) => {
-                self.type_contains_any_inner(*inner, visited)
+                self.type_contains_any_inner(inner, visited)
             }
             Some(TypeKey::TypeParameter(info)) => {
                 if let Some(constraint) = info.constraint {

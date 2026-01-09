@@ -2899,6 +2899,33 @@ fn test_variable_redeclaration_different_type_2403() {
 }
 
 #[test]
+fn test_variable_self_reference_no_2403() {
+    use crate::thin_parser::ThinParserState;
+
+    // Self-references in a var initializer should not trigger TS2403.
+    let source = r#"function test() {
+    var x = {
+        x,
+        parent: x
+    };
+}"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(!codes.contains(&2403),
+        "Expected no error 2403 for self-referential var initializer, got: {:?}", codes);
+}
+
+#[test]
 fn test_symbol_property_access_description() {
     use crate::solver::{PropertyAccessEvaluator, PropertyAccessResult, TypeKey};
     use std::sync::Arc;
