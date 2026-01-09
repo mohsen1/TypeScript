@@ -24990,65 +24990,46 @@ class DeepTransformer<T extends object> {
     );
 }
 
-// ============================================================================
-// MIXIN FACTORY PATTERN TESTS
-// ============================================================================
+// =============================================================================
+// CONDITIONAL TYPE PATTERNS - ES5 TRANSFORMATION TESTS
+// =============================================================================
 
-/// Test ES5 class with base class mixins
+/// Test: infer keyword in class context
+/// Verifies that classes using infer keyword in conditional types transform correctly to ES5
 #[test]
-fn test_class_es5_mixin_base_class() {
+fn test_class_es5_infer_keyword_patterns() {
     let source = r#"
-// Base class mixin pattern
-type Constructor<T = {}> = new (...args: any[]) => T;
+type ReturnType<T> = T extends (...args: any[]) => infer R ? R : never;
+type ParameterType<T> = T extends (arg: infer P) => any ? P : never;
+type UnwrapPromise<T> = T extends Promise<infer U> ? U : T;
 
-function Timestamped<TBase extends Constructor>(Base: TBase) {
-    return class extends Base {
-        createdAt = new Date();
-        updatedAt = new Date();
+class TypeInferrer {
+    inferReturnType<T extends (...args: any[]) => any>(fn: T): ReturnType<T> {
+        return fn() as ReturnType<T>;
+    }
 
-        touch() {
-            this.updatedAt = new Date();
+    inferFirstParam<T extends (arg: any) => any>(fn: T): ParameterType<T> | undefined {
+        return undefined;
+    }
+
+    async unwrapValue<T>(value: T): Promise<UnwrapPromise<T>> {
+        if (value instanceof Promise) {
+            return await value as UnwrapPromise<T>;
         }
-    };
-}
-
-function Tagged<TBase extends Constructor>(Base: TBase) {
-    return class extends Base {
-        tags: string[] = [];
-
-        addTag(tag: string) {
-            this.tags.push(tag);
-        }
-
-        hasTag(tag: string): boolean {
-            return this.tags.includes(tag);
-        }
-    };
-}
-
-class Entity {
-    id: number;
-    constructor(id: number) {
-        this.id = id;
+        return value as UnwrapPromise<T>;
     }
 }
 
-const TimestampedEntity = Timestamped(Entity);
-const TaggedTimestampedEntity = Tagged(Timestamped(Entity));
-
-class User extends TimestampedEntity {
-    name: string;
-    constructor(id: number, name: string) {
-        super(id);
-        this.name = name;
+class ArrayTypeExtractor {
+    extractElementType<T>(arr: T): T extends (infer E)[] ? E : never {
+        if (Array.isArray(arr) && arr.length > 0) {
+            return arr[0];
+        }
+        throw new Error("Cannot extract from empty or non-array");
     }
-}
 
-class Post extends TaggedTimestampedEntity {
-    title: string;
-    constructor(id: number, title: string) {
-        super(id);
-        this.title = title;
+    extractTupleFirst<T extends [any, ...any[]]>(tuple: T): T extends [infer F, ...any[]] ? F : never {
+        return tuple[0] as any;
     }
 }
 "#;
@@ -25067,97 +25048,86 @@ class Post extends TaggedTimestampedEntity {
 
     let output = printer.get_output().to_string();
 
-    // Functions and classes should be present
     assert!(
-        output.contains("Timestamped") && output.contains("Tagged") && output.contains("Entity"),
-        "Expected mixin functions and base class: {}",
+        output.contains("function TypeInferrer"),
+        "Expected TypeInferrer function: {}",
         output
     );
-
-    // Derived classes should be converted
     assert!(
-        output.contains("User") && output.contains("Post"),
-        "Expected derived classes: {}",
+        output.contains("TypeInferrer.prototype.inferReturnType"),
+        "Expected inferReturnType method: {}",
         output
     );
-
-    // Type alias should be stripped
     assert!(
-        !output.contains("type Constructor"),
-        "Expected type alias to be stripped: {}",
+        output.contains("TypeInferrer.prototype.inferFirstParam"),
+        "Expected inferFirstParam method: {}",
+        output
+    );
+    assert!(
+        output.contains("TypeInferrer.prototype.unwrapValue"),
+        "Expected unwrapValue async method: {}",
+        output
+    );
+    assert!(
+        output.contains("function ArrayTypeExtractor"),
+        "Expected ArrayTypeExtractor function: {}",
+        output
+    );
+    assert!(
+        output.contains("ArrayTypeExtractor.prototype.extractElementType"),
+        "Expected extractElementType method: {}",
         output
     );
 }
 
-/// Test ES5 class with trait composition mixins
+/// Test: distributive conditional types
+/// Verifies that classes using distributive conditionals transform correctly to ES5
 #[test]
-fn test_class_es5_mixin_trait_composition() {
+fn test_class_es5_distributive_conditionals() {
     let source = r#"
-// Trait composition using mixins
-type GConstructor<T = {}> = new (...args: any[]) => T;
+type ToArray<T> = T extends any ? T[] : never;
+type NonNullableCustom<T> = T extends null | undefined ? never : T;
+type Flatten<T> = T extends any[] ? T[number] : T;
 
-interface Disposable {
-    dispose(): void;
-}
+class DistributiveProcessor<T> {
+    private value: T;
 
-interface Activatable {
-    isActive: boolean;
-    activate(): void;
-    deactivate(): void;
-}
+    constructor(value: T) {
+        this.value = value;
+    }
 
-function DisposableMixin<TBase extends GConstructor>(Base: TBase) {
-    return class extends Base implements Disposable {
-        isDisposed = false;
+    toArrayType(): ToArray<T> {
+        return [this.value] as ToArray<T>;
+    }
 
-        dispose() {
-            this.isDisposed = true;
+    ensureNonNull(): NonNullableCustom<T> {
+        if (this.value === null || this.value === undefined) {
+            throw new Error("Value is null or undefined");
         }
-    };
-}
+        return this.value as NonNullableCustom<T>;
+    }
 
-function ActivatableMixin<TBase extends GConstructor>(Base: TBase) {
-    return class extends Base implements Activatable {
-        isActive = false;
-
-        activate() {
-            this.isActive = true;
+    flattenIfArray(): Flatten<T> {
+        if (Array.isArray(this.value)) {
+            return this.value[0] as Flatten<T>;
         }
-
-        deactivate() {
-            this.isActive = false;
-        }
-    };
-}
-
-function LoggableMixin<TBase extends GConstructor>(Base: TBase) {
-    return class extends Base {
-        private logs: string[] = [];
-
-        log(message: string) {
-            this.logs.push(`[${new Date().toISOString()}] ${message}`);
-        }
-
-        getLogs(): string[] {
-            return [...this.logs];
-        }
-    };
-}
-
-class BaseComponent {
-    name: string;
-    constructor(name: string) {
-        this.name = name;
+        return this.value as Flatten<T>;
     }
 }
 
-// Compose multiple traits
-const FullComponent = LoggableMixin(ActivatableMixin(DisposableMixin(BaseComponent)));
+class UnionDistributor {
+    distributeOverUnion<T extends string | number>(value: T): T extends string ? string[] : number[] {
+        if (typeof value === "string") {
+            return value.split("") as any;
+        }
+        return [value] as any;
+    }
 
-class Widget extends FullComponent {
-    render(): string {
-        this.log("Rendering widget");
-        return `<widget name="${this.name}" />`;
+    filterType<T, U>(value: T, guard: (v: T) => v is T & U): U | undefined {
+        if (guard(value)) {
+            return value;
+        }
+        return undefined;
     }
 }
 "#;
@@ -25176,103 +25146,84 @@ class Widget extends FullComponent {
 
     let output = printer.get_output().to_string();
 
-    // Mixin functions should be present
     assert!(
-        output.contains("DisposableMixin") && output.contains("ActivatableMixin") && output.contains("LoggableMixin"),
-        "Expected mixin functions: {}",
+        output.contains("function DistributiveProcessor"),
+        "Expected DistributiveProcessor function: {}",
         output
     );
-
-    // Classes should be converted
     assert!(
-        output.contains("BaseComponent") && output.contains("Widget"),
-        "Expected classes: {}",
+        output.contains("this.value = value"),
+        "Expected constructor assignment: {}",
         output
     );
-
-    // Interfaces should be stripped
     assert!(
-        !output.contains("interface Disposable") && !output.contains("interface Activatable"),
-        "Expected interfaces to be stripped: {}",
+        output.contains("DistributiveProcessor.prototype.toArrayType"),
+        "Expected toArrayType method: {}",
         output
     );
-
-    // implements clause should be stripped
     assert!(
-        !output.contains("implements Disposable") && !output.contains("implements Activatable"),
-        "Expected implements clauses to be stripped: {}",
+        output.contains("DistributiveProcessor.prototype.ensureNonNull"),
+        "Expected ensureNonNull method: {}",
+        output
+    );
+    assert!(
+        output.contains("function UnionDistributor"),
+        "Expected UnionDistributor function: {}",
+        output
+    );
+    assert!(
+        output.contains("UnionDistributor.prototype.distributeOverUnion"),
+        "Expected distributeOverUnion method: {}",
         output
     );
 }
 
-/// Test ES5 class with constrained mixins
+/// Test: Extract utility type patterns
+/// Verifies that classes using Extract<T, U> type transform correctly to ES5
 #[test]
-fn test_class_es5_mixin_constrained() {
+fn test_class_es5_extract_type_patterns() {
     let source = r#"
-// Constrained mixins requiring specific base class shape
-type Constructor<T = {}> = new (...args: any[]) => T;
+type EventType = "click" | "scroll" | "keydown" | "keyup" | "focus" | "blur";
+type MouseEvent = Extract<EventType, "click" | "scroll">;
+type KeyEvent = Extract<EventType, "keydown" | "keyup">;
+type FocusEvent = Extract<EventType, "focus" | "blur">;
 
-interface HasId {
-    id: string;
-}
+class EventRegistry {
+    private mouseHandlers: Map<MouseEvent, Function[]> = new Map();
+    private keyHandlers: Map<KeyEvent, Function[]> = new Map();
 
-interface HasName {
-    name: string;
-}
+    registerMouseEvent(event: MouseEvent, handler: Function): void {
+        const handlers = this.mouseHandlers.get(event) || [];
+        handlers.push(handler);
+        this.mouseHandlers.set(event, handlers);
+    }
 
-// Mixin that requires base class to have an id
-function Identifiable<TBase extends Constructor<HasId>>(Base: TBase) {
-    return class extends Base {
-        getIdentifier(): string {
-            return `entity-${this.id}`;
-        }
-    };
-}
+    registerKeyEvent(event: KeyEvent, handler: Function): void {
+        const handlers = this.keyHandlers.get(event) || [];
+        handlers.push(handler);
+        this.keyHandlers.set(event, handlers);
+    }
 
-// Mixin that requires base class to have a name
-function Nameable<TBase extends Constructor<HasName>>(Base: TBase) {
-    return class extends Base {
-        getDisplayName(): string {
-            return this.name.toUpperCase();
-        }
-
-        setName(name: string): void {
-            this.name = name;
-        }
-    };
-}
-
-// Mixin requiring both id and name
-function Describable<TBase extends Constructor<HasId & HasName>>(Base: TBase) {
-    return class extends Base {
-        describe(): string {
-            return `${this.name} (${this.id})`;
-        }
-    };
-}
-
-class BaseEntity implements HasId, HasName {
-    id: string;
-    name: string;
-
-    constructor(id: string, name: string) {
-        this.id = id;
-        this.name = name;
+    triggerMouse(event: MouseEvent): void {
+        const handlers = this.mouseHandlers.get(event) || [];
+        handlers.forEach(h => h());
     }
 }
 
-const DescribableEntity = Describable(Nameable(Identifiable(BaseEntity)));
+type Shape = { kind: "circle"; radius: number } | { kind: "square"; size: number } | { kind: "triangle"; base: number; height: number };
+type CircleShape = Extract<Shape, { kind: "circle" }>;
+type PolygonShape = Extract<Shape, { kind: "square" } | { kind: "triangle" }>;
 
-class Product extends DescribableEntity {
-    price: number;
-
-    constructor(id: string, name: string, price: number) {
-        super(id, name);
-        this.price = price;
+class ShapeProcessor {
+    processCircle(shape: CircleShape): number {
+        return Math.PI * shape.radius * shape.radius;
     }
 
-    getFullDescription(): string {
-        return `${this.describe()} - $${this.price}`;
+    processPolygon(shape: PolygonShape): number {
+        if (shape.kind === "square") {
+            return shape.size * shape.size;
+        }
+        return 0.5 * shape.base * shape.height;
     }
 }
 "#;
@@ -25291,145 +25242,81 @@ class Product extends DescribableEntity {
 
     let output = printer.get_output().to_string();
 
-    // Mixin functions should be present
     assert!(
-        output.contains("Identifiable") && output.contains("Nameable") && output.contains("Describable"),
-        "Expected constrained mixin functions: {}",
+        output.contains("function EventRegistry"),
+        "Expected EventRegistry function: {}",
         output
     );
-
-    // Classes should be converted
     assert!(
-        output.contains("BaseEntity") && output.contains("Product"),
-        "Expected classes: {}",
+        output.contains("EventRegistry.prototype.registerMouseEvent"),
+        "Expected registerMouseEvent method: {}",
         output
     );
-
-    // Interfaces should be stripped
     assert!(
-        !output.contains("interface HasId") && !output.contains("interface HasName"),
-        "Expected interfaces to be stripped: {}",
+        output.contains("EventRegistry.prototype.registerKeyEvent"),
+        "Expected registerKeyEvent method: {}",
         output
     );
-
-    // Type constraints in generics should be stripped
     assert!(
-        !output.contains("Constructor<HasId>") && !output.contains("Constructor<HasName>"),
-        "Expected generic constraints to be stripped: {}",
+        output.contains("EventRegistry.prototype.triggerMouse"),
+        "Expected triggerMouse method: {}",
+        output
+    );
+    assert!(
+        output.contains("function ShapeProcessor"),
+        "Expected ShapeProcessor function: {}",
+        output
+    );
+    assert!(
+        output.contains("ShapeProcessor.prototype.processCircle") && output.contains("ShapeProcessor.prototype.processPolygon"),
+        "Expected ShapeProcessor methods: {}",
         output
     );
 }
 
-/// Test ES5 class with parameterized mixins
+/// Test: Exclude utility type patterns
+/// Verifies that classes using Exclude<T, U> type transform correctly to ES5
 #[test]
-fn test_class_es5_mixin_parameterized() {
+fn test_class_es5_exclude_type_patterns() {
     let source = r#"
-// Parameterized mixins with configuration
-type Constructor<T = {}> = new (...args: any[]) => T;
+type AllPermissions = "read" | "write" | "delete" | "admin" | "superadmin";
+type BasicPermissions = Exclude<AllPermissions, "admin" | "superadmin">;
+type AdminPermissions = Exclude<AllPermissions, "superadmin">;
 
-interface CacheConfig {
-    maxSize: number;
-    ttl: number;
-}
+class PermissionManager {
+    private userPermissions: Set<BasicPermissions> = new Set();
+    private adminPermissions: Set<AdminPermissions> = new Set();
 
-interface RetryConfig {
-    maxRetries: number;
-    delay: number;
-}
+    grantBasic(permission: BasicPermissions): void {
+        this.userPermissions.add(permission);
+    }
 
-function Cacheable<TBase extends Constructor>(config: CacheConfig) {
-    return function(Base: TBase) {
-        return class extends Base {
-            private cache: Map<string, { value: any; expires: number }> = new Map();
-            private maxSize = config.maxSize;
-            private ttl = config.ttl;
+    grantAdmin(permission: AdminPermissions): void {
+        this.adminPermissions.add(permission);
+    }
 
-            getCached(key: string): any | undefined {
-                const entry = this.cache.get(key);
-                if (entry && entry.expires > Date.now()) {
-                    return entry.value;
-                }
-                this.cache.delete(key);
-                return undefined;
-            }
+    hasBasicPermission(permission: BasicPermissions): boolean {
+        return this.userPermissions.has(permission);
+    }
 
-            setCached(key: string, value: any): void {
-                if (this.cache.size >= this.maxSize) {
-                    const firstKey = this.cache.keys().next().value;
-                    this.cache.delete(firstKey);
-                }
-                this.cache.set(key, { value, expires: Date.now() + this.ttl });
-            }
-        };
-    };
-}
-
-function Retryable<TBase extends Constructor>(config: RetryConfig) {
-    return function(Base: TBase) {
-        return class extends Base {
-            private maxRetries = config.maxRetries;
-            private delay = config.delay;
-
-            async withRetry<T>(fn: () => Promise<T>): Promise<T> {
-                let lastError: Error | undefined;
-                for (let i = 0; i <= this.maxRetries; i++) {
-                    try {
-                        return await fn();
-                    } catch (e) {
-                        lastError = e as Error;
-                        if (i < this.maxRetries) {
-                            await new Promise(r => setTimeout(r, this.delay));
-                        }
-                    }
-                }
-                throw lastError;
-            }
-        };
-    };
-}
-
-function Throttled<TBase extends Constructor>(intervalMs: number) {
-    return function(Base: TBase) {
-        return class extends Base {
-            private lastCall = 0;
-            private interval = intervalMs;
-
-            canCall(): boolean {
-                return Date.now() - this.lastCall >= this.interval;
-            }
-
-            recordCall(): void {
-                this.lastCall = Date.now();
-            }
-        };
-    };
-}
-
-class ApiClient {
-    baseUrl: string;
-    constructor(baseUrl: string) {
-        this.baseUrl = baseUrl;
+    revokeBasic(permission: BasicPermissions): void {
+        this.userPermissions.delete(permission);
     }
 }
 
-const CachedClient = Cacheable({ maxSize: 100, ttl: 60000 })(ApiClient);
-const RetryableClient = Retryable({ maxRetries: 3, delay: 1000 })(ApiClient);
-const ThrottledCachedClient = Throttled(100)(Cacheable({ maxSize: 50, ttl: 30000 })(ApiClient));
+type PrimitiveType = string | number | boolean | null | undefined | symbol | bigint;
+type ObjectType = Exclude<unknown, PrimitiveType>;
 
-class DataService extends ThrottledCachedClient {
-    async fetch(endpoint: string): Promise<any> {
-        const cached = this.getCached(endpoint);
-        if (cached) return cached;
+class TypeFilter {
+    filterPrimitives<T>(values: T[]): Exclude<T, null | undefined>[] {
+        return values.filter((v): v is Exclude<T, null | undefined> => v !== null && v !== undefined);
+    }
 
-        if (!this.canCall()) {
-            throw new Error("Throttled");
+    excludeFalsy<T>(value: T): Exclude<T, false | 0 | "" | null | undefined> | undefined {
+        if (value) {
+            return value as Exclude<T, false | 0 | "" | null | undefined>;
         }
-
-        this.recordCall();
-        const response = await fetch(`${this.baseUrl}${endpoint}`);
-        const data = await response.json();
-        this.setCached(endpoint, data);
-        return data;
+        return undefined;
     }
 }
 "#;
@@ -25448,31 +25335,247 @@ class DataService extends ThrottledCachedClient {
 
     let output = printer.get_output().to_string();
 
-    // Mixin factory functions should be present
     assert!(
-        output.contains("Cacheable") && output.contains("Retryable") && output.contains("Throttled"),
-        "Expected parameterized mixin functions: {}",
+        output.contains("function PermissionManager"),
+        "Expected PermissionManager function: {}",
         output
     );
-
-    // Classes should be converted
     assert!(
-        output.contains("ApiClient") && output.contains("DataService"),
-        "Expected classes: {}",
+        output.contains("PermissionManager.prototype.grantBasic"),
+        "Expected grantBasic method: {}",
         output
     );
-
-    // Interfaces should be stripped
     assert!(
-        !output.contains("interface CacheConfig") && !output.contains("interface RetryConfig"),
-        "Expected interfaces to be stripped: {}",
+        output.contains("PermissionManager.prototype.grantAdmin"),
+        "Expected grantAdmin method: {}",
         output
     );
-
-    // Type alias should be stripped
     assert!(
-        !output.contains("type Constructor"),
-        "Expected type alias to be stripped: {}",
+        output.contains("PermissionManager.prototype.hasBasicPermission"),
+        "Expected hasBasicPermission method: {}",
+        output
+    );
+    assert!(
+        output.contains("function TypeFilter"),
+        "Expected TypeFilter function: {}",
+        output
+    );
+    assert!(
+        output.contains("TypeFilter.prototype.filterPrimitives") && output.contains("TypeFilter.prototype.excludeFalsy"),
+        "Expected TypeFilter methods: {}",
+        output
+    );
+}
+
+/// Test: nested conditional types
+/// Verifies that classes using nested conditional types transform correctly to ES5
+#[test]
+fn test_class_es5_nested_conditional_types() {
+    let source = r#"
+type DeepUnwrap<T> = T extends Promise<infer U>
+    ? DeepUnwrap<U>
+    : T extends Array<infer E>
+        ? DeepUnwrap<E>[]
+        : T;
+
+type TypeName<T> = T extends string ? "string"
+    : T extends number ? "number"
+    : T extends boolean ? "boolean"
+    : T extends undefined ? "undefined"
+    : T extends Function ? "function"
+    : "object";
+
+class DeepUnwrapper {
+    async unwrap<T>(value: T): Promise<DeepUnwrap<T>> {
+        let result: any = value;
+        while (result instanceof Promise) {
+            result = await result;
+        }
+        return result;
+    }
+
+    unwrapArray<T extends any[]>(arr: T): DeepUnwrap<T> {
+        return arr.map(item => {
+            if (Array.isArray(item)) {
+                return this.unwrapArray(item);
+            }
+            return item;
+        }) as DeepUnwrap<T>;
+    }
+}
+
+class TypeNameResolver {
+    getTypeName<T>(value: T): TypeName<T> {
+        const type = typeof value;
+        if (type === "string") return "string" as TypeName<T>;
+        if (type === "number") return "number" as TypeName<T>;
+        if (type === "boolean") return "boolean" as TypeName<T>;
+        if (type === "undefined") return "undefined" as TypeName<T>;
+        if (type === "function") return "function" as TypeName<T>;
+        return "object" as TypeName<T>;
+    }
+
+    isType<T, N extends TypeName<any>>(value: T, name: N): value is T & { __typeName: N } {
+        return this.getTypeName(value) === name;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function DeepUnwrapper"),
+        "Expected DeepUnwrapper function: {}",
+        output
+    );
+    assert!(
+        output.contains("DeepUnwrapper.prototype.unwrap"),
+        "Expected unwrap async method: {}",
+        output
+    );
+    assert!(
+        output.contains("DeepUnwrapper.prototype.unwrapArray"),
+        "Expected unwrapArray method: {}",
+        output
+    );
+    assert!(
+        output.contains("function TypeNameResolver"),
+        "Expected TypeNameResolver function: {}",
+        output
+    );
+    assert!(
+        output.contains("TypeNameResolver.prototype.getTypeName"),
+        "Expected getTypeName method: {}",
+        output
+    );
+    assert!(
+        output.contains("TypeNameResolver.prototype.isType"),
+        "Expected isType method: {}",
+        output
+    );
+}
+
+/// Test: combined conditional type patterns
+/// Verifies that classes using multiple conditional type patterns together transform correctly to ES5
+#[test]
+fn test_class_es5_combined_conditional_types() {
+    let source = r#"
+type UnwrapFunction<T> = T extends (...args: infer A) => infer R ? { args: A; return: R } : never;
+type ExtractArrayItem<T> = T extends (infer U)[] ? U : T;
+type ExcludeNullish<T> = Exclude<T, null | undefined>;
+type ExtractAsync<T> = Extract<T, Promise<any>>;
+
+class FunctionAnalyzer<T extends (...args: any[]) => any> {
+    private fn: T;
+
+    constructor(fn: T) {
+        this.fn = fn;
+    }
+
+    getMetadata(): UnwrapFunction<T> {
+        return {
+            args: [] as any,
+            return: undefined as any
+        } as UnwrapFunction<T>;
+    }
+
+    invoke(...args: UnwrapFunction<T> extends { args: infer A } ? A extends any[] ? A : never : never): UnwrapFunction<T> extends { return: infer R } ? R : never {
+        return this.fn(...args);
+    }
+}
+
+class DataPipeline<T> {
+    private data: T[];
+
+    constructor(data: T[]) {
+        this.data = data;
+    }
+
+    extractItems(): ExtractArrayItem<T>[] {
+        return this.data.flatMap(item =>
+            Array.isArray(item) ? item : [item]
+        ) as ExtractArrayItem<T>[];
+    }
+
+    excludeNullish(): ExcludeNullish<T>[] {
+        return this.data.filter((item): item is ExcludeNullish<T> =>
+            item !== null && item !== undefined
+        );
+    }
+
+    async resolveAsync(): Promise<Awaited<ExtractAsync<T>>[]> {
+        const asyncItems = this.data.filter((item): item is ExtractAsync<T> =>
+            item instanceof Promise
+        );
+        return Promise.all(asyncItems);
+    }
+
+    transform<U>(fn: (item: ExcludeNullish<T>) => U): DataPipeline<U> {
+        const transformed = this.excludeNullish().map(fn);
+        return new DataPipeline(transformed);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function FunctionAnalyzer"),
+        "Expected FunctionAnalyzer function: {}",
+        output
+    );
+    assert!(
+        output.contains("this.fn = fn"),
+        "Expected FunctionAnalyzer constructor assignment: {}",
+        output
+    );
+    assert!(
+        output.contains("FunctionAnalyzer.prototype.getMetadata") && output.contains("FunctionAnalyzer.prototype.invoke"),
+        "Expected FunctionAnalyzer methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function DataPipeline"),
+        "Expected DataPipeline function: {}",
+        output
+    );
+    assert!(
+        output.contains("this.data = data"),
+        "Expected DataPipeline constructor assignment: {}",
+        output
+    );
+    assert!(
+        output.contains("DataPipeline.prototype.extractItems") && output.contains("DataPipeline.prototype.excludeNullish"),
+        "Expected DataPipeline extraction methods: {}",
+        output
+    );
+    assert!(
+        output.contains("DataPipeline.prototype.resolveAsync") && output.contains("DataPipeline.prototype.transform"),
+        "Expected DataPipeline async and transform methods: {}",
         output
     );
 }
