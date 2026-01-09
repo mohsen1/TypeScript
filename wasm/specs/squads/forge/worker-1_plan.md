@@ -29,6 +29,7 @@ Priority: 1
 - [ ] Validate function return inference in conditional types and fix any mismatches in `wasm/src/solver/evaluate.rs`.
 
 ## Completed
+- [x] Added 5 template literal hyphen pattern tests for type inference (prefix/suffix extraction, two-part extraction, distributive union, no-match returns never).
 - [x] Application type expansion in TypeEvaluator with fallback extraction of type params from resolved Object properties (reduced redux test from 4 to 3 diagnostics).
 - [x] Fixed type predicate alias narrowing (`test_user_defined_type_predicate_alias_narrows` passes).
 - [x] Covered function optional/rest parameter inference in conditional types (distributive + non-distributive) in `wasm/src/solver/evaluate_tests.rs`. Ran `./wasm/test.sh` (fails: parallel::tests::test_check_redux_lodash_style_generics).
