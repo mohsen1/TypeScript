@@ -22916,3 +22916,698 @@ fn test_this_type_query_builder() {
 
     assert!(query_builder != TypeId::ERROR);
 }
+
+// ============================================================================
+// Readonly property tests (readonly modifiers, Readonly<T>)
+// ============================================================================
+
+#[test]
+fn test_readonly_property_basic() {
+    // { readonly x: string }
+    let interner = TypeInterner::new();
+
+    let readonly_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    assert!(readonly_obj != TypeId::ERROR);
+}
+
+#[test]
+fn test_readonly_vs_mutable_property() {
+    // { readonly x: string } vs { x: string }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let readonly_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    let mutable_obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Mutable is subtype of readonly (can assign mutable to readonly)
+    assert!(checker.is_subtype_of(mutable_obj, readonly_obj));
+
+    // Readonly is NOT subtype of mutable (can't write to readonly)
+    assert!(!checker.is_subtype_of(readonly_obj, mutable_obj));
+}
+
+#[test]
+fn test_readonly_array_basic() {
+    // readonly string[]
+    let interner = TypeInterner::new();
+
+    let readonly_array = interner.readonly_array(TypeId::STRING);
+
+    assert!(readonly_array != TypeId::ERROR);
+}
+
+#[test]
+fn test_readonly_array_vs_mutable() {
+    // readonly string[] vs string[]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let readonly_array = interner.readonly_array(TypeId::STRING);
+    let mutable_array = interner.array(TypeId::STRING);
+
+    // Mutable array is subtype of readonly array
+    assert!(checker.is_subtype_of(mutable_array, readonly_array));
+
+    // Readonly array is NOT subtype of mutable array
+    assert!(!checker.is_subtype_of(readonly_array, mutable_array));
+}
+
+#[test]
+fn test_readonly_tuple_basic() {
+    // readonly [string, number]
+    let interner = TypeInterner::new();
+
+    let readonly_tuple = interner.readonly_tuple(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    assert!(readonly_tuple != TypeId::ERROR);
+}
+
+#[test]
+fn test_readonly_tuple_vs_mutable() {
+    // readonly [string, number] vs [string, number]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let readonly_tuple = interner.readonly_tuple(vec![TypeId::STRING, TypeId::NUMBER]);
+    let mutable_tuple = interner.tuple(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    // Mutable tuple is subtype of readonly tuple
+    assert!(checker.is_subtype_of(mutable_tuple, readonly_tuple));
+
+    // Readonly tuple is NOT subtype of mutable tuple
+    assert!(!checker.is_subtype_of(readonly_tuple, mutable_tuple));
+}
+
+#[test]
+fn test_readonly_multiple_properties() {
+    // { readonly a: string, readonly b: number }
+    let interner = TypeInterner::new();
+
+    let obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: true,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: true,
+            is_method: false,
+        },
+    ]);
+
+    assert!(obj != TypeId::ERROR);
+}
+
+#[test]
+fn test_readonly_mixed_with_mutable() {
+    // { readonly a: string, b: number }
+    let interner = TypeInterner::new();
+
+    let mixed = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: true,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    assert!(mixed != TypeId::ERROR);
+}
+
+#[test]
+fn test_readonly_index_signature() {
+    // { readonly [key: string]: number }
+    let interner = TypeInterner::new();
+
+    let readonly_index = interner.object_with_index(
+        vec![],
+        Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: true,
+        }),
+    );
+
+    assert!(readonly_index != TypeId::ERROR);
+}
+
+#[test]
+fn test_readonly_index_vs_mutable() {
+    // { readonly [key: string]: number } vs { [key: string]: number }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let readonly_index = interner.object_with_index(
+        vec![],
+        Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: true,
+        }),
+    );
+
+    let mutable_index = interner.object_with_index(
+        vec![],
+        Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    );
+
+    // Mutable index is subtype of readonly index
+    assert!(checker.is_subtype_of(mutable_index, readonly_index));
+
+    // Readonly index is NOT subtype of mutable index
+    assert!(!checker.is_subtype_of(readonly_index, mutable_index));
+}
+
+#[test]
+fn test_readonly_optional_property() {
+    // { readonly x?: string }
+    let interner = TypeInterner::new();
+
+    let readonly_optional = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: true,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    assert!(readonly_optional != TypeId::ERROR);
+}
+
+#[test]
+fn test_readonly_nested_object() {
+    // { readonly data: { readonly inner: string } }
+    let interner = TypeInterner::new();
+
+    let inner = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("inner"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    let outer = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("data"),
+        type_id: inner,
+        write_type: inner,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    assert!(outer != TypeId::ERROR);
+}
+
+#[test]
+fn test_readonly_with_union_property() {
+    // { readonly x: string | number }
+    let interner = TypeInterner::new();
+
+    let union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: union,
+        write_type: union,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    assert!(obj != TypeId::ERROR);
+}
+
+#[test]
+fn test_readonly_with_array_property() {
+    // { readonly items: string[] }
+    let interner = TypeInterner::new();
+
+    let string_array = interner.array(TypeId::STRING);
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("items"),
+        type_id: string_array,
+        write_type: string_array,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    assert!(obj != TypeId::ERROR);
+}
+
+#[test]
+fn test_readonly_deep_with_array() {
+    // { readonly items: readonly string[] }
+    let interner = TypeInterner::new();
+
+    let readonly_array = interner.readonly_array(TypeId::STRING);
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("items"),
+        type_id: readonly_array,
+        write_type: readonly_array,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    assert!(obj != TypeId::ERROR);
+}
+
+#[test]
+fn test_readonly_with_function_property() {
+    // { readonly callback: () => void }
+    let interner = TypeInterner::new();
+
+    let callback = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("callback"),
+        type_id: callback,
+        write_type: callback,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    assert!(obj != TypeId::ERROR);
+}
+
+#[test]
+fn test_readonly_method_is_always_readonly() {
+    // Methods are inherently readonly
+    let interner = TypeInterner::new();
+
+    let method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("getValue"),
+        type_id: method,
+        write_type: method,
+        optional: false,
+        readonly: false, // Methods can be defined non-readonly
+        is_method: true,
+    }]);
+
+    assert!(obj != TypeId::ERROR);
+}
+
+#[test]
+fn test_readonly_with_literal_type() {
+    // { readonly status: "active" | "inactive" }
+    let interner = TypeInterner::new();
+
+    let lit_active = interner.literal_string("active");
+    let lit_inactive = interner.literal_string("inactive");
+    let status_union = interner.union(vec![lit_active, lit_inactive]);
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("status"),
+        type_id: status_union,
+        write_type: status_union,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    assert!(obj != TypeId::ERROR);
+}
+
+#[test]
+fn test_readonly_with_number_index() {
+    // { readonly [index: number]: string }
+    let interner = TypeInterner::new();
+
+    let readonly_number_index = interner.object_with_index(
+        vec![],
+        Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::STRING,
+            readonly: true,
+        }),
+    );
+
+    assert!(readonly_number_index != TypeId::ERROR);
+}
+
+#[test]
+fn test_readonly_intersection() {
+    // { readonly a: string } & { readonly b: number }
+    let interner = TypeInterner::new();
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    let intersection = interner.intersection(vec![obj_a, obj_b]);
+
+    assert!(intersection != TypeId::ERROR);
+}
+
+#[test]
+fn test_readonly_in_generic_context() {
+    // Container<T> = { readonly value: T }
+    let interner = TypeInterner::new();
+
+    let t_ref = interner.reference(SymbolRef(50));
+
+    let container = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("value"),
+        type_id: t_ref,
+        write_type: t_ref,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    assert!(container != TypeId::ERROR);
+}
+
+#[test]
+fn test_readonly_preserves_subtype_covariance() {
+    // { readonly x: "a" } is subtype of { readonly x: string }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let lit_a = interner.literal_string("a");
+
+    let readonly_literal = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: lit_a,
+        write_type: lit_a,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    let readonly_string = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    // Literal is subtype of wider type (covariant)
+    assert!(checker.is_subtype_of(readonly_literal, readonly_string));
+}
+
+#[test]
+fn test_readonly_with_this_type() {
+    // { readonly self: this }
+    let interner = TypeInterner::new();
+
+    let this_type = interner.intern(TypeKey::ThisType);
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("self"),
+        type_id: this_type,
+        write_type: this_type,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    assert!(obj != TypeId::ERROR);
+}
+
+#[test]
+fn test_readonly_with_tuple_property() {
+    // { readonly coords: [number, number] }
+    let interner = TypeInterner::new();
+
+    let coords = interner.tuple(vec![TypeId::NUMBER, TypeId::NUMBER]);
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("coords"),
+        type_id: coords,
+        write_type: coords,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    assert!(obj != TypeId::ERROR);
+}
+
+#[test]
+fn test_readonly_with_readonly_tuple_property() {
+    // { readonly coords: readonly [number, number] }
+    let interner = TypeInterner::new();
+
+    let readonly_coords = interner.readonly_tuple(vec![TypeId::NUMBER, TypeId::NUMBER]);
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("coords"),
+        type_id: readonly_coords,
+        write_type: readonly_coords,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    assert!(obj != TypeId::ERROR);
+}
+
+#[test]
+fn test_readonly_mapped_type_pattern() {
+    // Simulating Readonly<T> mapped type result
+    // { readonly a: string, readonly b: number }
+    let interner = TypeInterner::new();
+
+    let readonly_all = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: true,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: true,
+            is_method: false,
+        },
+    ]);
+
+    let mutable_all = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let mut checker = SubtypeChecker::new(&interner);
+
+    // Mutable is subtype of readonly
+    assert!(checker.is_subtype_of(mutable_all, readonly_all));
+}
+
+#[test]
+fn test_readonly_class_instance_properties() {
+    // Class instance: { readonly id: string, readonly createdAt: number }
+    let interner = TypeInterner::new();
+
+    let instance = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("id"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: true,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("createdAt"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: true,
+            is_method: false,
+        },
+    ]);
+
+    assert!(instance != TypeId::ERROR);
+}
+
+#[test]
+fn test_readonly_with_bigint() {
+    // { readonly value: bigint }
+    let interner = TypeInterner::new();
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("value"),
+        type_id: TypeId::BIGINT,
+        write_type: TypeId::BIGINT,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    assert!(obj != TypeId::ERROR);
+}
+
+#[test]
+fn test_readonly_with_symbol() {
+    // { readonly sym: symbol }
+    let interner = TypeInterner::new();
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("sym"),
+        type_id: TypeId::SYMBOL,
+        write_type: TypeId::SYMBOL,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    assert!(obj != TypeId::ERROR);
+}
+
+#[test]
+fn test_readonly_with_null_union() {
+    // { readonly value: string | null }
+    let interner = TypeInterner::new();
+
+    let nullable = interner.union(vec![TypeId::STRING, TypeId::NULL]);
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("value"),
+        type_id: nullable,
+        write_type: nullable,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    assert!(obj != TypeId::ERROR);
+}
+
+#[test]
+fn test_readonly_config_pattern() {
+    // Config object: { readonly host: string, readonly port: number, readonly debug: boolean }
+    let interner = TypeInterner::new();
+
+    let config = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("host"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: true,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("port"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: true,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("debug"),
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: true,
+            is_method: false,
+        },
+    ]);
+
+    assert!(config != TypeId::ERROR);
+}
