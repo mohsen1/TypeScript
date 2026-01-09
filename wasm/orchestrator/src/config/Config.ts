@@ -48,9 +48,10 @@ export interface ConfigInput {
 const DEFAULT_SESSION = 'zang-org';
 
 const DEFAULT_IDLE_THRESHOLDS: IdleThresholds = {
-  director: 600, // 10 minutes - Director is hands-off
-  em: 60,        // 1 minute - EMs should be responsive
-  worker: 300,   // 5 minutes - Workers need time to work
+  director: 600,  // 10 minutes - Director is hands-off
+  em: 120,        // 2 minutes - EMs should be responsive but not spammed
+  worker: 600,    // 10 minutes - Workers can be deep in debugging for 30-60+ min
+                  // Note: Smart detection will avoid poking workers showing active work
 };
 
 const DEFAULT_POKE_MESSAGES: PokeMessages = {
@@ -58,7 +59,7 @@ const DEFAULT_POKE_MESSAGES: PokeMessages = {
     'Run `git fetch origin` and check for new commits on squad branches. Merge any squad branches that have new commits into rust AND PUSH TO origin/rust. Always push after merging.',
   em: 'Check worker status: 1) Run `git fetch origin` and merge any new commits from worker branches (origin/worker/$SQUAD_NAME-*) into your squad branch AND PUSH to origin/squad/$SQUAD_NAME. 2) Check tmux panes for idle workers waiting for tasks. 3) If any worker is idle, assign them a task from the backlog in wasm/specs/squads/$SQUAD_NAME/. Update their worker plan file.',
   worker:
-    'How is your task going? If you have working code, commit and push to origin NOW. Push frequently - at least every 10-15 minutes. If stuck, describe the issue.',
+    'Quick status check: Are you still working on your task? If you have uncommitted work, please commit and push soon. If you are stuck or finished, let me know.',
 };
 
 const DEFAULT_STARTUP_PROMPTS: StartupPrompts = {

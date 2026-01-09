@@ -1,58 +1,89 @@
-# Worker 1 Plan
+# Worker 1 Plan - Squad Forge
 
 ## Mission
-Execute tasks assigned by EM-Forge for the Forge squad (type system).
+Implement TS2564 property initialization checking (constructor tracking).
 
 Status: Active
 Priority: 1
 
 ## Current Assignment
-- [ ] Redux test (`test_check_redux_lodash_style_generics`) has 2 remaining diagnostics:
-  - store.ts:590 - Object literal with replaceState not assignable to Store type
-  - app.ts:508 - Property 'tags' does not exist on type 'S'
-  - Progress made:
-    1. Fixed type param extraction for Mapped types in `collect_type_params`
-       - Removed incorrect addition of `mapped.type_param` (iteration var K)
-       - Added `TypeKey::KeyOf` handling to extract operand type param (T from keyof T)
-       - Added `TypeKey::IndexAccess` handling to extract both obj and idx type params
-    2. Reduced diagnostics from 3 to 2
-  - Remaining issue: replaceState param type comparison still fails
-  - Analysis of remaining issues:
-    1. store.ts:590: `DeepPartial<StateFromReducer<R>>` param not matching Store interface
-    2. app.ts:508: State type 'S' not being resolved to RootState (missing 'tags' property)
-  - Root cause: Conditional type `StateFromReducer<R>` not fully evaluating through the generic chain
-  - Next steps: Debug conditional type evaluation in `evaluate_conditional`
+Implement property initialization checking for class properties in constructors.
+
+**Error Code:** TS2564 - "Property 'X' has no initializer and is not definitely assigned in the constructor"
+
+**Impact:** 135 conformance tests affected
+
+### Background
+TypeScript's `strictPropertyInitialization` requires that class properties either:
+1. Have an initializer (`name: string = "default"`)
+2. Are definitely assigned in the constructor
+3. Have a `!` assertion (`name!: string`)
+4. Are optional (`name?: string`)
+
+Currently WASM checker does NOT emit TS2564. The code structure exists but the check is not wired up.
+
+### Steps
+1. **Find existing infrastructure** in `thin_checker.rs`:
+   - Search for `check_class_declaration` function
+   - Look for property initialization tracking (may be partial)
+   - Find where TS2564 should be emitted
+
+2. **Add test cases first** in `wasm/src/checker/tests/` or inline:
+   ```typescript
+   // Should error: TS2564
+   class Foo {
+     name: string;  // no initializer, not assigned in constructor
+   }
+
+   // Should NOT error
+   class Bar {
+     name: string;
+     constructor() { this.name = "bar"; }
+   }
+
+   // Should NOT error
+   class Baz {
+     name: string = "default";
+   }
+
+   // Should NOT error
+   class Qux {
+     name?: string;
+   }
+   ```
+
+3. **Implement tracking**:
+   - In `check_class_declaration`, collect all non-optional properties without initializers
+   - Walk constructor body to find `this.X = ...` assignments
+   - For unassigned properties, emit TS2564
+
+4. **Run conformance tests**:
+   ```bash
+   cd wasm/differential-test && node conformance-runner.mjs --max=500
+   ```
+   Report before/after numbers.
+
+### Key Files
+- `wasm/src/thin_checker.rs` - main checker, `check_class_declaration`
+- `wasm/src/checker/control_flow.rs` - may have flow analysis helpers
+
+### Success Criteria
+- TS2564 emitted for uninitialized properties
+- No false positives for properties assigned in constructor
+- Conformance "missing errors" count reduced
 
 ## Task Queue
-(empty - all queue items completed)
+(empty - single focused task)
 
 ## Completed
-- [x] Added function return inference edge case tests: void vs undefined, promise-like return, union return, never return. All tests pass.
-- [x] Added callable-parameter inference regression tests: union of signatures, overloaded callable, mixed union, param+return extraction, multiple params. All tests pass.
-- [x] Fixed type param extraction for Mapped types: removed iteration var (K), added KeyOf/IndexAccess handlers. Reduced redux diagnostics from 3 to 2.
-- [x] Added 5 template literal hyphen pattern tests for type inference (prefix/suffix extraction, two-part extraction, distributive union, no-match returns never).
-- [x] Application type expansion in TypeEvaluator with fallback extraction of type params from resolved Object properties (reduced redux test from 4 to 3 diagnostics).
-- [x] Fixed type predicate alias narrowing (`test_user_defined_type_predicate_alias_narrows` passes).
-- [x] Covered function optional/rest parameter inference in conditional types (distributive + non-distributive) in `wasm/src/solver/evaluate_tests.rs`. Ran `./wasm/test.sh` (fails: parallel::tests::test_check_redux_lodash_style_generics).
-- [x] Conditional type evaluation: implement function parameter/return inference in `wasm/src/solver/evaluate.rs`; updated regressions in `wasm/src/solver/evaluate_tests.rs`. Ran `./wasm/test.sh` (fails: parallel::tests::test_check_redux_lodash_style_generics).
-- [x] Solver inference hardening: add cyclic upper bound expansion + usage-based inference tests. Ran `./wasm/test.sh` (fails: emitter_edge_case_tests::test_export_assignment_suppresses_other_exports).
-- [x] Added contextual signature bounds tests for function parameter/return variance. Ran `./wasm/test.sh` (fails: emitter_edge_case_tests::test_export_assignment_suppresses_other_exports).
-- [x] Added circular upper-bound order regression test. Ran `./wasm/test.sh` (fails: emitter_edge_case_tests::test_export_assignment_suppresses_other_exports).
-- [x] Added union target placeholder inference test. Ran `./wasm/test.sh` (fails: emitter_edge_case_tests::test_export_assignment_suppresses_other_exports).
-- [x] Fix FunctionId build error in `wasm/src/solver/evaluate.rs`; ran `./wasm/test.sh` (fails: emitter_edge_case_tests::test_export_assignment_suppresses_other_exports).
-- [x] Checked `wasm/src/solver/evaluate.rs` for FunctionId build error (not reproducible after sync). Ran `./wasm/test.sh` (fails: emitter_edge_case_tests::test_export_assignment_suppresses_other_exports).
-- [x] Re-ran `./wasm/test.sh`; FunctionId build error still not reproducible (fails: emitter_edge_case_tests::test_export_assignment_suppresses_other_exports).
-- [x] Re-ran `./wasm/test.sh` (FAIL: emitter_edge_case_tests::test_export_assignment_suppresses_other_exports). FunctionId build error not reproducible after sync.
+(previous work cleared - fresh start for Operation Conformance)
 
 ## Ready for Merge
 No
 
 ## Notes
-- Project Direction: integration and conformance-first; prioritize solver correctness (inference/conditional/subtype) before new features.
-- Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md`
-- Use Docker for Rust tests: `./wasm/test.sh`
-- Conformance focus: tie regressions to official TypeScript conformance cases when possible.
-- Commit format: `[wasm] solver: <description>` or `[wasm] checker: <description>`
-- Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
+- Coordinate with Worker 2 (also on TS2564 - they handle class field analysis)
+- Run `./wasm/test.sh` before pushing
+- Commit format: `[wasm] checker: implement TS2564 property initialization checking`
 - Push to: `origin/worker/forge-1`
-- **NEVER edit**: `DIRECTOR_AGENT.md`, `SQUAD_LEAD_AGENT.md`, `MANAGER_AGENT.md`, `AGENTS.md`, `start_*.sh`
+- **NEVER edit**: `STRUCTURE.md`, `GOALS.md`, other workers' plan files, or anything in `orchestrator/`

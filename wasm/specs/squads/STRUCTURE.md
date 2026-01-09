@@ -82,8 +82,9 @@ wasm/specs/squads/
 
 ### Workers
 - **Reads:** Their `worker-*_plan.md`
-- **Writes:** Code in their assigned crates
+- **Writes:** Code in their assigned crates, their own `worker-*_plan.md` (status updates only)
 - **Does NOT:** Self-switch tasks, edit other squads' files, edit management files
+- **NEVER edits:** `STRUCTURE.md`, `GOALS.md`, other workers' plans, anything in `orchestrator/`
 - **Focus:** Execute assigned tasks, write tests, sync branches
 
 ## Squad Ownership (Director can reassign)

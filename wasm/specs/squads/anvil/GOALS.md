@@ -2,7 +2,7 @@
 
 Updated: 2026-01-09
 
-Priority: 2
+Priority: 1
 
 ---
 ## ⚠️ TMUX REMINDER - CHECK FOR HANGING PROMPTS
@@ -16,85 +16,86 @@ Priority: 2
 **Do this check NOW and periodically throughout your session.**
 
 ---
-## 📢 EM-ANVIL: READ THIS - DIRECTIVE FROM DIRECTOR
+## 📢 OPERATION CONFORMANCE - NEW DIRECTIVE
 
-**Operation Crucible is NOW IN EFFECT.** Your squad has been restructured:
+**Conformance test results show 18.1% exact match rate. Squad Anvil is reassigned to fix false positives and parser issues.**
 
-1. **Workers 1-2**: Bug fixes ONLY. No new ES5 tests, no new transforms.
-2. **Workers 3-5**: REASSIGNED to Crucible. They now port solver tests from official TS repo.
-3. **Reject any PR** that adds new emitter features.
+### Current State (from conformance runner)
+- Extra Errors: 271 tests (38.8%) - WASM reports errors TSC doesn't
+- Main culprits: TS2304 (75), TS2339 (68), TS1005 (44), TS2769 (30)
 
-Please acknowledge by updating Squad Status below.
+### Root Causes Identified (Anvil Scope)
+1. **Namespace Scoping Bug** (TS2304) - 75 false positives - Identifiers can't resolve siblings
+2. **Property Resolution** (TS2339) - 68 false positives - "Property does not exist" incorrectly
+3. **Parser Issues** (TS1005/TS1068) - 60 false positives - Unexpected token errors
+4. **Overload Resolution** (TS2769) - 30 false positives - "No overload matches" incorrectly
+5. **Index Signature** (TS7053) - 28 false positives - Implicit any index access
 
 ---
 
-## ⚠️ OPERATION CRUCIBLE - TACTICAL SHIFT
-
-**Emitter is 80% complete. MAINTENANCE MODE activated.**
-
-- **Squad reduced to 2 workers** (workers 1-2)
-- **Bug fixes ONLY** - critical source map bugs and blocking ES5 regressions
-- **⛔ NO NEW TRANSFORMS** - stop feature work
-- Workers 3-5 reassigned to **Crucible Tasks** (test porting)
-
 ## Current Milestone
-Phase 8 - Conformance, Convergence, and Hardening: Output fidelity across the integrated pipeline, driven by conformance tests.
+**Phase 9 - Conformance Parity**: Fix false positives to reach 50%+ conformance.
 
-## Project Direction Alignment
-- Emitter is 80% complete - stop adding new features
-- Bug fixes only: `super["m"]` in async, nested arrow `this` capture
-- ⚠️ Anti-pattern: Do NOT use regex substitutions for code transforms. Always operate on AST.
+## Focus Areas
+- `wasm/src/thin_binder.rs` - Fix namespace scoping (TS2304)
+- `wasm/src/thin_checker.rs` - Fix property resolution (TS2339)
+- `wasm/src/parser/` - Fix parser edge cases (TS1005/TS1068)
 
-## Focus Areas (MAINTENANCE ONLY)
-- `wasm/src/thin_emitter/` - Critical bug fixes only
-- `wasm/src/transforms/` - Blocking ES5 regressions only
+## Objectives (Ranked by Test Impact)
 
-## Objectives (Ranked)
+### 1. **Namespace Scoping Bug** (TS2304) - 75 false positives
+   - Problem: Identifiers inside `export namespace {}` can't resolve siblings
+   - Root Cause: Binder scope chain not properly linking namespace members
+   - Key Files: `thin_binder.rs` - scope resolution
+   - Assigned: **Workers 1-2**
 
-1. **Critical Bug Fixes Only**
-   - Context: Emitter is in maintenance mode per Operation Crucible
-   - Success Criteria: Fix blocking ES5 regressions (`super["m"]` in async, nested arrow `this` capture)
-   - Key Files: `transforms/class_es5.rs`, `transforms/async_es5.rs`
-   - ⛔ NO NEW FEATURES
+### 2. **Property Resolution** (TS2339) - 68 false positives
+   - Problem: "Property 'X' does not exist on type 'Y'" when it does exist
+   - Root Cause: Type resolution not finding inherited/merged properties
+   - Key Files: `thin_checker.rs` - property access checking
+   - Assigned: **Worker 3**
 
-2. **Source Map Bug Fixes**
-   - Context: Only fix bugs that block debugger attachment
-   - Success Criteria: Source maps validate and attach correctly
-   - Key Files: `thin_emitter/source_writer.rs`, `thin_emitter/source_map.rs`
-   - ⛔ NO NEW MAPPINGS
+### 3. **Parser Edge Cases** (TS1005/TS1068) - 60 false positives
+   - Problem: "Expected X" / "Unexpected token" for valid TypeScript
+   - Root Cause: Parser not handling certain syntax patterns
+   - Key Files: `parser/` - parse functions
+   - Assigned: **Worker 4**
 
-## Anti-Priorities (ENFORCED)
-- ⛔ **New Emitter transforms** - we have enough
-- ⛔ **New test coverage** - workers 3-5 reassigned to Crucible
-- New LSP features
-- CLI argument parsing
-- Performance micro-optimizations
+### 4. **Overload Resolution** (TS2769) - 30 false positives
+   - Problem: "No overload matches this call" when one should match
+   - Root Cause: Overload matching too strict or not checking all overloads
+   - Key Files: `thin_checker.rs`, `solver/` - call resolution
+   - Assigned: **Worker 5**
+
+## Anti-Priorities
+- ⛔ New emitter transforms
+- ⛔ New ES5 downleveling
+- ⛔ Source map enhancements
+- ⛔ LSP features
 
 ## Cross-Squad Dependencies
-- Forge squad owns type checking; coordinate on shared conformance regressions
+- Forge workers implementing missing checks (affects missing errors)
+- Share conformance runner: `wasm/differential-test/conformance-runner.mjs`
 
 ## Notes to EM
-- **Only 2 workers active** (workers 1-2)
-- Workers 3-5 are now on Crucible Tasks (test porting) - see their plans
-- Bug fixes only - reject any PR that adds new transforms
-- Read `wasm/specs/WASM_ARCHITECTURE.md` for architecture
+- Run conformance tests: `cd wasm/differential-test && node conformance-runner.mjs --max=500`
+- Focus on REDUCING false positives (extra errors)
+- Each fix should show reduction in "extra errors" count
 - Use Docker for tests: `./wasm/test.sh`
 
 ## Management Strategy
-Per Project Direction: **Autocratic Scheduling + Bisect-on-Merge**
-- PRs that regress ANY existing baseline are auto-rejected
-- Zero-Idle: If a high-priority task is blocked, swarm it
+**Conformance-Driven Development**:
+- PRs must include before/after conformance numbers
+- Target: Reduce extra errors from 271 to <100
 
 ## Squad Status
-- Last EM Report: 2026-01-08 - Operation Crucible activated
-- Workers Active: 2/5 (workers 1-2 on bug fixes)
-- Workers Reassigned: 3/5 (workers 3-5 on Crucible test porting)
-- Current Focus: Critical bug fixes only
-- Direction: MAINTENANCE MODE - no new transforms
-- Blockers: None
+- Last EM Report: 2026-01-09 - Operation Conformance initiated
+- Conformance Baseline: **271 tests with extra errors (38.8%)**
+- Workers Active: 5/5
+- Current Focus: Fixing false positives
 - Worker Assignments:
-  - W1: Bug fixes - blocking ES5 regressions
-  - W2: Bug fixes - critical source map issues
-  - W3: **CRUCIBLE** - Port conditional type tests from official TS repo
-  - W4: **CRUCIBLE** - Port mapped type tests from official TS repo
-  - W5: **CRUCIBLE** - Port conditional/mapped type tests from official TS repo
+  - W1: Namespace scoping (TS2304) - binder scope chain
+  - W2: Namespace scoping (TS2304) - symbol resolution
+  - W3: Property resolution (TS2339) - inherited properties
+  - W4: Parser edge cases (TS1005/TS1068) - syntax patterns
+  - W5: Overload resolution (TS2769) - call matching

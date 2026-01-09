@@ -16,102 +16,90 @@ Priority: 1
 **Do this check NOW and periodically throughout your session.**
 
 ---
-## 📢 EM-FORGE: DIRECTIVE UPDATE
+## 📢 OPERATION CONFORMANCE - NEW DIRECTIVE
 
-**Redux/Lodash blocker is handled by senior staff. DO NOT work on it.**
+**Conformance test results show 18.1% exact match rate. This is unacceptable.**
 
-Focus on these per Project Direction:
+The WASM checker has infrastructure but is MISSING critical checking passes. All workers are now reassigned to implement missing checks.
 
-### 1. Generic Inference (`solver/infer.rs`)
-- Inference from usage
-- Context-sensitive typing
-- Circular constraints in `extends` clauses
+### Current State (from conformance runner)
+- Total Tests: 698
+- Exact Match: 126 (18.1%)
+- Missing Errors: 444 tests (63.6%) - WASM doesn't catch errors TSC catches
+- Extra Errors: 271 tests (38.8%) - WASM reports false positives
 
-### 2. Conditional Types Stress Testing (`solver/evaluate.rs`)
-- Distributive conditional types over unions
-- This is where most "toy" compilers fail
-
-### 3. Fix Failing Tests
-- `test_conditional_infer_function_optional_param_distributive`
-- `test_conditional_infer_function_optional_param_non_distributive_union_input`
-- `compile_class_with_generic_constructor`
+### Root Causes Identified
+1. **Property Initialization** (TS2564) - 135 tests affected - NOT IMPLEMENTED
+2. **Definite Assignment** (TS2454) - 104 tests affected - NOT IMPLEMENTED
+3. **Access Modifiers** (TS2341/TS2445) - 63 tests affected - NOT ENFORCED
+4. **Function Return Checking** (TS7010/TS7006) - 80 tests affected - NOT IMPLEMENTED
+5. **Namespace Scoping Bug** (TS2304) - 75 false positives - BROKEN
 
 ---
 
-## Forge Focus: Generic Inference + Conditional Types
-
-**Solver is 55% complete. Focus on inference and conditional type evaluation.**
-
 ## Current Milestone
-Phase 8 - Conformance, Convergence, and Hardening: Type-system correctness in the integrated pipeline, driven by conformance tests.
-
-## Project Direction Alignment
-- Solver is the correctness bottleneck (estimated 55% complete)
-- Redux blocker handled separately by senior staff
-- Focus on Generic Inference and Conditional Types
+**Phase 9 - Conformance Parity**: Implement missing checker passes to reach 50%+ conformance.
 
 ## Focus Areas
-- `wasm/src/solver/infer.rs` - **PRIMARY: Generic inference from usage**
-- `wasm/src/solver/evaluate.rs` - Distributive conditional types over unions
-- `wasm/src/solver/` - Type inference, constraint solving
+- `wasm/src/thin_checker.rs` - Main checker (add missing passes)
+- `wasm/src/checker/` - Modular checker components
+- `wasm/src/thin_binder.rs` - Fix namespace scoping bug
 
-## Objectives (Ranked)
+## Objectives (Ranked by Test Impact)
 
-1. **Generic Inference Hardening**
-   - Inference from usage and context-sensitive typing
-   - Circular constraints in `extends` clauses
-   - Key Files: `solver/infer.rs`, `solver/infer_tests.rs`
+### 1. **Property Initialization Checking** (TS2564) - 135 tests
+   - Error: "Property has no initializer and is not definitely assigned in constructor"
+   - Implementation: Track property assignments in constructor, emit error for uninitialized
+   - Key Files: `thin_checker.rs`, `checker/control_flow.rs`
+   - Assigned: **Workers 1-2**
 
-2. **Conditional Types Stress Testing**
-   - Distributive conditional types over unions
-   - Key Files: `solver/evaluate.rs`, `solver/evaluate_tests.rs`
+### 2. **Definite Assignment Analysis** (TS2454) - 104 tests
+   - Error: "Variable is used before being assigned"
+   - Implementation: Track variable initialization through control flow
+   - Key Files: `thin_checker.rs`, `checker/control_flow.rs`
+   - Assigned: **Worker 3**
 
-3. **Fix Failing Tests** - ALL FIXED ✅
-   - `test_conditional_infer_function_optional_param_distributive` - ✅ FIXED
-   - `test_conditional_infer_function_optional_param_non_distributive_union_input` - ✅ FIXED
-   - `compile_class_with_generic_constructor` - ✅ FIXED
+### 3. **Access Modifier Enforcement** (TS2341/TS2445) - 63 tests
+   - Errors: "Property is private/protected and only accessible within class"
+   - Implementation: Check visibility on every property/method access
+   - Key Files: `thin_checker.rs` (functions exist but don't emit errors)
+   - Assigned: **Worker 4**
 
-4. **Template Literal Types**
-   - Context: Template literal inference and pattern matching
-   - Key Files: `solver/evaluate.rs`
+### 4. **Function Return Type Checking** (TS7010/TS7006) - 80 tests
+   - Errors: "Function must return a value", "Parameter implicitly has 'any' type"
+   - Implementation: Validate all code paths return, check implicit any
+   - Key Files: `thin_checker.rs`, `checker/statements.rs`
+   - Assigned: **Worker 5**
 
 ## Anti-Priorities
-- ⛔ Redux/Lodash blocker (handled by senior staff)
-- New LSP features
-- CLI argument parsing or UX changes
-- Performance micro-optimizations
-- New AST nodes
+- ⛔ Redux/Lodash blocker (handled separately)
+- ⛔ New solver features
+- ⛔ Template literal types
+- ⛔ Generic inference edge cases
 
 ## Cross-Squad Dependencies
-- Anvil workers 3-5 are on **Crucible Tasks** porting tests from official TS repo
-- These tests will help triangulate correct behavior for Forge workers
+- Anvil workers fixing namespace scoping bug (affects 75 false positives)
+- Share conformance runner results: `wasm/differential-test/conformance-runner.mjs`
 
 ## Notes to EM
-- **⛔ DO NOT assign workers to Redux blocker** - senior staff handling it
-- Focus on Generic Inference and Conditional Types stress testing
-- Read `wasm/specs/SOLVER.md` for solver architecture
+- Run conformance tests: `cd wasm/differential-test && node conformance-runner.mjs --max=500`
+- Each worker should add tests for their error codes FIRST, then implement
+- Track progress by re-running conformance tests after each PR
 - Use Docker for tests: `./wasm/test.sh`
 
 ## Management Strategy
-Per Project Direction: **Autocratic Scheduling + Bisect-on-Merge**
-- PRs that regress ANY existing baseline are auto-rejected
+**Conformance-Driven Development**:
+- PRs must include before/after conformance numbers
+- Target: 50% exact match by end of sprint
 
 ## Squad Status
-- Last EM Report: 2026-01-09 - EM session active
-- Redux Baseline: **2 diagnostics** (improved from 4, target: 0)
+- Last EM Report: 2026-01-09 - Operation Conformance initiated
+- Conformance Baseline: **18.1% exact match**
 - Workers Active: 5/5
-- Current Focus: Generic Inference + Conditional Types
-- Direction: Solver hardening per directive
-- Session Merges:
-  - forge-3: try_expand_type_arg fix
-  - forge-3: generic class type expansion fix
-  - forge-3: InferSubstitutor Function type support (Redux 4→2!)
-- Blocked Commits:
-  - forge-2: Removes Ref/TypeQuery handling (regression)
-  - forge-5: Large diff with merge conflicts
+- Current Focus: Missing checker passes
 - Worker Assignments:
-  - W1/Pane3: Template literal type inference
-  - W2/Pane4: ReturnType/Parameters edge cases
-  - W3/Pane5: Function parameter inference tests
-  - W4/Pane6: Circular constraints in extends clauses
-  - W5/Pane7: Distributive conditional stress tests
+  - W1: Property initialization (TS2564) - constructor tracking
+  - W2: Property initialization (TS2564) - class field analysis
+  - W3: Definite assignment (TS2454) - variable tracking
+  - W4: Access modifiers (TS2341/TS2445) - visibility enforcement
+  - W5: Function returns (TS7010/TS7006) - return validation

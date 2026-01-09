@@ -1,106 +1,100 @@
-# Worker 3 Plan
+# Worker 3 Plan - Squad Forge
 
 ## Mission
-Execute tasks assigned by EM-Forge for the Forge squad (type system).
+Implement TS2454 definite assignment analysis for variables.
 
 Status: Active
-Priority: 3
+Priority: 1
 
 ## Current Assignment
-- [x] Fix string enum opaque assignability (TS unsoundness #34): string literals should NOT be assignable to string enum types.
+Implement variable initialization tracking to detect use-before-assignment.
+
+**Error Code:** TS2454 - "Variable 'X' is used before being assigned"
+
+**Impact:** 104 conformance tests affected
+
+### Background
+TypeScript tracks whether variables are definitely assigned before use:
+```typescript
+let x: number;
+console.log(x);  // TS2454: Variable 'x' is used before being assigned
+
+let y: number;
+y = 5;
+console.log(y);  // OK
+```
+
+This requires control flow analysis to track variable state through branches.
+
+### Steps
+1. **Add test cases first**:
+   ```typescript
+   // Should error: TS2454
+   function foo() {
+     let x: number;
+     return x;  // used before assigned
+   }
+
+   // Should error: TS2454 - not all paths assign
+   function bar(flag: boolean) {
+     let x: number;
+     if (flag) { x = 1; }
+     return x;  // might not be assigned
+   }
+
+   // Should NOT error: assigned in all paths
+   function baz(flag: boolean) {
+     let x: number;
+     if (flag) { x = 1; } else { x = 2; }
+     return x;  // definitely assigned
+   }
+
+   // Should NOT error: assigned before use
+   function qux() {
+     let x: number;
+     x = 5;
+     return x;
+   }
+   ```
+
+2. **Implement variable tracking**:
+   - Create a `DefiniteAssignmentChecker` or extend existing flow analysis
+   - Track declared variables and their assignment state
+   - At each variable reference, check if definitely assigned
+
+3. **Handle control flow**:
+   - If/else branches: both must assign for "definitely assigned"
+   - Loops: conservative (assume loop might not execute)
+   - Try/catch: handle exception paths
+   - Switch: all cases must assign
+
+4. **Emit TS2454** when variable is used but not definitely assigned.
+
+5. **Run conformance tests** and report numbers.
+
+### Key Files
+- `wasm/src/thin_checker.rs` - main checker
+- `wasm/src/checker/control_flow.rs` - flow analysis infrastructure
+- `wasm/src/checker/statements.rs` - statement checking
+
+### Success Criteria
+- TS2454 emitted for use-before-assignment
+- Correct handling of control flow branches
+- No false positives for properly assigned variables
 
 ## Task Queue
-- [ ] Once Worker 2 fixes the core issue, verify all minimal repros pass (4 of 6 currently fail).
-- [ ] Once constraint property lookup is implemented, update `test_cross_scope_generic_constraints` to expect 0 errors.
-- [ ] Once setter type checking is implemented, update `test_split_accessors_write_error` to expect 1 error.
-- [ ] Once typeof class types work, update `test_abstract_constructor_assignability` to expect 0 errors.
-- [ ] Once class inheritance type checking works, update `test_concrete_extends_abstract` and `test_best_common_type_class_hierarchy` to expect 0 errors.
-- [ ] Once namespace-interface value merging works, update `test_namespace_interface_merging` to expect 0 errors.
-- [ ] Once enum member access works, update `test_enum_namespace_merging` to expect 0 errors.
-- [x] Pick the next unsoundness case from `wasm/specs/TS_UNSOUNDNESS_CATALOG.md` and add coverage if missing. All 44 catalog items are already covered.
+(empty - single focused task)
 
 ## Completed
-- [x] Object vs object vs {} trifecta (TS unsoundness #20): add thin checker coverage for object keyword vs empty object. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
-- [x] Nominal classes (TS unsoundness #5): add private/protected brand property and coverage. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
-- [x] Instantiation depth limit (TS unsoundness #17): guard deep instantiation in solver and add coverage. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
-- [x] Class static side rules (TS unsoundness #18): include static members in constructor type and add coverage. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
-- [x] Numeric/string enum nominalness (TS unsoundness #7/#24/#34): added enum assignability handling and coverage. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
-- [x] `import type` erasure (TS unsoundness #39): mark type-only imports to error on value usage; added coverage. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
-- [x] Template string expansion limits (TS unsoundness #22): added expansion guard and coverage. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
-- [x] `unique symbol` nominal primitives (TS unsoundness #37): added nominal assignability coverage. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
-- [x] Homomorphic mapped types over boolean primitives (TS unsoundness #27): added boolean key mapping assignability coverage. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
-- [x] Recursion depth circuit breaker (TS unsoundness #35): treat deep array instantiation as assignable to avoid runaway recursion. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
-- [x] Error poisoning union suppression (TS unsoundness #11): union with `error` collapses to `error`. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
-- [x] Intersection reduction for disjoint primitives (TS unsoundness #21): ensure `string & number` reduces to `never`. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
-- [x] Homomorphic mapped types over string primitives (TS unsoundness #27): added string key mapping coverage. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
-- [x] `keyof` union contravariance (TS unsoundness #30): ensure only shared keys are produced. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
-- [x] Comparison operator overlap (TS unsoundness #23): added loose equality overlap coverage. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
-- [x] Primitive boxing behavior (TS unsoundness #33): prevent `Number`-like object from assigning to `number`. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
-- [x] Literal widening for mutable bindings (TS unsoundness #10): widen boolean literals on let/var, keep const literal. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
-- [x] Freshness/excess property check: allow assigning non-fresh object (variable) to target type. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
-- [x] Covariant mutable arrays (TS unsoundness #3) coverage in compat assignability. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
-- [x] Structural property/method variance: allow bivariant checks when either side is a method; added mixed method vs function-property test. Tests: `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
-- [x] Function variance across union/intersection targets regression test. Tests: `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
-- [x] Method vs function-property variance coverage for function-source to method-target. Tests: `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
-- [x] Index-signature consistency with method bivariance regression (TS unsoundness #25). Tests: `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
-- [x] String index signature method bivariance regression (TS unsoundness #25). Tests: `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
-- [x] Investigated FunctionId build error in `wasm/src/solver/evaluate.rs` after sync; no references found, build succeeded. Tests: `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
-- [x] Implemented covariant `this`-type handling in parameter variance with regression coverage. Tests: `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
-- [x] Added class-like subtyping regression for `this`-typed parameters (base vs derived). Tests: `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
-- [x] Added mixed method/function-property variance tests for `this` parameters. Tests: `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
-- [x] Added void-return exception coverage for method properties. Tests: `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`).
-- [x] Reset flow at function boundaries to avoid narrowing in closures; added CFA invalidation test. Tests: `./wasm/test.sh` (fails: `wasm/src/transforms/async_es5.rs:749` unexpected closing delimiter after sync).
-- [x] Added best common type array literal regression coverage. Tests: `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_parse_error_tolerance`).
-- [x] Added correlated union index-access regression coverage (cross-product). Tests: `./wasm/test.sh` (fails: `emitter_parity_tests::test_parity_commonjs_export`).
-- [x] Rechecked FunctionId build error in `wasm/src/solver/evaluate.rs` after sync; not reproducible. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
-- [x] Tuple-array assignment (TS unsoundness #15): added thin checker coverage for tuple -> array ok and array -> tuple rejection. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
-- [x] Rest parameter bivariance (TS unsoundness #16): added thin checker coverage for `(...args: any[]) => void` accepting specific params. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
-- [x] Weak type detection (TS unsoundness #13): added thin checker coverage for optional-only target rejecting no-overlap source. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
-- [x] Optionality vs undefined (TS unsoundness #14): added thin checker coverage for optional properties accepting `undefined` by default. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
-- [x] Unchecked indexed access (TS unsoundness #8): added thin checker coverage for array element access returning element type without `undefined`. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
-- [x] Apparent members of primitives (TS unsoundness #12): added thin checker coverage for primitive method access via wrapper interfaces. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
-- [x] Void return exception (TS unsoundness #6): added thin checker coverage for assigning a non-void return function to `() => void`. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
-- [x] Distributivity disabling (TS unsoundness #40): added thin checker coverage for `[T] extends [U]` pattern that disables conditional type distribution. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
-- [x] Constructor void exception (TS unsoundness #28): added thin checker coverage for `new () => void` accepting concrete classes. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
-- [x] Key remapping syntax (TS unsoundness #41): added thin checker coverage for `[P in keyof T as ...]: T[P]` key filtering syntax (Omit, Pick). Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
-- [x] Redux/Lodash pattern minimal repros: created 6 tests isolating specific patterns (ExtractState infer, StateFromReducers mapped, DeepPartial, createStore generic, ActionFromReducers index, ReducersMapObject). Root cause: generic Application types not expanded. 5/6 fail, 1 passes. Tests: `./wasm/test.sh -- test_redux_pattern`.
-- [x] Base constraint assignability (TS unsoundness #31): added 4 tests for generic type parameter constraint checking. Tests cover T <: Constraint(T), rejection of Constraint -> T assignments, param identity checks, and cross-scope constraint property access (currently 3 expected errors until constraint property lookup is implemented). Tests: `./wasm/test.sh -- test_base_constraint\|test_generic_constraint\|test_generic_param\|test_cross_scope`.
-- [x] Split accessors (TS unsoundness #26): added 3 tests for getter/setter variance. Tests cover basic accessor usage, read type mismatch errors, and write type mismatch (currently 0 expected errors for write until setter type checking is implemented). Tests: `./wasm/test.sh -- test_split_accessors`.
-- [x] Abstract class instantiation (TS unsoundness #43): added 3 tests for abstract class behavior. Tests cover instantiation error, constructor type assignability (4 expected errors until typeof class works), and concrete-to-abstract assignment (3 expected errors until class inheritance works). Tests: `./wasm/test.sh -- test_abstract_class_instantiation\|test_abstract_constructor\|test_concrete_extends`.
-- [x] Global Function type (TS unsoundness #29): added 3 tests for untyped callable supertype. Tests cover callable-to-Function assignability, Function-to-specific assignability (with any), and function type hierarchy. Tests: `./wasm/test.sh -- test_global_function_type\|test_function_not_assignable\|test_function_type_hierarchy`.
-- [x] Best Common Type inference (TS unsoundness #32): added 3 tests for array literal type inference. Tests cover mixed array literals, class hierarchy (1 expected error until class inheritance works), and literal widening. Tests: `./wasm/test.sh -- test_best_common_type`.
-- [x] Module Augmentation Merging (TS unsoundness #44): added 6 tests for declaration merging. Tests cover interface merging, method overloads, extend+merge, namespace-interface merging (2 expected errors), class-namespace merging, and enum-namespace merging (4 expected errors). Tests: `./wasm/test.sh -- test_interface_merging\|test_namespace_interface\|test_class_namespace\|test_enum_namespace`.
-- [x] Application type expansion in evaluate(): added TypeResolver.get_type_params(), TypeEnvironment.insert_with_params(), evaluate_application() handler, and eager base symbol resolution. test_redux_pattern_extract_state_with_infer now passes. Tests: `./wasm/test.sh -- test_redux_pattern`.
-- [x] Function Bivariance (TS unsoundness #2): added 6 tests for method/function variance. Tests cover method bivariance (wider/narrower args - expected failures until method bivariance implemented), function property contravariance (expected failure until interface extends resolved), function property covariant rejection (passes), event handler pattern (expected failure), callback bivariance (expected failure). Tests: `./wasm/test.sh -- bivariance\|contravariance`.
-- [x] Any Type (TS unsoundness #1): added 5 tests for any type behavior. Tests cover any->specific assignability, specific->any assignability, any in function calls, any propagation through operations, and any-never relationship. All pass. Tests: `./wasm/test.sh -- test_any_type\|test_specific_types_assignable_to_any`.
-- [x] Freshness/Excess Property (TS unsoundness #4): added 5 tests with proper labeling. Tests cover object literal excess property check, variable no-check (width subtyping), function argument check, return statement check, and spread behavior (expected failure until spread implemented). Tests: `./wasm/test.sh -- test_freshness`.
-- [x] Covariant this Types (TS unsoundness #19): added 4 tests for this type covariance. Tests cover basic subtyping (expected failure until class extends implemented), fluent API pattern (expected failure until class extends implemented), interface with this pattern (passes), and unsound call scenario (expected failure until class extends implemented). Tests: `./wasm/test.sh -- test_covariant_this`.
-- [x] Legacy Null/Undefined (TS unsoundness #9): added 4 tests for strictNullChecks behavior. Tests cover valid code with null/undefined types (passes), null-to-string rejection (passes), undefined-to-number rejection (passes), and union types with null/undefined (passes). Tests: `./wasm/test.sh -- test_strict_null_checks\|test_null_undefined_union`.
-- [x] Correlated Unions (TS unsoundness #38): added 4 tests for cross-product limitation. Tests cover basic union property access (passes), discriminant narrowing (passes), index access with union key (passes), and common property access on union (passes). Tests: `./wasm/test.sh -- test_correlated_unions`.
-- [x] CFA Invalidation in Closures (TS unsoundness #42): added 4 tests for narrowing reset in closures. Tests cover mutable variable invalidation (passes), const narrowing maintenance (expected improvement once implemented), arrow function closure (passes), and callback parameter (passes). Tests: `./wasm/test.sh -- test_cfa_`.
-- [x] String enum opaque assignability fix (TS unsoundness #34): added string enum rejection in enum_assignability_override. String literals cannot be assigned to string enum types (test_string_enum_rejects_string_literal now passes). Tests: `./wasm/test.sh` (52 failures, down from 53).
-- [x] Weak type empty object fix (TS unsoundness #13): fixed violates_weak_type_with_target_props to allow empty objects `{}` to be assigned to weak types (all optional properties). Only trigger weak type violation when source has properties that don't overlap. Tests: `./wasm/test.sh` (51 failures, down from 52).
-- [x] Private member nominal test fix: updated test_private_member_nominal_class_assignability to accept either error code 2741 or 2322. Both correctly indicate rejection due to private member nominality. Tests: `./wasm/test.sh` (50 failures, down from 51).
-- [x] Class static side test fix: updated test_class_static_side_property_assignability to accept either error code 2741 or 2322. Both correctly indicate rejection due to missing static member. Tests: `./wasm/test.sh` (49 failures, down from 50).
-- [x] Method bivariance test fixes: updated test_callback_method_parameter_bivariance and test_method_bivariance_event_handler_pattern to expect 0 errors. Method bivariance is now working correctly for callbacks and event handlers. Tests: `./wasm/test.sh` (57 failures, down from 58 after sync).
-- [x] Generic type reference test fix: updated test_checker_lower_generic_type_reference_applies_args to accept Object type. Generic type aliases like `Box<string>` are now eagerly resolved to their expanded form. Tests: `./wasm/test.sh` (55 failures, down from 57).
-- [x] JSX Intrinsic Lookup coverage (TS unsoundness #36): added 3 tests for JSX tag resolution - lowercase intrinsic elements, uppercase component resolution, and invalid element error detection. Tests currently pass as non-crash verification since JSX type checking is not yet implemented. Tests: `./wasm/test.sh -- test_jsx` (all 3 pass).
-- [x] Ref type symbol resolution: fixed TypeFormatter to resolve SymbolRef types to actual symbol names. Before: `Ref(12)<...>`, After: `Store<...>`. Improves error message readability significantly.
-- [x] Merge fix: updated thin_checker.rs to use seed_type_params() instead of removed add_external_type_params(). Tests: `./wasm/test.sh` (40 failures, down from 55 after sync).
-- [x] Test expectation fixes: updated test_covariant_this_interface_pattern (accept 0-1 errors for incomplete this type) and test_cross_scope_generic_constraints (accept 3-4 errors for scope resolution). Tests: `./wasm/test.sh` (46 failures, down from 48).
-- [x] Abstract class test fixes: updated test_abstract_class_through_type_alias_2511 and test_abstract_class_union_type_2511 to accept 0 errors until abstract class instantiation checking is implemented. Tests: `./wasm/test.sh` (44 failures, down from 46).
-- [ ] Operation Crucible investigation: analyzed evaluate.rs - Deferred variant exists in ConditionalResult, TypeParameter deferral implemented at line 926. Issue appears to be in TypeEnvironment population for cross-file symbols (type params not registered).
+(previous work cleared - fresh start for Operation Conformance)
 
 ## Ready for Merge
-Yes
+No
 
 ## Notes
-- Project Direction: integration and conformance-first; prioritize solver correctness (inference/conditional/subtype) before new features.
-- Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md`
-- Use Docker for Rust tests: `./wasm/test.sh`
-- Conformance focus: tie regressions to official TypeScript conformance cases when possible.
-- Commit format: `[wasm] solver: <description>` or `[wasm] checker: <description>`
-- Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
+- Similar infrastructure to TS2564 (property init) - share patterns with Workers 1-2
+- Control flow analysis already exists in `control_flow.rs` - extend it
+- Run `./wasm/test.sh` before pushing
+- Commit format: `[wasm] checker: implement TS2454 definite assignment analysis`
 - Push to: `origin/worker/forge-3`
-- **NEVER edit**: `DIRECTOR_AGENT.md`, `SQUAD_LEAD_AGENT.md`, `MANAGER_AGENT.md`, `AGENTS.md`, `start_*.sh`
-- Latest `./wasm/test.sh`: 40 failures (test_check_redux_lodash_style_generics has 5 diagnostics).
+- **NEVER edit**: `STRUCTURE.md`, `GOALS.md`, other workers' plan files, or anything in `orchestrator/`
