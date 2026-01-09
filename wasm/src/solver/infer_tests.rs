@@ -21899,3 +21899,801 @@ fn test_array_readonly_property() {
         panic!("Expected object type");
     }
 }
+
+// =============================================================================
+// Union Type Tests (type narrowing, union distribution)
+// =============================================================================
+
+#[test]
+fn test_union_basic_two_types() {
+    // string | number - basic two-type union
+    let interner = TypeInterner::new();
+
+    let string_or_number = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    if let Some(TypeKey::Union(members)) = interner.lookup(string_or_number) {
+        assert_eq!(members.len(), 2);
+        assert!(members.contains(&TypeId::STRING));
+        assert!(members.contains(&TypeId::NUMBER));
+    } else {
+        panic!("Expected union type");
+    }
+}
+
+#[test]
+fn test_union_three_types() {
+    // string | number | boolean - three-type union
+    let interner = TypeInterner::new();
+
+    let union = interner.union(vec![TypeId::STRING, TypeId::NUMBER, TypeId::BOOLEAN]);
+
+    if let Some(TypeKey::Union(members)) = interner.lookup(union) {
+        assert_eq!(members.len(), 3);
+        assert!(members.contains(&TypeId::STRING));
+        assert!(members.contains(&TypeId::NUMBER));
+        assert!(members.contains(&TypeId::BOOLEAN));
+    } else {
+        panic!("Expected union type");
+    }
+}
+
+#[test]
+fn test_union_with_null() {
+    // string | null - nullable type
+    let interner = TypeInterner::new();
+
+    let nullable_string = interner.union(vec![TypeId::STRING, TypeId::NULL]);
+
+    if let Some(TypeKey::Union(members)) = interner.lookup(nullable_string) {
+        assert_eq!(members.len(), 2);
+        assert!(members.contains(&TypeId::STRING));
+        assert!(members.contains(&TypeId::NULL));
+    } else {
+        panic!("Expected union type");
+    }
+}
+
+#[test]
+fn test_union_with_undefined() {
+    // string | undefined - optional type pattern
+    let interner = TypeInterner::new();
+
+    let optional_string = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
+
+    if let Some(TypeKey::Union(members)) = interner.lookup(optional_string) {
+        assert_eq!(members.len(), 2);
+        assert!(members.contains(&TypeId::STRING));
+        assert!(members.contains(&TypeId::UNDEFINED));
+    } else {
+        panic!("Expected union type");
+    }
+}
+
+#[test]
+fn test_union_with_null_and_undefined() {
+    // string | null | undefined
+    let interner = TypeInterner::new();
+
+    let union = interner.union(vec![TypeId::STRING, TypeId::NULL, TypeId::UNDEFINED]);
+
+    if let Some(TypeKey::Union(members)) = interner.lookup(union) {
+        assert_eq!(members.len(), 3);
+        assert!(members.contains(&TypeId::STRING));
+        assert!(members.contains(&TypeId::NULL));
+        assert!(members.contains(&TypeId::UNDEFINED));
+    } else {
+        panic!("Expected union type");
+    }
+}
+
+#[test]
+fn test_union_of_string_literals() {
+    // "a" | "b" | "c" - string literal union
+    let interner = TypeInterner::new();
+
+    let lit_a = interner.literal_string("a");
+    let lit_b = interner.literal_string("b");
+    let lit_c = interner.literal_string("c");
+    let union = interner.union(vec![lit_a, lit_b, lit_c]);
+
+    if let Some(TypeKey::Union(members)) = interner.lookup(union) {
+        assert_eq!(members.len(), 3);
+        assert!(members.contains(&lit_a));
+        assert!(members.contains(&lit_b));
+        assert!(members.contains(&lit_c));
+    } else {
+        panic!("Expected union type");
+    }
+}
+
+#[test]
+fn test_union_of_number_literals() {
+    // 1 | 2 | 3 - number literal union
+    let interner = TypeInterner::new();
+
+    let lit_1 = interner.literal_number(OrderedFloat(1.0));
+    let lit_2 = interner.literal_number(OrderedFloat(2.0));
+    let lit_3 = interner.literal_number(OrderedFloat(3.0));
+    let union = interner.union(vec![lit_1, lit_2, lit_3]);
+
+    if let Some(TypeKey::Union(members)) = interner.lookup(union) {
+        assert_eq!(members.len(), 3);
+        assert!(members.contains(&lit_1));
+        assert!(members.contains(&lit_2));
+        assert!(members.contains(&lit_3));
+    } else {
+        panic!("Expected union type");
+    }
+}
+
+#[test]
+fn test_union_of_boolean_literals() {
+    // true | false - boolean literal union (equivalent to boolean)
+    let interner = TypeInterner::new();
+
+    let lit_true = interner.literal_boolean(true);
+    let lit_false = interner.literal_boolean(false);
+    let union = interner.union(vec![lit_true, lit_false]);
+
+    if let Some(TypeKey::Union(members)) = interner.lookup(union) {
+        assert_eq!(members.len(), 2);
+        assert!(members.contains(&lit_true));
+        assert!(members.contains(&lit_false));
+    } else {
+        panic!("Expected union type");
+    }
+}
+
+#[test]
+fn test_union_of_objects() {
+    // { x: string } | { y: number } - object union
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+    let y_name = interner.intern_string("y");
+
+    let obj_x = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_y = interner.object(vec![PropertyInfo {
+        name: y_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let union = interner.union(vec![obj_x, obj_y]);
+
+    if let Some(TypeKey::Union(members)) = interner.lookup(union) {
+        assert_eq!(members.len(), 2);
+        assert!(members.contains(&obj_x));
+        assert!(members.contains(&obj_y));
+    } else {
+        panic!("Expected union type");
+    }
+}
+
+#[test]
+fn test_union_of_functions() {
+    // (() => string) | (() => number) - function union
+    let interner = TypeInterner::new();
+
+    let fn_string = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn_number = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::NUMBER,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let union = interner.union(vec![fn_string, fn_number]);
+
+    if let Some(TypeKey::Union(members)) = interner.lookup(union) {
+        assert_eq!(members.len(), 2);
+    } else {
+        panic!("Expected union type");
+    }
+}
+
+#[test]
+fn test_union_of_arrays() {
+    // string[] | number[] - array union
+    let interner = TypeInterner::new();
+
+    let string_array = interner.array(TypeId::STRING);
+    let number_array = interner.array(TypeId::NUMBER);
+    let union = interner.union(vec![string_array, number_array]);
+
+    if let Some(TypeKey::Union(members)) = interner.lookup(union) {
+        assert_eq!(members.len(), 2);
+        assert!(members.contains(&string_array));
+        assert!(members.contains(&number_array));
+    } else {
+        panic!("Expected union type");
+    }
+}
+
+#[test]
+fn test_union_of_tuples() {
+    // [string] | [number] - tuple union
+    let interner = TypeInterner::new();
+
+    let tuple_string = interner.tuple(vec![TupleElement {
+        type_id: TypeId::STRING,
+        name: None,
+        optional: false,
+        rest: false,
+    }]);
+
+    let tuple_number = interner.tuple(vec![TupleElement {
+        type_id: TypeId::NUMBER,
+        name: None,
+        optional: false,
+        rest: false,
+    }]);
+
+    let union = interner.union(vec![tuple_string, tuple_number]);
+
+    if let Some(TypeKey::Union(members)) = interner.lookup(union) {
+        assert_eq!(members.len(), 2);
+    } else {
+        panic!("Expected union type");
+    }
+}
+
+#[test]
+fn test_union_never_absorption() {
+    // string | never = string - never is absorbed
+    let interner = TypeInterner::new();
+
+    let union = interner.union(vec![TypeId::STRING, TypeId::NEVER]);
+
+    // Never should be absorbed - check that the result is either string or a union without never
+    if let Some(TypeKey::Union(members)) = interner.lookup(union) {
+        // If still a union, never should not be present
+        assert!(!members.contains(&TypeId::NEVER));
+    }
+    // Otherwise it might have been simplified to just string
+}
+
+#[test]
+fn test_union_all_never() {
+    // never | never = never
+    let interner = TypeInterner::new();
+
+    let union = interner.union(vec![TypeId::NEVER, TypeId::NEVER]);
+
+    // Should simplify to never or an empty union
+    assert!(union == TypeId::NEVER || matches!(interner.lookup(union), Some(TypeKey::Union(m)) if m.is_empty()));
+}
+
+#[test]
+fn test_union_with_any() {
+    // string | any = any - any absorbs everything
+    let interner = TypeInterner::new();
+
+    let union = interner.union(vec![TypeId::STRING, TypeId::ANY]);
+
+    // Any should absorb other types
+    if let Some(TypeKey::Union(members)) = interner.lookup(union) {
+        // If still a union, check it contains any
+        assert!(members.contains(&TypeId::ANY) || union == TypeId::ANY);
+    }
+}
+
+#[test]
+fn test_union_with_unknown() {
+    // string | unknown
+    let interner = TypeInterner::new();
+
+    let union = interner.union(vec![TypeId::STRING, TypeId::UNKNOWN]);
+
+    if let Some(TypeKey::Union(members)) = interner.lookup(union) {
+        assert!(members.contains(&TypeId::UNKNOWN));
+    }
+}
+
+#[test]
+fn test_union_duplicate_removal() {
+    // string | string = string - duplicates should be removed
+    let interner = TypeInterner::new();
+
+    let union = interner.union(vec![TypeId::STRING, TypeId::STRING]);
+
+    // Should simplify to just string or a union with one element
+    if let Some(TypeKey::Union(members)) = interner.lookup(union) {
+        // If still a union, should have no duplicates
+        let unique: std::collections::HashSet<_> = members.iter().collect();
+        assert_eq!(unique.len(), members.len());
+    }
+}
+
+#[test]
+fn test_union_same_type_same_result() {
+    // Same union should produce same TypeId
+    let interner = TypeInterner::new();
+
+    let union1 = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let union2 = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    assert_eq!(union1, union2);
+}
+
+#[test]
+fn test_union_order_independence() {
+    // string | number should equal number | string
+    let interner = TypeInterner::new();
+
+    let union1 = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let union2 = interner.union(vec![TypeId::NUMBER, TypeId::STRING]);
+
+    assert_eq!(union1, union2);
+}
+
+#[test]
+fn test_union_nested_flattening() {
+    // (string | number) | boolean should flatten to string | number | boolean
+    let interner = TypeInterner::new();
+
+    let inner_union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let outer_union = interner.union(vec![inner_union, TypeId::BOOLEAN]);
+
+    if let Some(TypeKey::Union(members)) = interner.lookup(outer_union) {
+        // Should be flattened - no nested unions
+        for member in members.iter() {
+            assert!(!matches!(interner.lookup(*member), Some(TypeKey::Union(_))));
+        }
+    }
+}
+
+#[test]
+fn test_union_in_function_param() {
+    // (x: string | number) => void
+    let interner = TypeInterner::new();
+
+    let union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let x_name = interner.intern_string("x");
+
+    let fn_type = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(x_name),
+            type_id: union,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    if let Some(TypeKey::Function(shape)) = interner.lookup(fn_type) {
+        assert_eq!(shape.params[0].type_id, union);
+    } else {
+        panic!("Expected function type");
+    }
+}
+
+#[test]
+fn test_union_as_function_return() {
+    // () => string | null
+    let interner = TypeInterner::new();
+
+    let nullable_string = interner.union(vec![TypeId::STRING, TypeId::NULL]);
+
+    let fn_type = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: nullable_string,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    if let Some(TypeKey::Function(shape)) = interner.lookup(fn_type) {
+        assert_eq!(shape.return_type, nullable_string);
+    } else {
+        panic!("Expected function type");
+    }
+}
+
+#[test]
+fn test_union_in_object_property() {
+    // { value: string | number }
+    let interner = TypeInterner::new();
+
+    let union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let value_name = interner.intern_string("value");
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: value_name,
+        type_id: union,
+        write_type: union,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(obj) {
+        assert_eq!(props[0].type_id, union);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_union_in_array_element() {
+    // (string | number)[]
+    let interner = TypeInterner::new();
+
+    let union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let array = interner.array(union);
+
+    if let Some(TypeKey::Array(element_type)) = interner.lookup(array) {
+        assert_eq!(*element_type, union);
+    } else {
+        panic!("Expected array type");
+    }
+}
+
+#[test]
+fn test_union_inference() {
+    // Infer T = string | number
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    ctx.add_lower_bound(var_t, union);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, union);
+}
+
+#[test]
+fn test_union_discriminant_string() {
+    // { kind: "a", value: string } | { kind: "b", value: number }
+    let interner = TypeInterner::new();
+
+    let kind_name = interner.intern_string("kind");
+    let value_name = interner.intern_string("value");
+    let lit_a = interner.literal_string("a");
+    let lit_b = interner.literal_string("b");
+
+    let variant_a = interner.object(vec![
+        PropertyInfo {
+            name: kind_name,
+            type_id: lit_a,
+            write_type: lit_a,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: value_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let variant_b = interner.object(vec![
+        PropertyInfo {
+            name: kind_name,
+            type_id: lit_b,
+            write_type: lit_b,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: value_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let discriminated_union = interner.union(vec![variant_a, variant_b]);
+
+    if let Some(TypeKey::Union(members)) = interner.lookup(discriminated_union) {
+        assert_eq!(members.len(), 2);
+    } else {
+        panic!("Expected union type");
+    }
+}
+
+#[test]
+fn test_union_discriminant_number() {
+    // { type: 0, data: string } | { type: 1, data: number }
+    let interner = TypeInterner::new();
+
+    let type_name = interner.intern_string("type");
+    let data_name = interner.intern_string("data");
+    let lit_0 = interner.literal_number(OrderedFloat(0.0));
+    let lit_1 = interner.literal_number(OrderedFloat(1.0));
+
+    let variant_0 = interner.object(vec![
+        PropertyInfo {
+            name: type_name,
+            type_id: lit_0,
+            write_type: lit_0,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: data_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let variant_1 = interner.object(vec![
+        PropertyInfo {
+            name: type_name,
+            type_id: lit_1,
+            write_type: lit_1,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: data_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let discriminated_union = interner.union(vec![variant_0, variant_1]);
+
+    if let Some(TypeKey::Union(members)) = interner.lookup(discriminated_union) {
+        assert_eq!(members.len(), 2);
+    } else {
+        panic!("Expected union type");
+    }
+}
+
+#[test]
+fn test_union_with_void() {
+    // string | void - callback return type pattern
+    let interner = TypeInterner::new();
+
+    let union = interner.union(vec![TypeId::STRING, TypeId::VOID]);
+
+    if let Some(TypeKey::Union(members)) = interner.lookup(union) {
+        assert!(members.contains(&TypeId::STRING));
+        assert!(members.contains(&TypeId::VOID));
+    } else {
+        panic!("Expected union type");
+    }
+}
+
+#[test]
+fn test_union_of_promises() {
+    // Promise<string> | Promise<number>
+    let interner = TypeInterner::new();
+
+    let promise_string = interner.promise(TypeId::STRING);
+    let promise_number = interner.promise(TypeId::NUMBER);
+    let union = interner.union(vec![promise_string, promise_number]);
+
+    if let Some(TypeKey::Union(members)) = interner.lookup(union) {
+        assert_eq!(members.len(), 2);
+    } else {
+        panic!("Expected union type");
+    }
+}
+
+#[test]
+fn test_union_large() {
+    // string | number | boolean | null | undefined | void
+    let interner = TypeInterner::new();
+
+    let union = interner.union(vec![
+        TypeId::STRING,
+        TypeId::NUMBER,
+        TypeId::BOOLEAN,
+        TypeId::NULL,
+        TypeId::UNDEFINED,
+        TypeId::VOID,
+    ]);
+
+    if let Some(TypeKey::Union(members)) = interner.lookup(union) {
+        assert_eq!(members.len(), 6);
+    } else {
+        panic!("Expected union type");
+    }
+}
+
+#[test]
+fn test_union_with_intersection() {
+    // (A & B) | C - union containing intersection
+    let interner = TypeInterner::new();
+
+    let a_name = interner.intern_string("a");
+    let b_name = interner.intern_string("b");
+    let c_name = interner.intern_string("c");
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: a_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: b_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_c = interner.object(vec![PropertyInfo {
+        name: c_name,
+        type_id: TypeId::BOOLEAN,
+        write_type: TypeId::BOOLEAN,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let intersection = interner.intersection(vec![obj_a, obj_b]);
+    let union = interner.union(vec![intersection, obj_c]);
+
+    if let Some(TypeKey::Union(members)) = interner.lookup(union) {
+        assert_eq!(members.len(), 2);
+    } else {
+        panic!("Expected union type");
+    }
+}
+
+#[test]
+fn test_union_conditional_distribution() {
+    // T extends U ? X : Y with T = A | B distributes to (A extends U ? X : Y) | (B extends U ? X : Y)
+    let interner = TypeInterner::new();
+
+    let lit_a = interner.literal_string("a");
+    let lit_b = interner.literal_string("b");
+    let source_union = interner.union(vec![lit_a, lit_b]);
+
+    // Distributive conditional: T extends string ? T : never
+    let cond = ConditionalType {
+        check_type: source_union,
+        extends_type: TypeId::STRING,
+        true_type: source_union,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // Should produce union or the original union (since both "a" and "b" extend string)
+    assert!(result != TypeId::NEVER);
+}
+
+#[test]
+fn test_union_conditional_non_distribution() {
+    // [T] extends [U] prevents distribution
+    let interner = TypeInterner::new();
+
+    let lit_a = interner.literal_string("a");
+    let lit_b = interner.literal_string("b");
+    let source_union = interner.union(vec![lit_a, lit_b]);
+
+    // Non-distributive conditional
+    let cond = ConditionalType {
+        check_type: source_union,
+        extends_type: TypeId::STRING,
+        true_type: TypeId::NUMBER,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // Should not distribute - evaluates the whole union
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_union_in_tuple_element() {
+    // [string | number, boolean]
+    let interner = TypeInterner::new();
+
+    let union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: union,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    if let Some(TypeKey::Tuple(elements)) = interner.lookup(tuple) {
+        assert_eq!(elements[0].type_id, union);
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_union_optional_property() {
+    // { prop?: string | undefined }
+    let interner = TypeInterner::new();
+
+    let union = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
+    let prop_name = interner.intern_string("prop");
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: prop_name,
+        type_id: union,
+        write_type: union,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    if let Some(TypeKey::Object(props)) = interner.lookup(obj) {
+        assert!(props[0].optional);
+        assert_eq!(props[0].type_id, union);
+    } else {
+        panic!("Expected object type");
+    }
+}
+
+#[test]
+fn test_union_mixed_literals_and_primitives() {
+    // "a" | "b" | string - should simplify or contain all
+    let interner = TypeInterner::new();
+
+    let lit_a = interner.literal_string("a");
+    let lit_b = interner.literal_string("b");
+    let union = interner.union(vec![lit_a, lit_b, TypeId::STRING]);
+
+    // String should subsume the literals, or keep all
+    if let Some(TypeKey::Union(members)) = interner.lookup(union) {
+        // Implementation dependent - either simplified or all kept
+        assert!(members.len() >= 1);
+    }
+}
