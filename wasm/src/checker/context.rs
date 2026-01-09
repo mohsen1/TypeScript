@@ -21,6 +21,8 @@ use crate::binder::SymbolId;
 pub struct EnclosingClassInfo {
     /// Name of the class.
     pub name: String,
+    /// Node index for the class declaration.
+    pub class_idx: NodeIndex,
     /// Member node indices for symbol lookup.
     pub member_nodes: Vec<NodeIndex>,
     /// Whether we're in a constructor (for error 2715 checking).

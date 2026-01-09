@@ -58,6 +58,26 @@ enum EnumKind {
     String,
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+enum MemberAccessLevel {
+    Private,
+    Protected,
+}
+
+#[derive(Clone, Debug)]
+struct MemberAccessInfo {
+    level: MemberAccessLevel,
+    declaring_class_idx: NodeIndex,
+    declaring_class_name: String,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+enum MemberLookup {
+    NotFound,
+    Public,
+    Restricted(MemberAccessLevel),
+}
+
 impl<'a> ThinCheckerState<'a> {
     /// Create a new ThinCheckerState.
     ///
@@ -3888,6 +3908,17 @@ impl<'a> ThinCheckerState<'a> {
         // Evaluate Application types to resolve generic type aliases/interfaces
         let object_type = self.evaluate_application_type(object_type);
 
+        // Enforce private/protected access modifiers when possible
+        if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
+            let property_name = &ident.escaped_text;
+            self.check_property_accessibility(
+                access.expression,
+                property_name,
+                access.name_or_argument,
+                object_type,
+            );
+        }
+
         // Don't report errors for any/error types
         if object_type == TypeId::ANY || object_type == TypeId::ERROR {
             return TypeId::ANY;
@@ -3980,6 +4011,32 @@ impl<'a> ThinCheckerState<'a> {
 
         // Get the type of the object
         let object_type = self.get_type_of_node(access.expression);
+        let object_type = self.evaluate_application_type(object_type);
+
+        let literal_string = self.get_literal_string_from_node(access.name_or_argument)
+            .map(|name| name.to_string());
+        let numeric_string_index = literal_string
+            .as_deref()
+            .and_then(|name| self.get_numeric_index_from_string(name));
+        let literal_index = self.get_literal_index_from_node(access.name_or_argument)
+            .or(numeric_string_index);
+
+        if let Some(name) = literal_string.as_deref() {
+            self.check_property_accessibility(
+                access.expression,
+                name,
+                access.name_or_argument,
+                object_type,
+            );
+        } else if let Some(index) = literal_index {
+            let name = index.to_string();
+            self.check_property_accessibility(
+                access.expression,
+                &name,
+                access.name_or_argument,
+                object_type,
+            );
+        }
 
         // Don't report errors for any/error types
         if object_type == TypeId::ANY || object_type == TypeId::ERROR {
@@ -3998,14 +4055,7 @@ impl<'a> ThinCheckerState<'a> {
         };
 
         let index_type = self.get_type_of_node(access.name_or_argument);
-        let literal_string = self.get_literal_string_from_node(access.name_or_argument)
-            .map(|name| name.to_string());
         let literal_string_is_none = literal_string.is_none();
-        let numeric_string_index = literal_string
-            .as_deref()
-            .and_then(|name| self.get_numeric_index_from_string(name));
-        let literal_index = self.get_literal_index_from_node(access.name_or_argument)
-            .or(numeric_string_index);
 
         let mut result_type = None;
         let mut report_no_index = false;
@@ -5964,6 +6014,16 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    /// Check if a node is a `super` expression.
+    fn is_super_expression(&self, idx: NodeIndex) -> bool {
+        use crate::scanner::SyntaxKind;
+        if let Some(node) = self.ctx.arena.get(idx) {
+            node.kind == SyntaxKind::SuperKeyword as u16
+        } else {
+            false
+        }
+    }
+
     /// Report an argument count mismatch error using solver diagnostics with source tracking.
     pub fn error_argument_count_mismatch_at(
         &mut self,
@@ -6680,11 +6740,176 @@ impl<'a> ThinCheckerState<'a> {
         None
     }
 
-    /// Get the class name from a TypeId if it represents a class instance.
-    fn get_class_name_from_type(&self, _type_id: TypeId) -> Option<String> {
-        // For now, we don't have class types in the solver, so return None
-        // This will be implemented when we add proper class types to the solver
+    fn get_class_declaration_from_symbol(&self, sym_id: SymbolId) -> Option<NodeIndex> {
+        let symbol = self.ctx.binder.get_symbol(sym_id)?;
+        if !symbol.value_declaration.is_none() {
+            let decl_idx = symbol.value_declaration;
+            if let Some(node) = self.ctx.arena.get(decl_idx) {
+                if self.ctx.arena.get_class(node).is_some() {
+                    return Some(decl_idx);
+                }
+            }
+        }
+
+        for &decl_idx in &symbol.declarations {
+            if let Some(node) = self.ctx.arena.get(decl_idx) {
+                if self.ctx.arena.get_class(node).is_some() {
+                    return Some(decl_idx);
+                }
+            }
+        }
+
         None
+    }
+
+    fn get_class_name_from_decl(&self, class_idx: NodeIndex) -> String {
+        let Some(node) = self.ctx.arena.get(class_idx) else {
+            return "<anonymous>".to_string();
+        };
+        let Some(class) = self.ctx.arena.get_class(node) else {
+            return "<anonymous>".to_string();
+        };
+
+        if !class.name.is_none() {
+            if let Some(name_node) = self.ctx.arena.get(class.name) {
+                if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
+                    return ident.escaped_text.clone();
+                }
+            }
+        }
+
+        "<anonymous>".to_string()
+    }
+
+    fn get_base_class_idx(&self, class_idx: NodeIndex) -> Option<NodeIndex> {
+        use crate::scanner::SyntaxKind;
+
+        let node = self.ctx.arena.get(class_idx)?;
+        let class = self.ctx.arena.get_class(node)?;
+        let heritage_clauses = class.heritage_clauses.as_ref()?;
+
+        for &clause_idx in &heritage_clauses.nodes {
+            let clause_node = self.ctx.arena.get(clause_idx)?;
+            let heritage = self.ctx.arena.get_heritage_clause(clause_node)?;
+            if heritage.token != SyntaxKind::ExtendsKeyword as u16 {
+                continue;
+            }
+            let &type_idx = heritage.types.nodes.first()?;
+            let type_node = self.ctx.arena.get(type_idx)?;
+            let expr_idx = if let Some(expr_type_args) = self.ctx.arena.get_expr_type_args(type_node) {
+                expr_type_args.expression
+            } else {
+                type_idx
+            };
+            let base_sym_id = self.resolve_heritage_symbol(expr_idx)?;
+            return self.get_class_declaration_from_symbol(base_sym_id);
+        }
+
+        None
+    }
+
+    fn is_class_derived_from(&self, derived_idx: NodeIndex, base_idx: NodeIndex) -> bool {
+        use rustc_hash::FxHashSet;
+
+        if derived_idx == base_idx {
+            return true;
+        }
+
+        let mut visited: FxHashSet<NodeIndex> = FxHashSet::default();
+        let mut current = derived_idx;
+
+        while visited.insert(current) {
+            let Some(parent) = self.get_base_class_idx(current) else {
+                return false;
+            };
+            if parent == base_idx {
+                return true;
+            }
+            current = parent;
+        }
+
+        false
+    }
+
+    fn get_class_decl_from_type(&self, type_id: TypeId) -> Option<NodeIndex> {
+        use crate::solver::TypeKey;
+
+        fn parse_brand_name(name: &str) -> Option<Result<SymbolId, NodeIndex>> {
+            const NODE_PREFIX: &str = "__private_brand_node_";
+            const PREFIX: &str = "__private_brand_";
+
+            if let Some(rest) = name.strip_prefix(NODE_PREFIX) {
+                let node_id: u32 = rest.parse().ok()?;
+                return Some(Err(NodeIndex(node_id)));
+            }
+            if let Some(rest) = name.strip_prefix(PREFIX) {
+                let sym_id: u32 = rest.parse().ok()?;
+                return Some(Ok(SymbolId(sym_id)));
+            }
+
+            None
+        }
+
+        fn collect_candidates<'a>(
+            checker: &ThinCheckerState<'a>,
+            type_id: TypeId,
+            out: &mut Vec<NodeIndex>,
+        ) {
+            let Some(key) = checker.ctx.types.lookup(type_id) else {
+                return;
+            };
+
+            match key {
+                TypeKey::Object(shape_id) | TypeKey::ObjectWithIndex(shape_id) => {
+                    let shape = checker.ctx.types.object_shape(shape_id);
+                    for prop in &shape.properties {
+                        let name = checker.ctx.types.resolve_atom_ref(prop.name);
+                        if let Some(parsed) = parse_brand_name(&name) {
+                            let class_idx = match parsed {
+                                Ok(sym_id) => checker.get_class_declaration_from_symbol(sym_id),
+                                Err(node_idx) => Some(node_idx),
+                            };
+                            if let Some(class_idx) = class_idx {
+                                out.push(class_idx);
+                            }
+                        }
+                    }
+                }
+                TypeKey::Union(list_id) | TypeKey::Intersection(list_id) => {
+                    let list = checker.ctx.types.type_list(list_id);
+                    for &member in list.iter() {
+                        collect_candidates(checker, member, out);
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        let mut candidates = Vec::new();
+        collect_candidates(self, type_id, &mut candidates);
+        if candidates.is_empty() {
+            return None;
+        }
+        if candidates.len() == 1 {
+            return Some(candidates[0]);
+        }
+
+        for &candidate in &candidates {
+            if candidates
+                .iter()
+                .all(|&other| candidate == other || self.is_class_derived_from(candidate, other))
+            {
+                return Some(candidate);
+            }
+        }
+
+        None
+    }
+
+    /// Get the class name from a TypeId if it represents a class instance.
+    fn get_class_name_from_type(&self, type_id: TypeId) -> Option<String> {
+        self.get_class_decl_from_type(type_id)
+            .map(|class_idx| self.get_class_name_from_decl(class_idx))
     }
 
     /// Check if a property is readonly in a class declaration (by looking at AST).
@@ -7009,6 +7234,7 @@ impl<'a> ThinCheckerState<'a> {
         if let Some(name) = class_name {
             self.ctx.enclosing_class = Some(EnclosingClassInfo {
                 name,
+                class_idx: stmt_idx,
                 member_nodes: class.members.nodes.clone(),
                 in_constructor: false,
                 is_declared,
@@ -7182,6 +7408,250 @@ impl<'a> ThinCheckerState<'a> {
         self.has_private_modifier(modifiers)
             || self.has_protected_modifier(modifiers)
             || self.is_private_identifier_name(name_idx)
+    }
+
+    fn member_access_level_from_modifiers(
+        &self,
+        modifiers: &Option<crate::parser::NodeList>,
+    ) -> Option<MemberAccessLevel> {
+        if self.has_private_modifier(modifiers) {
+            return Some(MemberAccessLevel::Private);
+        }
+        if self.has_protected_modifier(modifiers) {
+            return Some(MemberAccessLevel::Protected);
+        }
+        None
+    }
+
+    fn lookup_member_access_in_class(
+        &self,
+        class_idx: NodeIndex,
+        name: &str,
+        is_static: bool,
+    ) -> MemberLookup {
+        let Some(node) = self.ctx.arena.get(class_idx) else {
+            return MemberLookup::NotFound;
+        };
+        let Some(class) = self.ctx.arena.get_class(node) else {
+            return MemberLookup::NotFound;
+        };
+
+        for &member_idx in &class.members.nodes {
+            let Some(member_node) = self.ctx.arena.get(member_idx) else {
+                continue;
+            };
+
+            match member_node.kind {
+                k if k == syntax_kind_ext::PROPERTY_DECLARATION => {
+                    let Some(prop) = self.ctx.arena.get_property_decl(member_node) else {
+                        continue;
+                    };
+                    if self.has_static_modifier(&prop.modifiers) != is_static {
+                        continue;
+                    }
+                    let Some(prop_name) = self.get_property_name(prop.name) else {
+                        continue;
+                    };
+                    if prop_name == name {
+                        return match self.member_access_level_from_modifiers(&prop.modifiers) {
+                            Some(level) => MemberLookup::Restricted(level),
+                            None => MemberLookup::Public,
+                        };
+                    }
+                }
+                k if k == syntax_kind_ext::METHOD_DECLARATION => {
+                    let Some(method) = self.ctx.arena.get_method_decl(member_node) else {
+                        continue;
+                    };
+                    if self.has_static_modifier(&method.modifiers) != is_static {
+                        continue;
+                    }
+                    let Some(method_name) = self.get_property_name(method.name) else {
+                        continue;
+                    };
+                    if method_name == name {
+                        return match self.member_access_level_from_modifiers(&method.modifiers) {
+                            Some(level) => MemberLookup::Restricted(level),
+                            None => MemberLookup::Public,
+                        };
+                    }
+                }
+                k if k == syntax_kind_ext::GET_ACCESSOR || k == syntax_kind_ext::SET_ACCESSOR => {
+                    let Some(accessor) = self.ctx.arena.get_accessor(member_node) else {
+                        continue;
+                    };
+                    if self.has_static_modifier(&accessor.modifiers) != is_static {
+                        continue;
+                    }
+                    let Some(accessor_name) = self.get_property_name(accessor.name) else {
+                        continue;
+                    };
+                    if accessor_name == name {
+                        return match self.member_access_level_from_modifiers(&accessor.modifiers) {
+                            Some(level) => MemberLookup::Restricted(level),
+                            None => MemberLookup::Public,
+                        };
+                    }
+                }
+                k if k == syntax_kind_ext::CONSTRUCTOR => {
+                    if is_static {
+                        continue;
+                    }
+                    let Some(ctor) = self.ctx.arena.get_constructor(member_node) else {
+                        continue;
+                    };
+                    if ctor.body.is_none() {
+                        continue;
+                    }
+                    for &param_idx in &ctor.parameters.nodes {
+                        let Some(param_node) = self.ctx.arena.get(param_idx) else {
+                            continue;
+                        };
+                        let Some(param) = self.ctx.arena.get_parameter(param_node) else {
+                            continue;
+                        };
+                        if !self.has_parameter_property_modifier(&param.modifiers) {
+                            continue;
+                        }
+                        let Some(param_name) = self.get_property_name(param.name) else {
+                            continue;
+                        };
+                        if param_name == name {
+                            return match self.member_access_level_from_modifiers(&param.modifiers) {
+                                Some(level) => MemberLookup::Restricted(level),
+                                None => MemberLookup::Public,
+                            };
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        MemberLookup::NotFound
+    }
+
+    fn find_member_access_info(
+        &self,
+        class_idx: NodeIndex,
+        name: &str,
+        is_static: bool,
+    ) -> Option<MemberAccessInfo> {
+        use rustc_hash::FxHashSet;
+
+        let mut current = class_idx;
+        let mut visited: FxHashSet<NodeIndex> = FxHashSet::default();
+
+        while visited.insert(current) {
+            match self.lookup_member_access_in_class(current, name, is_static) {
+                MemberLookup::Restricted(level) => {
+                    return Some(MemberAccessInfo {
+                        level,
+                        declaring_class_idx: current,
+                        declaring_class_name: self.get_class_name_from_decl(current),
+                    });
+                }
+                MemberLookup::Public => return None,
+                MemberLookup::NotFound => {
+                    let Some(base_idx) = self.get_base_class_idx(current) else {
+                        return None;
+                    };
+                    current = base_idx;
+                }
+            }
+        }
+
+        None
+    }
+
+    fn resolve_class_for_access(
+        &mut self,
+        expr_idx: NodeIndex,
+        object_type: TypeId,
+    ) -> Option<(NodeIndex, bool)> {
+        if self.is_this_expression(expr_idx) {
+            if let Some(ref class_info) = self.ctx.enclosing_class {
+                return Some((class_info.class_idx, false));
+            }
+        }
+
+        if self.is_super_expression(expr_idx) {
+            if let Some(ref class_info) = self.ctx.enclosing_class {
+                if let Some(base_idx) = self.get_base_class_idx(class_info.class_idx) {
+                    return Some((base_idx, false));
+                }
+            }
+        }
+
+        if let Some(sym_id) = self.resolve_identifier_symbol(expr_idx) {
+            if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
+                if symbol.flags & symbol_flags::CLASS != 0 {
+                    if let Some(class_idx) = self.get_class_declaration_from_symbol(sym_id) {
+                        return Some((class_idx, true));
+                    }
+                }
+            }
+        }
+
+        if object_type != TypeId::ANY && object_type != TypeId::ERROR {
+            if let Some(class_idx) = self.get_class_decl_from_type(object_type) {
+                return Some((class_idx, false));
+            }
+        }
+
+        None
+    }
+
+    fn check_property_accessibility(
+        &mut self,
+        object_expr: NodeIndex,
+        property_name: &str,
+        error_node: NodeIndex,
+        object_type: TypeId,
+    ) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+
+        let Some((class_idx, is_static)) =
+            self.resolve_class_for_access(object_expr, object_type) else {
+                return;
+            };
+        let Some(access_info) =
+            self.find_member_access_info(class_idx, property_name, is_static) else {
+                return;
+            };
+
+        let current_class_idx = self.ctx.enclosing_class.as_ref().map(|info| info.class_idx);
+        let allowed = match access_info.level {
+            MemberAccessLevel::Private => {
+                current_class_idx == Some(access_info.declaring_class_idx)
+            }
+            MemberAccessLevel::Protected => {
+                current_class_idx
+                    .map(|current| self.is_class_derived_from(current, access_info.declaring_class_idx))
+                    .unwrap_or(false)
+            }
+        };
+
+        if allowed {
+            return;
+        }
+
+        match access_info.level {
+            MemberAccessLevel::Private => {
+                let message = format!(
+                    "Property '{}' is private and only accessible within class '{}'.",
+                    property_name, access_info.declaring_class_name
+                );
+                self.error_at_node(error_node, &message, diagnostic_codes::PROPERTY_IS_PRIVATE);
+            }
+            MemberAccessLevel::Protected => {
+                let message = format!(
+                    "Property '{}' is protected and only accessible within class '{}' and its subclasses.",
+                    property_name, access_info.declaring_class_name
+                );
+                self.error_at_node(error_node, &message, diagnostic_codes::PROPERTY_IS_PROTECTED);
+            }
+        }
     }
 
     /// Get the const modifier node from a list of modifiers, if present.
