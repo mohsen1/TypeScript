@@ -8862,3 +8862,187 @@ fn test_async_do_while_loop_conditional() {
         output
     );
 }
+
+// ============================================================================
+// ASYNC SWITCH STATEMENT PATTERN TESTS
+// ============================================================================
+
+fn parse_and_emit_async_switch_statement(source: &str) -> String {
+    use crate::parser::syntax_kind_ext;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            for &stmt_idx in &source_file.statements.nodes {
+                if let Some(stmt_node) = parser.arena.get(stmt_idx) {
+                    if stmt_node.kind == syntax_kind_ext::FUNCTION_DECLARATION {
+                        if let Some(func_data) = parser.arena.get_function(stmt_node) {
+                            let emitter = AsyncES5Emitter::new(&parser.arena);
+                            let has_await = emitter.body_contains_await(func_data.body);
+                            let mut emitter = AsyncES5Emitter::new(&parser.arena);
+                            if has_await {
+                                return emitter.emit_generator_body_with_await(func_data.body);
+                            } else {
+                                return emitter.emit_simple_generator_body(func_data.body);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    String::new()
+}
+
+fn async_switch_statement_contains_await(source: &str) -> bool {
+    use crate::parser::syntax_kind_ext;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            for &stmt_idx in &source_file.statements.nodes {
+                if let Some(stmt_node) = parser.arena.get(stmt_idx) {
+                    if stmt_node.kind == syntax_kind_ext::FUNCTION_DECLARATION {
+                        if let Some(func_data) = parser.arena.get_function(stmt_node) {
+                            let emitter = AsyncES5Emitter::new(&parser.arena);
+                            return emitter.body_contains_await(func_data.body);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
+#[test]
+fn test_async_switch_statement_basic() {
+    let output = parse_and_emit_async_switch_statement(
+        "async function foo(x: number) { switch (x) { case 1: await doOne(); break; case 2: await doTwo(); break; } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Async switch statement should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_switch_statement_with_default() {
+    let output = parse_and_emit_async_switch_statement(
+        "async function foo(x: number) { switch (x) { case 1: await doOne(); break; default: await doDefault(); } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Async switch with default should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_switch_statement_no_await() {
+    let output = parse_and_emit_async_switch_statement(
+        "async function foo(x: number) { switch (x) { case 1: console.log('one'); break; case 2: console.log('two'); break; } }",
+    );
+    assert!(
+        output.contains("[2 /*return*/]"),
+        "Async switch without await should have simple return: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_switch_statement_body_contains_await() {
+    let result = async_switch_statement_contains_await(
+        "async function foo(x: number) { switch (x) { case 1: await process(); break; } }",
+    );
+    assert!(result, "Should detect await in switch case");
+}
+
+#[test]
+fn test_async_switch_statement_body_no_await() {
+    let result = async_switch_statement_contains_await(
+        "async function foo(x: number) { switch (x) { case 1: console.log('one'); break; } }",
+    );
+    assert!(!result, "Should not detect await when switch has no await");
+}
+
+#[test]
+fn test_async_switch_statement_ignores_nested_async() {
+    let result = async_switch_statement_contains_await(
+        "async function foo(x: number) { switch (x) { case 1: const inner = async () => { await y; }; break; } }",
+    );
+    assert!(!result, "Should not detect await inside nested async in switch");
+}
+
+#[test]
+fn test_async_switch_statement_fallthrough() {
+    let output = parse_and_emit_async_switch_statement(
+        "async function foo(x: number) { switch (x) { case 1: case 2: await doOneOrTwo(); break; case 3: await doThree(); break; } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Async switch with fallthrough should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_switch_statement_discriminant_await() {
+    let output = parse_and_emit_async_switch_statement(
+        "async function foo() { switch (await getValue()) { case 1: doOne(); break; case 2: doTwo(); break; } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Async switch with await discriminant should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_switch_statement_multiple_cases() {
+    let output = parse_and_emit_async_switch_statement(
+        "async function foo(x: number) { switch (x) { case 1: await a(); break; case 2: await b(); break; case 3: await c(); break; default: await d(); } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Async switch with multiple cases should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_switch_statement_nested() {
+    let output = parse_and_emit_async_switch_statement(
+        "async function foo(x: number, y: number) { switch (x) { case 1: switch (y) { case 1: await process(); break; } break; } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Nested async switch should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_switch_statement_with_try_catch() {
+    let output = parse_and_emit_async_switch_statement(
+        "async function foo(x: number) { switch (x) { case 1: try { await process(); } catch (e) { console.error(e); } break; } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Async switch with try/catch should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_switch_statement_with_return() {
+    let output = parse_and_emit_async_switch_statement(
+        "async function foo(x: number) { switch (x) { case 1: return await getOne(); case 2: return await getTwo(); default: return await getDefault(); } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Async switch with return should have switch or yield: {}",
+        output
+    );
+}
