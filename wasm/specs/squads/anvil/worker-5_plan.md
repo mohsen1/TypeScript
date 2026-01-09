@@ -7,13 +7,14 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-(Awaiting new assignment from EM-Anvil)
+(Completed - awaiting new assignment)
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)
 
 
 ## Completed
+- [x] Fixed TS2355 false positives for throw-only functions. Added `falls_through` check to TS2355 condition for functions, methods, and getters. Functions that only throw no longer incorrectly trigger "must return a value". Added tests `test_throw_only_function_no_2355` and `test_infinite_loop_no_2355`. Commit: `3eea80b3d93`.
 - [x] Added block scoping tests for loop var collection and closure capture in `wasm/src/transforms/block_scoping_es5_tests.rs`; wired test module in `wasm/src/transforms/block_scoping_es5.rs`; `./wasm/test.sh block_scoping_es5_tests` failed (Docker socket EOF).
 - [x] Added await detection for array/object literal elements (computed names, spreads) in `wasm/src/transforms/async_es5.rs`; added computed object literal await test in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (PASS).
 - [x] Added computed-name async method expression test in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (PASS).
@@ -185,11 +186,11 @@ Yes
 
 ## Resume Notes
 - Branch: `worker/anvil-5`
-- Last commit: `463cb7a181a` (`[wasm] transforms: add block scoping tests`)
-- New tests added: `wasm/src/transforms/block_scoping_es5_tests.rs` (loop var collection + closure capture)
-- Test status: `./wasm/test.sh block_scoping_es5_tests` failed to start because Docker socket EOF (`/Users/mohsenazimi/.orbstack/run/docker.sock`)
-- Worktree note: `wasm/src/transforms/async_es5_tests.rs` is modified but NOT part of the last commit; decide whether to stash/revert/commit before new work
-- Next step when resuming: fix Docker connectivity, rerun `./wasm/test.sh block_scoping_es5_tests`, then update plan with results
+- Last commit: `3eea80b3d93` (`[wasm] checker: fix TS2355 false positives for throw-only functions`)
+- Docker: working
+- Tests: `./wasm/test.sh throw_only` and `./wasm/test.sh infinite_loop` both PASS
+- Stashed work: `enum_es5_tests.rs` was stashed (incomplete) when new assignment arrived
+- Next step: awaiting new assignment from EM
 
 ## TS2769 Overload Resolution Work (Latest)
 
