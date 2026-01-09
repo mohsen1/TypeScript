@@ -6,27 +6,13 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-Add ES5 class tests for Proxy/Reflect patterns
-
-Per GOALS.md Objective 1: ES5 downleveling correctness
-
-Steps:
-1. Add 6 ES5 class tests for Proxy/Reflect patterns to `wasm/src/transforms/class_es5_tests.rs`:
-   - Basic Proxy handler
-   - Proxy with Reflect.get/set
-   - Revocable Proxy
-   - Proxy class wrapper
-   - Reflect.construct pattern
-   - Combined Proxy/Reflect patterns
-2. Run `./wasm/test.sh class_es5_tests` to verify all tests pass
-3. Commit with message: `[wasm] transforms: add Proxy/Reflect ES5 class tests`
-4. Push to `origin/worker/anvil-1`
-5. Update this plan file and push
+(awaiting assignment)
 
 ## Task Queue
 (empty)
 
 ## Completed
+- [x] Added ES5 tests for Proxy/Reflect patterns (6 tests): basic handler, Reflect.get/set, revocable access control, class instance wrapper, Reflect.construct with prototype, combined observable pattern. Ran `./wasm/test.sh class_es5_tests` (all 518 pass).
 - [x] Added ES5 tests for Symbol.species patterns (6 tests): basic getter, inheritance chain, custom constructor, Array subclass, Promise subclass, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 512 pass).
 - [x] Added ES5 tests for auto-accessor decorator patterns (6 tests): basic decorator, static decorator, multiple decorators, derived class, with initializer, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 500 pass).
 - [x] Added ES5 tests for static block initialization (6 tests): basic init, private field access, multiple blocks ordering, super reference, computed properties, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 488 pass).
