@@ -7,12 +7,13 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- [ ] Add ES5 parity tests for async/await complex patterns: async with try/finally, async with Promise.all destructure, async IIFE, nested async arrows. Tests: `./wasm/test.sh emitter_parity`
+(awaiting assignment)
 
 ## Task Queue
 (empty)
 
 ## Completed
+- [x] Added ES5 async/await complex patterns parity tests (try-finally, promise-all-destructure, iife, nested-arrows) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (257 tests).
 - [x] Added ES5 arrow function parameter pattern parity tests (typed-params-inference, defaults-complex, rest-tuple, generic, nested-destructuring, arrow-returning-arrow) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (253 tests).
 - [x] Added ES5 destructuring parity tests (object-typed, array-tuple, nested-deep, defaults-typed, rest-typed) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (247 tests).
 - [x] Added ES5 array spread parity tests (literal-typed, function-call, new-expression, mixed-complex) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (242 tests).

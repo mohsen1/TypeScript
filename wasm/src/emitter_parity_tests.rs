@@ -9824,6 +9824,301 @@ class AsyncDataFetcher extends DataFetcher {
     );
 }
 
+/// Parity test for ES5 async with try/finally.
+/// Async function with try/finally should downlevel properly.
+#[test]
+fn test_parity_es5_async_try_finally() {
+    let source = r#"
+interface Resource { close(): void }
+async function withResource<T>(resource: Resource, fn: () => Promise<T>): Promise<T> {
+    try {
+        return await fn();
+    } finally {
+        resource.close();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify function is emitted
+    assert!(
+        output.contains("function") && output.contains("withResource"),
+        "ES5 output should contain withResource function: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface"),
+        "ES5 output should erase interface: {}",
+        output
+    );
+    // Generic type parameters should be erased
+    assert!(
+        !output.contains("<T>"),
+        "ES5 output should erase generic type parameters: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": Resource") && !output.contains("Promise<T>"),
+        "ES5 output should erase type annotations: {}",
+        output
+    );
+    // try/finally structure should be preserved
+    assert!(
+        output.contains("try") && output.contains("finally"),
+        "ES5 output should preserve try/finally structure: {}",
+        output
+    );
+    // No async keyword in ES5
+    assert!(
+        !output.contains("async function"),
+        "ES5 output should not contain async keyword: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 async with Promise.all destructuring.
+/// Async function with Promise.all and destructuring assignment.
+#[test]
+fn test_parity_es5_async_promise_all_destructure() {
+    let source = r#"
+interface User { id: number; name: string }
+interface Order { orderId: string; total: number }
+async function fetchUserAndOrders(userId: number): Promise<[User, Order[]]> {
+    const [user, orders] = await Promise.all([
+        fetchUser(userId),
+        fetchOrders(userId)
+    ]);
+    return [user, orders];
+}
+declare function fetchUser(id: number): Promise<User>;
+declare function fetchOrders(id: number): Promise<Order[]>;
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify function is emitted
+    assert!(
+        output.contains("function") && output.contains("fetchUserAndOrders"),
+        "ES5 output should contain fetchUserAndOrders function: {}",
+        output
+    );
+    // Interfaces should be erased
+    assert!(
+        !output.contains("interface"),
+        "ES5 output should erase interfaces: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number") && !output.contains(": string"),
+        "ES5 output should erase type annotations: {}",
+        output
+    );
+    assert!(
+        !output.contains("Promise<[User, Order[]]>"),
+        "ES5 output should erase return type: {}",
+        output
+    );
+    // Promise.all should be preserved
+    assert!(
+        output.contains("Promise.all"),
+        "ES5 output should preserve Promise.all: {}",
+        output
+    );
+    // Declare functions should be erased
+    assert!(
+        !output.contains("declare"),
+        "ES5 output should erase declare statements: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 async IIFE (Immediately Invoked Function Expression).
+/// Async IIFE should downlevel to non-async IIFE with __awaiter.
+#[test]
+fn test_parity_es5_async_iife() {
+    let source = r#"
+type Config = { apiUrl: string; timeout: number };
+const result = (async (): Promise<Config> => {
+    const response = await fetch("/config");
+    return response.json();
+})();
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify function is emitted
+    assert!(
+        output.contains("function"),
+        "ES5 output should contain function keyword: {}",
+        output
+    );
+    // Type alias should be erased
+    assert!(
+        !output.contains("type Config"),
+        "ES5 output should erase type alias: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains("Promise<Config>"),
+        "ES5 output should erase return type: {}",
+        output
+    );
+    // No async keyword in ES5
+    assert!(
+        !output.contains("async"),
+        "ES5 output should not contain async keyword: {}",
+        output
+    );
+    // No arrow syntax
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should not contain arrow syntax: {}",
+        output
+    );
+    // Fetch call should be preserved
+    assert!(
+        output.contains("fetch"),
+        "ES5 output should preserve fetch call: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 nested async arrows.
+/// Multiple levels of nested async arrow functions.
+#[test]
+fn test_parity_es5_async_nested_arrows() {
+    let source = r#"
+interface Data { value: number }
+const outer = async (x: number): Promise<(y: number) => Promise<Data>> => {
+    const inner = async (y: number): Promise<Data> => {
+        const result = await process(x + y);
+        return { value: result };
+    };
+    return inner;
+};
+declare function process(n: number): Promise<number>;
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify function is emitted (should have multiple functions for outer and inner)
+    assert!(
+        output.contains("function"),
+        "ES5 output should contain function keyword: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface"),
+        "ES5 output should erase interface: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number") && !output.contains(": Promise"),
+        "ES5 output should erase type annotations: {}",
+        output
+    );
+    assert!(
+        !output.contains(": Data"),
+        "ES5 output should erase Data type annotation: {}",
+        output
+    );
+    // No async keyword in ES5
+    assert!(
+        !output.contains("async"),
+        "ES5 output should not contain async keyword: {}",
+        output
+    );
+    // No arrow syntax
+    assert!(
+        !output.contains("=>"),
+        "ES5 output should not contain arrow syntax: {}",
+        output
+    );
+    // Declare function should be erased
+    assert!(
+        !output.contains("declare"),
+        "ES5 output should erase declare statements: {}",
+        output
+    );
+    // Variable names should be preserved
+    assert!(
+        output.contains("outer") && output.contains("inner"),
+        "ES5 output should preserve variable names: {}",
+        output
+    );
+}
+
 // ============================================================================
 // ES5 PRIVATE FIELD ACCESSOR PARITY TESTS
 // ============================================================================
