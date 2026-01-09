@@ -334,7 +334,7 @@ pub struct CallSignature {
 ///   (x: number): string;
 /// }
 /// ```
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
 pub struct CallableShape {
     /// Call signatures (order matters for overload resolution)
     pub call_signatures: Vec<CallSignature>,
@@ -342,6 +342,10 @@ pub struct CallableShape {
     pub construct_signatures: Vec<CallSignature>,
     /// Optional properties on the callable (e.g., Function.prototype)
     pub properties: Vec<PropertyInfo>,
+    /// String index signature (for static index signatures on classes)
+    pub string_index: Option<IndexSignature>,
+    /// Number index signature (for static index signatures on classes)
+    pub number_index: Option<IndexSignature>,
 }
 
 /// Parameter information

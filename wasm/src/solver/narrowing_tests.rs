@@ -707,7 +707,7 @@ fn test_narrow_by_typeof_function_includes_callable() {
         call_signatures: vec![sig],
         construct_signatures: vec![],
         properties: vec![],
-    });
+    ..Default::default() });
     let union = interner.union(vec![callable, TypeId::NUMBER]);
 
     let narrowed = narrow_by_typeof(&interner, union, "function");
