@@ -7,12 +7,13 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- [ ] Add arrow function source map tests in `wasm/src/source_map_tests.rs`. Run `./wasm/test.sh source_map`.
+(none)
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added arrow function source map tests (no params, single param, default params, rest params, destructuring params, class property, IIFE, object return, higher-order, combined); `./wasm/test.sh source_map` passes.
 - [x] Added import/export source map tests (named imports, default imports, namespace imports, named exports, default exports, export from, import with alias, type-only imports, side-effect imports, combined); `./wasm/test.sh source_map` passes.
 - [x] Added class expression source map tests (named, with extends, static methods, accessors, in function, with constructor, computed props, in array, in IIFE, combined); `./wasm/test.sh source_map` passes.
 - [x] Added enum transform source map tests (const enums, with initializers, member references, in namespaces, merged enums, reverse mappings, heterogeneous enums, in classes, in switch statements, combined); `./wasm/test.sh source_map` passes.
