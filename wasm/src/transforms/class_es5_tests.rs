@@ -33427,3 +33427,648 @@ class ArrayProcessor<T extends any[]> {
         output
     );
 }
+
+// ============================================================================
+// MODULE AUGMENTATION PATTERN TESTS
+// ============================================================================
+
+/// Test module augmentation patterns: basic declare module
+#[test]
+fn test_class_es5_module_augmentation_basic() {
+    let source = r#"
+declare module "external-lib" {
+    export interface ExternalConfig {
+        timeout: number;
+        retries: number;
+    }
+
+    export function configure(config: ExternalConfig): void;
+}
+
+class ConfigManager {
+    private config: { timeout: number; retries: number };
+
+    constructor() {
+        this.config = { timeout: 5000, retries: 3 };
+    }
+
+    getTimeout(): number {
+        return this.config.timeout;
+    }
+
+    setRetries(retries: number): void {
+        this.config.retries = retries;
+    }
+}
+
+class ServiceWrapper {
+    private manager: ConfigManager;
+
+    constructor() {
+        this.manager = new ConfigManager();
+    }
+
+    configure(timeout: number, retries: number): void {
+        this.manager.setRetries(retries);
+    }
+
+    getConfig(): { timeout: number; retries: number } {
+        return { timeout: this.manager.getTimeout(), retries: 3 };
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted to ES5
+    assert!(
+        output.contains("function ConfigManager") && output.contains("function ServiceWrapper"),
+        "Expected ES5 class constructors: {}",
+        output
+    );
+
+    // Methods should be on prototype
+    assert!(
+        output.contains("ConfigManager.prototype.getTimeout") &&
+        output.contains("ServiceWrapper.prototype.configure"),
+        "Expected methods on prototype: {}",
+        output
+    );
+}
+
+/// Test module augmentation patterns: interface augmentation
+#[test]
+fn test_class_es5_module_augmentation_interface() {
+    let source = r#"
+interface Window {
+    customProperty: string;
+}
+
+interface Array<T> {
+    customMethod(): T[];
+}
+
+declare global {
+    interface String {
+        toTitleCase(): string;
+    }
+}
+
+class WindowHelper {
+    setCustomProperty(value: string): void {
+        (window as any).customProperty = value;
+    }
+
+    getCustomProperty(): string {
+        return (window as any).customProperty || "";
+    }
+}
+
+class ArrayUtils {
+    processArray<T>(arr: T[]): T[] {
+        return arr.slice();
+    }
+
+    mapArray<T, U>(arr: T[], fn: (item: T) => U): U[] {
+        return arr.map(fn);
+    }
+}
+
+class StringProcessor {
+    process(input: string): string {
+        return input.trim();
+    }
+
+    split(input: string, separator: string): string[] {
+        return input.split(separator);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("function WindowHelper") &&
+        output.contains("function ArrayUtils") &&
+        output.contains("function StringProcessor"),
+        "Expected ES5 class constructors: {}",
+        output
+    );
+
+    // Methods preserved
+    assert!(
+        output.contains("setCustomProperty") && output.contains("processArray"),
+        "Expected helper methods: {}",
+        output
+    );
+}
+
+/// Test module augmentation patterns: global augmentation
+#[test]
+fn test_class_es5_module_augmentation_global() {
+    let source = r#"
+declare global {
+    interface Window {
+        appVersion: string;
+        debugMode: boolean;
+    }
+
+    var globalConfig: {
+        apiUrl: string;
+        timeout: number;
+    };
+}
+
+class AppInitializer {
+    private version: string;
+
+    constructor(version: string) {
+        this.version = version;
+    }
+
+    initialize(): void {
+        if (typeof window !== "undefined") {
+            (window as any).appVersion = this.version;
+        }
+    }
+
+    setDebugMode(enabled: boolean): void {
+        if (typeof window !== "undefined") {
+            (window as any).debugMode = enabled;
+        }
+    }
+}
+
+class GlobalConfigManager {
+    private apiUrl: string;
+    private timeout: number;
+
+    constructor(apiUrl: string, timeout: number) {
+        this.apiUrl = apiUrl;
+        this.timeout = timeout;
+    }
+
+    applyGlobal(): void {
+        (globalThis as any).globalConfig = {
+            apiUrl: this.apiUrl,
+            timeout: this.timeout
+        };
+    }
+
+    getConfig(): { apiUrl: string; timeout: number } {
+        return { apiUrl: this.apiUrl, timeout: this.timeout };
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("function AppInitializer") && output.contains("function GlobalConfigManager"),
+        "Expected ES5 class constructors: {}",
+        output
+    );
+
+    // Methods preserved
+    assert!(
+        output.contains("initialize") && output.contains("setDebugMode") && output.contains("applyGlobal"),
+        "Expected initialization methods: {}",
+        output
+    );
+
+    // typeof check preserved
+    assert!(
+        output.contains("typeof"),
+        "Expected typeof check: {}",
+        output
+    );
+}
+
+/// Test module augmentation patterns: namespace augmentation
+#[test]
+fn test_class_es5_module_augmentation_namespace() {
+    let source = r#"
+namespace MyApp {
+    export interface User {
+        id: number;
+        name: string;
+    }
+
+    export class UserService {
+        private users: User[] = [];
+
+        addUser(user: User): void {
+            this.users.push(user);
+        }
+
+        getUser(id: number): User | undefined {
+            return this.users.find(u => u.id === id);
+        }
+    }
+}
+
+namespace MyApp {
+    export interface Admin extends User {
+        permissions: string[];
+    }
+
+    export class AdminService extends UserService {
+        private admins: Admin[] = [];
+
+        addAdmin(admin: Admin): void {
+            this.addUser(admin);
+            this.admins.push(admin);
+        }
+
+        getAdmin(id: number): Admin | undefined {
+            return this.admins.find(a => a.id === id);
+        }
+    }
+}
+
+class AppController {
+    private userService: MyApp.UserService;
+    private adminService: MyApp.AdminService;
+
+    constructor() {
+        this.userService = new MyApp.UserService();
+        this.adminService = new MyApp.AdminService();
+    }
+
+    createUser(id: number, name: string): void {
+        this.userService.addUser({ id, name });
+    }
+
+    createAdmin(id: number, name: string, permissions: string[]): void {
+        this.adminService.addAdmin({ id, name, permissions });
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted (including namespace classes)
+    assert!(
+        output.contains("UserService") && output.contains("AdminService") && output.contains("function AppController"),
+        "Expected ES5 class constructors: {}",
+        output
+    );
+
+    // MyApp namespace should exist
+    assert!(
+        output.contains("MyApp"),
+        "Expected MyApp namespace: {}",
+        output
+    );
+
+    // Methods preserved
+    assert!(
+        output.contains("addUser") && output.contains("getUser"),
+        "Expected service methods: {}",
+        output
+    );
+}
+
+/// Test module augmentation patterns: class augmentation with declare module
+#[test]
+fn test_class_es5_module_augmentation_class() {
+    let source = r#"
+declare module "express" {
+    interface Request {
+        user?: { id: string; role: string };
+    }
+
+    interface Response {
+        success(data: unknown): void;
+        error(message: string): void;
+    }
+}
+
+class RequestHandler {
+    private userId: string | null = null;
+    private role: string | null = null;
+
+    setUser(id: string, role: string): void {
+        this.userId = id;
+        this.role = role;
+    }
+
+    getUserId(): string | null {
+        return this.userId;
+    }
+
+    getRole(): string | null {
+        return this.role;
+    }
+
+    isAdmin(): boolean {
+        return this.role === "admin";
+    }
+}
+
+class ResponseBuilder {
+    private data: unknown = null;
+    private errorMessage: string | null = null;
+
+    setData(data: unknown): this {
+        this.data = data;
+        return this;
+    }
+
+    setError(message: string): this {
+        this.errorMessage = message;
+        return this;
+    }
+
+    build(): { success: boolean; data?: unknown; error?: string } {
+        if (this.errorMessage) {
+            return { success: false, error: this.errorMessage };
+        }
+        return { success: true, data: this.data };
+    }
+}
+
+class MiddlewareHandler {
+    private handlers: ((req: unknown, res: unknown, next: () => void) => void)[] = [];
+
+    use(handler: (req: unknown, res: unknown, next: () => void) => void): void {
+        this.handlers.push(handler);
+    }
+
+    execute(req: unknown, res: unknown): void {
+        let index = 0;
+        const next = () => {
+            if (index < this.handlers.length) {
+                this.handlers[index++](req, res, next);
+            }
+        };
+        next();
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("function RequestHandler") &&
+        output.contains("function ResponseBuilder") &&
+        output.contains("function MiddlewareHandler"),
+        "Expected ES5 class constructors: {}",
+        output
+    );
+
+    // Methods preserved
+    assert!(
+        output.contains("setUser") && output.contains("getUserId") && output.contains("isAdmin"),
+        "Expected RequestHandler methods: {}",
+        output
+    );
+
+    // Builder pattern preserved
+    assert!(
+        output.contains("setData") && output.contains("setError") && output.contains("build"),
+        "Expected ResponseBuilder methods: {}",
+        output
+    );
+
+    // Middleware methods
+    assert!(
+        output.contains("use") && output.contains("execute"),
+        "Expected MiddlewareHandler methods: {}",
+        output
+    );
+}
+
+/// Test module augmentation patterns: combined module augmentation patterns
+#[test]
+fn test_class_es5_module_augmentation_combined() {
+    let source = r#"
+declare module "lodash" {
+    export function merge<T, U>(obj1: T, obj2: U): T & U;
+    export function clone<T>(value: T): T;
+}
+
+declare global {
+    interface ObjectConstructor {
+        deepMerge<T, U>(target: T, source: U): T & U;
+    }
+
+    namespace NodeJS {
+        interface ProcessEnv {
+            NODE_ENV: "development" | "production" | "test";
+            API_KEY?: string;
+        }
+    }
+}
+
+namespace Utils {
+    export class ObjectHelper {
+        merge<T extends object, U extends object>(target: T, source: U): T & U {
+            return Object.assign({}, target, source) as T & U;
+        }
+
+        clone<T extends object>(obj: T): T {
+            return Object.assign({}, obj);
+        }
+
+        deepClone<T>(obj: T): T {
+            return JSON.parse(JSON.stringify(obj));
+        }
+    }
+
+    export class EnvHelper {
+        private env: Record<string, string | undefined>;
+
+        constructor() {
+            this.env = typeof process !== "undefined" ? process.env as Record<string, string | undefined> : {};
+        }
+
+        get(key: string): string | undefined {
+            return this.env[key];
+        }
+
+        getOrDefault(key: string, defaultValue: string): string {
+            return this.env[key] || defaultValue;
+        }
+
+        isDevelopment(): boolean {
+            return this.get("NODE_ENV") === "development";
+        }
+
+        isProduction(): boolean {
+            return this.get("NODE_ENV") === "production";
+        }
+    }
+}
+
+class ApplicationConfig {
+    private objectHelper: Utils.ObjectHelper;
+    private envHelper: Utils.EnvHelper;
+
+    constructor() {
+        this.objectHelper = new Utils.ObjectHelper();
+        this.envHelper = new Utils.EnvHelper();
+    }
+
+    mergeConfig<T extends object, U extends object>(base: T, override: U): T & U {
+        return this.objectHelper.merge(base, override);
+    }
+
+    getEnv(key: string): string | undefined {
+        return this.envHelper.get(key);
+    }
+
+    getApiKey(): string {
+        return this.envHelper.getOrDefault("API_KEY", "default-key");
+    }
+}
+
+class ConfigLoader {
+    private config: Record<string, unknown> = {};
+
+    load(data: Record<string, unknown>): void {
+        this.config = { ...this.config, ...data };
+    }
+
+    get<T>(key: string): T | undefined {
+        return this.config[key] as T | undefined;
+    }
+
+    getAll(): Record<string, unknown> {
+        return { ...this.config };
+    }
+
+    clear(): void {
+        this.config = {};
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // All classes should be converted
+    assert!(
+        output.contains("ObjectHelper") &&
+        output.contains("EnvHelper") &&
+        output.contains("function ApplicationConfig") &&
+        output.contains("function ConfigLoader"),
+        "Expected ES5 class constructors: {}",
+        output
+    );
+
+    // Utils namespace should exist
+    assert!(
+        output.contains("Utils"),
+        "Expected Utils namespace: {}",
+        output
+    );
+
+    // ObjectHelper methods
+    assert!(
+        output.contains("merge") && output.contains("clone") && output.contains("deepClone"),
+        "Expected ObjectHelper methods: {}",
+        output
+    );
+
+    // EnvHelper methods
+    assert!(
+        output.contains("isDevelopment") && output.contains("isProduction"),
+        "Expected EnvHelper methods: {}",
+        output
+    );
+
+    // ConfigLoader methods
+    assert!(
+        output.contains("load") && output.contains("getAll") && output.contains("clear"),
+        "Expected ConfigLoader methods: {}",
+        output
+    );
+
+    // Object.assign preserved
+    assert!(
+        output.contains("Object.assign"),
+        "Expected Object.assign: {}",
+        output
+    );
+}
