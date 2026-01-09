@@ -15681,3 +15681,411 @@ class ReflectUtilities {
         output
     );
 }
+
+#[test]
+fn test_class_es5_number_isfinite_basic() {
+    // Basic Number.isFinite usage
+    let source = r#"
+class FiniteChecker {
+    isFinite(value: unknown): boolean {
+        return Number.isFinite(value);
+    }
+
+    filterFinite(values: unknown[]): number[] {
+        return values.filter(v => Number.isFinite(v)) as number[];
+    }
+
+    validateFinite(value: unknown): number {
+        if (!Number.isFinite(value)) {
+            throw new Error('Value must be finite');
+        }
+        return value as number;
+    }
+
+    static allFinite(values: unknown[]): boolean {
+        return values.every(v => Number.isFinite(v));
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("FiniteChecker"),
+        "Expected FiniteChecker class: {}",
+        output
+    );
+    assert!(
+        output.contains("Number.isFinite"),
+        "Expected Number.isFinite: {}",
+        output
+    );
+    assert!(
+        output.contains("isFinite") && output.contains("filterFinite"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_number_isnan_basic() {
+    // Basic Number.isNaN usage
+    let source = r#"
+class NaNChecker {
+    isNaN(value: unknown): boolean {
+        return Number.isNaN(value);
+    }
+
+    hasNaN(values: unknown[]): boolean {
+        return values.some(v => Number.isNaN(v));
+    }
+
+    removeNaN(values: number[]): number[] {
+        return values.filter(v => !Number.isNaN(v));
+    }
+
+    static replaceNaN(values: number[], replacement: number): number[] {
+        return values.map(v => Number.isNaN(v) ? replacement : v);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("NaNChecker"),
+        "Expected NaNChecker class: {}",
+        output
+    );
+    assert!(
+        output.contains("Number.isNaN"),
+        "Expected Number.isNaN: {}",
+        output
+    );
+    assert!(
+        output.contains("hasNaN") && output.contains("removeNaN"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_number_isinteger_basic() {
+    // Basic Number.isInteger usage
+    let source = r#"
+class IntegerChecker {
+    isInteger(value: unknown): boolean {
+        return Number.isInteger(value);
+    }
+
+    filterIntegers(values: unknown[]): number[] {
+        return values.filter(v => Number.isInteger(v)) as number[];
+    }
+
+    validateInteger(value: unknown, name: string): number {
+        if (!Number.isInteger(value)) {
+            throw new TypeError(name + ' must be an integer');
+        }
+        return value as number;
+    }
+
+    static countIntegers(values: unknown[]): number {
+        return values.filter(v => Number.isInteger(v)).length;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("IntegerChecker"),
+        "Expected IntegerChecker class: {}",
+        output
+    );
+    assert!(
+        output.contains("Number.isInteger"),
+        "Expected Number.isInteger: {}",
+        output
+    );
+    assert!(
+        output.contains("isInteger") && output.contains("filterIntegers"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_number_issafeinteger_basic() {
+    // Basic Number.isSafeInteger usage
+    let source = r#"
+class SafeIntegerChecker {
+    isSafeInteger(value: unknown): boolean {
+        return Number.isSafeInteger(value);
+    }
+
+    validateSafeInteger(value: unknown): number {
+        if (!Number.isSafeInteger(value)) {
+            throw new RangeError('Value must be a safe integer');
+        }
+        return value as number;
+    }
+
+    static allSafeIntegers(values: unknown[]): boolean {
+        return values.every(v => Number.isSafeInteger(v));
+    }
+
+    toSafeInteger(value: number): number | null {
+        if (Number.isSafeInteger(value)) {
+            return value;
+        }
+        return null;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("SafeIntegerChecker"),
+        "Expected SafeIntegerChecker class: {}",
+        output
+    );
+    assert!(
+        output.contains("Number.isSafeInteger"),
+        "Expected Number.isSafeInteger: {}",
+        output
+    );
+    assert!(
+        output.contains("isSafeInteger") && output.contains("validateSafeInteger"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_number_checks_in_constructor() {
+    // Number checking methods in constructor
+    let source = r#"
+class NumberValidator {
+    private value: number;
+    private isFiniteValue: boolean;
+    private isIntegerValue: boolean;
+    private isSafeValue: boolean;
+
+    constructor(value: unknown) {
+        if (Number.isNaN(value)) {
+            throw new Error('Cannot create validator with NaN');
+        }
+        if (!Number.isFinite(value)) {
+            throw new Error('Value must be finite');
+        }
+
+        this.value = value as number;
+        this.isFiniteValue = Number.isFinite(value);
+        this.isIntegerValue = Number.isInteger(value);
+        this.isSafeValue = Number.isSafeInteger(value);
+    }
+
+    getValue(): number {
+        return this.value;
+    }
+
+    isInteger(): boolean {
+        return this.isIntegerValue;
+    }
+
+    isSafe(): boolean {
+        return this.isSafeValue;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("NumberValidator"),
+        "Expected NumberValidator class: {}",
+        output
+    );
+    assert!(
+        output.contains("Number.isNaN") && output.contains("Number.isFinite"),
+        "Expected Number.isNaN and Number.isFinite: {}",
+        output
+    );
+    assert!(
+        output.contains("Number.isInteger") && output.contains("Number.isSafeInteger"),
+        "Expected Number.isInteger and Number.isSafeInteger: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_number_checks_combined() {
+    // Combined Number checking patterns
+    let source = r#"
+class NumericAnalyzer {
+    static analyze(value: unknown): {
+        isNumber: boolean;
+        isFinite: boolean;
+        isNaN: boolean;
+        isInteger: boolean;
+        isSafeInteger: boolean;
+    } {
+        return {
+            isNumber: typeof value === 'number',
+            isFinite: Number.isFinite(value),
+            isNaN: Number.isNaN(value),
+            isInteger: Number.isInteger(value),
+            isSafeInteger: Number.isSafeInteger(value)
+        };
+    }
+
+    static categorize(values: unknown[]): {
+        finite: number[];
+        infinite: number[];
+        nan: number[];
+        integers: number[];
+        floats: number[];
+    } {
+        const numbers = values.filter(v => typeof v === 'number') as number[];
+        return {
+            finite: numbers.filter(n => Number.isFinite(n)),
+            infinite: numbers.filter(n => !Number.isFinite(n) && !Number.isNaN(n)),
+            nan: numbers.filter(n => Number.isNaN(n)),
+            integers: numbers.filter(n => Number.isInteger(n)),
+            floats: numbers.filter(n => Number.isFinite(n) && !Number.isInteger(n))
+        };
+    }
+
+    static validateRange(
+        value: unknown,
+        min: number,
+        max: number,
+        requireInteger: boolean
+    ): number {
+        if (Number.isNaN(value)) {
+            throw new Error('Value is NaN');
+        }
+        if (!Number.isFinite(value)) {
+            throw new Error('Value is not finite');
+        }
+        if (requireInteger && !Number.isInteger(value)) {
+            throw new Error('Value must be an integer');
+        }
+        const num = value as number;
+        if (num < min || num > max) {
+            throw new RangeError('Value out of range');
+        }
+        return num;
+    }
+
+    coerceToSafeInteger(value: number): number {
+        if (Number.isNaN(value)) {
+            return 0;
+        }
+        if (!Number.isFinite(value)) {
+            return value > 0 ? Number.MAX_SAFE_INTEGER : Number.MIN_SAFE_INTEGER;
+        }
+        if (Number.isSafeInteger(value)) {
+            return value;
+        }
+        return Math.round(value);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("NumericAnalyzer"),
+        "Expected NumericAnalyzer class: {}",
+        output
+    );
+    assert!(
+        output.contains("Number.isFinite") && output.contains("Number.isNaN"),
+        "Expected Number.isFinite and Number.isNaN: {}",
+        output
+    );
+    assert!(
+        output.contains("Number.isInteger") && output.contains("Number.isSafeInteger"),
+        "Expected Number.isInteger and Number.isSafeInteger: {}",
+        output
+    );
+    assert!(
+        output.contains("analyze") && output.contains("categorize"),
+        "Expected analysis methods: {}",
+        output
+    );
+}
