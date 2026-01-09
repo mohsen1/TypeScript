@@ -821,7 +821,7 @@ impl<'a> TypeLowering<'a> {
                     call_signatures,
                     construct_signatures,
                     properties,
-                });
+                ..Default::default() });
             }
 
             if string_index.is_some() || number_index.is_some() {
@@ -945,7 +945,7 @@ impl<'a> TypeLowering<'a> {
                         call_signatures: methods.signatures,
                         construct_signatures: Vec::new(),
                         properties: Vec::new(),
-                    });
+                    ..Default::default() });
                     properties.push(PropertyInfo {
                         name,
                         type_id,
@@ -964,7 +964,7 @@ impl<'a> TypeLowering<'a> {
                 call_signatures: parts.call_signatures,
                 construct_signatures: parts.construct_signatures,
                 properties,
-            });
+            ..Default::default() });
         }
 
         if parts.string_index.is_some() || parts.number_index.is_some() {

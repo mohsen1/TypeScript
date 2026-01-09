@@ -109,7 +109,7 @@ fn test_contextual_callable_signature() {
         call_signatures: vec![call_sig],
         construct_signatures: vec![],
         properties: vec![],
-    });
+    ..Default::default() });
 
     let ctx = ContextualTypeContext::with_expected(&interner, callable);
 
@@ -147,7 +147,7 @@ fn test_contextual_callable_overload_union() {
         call_signatures: vec![call_sig_a, call_sig_b],
         construct_signatures: vec![],
         properties: vec![],
-    });
+    ..Default::default() });
 
     let ctx = ContextualTypeContext::with_expected(&interner, callable);
 
@@ -190,7 +190,7 @@ fn test_contextual_callable_overload_by_arity() {
         call_signatures: vec![call_sig_a, call_sig_b],
         construct_signatures: vec![],
         properties: vec![],
-    });
+    ..Default::default() });
 
     let ctx = ContextualTypeContext::with_expected(&interner, callable);
 

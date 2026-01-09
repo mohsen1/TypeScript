@@ -695,7 +695,7 @@ fn test_construct_signature_void_return_assignability() {
             type_predicate: None,
             type_params: Vec::new(),
         }],
-        properties: Vec::new(),
+        properties: Vec::new(), ..Default::default()
     });
 
     let returns_void = interner.callable(CallableShape {
@@ -707,7 +707,7 @@ fn test_construct_signature_void_return_assignability() {
             type_predicate: None,
             type_params: Vec::new(),
         }],
-        properties: Vec::new(),
+        properties: Vec::new(), ..Default::default()
     });
 
     assert!(checker.is_assignable(returns_instance, returns_void));
@@ -1594,7 +1594,7 @@ fn test_function_type_accepts_callables() {
         call_signatures: Vec::new(),
         construct_signatures: Vec::new(),
         properties: Vec::new(),
-    });
+    ..Default::default() });
 
     let function = interner.function(FunctionShape {
         params: vec![ParamInfo {
@@ -1625,7 +1625,7 @@ fn test_function_type_accepts_callables() {
             type_params: Vec::new(),
         }],
         construct_signatures: Vec::new(),
-        properties: Vec::new(),
+        properties: Vec::new(), ..Default::default()
     });
     assert!(checker.is_assignable(callable, function_top));
 }
@@ -1639,7 +1639,7 @@ fn test_function_type_rejects_non_callables() {
         call_signatures: Vec::new(),
         construct_signatures: Vec::new(),
         properties: Vec::new(),
-    });
+    ..Default::default() });
 
     let name = interner.intern_string("name");
     let obj = interner.object(vec![PropertyInfo {
@@ -1662,7 +1662,7 @@ fn test_function_type_not_assignable_to_specific_callable() {
         call_signatures: Vec::new(),
         construct_signatures: Vec::new(),
         properties: Vec::new(),
-    });
+    ..Default::default() });
 
     let specific_callable = interner.callable(CallableShape {
         call_signatures: vec![CallSignature {
@@ -1678,7 +1678,7 @@ fn test_function_type_not_assignable_to_specific_callable() {
             type_params: Vec::new(),
         }],
         construct_signatures: Vec::new(),
-        properties: Vec::new(),
+        properties: Vec::new(), ..Default::default()
     });
 
     assert!(!checker.is_assignable(function_top, specific_callable));
@@ -2340,7 +2340,7 @@ fn test_rest_any_callable_target_from_function() {
             type_params: Vec::new(),
         }],
         construct_signatures: Vec::new(),
-        properties: Vec::new(),
+        properties: Vec::new(), ..Default::default()
     });
 
     let source = interner.function(FunctionShape {
@@ -2381,7 +2381,7 @@ fn test_rest_unknown_callable_target_from_callable() {
             type_params: Vec::new(),
         }],
         construct_signatures: Vec::new(),
-        properties: Vec::new(),
+        properties: Vec::new(), ..Default::default()
     });
 
     let source = interner.callable(CallableShape {
@@ -2398,7 +2398,7 @@ fn test_rest_unknown_callable_target_from_callable() {
             type_params: Vec::new(),
         }],
         construct_signatures: Vec::new(),
-        properties: Vec::new(),
+        properties: Vec::new(), ..Default::default()
     });
 
     assert!(checker.is_assignable(source, target));

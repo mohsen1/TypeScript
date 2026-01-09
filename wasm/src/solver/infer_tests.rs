@@ -4246,7 +4246,7 @@ fn test_resolve_bounds_callable_this_parameter_contravariant() {
             type_predicate: None,
         }],
         construct_signatures: Vec::new(),
-        properties: Vec::new(),
+        properties: Vec::new(), ..Default::default()
     });
     let upper = interner.callable(CallableShape {
         call_signatures: vec![CallSignature {
@@ -4257,7 +4257,7 @@ fn test_resolve_bounds_callable_this_parameter_contravariant() {
             type_predicate: None,
         }],
         construct_signatures: Vec::new(),
-        properties: Vec::new(),
+        properties: Vec::new(), ..Default::default()
     });
 
     ctx.add_lower_bound(var, lower);
@@ -4392,7 +4392,7 @@ fn test_resolve_bounds_callable_subtype() {
             type_predicate: None,
         }],
         construct_signatures: Vec::new(),
-        properties: Vec::new(),
+        properties: Vec::new(), ..Default::default()
     });
     let upper = interner.callable(CallableShape {
         call_signatures: vec![CallSignature {
@@ -4403,7 +4403,7 @@ fn test_resolve_bounds_callable_subtype() {
             type_predicate: None,
         }],
         construct_signatures: Vec::new(),
-        properties: Vec::new(),
+        properties: Vec::new(), ..Default::default()
     });
 
     ctx.add_lower_bound(var, lower);
@@ -4450,7 +4450,7 @@ fn test_resolve_bounds_function_to_callable() {
             type_predicate: None,
         }],
         construct_signatures: Vec::new(),
-        properties: Vec::new(),
+        properties: Vec::new(), ..Default::default()
     });
 
     ctx.add_lower_bound(var, lower);
@@ -4489,7 +4489,7 @@ fn test_resolve_bounds_callable_to_function() {
             type_predicate: None,
         }],
         construct_signatures: Vec::new(),
-        properties: Vec::new(),
+        properties: Vec::new(), ..Default::default()
     });
     let upper = interner.function(FunctionShape {
         type_params: Vec::new(),
