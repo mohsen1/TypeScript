@@ -7,12 +7,13 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [ ] Add ES5 class tests for Symbol.split patterns in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
+- [ ] (none)
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Add ES5 class tests for Symbol.split patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for Symbol.search patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for Symbol.replace patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for Symbol.match patterns. Tests: `./wasm/test.sh class_es5_tests`
