@@ -22660,3 +22660,587 @@ fn test_interface_with_symbol_property() {
     }]);
 
     assert!(iface != TypeId::ERROR);
+}
+
+// =============================================================================
+// Void vs Undefined Type Tests
+// =============================================================================
+// Tests for void and undefined type distinctions, strict null checks behavior
+
+#[test]
+fn test_void_is_not_subtype_of_undefined() {
+    // void is NOT a subtype of undefined
+    // This is asymmetric: undefined <: void, but void !<: undefined
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    // void should not be assignable to undefined
+    assert!(!checker.is_subtype_of(TypeId::VOID, TypeId::UNDEFINED));
+}
+
+#[test]
+fn test_undefined_is_subtype_of_void() {
+    // undefined <: void (this is the allowed direction)
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    assert!(checker.is_subtype_of(TypeId::UNDEFINED, TypeId::VOID));
+}
+
+#[test]
+fn test_void_is_not_subtype_of_null() {
+    // void is NOT a subtype of null
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    assert!(!checker.is_subtype_of(TypeId::VOID, TypeId::NULL));
+}
+
+#[test]
+fn test_null_is_not_subtype_of_void() {
+    // null is NOT a subtype of void
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    assert!(!checker.is_subtype_of(TypeId::NULL, TypeId::VOID));
+}
+
+#[test]
+fn test_void_is_subtype_of_void() {
+    // void <: void (reflexive)
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    assert!(checker.is_subtype_of(TypeId::VOID, TypeId::VOID));
+}
+
+#[test]
+fn test_undefined_is_subtype_of_undefined() {
+    // undefined <: undefined (reflexive)
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    assert!(checker.is_subtype_of(TypeId::UNDEFINED, TypeId::UNDEFINED));
+}
+
+#[test]
+fn test_void_union_with_undefined() {
+    // void | undefined should normalize (undefined <: void, so just void)
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let void_or_undefined = interner.union(vec![TypeId::VOID, TypeId::UNDEFINED]);
+
+    // void | undefined should be assignable to void
+    assert!(checker.is_subtype_of(void_or_undefined, TypeId::VOID));
+}
+
+#[test]
+fn test_void_in_union_with_other_types() {
+    // string | void - common pattern for optional return
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let string_or_void = interner.union(vec![TypeId::STRING, TypeId::VOID]);
+
+    // string is subtype of string | void
+    assert!(checker.is_subtype_of(TypeId::STRING, string_or_void));
+
+    // void is subtype of string | void
+    assert!(checker.is_subtype_of(TypeId::VOID, string_or_void));
+
+    // undefined is subtype of string | void (because undefined <: void)
+    assert!(checker.is_subtype_of(TypeId::UNDEFINED, string_or_void));
+}
+
+#[test]
+fn test_undefined_in_union_strict_null() {
+    // string | undefined - nullable string in strict mode
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let string_or_undefined = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
+
+    // string is subtype of string | undefined
+    assert!(checker.is_subtype_of(TypeId::STRING, string_or_undefined));
+
+    // undefined is subtype of string | undefined
+    assert!(checker.is_subtype_of(TypeId::UNDEFINED, string_or_undefined));
+
+    // void is NOT subtype of string | undefined
+    assert!(!checker.is_subtype_of(TypeId::VOID, string_or_undefined));
+}
+
+#[test]
+fn test_null_undefined_union_not_void() {
+    // null | undefined is NOT the same as void
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let null_or_undefined = interner.union(vec![TypeId::NULL, TypeId::UNDEFINED]);
+
+    // null | undefined is NOT subtype of void (null !<: void)
+    assert!(!checker.is_subtype_of(null_or_undefined, TypeId::VOID));
+}
+
+#[test]
+fn test_function_void_return_accepts_undefined_return() {
+    // (() => undefined) <: (() => void)
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let fn_undefined = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::UNDEFINED,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn_void = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    assert!(checker.is_subtype_of(fn_undefined, fn_void));
+}
+
+#[test]
+fn test_function_undefined_return_rejects_void_return() {
+    // (() => void) is NOT a subtype of (() => undefined)
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let fn_void = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn_undefined = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::UNDEFINED,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    assert!(!checker.is_subtype_of(fn_void, fn_undefined));
+}
+
+#[test]
+fn test_optional_param_with_void_vs_undefined() {
+    // (x?: string) vs (x: string | undefined)
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let x_name = interner.intern_string("x");
+    let string_or_undefined = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
+
+    let fn_optional = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(x_name),
+            type_id: TypeId::STRING,
+            optional: true,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn_union_undefined = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(x_name),
+            type_id: string_or_undefined,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // These are compatible in TypeScript
+    assert!(checker.is_subtype_of(fn_optional, fn_union_undefined));
+}
+
+#[test]
+fn test_void_not_assignable_to_primitives() {
+    // void is not assignable to string, number, boolean
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    assert!(!checker.is_subtype_of(TypeId::VOID, TypeId::STRING));
+    assert!(!checker.is_subtype_of(TypeId::VOID, TypeId::NUMBER));
+    assert!(!checker.is_subtype_of(TypeId::VOID, TypeId::BOOLEAN));
+}
+
+#[test]
+fn test_undefined_not_assignable_to_primitives_strict() {
+    // undefined is not assignable to string, number, boolean in strict mode
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    assert!(!checker.is_subtype_of(TypeId::UNDEFINED, TypeId::STRING));
+    assert!(!checker.is_subtype_of(TypeId::UNDEFINED, TypeId::NUMBER));
+    assert!(!checker.is_subtype_of(TypeId::UNDEFINED, TypeId::BOOLEAN));
+}
+
+#[test]
+fn test_void_and_undefined_assignable_to_unknown() {
+    // void and undefined are assignable to unknown
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    assert!(checker.is_subtype_of(TypeId::VOID, TypeId::UNKNOWN));
+    assert!(checker.is_subtype_of(TypeId::UNDEFINED, TypeId::UNKNOWN));
+}
+
+#[test]
+fn test_void_and_undefined_assignable_to_any() {
+    // void and undefined are assignable to any
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    assert!(checker.is_subtype_of(TypeId::VOID, TypeId::ANY));
+    assert!(checker.is_subtype_of(TypeId::UNDEFINED, TypeId::ANY));
+}
+
+#[test]
+fn test_any_assignable_to_void_and_undefined() {
+    // any is assignable to void and undefined
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    assert!(checker.is_subtype_of(TypeId::ANY, TypeId::VOID));
+    assert!(checker.is_subtype_of(TypeId::ANY, TypeId::UNDEFINED));
+}
+
+#[test]
+fn test_never_assignable_to_void_and_undefined() {
+    // never is assignable to all types including void and undefined
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    assert!(checker.is_subtype_of(TypeId::NEVER, TypeId::VOID));
+    assert!(checker.is_subtype_of(TypeId::NEVER, TypeId::UNDEFINED));
+}
+
+#[test]
+fn test_void_callback_pattern() {
+    // Common pattern: callback: () => void
+    // Should accept functions that return anything (void is "ignore return")
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let callback_void = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let callback_string = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let callback_number = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::NUMBER,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // Functions returning string/number should be assignable to () => void
+    assert!(checker.is_subtype_of(callback_string, callback_void));
+    assert!(checker.is_subtype_of(callback_number, callback_void));
+}
+
+#[test]
+fn test_object_property_optional_undefined() {
+    // { x?: string } vs { x: string | undefined }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let x_name = interner.intern_string("x");
+    let string_or_undefined = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
+
+    let obj_optional = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_union = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: string_or_undefined,
+        write_type: string_or_undefined,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // These have different semantics in exactOptionalPropertyTypes
+    // but for basic subtyping, optional property accepts undefined
+    assert!(checker.is_subtype_of(obj_optional, obj_union));
+}
+
+#[test]
+fn test_method_returning_void_vs_undefined() {
+    // interface A { foo(): void } vs interface B { foo(): undefined }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let foo_name = interner.intern_string("foo");
+
+    let method_void = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let method_undefined = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::UNDEFINED,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let obj_method_void = interner.object(vec![PropertyInfo {
+        name: foo_name,
+        type_id: method_void,
+        write_type: method_void,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let obj_method_undefined = interner.object(vec![PropertyInfo {
+        name: foo_name,
+        type_id: method_undefined,
+        write_type: method_undefined,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    // { foo(): undefined } <: { foo(): void }
+    assert!(checker.is_subtype_of(obj_method_undefined, obj_method_void));
+
+    // { foo(): void } is NOT subtype of { foo(): undefined }
+    assert!(!checker.is_subtype_of(obj_method_void, obj_method_undefined));
+}
+
+#[test]
+fn test_array_of_void_vs_undefined() {
+    // void[] vs undefined[]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let void_array = interner.array(TypeId::VOID);
+    let undefined_array = interner.array(TypeId::UNDEFINED);
+
+    // undefined[] <: void[]
+    assert!(checker.is_subtype_of(undefined_array, void_array));
+
+    // void[] is NOT subtype of undefined[]
+    assert!(!checker.is_subtype_of(void_array, undefined_array));
+}
+
+#[test]
+fn test_tuple_with_void_and_undefined() {
+    // [void, undefined] - mixed tuple
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let tuple_void_undefined = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::VOID,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::UNDEFINED,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    let tuple_undefined_undefined = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::UNDEFINED,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::UNDEFINED,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    // [undefined, undefined] <: [void, undefined] (first element: undefined <: void)
+    assert!(checker.is_subtype_of(tuple_undefined_undefined, tuple_void_undefined));
+}
+
+#[test]
+fn test_generic_with_void_constraint() {
+    // <T extends void> - T can be void, undefined, or never
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    // Types that satisfy extends void
+    assert!(checker.is_subtype_of(TypeId::VOID, TypeId::VOID));
+    assert!(checker.is_subtype_of(TypeId::UNDEFINED, TypeId::VOID));
+    assert!(checker.is_subtype_of(TypeId::NEVER, TypeId::VOID));
+
+    // Types that don't satisfy extends void
+    assert!(!checker.is_subtype_of(TypeId::NULL, TypeId::VOID));
+    assert!(!checker.is_subtype_of(TypeId::STRING, TypeId::VOID));
+}
+
+#[test]
+fn test_void_in_conditional_type() {
+    // T extends void ? true : false
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    // For conditional type evaluation, need to check subtype relations
+    // undefined extends void should be true
+    assert!(checker.is_subtype_of(TypeId::UNDEFINED, TypeId::VOID));
+
+    // void extends undefined should be false
+    assert!(!checker.is_subtype_of(TypeId::VOID, TypeId::UNDEFINED));
+
+    // null extends void should be false
+    assert!(!checker.is_subtype_of(TypeId::NULL, TypeId::VOID));
+}
+
+#[test]
+fn test_intersection_with_void() {
+    // void & string should be never (no overlap)
+    let interner = TypeInterner::new();
+
+    let void_and_string = interner.intersection(vec![TypeId::VOID, TypeId::STRING]);
+
+    // Intersection should produce something (either never or the intersection type)
+    assert!(void_and_string != TypeId::ERROR);
+}
+
+#[test]
+fn test_promise_void_vs_undefined() {
+    // Promise<void> vs Promise<undefined> simulation
+    let interner = TypeInterner::new();
+
+    let then_name = interner.intern_string("then");
+
+    // Simplified Promise<void>: { then: (cb: (value: void) => void) => void }
+    let cb_void = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("value")),
+            type_id: TypeId::VOID,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let then_void = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("cb")),
+            type_id: cb_void,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let promise_void = interner.object(vec![PropertyInfo {
+        name: then_name,
+        type_id: then_void,
+        write_type: then_void,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    // Just verify it creates valid types
+    assert!(promise_void != TypeId::ERROR);
+}
+
+#[test]
+fn test_strict_null_undefined_exclusive() {
+    // In strict null checks, null and undefined are distinct
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    // null is NOT subtype of undefined
+    assert!(!checker.is_subtype_of(TypeId::NULL, TypeId::UNDEFINED));
+
+    // undefined is NOT subtype of null
+    assert!(!checker.is_subtype_of(TypeId::UNDEFINED, TypeId::NULL));
+}
+
+#[test]
+fn test_void_undefined_null_union() {
+    // void | undefined | null - the "maybe missing" type
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let void_undefined_null = interner.union(vec![
+        TypeId::VOID,
+        TypeId::UNDEFINED,
+        TypeId::NULL,
+    ]);
+
+    // All three should be subtypes
+    assert!(checker.is_subtype_of(TypeId::VOID, void_undefined_null));
+    assert!(checker.is_subtype_of(TypeId::UNDEFINED, void_undefined_null));
+    assert!(checker.is_subtype_of(TypeId::NULL, void_undefined_null));
+
+    // But not string
+    assert!(!checker.is_subtype_of(TypeId::STRING, void_undefined_null));
+}
