@@ -12561,3 +12561,104 @@ fn test_async_retry_ignores_nested_async() {
     );
     assert!(!result, "Should not detect await inside nested async retry handler");
 }
+
+// ============================================================================
+// ASYNC STREAM PATTERN TESTS
+// Tests for stream patterns: readable, writable, transform, pipe
+// ============================================================================
+
+#[test]
+fn test_async_stream_readable() {
+    let result = async_error_propagation_contains_await(
+        "async function read(stream) { return await stream.read(); }",
+    );
+    assert!(result, "Should detect await in readable stream");
+}
+
+#[test]
+fn test_async_stream_writable() {
+    let result = async_error_propagation_contains_await(
+        "async function write(stream, data) { await stream.write(data); }",
+    );
+    assert!(result, "Should detect await in writable stream");
+}
+
+#[test]
+fn test_async_stream_transform() {
+    let result = async_error_propagation_contains_await(
+        "async function transform(chunk) { return await process(chunk); }",
+    );
+    assert!(result, "Should detect await in transform stream");
+}
+
+#[test]
+fn test_async_stream_pipe() {
+    let result = async_error_propagation_contains_await(
+        "async function pipe(src, dest) { await src.pipeTo(dest); }",
+    );
+    assert!(result, "Should detect await in pipe operation");
+}
+
+#[test]
+fn test_async_stream_reader() {
+    let result = async_error_propagation_contains_await(
+        "async function getReader(stream) { const reader = stream.getReader(); return await reader.read(); }",
+    );
+    assert!(result, "Should detect await in stream reader");
+}
+
+#[test]
+fn test_async_stream_writer() {
+    let result = async_error_propagation_contains_await(
+        "async function getWriter(stream) { const writer = stream.getWriter(); await writer.write(data); }",
+    );
+    assert!(result, "Should detect await in stream writer");
+}
+
+#[test]
+fn test_async_stream_tee() {
+    let result = async_error_propagation_contains_await(
+        "async function tee(stream) { const [a, b] = stream.tee(); await consume(a); }",
+    );
+    assert!(result, "Should detect await in stream tee");
+}
+
+#[test]
+fn test_async_stream_cancel() {
+    let result = async_error_propagation_contains_await(
+        "async function cancel(reader) { await reader.cancel(); }",
+    );
+    assert!(result, "Should detect await in stream cancel");
+}
+
+#[test]
+fn test_async_stream_close() {
+    let result = async_error_propagation_contains_await(
+        "async function close(writer) { await writer.close(); }",
+    );
+    assert!(result, "Should detect await in stream close");
+}
+
+#[test]
+fn test_async_stream_consume() {
+    let result = async_error_propagation_contains_await(
+        "async function consume(stream) { return await collectAll(stream); }",
+    );
+    assert!(result, "Should detect await in stream consumption");
+}
+
+#[test]
+fn test_async_stream_no_await() {
+    let result = async_error_propagation_contains_await(
+        "async function syncStream(stream) { return stream.getReader(); }",
+    );
+    assert!(!result, "Should not detect await when stream is sync");
+}
+
+#[test]
+fn test_async_stream_ignores_nested_async() {
+    let result = async_error_propagation_contains_await(
+        "async function outer() { const handler = async (chunk) => await process(chunk); }",
+    );
+    assert!(!result, "Should not detect await inside nested async stream handler");
+}
