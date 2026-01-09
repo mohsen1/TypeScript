@@ -7,12 +7,13 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [ ] Add ES5 class tests for mixed decorator patterns: combined class/method/property decorators, decorator order of execution, decorator with inheritance, decorator metadata reflection, decorator with private members. Tests: `./wasm/test.sh class_es5_tests`
+- (none – awaiting assignment)
 
 ## Task Queue
 - [ ] Add ES5 class tests for TypeScript-specific patterns: namespace merging with class, module augmentation
 
 ## Completed
+- [x] Add ES5 class tests for mixed decorator patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for accessor decorator patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for class decorator patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for property decorator patterns. Tests: `./wasm/test.sh class_es5_tests`

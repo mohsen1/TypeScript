@@ -21162,3 +21162,616 @@ class Counter {
         output
     );
 }
+
+#[test]
+fn test_class_es5_mixed_decorator_combined() {
+    // Combined class/method/property decorators pattern
+    let source = r#"
+function component(name: string) {
+    return function(target: Function) {
+        Reflect.defineMetadata("component:name", name, target);
+    };
+}
+
+function injectable(target: Function) {
+    Reflect.defineMetadata("di:injectable", true, target);
+}
+
+function property(options?: { required?: boolean }) {
+    return function(target: any, propertyKey: string) {
+        const props = Reflect.getMetadata("properties", target) || [];
+        props.push({ key: propertyKey, ...options });
+        Reflect.defineMetadata("properties", props, target);
+    };
+}
+
+function method(options?: { async?: boolean }) {
+    return function(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+        const methods = Reflect.getMetadata("methods", target) || [];
+        methods.push({ key: propertyKey, ...options });
+        Reflect.defineMetadata("methods", methods, target);
+        return descriptor;
+    };
+}
+
+function param(name: string) {
+    return function(target: any, propertyKey: string | symbol | undefined, parameterIndex: number) {
+        const params = Reflect.getMetadata("params", target, propertyKey as string) || [];
+        params[parameterIndex] = name;
+        Reflect.defineMetadata("params", params, target, propertyKey as string);
+    };
+}
+
+@component("UserCard")
+@injectable
+class UserCardComponent {
+    @property({ required: true })
+    userId: string;
+
+    @property()
+    displayName: string;
+
+    @property({ required: false })
+    avatar?: string;
+
+    @method({ async: true })
+    async loadUser(@param("id") id: string): Promise<void> {
+        console.log(`Loading user ${id}`);
+    }
+
+    @method()
+    render(): string {
+        return `<div>${this.displayName}</div>`;
+    }
+}
+
+@component("DataGrid")
+class DataGridComponent {
+    @property({ required: true })
+    data: any[];
+
+    @property()
+    columns: string[];
+
+    @method()
+    sort(@param("column") column: string, @param("direction") direction: string): void {
+        console.log(`Sorting by ${column} ${direction}`);
+    }
+
+    @method({ async: true })
+    async refresh(): Promise<void> {
+        console.log("Refreshing data");
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("UserCardComponent") && output.contains("DataGridComponent"),
+        "Expected combined decorated classes: {}",
+        output
+    );
+
+    // Various decorator types should be present
+    assert!(
+        output.contains("component") && output.contains("property") && output.contains("method"),
+        "Expected mixed decorators: {}",
+        output
+    );
+
+    // Class IIFE pattern should be present
+    assert!(
+        output.contains("(function ()") || output.contains("(function()"),
+        "Expected class IIFE pattern: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_mixed_decorator_order() {
+    // Decorator order of execution pattern
+    let source = r#"
+const executionOrder: string[] = [];
+
+function first(target: Function) {
+    executionOrder.push("first-class");
+}
+
+function second(target: Function) {
+    executionOrder.push("second-class");
+}
+
+function third(target: Function) {
+    executionOrder.push("third-class");
+}
+
+function methodFirst(target: any, key: string, descriptor: PropertyDescriptor) {
+    executionOrder.push("first-method");
+    return descriptor;
+}
+
+function methodSecond(target: any, key: string, descriptor: PropertyDescriptor) {
+    executionOrder.push("second-method");
+    return descriptor;
+}
+
+function propFirst(target: any, key: string) {
+    executionOrder.push("first-prop");
+}
+
+function propSecond(target: any, key: string) {
+    executionOrder.push("second-prop");
+}
+
+function paramFirst(target: any, key: string | symbol | undefined, index: number) {
+    executionOrder.push("first-param");
+}
+
+function paramSecond(target: any, key: string | symbol | undefined, index: number) {
+    executionOrder.push("second-param");
+}
+
+@first
+@second
+@third
+class OrderedClass {
+    @propFirst
+    @propSecond
+    value: string;
+
+    @methodFirst
+    @methodSecond
+    process(
+        @paramFirst @paramSecond input: string
+    ): void {
+        console.log(input);
+    }
+}
+
+@third
+@second
+@first
+class ReverseOrderedClass {
+    @propSecond
+    @propFirst
+    data: number;
+
+    @methodSecond
+    @methodFirst
+    execute(): void {
+        console.log("executing");
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("OrderedClass") && output.contains("ReverseOrderedClass"),
+        "Expected ordered decorator classes: {}",
+        output
+    );
+
+    // Order-related decorators should be present
+    assert!(
+        output.contains("first") && output.contains("second") && output.contains("third"),
+        "Expected order decorators: {}",
+        output
+    );
+
+    // Class IIFE pattern should be present
+    assert!(
+        output.contains("(function ()") || output.contains("(function()"),
+        "Expected class IIFE pattern: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_mixed_decorator_inheritance() {
+    // Decorator with inheritance pattern
+    let source = r#"
+function baseClass(target: Function) {
+    Reflect.defineMetadata("isBase", true, target);
+}
+
+function derivedClass(target: Function) {
+    Reflect.defineMetadata("isDerived", true, target);
+}
+
+function inherited(target: any, propertyKey: string, descriptor?: PropertyDescriptor) {
+    Reflect.defineMetadata("inherited", true, target, propertyKey);
+    return descriptor;
+}
+
+function overridden(target: any, propertyKey: string, descriptor?: PropertyDescriptor) {
+    Reflect.defineMetadata("overridden", true, target, propertyKey);
+    return descriptor;
+}
+
+function baseProperty(target: any, propertyKey: string) {
+    Reflect.defineMetadata("baseProperty", true, target, propertyKey);
+}
+
+function derivedProperty(target: any, propertyKey: string) {
+    Reflect.defineMetadata("derivedProperty", true, target, propertyKey);
+}
+
+@baseClass
+class BaseService {
+    @baseProperty
+    serviceName: string = "base";
+
+    @inherited
+    initialize(): void {
+        console.log("Base initialize");
+    }
+
+    @inherited
+    process(data: any): any {
+        return data;
+    }
+}
+
+@derivedClass
+class ExtendedService extends BaseService {
+    @derivedProperty
+    extendedName: string = "extended";
+
+    @overridden
+    initialize(): void {
+        super.initialize();
+        console.log("Extended initialize");
+    }
+
+    @overridden
+    process(data: any): any {
+        const result = super.process(data);
+        return { ...result, extended: true };
+    }
+
+    @inherited
+    newMethod(): void {
+        console.log("New method");
+    }
+}
+
+@derivedClass
+class FinalService extends ExtendedService {
+    @derivedProperty
+    finalName: string = "final";
+
+    @overridden
+    initialize(): void {
+        super.initialize();
+        console.log("Final initialize");
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("BaseService") && output.contains("ExtendedService") && output.contains("FinalService"),
+        "Expected inheritance decorated classes: {}",
+        output
+    );
+
+    // Inheritance decorators should be present
+    assert!(
+        output.contains("baseClass") && output.contains("derivedClass"),
+        "Expected inheritance decorators: {}",
+        output
+    );
+
+    // ES5 extends helper should be present
+    assert!(
+        output.contains("__extends") || output.contains("_super"),
+        "Expected ES5 extends pattern: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_mixed_decorator_metadata() {
+    // Decorator metadata reflection pattern
+    let source = r#"
+const TYPE_METADATA = Symbol("design:type");
+const PARAM_TYPES = Symbol("design:paramtypes");
+const RETURN_TYPE = Symbol("design:returntype");
+
+function reflectType(target: any, propertyKey: string) {
+    const type = Reflect.getMetadata("design:type", target, propertyKey);
+    Reflect.defineMetadata(TYPE_METADATA, type, target, propertyKey);
+}
+
+function reflectParams(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    const paramTypes = Reflect.getMetadata("design:paramtypes", target, propertyKey);
+    Reflect.defineMetadata(PARAM_TYPES, paramTypes, target, propertyKey);
+    return descriptor;
+}
+
+function reflectReturn(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    const returnType = Reflect.getMetadata("design:returntype", target, propertyKey);
+    Reflect.defineMetadata(RETURN_TYPE, returnType, target, propertyKey);
+    return descriptor;
+}
+
+function entity(tableName: string) {
+    return function(target: Function) {
+        Reflect.defineMetadata("entity:table", tableName, target);
+        Reflect.defineMetadata("entity:columns", [], target);
+    };
+}
+
+function column(options: { type: string; nullable?: boolean }) {
+    return function(target: any, propertyKey: string) {
+        const columns = Reflect.getMetadata("entity:columns", target.constructor) || [];
+        columns.push({ name: propertyKey, ...options });
+        Reflect.defineMetadata("entity:columns", columns, target.constructor);
+    };
+}
+
+function relation(type: string, target: () => Function) {
+    return function(classTarget: any, propertyKey: string) {
+        const relations = Reflect.getMetadata("entity:relations", classTarget.constructor) || [];
+        relations.push({ name: propertyKey, type, target });
+        Reflect.defineMetadata("entity:relations", relations, classTarget.constructor);
+    };
+}
+
+@entity("users")
+class UserEntity {
+    @column({ type: "int" })
+    @reflectType
+    id: number;
+
+    @column({ type: "varchar", nullable: false })
+    @reflectType
+    name: string;
+
+    @column({ type: "varchar", nullable: true })
+    @reflectType
+    email?: string;
+
+    @relation("one-to-many", () => PostEntity)
+    posts: any[];
+
+    @reflectParams
+    @reflectReturn
+    findById(id: number): UserEntity | null {
+        return null;
+    }
+}
+
+@entity("posts")
+class PostEntity {
+    @column({ type: "int" })
+    id: number;
+
+    @column({ type: "text" })
+    content: string;
+
+    @relation("many-to-one", () => UserEntity)
+    author: any;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("UserEntity") && output.contains("PostEntity"),
+        "Expected metadata decorated classes: {}",
+        output
+    );
+
+    // Metadata decorators should be present
+    assert!(
+        output.contains("entity") && output.contains("column") && output.contains("relation"),
+        "Expected metadata decorators: {}",
+        output
+    );
+
+    // Class IIFE pattern should be present
+    assert!(
+        output.contains("(function ()") || output.contains("(function()"),
+        "Expected class IIFE pattern: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_mixed_decorator_private_members() {
+    // Decorator with private members pattern
+    let source = r#"
+function logAccess(target: any, propertyKey: string, descriptor?: PropertyDescriptor) {
+    if (descriptor) {
+        const original = descriptor.value;
+        descriptor.value = function(...args: any[]) {
+            console.log(`Accessing ${propertyKey}`);
+            return original.apply(this, args);
+        };
+        return descriptor;
+    }
+}
+
+function validatePrivate(target: any, propertyKey: string) {
+    console.log(`Validating private property ${propertyKey}`);
+}
+
+function boundMethod(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    const original = descriptor.value;
+    return {
+        configurable: true,
+        get() {
+            const bound = original.bind(this);
+            Object.defineProperty(this, propertyKey, {
+                value: bound,
+                configurable: true,
+                writable: true
+            });
+            return bound;
+        }
+    };
+}
+
+function memoized(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    const original = descriptor.value;
+    const cacheKey = Symbol(`__cache_${propertyKey}`);
+
+    descriptor.value = function(...args: any[]) {
+        if (!(this as any)[cacheKey]) {
+            (this as any)[cacheKey] = new Map();
+        }
+        const cache = (this as any)[cacheKey];
+        const key = JSON.stringify(args);
+        if (!cache.has(key)) {
+            cache.set(key, original.apply(this, args));
+        }
+        return cache.get(key);
+    };
+    return descriptor;
+}
+
+class SecureService {
+    @validatePrivate
+    private _secretKey: string = "secret123";
+
+    @validatePrivate
+    private _apiToken: string = "";
+
+    private _cache: Map<string, any> = new Map();
+
+    @logAccess
+    private validateToken(token: string): boolean {
+        return token === this._secretKey;
+    }
+
+    @boundMethod
+    public authenticate(token: string): boolean {
+        return this.validateToken(token);
+    }
+
+    @memoized
+    public computeHash(data: string): string {
+        return btoa(data + this._secretKey);
+    }
+}
+
+class DataProcessor {
+    @validatePrivate
+    private _buffer: any[] = [];
+
+    @validatePrivate
+    private _maxSize: number = 1000;
+
+    @logAccess
+    private processItem(item: any): any {
+        return { ...item, processed: true };
+    }
+
+    @boundMethod
+    public addItem(item: any): void {
+        if (this._buffer.length < this._maxSize) {
+            this._buffer.push(this.processItem(item));
+        }
+    }
+
+    @memoized
+    public getStats(): object {
+        return {
+            size: this._buffer.length,
+            maxSize: this._maxSize
+        };
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("SecureService") && output.contains("DataProcessor"),
+        "Expected private member decorated classes: {}",
+        output
+    );
+
+    // Private member decorators should be present
+    assert!(
+        output.contains("logAccess") && output.contains("validatePrivate"),
+        "Expected private member decorators: {}",
+        output
+    );
+
+    // Class IIFE pattern should be present
+    assert!(
+        output.contains("(function ()") || output.contains("(function()"),
+        "Expected class IIFE pattern: {}",
+        output
+    );
+}
