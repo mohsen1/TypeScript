@@ -1450,6 +1450,22 @@ impl<'a> PropertyAccessEvaluator<'a> {
         prop_atom: Option<Atom>,
     ) -> PropertyAccessResult {
         // Handle intrinsic types first
+        if obj_type == TypeId::ANY {
+            // Any type allows any property access, returning any
+            return PropertyAccessResult::Success {
+                type_id: TypeId::ANY,
+                from_index_signature: false,
+            };
+        }
+
+        if obj_type == TypeId::ERROR {
+            // Error type suppresses further errors, returns error
+            return PropertyAccessResult::Success {
+                type_id: TypeId::ERROR,
+                from_index_signature: false,
+            };
+        }
+
         if obj_type == TypeId::UNKNOWN {
             return PropertyAccessResult::IsUnknown;
         }

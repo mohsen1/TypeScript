@@ -469,6 +469,14 @@ impl<'a> ThinCheckerState<'a> {
                 }
             }
 
+            // Template expression (template literals with substitutions)
+            k if k == syntax_kind_ext::TEMPLATE_EXPRESSION => {
+                self.get_type_of_template_expression(idx)
+            }
+
+            // No-substitution template literal - just a string
+            k if k == SyntaxKind::NoSubstitutionTemplateLiteral as u16 => TypeId::STRING,
+
             // =========================================================================
             // Type Nodes
             // =========================================================================
@@ -5640,6 +5648,35 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    /// Get type of template expression (template literal with substitutions).
+    /// Type-checks all expressions within template spans to emit errors like TS2304.
+    fn get_type_of_template_expression(&mut self, idx: NodeIndex) -> TypeId {
+        let Some(node) = self.ctx.arena.get(idx) else {
+            return TypeId::STRING;
+        };
+
+        let Some(template) = self.ctx.arena.get_template_expr(node) else {
+            return TypeId::STRING;
+        };
+
+        // Type-check each template span's expression
+        for &span_idx in &template.template_spans.nodes {
+            let Some(span_node) = self.ctx.arena.get(span_idx) else {
+                continue;
+            };
+
+            let Some(span) = self.ctx.arena.get_template_span(span_node) else {
+                continue;
+            };
+
+            // Type-check the expression - this will emit TS2304 if name is unresolved
+            self.get_type_of_node(span.expression);
+        }
+
+        // Template expressions always produce string type
+        TypeId::STRING
+    }
+
 
     // =========================================================================
     // Type Relations (uses solver::CompatChecker for assignability)
@@ -8051,6 +8088,52 @@ impl<'a> ThinCheckerState<'a> {
         );
     }
 
+    /// Check heritage clauses (extends/implements) for unresolved names.
+    /// Emits TS2304 when a referenced name cannot be resolved.
+    fn check_heritage_clauses_for_unresolved_names(&mut self, heritage_clauses: &Option<crate::parser::NodeList>) {
+        use crate::parser::syntax_kind_ext::HERITAGE_CLAUSE;
+
+        let Some(clauses) = heritage_clauses else {
+            return;
+        };
+
+        for &clause_idx in &clauses.nodes {
+            let Some(clause_node) = self.ctx.arena.get(clause_idx) else {
+                continue;
+            };
+
+            if clause_node.kind != HERITAGE_CLAUSE {
+                continue;
+            }
+
+            let Some(heritage) = self.ctx.arena.get_heritage_clause(clause_node) else {
+                continue;
+            };
+
+            // Check each type in the heritage clause
+            for &type_idx in &heritage.types.nodes {
+                let Some(type_node) = self.ctx.arena.get(type_idx) else {
+                    continue;
+                };
+
+                // Get the expression (identifier or property access) from ExpressionWithTypeArguments
+                let expr_idx = if let Some(expr_type_args) = self.ctx.arena.get_expr_type_args(type_node) {
+                    expr_type_args.expression
+                } else {
+                    type_idx
+                };
+
+                // Try to resolve the heritage symbol
+                if self.resolve_heritage_symbol(expr_idx).is_none() {
+                    // Get the name for the error message
+                    if let Some(name) = self.heritage_name_text(expr_idx) {
+                        self.error_cannot_find_name_at(&name, expr_idx);
+                    }
+                }
+            }
+        }
+    }
+
     /// Check a class declaration.
     fn check_class_declaration(&mut self, stmt_idx: NodeIndex) {
         use crate::checker::types::diagnostics::diagnostic_codes;
@@ -8157,6 +8240,9 @@ impl<'a> ThinCheckerState<'a> {
                 }
             }
         }
+
+        // Check heritage clauses for unresolved names (TS2304)
+        self.check_heritage_clauses_for_unresolved_names(&class.heritage_clauses);
 
         let (_type_params, type_param_updates) = self.push_type_parameters(&class.type_parameters);
 
@@ -9170,6 +9256,9 @@ impl<'a> ThinCheckerState<'a> {
                 }
             }
         }
+
+        // Check heritage clauses for unresolved names (TS2304)
+        self.check_heritage_clauses_for_unresolved_names(&iface.heritage_clauses);
 
         let (_type_params, type_param_updates) = self.push_type_parameters(&iface.type_parameters);
 
