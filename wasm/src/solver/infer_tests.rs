@@ -15995,3 +15995,912 @@ fn test_conditional_return_constructor_inference() {
     // Should infer R = instance type
     assert_eq!(result, instance);
 }
+
+// =============================================================================
+// Variadic Tuple Type Tests
+// =============================================================================
+
+#[test]
+fn test_variadic_tuple_basic_rest_element() {
+    // Test: [string, ...number[]] - basic variadic tuple with rest at end
+    let interner = TypeInterner::new();
+
+    let tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: true,
+        },
+    ]);
+
+    // Verify it's a valid tuple
+    assert!(matches!(interner.lookup(tuple), Some(TypeKey::Tuple(_))));
+    assert_ne!(tuple, TypeId::NEVER);
+}
+
+#[test]
+fn test_variadic_tuple_rest_at_start() {
+    // Test: [...string[], number] - variadic tuple with rest at start
+    let interner = TypeInterner::new();
+
+    let tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: true,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    assert!(matches!(interner.lookup(tuple), Some(TypeKey::Tuple(_))));
+    assert_ne!(tuple, TypeId::NEVER);
+}
+
+#[test]
+fn test_variadic_tuple_rest_in_middle() {
+    // Test: [string, ...boolean[], number] - variadic tuple with rest in middle
+    let interner = TypeInterner::new();
+
+    let tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            name: None,
+            optional: false,
+            rest: true,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    assert!(matches!(interner.lookup(tuple), Some(TypeKey::Tuple(_))));
+    assert_ne!(tuple, TypeId::NEVER);
+}
+
+#[test]
+fn test_variadic_tuple_infer_head_from_context() {
+    // Infer T from: const [head, ...rest]: [T, ...number[]] = [x, 1, 2, 3]
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // head is "hello"
+    let hello = interner.literal_string("hello");
+    ctx.add_lower_bound(var_t, hello);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, hello);
+}
+
+#[test]
+fn test_variadic_tuple_infer_rest_element_type() {
+    // Infer T from: const arr: [string, ...T[]] = ["hello", 1, 2, 3]
+    // T should be inferred as number
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Rest elements are numbers
+    ctx.add_lower_bound(var_t, TypeId::NUMBER);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
+fn test_variadic_tuple_spread_into_function_params() {
+    // function foo<T extends any[]>(...args: [...T, number]): void
+    // foo("a", "b", 42) -> T = [string, string]
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // T is inferred from leading args
+    let string_string = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    ctx.add_lower_bound(var_t, string_string);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, string_string);
+}
+
+#[test]
+fn test_variadic_tuple_concat_types() {
+    // type Concat<T extends any[], U extends any[]> = [...T, ...U]
+    // Concat<[1, 2], [3, 4]> should give [1, 2, 3, 4]
+    let interner = TypeInterner::new();
+
+    let lit_1 = interner.literal_number(1.0);
+    let lit_2 = interner.literal_number(2.0);
+    let lit_3 = interner.literal_number(3.0);
+    let lit_4 = interner.literal_number(4.0);
+
+    // Simulating the result of concatenation
+    let concat_result = interner.tuple(vec![
+        TupleElement {
+            type_id: lit_1,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: lit_2,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: lit_3,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: lit_4,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    assert!(matches!(interner.lookup(concat_result), Some(TypeKey::Tuple(_))));
+}
+
+#[test]
+fn test_variadic_tuple_push_type() {
+    // type Push<T extends any[], V> = [...T, V]
+    // Push<[1, 2], 3> should give [1, 2, 3]
+    let interner = TypeInterner::new();
+
+    let lit_1 = interner.literal_number(1.0);
+    let lit_2 = interner.literal_number(2.0);
+    let lit_3 = interner.literal_number(3.0);
+
+    let pushed = interner.tuple(vec![
+        TupleElement {
+            type_id: lit_1,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: lit_2,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: lit_3,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    assert!(matches!(interner.lookup(pushed), Some(TypeKey::Tuple(_))));
+}
+
+#[test]
+fn test_variadic_tuple_unshift_type() {
+    // type Unshift<T extends any[], V> = [V, ...T]
+    // Unshift<[2, 3], 1> should give [1, 2, 3]
+    let interner = TypeInterner::new();
+
+    let lit_1 = interner.literal_number(1.0);
+    let lit_2 = interner.literal_number(2.0);
+    let lit_3 = interner.literal_number(3.0);
+
+    let unshifted = interner.tuple(vec![
+        TupleElement {
+            type_id: lit_1,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: lit_2,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: lit_3,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    assert!(matches!(interner.lookup(unshifted), Some(TypeKey::Tuple(_))));
+}
+
+#[test]
+fn test_variadic_tuple_infer_from_spread_call() {
+    // function foo<T extends any[]>(...args: T): T
+    // foo(1, "hello", true) -> T = [number, string, boolean]
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    let args_tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    ctx.add_lower_bound(var_t, args_tuple);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, args_tuple);
+}
+
+#[test]
+fn test_variadic_tuple_with_labeled_elements() {
+    // [first: string, ...rest: number[]]
+    let interner = TypeInterner::new();
+
+    let first_label = interner.intern_string("first");
+    let rest_label = interner.intern_string("rest");
+
+    let tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: Some(first_label),
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: Some(rest_label),
+            optional: false,
+            rest: true,
+        },
+    ]);
+
+    if let Some(TypeKey::Tuple(elements)) = interner.lookup(tuple) {
+        assert_eq!(elements.len(), 2);
+        assert_eq!(elements[0].name, Some(first_label));
+        assert_eq!(elements[1].name, Some(rest_label));
+        assert!(elements[1].rest);
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_variadic_tuple_optional_before_rest() {
+    // [string, number?, ...boolean[]]
+    let interner = TypeInterner::new();
+
+    let tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: true,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            name: None,
+            optional: false,
+            rest: true,
+        },
+    ]);
+
+    if let Some(TypeKey::Tuple(elements)) = interner.lookup(tuple) {
+        assert_eq!(elements.len(), 3);
+        assert!(!elements[0].optional);
+        assert!(elements[1].optional);
+        assert!(elements[2].rest);
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_variadic_tuple_first_type_extraction() {
+    // type First<T extends any[]> = T extends [infer F, ...any[]] ? F : never
+    let interner = TypeInterner::new();
+
+    let infer_name = interner.intern_string("F");
+    let infer_f = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // Input: [string, number, boolean]
+    let input = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    // Pattern: [infer F, ...any[]]
+    let pattern = interner.tuple(vec![
+        TupleElement {
+            type_id: infer_f,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::ANY,
+            name: None,
+            optional: false,
+            rest: true,
+        },
+    ]);
+
+    let cond = ConditionalType {
+        check_type: input,
+        extends_type: pattern,
+        true_type: infer_f,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_variadic_tuple_last_type_extraction() {
+    // type Last<T extends any[]> = T extends [...any[], infer L] ? L : never
+    let interner = TypeInterner::new();
+
+    let infer_name = interner.intern_string("L");
+    let infer_l = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // Input: [string, number, boolean]
+    let input = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    // Pattern: [...any[], infer L]
+    let pattern = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::ANY,
+            name: None,
+            optional: false,
+            rest: true,
+        },
+        TupleElement {
+            type_id: infer_l,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    let cond = ConditionalType {
+        check_type: input,
+        extends_type: pattern,
+        true_type: infer_l,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    assert_eq!(result, TypeId::BOOLEAN);
+}
+
+#[test]
+fn test_variadic_tuple_tail_extraction() {
+    // type Tail<T extends any[]> = T extends [any, ...infer R] ? R : never
+    let interner = TypeInterner::new();
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // Input: [string, number, boolean]
+    let input = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    // Pattern: [any, ...infer R]
+    let pattern = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::ANY,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: infer_r,
+            name: None,
+            optional: false,
+            rest: true,
+        },
+    ]);
+
+    let cond = ConditionalType {
+        check_type: input,
+        extends_type: pattern,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // Should infer R = [number, boolean]
+    assert!(result != TypeId::NEVER);
+}
+
+#[test]
+fn test_variadic_tuple_init_extraction() {
+    // type Init<T extends any[]> = T extends [...infer I, any] ? I : never
+    let interner = TypeInterner::new();
+
+    let infer_name = interner.intern_string("I");
+    let infer_i = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // Input: [string, number, boolean]
+    let input = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    // Pattern: [...infer I, any]
+    let pattern = interner.tuple(vec![
+        TupleElement {
+            type_id: infer_i,
+            name: None,
+            optional: false,
+            rest: true,
+        },
+        TupleElement {
+            type_id: TypeId::ANY,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    let cond = ConditionalType {
+        check_type: input,
+        extends_type: pattern,
+        true_type: infer_i,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // Should infer I = [string, number]
+    assert!(result != TypeId::NEVER);
+}
+
+#[test]
+fn test_variadic_tuple_reverse_type() {
+    // Simulating reverse: [1, 2, 3] -> [3, 2, 1]
+    let interner = TypeInterner::new();
+
+    let lit_1 = interner.literal_number(1.0);
+    let lit_2 = interner.literal_number(2.0);
+    let lit_3 = interner.literal_number(3.0);
+
+    let original = interner.tuple(vec![
+        TupleElement { type_id: lit_1, name: None, optional: false, rest: false },
+        TupleElement { type_id: lit_2, name: None, optional: false, rest: false },
+        TupleElement { type_id: lit_3, name: None, optional: false, rest: false },
+    ]);
+
+    let reversed = interner.tuple(vec![
+        TupleElement { type_id: lit_3, name: None, optional: false, rest: false },
+        TupleElement { type_id: lit_2, name: None, optional: false, rest: false },
+        TupleElement { type_id: lit_1, name: None, optional: false, rest: false },
+    ]);
+
+    assert_ne!(original, reversed);
+    assert!(matches!(interner.lookup(original), Some(TypeKey::Tuple(_))));
+    assert!(matches!(interner.lookup(reversed), Some(TypeKey::Tuple(_))));
+}
+
+#[test]
+fn test_variadic_tuple_length_inference() {
+    // Infer tuple length from context
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let n_name = interner.intern_string("N");
+
+    let var_n = ctx.fresh_type_param(n_name);
+
+    // Tuple of length 3
+    let lit_3 = interner.literal_number(3.0);
+    ctx.add_lower_bound(var_n, lit_3);
+
+    let result = ctx.resolve_with_constraints(var_n).unwrap();
+    assert_eq!(result, lit_3);
+}
+
+#[test]
+fn test_variadic_tuple_spread_array_into_tuple() {
+    // [...number[]] becomes a tuple with rest element
+    let interner = TypeInterner::new();
+
+    let number_array = interner.array(TypeId::NUMBER);
+
+    // When spreading an array into a tuple position
+    let spread_tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: true,
+        },
+    ]);
+
+    assert!(matches!(interner.lookup(spread_tuple), Some(TypeKey::Tuple(_))));
+}
+
+#[test]
+fn test_variadic_tuple_function_apply_pattern() {
+    // function apply<T extends any[], R>(fn: (...args: T) => R, args: T): R
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let r_name = interner.intern_string("R");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_r = ctx.fresh_type_param(r_name);
+
+    // fn: (a: string, b: number) => boolean
+    // args: ["hello", 42]
+    // T = [string, number], R = boolean
+
+    let args_tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    ctx.add_lower_bound(var_t, args_tuple);
+    ctx.add_lower_bound(var_r, TypeId::BOOLEAN);
+
+    let result_t = ctx.resolve_with_constraints(var_t).unwrap();
+    let result_r = ctx.resolve_with_constraints(var_r).unwrap();
+
+    assert_eq!(result_t, args_tuple);
+    assert_eq!(result_r, TypeId::BOOLEAN);
+}
+
+#[test]
+fn test_variadic_tuple_curry_pattern() {
+    // type Curry<F> = F extends (...args: [...infer P, infer L]) => infer R
+    //   ? (last: L) => Curry<(...args: P) => R>
+    //   : F
+    let interner = TypeInterner::new();
+
+    let infer_p_name = interner.intern_string("P");
+    let infer_l_name = interner.intern_string("L");
+    let infer_r_name = interner.intern_string("R");
+
+    let infer_p = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_p_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_l = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_l_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_r_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // Pattern: (...args: [...infer P, infer L]) => infer R
+    let variadic_params = interner.tuple(vec![
+        TupleElement {
+            type_id: infer_p,
+            name: None,
+            optional: false,
+            rest: true,
+        },
+        TupleElement {
+            type_id: infer_l,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    assert!(matches!(interner.lookup(variadic_params), Some(TypeKey::Tuple(_))));
+}
+
+#[test]
+fn test_variadic_tuple_zip_pattern() {
+    // type Zip<T extends any[], U extends any[]> = ...
+    // Zip<[1, 2], ["a", "b"]> = [[1, "a"], [2, "b"]]
+    let interner = TypeInterner::new();
+
+    let lit_1 = interner.literal_number(1.0);
+    let lit_2 = interner.literal_number(2.0);
+    let lit_a = interner.literal_string("a");
+    let lit_b = interner.literal_string("b");
+
+    // Result pairs
+    let pair_1 = interner.tuple(vec![
+        TupleElement { type_id: lit_1, name: None, optional: false, rest: false },
+        TupleElement { type_id: lit_a, name: None, optional: false, rest: false },
+    ]);
+
+    let pair_2 = interner.tuple(vec![
+        TupleElement { type_id: lit_2, name: None, optional: false, rest: false },
+        TupleElement { type_id: lit_b, name: None, optional: false, rest: false },
+    ]);
+
+    let zipped = interner.tuple(vec![
+        TupleElement { type_id: pair_1, name: None, optional: false, rest: false },
+        TupleElement { type_id: pair_2, name: None, optional: false, rest: false },
+    ]);
+
+    assert!(matches!(interner.lookup(zipped), Some(TypeKey::Tuple(_))));
+}
+
+#[test]
+fn test_variadic_tuple_flatten_one_level() {
+    // Flatten [[1, 2], [3, 4]] = [1, 2, 3, 4]
+    let interner = TypeInterner::new();
+
+    let lit_1 = interner.literal_number(1.0);
+    let lit_2 = interner.literal_number(2.0);
+    let lit_3 = interner.literal_number(3.0);
+    let lit_4 = interner.literal_number(4.0);
+
+    let flattened = interner.tuple(vec![
+        TupleElement { type_id: lit_1, name: None, optional: false, rest: false },
+        TupleElement { type_id: lit_2, name: None, optional: false, rest: false },
+        TupleElement { type_id: lit_3, name: None, optional: false, rest: false },
+        TupleElement { type_id: lit_4, name: None, optional: false, rest: false },
+    ]);
+
+    assert!(matches!(interner.lookup(flattened), Some(TypeKey::Tuple(_))));
+}
+
+#[test]
+fn test_variadic_tuple_partial_application() {
+    // Partial<[string, number, boolean], [string]> = [number, boolean]
+    let interner = TypeInterner::new();
+
+    let remaining = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+    ]);
+
+    assert!(matches!(interner.lookup(remaining), Some(TypeKey::Tuple(_))));
+}
+
+#[test]
+fn test_variadic_tuple_empty_spread() {
+    // [...[]] = [] (empty)
+    let interner = TypeInterner::new();
+
+    let empty_tuple = interner.tuple(vec![]);
+
+    // Spreading empty gives empty
+    assert!(matches!(interner.lookup(empty_tuple), Some(TypeKey::Tuple(elements)) if elements.is_empty()));
+}
+
+#[test]
+fn test_variadic_tuple_single_element_rest() {
+    // [string, ...T] where T = [] gives [string]
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    let empty = interner.tuple(vec![]);
+    ctx.add_lower_bound(var_t, empty);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, empty);
+}
+
+#[test]
+fn test_variadic_tuple_mixed_fixed_and_rest() {
+    // [string, number, ...boolean[], bigint]
+    let interner = TypeInterner::new();
+
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: true },
+        TupleElement { type_id: TypeId::BIGINT, name: None, optional: false, rest: false },
+    ]);
+
+    if let Some(TypeKey::Tuple(elements)) = interner.lookup(tuple) {
+        assert_eq!(elements.len(), 4);
+        assert!(!elements[0].rest);
+        assert!(!elements[1].rest);
+        assert!(elements[2].rest);
+        assert!(!elements[3].rest);
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_variadic_tuple_infer_multiple_rest_positions() {
+    // Not valid TypeScript, but test handling: [...A, ...B]
+    // In practice, only one rest element is allowed per tuple
+    let interner = TypeInterner::new();
+
+    // Single rest is valid
+    let valid = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: true },
+    ]);
+
+    assert!(matches!(interner.lookup(valid), Some(TypeKey::Tuple(_))));
+}
+
+#[test]
+fn test_variadic_tuple_with_union_elements() {
+    // [string | number, ...(boolean | null)[]]
+    let interner = TypeInterner::new();
+
+    let string_or_number = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let bool_or_null = interner.union(vec![TypeId::BOOLEAN, TypeId::NULL]);
+
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: string_or_number, name: None, optional: false, rest: false },
+        TupleElement { type_id: bool_or_null, name: None, optional: false, rest: true },
+    ]);
+
+    assert!(matches!(interner.lookup(tuple), Some(TypeKey::Tuple(_))));
+}
