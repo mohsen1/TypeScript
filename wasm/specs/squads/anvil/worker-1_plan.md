@@ -6,7 +6,7 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-- [ ] (empty - awaiting next task)
+- [ ] Add ES5 tests for class expression patterns (anonymous class, named class expression, class in return statement, class in array, IIFE class) in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
 
 ## Task Queue
 - [ ] (empty)
