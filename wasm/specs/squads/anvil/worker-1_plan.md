@@ -6,7 +6,22 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-(none - awaiting new assignment from EM-Anvil)
+Add ES5 class tests for Symbol.species patterns
+
+Per GOALS.md Objective 1: ES5 downleveling correctness
+
+Steps:
+1. Add 6 ES5 class tests for Symbol.species patterns to `wasm/src/transforms/class_es5_tests.rs`:
+   - Basic Symbol.species getter
+   - Species in derived class
+   - Species with custom constructor
+   - Species in Array subclass
+   - Species in Promise subclass
+   - Combined species patterns
+2. Run `./wasm/test.sh class_es5_tests` to verify all tests pass
+3. Commit with message: `[wasm] transforms: add Symbol.species ES5 class tests`
+4. Push to `origin/worker/anvil-1`
+5. Update this plan file and push
 
 ## Task Queue
 (empty)
