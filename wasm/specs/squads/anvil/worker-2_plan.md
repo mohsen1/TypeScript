@@ -13,6 +13,7 @@ Priority: 2
 - [ ] (empty)
 
 ## Completed
+- [x] Added ES5 spread parameter parity tests (method-call, typed-array, constructor, nested) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (196 tests).
 - [x] Added ES5 default parameter parity tests (class-method, arrow, expression, constructor) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (192 tests).
 - [x] Added ES5 rest parameter parity tests (nested, overload, tuple, callback) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (188 tests).
 - [x] Added ES5 rest parameter parity tests (generator, async, destructuring, constructor) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (184 tests).
