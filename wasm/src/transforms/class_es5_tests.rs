@@ -45889,3 +45889,718 @@ const eventStream = new EventStream<string>();
         output
     );
 }
+
+/// Test basic event emitter class
+#[test]
+fn test_class_es5_event_emitter_basic() {
+    let source = r#"
+type EventCallback = (...args: any[]) => void;
+
+class EventEmitter {
+    private events: Map<string, Set<EventCallback>>;
+
+    constructor() {
+        this.events = new Map();
+    }
+
+    on(event: string, callback: EventCallback): void {
+        if (!this.events.has(event)) {
+            this.events.set(event, new Set());
+        }
+        this.events.get(event)!.add(callback);
+    }
+
+    off(event: string, callback: EventCallback): void {
+        const callbacks = this.events.get(event);
+        if (callbacks) {
+            callbacks.delete(callback);
+        }
+    }
+
+    emit(event: string, ...args: any[]): void {
+        const callbacks = this.events.get(event);
+        if (callbacks) {
+            callbacks.forEach(callback => callback(...args));
+        }
+    }
+
+    once(event: string, callback: EventCallback): void {
+        const wrapper: EventCallback = (...args) => {
+            this.off(event, wrapper);
+            callback(...args);
+        };
+        this.on(event, wrapper);
+    }
+
+    listenerCount(event: string): number {
+        return this.events.get(event)?.size ?? 0;
+    }
+
+    removeAllListeners(event?: string): void {
+        if (event) {
+            this.events.delete(event);
+        } else {
+            this.events.clear();
+        }
+    }
+}
+
+class ButtonComponent extends EventEmitter {
+    private label: string;
+
+    constructor(label: string) {
+        super();
+        this.label = label;
+    }
+
+    click(): void {
+        this.emit('click', { label: this.label, timestamp: Date.now() });
+    }
+
+    getLabel(): string {
+        return this.label;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+    let output = printer.get_output().to_string();
+
+    // Should have ES5 class structure
+    assert!(
+        output.contains("EventEmitter") && output.contains("ButtonComponent"),
+        "Expected class names: {}",
+        output
+    );
+
+    // Should have event methods
+    assert!(
+        output.contains("on") && output.contains("emit") && output.contains("off"),
+        "Expected event methods: {}",
+        output
+    );
+}
+
+/// Test observable with subscribe/unsubscribe
+#[test]
+fn test_class_es5_observable_subscribe() {
+    let source = r#"
+interface Observer<T> {
+    next(value: T): void;
+    error?(err: Error): void;
+    complete?(): void;
+}
+
+interface Subscription {
+    unsubscribe(): void;
+    readonly closed: boolean;
+}
+
+class Observable<T> {
+    private subscribers: Set<Observer<T>>;
+    private isComplete: boolean;
+
+    constructor() {
+        this.subscribers = new Set();
+        this.isComplete = false;
+    }
+
+    subscribe(observer: Observer<T>): Subscription {
+        if (this.isComplete) {
+            observer.complete?.();
+            return { unsubscribe: () => {}, closed: true };
+        }
+
+        this.subscribers.add(observer);
+
+        return {
+            unsubscribe: () => {
+                this.subscribers.delete(observer);
+            },
+            get closed() {
+                return !this.subscribers.has(observer);
+            }
+        };
+    }
+
+    next(value: T): void {
+        if (this.isComplete) return;
+        this.subscribers.forEach(observer => observer.next(value));
+    }
+
+    error(err: Error): void {
+        if (this.isComplete) return;
+        this.subscribers.forEach(observer => observer.error?.(err));
+        this.complete();
+    }
+
+    complete(): void {
+        if (this.isComplete) return;
+        this.isComplete = true;
+        this.subscribers.forEach(observer => observer.complete?.());
+        this.subscribers.clear();
+    }
+}
+
+class DataStream extends Observable<number> {
+    private interval: number | null;
+
+    constructor() {
+        super();
+        this.interval = null;
+    }
+
+    start(intervalMs: number): void {
+        let counter = 0;
+        this.interval = setInterval(() => {
+            this.next(counter++);
+        }, intervalMs) as unknown as number;
+    }
+
+    stop(): void {
+        if (this.interval !== null) {
+            clearInterval(this.interval);
+            this.interval = null;
+        }
+        this.complete();
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+    let output = printer.get_output().to_string();
+
+    // Should have ES5 class structure
+    assert!(
+        output.contains("Observable") && output.contains("DataStream"),
+        "Expected class names: {}",
+        output
+    );
+
+    // Should have observable methods
+    assert!(
+        output.contains("subscribe") && output.contains("next") && output.contains("complete"),
+        "Expected observable methods: {}",
+        output
+    );
+}
+
+/// Test event delegation pattern
+#[test]
+fn test_class_es5_event_delegation() {
+    let source = r#"
+interface DelegatedEvent {
+    type: string;
+    target: string;
+    data: unknown;
+}
+
+class EventDelegator {
+    private handlers: Map<string, Map<string, (event: DelegatedEvent) => void>>;
+
+    constructor() {
+        this.handlers = new Map();
+    }
+
+    delegate(eventType: string, selector: string, handler: (event: DelegatedEvent) => void): void {
+        if (!this.handlers.has(eventType)) {
+            this.handlers.set(eventType, new Map());
+        }
+        this.handlers.get(eventType)!.set(selector, handler);
+    }
+
+    undelegate(eventType: string, selector?: string): void {
+        if (selector) {
+            this.handlers.get(eventType)?.delete(selector);
+        } else {
+            this.handlers.delete(eventType);
+        }
+    }
+
+    dispatch(event: DelegatedEvent): void {
+        const typeHandlers = this.handlers.get(event.type);
+        if (typeHandlers) {
+            const handler = typeHandlers.get(event.target);
+            if (handler) {
+                handler(event);
+            }
+        }
+    }
+
+    getHandlerCount(eventType: string): number {
+        return this.handlers.get(eventType)?.size ?? 0;
+    }
+}
+
+class UIController {
+    private delegator: EventDelegator;
+    private componentId: string;
+
+    constructor(componentId: string) {
+        this.delegator = new EventDelegator();
+        this.componentId = componentId;
+        this.setupDelegation();
+    }
+
+    private setupDelegation(): void {
+        this.delegator.delegate('click', 'button', (event) => {
+            console.log('Button clicked:', event.data);
+        });
+
+        this.delegator.delegate('change', 'input', (event) => {
+            console.log('Input changed:', event.data);
+        });
+    }
+
+    handleEvent(event: DelegatedEvent): void {
+        this.delegator.dispatch(event);
+    }
+
+    getComponentId(): string {
+        return this.componentId;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+    let output = printer.get_output().to_string();
+
+    // Should have ES5 class structure
+    assert!(
+        output.contains("EventDelegator") && output.contains("UIController"),
+        "Expected class names: {}",
+        output
+    );
+
+    // Should have delegation methods
+    assert!(
+        output.contains("delegate") && output.contains("dispatch") && output.contains("undelegate"),
+        "Expected delegation methods: {}",
+        output
+    );
+}
+
+/// Test typed event emitter
+#[test]
+fn test_class_es5_typed_event_emitter() {
+    let source = r#"
+interface EventMap {
+    'user:login': { userId: string; timestamp: number };
+    'user:logout': { userId: string };
+    'data:update': { key: string; value: unknown };
+    'error': Error;
+}
+
+type EventName = keyof EventMap;
+
+class TypedEventEmitter<T extends Record<string, unknown>> {
+    private listeners: Map<keyof T, Set<(data: any) => void>>;
+
+    constructor() {
+        this.listeners = new Map();
+    }
+
+    on<K extends keyof T>(event: K, callback: (data: T[K]) => void): () => void {
+        if (!this.listeners.has(event)) {
+            this.listeners.set(event, new Set());
+        }
+        this.listeners.get(event)!.add(callback);
+        return () => this.off(event, callback);
+    }
+
+    off<K extends keyof T>(event: K, callback: (data: T[K]) => void): void {
+        this.listeners.get(event)?.delete(callback);
+    }
+
+    emit<K extends keyof T>(event: K, data: T[K]): void {
+        this.listeners.get(event)?.forEach(callback => callback(data));
+    }
+
+    clear(): void {
+        this.listeners.clear();
+    }
+}
+
+class UserEventBus extends TypedEventEmitter<EventMap> {
+    private currentUser: string | null;
+
+    constructor() {
+        super();
+        this.currentUser = null;
+    }
+
+    login(userId: string): void {
+        this.currentUser = userId;
+        this.emit('user:login', { userId, timestamp: Date.now() });
+    }
+
+    logout(): void {
+        if (this.currentUser) {
+            this.emit('user:logout', { userId: this.currentUser });
+            this.currentUser = null;
+        }
+    }
+
+    updateData(key: string, value: unknown): void {
+        this.emit('data:update', { key, value });
+    }
+
+    reportError(error: Error): void {
+        this.emit('error', error);
+    }
+
+    getCurrentUser(): string | null {
+        return this.currentUser;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+    let output = printer.get_output().to_string();
+
+    // Should have ES5 class structure
+    assert!(
+        output.contains("TypedEventEmitter") && output.contains("UserEventBus"),
+        "Expected class names: {}",
+        output
+    );
+
+    // Should have typed event methods
+    assert!(
+        output.contains("login") && output.contains("logout") && output.contains("emit"),
+        "Expected typed event methods: {}",
+        output
+    );
+}
+
+/// Test async event handling
+#[test]
+fn test_class_es5_async_event_handler() {
+    let source = r#"
+interface AsyncEventHandler<T> {
+    (data: T): Promise<void>;
+}
+
+class AsyncEventEmitter<T extends Record<string, unknown>> {
+    private handlers: Map<keyof T, Set<AsyncEventHandler<any>>>;
+    private pendingEmits: Map<string, Promise<void>>;
+
+    constructor() {
+        this.handlers = new Map();
+        this.pendingEmits = new Map();
+    }
+
+    on<K extends keyof T>(event: K, handler: AsyncEventHandler<T[K]>): () => void {
+        if (!this.handlers.has(event)) {
+            this.handlers.set(event, new Set());
+        }
+        this.handlers.get(event)!.add(handler);
+        return () => this.off(event, handler);
+    }
+
+    off<K extends keyof T>(event: K, handler: AsyncEventHandler<T[K]>): void {
+        this.handlers.get(event)?.delete(handler);
+    }
+
+    async emit<K extends keyof T>(event: K, data: T[K]): Promise<void> {
+        const eventHandlers = this.handlers.get(event);
+        if (!eventHandlers) return;
+
+        const promises = Array.from(eventHandlers).map(handler => handler(data));
+        const emitId = `${String(event)}-${Date.now()}`;
+        const pendingPromise = Promise.all(promises).then(() => {});
+        this.pendingEmits.set(emitId, pendingPromise);
+
+        try {
+            await pendingPromise;
+        } finally {
+            this.pendingEmits.delete(emitId);
+        }
+    }
+
+    async emitSerial<K extends keyof T>(event: K, data: T[K]): Promise<void> {
+        const eventHandlers = this.handlers.get(event);
+        if (!eventHandlers) return;
+
+        for (const handler of eventHandlers) {
+            await handler(data);
+        }
+    }
+
+    hasPendingEmits(): boolean {
+        return this.pendingEmits.size > 0;
+    }
+
+    async waitForPending(): Promise<void> {
+        await Promise.all(this.pendingEmits.values());
+    }
+}
+
+interface MessageEvents {
+    'message:received': { id: string; content: string };
+    'message:sent': { id: string; recipient: string };
+    'message:error': { id: string; error: Error };
+}
+
+class MessageProcessor extends AsyncEventEmitter<MessageEvents> {
+    private processedCount: number;
+
+    constructor() {
+        super();
+        this.processedCount = 0;
+    }
+
+    async processMessage(id: string, content: string): Promise<void> {
+        await this.emit('message:received', { id, content });
+        this.processedCount++;
+    }
+
+    async sendMessage(id: string, recipient: string): Promise<void> {
+        await this.emit('message:sent', { id, recipient });
+    }
+
+    async reportError(id: string, error: Error): Promise<void> {
+        await this.emit('message:error', { id, error });
+    }
+
+    getProcessedCount(): number {
+        return this.processedCount;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+    let output = printer.get_output().to_string();
+
+    // Should have ES5 class structure
+    assert!(
+        output.contains("AsyncEventEmitter") && output.contains("MessageProcessor"),
+        "Expected class names: {}",
+        output
+    );
+
+    // Should have async event methods
+    assert!(
+        output.contains("emit") && output.contains("emitSerial") && output.contains("processMessage"),
+        "Expected async event methods: {}",
+        output
+    );
+}
+
+/// Test combined observable patterns
+#[test]
+fn test_class_es5_observable_combined() {
+    let source = r#"
+type Unsubscribe = () => void;
+
+interface StateChange<T> {
+    previous: T;
+    current: T;
+    path: string[];
+}
+
+class Store<T extends object> {
+    private state: T;
+    private listeners: Set<(change: StateChange<T>) => void>;
+    private middleware: Array<(change: StateChange<T>) => StateChange<T> | null>;
+
+    constructor(initialState: T) {
+        this.state = initialState;
+        this.listeners = new Set();
+        this.middleware = [];
+    }
+
+    getState(): T {
+        return this.state;
+    }
+
+    setState(updater: (state: T) => Partial<T>, path: string[] = []): void {
+        const previous = { ...this.state };
+        const updates = updater(this.state);
+        this.state = { ...this.state, ...updates };
+
+        let change: StateChange<T> | null = {
+            previous,
+            current: this.state,
+            path
+        };
+
+        for (const mw of this.middleware) {
+            change = mw(change!);
+            if (!change) return;
+        }
+
+        this.listeners.forEach(listener => listener(change!));
+    }
+
+    subscribe(listener: (change: StateChange<T>) => void): Unsubscribe {
+        this.listeners.add(listener);
+        return () => this.listeners.delete(listener);
+    }
+
+    addMiddleware(mw: (change: StateChange<T>) => StateChange<T> | null): void {
+        this.middleware.push(mw);
+    }
+}
+
+interface AppState {
+    user: { name: string; loggedIn: boolean };
+    items: string[];
+    loading: boolean;
+}
+
+class AppStore extends Store<AppState> {
+    constructor() {
+        super({
+            user: { name: '', loggedIn: false },
+            items: [],
+            loading: false
+        });
+        this.setupMiddleware();
+    }
+
+    private setupMiddleware(): void {
+        this.addMiddleware((change) => {
+            console.log('State changed:', change.path);
+            return change;
+        });
+    }
+
+    login(name: string): void {
+        this.setState(state => ({
+            user: { name, loggedIn: true }
+        }), ['user']);
+    }
+
+    logout(): void {
+        this.setState(state => ({
+            user: { name: '', loggedIn: false }
+        }), ['user']);
+    }
+
+    addItem(item: string): void {
+        this.setState(state => ({
+            items: [...state.items, item]
+        }), ['items']);
+    }
+
+    setLoading(loading: boolean): void {
+        this.setState(() => ({ loading }), ['loading']);
+    }
+}
+
+class StoreConnector<T extends object> {
+    private store: Store<T>;
+    private subscriptions: Map<string, Unsubscribe>;
+
+    constructor(store: Store<T>) {
+        this.store = store;
+        this.subscriptions = new Map();
+    }
+
+    connect(id: string, selector: (state: T) => unknown, callback: (value: unknown) => void): void {
+        const unsubscribe = this.store.subscribe((change) => {
+            const value = selector(change.current);
+            callback(value);
+        });
+        this.subscriptions.set(id, unsubscribe);
+    }
+
+    disconnect(id: string): void {
+        const unsubscribe = this.subscriptions.get(id);
+        if (unsubscribe) {
+            unsubscribe();
+            this.subscriptions.delete(id);
+        }
+    }
+
+    disconnectAll(): void {
+        this.subscriptions.forEach(unsubscribe => unsubscribe());
+        this.subscriptions.clear();
+    }
+
+    getConnectionCount(): number {
+        return this.subscriptions.size;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+    let output = printer.get_output().to_string();
+
+    // Should have ES5 class structure
+    assert!(
+        output.contains("Store") && output.contains("AppStore") && output.contains("StoreConnector"),
+        "Expected class names: {}",
+        output
+    );
+
+    // Should have combined methods
+    assert!(
+        output.contains("subscribe") && output.contains("setState") && output.contains("connect"),
+        "Expected combined methods: {}",
+        output
+    );
+
+    // Type alias should be stripped
+    assert!(
+        !output.contains("type Unsubscribe"),
+        "Expected type alias to be stripped: {}",
+        output
+    );
+
+    // Interface should be stripped
+    assert!(
+        !output.contains("interface StateChange") && !output.contains("interface AppState"),
+        "Expected interfaces to be stripped: {}",
+        output
+    );
+}

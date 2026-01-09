@@ -6,27 +6,13 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-Add ES5 class tests for observable/event emitter patterns
-
-Per GOALS.md Objective 1: ES5 downleveling correctness
-
-Steps:
-1. Add 6 ES5 class tests for observable/event emitter patterns to `wasm/src/transforms/class_es5_tests.rs`:
-   - Basic event emitter class
-   - Observable with subscribe/unsubscribe
-   - Event delegation pattern
-   - Typed event emitter
-   - Async event handling
-   - Combined observable patterns
-2. Run `./wasm/test.sh class_es5_tests` to verify all tests pass
-3. Commit with message: `[wasm] transforms: add observable/event emitter ES5 class tests`
-4. Push to `origin/worker/anvil-1`
-5. Update this plan file and push
+(awaiting assignment)
 
 ## Task Queue
-(empty - will receive new tasks from EM after completing current assignment)
+(empty)
 
 ## Completed
+- [x] Added ES5 tests for observable/event emitter patterns (6 tests): basic event emitter, subscribe/unsubscribe, event delegation, typed event emitter, async event handling, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 536 pass).
 - [x] Added ES5 tests for error boundary patterns (6 tests): try/catch, componentDidCatch, getDerivedStateFromError, nested boundaries, async error handling, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 530 pass).
 - [x] Added ES5 tests for BigInt integration patterns (6 tests): class property, arithmetic methods, comparison operations, constructor parameter, static field, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 524 pass).
 - [x] Added ES5 tests for Proxy/Reflect patterns (6 tests): basic handler, Reflect.get/set, revocable access control, class instance wrapper, Reflect.construct with prototype, combined observable pattern. Ran `./wasm/test.sh class_es5_tests` (all 518 pass).
