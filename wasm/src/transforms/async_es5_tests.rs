@@ -13167,3 +13167,104 @@ fn test_async_derived_ignores_nested_async() {
     );
     assert!(!result, "Should not detect await inside nested async in derived class");
 }
+
+// ============================================================================
+// ASYNC COMPUTED SUPER PROPERTY ACCESS TESTS
+// Tests for computed super property access: super[key], super["method"]()
+// ============================================================================
+
+#[test]
+fn test_async_super_computed_key() {
+    let result = async_error_propagation_contains_await(
+        "async function computed(key) { return await super[key](); }",
+    );
+    assert!(result, "Should detect await in super[key] access");
+}
+
+#[test]
+fn test_async_super_computed_call() {
+    let result = async_error_propagation_contains_await(
+        "async function computedCall() { return await super[getMethod()](); }",
+    );
+    assert!(result, "Should detect await in super[computed()] call");
+}
+
+#[test]
+fn test_async_super_string_key() {
+    let result = async_error_propagation_contains_await(
+        "async function stringKey() { return await super[\"method\"](); }",
+    );
+    assert!(result, "Should detect await in super[\"method\"]() call");
+}
+
+#[test]
+fn test_async_super_symbol() {
+    let result = async_error_propagation_contains_await(
+        "async function symbolKey() { return await super[Symbol.iterator](); }",
+    );
+    assert!(result, "Should detect await in super[Symbol.iterator] pattern");
+}
+
+#[test]
+fn test_async_super_computed_read() {
+    let result = async_error_propagation_contains_await(
+        "async function readSuper(key) { return await super[key]; }",
+    );
+    assert!(result, "Should detect await in super[key] read");
+}
+
+#[test]
+fn test_async_super_computed_write() {
+    let result = async_error_propagation_contains_await(
+        "async function writeSuper(key) { super[key] = await getValue(); }",
+    );
+    assert!(result, "Should detect await in super[key] write");
+}
+
+#[test]
+fn test_async_super_computed_try_catch() {
+    let result = async_error_propagation_contains_await(
+        "async function tryCatch(key) { try { return await super[key](); } catch { return null; } }",
+    );
+    assert!(result, "Should detect await in super[key] in try/catch");
+}
+
+#[test]
+fn test_async_super_computed_chain() {
+    let result = async_error_propagation_contains_await(
+        "async function chain(k1, k2) { return await super[k1][k2](); }",
+    );
+    assert!(result, "Should detect await in chained super[k1][k2] access");
+}
+
+#[test]
+fn test_async_super_computed_conditional() {
+    let result = async_error_propagation_contains_await(
+        "async function conditional(key) { return key ? await super[key]() : null; }",
+    );
+    assert!(result, "Should detect await in conditional super[key]");
+}
+
+#[test]
+fn test_async_super_computed_template() {
+    let result = async_error_propagation_contains_await(
+        "async function template(name) { return await super[`get${name}`](); }",
+    );
+    assert!(result, "Should detect await in super with template literal key");
+}
+
+#[test]
+fn test_async_super_computed_no_await() {
+    let result = async_error_propagation_contains_await(
+        "async function syncSuper(key) { return super[key]; }",
+    );
+    assert!(!result, "Should not detect await when computed super is sync");
+}
+
+#[test]
+fn test_async_super_computed_ignores_nested() {
+    let result = async_error_propagation_contains_await(
+        "async function outer() { const fn = async (key) => await super[key](); }",
+    );
+    assert!(!result, "Should not detect await inside nested async with super[key]");
+}

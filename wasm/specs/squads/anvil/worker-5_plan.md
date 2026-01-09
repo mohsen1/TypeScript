@@ -7,33 +7,14 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-Add async ES5 tests for computed super property access patterns
-
-Per GOALS.md Objective 1: "Match tsc for computed super[...] cases"
-
-Steps:
-1. Add 12 async computed super tests to `wasm/src/transforms/async_es5_tests.rs`:
-   - async method with super[key] access
-   - async method with super[computed()] call
-   - async arrow with super property
-   - async static with super access
-   - async generator with super[key]
-   - super[key] in try/catch async
-   - super[Symbol.iterator] async pattern
-   - super["method"]() async call
-   - body_contains_await tests for super patterns
-   - ignores nested async patterns
-   - Combined computed super patterns
-2. Run `./wasm/test.sh async_es5_tests` to verify all tests pass
-3. Commit with message: `[wasm] async_es5: add computed super property access tests`
-4. Push to `origin/worker/anvil-5`
-5. Update this plan file and push
+None - awaiting new task
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)
 
 
 ## Completed
+- [x] Added 12 async computed super property access tests (computed_key, computed_call, string_key, symbol, computed_read, computed_write, try_catch, chain, conditional, template, no await, ignores nested) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (988 tests PASS).
 - [x] Added 12 async derived class edge case tests (field_initializer, arrow_after_super, super_method, static_this, nested_arrow_this, param_property, generator, multiple_fields, computed_field, super_property, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (976 tests PASS).
 - [x] Added 12 async transaction pattern tests (begin, commit, rollback, savepoint, nested, timeout, try_catch, conditional, isolation, execute, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (964 tests PASS).
 - [x] Added 12 async resource pool pattern tests (acquire, release, drain, resize, create, destroy, validate, evict, warmup, health_check, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (952 tests PASS).
