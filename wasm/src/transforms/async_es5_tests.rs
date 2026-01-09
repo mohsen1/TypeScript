@@ -11248,3 +11248,104 @@ fn test_async_mutex_ignores_nested_async() {
     );
     assert!(!result, "Should not detect await inside nested async in mutex function");
 }
+
+// ============================================================================
+// ASYNC BARRIER PATTERN TESTS
+// Tests for barrier patterns: wait all, count down, reset, timeout
+// ============================================================================
+
+#[test]
+fn test_async_barrier_wait() {
+    let result = async_error_propagation_contains_await(
+        "async function wait() { await barrier.wait(); }",
+    );
+    assert!(result, "Should detect await in barrier wait");
+}
+
+#[test]
+fn test_async_barrier_wait_all() {
+    let result = async_error_propagation_contains_await(
+        "async function waitAll() { await barrier.waitForAll(); }",
+    );
+    assert!(result, "Should detect await in barrier wait all");
+}
+
+#[test]
+fn test_async_barrier_count_down() {
+    let result = async_error_propagation_contains_await(
+        "async function countDown() { await latch.countDown(); }",
+    );
+    assert!(result, "Should detect await in count down latch");
+}
+
+#[test]
+fn test_async_barrier_reset() {
+    let result = async_error_propagation_contains_await(
+        "async function reset() { await barrier.reset(); }",
+    );
+    assert!(result, "Should detect await in barrier reset");
+}
+
+#[test]
+fn test_async_barrier_timeout() {
+    let result = async_error_propagation_contains_await(
+        "async function waitTimeout() { return await barrier.waitWithTimeout(5000); }",
+    );
+    assert!(result, "Should detect await in barrier wait with timeout");
+}
+
+#[test]
+fn test_async_barrier_arrive() {
+    let result = async_error_propagation_contains_await(
+        "async function arrive() { await barrier.arrive(); }",
+    );
+    assert!(result, "Should detect await in barrier arrive");
+}
+
+#[test]
+fn test_async_barrier_parties() {
+    let result = async_error_propagation_contains_await(
+        "async function getParties() { return await barrier.getNumberWaiting(); }",
+    );
+    assert!(result, "Should detect await in barrier parties check");
+}
+
+#[test]
+fn test_async_barrier_phase() {
+    let result = async_error_propagation_contains_await(
+        "async function awaitPhase() { await phaser.arriveAndAwaitAdvance(); }",
+    );
+    assert!(result, "Should detect await in phase completion");
+}
+
+#[test]
+fn test_async_barrier_broken() {
+    let result = async_error_propagation_contains_await(
+        "async function checkBroken() { return await barrier.isBroken(); }",
+    );
+    assert!(result, "Should detect await in broken barrier check");
+}
+
+#[test]
+fn test_async_barrier_action() {
+    let result = async_error_propagation_contains_await(
+        "async function barrierAction() { await barrier.runAction(); }",
+    );
+    assert!(result, "Should detect await in barrier action execution");
+}
+
+#[test]
+fn test_async_barrier_no_await() {
+    let result = async_error_propagation_contains_await(
+        "async function syncBarrier() { return barrier.getParties(); }",
+    );
+    assert!(!result, "Should not detect await when barrier access is sync");
+}
+
+#[test]
+fn test_async_barrier_ignores_nested_async() {
+    let result = async_error_propagation_contains_await(
+        "async function outer() { const waiter = async () => await barrier.wait(); }",
+    );
+    assert!(!result, "Should not detect await inside nested async in barrier function");
+}
