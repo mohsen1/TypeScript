@@ -7848,3 +7848,229 @@ class AsyncDataFetcher extends DataFetcher {
         output
     );
 }
+
+// ============================================================================
+// ES5 PRIVATE FIELD ACCESSOR PARITY TESTS
+// ============================================================================
+
+#[test]
+fn test_parity_es5_private_accessor_getter() {
+    let source = r#"
+class Person {
+    #name: string = "Anonymous";
+
+    get #privateName(): string {
+        return this.#name;
+    }
+
+    getName(): string {
+        return this.#privateName;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the class
+    assert!(
+        output.contains("Person"),
+        "Output should contain Person class: {}",
+        output
+    );
+    // Private field syntax should be transformed
+    assert!(
+        !output.contains("#name") && !output.contains("#privateName"),
+        "Private field syntax should be transformed: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_private_accessor_setter() {
+    let source = r#"
+class Counter {
+    #count: number = 0;
+
+    set #privateCount(value: number) {
+        this.#count = value;
+    }
+
+    setCount(value: number): void {
+        this.#privateCount = value;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the class
+    assert!(
+        output.contains("Counter"),
+        "Output should contain Counter class: {}",
+        output
+    );
+    // Private field syntax should be transformed
+    assert!(
+        !output.contains("#count") && !output.contains("#privateCount"),
+        "Private field syntax should be transformed: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number") && !output.contains(": void"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_private_accessor_pair() {
+    let source = r#"
+class Temperature {
+    #celsius: number = 0;
+
+    get #privateTemp(): number {
+        return this.#celsius;
+    }
+
+    set #privateTemp(value: number) {
+        this.#celsius = value;
+    }
+
+    get fahrenheit(): number {
+        return this.#privateTemp * 9 / 5 + 32;
+    }
+
+    set fahrenheit(value: number) {
+        this.#privateTemp = (value - 32) * 5 / 9;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the class
+    assert!(
+        output.contains("Temperature"),
+        "Output should contain Temperature class: {}",
+        output
+    );
+    // Private field syntax should be transformed
+    assert!(
+        !output.contains("#celsius") && !output.contains("#privateTemp"),
+        "Private field syntax should be transformed: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_private_accessor_static() {
+    let source = r#"
+class Registry {
+    static #items: string[] = [];
+
+    static get #privateItems(): string[] {
+        return Registry.#items;
+    }
+
+    static getAll(): string[] {
+        return Registry.#privateItems;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Should contain the class
+    assert!(
+        output.contains("Registry"),
+        "Output should contain Registry class: {}",
+        output
+    );
+    // Should use __classPrivateFieldGet helper for private field access
+    assert!(
+        output.contains("__classPrivateFieldGet") || !output.contains("#items"),
+        "Output should transform private fields: {}",
+        output
+    );
+}
