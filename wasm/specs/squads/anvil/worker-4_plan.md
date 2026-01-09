@@ -7,10 +7,10 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [ ] Add ES5 class tests for mixin factory patterns: base class mixins, trait composition, constrained mixins, parameterized mixins. Tests: `./wasm/test.sh class_es5_tests`
+- [ ] Add ES5 class tests for decorator factory patterns: decorator with parameters, composed decorators, metadata decorators. Tests: `./wasm/test.sh class_es5_tests`
 
 ## Task Queue
-- [ ] Add ES5 class tests for decorator factory patterns: decorator with parameters, composed decorators
+- [ ] Add ES5 class tests for class field initializer patterns: complex initializers, computed field names
 
 ## Completed
 - [x] Add ES5 class tests for branded type patterns. Tests: `./wasm/test.sh class_es5_tests`
