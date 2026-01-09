@@ -8,12 +8,13 @@ Priority: 1
 Blocked: Awaiting next EM-Anvil assignment.
 
 ## Current Assignment
-- [ ] Add ES5 class tests for WeakMap/WeakSet patterns in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
+- [ ] Add ES5 class tests for Map/Set patterns in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added ES5 tests for WeakMap/WeakSet patterns (6 tests): WeakMap cache pattern, WeakSet membership pattern, WeakMap metadata pattern, WeakSet visited pattern, in constructor, combined. Ran `./wasm/test.sh class_es5_tests` (all 293 pass).
 - [x] Added ES5 tests for Object.getOwnPropertyNames/getOwnPropertySymbols patterns (6 tests): getOwnPropertyNames basic, getOwnPropertySymbols basic, get all property keys, property reflection, in constructor, combined. Ran `./wasm/test.sh class_es5_tests` (all 288 pass).
 - [x] Added ES5 tests for Array.find/findIndex/fill/copyWithin patterns (6 tests): find basic, findIndex basic, fill basic, copyWithin basic, in constructor, combined. Ran `./wasm/test.sh class_es5_tests` (all 283 pass).
 - [x] Added ES5 tests for String.fromCodePoint/codePointAt/includes/startsWith/endsWith patterns (6 tests): fromCodePoint basic, codePointAt basic, includes basic, startsWith/endsWith basic, in constructor, combined. Ran `./wasm/test.sh class_es5_tests` (all 278 pass).

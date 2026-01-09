@@ -17454,3 +17454,368 @@ class TransactionScope extends BaseResource {
         output
     );
 }
+
+// ============================================================================
+// Class Static Initialization Block Pattern Tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_static_block_basic() {
+    // Basic static initialization block
+    let source = r#"
+class Config {
+    static readonly ENV: string;
+    static readonly DEBUG: boolean;
+    static readonly VERSION: string;
+
+    static {
+        Config.ENV = process.env.NODE_ENV || "development";
+        Config.DEBUG = Config.ENV === "development";
+        Config.VERSION = "1.0.0";
+    }
+
+    static getConfig(): { env: string; debug: boolean; version: string } {
+        return {
+            env: Config.ENV,
+            debug: Config.DEBUG,
+            version: Config.VERSION
+        };
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function Config") || output.contains("Config"),
+        "Expected Config class: {}",
+        output
+    );
+
+    // Static properties should be initialized
+    assert!(
+        output.contains("ENV") && output.contains("DEBUG") && output.contains("VERSION"),
+        "Expected static properties: {}",
+        output
+    );
+
+    // Static method should be present
+    assert!(
+        output.contains("getConfig"),
+        "Expected getConfig method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_static_block_multiple() {
+    // Multiple static initialization blocks
+    let source = r#"
+class Registry {
+    static handlers: Map<string, Function> = new Map();
+    static validators: Map<string, Function> = new Map();
+    static initialized: boolean = false;
+
+    static {
+        // Register default handlers
+        Registry.handlers.set("log", console.log);
+        Registry.handlers.set("error", console.error);
+    }
+
+    static {
+        // Register default validators
+        Registry.validators.set("string", (v: any) => typeof v === "string");
+        Registry.validators.set("number", (v: any) => typeof v === "number");
+    }
+
+    static {
+        // Mark as initialized
+        Registry.initialized = true;
+        console.log("Registry initialized");
+    }
+
+    static addHandler(name: string, handler: Function): void {
+        Registry.handlers.set(name, handler);
+    }
+
+    static addValidator(name: string, validator: Function): void {
+        Registry.validators.set(name, validator);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function Registry") || output.contains("Registry"),
+        "Expected Registry class: {}",
+        output
+    );
+
+    // Static properties should be present
+    assert!(
+        output.contains("handlers") && output.contains("validators"),
+        "Expected static properties: {}",
+        output
+    );
+
+    // Static methods should be present
+    assert!(
+        output.contains("addHandler") && output.contains("addValidator"),
+        "Expected static methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_static_block_private_fields() {
+    // Static block with private static fields
+    let source = r#"
+class SecureService {
+    static #secret: string;
+    static #apiKey: string;
+    static #initialized: boolean = false;
+
+    static {
+        SecureService.#secret = crypto.randomUUID();
+        SecureService.#apiKey = `key_${SecureService.#secret.slice(0, 8)}`;
+        SecureService.#initialized = true;
+    }
+
+    static isInitialized(): boolean {
+        return SecureService.#initialized;
+    }
+
+    static getApiKey(): string {
+        if (!SecureService.#initialized) {
+            throw new Error("Service not initialized");
+        }
+        return SecureService.#apiKey;
+    }
+
+    static validateSecret(secret: string): boolean {
+        return secret === SecureService.#secret;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function SecureService") || output.contains("SecureService"),
+        "Expected SecureService class: {}",
+        output
+    );
+
+    // Static methods should be present
+    assert!(
+        output.contains("isInitialized") && output.contains("getApiKey"),
+        "Expected static methods: {}",
+        output
+    );
+
+    assert!(
+        output.contains("validateSecret"),
+        "Expected validateSecret method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_static_block_inheritance() {
+    // Static block with inheritance
+    let source = r#"
+class BaseLogger {
+    static logLevel: string = "info";
+    static prefix: string = "";
+
+    static {
+        BaseLogger.prefix = "[BaseLogger]";
+    }
+
+    static log(message: string): void {
+        console.log(`${BaseLogger.prefix} ${message}`);
+    }
+}
+
+class AppLogger extends BaseLogger {
+    static appName: string;
+
+    static {
+        AppLogger.appName = "MyApp";
+        AppLogger.prefix = `[${AppLogger.appName}]`;
+        AppLogger.logLevel = "debug";
+    }
+
+    static debug(message: string): void {
+        if (AppLogger.logLevel === "debug") {
+            console.log(`${AppLogger.prefix} DEBUG: ${message}`);
+        }
+    }
+
+    static info(message: string): void {
+        console.log(`${AppLogger.prefix} INFO: ${message}`);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("function BaseLogger") || output.contains("BaseLogger"),
+        "Expected BaseLogger class: {}",
+        output
+    );
+    assert!(
+        output.contains("function AppLogger") || output.contains("AppLogger"),
+        "Expected AppLogger class: {}",
+        output
+    );
+
+    // Static methods should be present
+    assert!(
+        output.contains("log") && output.contains("debug") && output.contains("info"),
+        "Expected logging methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_static_block_complex_init() {
+    // Static block with complex initialization logic
+    let source = r#"
+class DataProcessor {
+    static processors: Map<string, (data: any) => any> = new Map();
+    static defaultProcessor: (data: any) => any;
+    static stats: { processed: number; errors: number };
+
+    static {
+        // Initialize stats
+        DataProcessor.stats = { processed: 0, errors: 0 };
+
+        // Set up default processor
+        DataProcessor.defaultProcessor = (data: any) => {
+            DataProcessor.stats.processed++;
+            return data;
+        };
+
+        // Register built-in processors
+        DataProcessor.processors.set("uppercase", (data: string) => {
+            DataProcessor.stats.processed++;
+            return data.toUpperCase();
+        });
+
+        DataProcessor.processors.set("lowercase", (data: string) => {
+            DataProcessor.stats.processed++;
+            return data.toLowerCase();
+        });
+
+        DataProcessor.processors.set("trim", (data: string) => {
+            DataProcessor.stats.processed++;
+            return data.trim();
+        });
+    }
+
+    static process(type: string, data: any): any {
+        const processor = DataProcessor.processors.get(type) || DataProcessor.defaultProcessor;
+        try {
+            return processor(data);
+        } catch (e) {
+            DataProcessor.stats.errors++;
+            throw e;
+        }
+    }
+
+    static getStats(): { processed: number; errors: number } {
+        return { ...DataProcessor.stats };
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function DataProcessor") || output.contains("DataProcessor"),
+        "Expected DataProcessor class: {}",
+        output
+    );
+
+    // Static properties should be present
+    assert!(
+        output.contains("processors") && output.contains("stats"),
+        "Expected static properties: {}",
+        output
+    );
+
+    // Static methods should be present
+    assert!(
+        output.contains("process") && output.contains("getStats"),
+        "Expected static methods: {}",
+        output
+    );
+}
