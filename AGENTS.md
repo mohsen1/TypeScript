@@ -139,3 +139,8 @@ The notification file is at `.notify/notify.sh` in the repository root.
 ## 💡 Exploration is OK
 
 This is a complex compiler project. Take time to understand the code before making changes. Reading architecture docs, tracing call paths, and understanding existing patterns is valuable work - not wasted time.
+
+
+## Gemini is your friend 
+
+Ask Gemini using `./scripts/ask-gemini.mjs` questions frequently. When something is getting complicated and hard to understand Gemini can help
