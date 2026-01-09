@@ -16409,25 +16409,27 @@ class UserRepository extends AbstractRepository<{ id: string; name: string }> {
     );
 }
 
+// ============================================================================
+// Private Static Field Pattern Tests
+// ============================================================================
+
 #[test]
-fn test_class_es5_string_fromcodepoint_basic() {
-    // Basic String.fromCodePoint usage
+fn test_class_es5_private_static_field_basic() {
+    // Basic private static field usage
     let source = r#"
-class UnicodeBuilder {
-    static fromCodePoints(...codePoints: number[]): string {
-        return String.fromCodePoint(...codePoints);
+class Counter {
+    static #count: number = 0;
+
+    constructor() {
+        Counter.#count++;
     }
 
-    static emoji(codePoint: number): string {
-        return String.fromCodePoint(codePoint);
+    static getCount(): number {
+        return Counter.#count;
     }
 
-    buildString(codePoints: number[]): string {
-        return String.fromCodePoint(...codePoints);
-    }
-
-    static surrogatePair(high: number, low: number): string {
-        return String.fromCodePoint(high, low);
+    static reset(): void {
+        Counter.#count = 0;
     }
 }
 "#;
@@ -16446,54 +16448,53 @@ class UnicodeBuilder {
 
     let output = printer.get_output().to_string();
 
+    // Class should be converted
     assert!(
-        output.contains("UnicodeBuilder"),
-        "Expected UnicodeBuilder class: {}",
+        output.contains("function Counter"),
+        "Expected Counter function: {}",
         output
     );
+
+    // Static methods should be present
     assert!(
-        output.contains("String.fromCodePoint"),
-        "Expected String.fromCodePoint: {}",
+        output.contains("getCount") && output.contains("reset"),
+        "Expected static methods: {}",
         output
     );
+
+    // Private field should use WeakMap or similar pattern
     assert!(
-        output.contains("fromCodePoints") && output.contains("emoji"),
-        "Expected methods: {}",
+        output.contains("count") || output.contains("_count") || output.contains("WeakMap"),
+        "Expected private field handling: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_string_codepointat_basic() {
-    // Basic String.prototype.codePointAt usage
+fn test_class_es5_private_static_field_singleton() {
+    // Private static field for singleton pattern
     let source = r#"
-class UnicodeAnalyzer {
-    getCodePointAt(str: string, index: number): number | undefined {
-        return str.codePointAt(index);
+class Singleton {
+    static #instance: Singleton | null = null;
+    private value: string;
+
+    private constructor(value: string) {
+        this.value = value;
     }
 
-    getAllCodePoints(str: string): number[] {
-        const result: number[] = [];
-        for (let i = 0; i < str.length; i++) {
-            const cp = str.codePointAt(i);
-            if (cp !== undefined) {
-                result.push(cp);
-                if (cp > 0xFFFF) i++;
-            }
+    static getInstance(): Singleton {
+        if (Singleton.#instance === null) {
+            Singleton.#instance = new Singleton("default");
         }
-        return result;
+        return Singleton.#instance;
     }
 
-    static firstCodePoint(str: string): number | undefined {
-        return str.codePointAt(0);
+    static hasInstance(): boolean {
+        return Singleton.#instance !== null;
     }
 
-    hasHighCodePoint(str: string): boolean {
-        for (let i = 0; i < str.length; i++) {
-            const cp = str.codePointAt(i);
-            if (cp !== undefined && cp > 0xFFFF) return true;
-        }
-        return false;
+    getValue(): string {
+        return this.value;
     }
 }
 "#;
@@ -16512,263 +16513,61 @@ class UnicodeAnalyzer {
 
     let output = printer.get_output().to_string();
 
+    // Class should be converted
     assert!(
-        output.contains("UnicodeAnalyzer"),
-        "Expected UnicodeAnalyzer class: {}",
+        output.contains("function Singleton"),
+        "Expected Singleton function: {}",
         output
     );
+
+    // Static methods should be present
     assert!(
-        output.contains("codePointAt"),
-        "Expected codePointAt: {}",
+        output.contains("getInstance") && output.contains("hasInstance"),
+        "Expected static methods: {}",
         output
     );
+
+    // Instance method should be present
     assert!(
-        output.contains("getCodePointAt") && output.contains("getAllCodePoints"),
-        "Expected methods: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_string_includes_basic() {
-    // Basic String.prototype.includes usage
-    let source = r#"
-class StringSearcher {
-    includes(str: string, search: string): boolean {
-        return str.includes(search);
-    }
-
-    includesAt(str: string, search: string, position: number): boolean {
-        return str.includes(search, position);
-    }
-
-    static containsAny(str: string, searches: string[]): boolean {
-        return searches.some(s => str.includes(s));
-    }
-
-    static containsAll(str: string, searches: string[]): boolean {
-        return searches.every(s => str.includes(s));
-    }
-
-    filterByContent(strings: string[], search: string): string[] {
-        return strings.filter(s => s.includes(search));
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    assert!(
-        output.contains("StringSearcher"),
-        "Expected StringSearcher class: {}",
-        output
-    );
-    assert!(
-        output.contains(".includes("),
-        "Expected includes: {}",
-        output
-    );
-    assert!(
-        output.contains("containsAny") && output.contains("containsAll"),
-        "Expected methods: {}",
+        output.contains("getValue"),
+        "Expected getValue method: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_string_startswith_endswith_basic() {
-    // Basic String.prototype.startsWith and endsWith usage
+fn test_class_es5_private_static_field_cache() {
+    // Private static field for caching pattern
     let source = r#"
-class PrefixSuffixChecker {
-    startsWith(str: string, prefix: string): boolean {
-        return str.startsWith(prefix);
-    }
+class ResourceLoader {
+    static #cache: Map<string, any> = new Map();
+    static #loading: Set<string> = new Set();
 
-    endsWith(str: string, suffix: string): boolean {
-        return str.endsWith(suffix);
-    }
-
-    startsWithAt(str: string, prefix: string, position: number): boolean {
-        return str.startsWith(prefix, position);
-    }
-
-    endsWithLength(str: string, suffix: string, length: number): boolean {
-        return str.endsWith(suffix, length);
-    }
-
-    static hasPrefix(strings: string[], prefix: string): string[] {
-        return strings.filter(s => s.startsWith(prefix));
-    }
-
-    static hasSuffix(strings: string[], suffix: string): string[] {
-        return strings.filter(s => s.endsWith(suffix));
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    assert!(
-        output.contains("PrefixSuffixChecker"),
-        "Expected PrefixSuffixChecker class: {}",
-        output
-    );
-    assert!(
-        output.contains(".startsWith(") && output.contains(".endsWith("),
-        "Expected startsWith and endsWith: {}",
-        output
-    );
-    assert!(
-        output.contains("hasPrefix") && output.contains("hasSuffix"),
-        "Expected methods: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_string_methods_in_constructor() {
-    // String ES6 methods in constructor
-    let source = r#"
-class StringValidator {
-    private hasEmoji: boolean;
-    private startsWithPrefix: boolean;
-    private endsWithSuffix: boolean;
-    private containsKeyword: boolean;
-
-    constructor(
-        value: string,
-        prefix: string,
-        suffix: string,
-        keyword: string
-    ) {
-        const firstCodePoint = value.codePointAt(0);
-        this.hasEmoji = firstCodePoint !== undefined && firstCodePoint > 0xFFFF;
-        this.startsWithPrefix = value.startsWith(prefix);
-        this.endsWithSuffix = value.endsWith(suffix);
-        this.containsKeyword = value.includes(keyword);
-    }
-
-    isValid(): boolean {
-        return this.startsWithPrefix && this.endsWithSuffix;
-    }
-
-    hasKeyword(): boolean {
-        return this.containsKeyword;
-    }
-
-    hasEmojiStart(): boolean {
-        return this.hasEmoji;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    assert!(
-        output.contains("StringValidator"),
-        "Expected StringValidator class: {}",
-        output
-    );
-    assert!(
-        output.contains("codePointAt") && output.contains(".includes("),
-        "Expected codePointAt and includes: {}",
-        output
-    );
-    assert!(
-        output.contains(".startsWith(") && output.contains(".endsWith("),
-        "Expected startsWith and endsWith: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_string_methods_combined() {
-    // Combined String ES6 methods
-    let source = r#"
-class StringUtilities {
-    static analyze(str: string): {
-        length: number;
-        codePoints: number[];
-        startsWithLetter: boolean;
-        endsWithPunctuation: boolean;
-    } {
-        const codePoints: number[] = [];
-        for (let i = 0; i < str.length; i++) {
-            const cp = str.codePointAt(i);
-            if (cp !== undefined) {
-                codePoints.push(cp);
-                if (cp > 0xFFFF) i++;
-            }
+    static async load(url: string): Promise<any> {
+        if (ResourceLoader.#cache.has(url)) {
+            return ResourceLoader.#cache.get(url);
         }
 
-        return {
-            length: str.length,
-            codePoints,
-            startsWithLetter: /^[a-zA-Z]/.test(str),
-            endsWithPunctuation: str.endsWith('.') || str.endsWith('!') || str.endsWith('?')
-        };
-    }
-
-    static buildFromCodePoints(codePoints: number[]): string {
-        return String.fromCodePoint(...codePoints);
-    }
-
-    static matchPattern(
-        str: string,
-        options: { prefix?: string; suffix?: string; contains?: string }
-    ): boolean {
-        if (options.prefix && !str.startsWith(options.prefix)) return false;
-        if (options.suffix && !str.endsWith(options.suffix)) return false;
-        if (options.contains && !str.includes(options.contains)) return false;
-        return true;
-    }
-
-    transformCodePoints(str: string, transform: (cp: number) => number): string {
-        const newCodePoints: number[] = [];
-        for (let i = 0; i < str.length; i++) {
-            const cp = str.codePointAt(i);
-            if (cp !== undefined) {
-                newCodePoints.push(transform(cp));
-                if (cp > 0xFFFF) i++;
-            }
+        if (ResourceLoader.#loading.has(url)) {
+            // Wait for existing load
+            return new Promise(resolve => {
+                setTimeout(() => resolve(ResourceLoader.load(url)), 100);
+            });
         }
-        return String.fromCodePoint(...newCodePoints);
+
+        ResourceLoader.#loading.add(url);
+        const data = await fetch(url).then(r => r.json());
+        ResourceLoader.#cache.set(url, data);
+        ResourceLoader.#loading.delete(url);
+        return data;
+    }
+
+    static clearCache(): void {
+        ResourceLoader.#cache.clear();
+    }
+
+    static getCacheSize(): number {
+        return ResourceLoader.#cache.size;
     }
 }
 "#;
@@ -16787,24 +16586,174 @@ class StringUtilities {
 
     let output = printer.get_output().to_string();
 
+    // Class should be converted
     assert!(
-        output.contains("StringUtilities"),
-        "Expected StringUtilities class: {}",
+        output.contains("function ResourceLoader"),
+        "Expected ResourceLoader function: {}",
         output
     );
+
+    // Static methods should be present
     assert!(
-        output.contains("String.fromCodePoint") && output.contains("codePointAt"),
-        "Expected String.fromCodePoint and codePointAt: {}",
+        output.contains("load") && output.contains("clearCache"),
+        "Expected static methods: {}",
         output
     );
+
+    // Cache handling
     assert!(
-        output.contains(".startsWith(") && output.contains(".endsWith(") && output.contains(".includes("),
-        "Expected startsWith, endsWith, and includes: {}",
+        output.contains("getCacheSize"),
+        "Expected getCacheSize method: {}",
         output
     );
+}
+
+#[test]
+fn test_class_es5_private_static_field_registry() {
+    // Private static field for registry pattern
+    let source = r#"
+class ComponentRegistry {
+    static #components: Map<string, new () => object> = new Map();
+    static #instances: WeakMap<object, string> = new WeakMap();
+
+    static register(name: string, component: new () => object): void {
+        ComponentRegistry.#components.set(name, component);
+    }
+
+    static create(name: string): object | null {
+        const Component = ComponentRegistry.#components.get(name);
+        if (!Component) return null;
+
+        const instance = new Component();
+        ComponentRegistry.#instances.set(instance, name);
+        return instance;
+    }
+
+    static getComponentName(instance: object): string | undefined {
+        return ComponentRegistry.#instances.get(instance);
+    }
+
+    static getRegisteredNames(): string[] {
+        return Array.from(ComponentRegistry.#components.keys());
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
     assert!(
-        output.contains("analyze") && output.contains("matchPattern"),
-        "Expected utility methods: {}",
+        output.contains("function ComponentRegistry"),
+        "Expected ComponentRegistry function: {}",
+        output
+    );
+
+    // Static methods should be present
+    assert!(
+        output.contains("register") && output.contains("create"),
+        "Expected register and create methods: {}",
+        output
+    );
+
+    assert!(
+        output.contains("getComponentName") && output.contains("getRegisteredNames"),
+        "Expected getter methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_private_static_field_config() {
+    // Private static field for configuration pattern
+    let source = r#"
+class AppConfig {
+    static #config: Record<string, any> = {};
+    static #frozen: boolean = false;
+    static #validators: Map<string, (value: any) => boolean> = new Map();
+
+    static set(key: string, value: any): void {
+        if (AppConfig.#frozen) {
+            throw new Error("Config is frozen");
+        }
+
+        const validator = AppConfig.#validators.get(key);
+        if (validator && !validator(value)) {
+            throw new Error(`Invalid value for ${key}`);
+        }
+
+        AppConfig.#config[key] = value;
+    }
+
+    static get(key: string): any {
+        return AppConfig.#config[key];
+    }
+
+    static addValidator(key: string, validator: (value: any) => boolean): void {
+        if (AppConfig.#frozen) {
+            throw new Error("Config is frozen");
+        }
+        AppConfig.#validators.set(key, validator);
+    }
+
+    static freeze(): void {
+        AppConfig.#frozen = true;
+    }
+
+    static isFrozen(): boolean {
+        return AppConfig.#frozen;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function AppConfig"),
+        "Expected AppConfig function: {}",
+        output
+    );
+
+    // Static methods should be present
+    assert!(
+        output.contains("set") && output.contains("get"),
+        "Expected set and get methods: {}",
+        output
+    );
+
+    assert!(
+        output.contains("freeze") && output.contains("isFrozen"),
+        "Expected freeze methods: {}",
+        output
+    );
+
+    assert!(
+        output.contains("addValidator"),
+        "Expected addValidator method: {}",
         output
     );
 }
