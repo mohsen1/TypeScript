@@ -818,6 +818,10 @@ impl ThinBinderState {
                     self.current_flow = loop_label;
 
                     self.bind_expression(arena, for_data.expression);
+                    if !for_data.initializer.is_none() {
+                        let flow = self.create_flow_assignment(for_data.initializer);
+                        self.current_flow = flow;
+                    }
                     self.bind_node(arena, for_data.statement);
                     self.add_antecedent(loop_label, self.current_flow);
                     let merge_label = self.create_branch_label();
@@ -1838,6 +1842,8 @@ impl ThinBinderState {
 
             if !decl.initializer.is_none() {
                 self.bind_node(arena, decl.initializer);
+                let flow = self.create_flow_assignment(idx);
+                self.current_flow = flow;
             }
         }
     }
@@ -2221,8 +2227,12 @@ impl ThinBinderState {
 
     fn bind_try_statement(&mut self, arena: &ThinNodeArena, node: &ThinNode, idx: NodeIndex) {
         if let Some(try_data) = arena.get_try(node) {
+            let pre_try_flow = self.current_flow;
+            let end_label = self.create_branch_label();
+
             // Bind try block
             self.bind_node(arena, try_data.try_block);
+            let post_try_flow = self.current_flow;
 
             // Bind catch clause
             if !try_data.catch_clause.is_none() {
@@ -2230,22 +2240,34 @@ impl ThinBinderState {
                     if let Some(catch) = arena.get_catch_clause(catch_node) {
                         self.enter_scope(ContainerKind::Block, idx);
 
-                        // Bind catch variable
+                        // Catch can be entered from any point in try.
+                        self.current_flow = pre_try_flow;
+
+                        // Bind catch variable and mark it assigned.
                         if !catch.variable_declaration.is_none() {
                             self.bind_node(arena, catch.variable_declaration);
+                            let flow = self.create_flow_assignment(catch.variable_declaration);
+                            self.current_flow = flow;
                         }
 
                         // Bind catch block
                         self.bind_node(arena, catch.block);
+                        self.add_antecedent(end_label, self.current_flow);
 
                         self.exit_scope();
                     }
                 }
             }
 
+            // Add post-try flow to end label
+            self.add_antecedent(end_label, post_try_flow);
+
             // Bind finally block
             if !try_data.finally_block.is_none() {
+                self.current_flow = end_label;
                 self.bind_node(arena, try_data.finally_block);
+            } else {
+                self.current_flow = end_label;
             }
         }
     }
