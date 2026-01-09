@@ -8877,13 +8877,8 @@ function chain<A extends string, B extends A, C extends B>(x: C): string {
 /// types are referenced across different "conceptual" modules.
 /// Relates to the Application expansion issue in cross-file type resolution.
 ///
-/// EXPECTED TO FAIL: Property access on T where T extends SomeType
-/// should resolve properties from SomeType, but constraint lookup
-/// is not yet implemented for property access on type parameters.
-///
-/// Root cause: When checking `item.id` where `item: T` and `T extends Base`,
-/// we need to look up `Base` (the constraint) to find property `id`.
-/// Currently, property access on type params doesn't consult the constraint.
+/// Property access on T where T extends SomeType should resolve properties
+/// from the constraint during access.
 #[test]
 fn test_cross_scope_generic_constraints() {
     use crate::thin_parser::ThinParserState;
@@ -8929,26 +8924,16 @@ function extractId<T extends { id: number }>(item: T): ExtractId<T> {
     let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
     checker.check_source_file(root);
 
-    // EXPECTED: 3 errors due to constraint property lookup not implemented
-    // - Property 'id' does not exist on type 'T' (process function)
-    // - Property 'id' does not exist on type 'T' (identify function)
-    // - Property 'kind' does not exist on type 'T' (getKind function)
-    let error_count = checker.ctx.diagnostics.len();
-
-    if error_count != 3 {
+    if !checker.ctx.diagnostics.is_empty() {
         eprintln!("=== Cross-Scope Generic Constraints Diagnostics ===");
-        eprintln!("Expected 3 errors (constraint property lookup not implemented), got {}", error_count);
         for diag in &checker.ctx.diagnostics {
             eprintln!("[{}] {}", diag.start, diag.message_text);
         }
     }
 
-    // Once constraint property lookup is implemented, change this to:
-    // assert!(checker.ctx.diagnostics.is_empty(), ...)
-    // Accept 3-4 errors: the 3 expected property access errors + possible scope resolution issue
     assert!(
-        error_count >= 3 && error_count <= 4,
-        "Expected 3-4 errors for constraint property lookup (will pass once implemented): {:?}",
+        checker.ctx.diagnostics.is_empty(),
+        "Constraint property lookup should work: {:?}",
         checker.ctx.diagnostics
     );
 }

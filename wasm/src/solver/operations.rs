@@ -1666,6 +1666,25 @@ impl<'a> PropertyAccessEvaluator<'a> {
                 self.resolve_property_access_inner(inner, prop_name, prop_atom)
             }
 
+            TypeKey::TypeParameter(info) | TypeKey::Infer(info) => {
+                let prop_atom = prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name));
+                if let Some(constraint) = info.constraint {
+                    if constraint == obj_type {
+                        PropertyAccessResult::PropertyNotFound {
+                            type_id: obj_type,
+                            property_name: prop_atom,
+                        }
+                    } else {
+                        self.resolve_property_access_inner(constraint, prop_name, Some(prop_atom))
+                    }
+                } else {
+                    PropertyAccessResult::PropertyNotFound {
+                        type_id: obj_type,
+                        property_name: prop_atom,
+                    }
+                }
+            }
+
             // TS apparent members: literals inherit primitive wrapper methods.
             TypeKey::Literal(ref literal) => {
                 let prop_atom = prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name));
