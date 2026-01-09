@@ -7362,3 +7362,195 @@ fn test_async_class_method_conditional_extra() {
         output
     );
 }
+
+// ============================================================================
+// Async getter/setter tests
+// ============================================================================
+
+fn parse_and_emit_async_with_accessor(source: &str) -> String {
+    use crate::parser::syntax_kind_ext;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            for &stmt_idx in &source_file.statements.nodes {
+                if let Some(stmt_node) = parser.arena.get(stmt_idx) {
+                    if stmt_node.kind == syntax_kind_ext::CLASS_DECLARATION {
+                        if let Some(class_data) = parser.arena.get_class(stmt_node) {
+                            for &member_idx in &class_data.members.nodes {
+                                if let Some(member_node) = parser.arena.get(member_idx) {
+                                    if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
+                                        if let Some(method_data) = parser.arena.get_method_decl(member_node) {
+                                            let emitter = AsyncES5Emitter::new(&parser.arena);
+                                            let has_await = emitter.body_contains_await(method_data.body);
+                                            let mut emitter = AsyncES5Emitter::new(&parser.arena);
+                                            if has_await {
+                                                return emitter.emit_generator_body_with_await(method_data.body);
+                                            } else {
+                                                return emitter.emit_simple_generator_body(method_data.body);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    String::new()
+}
+
+fn async_with_accessor_contains_await(source: &str) -> bool {
+    use crate::parser::syntax_kind_ext;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            for &stmt_idx in &source_file.statements.nodes {
+                if let Some(stmt_node) = parser.arena.get(stmt_idx) {
+                    if stmt_node.kind == syntax_kind_ext::CLASS_DECLARATION {
+                        if let Some(class_data) = parser.arena.get_class(stmt_node) {
+                            for &member_idx in &class_data.members.nodes {
+                                if let Some(member_node) = parser.arena.get(member_idx) {
+                                    if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
+                                        if let Some(method_data) = parser.arena.get_method_decl(member_node) {
+                                            let emitter = AsyncES5Emitter::new(&parser.arena);
+                                            return emitter.body_contains_await(method_data.body);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
+#[test]
+fn test_async_getter_setter_basic() {
+    let output = parse_and_emit_async_with_accessor(
+        "class Foo { get value() { return 1; } async fetch() { await process(); } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Async method with getter should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_getter_setter_with_await() {
+    let output = parse_and_emit_async_with_accessor(
+        "class Foo { set value(v: number) { this._v = v; } async save() { await store(this._v); } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Async method with setter should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_getter_setter_no_await() {
+    let result = async_with_accessor_contains_await(
+        "class Foo { get value() { return 1; } async bar() { return 42; } }",
+    );
+    assert!(!result, "Should not detect await in async method without await");
+}
+
+#[test]
+fn test_async_getter_setter_both() {
+    let output = parse_and_emit_async_with_accessor(
+        "class Foo { get val() { return this._v; } set val(v) { this._v = v; } async update() { await save(); } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Async method with getter and setter should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_getter_setter_body_contains_await() {
+    let result = async_with_accessor_contains_await(
+        "class Foo { get data() { return 1; } async load() { await fetch(); } }",
+    );
+    assert!(result, "Should detect await in async method with getter");
+}
+
+#[test]
+fn test_async_getter_setter_body_no_await() {
+    let result = async_with_accessor_contains_await(
+        "class Foo { set data(v) { this._d = v; } async bar() { return 1; } }",
+    );
+    assert!(!result, "Should not detect await when async method has no await");
+}
+
+#[test]
+fn test_async_getter_setter_ignores_nested_async() {
+    let result = async_with_accessor_contains_await(
+        "class Foo { get fn() { return async () => { await x; }; } async bar() { return 1; } }",
+    );
+    assert!(!result, "Should not detect await inside nested async in getter");
+}
+
+#[test]
+fn test_async_getter_setter_static() {
+    let output = parse_and_emit_async_with_accessor(
+        "class Foo { static get instance() { return inst; } static async create() { await init(); return new Foo(); } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Static async method with static getter should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_getter_setter_with_try_catch() {
+    let output = parse_and_emit_async_with_accessor(
+        "class Foo { get value() { return 1; } async bar() { try { await riskyOp(); } catch (e) { return null; } } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Async method with try/catch and getter should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_getter_setter_computed() {
+    let output = parse_and_emit_async_with_accessor(
+        "class Foo { get ['data']() { return 1; } async load() { await fetch(); } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Async method with computed getter should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_getter_setter_private() {
+    let result = async_with_accessor_contains_await(
+        "class Foo { get data() { return this.#value; } async load() { await fetch(); } }",
+    );
+    assert!(result, "Should detect await in async method with getter accessing private field");
+}
+
+#[test]
+fn test_async_getter_setter_conditional() {
+    let output = parse_and_emit_async_with_accessor(
+        "class Foo { get val() { return 1; } async bar(cond: boolean) { if (cond) { await process(); } return 1; } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Conditional async method with getter should have switch or yield: {}",
+        output
+    );
+}
