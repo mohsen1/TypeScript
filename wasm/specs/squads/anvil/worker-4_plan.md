@@ -7,12 +7,13 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [ ] Add ES5 class tests for accessor keyword patterns: auto-accessor fields, accessor decorators, static accessors. Tests: `./wasm/test.sh class_es5_tests`
+(none)
 
 ## Task Queue
 - [ ] Add ES5 class tests for explicit resource management: await using, Symbol.asyncDispose
 
 ## Completed
+- [x] Add ES5 class tests for accessor keyword patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for using declarations patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for private method patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for class field initializer patterns. Tests: `./wasm/test.sh class_es5_tests`
