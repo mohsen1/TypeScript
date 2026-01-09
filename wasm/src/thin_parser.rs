@@ -2214,6 +2214,9 @@ impl ThinParserState {
             return self.parse_index_signature_with_readonly(readonly, start_pos);
         }
 
+        // Handle generator methods: *foo() or async *#bar()
+        let asterisk_token = self.parse_optional(SyntaxKind::AsteriskToken);
+
         // Handle methods and properties
         // For now, just parse name and check for ( for methods
         // Note: Many reserved keywords can be used as property names (const, class, etc.)
@@ -2292,7 +2295,7 @@ impl ThinParserState {
                 end_pos,
                 crate::parser::thin_node::MethodDeclData {
                     modifiers,
-                    asterisk_token: false,
+                    asterisk_token,
                     name,
                     question_token,
                     type_parameters,

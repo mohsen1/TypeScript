@@ -6237,6 +6237,45 @@ class A {
 }
 
 #[test]
+fn test_private_static_generator_method_access_no_error() {
+    use crate::thin_parser::ThinParserState;
+
+    // Private static async generator methods should be accessible within the class
+    let source = r#"
+class A {
+    static async *#baz(a: number) {
+        return 3;
+    }
+    constructor() {
+        A.#baz(30);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    // TS1068 = "Unexpected token"
+    // TS2339 = "Property 'X' does not exist on type 'Y'"
+    let error_1068_count = codes.iter().filter(|&&c| c == 1068).count();
+    let error_2339_count = codes.iter().filter(|&&c| c == 2339).count();
+
+    assert_eq!(error_1068_count, 0,
+        "Expected no TS1068 (unexpected token) error for private static generator method, got errors: {:?}", codes);
+    assert_eq!(error_2339_count, 0,
+        "Expected no TS2339 error for private static generator method access, got errors: {:?}", codes);
+}
+
+#[test]
 fn test_namespace_with_relative_path_ok() {
     use crate::thin_parser::ThinParserState;
 
