@@ -6,22 +6,29 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-Add ES5 class tests for dependency injection patterns
+Fix TS2304 false positives (Cannot find name - 759 occurrences)
 
-Per GOALS.md Objective 1: ES5 downleveling correctness
+Per GOALS.md Phase 10: False Positive Elimination - **HIGHEST PRIORITY**
+
+**Problem:** "Cannot find name 'X'" when X is clearly defined
+
+Root Causes:
+1. Namespace members not finding sibling exports
+2. Module augmentation not merging correctly
+3. Global ambient declarations not registered
+
+Files: `thin_binder.rs`, `thin_checker.rs`
 
 Steps:
-1. Add 6 ES5 class tests for dependency injection patterns to `wasm/src/transforms/class_es5_tests.rs`:
-   - Basic constructor injection
-   - Property injection
-   - Factory pattern injection
-   - Singleton pattern
-   - Scoped injection
-   - Combined DI patterns
-2. Run `./wasm/test.sh class_es5_tests` to verify all tests pass
-3. Commit with message: `[wasm] transforms: add dependency injection ES5 class tests`
-4. Push to `origin/worker/anvil-1`
-5. Update this plan file and push
+1. Run conformance baseline: `cd wasm/differential-test && bash run-conformance.sh --all --workers=14`
+2. Record baseline TS2304 count and exact match %
+3. Investigate TS2304 false positive cases in conformance output
+4. Identify patterns (namespace scoping, module augmentation, globals)
+5. Fix symbol resolution in binder/checker
+6. Run conformance again to verify reduction
+7. Commit with message: `[wasm] binder/checker: fix TS2304 false positives`
+8. Push to `origin/worker/anvil-1`
+9. Update this plan file and push
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)
