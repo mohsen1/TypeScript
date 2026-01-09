@@ -389,17 +389,28 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             }
             TypeKey::Mapped(mapped_id) => {
                 let mapped = self.interner.mapped_type(mapped_id);
-                // The mapped type's type_param IS a type parameter!
-                if !seen.contains(&mapped.type_param.name) {
-                    seen.insert(mapped.type_param.name);
-                    params.push(mapped.type_param.clone());
-                }
-                // Also check constraint and template for nested type params
+                // Note: mapped.type_param is the iteration variable (e.g., K in "K in keyof T")
+                // We should NOT add it directly - the outer type param (T) is found in the constraint.
+                // For DeepPartial<T> = { [K in keyof T]?: DeepPartial<T[K]> }:
+                //   - type_param is K (iteration var, NOT the outer param)
+                //   - constraint is "keyof T" (contains T, the actual param to extract)
+                //   - template is DeepPartial<T[K]> (also contains T)
                 self.collect_type_params(mapped.constraint, seen, params);
                 self.collect_type_params(mapped.template, seen, params);
                 if let Some(name_type) = mapped.name_type {
                     self.collect_type_params(name_type, seen, params);
                 }
+            }
+            TypeKey::KeyOf(operand) => {
+                // Extract type params from the operand of keyof
+                // e.g., keyof T -> extract T
+                self.collect_type_params(operand, seen, params);
+            }
+            TypeKey::IndexAccess(obj, idx) => {
+                // Extract type params from both object and index
+                // e.g., T[K] -> extract T and K
+                self.collect_type_params(obj, seen, params);
+                self.collect_type_params(idx, seen, params);
             }
             _ => {}
         }
