@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-01-09T09:55:30.517Z",
+  "timestamp": "2026-01-09T10:00:09.372Z",
   "summary": {
     "total": 15,
     "passed": 6,
@@ -49,7 +49,7 @@
         2559
       ],
       "extraInWasm": [],
-      "duration": 582
+      "duration": 429
     },
     {
       "id": "unsoundness-16-inline-1",
@@ -59,7 +59,7 @@
       "wasmErrors": 0,
       "missingInWasm": [],
       "extraInWasm": [],
-      "duration": 222
+      "duration": 205
     },
     {
       "id": "unsoundness-19-inline-1",
@@ -69,7 +69,7 @@
       "wasmErrors": 0,
       "missingInWasm": [],
       "extraInWasm": [],
-      "duration": 218
+      "duration": 180
     },
     {
       "id": "unsoundness-31-inline-1",
@@ -83,7 +83,7 @@
       "extraInWasm": [
         2304
       ],
-      "duration": 178
+      "duration": 170
     },
     {
       "id": "custom-basic-types",
@@ -93,7 +93,7 @@
       "wasmErrors": 0,
       "missingInWasm": [],
       "extraInWasm": [],
-      "duration": 185
+      "duration": 180
     },
     {
       "id": "custom-phase1-critical-AnyTypeTests",
@@ -105,7 +105,7 @@
       "extraInWasm": [
         2304
       ],
-      "duration": 221
+      "duration": 186
     },
     {
       "id": "custom-phase1-critical-ObjectTrifectaTests",
@@ -119,7 +119,7 @@
         2322,
         2353
       ],
-      "duration": 171
+      "duration": 179
     },
     {
       "id": "custom-phase1-critical-VoidReturnTests",
@@ -141,7 +141,7 @@
       "wasmErrors": 1,
       "missingInWasm": [],
       "extraInWasm": [],
-      "duration": 177
+      "duration": 167
     },
     {
       "id": "custom-phase1-critical-CovariantArrayTests",
@@ -154,7 +154,7 @@
         2322,
         2304
       ],
-      "duration": 166
+      "duration": 168
     },
     {
       "id": "custom-phase1-critical-FunctionBivarianceTests",
@@ -164,7 +164,7 @@
       "wasmErrors": 1,
       "missingInWasm": [],
       "extraInWasm": [],
-      "duration": 173
+      "duration": 171
     },
     {
       "id": "custom-phase1-critical-NullUndefinedTests",
@@ -176,7 +176,7 @@
       "extraInWasm": [
         2304
       ],
-      "duration": 171
+      "duration": 193
     },
     {
       "id": "custom-phase1-critical-LiteralWideningTests",
@@ -186,7 +186,7 @@
       "wasmErrors": 1,
       "missingInWasm": [],
       "extraInWasm": [],
-      "duration": 168
+      "duration": 162
     },
     {
       "id": "custom-phase1-critical-OptionalityTests",
@@ -198,7 +198,7 @@
       "extraInWasm": [
         2304
       ],
-      "duration": 244
+      "duration": 160
     },
     {
       "id": "custom-phase1-critical-ExcessPropertyTests",
@@ -210,7 +210,7 @@
       "extraInWasm": [
         2304
       ],
-      "duration": 164
+      "duration": 182
     }
   ]
 }

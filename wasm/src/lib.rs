@@ -507,6 +507,127 @@ impl ThinParser {
         }
     }
 
+    /// Debug type lowering - trace what happens when lowering an interface type
+    #[wasm_bindgen(js_name = debugTypeLowering)]
+    pub fn debug_type_lowering(&self, interface_name: &str) -> String {
+        use parser::syntax_kind_ext;
+        use solver::{TypeLowering, TypeKey};
+
+        let arena = self.parser.get_arena();
+        let mut result = Vec::new();
+
+        // Find the interface declaration
+        let mut interface_decls = Vec::new();
+        for i in 0..arena.len() {
+            let idx = parser::NodeIndex(i as u32);
+            if let Some(node) = arena.get(idx) {
+                if node.kind == syntax_kind_ext::INTERFACE_DECLARATION {
+                    if let Some(interface) = arena.get_interface(node) {
+                        if let Some(name_node) = arena.get(interface.name) {
+                            if let Some(ident) = arena.get_identifier(name_node) {
+                                if ident.escaped_text == interface_name {
+                                    interface_decls.push(idx);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if interface_decls.is_empty() {
+            return format!("Interface '{}' not found", interface_name);
+        }
+
+        result.push(format!("Found {} declaration(s) for '{}'", interface_decls.len(), interface_name));
+
+        // Lower the interface
+        let lowering = TypeLowering::new(arena, &self.type_interner);
+        let type_id = lowering.lower_interface_declarations(&interface_decls);
+
+        result.push(format!("Lowered type ID: {:?}", type_id));
+
+        // Inspect the result
+        if let Some(key) = self.type_interner.lookup(type_id) {
+            result.push(format!("Type key: {:?}", key));
+            if let TypeKey::Object(shape_id) = key {
+                let shape = self.type_interner.object_shape(shape_id);
+                result.push(format!("Object shape properties: {}", shape.properties.len()));
+                for prop in &shape.properties {
+                    let name = self.type_interner.resolve_atom(prop.name);
+                    result.push(format!("  Property '{}': type_id={:?}, optional={}", name, prop.type_id, prop.optional));
+                    // Try to show what the type_id resolves to
+                    if let Some(prop_key) = self.type_interner.lookup(prop.type_id) {
+                        result.push(format!("    -> {:?}", prop_key));
+                    }
+                }
+            }
+        }
+
+        result.join("\n")
+    }
+
+    /// Debug interface parsing - dump interface members for diagnostics
+    #[wasm_bindgen(js_name = debugInterfaceMembers)]
+    pub fn debug_interface_members(&self, interface_name: &str) -> String {
+        use parser::syntax_kind_ext;
+
+        let arena = self.parser.get_arena();
+        let mut result = Vec::new();
+
+        for i in 0..arena.len() {
+            let idx = parser::NodeIndex(i as u32);
+            if let Some(node) = arena.get(idx) {
+                if node.kind == syntax_kind_ext::INTERFACE_DECLARATION {
+                    if let Some(interface) = arena.get_interface(node) {
+                        if let Some(name_node) = arena.get(interface.name) {
+                            if let Some(ident) = arena.get_identifier(name_node) {
+                                if ident.escaped_text == interface_name {
+                                    result.push(format!("Interface '{}' found at node {}", interface_name, i));
+                                    result.push(format!("  members list: {:?}", interface.members.nodes));
+
+                                    for (mi, &member_idx) in interface.members.nodes.iter().enumerate() {
+                                        if let Some(member_node) = arena.get(member_idx) {
+                                            result.push(format!("  Member {} (idx {}): kind={}", mi, member_idx.0, member_node.kind));
+                                            if let Some(sig) = arena.get_signature(member_node) {
+                                                result.push(format!("    name_idx: {:?}", sig.name));
+                                                result.push(format!("    type_annotation_idx: {:?}", sig.type_annotation));
+
+                                                // Get name text
+                                                if let Some(name_n) = arena.get(sig.name) {
+                                                    if let Some(name_id) = arena.get_identifier(name_n) {
+                                                        result.push(format!("    name_text: '{}'", name_id.escaped_text));
+                                                    } else {
+                                                        result.push(format!("    name_node kind: {}", name_n.kind));
+                                                    }
+                                                }
+
+                                                // Get type annotation text
+                                                if let Some(type_n) = arena.get(sig.type_annotation) {
+                                                    if let Some(type_id) = arena.get_identifier(type_n) {
+                                                        result.push(format!("    type_text: '{}'", type_id.escaped_text));
+                                                    } else {
+                                                        result.push(format!("    type_node kind: {}", type_n.kind));
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if result.is_empty() {
+            format!("Interface '{}' not found", interface_name)
+        } else {
+            result.join("\n")
+        }
+    }
+
     // =========================================================================
     // LSP Feature Methods
     // =========================================================================

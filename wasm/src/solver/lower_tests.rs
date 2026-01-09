@@ -1880,6 +1880,43 @@ fn test_lower_interface_index_signature_mismatch() {
 }
 
 #[test]
+fn test_lower_interface_single_with_two_properties() {
+    // Regression test: Single interface with two properties
+    let source = "interface Point { x: number; y: number; }";
+    let (arena, declarations) = parse_interface_declarations(source, "Point");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_interface_declarations(&declarations);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Object(shape_id) => {
+            let shape = interner.object_shape(shape_id);
+            eprintln!("Properties found: {:?}", shape.properties.iter().map(|p| interner.resolve_atom(p.name).to_string()).collect::<Vec<_>>());
+            assert_eq!(shape.properties.len(), 2, "Expected 2 properties, got {}", shape.properties.len());
+
+            let mut found_x = None;
+            let mut found_y = None;
+            for prop in &shape.properties {
+                let name = interner.resolve_atom(prop.name);
+                eprintln!("  Property: {} -> {:?}", name, prop.type_id);
+                match name.as_str() {
+                    "x" => found_x = Some(prop),
+                    "y" => found_y = Some(prop),
+                    other => panic!("Unexpected property name: {}", other),
+                }
+            }
+
+            let x = found_x.expect("Expected property x");
+            let y = found_y.expect("Expected property y");
+            assert_eq!(x.type_id, TypeId::NUMBER, "Expected x to be number");
+            assert_eq!(y.type_id, TypeId::NUMBER, "Expected y to be number");
+        }
+        _ => panic!("Expected Object type, got {:?}", key),
+    }
+}
+
+#[test]
 fn test_lower_interface_merges_properties() {
     let source = "interface Foo { a: string; } interface Foo { b?: number; }";
     let (arena, declarations) = parse_interface_declarations(source, "Foo");
