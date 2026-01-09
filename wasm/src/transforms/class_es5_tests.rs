@@ -31950,3 +31950,667 @@ class LazyLoader {
         output
     );
 }
+
+// ============================================================================
+// ASSERTION FUNCTION PATTERN TESTS
+// ============================================================================
+
+/// Test assertion function patterns: basic asserts keyword
+#[test]
+fn test_class_es5_assertion_basic() {
+    let source = r#"
+function assertDefined<T>(value: T | undefined): asserts value is T {
+    if (value === undefined) {
+        throw new Error("Value is undefined");
+    }
+}
+
+function assertString(value: unknown): asserts value is string {
+    if (typeof value !== "string") {
+        throw new Error("Value is not a string");
+    }
+}
+
+class ValueValidator {
+    private value: unknown;
+
+    constructor(value: unknown) {
+        this.value = value;
+    }
+
+    assertDefined(): void {
+        assertDefined(this.value);
+    }
+
+    assertString(): void {
+        assertString(this.value);
+    }
+
+    getValue(): unknown {
+        return this.value;
+    }
+}
+
+class TypeChecker {
+    check<T>(value: T | undefined): T {
+        assertDefined(value);
+        return value;
+    }
+
+    checkString(value: unknown): string {
+        assertString(value);
+        return value;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted to ES5
+    assert!(
+        output.contains("function ValueValidator") && output.contains("function TypeChecker"),
+        "Expected ES5 class constructors: {}",
+        output
+    );
+
+    // Assertion functions should be preserved
+    assert!(
+        output.contains("assertDefined") && output.contains("assertString"),
+        "Expected assertion function calls: {}",
+        output
+    );
+
+    // Methods should be on prototype
+    assert!(
+        output.contains("ValueValidator.prototype.assertDefined") &&
+        output.contains("TypeChecker.prototype.check"),
+        "Expected methods on prototype: {}",
+        output
+    );
+}
+
+/// Test assertion function patterns: asserts with type predicates
+#[test]
+fn test_class_es5_assertion_type_predicates() {
+    let source = r#"
+interface User {
+    id: number;
+    name: string;
+}
+
+interface Admin extends User {
+    permissions: string[];
+}
+
+function assertIsUser(value: unknown): asserts value is User {
+    if (!value || typeof value !== "object") {
+        throw new Error("Not a user object");
+    }
+    const obj = value as Record<string, unknown>;
+    if (typeof obj.id !== "number" || typeof obj.name !== "string") {
+        throw new Error("Invalid user structure");
+    }
+}
+
+function assertIsAdmin(value: User): asserts value is Admin {
+    if (!("permissions" in value)) {
+        throw new Error("User is not an admin");
+    }
+}
+
+class AuthService {
+    private currentUser: unknown;
+
+    setUser(user: unknown): void {
+        this.currentUser = user;
+    }
+
+    validateUser(): User {
+        assertIsUser(this.currentUser);
+        return this.currentUser;
+    }
+
+    validateAdmin(): Admin {
+        const user = this.validateUser();
+        assertIsAdmin(user);
+        return user;
+    }
+}
+
+class PermissionChecker {
+    private authService: AuthService;
+
+    constructor(authService: AuthService) {
+        this.authService = authService;
+    }
+
+    checkAdmin(): boolean {
+        try {
+            this.authService.validateAdmin();
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    getPermissions(): string[] {
+        const admin = this.authService.validateAdmin();
+        return admin.permissions;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("function AuthService") && output.contains("function PermissionChecker"),
+        "Expected ES5 class constructors: {}",
+        output
+    );
+
+    // Assertion functions should be preserved
+    assert!(
+        output.contains("assertIsUser") && output.contains("assertIsAdmin"),
+        "Expected assertion functions: {}",
+        output
+    );
+
+    // Methods should work
+    assert!(
+        output.contains("validateUser") && output.contains("validateAdmin"),
+        "Expected validation methods: {}",
+        output
+    );
+}
+
+/// Test assertion function patterns: assertion signatures with generics
+#[test]
+fn test_class_es5_assertion_generic_signatures() {
+    let source = r#"
+function assertNonNull<T>(value: T | null | undefined): asserts value is NonNullable<T> {
+    if (value === null || value === undefined) {
+        throw new Error("Value is null or undefined");
+    }
+}
+
+function assertArrayOf<T>(
+    value: unknown[],
+    predicate: (item: unknown) => item is T
+): asserts value is T[] {
+    for (const item of value) {
+        if (!predicate(item)) {
+            throw new Error("Array contains invalid element");
+        }
+    }
+}
+
+class GenericValidator<T> {
+    private value: T | null | undefined;
+
+    constructor(value: T | null | undefined) {
+        this.value = value;
+    }
+
+    assertValue(): T {
+        assertNonNull(this.value);
+        return this.value;
+    }
+
+    getOrThrow(): T {
+        return this.assertValue();
+    }
+}
+
+class ArrayValidator {
+    isString(value: unknown): value is string {
+        return typeof value === "string";
+    }
+
+    isNumber(value: unknown): value is number {
+        return typeof value === "number";
+    }
+
+    validateStrings(values: unknown[]): string[] {
+        assertArrayOf(values, this.isString);
+        return values;
+    }
+
+    validateNumbers(values: unknown[]): number[] {
+        assertArrayOf(values, this.isNumber);
+        return values;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("function GenericValidator") && output.contains("function ArrayValidator"),
+        "Expected ES5 class constructors: {}",
+        output
+    );
+
+    // Generic assertion functions preserved
+    assert!(
+        output.contains("assertNonNull") && output.contains("assertArrayOf"),
+        "Expected generic assertion functions: {}",
+        output
+    );
+
+    // Type guard methods
+    assert!(
+        output.contains("isString") && output.contains("isNumber"),
+        "Expected type guard methods: {}",
+        output
+    );
+}
+
+/// Test assertion function patterns: class methods as assertion functions
+#[test]
+fn test_class_es5_assertion_class_methods() {
+    let source = r#"
+class FormValidator {
+    private fields: Map<string, unknown> = new Map();
+
+    setField(name: string, value: unknown): void {
+        this.fields.set(name, value);
+    }
+
+    assertFieldExists(name: string): asserts this is FormValidator & { fields: Map<string, unknown> } {
+        if (!this.fields.has(name)) {
+            throw new Error("Field " + name + " does not exist");
+        }
+    }
+
+    assertFieldIsString(name: string): void {
+        this.assertFieldExists(name);
+        const value = this.fields.get(name);
+        if (typeof value !== "string") {
+            throw new Error("Field " + name + " is not a string");
+        }
+    }
+
+    assertFieldIsNumber(name: string): void {
+        this.assertFieldExists(name);
+        const value = this.fields.get(name);
+        if (typeof value !== "number") {
+            throw new Error("Field " + name + " is not a number");
+        }
+    }
+
+    getStringField(name: string): string {
+        this.assertFieldIsString(name);
+        return this.fields.get(name) as string;
+    }
+}
+
+class InputValidator {
+    assertNotEmpty(value: string): asserts value is string {
+        if (value.length === 0) {
+            throw new Error("Value cannot be empty");
+        }
+    }
+
+    assertValidEmail(value: string): void {
+        this.assertNotEmpty(value);
+        if (!value.includes("@")) {
+            throw new Error("Invalid email format");
+        }
+    }
+
+    validateEmail(email: string): string {
+        this.assertValidEmail(email);
+        return email.toLowerCase();
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("function FormValidator") && output.contains("function InputValidator"),
+        "Expected ES5 class constructors: {}",
+        output
+    );
+
+    // Assertion methods on prototype
+    assert!(
+        output.contains("FormValidator.prototype.assertFieldExists") ||
+        output.contains("assertFieldExists"),
+        "Expected assertion methods: {}",
+        output
+    );
+
+    // Validation methods
+    assert!(
+        output.contains("assertNotEmpty") && output.contains("assertValidEmail"),
+        "Expected input validation methods: {}",
+        output
+    );
+}
+
+/// Test assertion function patterns: assertion functions with inheritance
+#[test]
+fn test_class_es5_assertion_inheritance() {
+    let source = r#"
+function assertInstanceOf<T>(value: unknown, ctor: new (...args: any[]) => T): asserts value is T {
+    if (!(value instanceof ctor)) {
+        throw new Error("Value is not an instance of expected type");
+    }
+}
+
+class BaseValidator {
+    protected value: unknown;
+
+    constructor(value: unknown) {
+        this.value = value;
+    }
+
+    assertDefined(): void {
+        if (this.value === undefined || this.value === null) {
+            throw new Error("Value is not defined");
+        }
+    }
+}
+
+class StringValidator extends BaseValidator {
+    constructor(value: unknown) {
+        super(value);
+    }
+
+    assertString(): void {
+        this.assertDefined();
+        if (typeof this.value !== "string") {
+            throw new Error("Value is not a string");
+        }
+    }
+
+    assertMinLength(min: number): void {
+        this.assertString();
+        if ((this.value as string).length < min) {
+            throw new Error("String too short");
+        }
+    }
+
+    validate(minLength: number): string {
+        this.assertMinLength(minLength);
+        return this.value as string;
+    }
+}
+
+class NumberValidator extends BaseValidator {
+    constructor(value: unknown) {
+        super(value);
+    }
+
+    assertNumber(): void {
+        this.assertDefined();
+        if (typeof this.value !== "number") {
+            throw new Error("Value is not a number");
+        }
+    }
+
+    assertPositive(): void {
+        this.assertNumber();
+        if ((this.value as number) <= 0) {
+            throw new Error("Number must be positive");
+        }
+    }
+
+    validate(): number {
+        this.assertPositive();
+        return this.value as number;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted with inheritance
+    assert!(
+        output.contains("function BaseValidator") &&
+        output.contains("function StringValidator") &&
+        output.contains("function NumberValidator"),
+        "Expected ES5 class constructors: {}",
+        output
+    );
+
+    // Extends helper should be used
+    assert!(
+        output.contains("__extends") || output.contains("extends"),
+        "Expected inheritance pattern: {}",
+        output
+    );
+
+    // Assertion methods should be preserved
+    assert!(
+        output.contains("assertDefined") &&
+        output.contains("assertString") &&
+        output.contains("assertNumber"),
+        "Expected assertion methods: {}",
+        output
+    );
+}
+
+/// Test assertion function patterns: combined assertion patterns
+#[test]
+fn test_class_es5_assertion_combined_patterns() {
+    let source = r#"
+type JSONValue = string | number | boolean | null | JSONObject | JSONArray;
+interface JSONObject { [key: string]: JSONValue; }
+interface JSONArray extends Array<JSONValue> {}
+
+function assertIsObject(value: unknown): asserts value is Record<string, unknown> {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) {
+        throw new Error("Value is not an object");
+    }
+}
+
+function assertIsArray(value: unknown): asserts value is unknown[] {
+    if (!Array.isArray(value)) {
+        throw new Error("Value is not an array");
+    }
+}
+
+function assertHasProperty<K extends string>(
+    obj: object,
+    key: K
+): asserts obj is object & Record<K, unknown> {
+    if (!(key in obj)) {
+        throw new Error("Object missing property: " + key);
+    }
+}
+
+class JSONParser {
+    private data: unknown;
+
+    constructor(json: string) {
+        this.data = JSON.parse(json);
+    }
+
+    assertObject(): Record<string, unknown> {
+        assertIsObject(this.data);
+        return this.data;
+    }
+
+    assertArray(): unknown[] {
+        assertIsArray(this.data);
+        return this.data;
+    }
+
+    getProperty<K extends string>(key: K): unknown {
+        const obj = this.assertObject();
+        assertHasProperty(obj, key);
+        return obj[key];
+    }
+}
+
+class ConfigLoader {
+    private parser: JSONParser;
+
+    constructor(configJson: string) {
+        this.parser = new JSONParser(configJson);
+    }
+
+    assertConfigValid(): void {
+        const config = this.parser.assertObject();
+        assertHasProperty(config, "version");
+        assertHasProperty(config, "settings");
+    }
+
+    getVersion(): unknown {
+        this.assertConfigValid();
+        return this.parser.getProperty("version");
+    }
+
+    getSettings(): Record<string, unknown> {
+        this.assertConfigValid();
+        const settings = this.parser.getProperty("settings");
+        assertIsObject(settings);
+        return settings;
+    }
+}
+
+class SchemaValidator {
+    private schema: Record<string, string>;
+
+    constructor(schema: Record<string, string>) {
+        this.schema = schema;
+    }
+
+    assertMatchesSchema(obj: unknown): void {
+        assertIsObject(obj);
+        for (const key of Object.keys(this.schema)) {
+            assertHasProperty(obj, key);
+            const expectedType = this.schema[key];
+            const actualType = typeof obj[key];
+            if (actualType !== expectedType) {
+                throw new Error("Type mismatch for " + key);
+            }
+        }
+    }
+
+    validate(obj: unknown): Record<string, unknown> {
+        this.assertMatchesSchema(obj);
+        return obj as Record<string, unknown>;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // All classes converted
+    assert!(
+        output.contains("function JSONParser") &&
+        output.contains("function ConfigLoader") &&
+        output.contains("function SchemaValidator"),
+        "Expected ES5 class constructors: {}",
+        output
+    );
+
+    // Assertion functions preserved
+    assert!(
+        output.contains("assertIsObject") &&
+        output.contains("assertIsArray") &&
+        output.contains("assertHasProperty"),
+        "Expected assertion functions: {}",
+        output
+    );
+
+    // Methods on prototype
+    assert!(
+        output.contains("assertObject") &&
+        output.contains("assertConfigValid") &&
+        output.contains("assertMatchesSchema"),
+        "Expected assertion methods: {}",
+        output
+    );
+
+    // JSON.parse preserved
+    assert!(
+        output.contains("JSON.parse"),
+        "Expected JSON.parse: {}",
+        output
+    );
+}
