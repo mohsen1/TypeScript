@@ -32325,3 +32325,411 @@ class UserService extends Service<User> {
         output
     );
 }
+
+// ============================================================================
+// INTERFACE IMPLEMENTATION PATTERN TESTS
+// ============================================================================
+
+/// Test ES5 class downleveling with implements clause patterns
+#[test]
+fn test_class_es5_interface_implements_clause() {
+    let source = r#"
+interface Serializable {
+    serialize(): string;
+    deserialize(data: string): void;
+}
+
+interface Identifiable {
+    readonly id: string;
+    getId(): string;
+}
+
+interface Timestamped {
+    createdAt: Date;
+    updatedAt: Date;
+    touch(): void;
+}
+
+class Document implements Serializable, Identifiable, Timestamped {
+    readonly id: string;
+    createdAt: Date;
+    updatedAt: Date;
+    private content: string;
+
+    constructor(id: string, content: string) {
+        this.id = id;
+        this.content = content;
+        this.createdAt = new Date();
+        this.updatedAt = new Date();
+    }
+
+    serialize(): string {
+        return JSON.stringify({
+            id: this.id,
+            content: this.content,
+            createdAt: this.createdAt.toISOString(),
+            updatedAt: this.updatedAt.toISOString()
+        });
+    }
+
+    deserialize(data: string): void {
+        const parsed = JSON.parse(data);
+        this.content = parsed.content;
+    }
+
+    getId(): string {
+        return this.id;
+    }
+
+    touch(): void {
+        this.updatedAt = new Date();
+    }
+
+    getContent(): string {
+        return this.content;
+    }
+}
+
+class User implements Identifiable {
+    readonly id: string;
+    name: string;
+    email: string;
+
+    constructor(id: string, name: string, email: string) {
+        this.id = id;
+        this.name = name;
+        this.email = email;
+    }
+
+    getId(): string {
+        return this.id;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("Document") && output.contains("User"),
+        "Expected implements clause classes: {}",
+        output
+    );
+
+    // Document methods should be preserved
+    assert!(
+        output.contains("serialize") && output.contains("deserialize") && output.contains("getId"),
+        "Expected Document methods: {}",
+        output
+    );
+
+    // Touch method should be present
+    assert!(
+        output.contains("touch") && output.contains("getContent"),
+        "Expected additional methods: {}",
+        output
+    );
+}
+
+/// Test ES5 class downleveling with multiple interface implementations
+#[test]
+fn test_class_es5_interface_multiple_implements() {
+    let source = r#"
+interface Disposable {
+    dispose(): void;
+    isDisposed: boolean;
+}
+
+interface Cloneable<T> {
+    clone(): T;
+}
+
+interface Comparable<T> {
+    compareTo(other: T): number;
+    equals(other: T): boolean;
+}
+
+interface Hashable {
+    hashCode(): number;
+}
+
+class Entity implements Disposable, Cloneable<Entity>, Comparable<Entity>, Hashable {
+    private _isDisposed: boolean = false;
+    readonly value: number;
+
+    constructor(value: number) {
+        this.value = value;
+    }
+
+    get isDisposed(): boolean {
+        return this._isDisposed;
+    }
+
+    set isDisposed(value: boolean) {
+        this._isDisposed = value;
+    }
+
+    dispose(): void {
+        this._isDisposed = true;
+    }
+
+    clone(): Entity {
+        return new Entity(this.value);
+    }
+
+    compareTo(other: Entity): number {
+        return this.value - other.value;
+    }
+
+    equals(other: Entity): boolean {
+        return this.value === other.value;
+    }
+
+    hashCode(): number {
+        return this.value * 31;
+    }
+}
+
+interface EventEmitter {
+    on(event: string, handler: Function): void;
+    off(event: string, handler: Function): void;
+    emit(event: string, data?: any): void;
+}
+
+interface Logger {
+    log(message: string): void;
+    error(message: string): void;
+    warn(message: string): void;
+}
+
+class ServiceBase implements EventEmitter, Logger {
+    private handlers: Map<string, Function[]> = new Map();
+
+    on(event: string, handler: Function): void {
+        const list = this.handlers.get(event) || [];
+        list.push(handler);
+        this.handlers.set(event, list);
+    }
+
+    off(event: string, handler: Function): void {
+        const list = this.handlers.get(event) || [];
+        const index = list.indexOf(handler);
+        if (index >= 0) list.splice(index, 1);
+    }
+
+    emit(event: string, data?: any): void {
+        const list = this.handlers.get(event) || [];
+        list.forEach(h => h(data));
+    }
+
+    log(message: string): void {
+        console.log("[LOG]", message);
+    }
+
+    error(message: string): void {
+        console.error("[ERROR]", message);
+    }
+
+    warn(message: string): void {
+        console.warn("[WARN]", message);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("Entity") && output.contains("ServiceBase"),
+        "Expected multiple interface classes: {}",
+        output
+    );
+
+    // Entity methods
+    assert!(
+        output.contains("dispose") && output.contains("clone") && output.contains("compareTo"),
+        "Expected Entity methods: {}",
+        output
+    );
+
+    // ServiceBase methods
+    assert!(
+        output.contains("emit") && output.contains("log") && output.contains("error"),
+        "Expected ServiceBase methods: {}",
+        output
+    );
+}
+
+/// Test ES5 class downleveling with generic interface implementations
+#[test]
+fn test_class_es5_interface_generic_implements() {
+    let source = r#"
+interface Collection<T> {
+    add(item: T): void;
+    remove(item: T): boolean;
+    contains(item: T): boolean;
+    size(): number;
+    toArray(): T[];
+}
+
+interface Iterator<T> {
+    next(): { value: T; done: boolean };
+    hasNext(): boolean;
+    reset(): void;
+}
+
+class ArrayList<T> implements Collection<T>, Iterator<T> {
+    private items: T[] = [];
+    private index: number = 0;
+
+    add(item: T): void {
+        this.items.push(item);
+    }
+
+    remove(item: T): boolean {
+        const idx = this.items.indexOf(item);
+        if (idx >= 0) {
+            this.items.splice(idx, 1);
+            return true;
+        }
+        return false;
+    }
+
+    contains(item: T): boolean {
+        return this.items.indexOf(item) >= 0;
+    }
+
+    size(): number {
+        return this.items.length;
+    }
+
+    toArray(): T[] {
+        return [...this.items];
+    }
+
+    next(): { value: T; done: boolean } {
+        if (this.index < this.items.length) {
+            return { value: this.items[this.index++], done: false };
+        }
+        return { value: undefined as any, done: true };
+    }
+
+    hasNext(): boolean {
+        return this.index < this.items.length;
+    }
+
+    reset(): void {
+        this.index = 0;
+    }
+}
+
+interface KeyValueStore<K, V> {
+    get(key: K): V | undefined;
+    set(key: K, value: V): void;
+    delete(key: K): boolean;
+    has(key: K): boolean;
+    clear(): void;
+}
+
+class HashMap<K, V> implements KeyValueStore<K, V> {
+    private storage: Map<K, V> = new Map();
+
+    get(key: K): V | undefined {
+        return this.storage.get(key);
+    }
+
+    set(key: K, value: V): void {
+        this.storage.set(key, value);
+    }
+
+    delete(key: K): boolean {
+        return this.storage.delete(key);
+    }
+
+    has(key: K): boolean {
+        return this.storage.has(key);
+    }
+
+    clear(): void {
+        this.storage.clear();
+    }
+
+    keys(): K[] {
+        return Array.from(this.storage.keys());
+    }
+
+    values(): V[] {
+        return Array.from(this.storage.values());
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("ArrayList") && output.contains("HashMap"),
+        "Expected generic interface classes: {}",
+        output
+    );
+
+    // ArrayList/Collection methods
+    assert!(
+        output.contains("add") && output.contains("remove") && output.contains("contains"),
+        "Expected Collection methods: {}",
+        output
+    );
+
+    // Iterator methods
+    assert!(
+        output.contains("next") && output.contains("hasNext") && output.contains("reset"),
+        "Expected Iterator methods: {}",
+        output
+    );
+
+    // HashMap methods
+    assert!(
+        output.contains("keys") && output.contains("values") && output.contains("clear"),
+        "Expected HashMap methods: {}",
+        output
+    );
+}
