@@ -7,13 +7,14 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-Add async ES5 tests for async retry patterns: exponential backoff, jitter, circuit breaker. Tests: `./wasm/test.sh async_es5_tests`
+None - awaiting new task
 
 ## Task Queue
 - [ ] Add async ES5 tests for async stream patterns: readable, writable, transform, pipe
 
 
 ## Completed
+- [x] Added 12 async retry pattern tests (exponential_backoff, linear_backoff, jitter, circuit_breaker, max_attempts, conditional, fallback, timeout, reset, half_open, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (904 tests PASS).
 - [x] Added 12 async batching pattern tests (collect, flush, debounce, throttle, coalesce, queue, window, merge, split, rate_limit, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (892 tests PASS).
 - [x] Added 12 async caching pattern tests (memoize, get_or_set, invalidate, ttl, refresh, warmup, stale_while_revalidate, write_through, evict, distributed, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (880 tests PASS).
 - [x] Added 12 async cancellation pattern tests (abort_controller, signal, token, check, throw, cleanup, propagate, timeout, race, listener, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (868 tests PASS).
