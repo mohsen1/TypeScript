@@ -13715,3 +13715,53 @@ fn test_async_iifepat_combined() {
     );
     assert!(result, "Should detect await in combined async IIFE patterns");
 }
+
+// ASYNC METHOD CHAINING PATTERN TESTS
+
+#[test]
+fn test_async_methchain_basic() {
+    let result = async_error_propagation_contains_await(
+        "async function chain() { return await obj.method1().method2(); }",
+    );
+    assert!(result, "Should detect await in basic async method chain");
+}
+
+#[test]
+fn test_async_methchain_with_await() {
+    let result = async_error_propagation_contains_await(
+        "async function chain() { return await builder.step1().step2().build(); }",
+    );
+    assert!(result, "Should detect await in async chain with await");
+}
+
+#[test]
+fn test_async_methchain_fluent_builder() {
+    let result = async_error_propagation_contains_await(
+        "async function build() { return await new Builder().setName(n).setValue(v).build(); }",
+    );
+    assert!(result, "Should detect await in fluent async builder");
+}
+
+#[test]
+fn test_async_methchain_pipeline() {
+    let result = async_error_propagation_contains_await(
+        "async function pipeline() { return await data.filter(f).map(m).reduce(r); }",
+    );
+    assert!(result, "Should detect await in async pipeline pattern");
+}
+
+#[test]
+fn test_async_methchain_error_handling() {
+    let result = async_error_propagation_contains_await(
+        "async function chain() { try { return await api.fetch().parse().validate(); } catch (e) { return null; } }",
+    );
+    assert!(result, "Should detect await in async chain with error handling");
+}
+
+#[test]
+fn test_async_methchain_combined() {
+    let result = async_error_propagation_contains_await(
+        "async function process() { return await this.init().configure().execute(); }",
+    );
+    assert!(result, "Should detect await in combined async chain patterns");
+}
