@@ -6,12 +6,17 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-- [ ] Add ES5 tests for Promise patterns (Promise.all, Promise.race, Promise.allSettled, Promise.any, promise chaining in class methods) in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
+- [ ] Add ES5 class tests for module pattern variations: CommonJS class exports, ESM default class, re-export patterns. Tests: `./wasm/test.sh class_es5_tests`
 
 ## Task Queue
-- [ ] (empty)
+(empty)
 
 ## Completed
+- [x] Added ES5 tests for namespace merging patterns (6 tests): class with namespace augmentation, namespace with interface, namespace with enum, namespace with function, nested namespaces, namespace exports. Ran `./wasm/test.sh class_es5_tests` (all 330 pass).
+- [x] Added ES5 tests for abstract class patterns (6 tests): abstract method inheritance, abstract with decorators, abstract static methods, abstract getters/setters, multi-level inheritance, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 324 pass).
+- [x] Added ES5 tests for super() call patterns (6 tests): super with conditional expressions, super in try/catch, super with Promise.resolve, super with async/await context, super with spread in derived constructor, super with complex argument expressions. Ran `./wasm/test.sh class_es5_tests` (all 318 pass).
+- [x] Added ES5 tests for class expression patterns (6 tests): anonymous class, named class expression, class in return statement, class in array, IIFE class, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 319 pass).
+- [x] Added ES5 tests for Promise patterns (6 tests): Promise.all, Promise.race, Promise.allSettled, Promise.any, promise chaining pipeline, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 320 pass).
 - [x] Added ES5 tests for Generator/yield patterns (6 tests): generator basic, yield expressions, yield delegation, generator with state, async generator class, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 314 pass).
 - [x] Added ES5 tests for AsyncIterator/AsyncIterable patterns (6 tests): async iterator basic, for-await-of pattern, async generator iterable, async iterator protocol, in constructor, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 309 pass).
 - [x] Added ES5 tests for Iterator/Iterable patterns (6 tests): custom iterator basic, iterable class pattern, iterator with state, for-of with iterator, in constructor, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 304 pass).

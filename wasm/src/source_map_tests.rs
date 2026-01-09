@@ -41714,3 +41714,3630 @@ const processor = new DataProcessor('https://api.example.com');
         "expected mappings to reference source file"
     );
 }
+
+// =============================================================================
+// Generator ES5 Source Map Tests - Extended Patterns
+// =============================================================================
+
+#[test]
+fn test_source_map_generator_es5_control_flow() {
+    let source = r#"function* controlFlowGenerator(n: number): Generator<number> {
+    for (let i = 0; i < n; i++) {
+        if (i % 2 === 0) {
+            yield i * 2;
+        } else {
+            yield i * 3;
+        }
+    }
+
+    let j = 0;
+    while (j < 3) {
+        yield j * 10;
+        j++;
+    }
+
+    switch (n) {
+        case 1: yield 100; break;
+        case 2: yield 200; break;
+        default: yield 999;
+    }
+}
+
+const gen = controlFlowGenerator(5);
+console.log([...gen]);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("controlFlowGenerator"),
+        "expected output to contain controlFlowGenerator. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for control flow generator"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_generator_es5_state_machine() {
+    let source = r#"type State = 'idle' | 'loading' | 'success' | 'error';
+
+function* stateMachine(): Generator<State, void, string> {
+    let input: string;
+
+    while (true) {
+        yield 'idle';
+        input = yield 'loading';
+
+        if (input === 'success') {
+            yield 'success';
+        } else if (input === 'error') {
+            yield 'error';
+        }
+    }
+}
+
+const machine = stateMachine();
+console.log(machine.next());
+console.log(machine.next());
+console.log(machine.next('success'));"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("stateMachine"),
+        "expected output to contain stateMachine. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for state machine generator"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_generator_es5_finally() {
+    let source = r#"function* generatorWithFinally(): Generator<number> {
+    try {
+        yield 1;
+        yield 2;
+        yield 3;
+    } finally {
+        console.log('Generator cleanup');
+    }
+}
+
+function* nestedTryFinally(): Generator<string> {
+    try {
+        try {
+            yield 'inner-1';
+            yield 'inner-2';
+        } finally {
+            yield 'inner-finally';
+        }
+        yield 'outer-1';
+    } finally {
+        yield 'outer-finally';
+    }
+}
+
+const gen1 = generatorWithFinally();
+const gen2 = nestedTryFinally();
+console.log([...gen1], [...gen2]);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("generatorWithFinally") || output.contains("nestedTryFinally"),
+        "expected output to contain generator functions. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for finally generator"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_generator_es5_composition() {
+    let source = r#"function* numbers(n: number): Generator<number> {
+    for (let i = 1; i <= n; i++) {
+        yield i;
+    }
+}
+
+function* letters(s: string): Generator<string> {
+    for (const c of s) {
+        yield c;
+    }
+}
+
+function* combined(): Generator<number | string> {
+    yield* numbers(3);
+    yield '---';
+    yield* letters('abc');
+    yield '---';
+    yield* numbers(2);
+}
+
+function* flatten<T>(iterables: Iterable<T>[]): Generator<T> {
+    for (const iterable of iterables) {
+        yield* iterable;
+    }
+}
+
+console.log([...combined()]);
+console.log([...flatten([[1, 2], [3, 4], [5]])]);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("combined") || output.contains("flatten"),
+        "expected output to contain composition generators. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for composition generator"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_generator_es5_iterator_protocol() {
+    let source = r#"class Range {
+    constructor(private start: number, private end: number) {}
+
+    *[Symbol.iterator](): Generator<number> {
+        for (let i = this.start; i <= this.end; i++) {
+            yield i;
+        }
+    }
+}
+
+class KeyValuePairs<K, V> {
+    private pairs: [K, V][] = [];
+
+    add(key: K, value: V): void {
+        this.pairs.push([key, value]);
+    }
+
+    *keys(): Generator<K> {
+        for (const [key] of this.pairs) {
+            yield key;
+        }
+    }
+
+    *values(): Generator<V> {
+        for (const [, value] of this.pairs) {
+            yield value;
+        }
+    }
+
+    *entries(): Generator<[K, V]> {
+        yield* this.pairs;
+    }
+}
+
+const range = new Range(1, 5);
+console.log([...range]);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("Range") || output.contains("KeyValuePairs"),
+        "expected output to contain iterator protocol classes. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for iterator protocol"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_generator_es5_default_params() {
+    let source = r#"function* range(
+    start: number = 0,
+    end: number = 10,
+    step: number = 1
+): Generator<number> {
+    for (let i = start; i < end; i += step) {
+        yield i;
+    }
+}
+
+function* repeat<T>(
+    value: T,
+    times: number = Infinity
+): Generator<T> {
+    for (let i = 0; i < times; i++) {
+        yield value;
+    }
+}
+
+function* take<T>(
+    iterable: Iterable<T>,
+    count: number = 5
+): Generator<T> {
+    let i = 0;
+    for (const item of iterable) {
+        if (i++ >= count) break;
+        yield item;
+    }
+}
+
+console.log([...range()]);
+console.log([...range(5, 10, 2)]);
+console.log([...take(repeat('x'), 3)]);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("range") || output.contains("repeat"),
+        "expected output to contain generators with default params. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for default params generator"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_generator_es5_object_yielding() {
+    let source = r#"interface Person {
+    id: number;
+    name: string;
+    age: number;
+}
+
+function* personGenerator(): Generator<Person> {
+    yield { id: 1, name: 'Alice', age: 30 };
+    yield { id: 2, name: 'Bob', age: 25 };
+    yield { id: 3, name: 'Charlie', age: 35 };
+}
+
+function* objectTransformer<T, U>(
+    source: Iterable<T>,
+    transform: (item: T) => U
+): Generator<U> {
+    for (const item of source) {
+        yield transform(item);
+    }
+}
+
+const people = personGenerator();
+const names = objectTransformer(personGenerator(), p => p.name);
+console.log([...people], [...names]);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("personGenerator") || output.contains("objectTransformer"),
+        "expected output to contain object yielding generators. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for object yielding generator"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_generator_es5_recursion() {
+    let source = r#"interface TreeNode<T> {
+    value: T;
+    children?: TreeNode<T>[];
+}
+
+function* traverseTree<T>(node: TreeNode<T>): Generator<T> {
+    yield node.value;
+    if (node.children) {
+        for (const child of node.children) {
+            yield* traverseTree(child);
+        }
+    }
+}
+
+function* fibonacci(): Generator<number> {
+    let [a, b] = [0, 1];
+    while (true) {
+        yield a;
+        [a, b] = [b, a + b];
+    }
+}
+
+function* permutations<T>(items: T[]): Generator<T[]> {
+    if (items.length <= 1) {
+        yield items;
+    } else {
+        for (let i = 0; i < items.length; i++) {
+            const rest = [...items.slice(0, i), ...items.slice(i + 1)];
+            for (const perm of permutations(rest)) {
+                yield [items[i], ...perm];
+            }
+        }
+    }
+}
+
+const tree: TreeNode<number> = {
+    value: 1,
+    children: [{ value: 2 }, { value: 3, children: [{ value: 4 }] }]
+};
+console.log([...traverseTree(tree)]);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("traverseTree") || output.contains("fibonacci"),
+        "expected output to contain recursive generators. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for recursive generator"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_generator_es5_lazy_evaluation() {
+    let source = r#"function* lazyMap<T, U>(
+    source: Iterable<T>,
+    fn: (item: T) => U
+): Generator<U> {
+    for (const item of source) {
+        yield fn(item);
+    }
+}
+
+function* lazyFilter<T>(
+    source: Iterable<T>,
+    predicate: (item: T) => boolean
+): Generator<T> {
+    for (const item of source) {
+        if (predicate(item)) {
+            yield item;
+        }
+    }
+}
+
+function* lazyTakeWhile<T>(
+    source: Iterable<T>,
+    predicate: (item: T) => boolean
+): Generator<T> {
+    for (const item of source) {
+        if (!predicate(item)) break;
+        yield item;
+    }
+}
+
+function pipe<T>(...generators: ((input: Iterable<T>) => Generator<T>)[]): (input: Iterable<T>) => Generator<T> {
+    return function*(input: Iterable<T>): Generator<T> {
+        let result: Iterable<T> = input;
+        for (const gen of generators) {
+            result = gen(result);
+        }
+        yield* result;
+    };
+}
+
+const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+const result = lazyFilter(
+    lazyMap(numbers, x => x * 2),
+    x => x > 5
+);
+console.log([...result]);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("lazyMap") || output.contains("lazyFilter"),
+        "expected output to contain lazy evaluation generators. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for lazy evaluation generator"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_generator_es5_comprehensive() {
+    let source = r#"// Utility generators
+function* range(start: number, end: number): Generator<number> {
+    for (let i = start; i < end; i++) yield i;
+}
+
+function* map<T, U>(iter: Iterable<T>, fn: (x: T) => U): Generator<U> {
+    for (const x of iter) yield fn(x);
+}
+
+function* filter<T>(iter: Iterable<T>, pred: (x: T) => boolean): Generator<T> {
+    for (const x of iter) if (pred(x)) yield x;
+}
+
+// Class with generator methods
+class DataStream<T> {
+    private data: T[] = [];
+
+    push(...items: T[]): void {
+        this.data.push(...items);
+    }
+
+    *[Symbol.iterator](): Generator<T> {
+        yield* this.data;
+    }
+
+    *reversed(): Generator<T> {
+        for (let i = this.data.length - 1; i >= 0; i--) {
+            yield this.data[i];
+        }
+    }
+
+    *chunks(size: number): Generator<T[]> {
+        for (let i = 0; i < this.data.length; i += size) {
+            yield this.data.slice(i, i + size);
+        }
+    }
+
+    *zip<U>(other: Iterable<U>): Generator<[T, U]> {
+        const otherIter = other[Symbol.iterator]();
+        for (const item of this.data) {
+            const otherResult = otherIter.next();
+            if (otherResult.done) break;
+            yield [item, otherResult.value];
+        }
+    }
+}
+
+// Async generator for completeness
+async function* asyncNumbers(): AsyncGenerator<number> {
+    for (let i = 0; i < 5; i++) {
+        await new Promise(r => setTimeout(r, 10));
+        yield i;
+    }
+}
+
+// Usage
+const stream = new DataStream<number>();
+stream.push(1, 2, 3, 4, 5, 6);
+
+const evenDoubled = filter(
+    map(stream, x => x * 2),
+    x => x % 4 === 0
+);
+
+console.log([...evenDoubled]);
+console.log([...stream.chunks(2)]);
+console.log([...stream.zip(['a', 'b', 'c'])]);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("DataStream"),
+        "expected output to contain DataStream class. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for comprehensive generator"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+// =============================================================================
+// Class Inheritance ES5 Source Map Tests
+// =============================================================================
+
+#[test]
+fn test_source_map_class_inheritance_es5_extends_clause() {
+    let source = r#"class Animal {
+    name: string;
+
+    constructor(name: string) {
+        this.name = name;
+    }
+
+    speak(): void {
+        console.log(`${this.name} makes a sound`);
+    }
+}
+
+class Dog extends Animal {
+    breed: string;
+
+    constructor(name: string, breed: string) {
+        super(name);
+        this.breed = breed;
+    }
+}
+
+const dog = new Dog("Buddy", "Labrador");"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("Animal"),
+        "expected output to contain Animal class. output: {output}"
+    );
+    assert!(
+        output.contains("Dog"),
+        "expected output to contain Dog class. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for extends clause"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_class_inheritance_es5_super_calls() {
+    let source = r#"class Base {
+    protected value: number;
+
+    constructor(value: number) {
+        this.value = value;
+    }
+
+    getValue(): number {
+        return this.value;
+    }
+
+    protected increment(): void {
+        this.value++;
+    }
+}
+
+class Derived extends Base {
+    private multiplier: number;
+
+    constructor(value: number, multiplier: number) {
+        super(value);
+        this.multiplier = multiplier;
+    }
+
+    getValue(): number {
+        return super.getValue() * this.multiplier;
+    }
+
+    increment(): void {
+        super.increment();
+        console.log("Incremented to", this.value);
+    }
+}
+
+const d = new Derived(5, 2);
+console.log(d.getValue());
+d.increment();"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("Derived"),
+        "expected output to contain Derived class. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for super calls"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_class_inheritance_es5_method_overrides() {
+    let source = r#"class Shape {
+    protected x: number;
+    protected y: number;
+
+    constructor(x: number, y: number) {
+        this.x = x;
+        this.y = y;
+    }
+
+    area(): number {
+        return 0;
+    }
+
+    perimeter(): number {
+        return 0;
+    }
+
+    describe(): string {
+        return `Shape at (${this.x}, ${this.y})`;
+    }
+}
+
+class Rectangle extends Shape {
+    private width: number;
+    private height: number;
+
+    constructor(x: number, y: number, width: number, height: number) {
+        super(x, y);
+        this.width = width;
+        this.height = height;
+    }
+
+    area(): number {
+        return this.width * this.height;
+    }
+
+    perimeter(): number {
+        return 2 * (this.width + this.height);
+    }
+
+    describe(): string {
+        return `Rectangle ${this.width}x${this.height} at (${this.x}, ${this.y})`;
+    }
+}
+
+class Circle extends Shape {
+    private radius: number;
+
+    constructor(x: number, y: number, radius: number) {
+        super(x, y);
+        this.radius = radius;
+    }
+
+    area(): number {
+        return Math.PI * this.radius * this.radius;
+    }
+
+    perimeter(): number {
+        return 2 * Math.PI * this.radius;
+    }
+
+    describe(): string {
+        return `Circle r=${this.radius} at (${this.x}, ${this.y})`;
+    }
+}
+
+const shapes: Shape[] = [new Rectangle(0, 0, 10, 5), new Circle(5, 5, 3)];
+shapes.forEach(s => console.log(s.describe(), s.area()));"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("Rectangle"),
+        "expected output to contain Rectangle class. output: {output}"
+    );
+    assert!(
+        output.contains("Circle"),
+        "expected output to contain Circle class. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for method overrides"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_class_inheritance_es5_multi_level() {
+    let source = r#"class Entity {
+    id: string;
+
+    constructor(id: string) {
+        this.id = id;
+    }
+
+    toString(): string {
+        return `Entity(${this.id})`;
+    }
+}
+
+class LivingEntity extends Entity {
+    health: number;
+
+    constructor(id: string, health: number) {
+        super(id);
+        this.health = health;
+    }
+
+    isAlive(): boolean {
+        return this.health > 0;
+    }
+
+    toString(): string {
+        return `${super.toString()} HP:${this.health}`;
+    }
+}
+
+class Character extends LivingEntity {
+    name: string;
+    level: number;
+
+    constructor(id: string, name: string, health: number, level: number) {
+        super(id, health);
+        this.name = name;
+        this.level = level;
+    }
+
+    toString(): string {
+        return `${this.name} Lv.${this.level} ${super.toString()}`;
+    }
+}
+
+class Player extends Character {
+    experience: number;
+
+    constructor(id: string, name: string) {
+        super(id, name, 100, 1);
+        this.experience = 0;
+    }
+
+    gainExp(amount: number): void {
+        this.experience += amount;
+        if (this.experience >= this.level * 100) {
+            this.level++;
+            this.health += 10;
+        }
+    }
+
+    toString(): string {
+        return `[Player] ${super.toString()} EXP:${this.experience}`;
+    }
+}
+
+const player = new Player("p1", "Hero");
+player.gainExp(150);
+console.log(player.toString());"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("Player"),
+        "expected output to contain Player class. output: {output}"
+    );
+    assert!(
+        output.contains("Character"),
+        "expected output to contain Character class. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for multi-level inheritance"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_class_inheritance_es5_mixin_pattern() {
+    let source = r#"type Constructor<T = {}> = new (...args: any[]) => T;
+
+function Timestamped<TBase extends Constructor>(Base: TBase) {
+    return class extends Base {
+        timestamp = Date.now();
+
+        getTimestamp(): number {
+            return this.timestamp;
+        }
+    };
+}
+
+function Tagged<TBase extends Constructor>(Base: TBase) {
+    return class extends Base {
+        tag: string = "";
+
+        setTag(tag: string): void {
+            this.tag = tag;
+        }
+
+        getTag(): string {
+            return this.tag;
+        }
+    };
+}
+
+function Serializable<TBase extends Constructor>(Base: TBase) {
+    return class extends Base {
+        serialize(): string {
+            return JSON.stringify(this);
+        }
+    };
+}
+
+class BaseEntity {
+    id: number;
+
+    constructor(id: number) {
+        this.id = id;
+    }
+}
+
+const MixedEntity = Serializable(Tagged(Timestamped(BaseEntity)));
+
+const entity = new MixedEntity(1);
+entity.setTag("important");
+console.log(entity.serialize());"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("Timestamped"),
+        "expected output to contain Timestamped mixin. output: {output}"
+    );
+    assert!(
+        output.contains("Tagged"),
+        "expected output to contain Tagged mixin. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for mixin pattern"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_class_inheritance_es5_super_property_access() {
+    let source = r#"class Config {
+    protected settings: Map<string, any> = new Map();
+
+    get(key: string): any {
+        return this.settings.get(key);
+    }
+
+    set(key: string, value: any): void {
+        this.settings.set(key, value);
+    }
+
+    has(key: string): boolean {
+        return this.settings.has(key);
+    }
+}
+
+class AppConfig extends Config {
+    private defaults: Map<string, any>;
+
+    constructor(defaults: Record<string, any>) {
+        super();
+        this.defaults = new Map(Object.entries(defaults));
+    }
+
+    get(key: string): any {
+        if (super.has(key)) {
+            return super.get(key);
+        }
+        return this.defaults.get(key);
+    }
+
+    set(key: string, value: any): void {
+        if (this.defaults.has(key)) {
+            super.set(key, value);
+        } else {
+            throw new Error(`Unknown config key: ${key}`);
+        }
+    }
+
+    reset(key: string): void {
+        if (this.defaults.has(key)) {
+            super.set(key, this.defaults.get(key));
+        }
+    }
+}
+
+const config = new AppConfig({ debug: false, timeout: 5000 });
+config.set("debug", true);
+console.log(config.get("debug"), config.get("timeout"));"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("AppConfig"),
+        "expected output to contain AppConfig class. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for super property access"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_class_inheritance_es5_static_inheritance() {
+    let source = r#"class Database {
+    static connectionCount = 0;
+    static instances: Database[] = [];
+
+    static create(): Database {
+        const db = new Database();
+        Database.instances.push(db);
+        return db;
+    }
+
+    static getConnectionCount(): number {
+        return Database.connectionCount;
+    }
+
+    constructor() {
+        Database.connectionCount++;
+    }
+}
+
+class PostgresDB extends Database {
+    static driver = "pg";
+
+    static create(): PostgresDB {
+        const db = new PostgresDB();
+        Database.instances.push(db);
+        return db;
+    }
+
+    static getDriver(): string {
+        return PostgresDB.driver;
+    }
+
+    query(sql: string): void {
+        console.log(`Executing on ${PostgresDB.driver}: ${sql}`);
+    }
+}
+
+class MySQLDB extends Database {
+    static driver = "mysql2";
+
+    static create(): MySQLDB {
+        const db = new MySQLDB();
+        Database.instances.push(db);
+        return db;
+    }
+}
+
+const pg = PostgresDB.create();
+const mysql = MySQLDB.create();
+console.log(Database.getConnectionCount());"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("PostgresDB"),
+        "expected output to contain PostgresDB class. output: {output}"
+    );
+    assert!(
+        output.contains("MySQLDB"),
+        "expected output to contain MySQLDB class. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for static inheritance"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_class_inheritance_es5_abstract_class() {
+    let source = r#"abstract class Transport {
+    abstract connect(): Promise<void>;
+    abstract disconnect(): Promise<void>;
+    abstract send(data: string): Promise<void>;
+
+    protected connected = false;
+
+    isConnected(): boolean {
+        return this.connected;
+    }
+
+    async sendIfConnected(data: string): Promise<boolean> {
+        if (this.connected) {
+            await this.send(data);
+            return true;
+        }
+        return false;
+    }
+}
+
+class WebSocketTransport extends Transport {
+    private url: string;
+    private ws: any;
+
+    constructor(url: string) {
+        super();
+        this.url = url;
+    }
+
+    async connect(): Promise<void> {
+        this.ws = new WebSocket(this.url);
+        this.connected = true;
+    }
+
+    async disconnect(): Promise<void> {
+        this.ws?.close();
+        this.connected = false;
+    }
+
+    async send(data: string): Promise<void> {
+        this.ws?.send(data);
+    }
+}
+
+class HTTPTransport extends Transport {
+    private baseUrl: string;
+
+    constructor(baseUrl: string) {
+        super();
+        this.baseUrl = baseUrl;
+    }
+
+    async connect(): Promise<void> {
+        this.connected = true;
+    }
+
+    async disconnect(): Promise<void> {
+        this.connected = false;
+    }
+
+    async send(data: string): Promise<void> {
+        await fetch(this.baseUrl, { method: 'POST', body: data });
+    }
+}
+
+const transports: Transport[] = [
+    new WebSocketTransport("ws://localhost:8080"),
+    new HTTPTransport("http://api.example.com")
+];"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("Transport"),
+        "expected output to contain Transport class. output: {output}"
+    );
+    assert!(
+        output.contains("WebSocketTransport"),
+        "expected output to contain WebSocketTransport class. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for abstract class"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_class_inheritance_es5_interface_implementation() {
+    let source = r#"interface Comparable<T> {
+    compareTo(other: T): number;
+}
+
+interface Hashable {
+    hashCode(): number;
+}
+
+interface Cloneable<T> {
+    clone(): T;
+}
+
+class BaseValue {
+    protected value: number;
+
+    constructor(value: number) {
+        this.value = value;
+    }
+
+    getValue(): number {
+        return this.value;
+    }
+}
+
+class ComparableValue extends BaseValue implements Comparable<ComparableValue>, Hashable, Cloneable<ComparableValue> {
+    constructor(value: number) {
+        super(value);
+    }
+
+    compareTo(other: ComparableValue): number {
+        return this.value - other.value;
+    }
+
+    hashCode(): number {
+        return this.value | 0;
+    }
+
+    clone(): ComparableValue {
+        return new ComparableValue(this.value);
+    }
+}
+
+const a = new ComparableValue(10);
+const b = new ComparableValue(20);
+console.log(a.compareTo(b));
+console.log(a.hashCode());
+const c = a.clone();"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("ComparableValue"),
+        "expected output to contain ComparableValue class. output: {output}"
+    );
+    assert!(
+        output.contains("BaseValue"),
+        "expected output to contain BaseValue class. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for interface implementation"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_class_inheritance_es5_comprehensive() {
+    let source = r#"// Comprehensive class inheritance test with mixins, abstract classes, and interfaces
+
+type Constructor<T = {}> = new (...args: any[]) => T;
+
+interface Identifiable {
+    getId(): string;
+}
+
+interface Persistable {
+    save(): Promise<void>;
+    load(): Promise<void>;
+}
+
+function Loggable<TBase extends Constructor>(Base: TBase) {
+    return class extends Base {
+        log(message: string): void {
+            console.log(`[${new Date().toISOString()}] ${message}`);
+        }
+    };
+}
+
+function Validatable<TBase extends Constructor>(Base: TBase) {
+    return class extends Base {
+        protected errors: string[] = [];
+
+        validate(): boolean {
+            this.errors = [];
+            return true;
+        }
+
+        getErrors(): string[] {
+            return [...this.errors];
+        }
+    };
+}
+
+abstract class Entity implements Identifiable {
+    protected id: string;
+    protected createdAt: Date;
+    protected updatedAt: Date;
+
+    constructor(id?: string) {
+        this.id = id || crypto.randomUUID();
+        this.createdAt = new Date();
+        this.updatedAt = new Date();
+    }
+
+    getId(): string {
+        return this.id;
+    }
+
+    abstract toJSON(): object;
+}
+
+abstract class Model extends Entity implements Persistable {
+    protected dirty = false;
+
+    markDirty(): void {
+        this.dirty = true;
+        this.updatedAt = new Date();
+    }
+
+    abstract save(): Promise<void>;
+    abstract load(): Promise<void>;
+}
+
+const ValidatableModel = Validatable(Loggable(class extends Model {
+    toJSON(): object {
+        return { id: this.id, createdAt: this.createdAt, updatedAt: this.updatedAt };
+    }
+
+    async save(): Promise<void> {
+        this.log(`Saving entity ${this.id}`);
+    }
+
+    async load(): Promise<void> {
+        this.log(`Loading entity ${this.id}`);
+    }
+}));
+
+class User extends ValidatableModel {
+    private email: string;
+    private name: string;
+    private role: "admin" | "user" | "guest";
+
+    constructor(email: string, name: string, role: "admin" | "user" | "guest" = "user") {
+        super();
+        this.email = email;
+        this.name = name;
+        this.role = role;
+    }
+
+    validate(): boolean {
+        super.validate();
+
+        if (!this.email.includes("@")) {
+            this.errors.push("Invalid email format");
+        }
+        if (this.name.length < 2) {
+            this.errors.push("Name too short");
+        }
+
+        return this.errors.length === 0;
+    }
+
+    toJSON(): object {
+        return {
+            ...super.toJSON(),
+            email: this.email,
+            name: this.name,
+            role: this.role
+        };
+    }
+
+    async save(): Promise<void> {
+        if (!this.validate()) {
+            throw new Error(`Validation failed: ${this.getErrors().join(", ")}`);
+        }
+        await super.save();
+        this.dirty = false;
+    }
+
+    promote(): void {
+        if (this.role === "guest") {
+            this.role = "user";
+        } else if (this.role === "user") {
+            this.role = "admin";
+        }
+        this.markDirty();
+    }
+}
+
+class AdminUser extends User {
+    private permissions: Set<string>;
+
+    constructor(email: string, name: string, permissions: string[] = []) {
+        super(email, name, "admin");
+        this.permissions = new Set(permissions);
+    }
+
+    hasPermission(permission: string): boolean {
+        return this.permissions.has(permission) || this.permissions.has("*");
+    }
+
+    grant(permission: string): void {
+        this.permissions.add(permission);
+        this.markDirty();
+    }
+
+    revoke(permission: string): void {
+        this.permissions.delete(permission);
+        this.markDirty();
+    }
+
+    toJSON(): object {
+        return {
+            ...super.toJSON(),
+            permissions: [...this.permissions]
+        };
+    }
+}
+
+// Usage
+const admin = new AdminUser("admin@example.com", "Admin", ["users.read", "users.write"]);
+admin.grant("settings.read");
+admin.validate();
+console.log(JSON.stringify(admin.toJSON(), null, 2));
+
+const user = new User("test", "A", "guest");
+if (!user.validate()) {
+    console.log("Validation errors:", user.getErrors());
+}
+user.promote();
+console.log(JSON.stringify(user.toJSON(), null, 2));"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("User"),
+        "expected output to contain User class. output: {output}"
+    );
+    assert!(
+        output.contains("AdminUser"),
+        "expected output to contain AdminUser class. output: {output}"
+    );
+    assert!(
+        output.contains("Entity"),
+        "expected output to contain Entity class. output: {output}"
+    );
+    assert!(
+        output.contains("Loggable"),
+        "expected output to contain Loggable mixin. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for comprehensive class inheritance"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+// =============================================================================
+// Private Field ES5 Source Map Tests
+// =============================================================================
+
+#[test]
+fn test_source_map_private_field_es5_instance_field_access() {
+    let source = r#"class Counter {
+    #count: number = 0;
+
+    increment(): void {
+        this.#count++;
+    }
+
+    decrement(): void {
+        this.#count--;
+    }
+
+    getCount(): number {
+        return this.#count;
+    }
+
+    setCount(value: number): void {
+        this.#count = value;
+    }
+
+    reset(): void {
+        this.#count = 0;
+    }
+}
+
+const counter = new Counter();
+counter.increment();
+counter.increment();
+console.log(counter.getCount());
+counter.setCount(10);
+console.log(counter.getCount());"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("Counter"),
+        "expected output to contain Counter class. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for private instance field access"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_private_field_es5_static_field_access() {
+    let source = r#"class IdGenerator {
+    static #nextId: number = 1;
+    static #prefix: string = "ID_";
+
+    static generate(): string {
+        return IdGenerator.#prefix + IdGenerator.#nextId++;
+    }
+
+    static reset(): void {
+        IdGenerator.#nextId = 1;
+    }
+
+    static setPrefix(prefix: string): void {
+        IdGenerator.#prefix = prefix;
+    }
+
+    static getNextId(): number {
+        return IdGenerator.#nextId;
+    }
+}
+
+console.log(IdGenerator.generate());
+console.log(IdGenerator.generate());
+IdGenerator.setPrefix("USER_");
+console.log(IdGenerator.generate());
+console.log(IdGenerator.getNextId());"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("IdGenerator"),
+        "expected output to contain IdGenerator class. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for private static field access"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_private_field_es5_private_method_calls() {
+    let source = r#"class Calculator {
+    #value: number = 0;
+
+    #add(n: number): void {
+        this.#value += n;
+    }
+
+    #subtract(n: number): void {
+        this.#value -= n;
+    }
+
+    #multiply(n: number): void {
+        this.#value *= n;
+    }
+
+    #divide(n: number): void {
+        if (n !== 0) {
+            this.#value /= n;
+        }
+    }
+
+    #validate(n: number): boolean {
+        return typeof n === 'number' && !isNaN(n);
+    }
+
+    add(n: number): this {
+        if (this.#validate(n)) {
+            this.#add(n);
+        }
+        return this;
+    }
+
+    subtract(n: number): this {
+        if (this.#validate(n)) {
+            this.#subtract(n);
+        }
+        return this;
+    }
+
+    multiply(n: number): this {
+        if (this.#validate(n)) {
+            this.#multiply(n);
+        }
+        return this;
+    }
+
+    divide(n: number): this {
+        if (this.#validate(n)) {
+            this.#divide(n);
+        }
+        return this;
+    }
+
+    getValue(): number {
+        return this.#value;
+    }
+}
+
+const calc = new Calculator();
+const result = calc.add(10).multiply(2).subtract(5).divide(3).getValue();
+console.log(result);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("Calculator"),
+        "expected output to contain Calculator class. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for private method calls"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_private_field_es5_accessor_patterns() {
+    let source = r#"class Person {
+    #firstName: string;
+    #lastName: string;
+    #age: number;
+
+    constructor(firstName: string, lastName: string, age: number) {
+        this.#firstName = firstName;
+        this.#lastName = lastName;
+        this.#age = age;
+    }
+
+    get firstName(): string {
+        return this.#firstName;
+    }
+
+    set firstName(value: string) {
+        this.#firstName = value.trim();
+    }
+
+    get lastName(): string {
+        return this.#lastName;
+    }
+
+    set lastName(value: string) {
+        this.#lastName = value.trim();
+    }
+
+    get fullName(): string {
+        return `${this.#firstName} ${this.#lastName}`;
+    }
+
+    set fullName(value: string) {
+        const parts = value.split(' ');
+        this.#firstName = parts[0] || '';
+        this.#lastName = parts.slice(1).join(' ') || '';
+    }
+
+    get age(): number {
+        return this.#age;
+    }
+
+    set age(value: number) {
+        if (value >= 0 && value <= 150) {
+            this.#age = value;
+        }
+    }
+}
+
+const person = new Person("John", "Doe", 30);
+console.log(person.fullName);
+person.fullName = "Jane Smith";
+console.log(person.firstName, person.lastName);
+person.age = 25;
+console.log(person.age);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("Person"),
+        "expected output to contain Person class. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for private accessor patterns"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_private_field_es5_derived_class() {
+    let source = r#"class Animal {
+    #name: string;
+    #species: string;
+
+    constructor(name: string, species: string) {
+        this.#name = name;
+        this.#species = species;
+    }
+
+    getName(): string {
+        return this.#name;
+    }
+
+    getSpecies(): string {
+        return this.#species;
+    }
+
+    describe(): string {
+        return `${this.#name} is a ${this.#species}`;
+    }
+}
+
+class Dog extends Animal {
+    #breed: string;
+    #trained: boolean;
+
+    constructor(name: string, breed: string) {
+        super(name, "dog");
+        this.#breed = breed;
+        this.#trained = false;
+    }
+
+    getBreed(): string {
+        return this.#breed;
+    }
+
+    train(): void {
+        this.#trained = true;
+    }
+
+    isTrained(): boolean {
+        return this.#trained;
+    }
+
+    describe(): string {
+        const base = super.describe();
+        return `${base} (${this.#breed}, trained: ${this.#trained})`;
+    }
+}
+
+class Cat extends Animal {
+    #indoor: boolean;
+
+    constructor(name: string, indoor: boolean = true) {
+        super(name, "cat");
+        this.#indoor = indoor;
+    }
+
+    isIndoor(): boolean {
+        return this.#indoor;
+    }
+
+    describe(): string {
+        const base = super.describe();
+        return `${base} (${this.#indoor ? "indoor" : "outdoor"})`;
+    }
+}
+
+const dog = new Dog("Buddy", "Labrador");
+dog.train();
+console.log(dog.describe());
+
+const cat = new Cat("Whiskers", false);
+console.log(cat.describe());"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("Animal"),
+        "expected output to contain Animal class. output: {output}"
+    );
+    assert!(
+        output.contains("Dog"),
+        "expected output to contain Dog class. output: {output}"
+    );
+    assert!(
+        output.contains("Cat"),
+        "expected output to contain Cat class. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for private field in derived class"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_private_field_es5_weakmap_polyfill() {
+    let source = r#"class SecureStorage {
+    #data: Map<string, any> = new Map();
+    #encryptionKey: string;
+    static #instances: WeakMap<object, SecureStorage> = new WeakMap();
+
+    constructor(key: string) {
+        this.#encryptionKey = key;
+        SecureStorage.#instances.set(this, this);
+    }
+
+    #encrypt(value: string): string {
+        return btoa(value + this.#encryptionKey);
+    }
+
+    #decrypt(value: string): string {
+        const decoded = atob(value);
+        return decoded.replace(this.#encryptionKey, '');
+    }
+
+    set(key: string, value: any): void {
+        const encrypted = this.#encrypt(JSON.stringify(value));
+        this.#data.set(key, encrypted);
+    }
+
+    get(key: string): any {
+        const encrypted = this.#data.get(key);
+        if (encrypted) {
+            return JSON.parse(this.#decrypt(encrypted));
+        }
+        return undefined;
+    }
+
+    has(key: string): boolean {
+        return this.#data.has(key);
+    }
+
+    delete(key: string): boolean {
+        return this.#data.delete(key);
+    }
+
+    static getInstance(obj: object): SecureStorage | undefined {
+        return SecureStorage.#instances.get(obj);
+    }
+}
+
+const storage = new SecureStorage("secret123");
+storage.set("user", { name: "John", role: "admin" });
+console.log(storage.get("user"));
+console.log(storage.has("user"));
+console.log(SecureStorage.getInstance(storage));"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("SecureStorage"),
+        "expected output to contain SecureStorage class. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for WeakMap polyfill"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_private_field_es5_in_check() {
+    let source = r#"class BrandedClass {
+    #brand: symbol = Symbol("branded");
+
+    static isBranded(obj: any): boolean {
+        return #brand in obj;
+    }
+
+    getBrand(): symbol {
+        return this.#brand;
+    }
+}
+
+class Container<T> {
+    #value: T;
+    #initialized: boolean = false;
+
+    constructor(value: T) {
+        this.#value = value;
+        this.#initialized = true;
+    }
+
+    static isContainer(obj: any): boolean {
+        return #value in obj && #initialized in obj;
+    }
+
+    getValue(): T {
+        return this.#value;
+    }
+
+    setValue(value: T): void {
+        this.#value = value;
+    }
+}
+
+const branded = new BrandedClass();
+console.log(BrandedClass.isBranded(branded));
+console.log(BrandedClass.isBranded({}));
+
+const container = new Container<number>(42);
+console.log(Container.isContainer(container));
+console.log(container.getValue());"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("BrandedClass"),
+        "expected output to contain BrandedClass. output: {output}"
+    );
+    assert!(
+        output.contains("Container"),
+        "expected output to contain Container. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for private field in-check"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_private_field_es5_static_method() {
+    let source = r#"class Singleton {
+    static #instance: Singleton | null = null;
+    #id: number;
+
+    private constructor() {
+        this.#id = Math.random();
+    }
+
+    static #createInstance(): Singleton {
+        return new Singleton();
+    }
+
+    static getInstance(): Singleton {
+        if (Singleton.#instance === null) {
+            Singleton.#instance = Singleton.#createInstance();
+        }
+        return Singleton.#instance;
+    }
+
+    static #resetInstance(): void {
+        Singleton.#instance = null;
+    }
+
+    static reset(): void {
+        Singleton.#resetInstance();
+    }
+
+    getId(): number {
+        return this.#id;
+    }
+}
+
+const instance1 = Singleton.getInstance();
+const instance2 = Singleton.getInstance();
+console.log(instance1 === instance2);
+console.log(instance1.getId());
+Singleton.reset();
+const instance3 = Singleton.getInstance();
+console.log(instance1 === instance3);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("Singleton"),
+        "expected output to contain Singleton class. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for private static method"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_private_field_es5_comprehensive() {
+    let source = r#"// Comprehensive private field test with all patterns
+
+class EventEmitter<T extends Record<string, any[]>> {
+    #listeners: Map<keyof T, Set<(...args: any[]) => void>> = new Map();
+    #maxListeners: number = 10;
+    static #globalEmitters: WeakMap<object, EventEmitter<any>> = new WeakMap();
+
+    constructor() {
+        EventEmitter.#globalEmitters.set(this, this);
+    }
+
+    #getListeners<K extends keyof T>(event: K): Set<(...args: T[K]) => void> {
+        let listeners = this.#listeners.get(event);
+        if (!listeners) {
+            listeners = new Set();
+            this.#listeners.set(event, listeners);
+        }
+        return listeners as Set<(...args: T[K]) => void>;
+    }
+
+    #checkMaxListeners(event: keyof T): void {
+        const count = this.#getListeners(event).size;
+        if (count > this.#maxListeners) {
+            console.warn(`Max listeners exceeded for event: ${String(event)}`);
+        }
+    }
+
+    on<K extends keyof T>(event: K, listener: (...args: T[K]) => void): this {
+        this.#getListeners(event).add(listener);
+        this.#checkMaxListeners(event);
+        return this;
+    }
+
+    off<K extends keyof T>(event: K, listener: (...args: T[K]) => void): this {
+        this.#getListeners(event).delete(listener);
+        return this;
+    }
+
+    emit<K extends keyof T>(event: K, ...args: T[K]): boolean {
+        const listeners = this.#getListeners(event);
+        if (listeners.size === 0) return false;
+        listeners.forEach(listener => listener(...args));
+        return true;
+    }
+
+    get maxListeners(): number {
+        return this.#maxListeners;
+    }
+
+    set maxListeners(value: number) {
+        this.#maxListeners = Math.max(0, value);
+    }
+
+    static isEmitter(obj: any): boolean {
+        return #listeners in obj;
+    }
+
+    static getEmitter(obj: object): EventEmitter<any> | undefined {
+        return EventEmitter.#globalEmitters.get(obj);
+    }
+}
+
+class TypedEventEmitter extends EventEmitter<{
+    connect: [host: string, port: number];
+    disconnect: [reason: string];
+    message: [data: string, timestamp: Date];
+}> {
+    #connected: boolean = false;
+    #host: string = "";
+    #port: number = 0;
+
+    async #doConnect(host: string, port: number): Promise<void> {
+        await new Promise(r => setTimeout(r, 100));
+        this.#host = host;
+        this.#port = port;
+        this.#connected = true;
+    }
+
+    async connect(host: string, port: number): Promise<void> {
+        await this.#doConnect(host, port);
+        this.emit("connect", host, port);
+    }
+
+    disconnect(reason: string): void {
+        this.#connected = false;
+        this.emit("disconnect", reason);
+    }
+
+    send(data: string): void {
+        if (this.#connected) {
+            this.emit("message", data, new Date());
+        }
+    }
+
+    get isConnected(): boolean {
+        return this.#connected;
+    }
+
+    get connectionInfo(): { host: string; port: number } | null {
+        if (this.#connected) {
+            return { host: this.#host, port: this.#port };
+        }
+        return null;
+    }
+}
+
+// Usage
+const emitter = new TypedEventEmitter();
+
+emitter.on("connect", (host, port) => {
+    console.log(`Connected to ${host}:${port}`);
+});
+
+emitter.on("message", (data, timestamp) => {
+    console.log(`[${timestamp.toISOString()}] ${data}`);
+});
+
+emitter.on("disconnect", (reason) => {
+    console.log(`Disconnected: ${reason}`);
+});
+
+emitter.connect("localhost", 8080).then(() => {
+    emitter.send("Hello, World!");
+    emitter.disconnect("User requested");
+});
+
+console.log(EventEmitter.isEmitter(emitter));
+console.log(EventEmitter.getEmitter(emitter) === emitter);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("EventEmitter"),
+        "expected output to contain EventEmitter class. output: {output}"
+    );
+    assert!(
+        output.contains("TypedEventEmitter"),
+        "expected output to contain TypedEventEmitter class. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for comprehensive private field"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+// =============================================================================
+// Symbol-keyed Member ES5 Source Map Tests
+// =============================================================================
+
+#[test]
+fn test_source_map_symbol_es5_iterator() {
+    let source = r#"class Range {
+    private start: number;
+    private end: number;
+    private step: number;
+
+    constructor(start: number, end: number, step: number = 1) {
+        this.start = start;
+        this.end = end;
+        this.step = step;
+    }
+
+    *[Symbol.iterator](): Iterator<number> {
+        for (let i = this.start; i < this.end; i += this.step) {
+            yield i;
+        }
+    }
+
+    toArray(): number[] {
+        return [...this];
+    }
+}
+
+const range = new Range(0, 10, 2);
+for (const n of range) {
+    console.log(n);
+}
+console.log(range.toArray());"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("Range"),
+        "expected output to contain Range class. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for Symbol.iterator"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_symbol_es5_async_iterator() {
+    let source = r#"class AsyncQueue<T> {
+    private items: T[] = [];
+    private resolvers: ((value: IteratorResult<T>) => void)[] = [];
+    private done: boolean = false;
+
+    push(item: T): void {
+        if (this.resolvers.length > 0) {
+            const resolve = this.resolvers.shift()!;
+            resolve({ value: item, done: false });
+        } else {
+            this.items.push(item);
+        }
+    }
+
+    close(): void {
+        this.done = true;
+        for (const resolve of this.resolvers) {
+            resolve({ value: undefined as any, done: true });
+        }
+        this.resolvers = [];
+    }
+
+    async *[Symbol.asyncIterator](): AsyncIterator<T> {
+        while (!this.done || this.items.length > 0) {
+            if (this.items.length > 0) {
+                yield this.items.shift()!;
+            } else if (!this.done) {
+                yield await new Promise<T>((resolve) => {
+                    this.resolvers.push((result) => {
+                        if (!result.done) {
+                            resolve(result.value);
+                        }
+                    });
+                });
+            }
+        }
+    }
+}
+
+const queue = new AsyncQueue<number>();
+queue.push(1);
+queue.push(2);
+queue.push(3);
+queue.close();
+
+(async () => {
+    for await (const item of queue) {
+        console.log(item);
+    }
+})();"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("AsyncQueue"),
+        "expected output to contain AsyncQueue class. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for Symbol.asyncIterator"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_symbol_es5_computed_symbol_methods() {
+    let source = r#"const customMethod = Symbol("customMethod");
+const customGetter = Symbol("customGetter");
+const customProperty = Symbol("customProperty");
+
+class SymbolClass {
+    [customProperty]: string = "default";
+
+    [customMethod](x: number, y: number): number {
+        return x + y;
+    }
+
+    get [customGetter](): string {
+        return `Value: ${this[customProperty]}`;
+    }
+
+    set [customGetter](value: string) {
+        this[customProperty] = value;
+    }
+}
+
+const obj = new SymbolClass();
+console.log(obj[customMethod](1, 2));
+console.log(obj[customGetter]);
+obj[customGetter] = "updated";
+console.log(obj[customProperty]);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("SymbolClass"),
+        "expected output to contain SymbolClass. output: {output}"
+    );
+    assert!(
+        output.contains("customMethod"),
+        "expected output to contain customMethod. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for computed Symbol methods"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_symbol_es5_to_string_tag() {
+    let source = r#"class CustomCollection<T> {
+    private items: T[] = [];
+
+    get [Symbol.toStringTag](): string {
+        return "CustomCollection";
+    }
+
+    add(item: T): void {
+        this.items.push(item);
+    }
+
+    get size(): number {
+        return this.items.length;
+    }
+}
+
+class NamedObject {
+    private name: string;
+
+    constructor(name: string) {
+        this.name = name;
+    }
+
+    get [Symbol.toStringTag](): string {
+        return `NamedObject(${this.name})`;
+    }
+}
+
+const collection = new CustomCollection<number>();
+collection.add(1);
+collection.add(2);
+console.log(Object.prototype.toString.call(collection));
+
+const named = new NamedObject("test");
+console.log(Object.prototype.toString.call(named));"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("CustomCollection"),
+        "expected output to contain CustomCollection class. output: {output}"
+    );
+    assert!(
+        output.contains("NamedObject"),
+        "expected output to contain NamedObject class. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for Symbol.toStringTag"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_symbol_es5_has_instance() {
+    let source = r#"class CustomType {
+    private value: any;
+
+    constructor(value: any) {
+        this.value = value;
+    }
+
+    static [Symbol.hasInstance](instance: any): boolean {
+        return instance !== null &&
+               typeof instance === "object" &&
+               "value" in instance;
+    }
+}
+
+class ExtendedCustomType extends CustomType {
+    private extra: string;
+
+    constructor(value: any, extra: string) {
+        super(value);
+        this.extra = extra;
+    }
+
+    static [Symbol.hasInstance](instance: any): boolean {
+        return super[Symbol.hasInstance](instance) && "extra" in instance;
+    }
+}
+
+const obj1 = new CustomType(42);
+const obj2 = new ExtendedCustomType(42, "hello");
+const obj3 = { value: 10 };
+
+console.log(obj1 instanceof CustomType);
+console.log(obj2 instanceof CustomType);
+console.log(obj3 instanceof CustomType);
+console.log(obj2 instanceof ExtendedCustomType);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("CustomType"),
+        "expected output to contain CustomType class. output: {output}"
+    );
+    assert!(
+        output.contains("ExtendedCustomType"),
+        "expected output to contain ExtendedCustomType class. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for Symbol.hasInstance"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_symbol_es5_species() {
+    let source = r#"class MyArray<T> extends Array<T> {
+    static get [Symbol.species](): ArrayConstructor {
+        return Array;
+    }
+
+    customMethod(): T | undefined {
+        return this[0];
+    }
+}
+
+class SpecialArray<T> extends Array<T> {
+    static get [Symbol.species](): typeof SpecialArray {
+        return SpecialArray;
+    }
+
+    static create<U>(...items: U[]): SpecialArray<U> {
+        const arr = new SpecialArray<U>();
+        arr.push(...items);
+        return arr;
+    }
+
+    double(): SpecialArray<T> {
+        return this.concat(this) as SpecialArray<T>;
+    }
+}
+
+const myArr = new MyArray(1, 2, 3);
+const mapped = myArr.map(x => x * 2);
+console.log(mapped instanceof MyArray);
+console.log(mapped instanceof Array);
+
+const special = SpecialArray.create(1, 2, 3);
+const doubled = special.double();
+console.log(doubled instanceof SpecialArray);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("MyArray"),
+        "expected output to contain MyArray class. output: {output}"
+    );
+    assert!(
+        output.contains("SpecialArray"),
+        "expected output to contain SpecialArray class. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for Symbol.species"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_symbol_es5_to_primitive() {
+    let source = r#"class Money {
+    private amount: number;
+    private currency: string;
+
+    constructor(amount: number, currency: string = "USD") {
+        this.amount = amount;
+        this.currency = currency;
+    }
+
+    [Symbol.toPrimitive](hint: string): string | number {
+        if (hint === "number") {
+            return this.amount;
+        }
+        if (hint === "string") {
+            return `${this.currency} ${this.amount.toFixed(2)}`;
+        }
+        return this.amount;
+    }
+
+    add(other: Money): Money {
+        if (this.currency !== other.currency) {
+            throw new Error("Currency mismatch");
+        }
+        return new Money(this.amount + other.amount, this.currency);
+    }
+}
+
+const price = new Money(99.99);
+const tax = new Money(8.50);
+console.log(+price);
+console.log(`${price}`);
+console.log(price + 0);
+const total = price.add(tax);
+console.log(`${total}`);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("Money"),
+        "expected output to contain Money class. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for Symbol.toPrimitive"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_symbol_es5_is_concat_spreadable() {
+    let source = r#"class SpreadableCollection<T> {
+    private items: T[];
+
+    constructor(...items: T[]) {
+        this.items = items;
+    }
+
+    get [Symbol.isConcatSpreadable](): boolean {
+        return true;
+    }
+
+    get length(): number {
+        return this.items.length;
+    }
+
+    [index: number]: T;
+
+    *[Symbol.iterator](): Iterator<T> {
+        yield* this.items;
+    }
+}
+
+// Set up indexed access
+const createSpreadable = <T>(...items: T[]): SpreadableCollection<T> & T[] => {
+    const collection = new SpreadableCollection(...items);
+    items.forEach((item, i) => {
+        (collection as any)[i] = item;
+    });
+    return collection as SpreadableCollection<T> & T[];
+};
+
+const arr1 = [1, 2, 3];
+const spreadable = createSpreadable(4, 5, 6);
+const combined = arr1.concat(spreadable);
+console.log(combined);
+console.log(combined.length);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("SpreadableCollection"),
+        "expected output to contain SpreadableCollection class. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for Symbol.isConcatSpreadable"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_symbol_es5_comprehensive() {
+    let source = r#"// Comprehensive Symbol-keyed member test
+
+const customKey = Symbol("customKey");
+
+class SuperCollection<T> {
+    protected items: T[] = [];
+    protected name: string;
+
+    constructor(name: string) {
+        this.name = name;
+    }
+
+    // Symbol.toStringTag
+    get [Symbol.toStringTag](): string {
+        return `SuperCollection<${this.name}>`;
+    }
+
+    // Symbol.iterator
+    *[Symbol.iterator](): Iterator<T> {
+        yield* this.items;
+    }
+
+    // Symbol.toPrimitive
+    [Symbol.toPrimitive](hint: string): string | number {
+        if (hint === "number") {
+            return this.items.length;
+        }
+        return `[${this.name}: ${this.items.length} items]`;
+    }
+
+    // Custom symbol method
+    [customKey](multiplier: number): number {
+        return this.items.length * multiplier;
+    }
+
+    // Symbol.hasInstance
+    static [Symbol.hasInstance](instance: any): boolean {
+        return instance !== null &&
+               typeof instance === "object" &&
+               "items" in instance &&
+               "name" in instance;
+    }
+
+    add(...items: T[]): this {
+        this.items.push(...items);
+        return this;
+    }
+
+    get size(): number {
+        return this.items.length;
+    }
+}
+
+class AsyncSuperCollection<T> extends SuperCollection<T> {
+    // Symbol.asyncIterator
+    async *[Symbol.asyncIterator](): AsyncIterator<T> {
+        for (const item of this.items) {
+            await new Promise(r => setTimeout(r, 10));
+            yield item;
+        }
+    }
+
+    // Override Symbol.toStringTag
+    get [Symbol.toStringTag](): string {
+        return `AsyncSuperCollection<${this.name}>`;
+    }
+
+    // Symbol.species
+    static get [Symbol.species](): typeof AsyncSuperCollection {
+        return AsyncSuperCollection;
+    }
+
+    async processAll<U>(fn: (item: T) => Promise<U>): Promise<U[]> {
+        const results: U[] = [];
+        for await (const item of this) {
+            results.push(await fn(item));
+        }
+        return results;
+    }
+}
+
+// Usage
+const collection = new SuperCollection<number>("Numbers");
+collection.add(1, 2, 3, 4, 5);
+
+console.log(Object.prototype.toString.call(collection));
+console.log([...collection]);
+console.log(+collection);
+console.log(`${collection}`);
+console.log(collection[customKey](10));
+console.log({ items: [], name: "test" } instanceof SuperCollection);
+
+const asyncCollection = new AsyncSuperCollection<string>("Strings");
+asyncCollection.add("a", "b", "c");
+
+(async () => {
+    for await (const item of asyncCollection) {
+        console.log(item);
+    }
+
+    const results = await asyncCollection.processAll(async (s) => s.toUpperCase());
+    console.log(results);
+})();"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("SuperCollection"),
+        "expected output to contain SuperCollection class. output: {output}"
+    );
+    assert!(
+        output.contains("AsyncSuperCollection"),
+        "expected output to contain AsyncSuperCollection class. output: {output}"
+    );
+    assert!(
+        output.contains("customKey"),
+        "expected output to contain customKey symbol. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for comprehensive Symbol-keyed members"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}

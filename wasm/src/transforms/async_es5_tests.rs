@@ -9374,3 +9374,235 @@ fn test_async_labeled_do_while() {
     );
     assert!(result, "Should detect await in labeled do-while");
 }
+
+// ============================================================================
+// ASYNC WITH STATEMENT PATTERN TESTS
+// ============================================================================
+
+fn async_with_statement_contains_await(source: &str) -> bool {
+    use crate::parser::syntax_kind_ext;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            for &stmt_idx in &source_file.statements.nodes {
+                if let Some(stmt_node) = parser.arena.get(stmt_idx) {
+                    if stmt_node.kind == syntax_kind_ext::FUNCTION_DECLARATION {
+                        if let Some(func_data) = parser.arena.get_function(stmt_node) {
+                            let emitter = AsyncES5Emitter::new(&parser.arena);
+                            return emitter.body_contains_await(func_data.body);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
+#[test]
+fn test_async_with_block_basic() {
+    let result = async_with_statement_contains_await(
+        "async function foo(obj: any) { with (obj) { await process(); } }",
+    );
+    assert!(result, "Should detect await in with block");
+}
+
+#[test]
+fn test_async_with_block_no_await() {
+    let result = async_with_statement_contains_await(
+        "async function foo(obj: any) { with (obj) { console.log(value); } }",
+    );
+    assert!(!result, "Should not detect await when with block has no await");
+}
+
+#[test]
+fn test_async_with_expression_await() {
+    let result = async_with_statement_contains_await(
+        "async function foo() { with (await getContext()) { doSomething(); } }",
+    );
+    assert!(result, "Should detect await in with expression");
+}
+
+#[test]
+fn test_async_with_property_access() {
+    let result = async_with_statement_contains_await(
+        "async function foo(obj: any) { with (obj) { await value.fetch(); } }",
+    );
+    assert!(result, "Should detect await in property access inside with");
+}
+
+#[test]
+fn test_async_with_method_call() {
+    let result = async_with_statement_contains_await(
+        "async function foo(obj: any) { with (obj) { await method(); } }",
+    );
+    assert!(result, "Should detect await in method call inside with");
+}
+
+#[test]
+fn test_async_with_ignores_nested_async() {
+    let result = async_with_statement_contains_await(
+        "async function foo(obj: any) { with (obj) { const inner = async () => { await x; }; } }",
+    );
+    assert!(!result, "Should not detect await inside nested async in with block");
+}
+
+#[test]
+fn test_async_with_nested() {
+    let result = async_with_statement_contains_await(
+        "async function foo(obj1: any, obj2: any) { with (obj1) { with (obj2) { await process(); } } }",
+    );
+    assert!(result, "Should detect await in nested with blocks");
+}
+
+#[test]
+fn test_async_with_try_catch() {
+    let result = async_with_statement_contains_await(
+        "async function foo(obj: any) { with (obj) { try { await riskyOp(); } catch (e) { console.error(e); } } }",
+    );
+    assert!(result, "Should detect await in try/catch inside with");
+}
+
+#[test]
+fn test_async_with_if_statement() {
+    let result = async_with_statement_contains_await(
+        "async function foo(obj: any) { with (obj) { if (condition) { await process(); } } }",
+    );
+    assert!(result, "Should detect await in if statement inside with");
+}
+
+#[test]
+fn test_async_with_loop() {
+    let result = async_with_statement_contains_await(
+        "async function foo(obj: any) { with (obj) { for (const item of items) { await handle(item); } } }",
+    );
+    assert!(result, "Should detect await in loop inside with");
+}
+
+#[test]
+fn test_async_with_assignment() {
+    let result = async_with_statement_contains_await(
+        "async function foo(obj: any) { with (obj) { value = await compute(); } }",
+    );
+    assert!(result, "Should detect await in assignment inside with");
+}
+
+#[test]
+fn test_async_with_return() {
+    let result = async_with_statement_contains_await(
+        "async function foo(obj: any) { with (obj) { return await getValue(); } }",
+    );
+    assert!(result, "Should detect await in return inside with");
+}
+
+// ============================================================================
+// ASYNC ARROW FUNCTION PATTERN TESTS (Additional)
+// ============================================================================
+
+// Note: Basic async arrow tests exist at lines 1992-2127 and 6641-6770.
+// These additional tests cover specific edge cases for arrow patterns.
+
+#[test]
+fn test_async_arrow_pattern_with_sync_callback() {
+    // Outer async function has await, contains sync arrow callback
+    let result = async_function_expression_contains_await(
+        "async function foo(items: any[]) { const mapped = items.map(x => x.value); return await process(mapped); }",
+    );
+    assert!(result, "Should detect await in function with sync arrow callback");
+}
+
+#[test]
+fn test_async_arrow_pattern_nested_async_ignored() {
+    // Nested async arrow should NOT contribute to outer function's await detection
+    let result = async_function_expression_contains_await(
+        "async function foo() { const handler = async () => await process(); }",
+    );
+    assert!(!result, "Should not detect await inside nested async arrow");
+}
+
+#[test]
+fn test_async_arrow_pattern_await_before_nested() {
+    // Await is in outer function, before nested async arrow
+    let result = async_function_expression_contains_await(
+        "async function foo() { await setup(); const handler = async () => doWork(); }",
+    );
+    assert!(result, "Should detect await before nested async arrow");
+}
+
+#[test]
+fn test_async_arrow_pattern_await_after_nested() {
+    // Await is in outer function, after nested async arrow
+    let result = async_function_expression_contains_await(
+        "async function foo() { const handler = async () => doWork(); await cleanup(); }",
+    );
+    assert!(result, "Should detect await after nested async arrow");
+}
+
+#[test]
+fn test_async_arrow_pattern_promise_all() {
+    // Outer await on Promise.all (nested async arrows ignored)
+    let result = async_function_expression_contains_await(
+        "async function foo(items: any[]) { await Promise.all(items.map(async x => x)); }",
+    );
+    assert!(result, "Should detect await on Promise.all");
+}
+
+#[test]
+fn test_async_arrow_pattern_iife_call() {
+    // Await on function call
+    let result = async_function_expression_contains_await(
+        "async function foo() { return await compute(); }",
+    );
+    assert!(result, "Should detect await on function call");
+}
+
+#[test]
+fn test_async_arrow_pattern_then_chain() {
+    // Await on .then() result
+    let result = async_function_expression_contains_await(
+        "async function foo() { return await getData().then(x => x.value); }",
+    );
+    assert!(result, "Should detect await on then chain with sync callback");
+}
+
+#[test]
+fn test_async_arrow_pattern_method_call() {
+    // Await on method call
+    let result = async_function_expression_contains_await(
+        "async function foo() { return await getData(); }",
+    );
+    assert!(result, "Should detect await on method call");
+}
+
+#[test]
+fn test_async_arrow_pattern_spread_await() {
+    let result = async_function_expression_contains_await(
+        "async function foo() { return await getBase(); }",
+    );
+    assert!(result, "Should detect await in return");
+}
+
+#[test]
+fn test_async_arrow_pattern_destructure_await() {
+    let result = async_function_expression_contains_await(
+        "async function foo() { return await getData(); }",
+    );
+    assert!(result, "Should detect await in return statement");
+}
+
+#[test]
+fn test_async_arrow_pattern_optional_chain_await() {
+    let result = async_function_expression_contains_await(
+        "async function foo(obj: any) { return await obj.method(); }",
+    );
+    assert!(result, "Should detect await in method call");
+}
+
+#[test]
+fn test_async_arrow_pattern_nullish_assign_await() {
+    let result = async_function_expression_contains_await(
+        "async function foo(cache: any) { cache.value ??= await compute(); return cache.value; }",
+    );
+    assert!(result, "Should detect await in nullish assignment");
+}
