@@ -7,12 +7,13 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- [ ] Add ES5 generator method patterns parity tests: yield expressions, delegation, async generators. Tests: `./wasm/test.sh emitter_parity`
+(awaiting assignment)
 
 ## Task Queue
 (empty)
 
 ## Completed
+- [x] Added ES5 generator method patterns parity tests (yield-conditional, yield-argument, delegation-nested, async-promise-all) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (327 tests).
 - [x] Added ES5 super call patterns parity tests (property-access, method-computed, async-method, in-arrow) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (323 tests).
 - [x] Added ES5 static block patterns parity tests (complex-init-order, interleaved, async-pattern) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (319 tests).
 - [x] Added ES5 private field patterns parity tests (instance-methods, static-complex, method-context, accessor-validation) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (316 tests).
