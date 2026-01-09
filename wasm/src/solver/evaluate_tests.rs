@@ -41364,3 +41364,720 @@ fn test_distribution_keyof_result() {
     let expected = interner.union(vec![lit_a, lit_b]);
     assert!(result == expected || result != TypeId::ERROR);
 }
+
+// ============================================================================
+// Additional typeof (TypeQuery) operator tests
+// ============================================================================
+
+#[test]
+fn test_typeof_literal_string_type() {
+    use crate::solver::{TypeEnvironment, SymbolRef};
+
+    // typeof x where x: "hello"
+    let interner = TypeInterner::new();
+    let mut env = TypeEnvironment::new();
+
+    let lit_hello = interner.literal_string("hello");
+    let sym = SymbolRef(1);
+    env.insert(sym, lit_hello);
+
+    let type_query = interner.intern(TypeKey::TypeQuery(sym));
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(type_query);
+
+    assert_eq!(result, lit_hello);
+}
+
+#[test]
+fn test_typeof_literal_number_type() {
+    use crate::solver::{TypeEnvironment, SymbolRef};
+
+    // typeof x where x: 42
+    let interner = TypeInterner::new();
+    let mut env = TypeEnvironment::new();
+
+    let lit_42 = interner.number_literal(42);
+    let sym = SymbolRef(1);
+    env.insert(sym, lit_42);
+
+    let type_query = interner.intern(TypeKey::TypeQuery(sym));
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(type_query);
+
+    assert_eq!(result, lit_42);
+}
+
+#[test]
+fn test_typeof_union_type() {
+    use crate::solver::{TypeEnvironment, SymbolRef};
+
+    // typeof x where x: string | number
+    let interner = TypeInterner::new();
+    let mut env = TypeEnvironment::new();
+
+    let union_type = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let sym = SymbolRef(1);
+    env.insert(sym, union_type);
+
+    let type_query = interner.intern(TypeKey::TypeQuery(sym));
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(type_query);
+
+    assert_eq!(result, union_type);
+}
+
+#[test]
+fn test_typeof_tuple_type() {
+    use crate::solver::{TypeEnvironment, SymbolRef};
+
+    // typeof x where x: [string, number]
+    let interner = TypeInterner::new();
+    let mut env = TypeEnvironment::new();
+
+    let tuple = interner.tuple(vec![TypeId::STRING, TypeId::NUMBER]);
+    let sym = SymbolRef(1);
+    env.insert(sym, tuple);
+
+    let type_query = interner.intern(TypeKey::TypeQuery(sym));
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(type_query);
+
+    assert_eq!(result, tuple);
+}
+
+#[test]
+fn test_typeof_intersection_type() {
+    use crate::solver::{TypeEnvironment, SymbolRef};
+
+    // typeof x where x: { a: string } & { b: number }
+    let interner = TypeInterner::new();
+    let mut env = TypeEnvironment::new();
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let intersection = interner.intersection(vec![obj_a, obj_b]);
+    let sym = SymbolRef(1);
+    env.insert(sym, intersection);
+
+    let type_query = interner.intern(TypeKey::TypeQuery(sym));
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(type_query);
+
+    assert_eq!(result, intersection);
+}
+
+#[test]
+fn test_typeof_optional_properties() {
+    use crate::solver::{TypeEnvironment, SymbolRef};
+
+    // typeof x where x: { a?: string }
+    let interner = TypeInterner::new();
+    let mut env = TypeEnvironment::new();
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let sym = SymbolRef(1);
+    env.insert(sym, obj);
+
+    let type_query = interner.intern(TypeKey::TypeQuery(sym));
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(type_query);
+
+    assert_eq!(result, obj);
+}
+
+#[test]
+fn test_typeof_readonly_properties() {
+    use crate::solver::{TypeEnvironment, SymbolRef};
+
+    // typeof x where x: { readonly a: string }
+    let interner = TypeInterner::new();
+    let mut env = TypeEnvironment::new();
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    let sym = SymbolRef(1);
+    env.insert(sym, obj);
+
+    let type_query = interner.intern(TypeKey::TypeQuery(sym));
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(type_query);
+
+    assert_eq!(result, obj);
+}
+
+#[test]
+fn test_typeof_async_function() {
+    use crate::solver::{TypeEnvironment, SymbolRef};
+
+    // typeof asyncFn where asyncFn: () => Promise<string>
+    let interner = TypeInterner::new();
+    let mut env = TypeEnvironment::new();
+
+    // Simulate Promise<string> as a reference
+    let promise_string = interner.reference(SymbolRef(100));
+
+    let async_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: promise_string,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let sym = SymbolRef(1);
+    env.insert(sym, async_fn);
+
+    let type_query = interner.intern(TypeKey::TypeQuery(sym));
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(type_query);
+
+    assert_eq!(result, async_fn);
+}
+
+#[test]
+fn test_typeof_generic_function() {
+    use crate::solver::{TypeEnvironment, SymbolRef};
+
+    // typeof fn where fn: <T>(x: T) => T
+    let interner = TypeInterner::new();
+    let mut env = TypeEnvironment::new();
+
+    let t_ref = interner.reference(SymbolRef(50));
+
+    let generic_fn = interner.function(FunctionShape {
+        type_params: vec![SymbolRef(50)],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: t_ref,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: t_ref,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let sym = SymbolRef(1);
+    env.insert(sym, generic_fn);
+
+    let type_query = interner.intern(TypeKey::TypeQuery(sym));
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(type_query);
+
+    assert_eq!(result, generic_fn);
+}
+
+#[test]
+fn test_typeof_constructor_function() {
+    use crate::solver::{TypeEnvironment, SymbolRef};
+
+    // typeof Cls where Cls is a constructor: new () => Instance
+    let interner = TypeInterner::new();
+    let mut env = TypeEnvironment::new();
+
+    let instance_type = interner.reference(SymbolRef(100));
+
+    let ctor = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: instance_type,
+        type_predicate: None,
+        is_constructor: true,
+    });
+
+    let sym = SymbolRef(1);
+    env.insert(sym, ctor);
+
+    let type_query = interner.intern(TypeKey::TypeQuery(sym));
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(type_query);
+
+    assert_eq!(result, ctor);
+}
+
+#[test]
+fn test_typeof_never_type() {
+    use crate::solver::{TypeEnvironment, SymbolRef};
+
+    // typeof x where x: never
+    let interner = TypeInterner::new();
+    let mut env = TypeEnvironment::new();
+
+    let sym = SymbolRef(1);
+    env.insert(sym, TypeId::NEVER);
+
+    let type_query = interner.intern(TypeKey::TypeQuery(sym));
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(type_query);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_typeof_unknown_type() {
+    use crate::solver::{TypeEnvironment, SymbolRef};
+
+    // typeof x where x: unknown
+    let interner = TypeInterner::new();
+    let mut env = TypeEnvironment::new();
+
+    let sym = SymbolRef(1);
+    env.insert(sym, TypeId::UNKNOWN);
+
+    let type_query = interner.intern(TypeKey::TypeQuery(sym));
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(type_query);
+
+    assert_eq!(result, TypeId::UNKNOWN);
+}
+
+#[test]
+fn test_typeof_any_type() {
+    use crate::solver::{TypeEnvironment, SymbolRef};
+
+    // typeof x where x: any
+    let interner = TypeInterner::new();
+    let mut env = TypeEnvironment::new();
+
+    let sym = SymbolRef(1);
+    env.insert(sym, TypeId::ANY);
+
+    let type_query = interner.intern(TypeKey::TypeQuery(sym));
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(type_query);
+
+    assert_eq!(result, TypeId::ANY);
+}
+
+#[test]
+fn test_typeof_symbol_type() {
+    use crate::solver::{TypeEnvironment, SymbolRef};
+
+    // typeof sym where sym: symbol
+    let interner = TypeInterner::new();
+    let mut env = TypeEnvironment::new();
+
+    let sym = SymbolRef(1);
+    env.insert(sym, TypeId::SYMBOL);
+
+    let type_query = interner.intern(TypeKey::TypeQuery(sym));
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(type_query);
+
+    assert_eq!(result, TypeId::SYMBOL);
+}
+
+#[test]
+fn test_typeof_bigint_type() {
+    use crate::solver::{TypeEnvironment, SymbolRef};
+
+    // typeof x where x: bigint
+    let interner = TypeInterner::new();
+    let mut env = TypeEnvironment::new();
+
+    let sym = SymbolRef(1);
+    env.insert(sym, TypeId::BIGINT);
+
+    let type_query = interner.intern(TypeKey::TypeQuery(sym));
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(type_query);
+
+    assert_eq!(result, TypeId::BIGINT);
+}
+
+#[test]
+fn test_typeof_bigint_literal() {
+    use crate::solver::{TypeEnvironment, SymbolRef};
+
+    // typeof x where x: 100n
+    let interner = TypeInterner::new();
+    let mut env = TypeEnvironment::new();
+
+    let big_100 = interner.bigint_literal(100);
+    let sym = SymbolRef(1);
+    env.insert(sym, big_100);
+
+    let type_query = interner.intern(TypeKey::TypeQuery(sym));
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(type_query);
+
+    assert_eq!(result, big_100);
+}
+
+#[test]
+fn test_typeof_method_type() {
+    use crate::solver::{TypeEnvironment, SymbolRef};
+
+    // typeof obj where obj: { method(): string }
+    let interner = TypeInterner::new();
+    let mut env = TypeEnvironment::new();
+
+    let method_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("method"),
+        type_id: method_fn,
+        write_type: method_fn,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let sym = SymbolRef(1);
+    env.insert(sym, obj);
+
+    let type_query = interner.intern(TypeKey::TypeQuery(sym));
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(type_query);
+
+    assert_eq!(result, obj);
+}
+
+#[test]
+fn test_typeof_rest_params_function() {
+    use crate::solver::{TypeEnvironment, SymbolRef};
+
+    // typeof fn where fn: (...args: string[]) => void
+    let interner = TypeInterner::new();
+    let mut env = TypeEnvironment::new();
+
+    let string_array = interner.array(TypeId::STRING);
+
+    let rest_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: string_array,
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let sym = SymbolRef(1);
+    env.insert(sym, rest_fn);
+
+    let type_query = interner.intern(TypeKey::TypeQuery(sym));
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(type_query);
+
+    assert_eq!(result, rest_fn);
+}
+
+#[test]
+fn test_typeof_multiple_symbols() {
+    use crate::solver::{TypeEnvironment, SymbolRef};
+
+    // typeof x, typeof y in same environment
+    let interner = TypeInterner::new();
+    let mut env = TypeEnvironment::new();
+
+    let sym_x = SymbolRef(1);
+    let sym_y = SymbolRef(2);
+    env.insert(sym_x, TypeId::STRING);
+    env.insert(sym_y, TypeId::NUMBER);
+
+    let query_x = interner.intern(TypeKey::TypeQuery(sym_x));
+    let query_y = interner.intern(TypeKey::TypeQuery(sym_y));
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result_x = evaluator.evaluate(query_x);
+    let result_y = evaluator.evaluate(query_y);
+
+    assert_eq!(result_x, TypeId::STRING);
+    assert_eq!(result_y, TypeId::NUMBER);
+}
+
+#[test]
+fn test_typeof_nested_object() {
+    use crate::solver::{TypeEnvironment, SymbolRef};
+
+    // typeof obj where obj: { a: { b: { c: string } } }
+    let interner = TypeInterner::new();
+    let mut env = TypeEnvironment::new();
+
+    let inner_c = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("c"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let inner_b = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: inner_c,
+        write_type: inner_c,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let outer = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: inner_b,
+        write_type: inner_b,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let sym = SymbolRef(1);
+    env.insert(sym, outer);
+
+    let type_query = interner.intern(TypeKey::TypeQuery(sym));
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(type_query);
+
+    assert_eq!(result, outer);
+}
+
+#[test]
+fn test_typeof_index_signature() {
+    use crate::solver::{TypeEnvironment, SymbolRef, IndexSignature};
+
+    // typeof obj where obj: { [key: string]: number }
+    let interner = TypeInterner::new();
+    let mut env = TypeEnvironment::new();
+
+    let obj = interner.object_with_index(
+        vec![],
+        Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    );
+
+    let sym = SymbolRef(1);
+    env.insert(sym, obj);
+
+    let type_query = interner.intern(TypeKey::TypeQuery(sym));
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(type_query);
+
+    assert_eq!(result, obj);
+}
+
+#[test]
+fn test_typeof_readonly_index_signature() {
+    use crate::solver::{TypeEnvironment, SymbolRef, IndexSignature};
+
+    // typeof obj where obj: { readonly [key: string]: number }
+    let interner = TypeInterner::new();
+    let mut env = TypeEnvironment::new();
+
+    let obj = interner.object_with_index(
+        vec![],
+        Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: true,
+        }),
+    );
+
+    let sym = SymbolRef(1);
+    env.insert(sym, obj);
+
+    let type_query = interner.intern(TypeKey::TypeQuery(sym));
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(type_query);
+
+    assert_eq!(result, obj);
+}
+
+#[test]
+fn test_typeof_boolean_literal_true() {
+    use crate::solver::{TypeEnvironment, SymbolRef};
+
+    // typeof x where x: true
+    let interner = TypeInterner::new();
+    let mut env = TypeEnvironment::new();
+
+    let sym = SymbolRef(1);
+    env.insert(sym, TypeId::LITERAL_TRUE);
+
+    let type_query = interner.intern(TypeKey::TypeQuery(sym));
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(type_query);
+
+    assert_eq!(result, TypeId::LITERAL_TRUE);
+}
+
+#[test]
+fn test_typeof_boolean_literal_false() {
+    use crate::solver::{TypeEnvironment, SymbolRef};
+
+    // typeof x where x: false
+    let interner = TypeInterner::new();
+    let mut env = TypeEnvironment::new();
+
+    let sym = SymbolRef(1);
+    env.insert(sym, TypeId::LITERAL_FALSE);
+
+    let type_query = interner.intern(TypeKey::TypeQuery(sym));
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(type_query);
+
+    assert_eq!(result, TypeId::LITERAL_FALSE);
+}
+
+#[test]
+fn test_typeof_null_type() {
+    use crate::solver::{TypeEnvironment, SymbolRef};
+
+    // typeof x where x: null
+    let interner = TypeInterner::new();
+    let mut env = TypeEnvironment::new();
+
+    let sym = SymbolRef(1);
+    env.insert(sym, TypeId::NULL);
+
+    let type_query = interner.intern(TypeKey::TypeQuery(sym));
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(type_query);
+
+    assert_eq!(result, TypeId::NULL);
+}
+
+#[test]
+fn test_typeof_undefined_type() {
+    use crate::solver::{TypeEnvironment, SymbolRef};
+
+    // typeof x where x: undefined
+    let interner = TypeInterner::new();
+    let mut env = TypeEnvironment::new();
+
+    let sym = SymbolRef(1);
+    env.insert(sym, TypeId::UNDEFINED);
+
+    let type_query = interner.intern(TypeKey::TypeQuery(sym));
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(type_query);
+
+    assert_eq!(result, TypeId::UNDEFINED);
+}
+
+#[test]
+fn test_typeof_void_type() {
+    use crate::solver::{TypeEnvironment, SymbolRef};
+
+    // typeof x where x: void
+    let interner = TypeInterner::new();
+    let mut env = TypeEnvironment::new();
+
+    let sym = SymbolRef(1);
+    env.insert(sym, TypeId::VOID);
+
+    let type_query = interner.intern(TypeKey::TypeQuery(sym));
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(type_query);
+
+    assert_eq!(result, TypeId::VOID);
+}
+
+#[test]
+fn test_typeof_object_type() {
+    use crate::solver::{TypeEnvironment, SymbolRef};
+
+    // typeof x where x: object
+    let interner = TypeInterner::new();
+    let mut env = TypeEnvironment::new();
+
+    let sym = SymbolRef(1);
+    env.insert(sym, TypeId::OBJECT);
+
+    let type_query = interner.intern(TypeKey::TypeQuery(sym));
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(type_query);
+
+    assert_eq!(result, TypeId::OBJECT);
+}
+
+#[test]
+fn test_typeof_union_with_literals() {
+    use crate::solver::{TypeEnvironment, SymbolRef};
+
+    // typeof x where x: "a" | "b" | "c"
+    let interner = TypeInterner::new();
+    let mut env = TypeEnvironment::new();
+
+    let lit_a = interner.literal_string("a");
+    let lit_b = interner.literal_string("b");
+    let lit_c = interner.literal_string("c");
+    let union = interner.union(vec![lit_a, lit_b, lit_c]);
+
+    let sym = SymbolRef(1);
+    env.insert(sym, union);
+
+    let type_query = interner.intern(TypeKey::TypeQuery(sym));
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(type_query);
+
+    assert_eq!(result, union);
+}
+
+#[test]
+fn test_typeof_union_mixed_types() {
+    use crate::solver::{TypeEnvironment, SymbolRef};
+
+    // typeof x where x: string | number | boolean
+    let interner = TypeInterner::new();
+    let mut env = TypeEnvironment::new();
+
+    let union = interner.union(vec![TypeId::STRING, TypeId::NUMBER, TypeId::BOOLEAN]);
+
+    let sym = SymbolRef(1);
+    env.insert(sym, union);
+
+    let type_query = interner.intern(TypeKey::TypeQuery(sym));
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(type_query);
+
+    assert_eq!(result, union);
+}
