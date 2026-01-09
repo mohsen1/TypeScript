@@ -36394,416 +36394,155 @@ class TimeoutPromise<T> {
     );
 }
 
-// ============================================================================
-// AMBIENT MODULE PATTERN TESTS
-// ============================================================================
+// =============================================================================
+// RECURSIVE TYPE PATTERN TESTS - tree, linked list, JSON
+// =============================================================================
 
-/// Test basic declare module for ambient declarations
 #[test]
-fn test_class_es5_ambient_module_basic() {
+fn test_class_es5_recursive_type_tree() {
     let source = r#"
-declare module "external-api" {
-    export interface ApiResponse<T> {
-        data: T;
-        status: number;
-        message: string;
-    }
-
-    export function fetch<T>(url: string): Promise<ApiResponse<T>>;
-    export function post<T>(url: string, body: any): Promise<ApiResponse<T>>;
+// Recursive tree type pattern
+interface TreeNode<T> {
+    value: T;
+    children: TreeNode<T>[];
 }
 
-class ApiClient {
-    private baseUrl: string;
-
-    constructor(baseUrl: string) {
-        this.baseUrl = baseUrl;
-    }
-
-    getUrl(endpoint: string): string {
-        return this.baseUrl + endpoint;
-    }
-
-    async fetchData(endpoint: string): Promise<any> {
-        const url = this.getUrl(endpoint);
-        return { data: null, status: 200, message: "OK" };
-    }
-
-    async postData(endpoint: string, data: any): Promise<any> {
-        const url = this.getUrl(endpoint);
-        return { data: null, status: 201, message: "Created" };
-    }
-}
-
-class UserApiClient extends ApiClient {
-    constructor() {
-        super("https://api.example.com");
-    }
-
-    async getUsers(): Promise<any> {
-        return this.fetchData("/users");
-    }
-
-    async createUser(userData: any): Promise<any> {
-        return this.postData("/users", userData);
-    }
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // ApiClient class should be ES5 constructor
-    assert!(
-        output.contains("function ApiClient"),
-        "Expected ES5 ApiClient class: {}",
-        output
-    );
-
-    // UserApiClient class should be ES5 constructor
-    assert!(
-        output.contains("function UserApiClient"),
-        "Expected ES5 UserApiClient class: {}",
-        output
-    );
-
-    // Methods should exist
-    assert!(
-        output.contains("getUrl") && output.contains("fetchData") && output.contains("postData"),
-        "Expected ApiClient methods: {}",
-        output
-    );
-
-    // Inheritance should be present
-    assert!(
-        output.contains("__extends") || output.contains("_super"),
-        "Expected inheritance pattern: {}",
-        output
-    );
-}
-
-/// Test global augmentation with declare global
-#[test]
-fn test_class_es5_ambient_global_augmentation() {
-    let source = r#"
-declare global {
-    interface Window {
-        customProperty: string;
-        customMethod(): void;
-    }
-
-    interface Array<T> {
-        customArrayMethod(): T[];
-    }
-
-    var globalConfig: {
-        debug: boolean;
-        version: string;
-    };
-}
-
-class WindowHelper {
-    private window: Window;
-
-    constructor() {
-        this.window = window;
-    }
-
-    setCustomProperty(value: string): void {
-        this.window.customProperty = value;
-    }
-
-    getCustomProperty(): string {
-        return this.window.customProperty;
-    }
-
-    callCustomMethod(): void {
-        this.window.customMethod();
-    }
-}
-
-class ArrayHelper<T> {
-    private items: T[];
-
-    constructor(items: T[]) {
-        this.items = items;
-    }
-
-    getItems(): T[] {
-        return this.items;
-    }
-
-    addItem(item: T): void {
-        this.items.push(item);
-    }
-
-    getLength(): number {
-        return this.items.length;
-    }
-}
-
-class ConfigManager {
-    isDebug(): boolean {
-        return globalConfig.debug;
-    }
-
-    getVersion(): string {
-        return globalConfig.version;
-    }
-
-    setDebug(debug: boolean): void {
-        globalConfig.debug = debug;
-    }
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // WindowHelper class should be ES5 constructor
-    assert!(
-        output.contains("function WindowHelper"),
-        "Expected ES5 WindowHelper class: {}",
-        output
-    );
-
-    // ArrayHelper class should be ES5 constructor
-    assert!(
-        output.contains("function ArrayHelper"),
-        "Expected ES5 ArrayHelper class: {}",
-        output
-    );
-
-    // ConfigManager class should be ES5 constructor
-    assert!(
-        output.contains("function ConfigManager"),
-        "Expected ES5 ConfigManager class: {}",
-        output
-    );
-
-    // WindowHelper methods
-    assert!(
-        output.contains("setCustomProperty") && output.contains("getCustomProperty"),
-        "Expected WindowHelper methods: {}",
-        output
-    );
-
-    // ConfigManager methods
-    assert!(
-        output.contains("isDebug") && output.contains("getVersion"),
-        "Expected ConfigManager methods: {}",
-        output
-    );
-}
-
-/// Test declare module with namespace content
-#[test]
-fn test_class_es5_ambient_module_namespace() {
-    let source = r#"
-declare module "lodash" {
-    export function map<T, U>(arr: T[], fn: (item: T) => U): U[];
-    export function filter<T>(arr: T[], predicate: (item: T) => boolean): T[];
-    export function reduce<T, U>(arr: T[], fn: (acc: U, item: T) => U, initial: U): U;
-}
-
-declare module "moment" {
-    export interface Moment {
-        format(pattern: string): string;
-        add(amount: number, unit: string): Moment;
-        subtract(amount: number, unit: string): Moment;
-    }
-
-    export function moment(input?: string | Date): Moment;
-}
-
-class DataTransformer<T> {
-    private data: T[];
-
-    constructor(data: T[]) {
-        this.data = data;
-    }
-
-    getData(): T[] {
-        return this.data;
-    }
-
-    transform<U>(fn: (item: T) => U): DataTransformer<U> {
-        const transformed = this.data.map(fn);
-        return new DataTransformer(transformed);
-    }
-
-    filterBy(predicate: (item: T) => boolean): DataTransformer<T> {
-        const filtered = this.data.filter(predicate);
-        return new DataTransformer(filtered);
-    }
-
-    reduce<U>(fn: (acc: U, item: T) => U, initial: U): U {
-        return this.data.reduce(fn, initial);
-    }
-}
-
-class DateFormatter {
-    private date: Date;
-
-    constructor(date: Date = new Date()) {
-        this.date = date;
-    }
-
-    getDate(): Date {
-        return this.date;
-    }
-
-    setDate(date: Date): void {
-        this.date = date;
-    }
-
-    toISOString(): string {
-        return this.date.toISOString();
-    }
-
-    toLocaleDateString(): string {
-        return this.date.toLocaleDateString();
-    }
-
-    addDays(days: number): void {
-        this.date.setDate(this.date.getDate() + days);
-    }
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // DataTransformer class should be ES5 constructor
-    assert!(
-        output.contains("function DataTransformer"),
-        "Expected ES5 DataTransformer class: {}",
-        output
-    );
-
-    // DateFormatter class should be ES5 constructor
-    assert!(
-        output.contains("function DateFormatter"),
-        "Expected ES5 DateFormatter class: {}",
-        output
-    );
-
-    // DataTransformer methods
-    assert!(
-        output.contains("transform") && output.contains("filterBy") && output.contains("reduce"),
-        "Expected DataTransformer methods: {}",
-        output
-    );
-
-    // DateFormatter methods
-    assert!(
-        output.contains("toISOString") && output.contains("toLocaleDateString") && output.contains("addDays"),
-        "Expected DateFormatter methods: {}",
-        output
-    );
-}
-
-/// Test ambient module with class declarations
-#[test]
-fn test_class_es5_ambient_module_with_class() {
-    let source = r#"
-declare module "event-emitter" {
-    export class EventEmitter {
-        on(event: string, handler: (...args: any[]) => void): this;
-        off(event: string, handler: (...args: any[]) => void): this;
-        emit(event: string, ...args: any[]): boolean;
-        once(event: string, handler: (...args: any[]) => void): this;
-    }
-}
-
-declare module "http-client" {
-    export class HttpClient {
-        get<T>(url: string): Promise<T>;
-        post<T>(url: string, data: any): Promise<T>;
-        put<T>(url: string, data: any): Promise<T>;
-        delete<T>(url: string): Promise<T>;
-    }
-}
-
-class CustomEventEmitter {
-    private handlers: Map<string, Function[]> = new Map();
-
-    on(event: string, handler: Function): void {
-        if (!this.handlers.has(event)) {
-            this.handlers.set(event, []);
+type BinaryTreeNode<T> = {
+    value: T;
+    left: BinaryTreeNode<T> | null;
+    right: BinaryTreeNode<T> | null;
+};
+
+class Tree<T> {
+    private root: TreeNode<T> | null = null;
+
+    constructor(rootValue?: T) {
+        if (rootValue !== undefined) {
+            this.root = { value: rootValue, children: [] };
         }
-        this.handlers.get(event)!.push(handler);
     }
 
-    off(event: string, handler: Function): void {
-        const handlers = this.handlers.get(event);
-        if (handlers) {
-            const index = handlers.indexOf(handler);
-            if (index !== -1) {
-                handlers.splice(index, 1);
+    getRoot(): TreeNode<T> | null {
+        return this.root;
+    }
+
+    setRoot(node: TreeNode<T>): void {
+        this.root = node;
+    }
+
+    addChild(parent: TreeNode<T>, value: T): TreeNode<T> {
+        const child: TreeNode<T> = { value, children: [] };
+        parent.children.push(child);
+        return child;
+    }
+
+    traverse(callback: (node: TreeNode<T>) => void): void {
+        if (this.root) {
+            this.traverseNode(this.root, callback);
+        }
+    }
+
+    private traverseNode(node: TreeNode<T>, callback: (node: TreeNode<T>) => void): void {
+        callback(node);
+        node.children.forEach(child => this.traverseNode(child, callback));
+    }
+
+    getDepth(): number {
+        if (!this.root) return 0;
+        return this.calculateDepth(this.root);
+    }
+
+    private calculateDepth(node: TreeNode<T>): number {
+        if (node.children.length === 0) return 1;
+        return 1 + Math.max(...node.children.map(c => this.calculateDepth(c)));
+    }
+}
+
+class BinaryTree<T> {
+    private root: BinaryTreeNode<T> | null = null;
+
+    constructor(rootValue?: T) {
+        if (rootValue !== undefined) {
+            this.root = { value: rootValue, left: null, right: null };
+        }
+    }
+
+    getRoot(): BinaryTreeNode<T> | null {
+        return this.root;
+    }
+
+    insert(value: T, compareFn: (a: T, b: T) => number): void {
+        const newNode: BinaryTreeNode<T> = { value, left: null, right: null };
+        if (!this.root) {
+            this.root = newNode;
+            return;
+        }
+        this.insertNode(this.root, newNode, compareFn);
+    }
+
+    private insertNode(node: BinaryTreeNode<T>, newNode: BinaryTreeNode<T>, compareFn: (a: T, b: T) => number): void {
+        if (compareFn(newNode.value, node.value) < 0) {
+            if (node.left === null) {
+                node.left = newNode;
+            } else {
+                this.insertNode(node.left, newNode, compareFn);
+            }
+        } else {
+            if (node.right === null) {
+                node.right = newNode;
+            } else {
+                this.insertNode(node.right, newNode, compareFn);
             }
         }
     }
 
-    emit(event: string, ...args: any[]): void {
-        const handlers = this.handlers.get(event);
-        if (handlers) {
-            handlers.forEach(handler => handler(...args));
+    inorderTraversal(callback: (value: T) => void): void {
+        if (this.root) {
+            this.inorder(this.root, callback);
         }
     }
 
-    clear(): void {
-        this.handlers.clear();
+    private inorder(node: BinaryTreeNode<T>, callback: (value: T) => void): void {
+        if (node.left) this.inorder(node.left, callback);
+        callback(node.value);
+        if (node.right) this.inorder(node.right, callback);
     }
 }
 
-class NotificationService extends CustomEventEmitter {
-    notify(message: string): void {
-        this.emit("notification", message);
+class FileSystemTree {
+    private root: TreeNode<string>;
+
+    constructor(rootName: string) {
+        this.root = { value: rootName, children: [] };
     }
 
-    onNotification(handler: (message: string) => void): void {
-        this.on("notification", handler);
+    getRoot(): TreeNode<string> {
+        return this.root;
     }
 
-    offNotification(handler: (message: string) => void): void {
-        this.off("notification", handler);
+    addFolder(parent: TreeNode<string>, name: string): TreeNode<string> {
+        const folder: TreeNode<string> = { value: name, children: [] };
+        parent.children.push(folder);
+        return folder;
+    }
+
+    addFile(parent: TreeNode<string>, name: string): TreeNode<string> {
+        const file: TreeNode<string> = { value: name, children: [] };
+        parent.children.push(file);
+        return file;
+    }
+
+    findNode(name: string): TreeNode<string> | null {
+        return this.findInNode(this.root, name);
+    }
+
+    private findInNode(node: TreeNode<string>, name: string): TreeNode<string> | null {
+        if (node.value === name) return node;
+        for (const child of node.children) {
+            const found = this.findInNode(child, name);
+            if (found) return found;
+        }
+        return null;
     }
 }
 "#;
@@ -36823,121 +36562,237 @@ class NotificationService extends CustomEventEmitter {
 
     let output = printer.get_output().to_string();
 
-    // CustomEventEmitter class should be ES5 constructor
+    // Classes should be converted
     assert!(
-        output.contains("function CustomEventEmitter"),
-        "Expected ES5 CustomEventEmitter class: {}",
+        output.contains("Tree") && output.contains("BinaryTree") && output.contains("FileSystemTree"),
+        "Expected recursive tree type classes: {}",
         output
     );
 
-    // NotificationService class should be ES5 constructor
+    // Tree methods
     assert!(
-        output.contains("function NotificationService"),
-        "Expected ES5 NotificationService class: {}",
+        output.contains("getRoot") && output.contains("setRoot") && output.contains("addChild") && output.contains("traverse"),
+        "Expected Tree methods: {}",
         output
     );
 
-    // CustomEventEmitter methods
+    // BinaryTree methods
     assert!(
-        output.contains(".on") && output.contains(".off") && output.contains(".emit"),
-        "Expected CustomEventEmitter methods: {}",
+        output.contains("insert") && output.contains("inorderTraversal"),
+        "Expected BinaryTree methods: {}",
         output
     );
 
-    // NotificationService methods
+    // FileSystemTree methods
     assert!(
-        output.contains("notify") && output.contains("onNotification") && output.contains("offNotification"),
-        "Expected NotificationService methods: {}",
+        output.contains("addFolder") && output.contains("addFile") && output.contains("findNode"),
+        "Expected FileSystemTree methods: {}",
+        output
+    );
+
+    // Interface and type aliases should be stripped
+    assert!(
+        !output.contains("interface TreeNode") && !output.contains("type BinaryTreeNode"),
+        "Expected interface and type aliases to be stripped: {}",
         output
     );
 }
 
-/// Test wildcard module declarations
 #[test]
-fn test_class_es5_ambient_module_wildcard() {
+fn test_class_es5_recursive_type_linked_list() {
     let source = r#"
-declare module "*.json" {
-    const value: any;
-    export default value;
+// Recursive linked list type pattern
+interface ListNode<T> {
+    value: T;
+    next: ListNode<T> | null;
 }
 
-declare module "*.css" {
-    const styles: { [key: string]: string };
-    export default styles;
-}
+type DoublyLinkedNode<T> = {
+    value: T;
+    prev: DoublyLinkedNode<T> | null;
+    next: DoublyLinkedNode<T> | null;
+};
 
-declare module "*.svg" {
-    const content: string;
-    export default content;
-}
+class LinkedList<T> {
+    private head: ListNode<T> | null = null;
+    private tail: ListNode<T> | null = null;
+    private length: number = 0;
 
-class AssetLoader {
-    private basePath: string;
-    private cache: Map<string, any> = new Map();
-
-    constructor(basePath: string = "") {
-        this.basePath = basePath;
+    getHead(): ListNode<T> | null {
+        return this.head;
     }
 
-    getBasePath(): string {
-        return this.basePath;
+    getTail(): ListNode<T> | null {
+        return this.tail;
     }
 
-    setBasePath(path: string): void {
-        this.basePath = path;
+    getLength(): number {
+        return this.length;
     }
 
-    async loadJson(path: string): Promise<any> {
-        if (this.cache.has(path)) {
-            return this.cache.get(path);
+    append(value: T): void {
+        const node: ListNode<T> = { value, next: null };
+        if (!this.tail) {
+            this.head = this.tail = node;
+        } else {
+            this.tail.next = node;
+            this.tail = node;
         }
-        const data = { loaded: true, path };
-        this.cache.set(path, data);
-        return data;
+        this.length++;
     }
 
-    async loadCss(path: string): Promise<Record<string, string>> {
-        if (this.cache.has(path)) {
-            return this.cache.get(path);
+    prepend(value: T): void {
+        const node: ListNode<T> = { value, next: this.head };
+        this.head = node;
+        if (!this.tail) {
+            this.tail = node;
         }
-        const styles = { main: "loaded" };
-        this.cache.set(path, styles);
-        return styles;
+        this.length++;
     }
 
-    async loadSvg(path: string): Promise<string> {
-        if (this.cache.has(path)) {
-            return this.cache.get(path);
+    removeFirst(): T | null {
+        if (!this.head) return null;
+        const value = this.head.value;
+        this.head = this.head.next;
+        if (!this.head) {
+            this.tail = null;
         }
-        const content = "<svg></svg>";
-        this.cache.set(path, content);
-        return content;
+        this.length--;
+        return value;
     }
 
-    clearCache(): void {
-        this.cache.clear();
+    find(predicate: (value: T) => boolean): T | null {
+        let current = this.head;
+        while (current) {
+            if (predicate(current.value)) {
+                return current.value;
+            }
+            current = current.next;
+        }
+        return null;
+    }
+
+    toArray(): T[] {
+        const result: T[] = [];
+        let current = this.head;
+        while (current) {
+            result.push(current.value);
+            current = current.next;
+        }
+        return result;
     }
 }
 
-class ThemeManager {
-    private loader: AssetLoader;
-    private currentTheme: string = "default";
+class DoublyLinkedList<T> {
+    private head: DoublyLinkedNode<T> | null = null;
+    private tail: DoublyLinkedNode<T> | null = null;
+    private length: number = 0;
 
-    constructor() {
-        this.loader = new AssetLoader("/themes");
+    getHead(): DoublyLinkedNode<T> | null {
+        return this.head;
     }
 
-    async loadTheme(name: string): Promise<void> {
-        const styles = await this.loader.loadCss(name + ".css");
-        this.currentTheme = name;
+    getTail(): DoublyLinkedNode<T> | null {
+        return this.tail;
     }
 
-    getCurrentTheme(): string {
-        return this.currentTheme;
+    getLength(): number {
+        return this.length;
     }
 
-    async getThemeConfig(name: string): Promise<any> {
-        return this.loader.loadJson(name + ".json");
+    append(value: T): void {
+        const node: DoublyLinkedNode<T> = { value, prev: this.tail, next: null };
+        if (!this.tail) {
+            this.head = this.tail = node;
+        } else {
+            this.tail.next = node;
+            this.tail = node;
+        }
+        this.length++;
+    }
+
+    prepend(value: T): void {
+        const node: DoublyLinkedNode<T> = { value, prev: null, next: this.head };
+        if (!this.head) {
+            this.head = this.tail = node;
+        } else {
+            this.head.prev = node;
+            this.head = node;
+        }
+        this.length++;
+    }
+
+    removeLast(): T | null {
+        if (!this.tail) return null;
+        const value = this.tail.value;
+        this.tail = this.tail.prev;
+        if (this.tail) {
+            this.tail.next = null;
+        } else {
+            this.head = null;
+        }
+        this.length--;
+        return value;
+    }
+
+    reverse(): void {
+        let current = this.head;
+        let temp: DoublyLinkedNode<T> | null = null;
+        while (current) {
+            temp = current.prev;
+            current.prev = current.next;
+            current.next = temp;
+            current = current.prev;
+        }
+        temp = this.head;
+        this.head = this.tail;
+        this.tail = temp;
+    }
+}
+
+class CircularLinkedList<T> {
+    private head: ListNode<T> | null = null;
+    private length: number = 0;
+
+    getHead(): ListNode<T> | null {
+        return this.head;
+    }
+
+    getLength(): number {
+        return this.length;
+    }
+
+    append(value: T): void {
+        const node: ListNode<T> = { value, next: null };
+        if (!this.head) {
+            this.head = node;
+            node.next = node;
+        } else {
+            let current = this.head;
+            while (current.next !== this.head) {
+                current = current.next!;
+            }
+            current.next = node;
+            node.next = this.head;
+        }
+        this.length++;
+    }
+
+    rotate(): void {
+        if (this.head && this.head.next) {
+            this.head = this.head.next;
+        }
+    }
+
+    toArray(): T[] {
+        const result: T[] = [];
+        if (!this.head) return result;
+        let current = this.head;
+        do {
+            result.push(current.value);
+            current = current.next!;
+        } while (current !== this.head);
+        return result;
     }
 }
 "#;
@@ -36957,199 +36812,202 @@ class ThemeManager {
 
     let output = printer.get_output().to_string();
 
-    // AssetLoader class should be ES5 constructor
+    // Classes should be converted
     assert!(
-        output.contains("function AssetLoader"),
-        "Expected ES5 AssetLoader class: {}",
+        output.contains("LinkedList") && output.contains("DoublyLinkedList") && output.contains("CircularLinkedList"),
+        "Expected recursive linked list type classes: {}",
         output
     );
 
-    // ThemeManager class should be ES5 constructor
+    // LinkedList methods
     assert!(
-        output.contains("function ThemeManager"),
-        "Expected ES5 ThemeManager class: {}",
+        output.contains("append") && output.contains("prepend") && output.contains("removeFirst") && output.contains("find"),
+        "Expected LinkedList methods: {}",
         output
     );
 
-    // AssetLoader methods
+    // DoublyLinkedList methods
     assert!(
-        output.contains("loadJson") && output.contains("loadCss") && output.contains("loadSvg"),
-        "Expected AssetLoader methods: {}",
+        output.contains("removeLast") && output.contains("reverse"),
+        "Expected DoublyLinkedList methods: {}",
         output
     );
 
-    // ThemeManager methods
+    // CircularLinkedList methods
     assert!(
-        output.contains("loadTheme") && output.contains("getCurrentTheme") && output.contains("getThemeConfig"),
-        "Expected ThemeManager methods: {}",
+        output.contains("rotate") && output.contains("toArray"),
+        "Expected CircularLinkedList methods: {}",
+        output
+    );
+
+    // Interface and type aliases should be stripped
+    assert!(
+        !output.contains("interface ListNode") && !output.contains("type DoublyLinkedNode"),
+        "Expected interface and type aliases to be stripped: {}",
         output
     );
 }
 
-/// Test combined ambient module patterns
 #[test]
-fn test_class_es5_ambient_module_combined() {
+fn test_class_es5_recursive_type_json() {
     let source = r#"
-// External library ambient declaration
-declare module "database" {
-    export interface Connection {
-        query<T>(sql: string): Promise<T[]>;
-        execute(sql: string): Promise<void>;
-        close(): Promise<void>;
+// Recursive JSON type pattern
+type JSONPrimitive = string | number | boolean | null;
+type JSONArray = JSONValue[];
+type JSONObject = { [key: string]: JSONValue };
+type JSONValue = JSONPrimitive | JSONArray | JSONObject;
+
+class JSONParser {
+    parse(input: string): JSONValue {
+        return JSON.parse(input);
     }
 
-    export interface PoolConfig {
-        host: string;
-        port: number;
-        database: string;
-        maxConnections: number;
+    stringify(value: JSONValue, indent?: number): string {
+        return JSON.stringify(value, null, indent);
     }
 
-    export function createPool(config: PoolConfig): ConnectionPool;
-
-    export class ConnectionPool {
-        getConnection(): Promise<Connection>;
-        releaseConnection(conn: Connection): void;
-        end(): Promise<void>;
-    }
-}
-
-// Global augmentation
-declare global {
-    interface Console {
-        sql(query: string): void;
+    isObject(value: JSONValue): value is JSONObject {
+        return typeof value === "object" && value !== null && !Array.isArray(value);
     }
 
-    var dbPool: any;
-}
-
-// Another ambient module
-declare module "cache" {
-    export interface CacheOptions {
-        ttl: number;
-        maxSize: number;
+    isArray(value: JSONValue): value is JSONArray {
+        return Array.isArray(value);
     }
 
-    export class Cache<T> {
-        get(key: string): T | undefined;
-        set(key: string, value: T): void;
-        delete(key: string): boolean;
-        clear(): void;
+    isPrimitive(value: JSONValue): value is JSONPrimitive {
+        return !this.isObject(value) && !this.isArray(value);
     }
 }
 
-class DatabaseService {
-    private config: { host: string; port: number; database: string };
-    private connected: boolean = false;
+class JSONTransformer {
+    private value: JSONValue;
 
-    constructor(host: string, port: number, database: string) {
-        this.config = { host, port, database };
+    constructor(value: JSONValue) {
+        this.value = value;
     }
 
-    async connect(): Promise<void> {
-        this.connected = true;
+    getValue(): JSONValue {
+        return this.value;
     }
 
-    async disconnect(): Promise<void> {
-        this.connected = false;
+    mapStrings(fn: (s: string) => string): JSONTransformer {
+        return new JSONTransformer(this.transformStrings(this.value, fn));
     }
 
-    isConnected(): boolean {
-        return this.connected;
+    private transformStrings(value: JSONValue, fn: (s: string) => string): JSONValue {
+        if (typeof value === "string") {
+            return fn(value);
+        }
+        if (Array.isArray(value)) {
+            return value.map(item => this.transformStrings(item, fn));
+        }
+        if (typeof value === "object" && value !== null) {
+            const result: JSONObject = {};
+            for (const key in value) {
+                result[key] = this.transformStrings(value[key], fn);
+            }
+            return result;
+        }
+        return value;
     }
 
-    getConfig(): { host: string; port: number; database: string } {
-        return this.config;
+    filterNulls(): JSONTransformer {
+        return new JSONTransformer(this.removeNulls(this.value));
     }
 
-    async query<T>(sql: string): Promise<T[]> {
-        if (!this.connected) {
-            throw new Error("Not connected");
+    private removeNulls(value: JSONValue): JSONValue {
+        if (value === null) {
+            return null;
+        }
+        if (Array.isArray(value)) {
+            return value.filter(item => item !== null).map(item => this.removeNulls(item));
+        }
+        if (typeof value === "object" && value !== null) {
+            const result: JSONObject = {};
+            for (const key in value) {
+                if (value[key] !== null) {
+                    result[key] = this.removeNulls(value[key]);
+                }
+            }
+            return result;
+        }
+        return value;
+    }
+
+    getDepth(): number {
+        return this.calculateDepth(this.value);
+    }
+
+    private calculateDepth(value: JSONValue): number {
+        if (value === null || typeof value !== "object") {
+            return 0;
+        }
+        if (Array.isArray(value)) {
+            if (value.length === 0) return 1;
+            return 1 + Math.max(...value.map(item => this.calculateDepth(item)));
+        }
+        const keys = Object.keys(value);
+        if (keys.length === 0) return 1;
+        return 1 + Math.max(...keys.map(key => this.calculateDepth(value[key])));
+    }
+}
+
+class JSONPathQuery {
+    private root: JSONValue;
+
+    constructor(root: JSONValue) {
+        this.root = root;
+    }
+
+    getRoot(): JSONValue {
+        return this.root;
+    }
+
+    get(path: string): JSONValue | undefined {
+        const parts = path.split(".").filter(p => p.length > 0);
+        let current: JSONValue = this.root;
+        for (const part of parts) {
+            if (typeof current !== "object" || current === null) {
+                return undefined;
+            }
+            if (Array.isArray(current)) {
+                const index = parseInt(part, 10);
+                if (isNaN(index)) return undefined;
+                current = current[index];
+            } else {
+                current = (current as JSONObject)[part];
+            }
+            if (current === undefined) return undefined;
+        }
+        return current;
+    }
+
+    set(path: string, value: JSONValue): void {
+        const parts = path.split(".").filter(p => p.length > 0);
+        if (parts.length === 0) return;
+        let current: JSONValue = this.root;
+        for (let i = 0; i < parts.length - 1; i++) {
+            const part = parts[i];
+            if (typeof current !== "object" || current === null || Array.isArray(current)) {
+                return;
+            }
+            current = (current as JSONObject)[part];
+        }
+        if (typeof current === "object" && current !== null && !Array.isArray(current)) {
+            (current as JSONObject)[parts[parts.length - 1]] = value;
+        }
+    }
+
+    has(path: string): boolean {
+        return this.get(path) !== undefined;
+    }
+
+    keys(): string[] {
+        if (typeof this.root === "object" && this.root !== null && !Array.isArray(this.root)) {
+            return Object.keys(this.root);
         }
         return [];
     }
-
-    async execute(sql: string): Promise<void> {
-        if (!this.connected) {
-            throw new Error("Not connected");
-        }
-    }
-}
-
-class CacheService<T> {
-    private cache: Map<string, { value: T; expires: number }> = new Map();
-    private ttl: number;
-
-    constructor(ttl: number = 60000) {
-        this.ttl = ttl;
-    }
-
-    get(key: string): T | undefined {
-        const entry = this.cache.get(key);
-        if (!entry) return undefined;
-        if (Date.now() > entry.expires) {
-            this.cache.delete(key);
-            return undefined;
-        }
-        return entry.value;
-    }
-
-    set(key: string, value: T): void {
-        this.cache.set(key, {
-            value,
-            expires: Date.now() + this.ttl
-        });
-    }
-
-    delete(key: string): boolean {
-        return this.cache.delete(key);
-    }
-
-    clear(): void {
-        this.cache.clear();
-    }
-
-    has(key: string): boolean {
-        return this.get(key) !== undefined;
-    }
-}
-
-class DataRepository<T extends { id: string }> {
-    private db: DatabaseService;
-    private cache: CacheService<T>;
-    private tableName: string;
-
-    constructor(db: DatabaseService, tableName: string) {
-        this.db = db;
-        this.cache = new CacheService<T>();
-        this.tableName = tableName;
-    }
-
-    async findById(id: string): Promise<T | undefined> {
-        const cached = this.cache.get(id);
-        if (cached) return cached;
-
-        const results = await this.db.query<T>("SELECT * FROM " + this.tableName + " WHERE id = '" + id + "'");
-        if (results.length > 0) {
-            this.cache.set(id, results[0]);
-            return results[0];
-        }
-        return undefined;
-    }
-
-    async save(item: T): Promise<void> {
-        await this.db.execute("INSERT INTO " + this.tableName + " VALUES (...)");
-        this.cache.set(item.id, item);
-    }
-
-    async delete(id: string): Promise<void> {
-        await this.db.execute("DELETE FROM " + this.tableName + " WHERE id = '" + id + "'");
-        this.cache.delete(id);
-    }
-
-    clearCache(): void {
-        this.cache.clear();
-    }
 }
 "#;
 
@@ -37168,45 +37026,38 @@ class DataRepository<T extends { id: string }> {
 
     let output = printer.get_output().to_string();
 
-    // DatabaseService class should be ES5 constructor
+    // Classes should be converted
     assert!(
-        output.contains("function DatabaseService"),
-        "Expected ES5 DatabaseService class: {}",
+        output.contains("JSONParser") && output.contains("JSONTransformer") && output.contains("JSONPathQuery"),
+        "Expected recursive JSON type classes: {}",
         output
     );
 
-    // CacheService class should be ES5 constructor
+    // JSONParser methods
     assert!(
-        output.contains("function CacheService"),
-        "Expected ES5 CacheService class: {}",
+        output.contains("parse") && output.contains("stringify") && output.contains("isObject") && output.contains("isArray"),
+        "Expected JSONParser methods: {}",
         output
     );
 
-    // DataRepository class should be ES5 constructor
+    // JSONTransformer methods
     assert!(
-        output.contains("function DataRepository"),
-        "Expected ES5 DataRepository class: {}",
+        output.contains("mapStrings") && output.contains("filterNulls") && output.contains("getDepth"),
+        "Expected JSONTransformer methods: {}",
         output
     );
 
-    // DatabaseService methods
+    // JSONPathQuery methods
     assert!(
-        output.contains("connect") && output.contains("disconnect") && output.contains("query"),
-        "Expected DatabaseService methods: {}",
+        output.contains("get") && output.contains("set") && output.contains("has") && output.contains("keys"),
+        "Expected JSONPathQuery methods: {}",
         output
     );
 
-    // CacheService methods
+    // Type aliases should be stripped
     assert!(
-        output.contains(".get") && output.contains(".set") && output.contains(".delete"),
-        "Expected CacheService methods: {}",
-        output
-    );
-
-    // DataRepository methods
-    assert!(
-        output.contains("findById") && output.contains("save") && output.contains("clearCache"),
-        "Expected DataRepository methods: {}",
+        !output.contains("type JSONPrimitive") && !output.contains("type JSONArray") && !output.contains("type JSONValue"),
+        "Expected type aliases to be stripped: {}",
         output
     );
 }
