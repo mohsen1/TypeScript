@@ -16408,3 +16408,352 @@ class UserRepository extends AbstractRepository<{ id: string; name: string }> {
         output
     );
 }
+
+// ============================================================================
+// Private Static Field Pattern Tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_private_static_field_basic() {
+    // Basic private static field usage
+    let source = r#"
+class Counter {
+    static #count: number = 0;
+
+    constructor() {
+        Counter.#count++;
+    }
+
+    static getCount(): number {
+        return Counter.#count;
+    }
+
+    static reset(): void {
+        Counter.#count = 0;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function Counter"),
+        "Expected Counter function: {}",
+        output
+    );
+
+    // Static methods should be present
+    assert!(
+        output.contains("getCount") && output.contains("reset"),
+        "Expected static methods: {}",
+        output
+    );
+
+    // Private field should use WeakMap or similar pattern
+    assert!(
+        output.contains("count") || output.contains("_count") || output.contains("WeakMap"),
+        "Expected private field handling: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_private_static_field_singleton() {
+    // Private static field for singleton pattern
+    let source = r#"
+class Singleton {
+    static #instance: Singleton | null = null;
+    private value: string;
+
+    private constructor(value: string) {
+        this.value = value;
+    }
+
+    static getInstance(): Singleton {
+        if (Singleton.#instance === null) {
+            Singleton.#instance = new Singleton("default");
+        }
+        return Singleton.#instance;
+    }
+
+    static hasInstance(): boolean {
+        return Singleton.#instance !== null;
+    }
+
+    getValue(): string {
+        return this.value;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function Singleton"),
+        "Expected Singleton function: {}",
+        output
+    );
+
+    // Static methods should be present
+    assert!(
+        output.contains("getInstance") && output.contains("hasInstance"),
+        "Expected static methods: {}",
+        output
+    );
+
+    // Instance method should be present
+    assert!(
+        output.contains("getValue"),
+        "Expected getValue method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_private_static_field_cache() {
+    // Private static field for caching pattern
+    let source = r#"
+class ResourceLoader {
+    static #cache: Map<string, any> = new Map();
+    static #loading: Set<string> = new Set();
+
+    static async load(url: string): Promise<any> {
+        if (ResourceLoader.#cache.has(url)) {
+            return ResourceLoader.#cache.get(url);
+        }
+
+        if (ResourceLoader.#loading.has(url)) {
+            // Wait for existing load
+            return new Promise(resolve => {
+                setTimeout(() => resolve(ResourceLoader.load(url)), 100);
+            });
+        }
+
+        ResourceLoader.#loading.add(url);
+        const data = await fetch(url).then(r => r.json());
+        ResourceLoader.#cache.set(url, data);
+        ResourceLoader.#loading.delete(url);
+        return data;
+    }
+
+    static clearCache(): void {
+        ResourceLoader.#cache.clear();
+    }
+
+    static getCacheSize(): number {
+        return ResourceLoader.#cache.size;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function ResourceLoader"),
+        "Expected ResourceLoader function: {}",
+        output
+    );
+
+    // Static methods should be present
+    assert!(
+        output.contains("load") && output.contains("clearCache"),
+        "Expected static methods: {}",
+        output
+    );
+
+    // Cache handling
+    assert!(
+        output.contains("getCacheSize"),
+        "Expected getCacheSize method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_private_static_field_registry() {
+    // Private static field for registry pattern
+    let source = r#"
+class ComponentRegistry {
+    static #components: Map<string, new () => object> = new Map();
+    static #instances: WeakMap<object, string> = new WeakMap();
+
+    static register(name: string, component: new () => object): void {
+        ComponentRegistry.#components.set(name, component);
+    }
+
+    static create(name: string): object | null {
+        const Component = ComponentRegistry.#components.get(name);
+        if (!Component) return null;
+
+        const instance = new Component();
+        ComponentRegistry.#instances.set(instance, name);
+        return instance;
+    }
+
+    static getComponentName(instance: object): string | undefined {
+        return ComponentRegistry.#instances.get(instance);
+    }
+
+    static getRegisteredNames(): string[] {
+        return Array.from(ComponentRegistry.#components.keys());
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function ComponentRegistry"),
+        "Expected ComponentRegistry function: {}",
+        output
+    );
+
+    // Static methods should be present
+    assert!(
+        output.contains("register") && output.contains("create"),
+        "Expected register and create methods: {}",
+        output
+    );
+
+    assert!(
+        output.contains("getComponentName") && output.contains("getRegisteredNames"),
+        "Expected getter methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_private_static_field_config() {
+    // Private static field for configuration pattern
+    let source = r#"
+class AppConfig {
+    static #config: Record<string, any> = {};
+    static #frozen: boolean = false;
+    static #validators: Map<string, (value: any) => boolean> = new Map();
+
+    static set(key: string, value: any): void {
+        if (AppConfig.#frozen) {
+            throw new Error("Config is frozen");
+        }
+
+        const validator = AppConfig.#validators.get(key);
+        if (validator && !validator(value)) {
+            throw new Error(`Invalid value for ${key}`);
+        }
+
+        AppConfig.#config[key] = value;
+    }
+
+    static get(key: string): any {
+        return AppConfig.#config[key];
+    }
+
+    static addValidator(key: string, validator: (value: any) => boolean): void {
+        if (AppConfig.#frozen) {
+            throw new Error("Config is frozen");
+        }
+        AppConfig.#validators.set(key, validator);
+    }
+
+    static freeze(): void {
+        AppConfig.#frozen = true;
+    }
+
+    static isFrozen(): boolean {
+        return AppConfig.#frozen;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function AppConfig"),
+        "Expected AppConfig function: {}",
+        output
+    );
+
+    // Static methods should be present
+    assert!(
+        output.contains("set") && output.contains("get"),
+        "Expected set and get methods: {}",
+        output
+    );
+
+    assert!(
+        output.contains("freeze") && output.contains("isFrozen"),
+        "Expected freeze methods: {}",
+        output
+    );
+
+    assert!(
+        output.contains("addValidator"),
+        "Expected addValidator method: {}",
+        output
+    );
+}
