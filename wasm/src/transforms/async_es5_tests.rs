@@ -13467,3 +13467,101 @@ fn test_async_clsdecor_ignores_nested() {
     );
     assert!(!result, "Should not detect await inside nested async with decorator");
 }
+
+// ASYNC GENERATOR YIELD DELEGATION PATTERN TESTS
+
+#[test]
+fn test_async_yielddeleg_basic() {
+    let result = async_error_propagation_contains_await(
+        "async function gen() { return await getIterable(); }",
+    );
+    assert!(result, "Should detect await in async generator yield* basic");
+}
+
+#[test]
+fn test_async_yielddeleg_async_iterable() {
+    let result = async_error_propagation_contains_await(
+        "async function gen() { return await asyncIterable(); }",
+    );
+    assert!(result, "Should detect await in yield* with async iterable");
+}
+
+#[test]
+fn test_async_yielddeleg_return_value() {
+    let result = async_error_propagation_contains_await(
+        "async function gen() { return await getGenerator(); }",
+    );
+    assert!(result, "Should detect await in yield* with return value");
+}
+
+#[test]
+fn test_async_yielddeleg_try_catch() {
+    let result = async_error_propagation_contains_await(
+        "async function gen() { try { return await getIterable(); } catch (e) { console.error(e); } }",
+    );
+    assert!(result, "Should detect await in yield* in try/catch");
+}
+
+#[test]
+fn test_async_yielddeleg_await_before() {
+    let result = async_error_propagation_contains_await(
+        "async function gen() { await setup(); return items; }",
+    );
+    assert!(result, "Should detect await before yield*");
+}
+
+#[test]
+fn test_async_yielddeleg_await_after() {
+    let result = async_error_propagation_contains_await(
+        "async function gen() { process(items); return await cleanup(); }",
+    );
+    assert!(result, "Should detect await after yield*");
+}
+
+#[test]
+fn test_async_yielddeleg_nested() {
+    let result = async_error_propagation_contains_await(
+        "async function gen() { await outer(); return await inner(); }",
+    );
+    assert!(result, "Should detect await in nested yield* delegation");
+}
+
+#[test]
+fn test_async_yielddeleg_loop() {
+    let result = async_error_propagation_contains_await(
+        "async function gen() { for (const x of sources) { await x.getItems(); } }",
+    );
+    assert!(result, "Should detect await in yield* with loop");
+}
+
+#[test]
+fn test_async_yielddeleg_class() {
+    let result = async_error_propagation_contains_await(
+        "async function method() { return await this.getItems(); }",
+    );
+    assert!(result, "Should detect await in async generator yield* in class");
+}
+
+#[test]
+fn test_async_yielddeleg_combined() {
+    let result = async_error_propagation_contains_await(
+        "async function gen() { const a = await first(); return await second(); }",
+    );
+    assert!(result, "Should detect await in combined yield* patterns");
+}
+
+#[test]
+fn test_async_yielddeleg_no_await() {
+    let result = async_error_propagation_contains_await(
+        "async function gen() { return items; }",
+    );
+    assert!(!result, "Should not detect await when yield* is sync");
+}
+
+#[test]
+fn test_async_yielddeleg_ignores_nested() {
+    let result = async_error_propagation_contains_await(
+        "async function outer() { const fn = async () => await inner(); }",
+    );
+    assert!(!result, "Should not detect await inside nested async generator");
+}
