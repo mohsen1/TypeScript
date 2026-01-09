@@ -29311,3 +29311,715 @@ const service: Instrumented<{ name: string }> = {
         output
     );
 }
+
+// ============================================================================
+// ES5 Type Guard Patterns Parity Tests
+// ============================================================================
+
+/// Test ES5 user-defined type guard
+#[test]
+fn test_parity_es5_type_guard_user_defined() {
+    let source = r#"
+interface Cat {
+    meow(): void;
+    purr(): void;
+}
+
+interface Dog {
+    bark(): void;
+    wagTail(): void;
+}
+
+type Animal = Cat | Dog;
+
+function isCat(animal: Animal): animal is Cat {
+    return "meow" in animal;
+}
+
+function isDog(animal: Animal): animal is Dog {
+    return "bark" in animal;
+}
+
+function processAnimal(animal: Animal): string {
+    if (isCat(animal)) {
+        animal.meow();
+        return "cat";
+    } else if (isDog(animal)) {
+        animal.bark();
+        return "dog";
+    }
+    return "unknown";
+}
+
+class AnimalHandler {
+    private animals: Animal[] = [];
+
+    add(animal: Animal): void {
+        this.animals.push(animal);
+    }
+
+    getCats(): Cat[] {
+        return this.animals.filter(isCat);
+    }
+
+    getDogs(): Dog[] {
+        return this.animals.filter(isDog);
+    }
+}
+
+function isNonNull<T>(value: T | null | undefined): value is T {
+    return value !== null && value !== undefined;
+}
+
+const values = [1, null, 2, undefined, 3];
+const nonNullValues = values.filter(isNonNull);
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions and class should be present
+    assert!(
+        output.contains("isCat") && output.contains("isDog") && output.contains("AnimalHandler"),
+        "Functions and class should be present: {}",
+        output
+    );
+    // Interfaces should be erased
+    assert!(
+        !output.contains("interface Cat") && !output.contains("interface Dog"),
+        "Interfaces should be erased: {}",
+        output
+    );
+    // Type alias should be erased
+    assert!(
+        !output.contains("type Animal"),
+        "Type alias should be erased: {}",
+        output
+    );
+    // Type predicates should be erased
+    assert!(
+        !output.contains("animal is Cat") && !output.contains("animal is Dog") && !output.contains("value is T"),
+        "Type predicates should be erased: {}",
+        output
+    );
+    // Generic type parameters should be erased
+    assert!(
+        !output.contains("<T>"),
+        "Generic type parameters should be erased: {}",
+        output
+    );
+}
+
+/// Test ES5 typeof type guard
+#[test]
+fn test_parity_es5_type_guard_typeof() {
+    let source = r#"
+type Primitive = string | number | boolean | symbol | bigint;
+
+function isString(value: unknown): value is string {
+    return typeof value === "string";
+}
+
+function isNumber(value: unknown): value is number {
+    return typeof value === "number";
+}
+
+function isBoolean(value: unknown): value is boolean {
+    return typeof value === "boolean";
+}
+
+function formatPrimitive(value: Primitive): string {
+    if (typeof value === "string") {
+        return value.toUpperCase();
+    } else if (typeof value === "number") {
+        return value.toFixed(2);
+    } else if (typeof value === "boolean") {
+        return value ? "yes" : "no";
+    } else if (typeof value === "symbol") {
+        return value.toString();
+    } else if (typeof value === "bigint") {
+        return value.toString() + "n";
+    }
+    return String(value);
+}
+
+class TypeChecker {
+    check(value: unknown): string {
+        if (typeof value === "function") {
+            return "function";
+        }
+        if (typeof value === "object") {
+            return value === null ? "null" : "object";
+        }
+        if (typeof value === "undefined") {
+            return "undefined";
+        }
+        return typeof value;
+    }
+}
+
+function processValue(value: string | number | object): void {
+    if (typeof value === "string") {
+        console.log(value.length);
+    } else if (typeof value === "number") {
+        console.log(value.toFixed(0));
+    } else {
+        console.log(Object.keys(value));
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions and class should be present
+    assert!(
+        output.contains("isString") && output.contains("formatPrimitive") && output.contains("TypeChecker"),
+        "Functions and class should be present: {}",
+        output
+    );
+    // Type alias should be erased
+    assert!(
+        !output.contains("type Primitive"),
+        "Type alias should be erased: {}",
+        output
+    );
+    // Type predicates should be erased
+    assert!(
+        !output.contains("value is string") && !output.contains("value is number"),
+        "Type predicates should be erased: {}",
+        output
+    );
+    // Parameter type annotations should be erased
+    assert!(
+        !output.contains(": unknown") && !output.contains(": Primitive"),
+        "Parameter type annotations should be erased: {}",
+        output
+    );
+    // typeof operators should remain (they're runtime)
+    assert!(
+        output.contains("typeof value"),
+        "typeof operators should remain: {}",
+        output
+    );
+}
+
+/// Test ES5 instanceof type guard
+#[test]
+fn test_parity_es5_type_guard_instanceof() {
+    let source = r#"
+class Animal {
+    name: string;
+    constructor(name: string) {
+        this.name = name;
+    }
+}
+
+class Dog extends Animal {
+    breed: string;
+    constructor(name: string, breed: string) {
+        super(name);
+        this.breed = breed;
+    }
+    bark(): void {
+        console.log("Woof!");
+    }
+}
+
+class Cat extends Animal {
+    color: string;
+    constructor(name: string, color: string) {
+        super(name);
+        this.color = color;
+    }
+    meow(): void {
+        console.log("Meow!");
+    }
+}
+
+function isDog(animal: Animal): animal is Dog {
+    return animal instanceof Dog;
+}
+
+function isCat(animal: Animal): animal is Cat {
+    return animal instanceof Cat;
+}
+
+function processAnimal(animal: Animal): void {
+    if (animal instanceof Dog) {
+        animal.bark();
+        console.log(animal.breed);
+    } else if (animal instanceof Cat) {
+        animal.meow();
+        console.log(animal.color);
+    }
+}
+
+class AnimalProcessor {
+    process(animals: Animal[]): { dogs: Dog[]; cats: Cat[] } {
+        return {
+            dogs: animals.filter((a): a is Dog => a instanceof Dog),
+            cats: animals.filter((a): a is Cat => a instanceof Cat)
+        };
+    }
+}
+
+function isError(value: unknown): value is Error {
+    return value instanceof Error;
+}
+
+function handleError(e: unknown): string {
+    if (e instanceof Error) {
+        return e.message;
+    }
+    return String(e);
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Classes and functions should be present
+    assert!(
+        output.contains("Animal") && output.contains("Dog") && output.contains("Cat") && output.contains("AnimalProcessor"),
+        "Classes and functions should be present: {}",
+        output
+    );
+    // Type predicates should be erased
+    assert!(
+        !output.contains("animal is Dog") && !output.contains("animal is Cat") && !output.contains("a is Dog"),
+        "Type predicates should be erased: {}",
+        output
+    );
+    // instanceof operators should remain (they're runtime)
+    assert!(
+        output.contains("instanceof Dog") && output.contains("instanceof Cat"),
+        "instanceof operators should remain: {}",
+        output
+    );
+    // Return type annotations should be erased
+    assert!(
+        !output.contains("): void") && !output.contains(": { dogs:"),
+        "Return type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test ES5 in operator guard
+#[test]
+fn test_parity_es5_type_guard_in() {
+    let source = r#"
+interface Fish {
+    swim(): void;
+}
+
+interface Bird {
+    fly(): void;
+}
+
+interface Amphibian {
+    swim(): void;
+    walk(): void;
+}
+
+type Creature = Fish | Bird | Amphibian;
+
+function isFish(creature: Creature): creature is Fish {
+    return "swim" in creature && !("walk" in creature);
+}
+
+function isBird(creature: Creature): creature is Bird {
+    return "fly" in creature;
+}
+
+function isAmphibian(creature: Creature): creature is Amphibian {
+    return "swim" in creature && "walk" in creature;
+}
+
+function processCreature(creature: Creature): void {
+    if ("fly" in creature) {
+        creature.fly();
+    } else if ("swim" in creature) {
+        creature.swim();
+    }
+}
+
+class CreatureHandler {
+    handle(creature: Creature): string {
+        if ("fly" in creature) {
+            return "bird";
+        }
+        if ("walk" in creature) {
+            return "amphibian";
+        }
+        if ("swim" in creature) {
+            return "fish";
+        }
+        return "unknown";
+    }
+}
+
+interface WithId {
+    id: string;
+}
+
+interface WithName {
+    name: string;
+}
+
+function hasId<T>(obj: T): obj is T & WithId {
+    return typeof obj === "object" && obj !== null && "id" in obj;
+}
+
+function hasName<T>(obj: T): obj is T & WithName {
+    return typeof obj === "object" && obj !== null && "name" in obj;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions and class should be present
+    assert!(
+        output.contains("isFish") && output.contains("isBird") && output.contains("CreatureHandler"),
+        "Functions and class should be present: {}",
+        output
+    );
+    // Interfaces should be erased
+    assert!(
+        !output.contains("interface Fish") && !output.contains("interface Bird"),
+        "Interfaces should be erased: {}",
+        output
+    );
+    // Type alias should be erased
+    assert!(
+        !output.contains("type Creature"),
+        "Type alias should be erased: {}",
+        output
+    );
+    // Type predicates should be erased
+    assert!(
+        !output.contains("creature is Fish") && !output.contains("creature is Bird"),
+        "Type predicates should be erased: {}",
+        output
+    );
+    // in operators should remain (they're runtime)
+    assert!(
+        output.contains("\"swim\" in") && output.contains("\"fly\" in"),
+        "in operators should remain: {}",
+        output
+    );
+}
+
+/// Test ES5 assertion function guard
+#[test]
+fn test_parity_es5_type_guard_assertion() {
+    let source = r#"
+function assertIsString(value: unknown): asserts value is string {
+    if (typeof value !== "string") {
+        throw new Error("Expected string");
+    }
+}
+
+function assertIsNumber(value: unknown): asserts value is number {
+    if (typeof value !== "number") {
+        throw new Error("Expected number");
+    }
+}
+
+function assertIsDefined<T>(value: T | null | undefined): asserts value is T {
+    if (value === null || value === undefined) {
+        throw new Error("Expected defined value");
+    }
+}
+
+function assertNonNull<T>(value: T | null): asserts value is T {
+    if (value === null) {
+        throw new Error("Expected non-null value");
+    }
+}
+
+interface User {
+    id: string;
+    name: string;
+}
+
+function assertIsUser(value: unknown): asserts value is User {
+    if (typeof value !== "object" || value === null) {
+        throw new Error("Expected object");
+    }
+    if (!("id" in value) || !("name" in value)) {
+        throw new Error("Expected User");
+    }
+}
+
+class Validator {
+    assertValid(data: unknown): asserts data is { valid: true } {
+        if (typeof data !== "object" || data === null || !("valid" in data)) {
+            throw new Error("Invalid data");
+        }
+    }
+
+    validate(data: unknown): void {
+        this.assertValid(data);
+        console.log("Data is valid");
+    }
+}
+
+function processValue(value: unknown): string {
+    assertIsString(value);
+    return value.toUpperCase();
+}
+
+function processNumber(value: unknown): number {
+    assertIsNumber(value);
+    return value * 2;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions and class should be present
+    assert!(
+        output.contains("assertIsString") && output.contains("assertIsDefined") && output.contains("Validator"),
+        "Functions and class should be present: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface User"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Assertion predicates should be erased
+    assert!(
+        !output.contains("asserts value is string") && !output.contains("asserts value is number"),
+        "Assertion predicates should be erased: {}",
+        output
+    );
+    // Generic type parameters should be erased
+    assert!(
+        !output.contains("<T>"),
+        "Generic type parameters should be erased: {}",
+        output
+    );
+    // Parameter type annotations should be erased
+    assert!(
+        !output.contains(": unknown"),
+        "Parameter type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test ES5 combined type guard patterns
+#[test]
+fn test_parity_es5_type_guard_combined() {
+    let source = r#"
+interface ApiResponse<T> {
+    status: number;
+    data?: T;
+    error?: string;
+}
+
+interface SuccessResponse<T> extends ApiResponse<T> {
+    status: 200;
+    data: T;
+}
+
+interface ErrorResponse extends ApiResponse<never> {
+    status: 400 | 404 | 500;
+    error: string;
+}
+
+type Response<T> = SuccessResponse<T> | ErrorResponse;
+
+function isSuccessResponse<T>(response: Response<T>): response is SuccessResponse<T> {
+    return response.status === 200 && "data" in response;
+}
+
+function isErrorResponse<T>(response: Response<T>): response is ErrorResponse {
+    return response.status !== 200 && "error" in response;
+}
+
+function assertSuccess<T>(response: Response<T>): asserts response is SuccessResponse<T> {
+    if (!isSuccessResponse(response)) {
+        throw new Error(response.error || "Unknown error");
+    }
+}
+
+class ApiClient {
+    async fetch<T>(url: string): Promise<Response<T>> {
+        const res = await fetch(url);
+        const data = await res.json();
+        if (res.ok) {
+            return { status: 200, data } as SuccessResponse<T>;
+        }
+        return { status: res.status as 400 | 404 | 500, error: data.message } as ErrorResponse;
+    }
+
+    async fetchOrThrow<T>(url: string): Promise<T> {
+        const response = await this.fetch<T>(url);
+        assertSuccess(response);
+        return response.data;
+    }
+
+    isValidData<T>(data: unknown, validator: (d: unknown) => d is T): data is T {
+        return validator(data);
+    }
+}
+
+type Guard<T> = (value: unknown) => value is T;
+
+function createArrayGuard<T>(itemGuard: Guard<T>): Guard<T[]> {
+    return (value: unknown): value is T[] => {
+        return Array.isArray(value) && value.every(itemGuard);
+    };
+}
+
+function isString(value: unknown): value is string {
+    return typeof value === "string";
+}
+
+const isStringArray = createArrayGuard(isString);
+
+function narrowUnion(value: string | number | boolean | object | null): string {
+    if (value === null) return "null";
+    if (typeof value === "string") return "string: " + value;
+    if (typeof value === "number") return "number: " + value;
+    if (typeof value === "boolean") return "boolean: " + value;
+    if (value instanceof Array) return "array";
+    return "object";
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions and class should be present
+    assert!(
+        output.contains("isSuccessResponse") && output.contains("assertSuccess") && output.contains("ApiClient"),
+        "Functions and class should be present: {}",
+        output
+    );
+    // Interfaces should be erased
+    assert!(
+        !output.contains("interface ApiResponse") && !output.contains("interface SuccessResponse"),
+        "Interfaces should be erased: {}",
+        output
+    );
+    // Type aliases should be erased
+    assert!(
+        !output.contains("type Response") && !output.contains("type Guard"),
+        "Type aliases should be erased: {}",
+        output
+    );
+    // Type predicates should be erased
+    assert!(
+        !output.contains("response is SuccessResponse") && !output.contains("value is T[]"),
+        "Type predicates should be erased: {}",
+        output
+    );
+    // Assertion predicates should be erased
+    assert!(
+        !output.contains("asserts response is"),
+        "Assertion predicates should be erased: {}",
+        output
+    );
+    // Generic type parameters should be erased
+    assert!(
+        !output.contains("<T>") && !output.contains("<T>("),
+        "Generic type parameters should be erased: {}",
+        output
+    );
+}
