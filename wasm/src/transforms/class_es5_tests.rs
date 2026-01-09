@@ -10125,3 +10125,304 @@ class ReverseIterator<T> extends BaseIterator<T> {
         output
     );
 }
+
+// ============================================================================
+// Symbol.toStringTag Tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_symbol_to_string_tag_basic() {
+    // Basic Symbol.toStringTag getter
+    let source = r#"
+class MyClass {
+    get [Symbol.toStringTag](): string {
+        return "MyClass";
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted to function
+    assert!(
+        output.contains("function MyClass"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Getter should be defined via Object.defineProperty
+    assert!(
+        output.contains("Object.defineProperty") && output.contains("get:"),
+        "Expected getter via Object.defineProperty: {}",
+        output
+    );
+
+    // Return value should be present
+    assert!(
+        output.contains("\"MyClass\""),
+        "Expected class name in return value: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_to_string_tag_static() {
+    // Static Symbol.toStringTag getter
+    let source = r#"
+class Container<T> {
+    private value: T;
+
+    constructor(value: T) {
+        this.value = value;
+    }
+
+    static get [Symbol.toStringTag](): string {
+        return "Container";
+    }
+
+    getValue(): T {
+        return this.value;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function Container"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Getter should be defined via Object.defineProperty
+    assert!(
+        output.contains("Object.defineProperty") && output.contains("get:"),
+        "Expected getter via Object.defineProperty: {}",
+        output
+    );
+
+    // getValue method should be on prototype
+    assert!(
+        output.contains("getValue"),
+        "Expected getValue method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_to_string_tag_with_other_symbols() {
+    // Class with multiple well-known symbols
+    let source = r#"
+class SymbolRich {
+    private items: number[] = [];
+
+    get [Symbol.toStringTag](): string {
+        return "SymbolRich";
+    }
+
+    *[Symbol.iterator](): Iterator<number> {
+        yield* this.items;
+    }
+
+    [Symbol.hasInstance](instance: unknown): boolean {
+        return instance instanceof SymbolRich;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function SymbolRich") || output.contains("SymbolRich"),
+        "Expected class definition: {}",
+        output
+    );
+
+    // Getter should be defined via Object.defineProperty (for toStringTag)
+    assert!(
+        output.contains("Object.defineProperty") && output.contains("get:"),
+        "Expected getter via Object.defineProperty: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_to_string_tag_inheritance() {
+    // Symbol.toStringTag with inheritance
+    let source = r#"
+class BaseType {
+    get [Symbol.toStringTag](): string {
+        return "BaseType";
+    }
+}
+
+class DerivedType extends BaseType {
+    get [Symbol.toStringTag](): string {
+        return "DerivedType";
+    }
+}
+
+class AnotherDerived extends BaseType {
+    // Inherits toStringTag from BaseType
+    doSomething(): void {
+        console.log("something");
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // All classes should be present
+    assert!(
+        output.contains("BaseType") && output.contains("DerivedType") && output.contains("AnotherDerived"),
+        "Expected all classes: {}",
+        output
+    );
+
+    // Inheritance pattern should be present
+    assert!(
+        output.contains("__extends") || output.contains("prototype"),
+        "Expected inheritance pattern: {}",
+        output
+    );
+
+    // Getter should be defined via Object.defineProperty (for toStringTag)
+    assert!(
+        output.contains("Object.defineProperty") && output.contains("get:"),
+        "Expected getter via Object.defineProperty: {}",
+        output
+    );
+
+    // doSomething method should be present
+    assert!(
+        output.contains("doSomething"),
+        "Expected doSomething method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_to_string_tag_computed_value() {
+    // Symbol.toStringTag with computed/dynamic value
+    let source = r#"
+class DynamicTag {
+    private name: string;
+
+    constructor(name: string) {
+        this.name = name;
+    }
+
+    get [Symbol.toStringTag](): string {
+        return `DynamicTag(${this.name})`;
+    }
+
+    setName(name: string): void {
+        this.name = name;
+    }
+}
+
+class VersionedType {
+    private version: number = 1;
+
+    get [Symbol.toStringTag](): string {
+        return `VersionedType.v${this.version}`;
+    }
+
+    upgrade(): void {
+        this.version++;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Both classes should be present
+    assert!(
+        output.contains("DynamicTag") && output.contains("VersionedType"),
+        "Expected both classes: {}",
+        output
+    );
+
+    // Getter should be defined via Object.defineProperty
+    assert!(
+        output.contains("Object.defineProperty") && output.contains("get:"),
+        "Expected getter via Object.defineProperty: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("setName") && output.contains("upgrade"),
+        "Expected methods: {}",
+        output
+    );
+
+    // Template literal should be transformed (concatenation in ES5)
+    assert!(
+        output.contains("DynamicTag(") && output.contains("VersionedType.v"),
+        "Expected class names in return values: {}",
+        output
+    );
+}
