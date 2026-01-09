@@ -4019,6 +4019,369 @@ fn test_parity_es5_array_spread_mixed() {
     );
 }
 
+#[test]
+fn test_parity_es5_array_spread_literal_typed() {
+    let source = r#"
+const numbers: number[] = [1, 2, 3];
+const strings: string[] = ["a", "b"];
+
+const combined: (number | string)[] = [...numbers, ...strings];
+
+function createArray<T>(...items: T[]): T[] {
+    return [...items];
+}
+
+const doubled: number[] = [...numbers, ...numbers];
+
+interface Point { x: number; y: number; }
+const points: Point[] = [{ x: 0, y: 0 }];
+const morePoints: Point[] = [...points, { x: 1, y: 1 }];
+
+type NumberArray = number[];
+const typed: NumberArray = [...numbers];
+
+class Container<T> {
+    items: T[] = [];
+
+    addAll(...newItems: T[]): void {
+        this.items = [...this.items, ...newItems];
+    }
+
+    getAll(): T[] {
+        return [...this.items];
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Spread syntax should not appear
+    assert!(
+        !output.contains("...numbers") && !output.contains("...strings") && !output.contains("...items"),
+        "Spread syntax should not appear: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number[]") && !output.contains(": string[]"),
+        "Type annotations should be erased: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Type alias should be erased
+    assert!(
+        !output.contains("type NumberArray"),
+        "Type alias should be erased: {}",
+        output
+    );
+    // Class should be present
+    assert!(
+        output.contains("Container"),
+        "Class should be present: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_array_spread_function_call() {
+    let source = r#"
+function sum(...nums: number[]): number {
+    return nums.reduce((a, b) => a + b, 0);
+}
+
+function formatMessage(template: string, ...args: string[]): string {
+    return template + args.join(", ");
+}
+
+const values: number[] = [1, 2, 3, 4, 5];
+
+class Calculator {
+    static total(...nums: number[]): number {
+        return nums.reduce((a, b) => a + b, 0);
+    }
+}
+
+function applyToAll<T, R>(fn: (...args: T[]) => R, items: T[]): R {
+    return fn.apply(null, items);
+}
+
+interface Logger {
+    log(...args: unknown[]): void;
+}
+
+const logger: Logger = {
+    log(...args: unknown[]) {
+        console.log(args);
+    }
+};
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Rest parameters should be transformed to arguments access
+    assert!(
+        output.contains("arguments"),
+        "Rest params should use arguments: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number[]") && !output.contains(": string[]"),
+        "Type annotations should be erased: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Class should be present
+    assert!(
+        output.contains("Calculator"),
+        "Class should be present: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_array_spread_new_expression() {
+    let source = r#"
+class Vector {
+    constructor(public x: number, public y: number, public z: number) {}
+
+    magnitude(): number {
+        return Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z);
+    }
+}
+
+class DataStore<T> {
+    private data: T[];
+
+    constructor(initial: T[]) {
+        this.data = initial.slice();
+    }
+
+    add(item: T): void {
+        this.data.push(item);
+    }
+
+    getAll(): T[] {
+        return this.data.slice();
+    }
+}
+
+class Logger {
+    constructor(private prefix: string) {}
+
+    log(message: string): void {
+        console.log(this.prefix, message);
+    }
+}
+
+interface Factory<T> {
+    create(): T;
+}
+
+class VectorFactory implements Factory<Vector> {
+    create(): Vector {
+        return new Vector(0, 0, 0);
+    }
+}
+
+function createWithDefaults<T>(factory: Factory<T>): T {
+    return factory.create();
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // public/private keywords should be erased
+    assert!(
+        !output.contains("public") && !output.contains("private"),
+        "Access modifiers should be erased: {}",
+        output
+    );
+    // Classes should be present
+    assert!(
+        output.contains("Vector") && output.contains("Logger") && output.contains("DataStore"),
+        "Classes should be present: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface"),
+        "Interface should be erased: {}",
+        output
+    );
+    // implements clause should be erased
+    assert!(
+        !output.contains("implements"),
+        "implements clause should be erased: {}",
+        output
+    );
+    // Generic type parameters should be erased
+    assert!(
+        !output.contains("<T>") && !output.contains("<Vector>"),
+        "Generic types should be erased: {}",
+        output
+    );
+}
+
+#[test]
+fn test_parity_es5_array_spread_mixed_complex() {
+    let source = r#"
+type Item = { id: number; name: string };
+
+const first: Item[] = [{ id: 1, name: "a" }];
+const second: Item[] = [{ id: 2, name: "b" }];
+
+const mixed: (Item | number | string)[] = [
+    0,
+    ...first,
+    "separator",
+    ...second,
+    { id: 3, name: "c" },
+    99
+];
+
+function interleave<T>(a: T[], b: T[]): T[] {
+    const result: T[] = [];
+    const maxLen = Math.max(a.length, b.length);
+    for (let i = 0; i < maxLen; i++) {
+        if (i < a.length) result.push(a[i]);
+        if (i < b.length) result.push(b[i]);
+    }
+    return result;
+}
+
+const nums1 = [1, 3, 5];
+const nums2 = [2, 4, 6];
+const interleaved = [...interleave(nums1, nums2), 7, 8, 9];
+
+class ArrayUtils {
+    static flatten<T>(arrays: T[][]): T[] {
+        return arrays.reduce((acc, arr) => [...acc, ...arr], [] as T[]);
+    }
+
+    static unique<T>(arr: T[]): T[] {
+        return [...new Set(arr)];
+    }
+
+    static prepend<T>(item: T, arr: T[]): T[] {
+        return [item, ...arr];
+    }
+
+    static append<T>(arr: T[], item: T): T[] {
+        return [...arr, item];
+    }
+}
+
+const nested = [[1, 2], [3, 4], [5, 6]];
+const flat = ArrayUtils.flatten(nested);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Spread syntax should not appear
+    assert!(
+        !output.contains("...first") && !output.contains("...second") && !output.contains("...arr"),
+        "Spread syntax should not appear: {}",
+        output
+    );
+    // Type alias should be erased
+    assert!(
+        !output.contains("type Item"),
+        "Type alias should be erased: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": Item[]") && !output.contains(": T[]"),
+        "Type annotations should be erased: {}",
+        output
+    );
+    // Class should be present
+    assert!(
+        output.contains("ArrayUtils"),
+        "Class should be present: {}",
+        output
+    );
+}
+
 /// Parity test for ES5 array destructuring assignment downlevel.
 /// Array destructuring should be converted to indexed access.
 #[test]

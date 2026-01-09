@@ -7,12 +7,13 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- [ ] Add async ES5 tests for async/await in with statement patterns (with block, property access in with, method calls in with, nested with) in `wasm/src/transforms/async_es5_tests.rs`. Run `./wasm/test.sh async_es5_tests`.
+- [ ] Add async ES5 tests for async/await in arrow function patterns (concise body await, block body await, nested arrows, arrow in class field) in `wasm/src/transforms/async_es5_tests.rs`. Run `./wasm/test.sh async_es5_tests`.
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added 12 async with statement pattern tests (with block basic, no await, expression await, property access, method call, ignores nested async, nested with, try/catch, if statement, loop, assignment, return) and extended `body_contains_await` to handle WITH_STATEMENT in `wasm/src/transforms/async_es5.rs` and `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (544 tests PASS).
 - [x] Added 12 async labeled statement pattern tests (labeled break, labeled continue, no await, body_contains_await, body_no_await, ignores nested async, nested labels, labeled while, labeled block, try/catch, labeled switch, labeled do-while) and extended `body_contains_await` to handle LABELED_STATEMENT in `wasm/src/transforms/async_es5.rs` and `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (532 tests PASS).
 - [x] Added 12 async conditional expression pattern tests (ternary basic, condition await, no await, body_contains_await, body_no_await, ignores nested async, nested ternary, short-circuit AND, short-circuit OR, nullish coalescing, try/catch, chained) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (520 tests PASS).
 - [x] Added 12 async switch statement pattern tests (basic, with default, no await, body_contains_await, body_no_await, ignores nested async, fallthrough, discriminant await, multiple cases, nested, try/catch, with return) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (508 tests PASS).
