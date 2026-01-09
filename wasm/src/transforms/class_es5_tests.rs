@@ -23509,3 +23509,792 @@ class CssBuilder {
         output
     );
 }
+
+// ============================================================================
+// UTILITY TYPE PATTERN TESTS
+// ============================================================================
+
+/// Test ES5 class with Partial utility type
+#[test]
+fn test_class_es5_utility_partial() {
+    let source = r#"
+interface User {
+    id: number;
+    name: string;
+    email: string;
+    age: number;
+}
+
+class UserUpdater {
+    private defaultValues: Partial<User> = {};
+
+    constructor(defaults?: Partial<User>) {
+        if (defaults) {
+            this.defaultValues = defaults;
+        }
+    }
+
+    update(user: User, changes: Partial<User>): User {
+        return { ...user, ...this.defaultValues, ...changes };
+    }
+
+    setDefaults(defaults: Partial<User>): void {
+        this.defaultValues = defaults;
+    }
+}
+
+class FormBuilder<T> {
+    private values: Partial<T> = {};
+    private errors: Partial<Record<keyof T, string>> = {};
+
+    setValue<K extends keyof T>(key: K, value: T[K]): this {
+        this.values[key] = value;
+        return this;
+    }
+
+    setError<K extends keyof T>(key: K, error: string): this {
+        this.errors[key] = error;
+        return this;
+    }
+
+    getPartial(): Partial<T> {
+        return { ...this.values };
+    }
+}
+
+class ConfigManager<C> {
+    private config: Partial<C>;
+
+    constructor(initial: Partial<C> = {}) {
+        this.config = initial;
+    }
+
+    merge(updates: Partial<C>): Partial<C> {
+        this.config = { ...this.config, ...updates };
+        return this.config;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("UserUpdater") && output.contains("FormBuilder") && output.contains("ConfigManager"),
+        "Expected Partial utility type classes: {}",
+        output
+    );
+
+    // Interface should be stripped
+    assert!(
+        !output.contains("interface User"),
+        "Expected interface to be stripped: {}",
+        output
+    );
+
+    // Partial type annotations should be stripped
+    assert!(
+        !output.contains("Partial<User>") && !output.contains("Partial<T>"),
+        "Expected Partial type annotations to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with Required utility type
+#[test]
+fn test_class_es5_utility_required() {
+    let source = r#"
+interface OptionalConfig {
+    host?: string;
+    port?: number;
+    timeout?: number;
+    retries?: number;
+}
+
+class StrictConfigValidator {
+    validate(config: unknown): config is Required<OptionalConfig> {
+        const c = config as OptionalConfig;
+        return c.host !== undefined &&
+               c.port !== undefined &&
+               c.timeout !== undefined &&
+               c.retries !== undefined;
+    }
+
+    ensureComplete(config: OptionalConfig): Required<OptionalConfig> {
+        return {
+            host: config.host ?? "localhost",
+            port: config.port ?? 8080,
+            timeout: config.timeout ?? 30000,
+            retries: config.retries ?? 3
+        };
+    }
+}
+
+class RequiredFieldsChecker<T> {
+    private requiredFields: (keyof T)[] = [];
+
+    addRequired(field: keyof T): this {
+        this.requiredFields.push(field);
+        return this;
+    }
+
+    isComplete(obj: Partial<T>): obj is Required<T> {
+        return this.requiredFields.every(field => obj[field] !== undefined);
+    }
+}
+
+class DatabaseConnection {
+    private config: Required<OptionalConfig>;
+
+    constructor(config: OptionalConfig) {
+        this.config = {
+            host: config.host ?? "localhost",
+            port: config.port ?? 5432,
+            timeout: config.timeout ?? 10000,
+            retries: config.retries ?? 5
+        };
+    }
+
+    getConfig(): Required<OptionalConfig> {
+        return this.config;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("StrictConfigValidator") && output.contains("RequiredFieldsChecker") && output.contains("DatabaseConnection"),
+        "Expected Required utility type classes: {}",
+        output
+    );
+
+    // Required type annotations should be stripped
+    assert!(
+        !output.contains("Required<OptionalConfig>") && !output.contains("Required<T>"),
+        "Expected Required type annotations to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with Pick utility type
+#[test]
+fn test_class_es5_utility_pick() {
+    let source = r#"
+interface FullUser {
+    id: number;
+    username: string;
+    email: string;
+    password: string;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+type PublicUser = Pick<FullUser, "id" | "username" | "email">;
+type AuthCredentials = Pick<FullUser, "email" | "password">;
+
+class UserSerializer {
+    toPublic(user: FullUser): Pick<FullUser, "id" | "username" | "email"> {
+        return {
+            id: user.id,
+            username: user.username,
+            email: user.email
+        };
+    }
+
+    extractCredentials(user: FullUser): Pick<FullUser, "email" | "password"> {
+        return {
+            email: user.email,
+            password: user.password
+        };
+    }
+}
+
+class FieldPicker<T, K extends keyof T> {
+    private keys: K[];
+
+    constructor(keys: K[]) {
+        this.keys = keys;
+    }
+
+    pick(obj: T): Pick<T, K> {
+        const result = {} as Pick<T, K>;
+        for (const key of this.keys) {
+            result[key] = obj[key];
+        }
+        return result;
+    }
+}
+
+class ApiResponseBuilder<T> {
+    private data: T;
+
+    constructor(data: T) {
+        this.data = data;
+    }
+
+    selectFields<K extends keyof T>(...keys: K[]): Pick<T, K> {
+        const result = {} as Pick<T, K>;
+        for (const key of keys) {
+            result[key] = this.data[key];
+        }
+        return result;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("UserSerializer") && output.contains("FieldPicker") && output.contains("ApiResponseBuilder"),
+        "Expected Pick utility type classes: {}",
+        output
+    );
+
+    // Type aliases should be stripped
+    assert!(
+        !output.contains("type PublicUser") && !output.contains("type AuthCredentials"),
+        "Expected type aliases to be stripped: {}",
+        output
+    );
+
+    // Pick type annotations should be stripped
+    assert!(
+        !output.contains("Pick<FullUser") && !output.contains("Pick<T, K>"),
+        "Expected Pick type annotations to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with Omit utility type
+#[test]
+fn test_class_es5_utility_omit() {
+    let source = r#"
+interface Entity {
+    id: number;
+    createdAt: Date;
+    updatedAt: Date;
+    deletedAt: Date | null;
+}
+
+interface User extends Entity {
+    name: string;
+    email: string;
+}
+
+type CreateUserDTO = Omit<User, "id" | "createdAt" | "updatedAt" | "deletedAt">;
+type UpdateUserDTO = Omit<User, "id" | "createdAt">;
+
+class EntityFactory<T extends Entity> {
+    create(data: Omit<T, keyof Entity>): T {
+        const now = new Date();
+        return {
+            id: Math.random(),
+            createdAt: now,
+            updatedAt: now,
+            deletedAt: null,
+            ...data
+        } as T;
+    }
+
+    update(entity: T, data: Omit<T, "id" | "createdAt">): T {
+        return {
+            ...entity,
+            ...data,
+            updatedAt: new Date()
+        };
+    }
+}
+
+class SensitiveDataRemover<T> {
+    private sensitiveKeys: (keyof T)[] = [];
+
+    addSensitiveKey(key: keyof T): this {
+        this.sensitiveKeys.push(key);
+        return this;
+    }
+
+    sanitize<K extends keyof T>(data: T): Omit<T, K> {
+        const result = { ...data };
+        for (const key of this.sensitiveKeys) {
+            delete result[key];
+        }
+        return result as Omit<T, K>;
+    }
+}
+
+class DtoMapper {
+    userToCreateDto(user: User): Omit<User, keyof Entity> {
+        const { id, createdAt, updatedAt, deletedAt, ...rest } = user;
+        return rest;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("EntityFactory") && output.contains("SensitiveDataRemover") && output.contains("DtoMapper"),
+        "Expected Omit utility type classes: {}",
+        output
+    );
+
+    // Type definitions should be stripped
+    assert!(
+        !output.contains("type CreateUserDTO") && !output.contains("type UpdateUserDTO"),
+        "Expected type definitions to be stripped: {}",
+        output
+    );
+
+    // Omit type annotations should be stripped
+    assert!(
+        !output.contains("Omit<User") && !output.contains("Omit<T,"),
+        "Expected Omit type annotations to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with Record utility type
+#[test]
+fn test_class_es5_utility_record() {
+    let source = r#"
+type Status = "pending" | "active" | "completed" | "failed";
+type StatusConfig = Record<Status, { color: string; icon: string }>;
+
+class StatusManager {
+    private configs: Record<Status, { color: string; icon: string }> = {
+        pending: { color: "yellow", icon: "clock" },
+        active: { color: "blue", icon: "play" },
+        completed: { color: "green", icon: "check" },
+        failed: { color: "red", icon: "x" }
+    };
+
+    getConfig(status: Status): { color: string; icon: string } {
+        return this.configs[status];
+    }
+}
+
+class Cache<K extends string, V> {
+    private store: Record<K, V> = {} as Record<K, V>;
+    private timestamps: Record<K, number> = {} as Record<K, number>;
+
+    set(key: K, value: V): void {
+        this.store[key] = value;
+        this.timestamps[key] = Date.now();
+    }
+
+    get(key: K): V | undefined {
+        return this.store[key];
+    }
+
+    getAll(): Record<K, V> {
+        return { ...this.store };
+    }
+}
+
+class EventRegistry<E extends string> {
+    private handlers: Record<E, Function[]> = {} as Record<E, Function[]>;
+
+    on(event: E, handler: Function): void {
+        if (!this.handlers[event]) {
+            this.handlers[event] = [];
+        }
+        this.handlers[event].push(handler);
+    }
+
+    emit(event: E, ...args: unknown[]): void {
+        const eventHandlers = this.handlers[event];
+        if (eventHandlers) {
+            eventHandlers.forEach(h => h(...args));
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("StatusManager") && output.contains("Cache") && output.contains("EventRegistry"),
+        "Expected Record utility type classes: {}",
+        output
+    );
+
+    // Type aliases should be stripped
+    assert!(
+        !output.contains("type Status =") && !output.contains("type StatusConfig"),
+        "Expected type aliases to be stripped: {}",
+        output
+    );
+
+    // Record type annotations should be stripped
+    assert!(
+        !output.contains("Record<Status") && !output.contains("Record<K, V>"),
+        "Expected Record type annotations to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with Readonly utility type
+#[test]
+fn test_class_es5_utility_readonly() {
+    let source = r#"
+interface MutableState {
+    count: number;
+    items: string[];
+    config: { enabled: boolean };
+}
+
+class ImmutableStore<T> {
+    private state: Readonly<T>;
+
+    constructor(initial: T) {
+        this.state = Object.freeze({ ...initial }) as Readonly<T>;
+    }
+
+    getState(): Readonly<T> {
+        return this.state;
+    }
+
+    update(updater: (current: Readonly<T>) => T): void {
+        const newState = updater(this.state);
+        this.state = Object.freeze({ ...newState }) as Readonly<T>;
+    }
+}
+
+class DeepReadonlyWrapper<T> {
+    private readonly data: Readonly<T>;
+
+    constructor(data: T) {
+        this.data = Object.freeze({ ...data }) as Readonly<T>;
+    }
+
+    get(): Readonly<T> {
+        return this.data;
+    }
+
+    clone(): T {
+        return { ...this.data } as T;
+    }
+}
+
+class ConfigReader {
+    private readonly config: Readonly<MutableState>;
+
+    constructor(config: MutableState) {
+        this.config = Object.freeze(config);
+    }
+
+    getCount(): number {
+        return this.config.count;
+    }
+
+    getItems(): readonly string[] {
+        return this.config.items;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("ImmutableStore") && output.contains("DeepReadonlyWrapper") && output.contains("ConfigReader"),
+        "Expected Readonly utility type classes: {}",
+        output
+    );
+
+    // Readonly type annotations should be stripped
+    assert!(
+        !output.contains("Readonly<T>") && !output.contains("Readonly<MutableState>"),
+        "Expected Readonly type annotations to be stripped: {}",
+        output
+    );
+
+    // readonly modifier on arrays should be stripped
+    assert!(
+        !output.contains("readonly string[]"),
+        "Expected readonly array type to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with ReturnType utility type
+#[test]
+fn test_class_es5_utility_return_type() {
+    let source = r#"
+function createUser(name: string, age: number) {
+    return { id: Math.random(), name, age, createdAt: new Date() };
+}
+
+function fetchData<T>(url: string): Promise<{ data: T; status: number }> {
+    return Promise.resolve({ data: {} as T, status: 200 });
+}
+
+type UserResult = ReturnType<typeof createUser>;
+type FetchResult<T> = ReturnType<typeof fetchData<T>>;
+
+class UserCache {
+    private cache: Map<number, ReturnType<typeof createUser>> = new Map();
+
+    store(user: ReturnType<typeof createUser>): void {
+        this.cache.set(user.id, user);
+    }
+
+    get(id: number): ReturnType<typeof createUser> | undefined {
+        return this.cache.get(id);
+    }
+}
+
+class MethodReturnExtractor<T> {
+    extractType<M extends keyof T>(
+        obj: T,
+        method: M
+    ): T[M] extends (...args: any[]) => infer R ? R : never {
+        const fn = obj[method];
+        if (typeof fn === "function") {
+            return fn.call(obj) as any;
+        }
+        throw new Error("Not a method");
+    }
+}
+
+class FunctionWrapper<F extends (...args: any[]) => any> {
+    private fn: F;
+    private lastResult: ReturnType<F> | undefined;
+
+    constructor(fn: F) {
+        this.fn = fn;
+    }
+
+    call(...args: Parameters<F>): ReturnType<F> {
+        this.lastResult = this.fn(...args);
+        return this.lastResult;
+    }
+
+    getLastResult(): ReturnType<F> | undefined {
+        return this.lastResult;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("UserCache") && output.contains("MethodReturnExtractor") && output.contains("FunctionWrapper"),
+        "Expected ReturnType utility type classes: {}",
+        output
+    );
+
+    // Type aliases should be stripped
+    assert!(
+        !output.contains("type UserResult") && !output.contains("type FetchResult"),
+        "Expected type aliases to be stripped: {}",
+        output
+    );
+
+    // ReturnType annotations should be stripped
+    assert!(
+        !output.contains("ReturnType<typeof") && !output.contains("ReturnType<F>"),
+        "Expected ReturnType type annotations to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with Parameters utility type
+#[test]
+fn test_class_es5_utility_parameters() {
+    let source = r#"
+function greet(name: string, age: number, isVip?: boolean): string {
+    return `Hello, ${name}!`;
+}
+
+type GreetParams = Parameters<typeof greet>;
+
+class FunctionInvoker<F extends (...args: any[]) => any> {
+    private fn: F;
+    private defaultArgs: Partial<Parameters<F>> = [];
+
+    constructor(fn: F) {
+        this.fn = fn;
+    }
+
+    setDefaults(...args: Partial<Parameters<F>>): this {
+        this.defaultArgs = args;
+        return this;
+    }
+
+    invoke(...args: Parameters<F>): ReturnType<F> {
+        return this.fn(...args);
+    }
+
+    invokeWithDefaults(...overrides: Partial<Parameters<F>>): ReturnType<F> {
+        const merged = this.defaultArgs.map((d, i) => overrides[i] ?? d);
+        return this.fn(...merged as Parameters<F>);
+    }
+}
+
+class MethodDecorator<T> {
+    wrap<K extends keyof T>(
+        obj: T,
+        method: K
+    ): T[K] extends (...args: infer P) => infer R
+        ? (...args: P) => R
+        : never {
+        const original = obj[method];
+        if (typeof original === "function") {
+            return ((...args: any[]) => {
+                console.log(`Calling ${String(method)}`);
+                return original.apply(obj, args);
+            }) as any;
+        }
+        throw new Error("Not a method");
+    }
+}
+
+class ArgumentValidator<F extends (...args: any[]) => any> {
+    private validators: ((args: Parameters<F>) => boolean)[] = [];
+
+    addValidator(fn: (args: Parameters<F>) => boolean): this {
+        this.validators.push(fn);
+        return this;
+    }
+
+    validate(args: Parameters<F>): boolean {
+        return this.validators.every(v => v(args));
+    }
+
+    createValidated(fn: F): F {
+        return ((...args: Parameters<F>) => {
+            if (!this.validate(args)) {
+                throw new Error("Validation failed");
+            }
+            return fn(...args);
+        }) as F;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("FunctionInvoker") && output.contains("MethodDecorator") && output.contains("ArgumentValidator"),
+        "Expected Parameters utility type classes: {}",
+        output
+    );
+
+    // Type alias should be stripped
+    assert!(
+        !output.contains("type GreetParams"),
+        "Expected type alias to be stripped: {}",
+        output
+    );
+
+    // Parameters type annotations should be stripped
+    assert!(
+        !output.contains("Parameters<typeof") && !output.contains("Parameters<F>"),
+        "Expected Parameters type annotations to be stripped: {}",
+        output
+    );
+}
