@@ -10945,3 +10945,104 @@ fn test_async_observable_ignores_nested_async() {
     );
     assert!(!result, "Should not detect await inside nested async in observable function");
 }
+
+// ============================================================================
+// ASYNC CHANNEL PATTERN TESTS
+// Tests for channel patterns: send, receive, buffered, unbuffered
+// ============================================================================
+
+#[test]
+fn test_async_channel_send() {
+    let result = async_error_propagation_contains_await(
+        "async function send() { await channel.send(message); }",
+    );
+    assert!(result, "Should detect await in channel send");
+}
+
+#[test]
+fn test_async_channel_receive() {
+    let result = async_error_propagation_contains_await(
+        "async function receive() { return await channel.receive(); }",
+    );
+    assert!(result, "Should detect await in channel receive");
+}
+
+#[test]
+fn test_async_channel_buffered() {
+    let result = async_error_propagation_contains_await(
+        "async function buffered() { return await bufferedChannel.take(); }",
+    );
+    assert!(result, "Should detect await in buffered channel");
+}
+
+#[test]
+fn test_async_channel_unbuffered() {
+    let result = async_error_propagation_contains_await(
+        "async function unbuffered() { await syncChannel.put(value); }",
+    );
+    assert!(result, "Should detect await in unbuffered channel");
+}
+
+#[test]
+fn test_async_channel_close() {
+    let result = async_error_propagation_contains_await(
+        "async function close() { await channel.close(); }",
+    );
+    assert!(result, "Should detect await in channel close");
+}
+
+#[test]
+fn test_async_channel_select() {
+    let result = async_error_propagation_contains_await(
+        "async function selectChannel() { return await select([ch1, ch2, ch3]); }",
+    );
+    assert!(result, "Should detect await in channel select");
+}
+
+#[test]
+fn test_async_channel_broadcast() {
+    let result = async_error_propagation_contains_await(
+        "async function broadcast() { await broadcaster.send(event); }",
+    );
+    assert!(result, "Should detect await in broadcast channel");
+}
+
+#[test]
+fn test_async_channel_multicast() {
+    let result = async_error_propagation_contains_await(
+        "async function multicast() { return await multicastChannel.subscribe(); }",
+    );
+    assert!(result, "Should detect await in multicast channel");
+}
+
+#[test]
+fn test_async_channel_pipe() {
+    let result = async_error_propagation_contains_await(
+        "async function pipe() { await input.pipe(output); }",
+    );
+    assert!(result, "Should detect await in channel pipe");
+}
+
+#[test]
+fn test_async_channel_timeout() {
+    let result = async_error_propagation_contains_await(
+        "async function receiveTimeout() { return await channel.receiveWithTimeout(5000); }",
+    );
+    assert!(result, "Should detect await in channel receive with timeout");
+}
+
+#[test]
+fn test_async_channel_no_await() {
+    let result = async_error_propagation_contains_await(
+        "async function syncChannel() { return channel.isEmpty(); }",
+    );
+    assert!(!result, "Should not detect await when channel access is sync");
+}
+
+#[test]
+fn test_async_channel_ignores_nested_async() {
+    let result = async_error_propagation_contains_await(
+        "async function outer() { const receiver = async () => await channel.receive(); }",
+    );
+    assert!(!result, "Should not detect await inside nested async in channel function");
+}
