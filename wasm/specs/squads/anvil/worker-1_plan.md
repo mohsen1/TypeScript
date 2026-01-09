@@ -8,12 +8,13 @@ Priority: 1
 Blocked: Awaiting next EM-Anvil assignment.
 
 ## Current Assignment
-- [ ] Add ES5 class tests for Promise patterns in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
+- [x] Add ES5 class tests for Promise patterns in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added ES5 tests for Promise patterns (6 tests): resolve/reject, all, race, chaining, allSettled, wrapper. Ran `./wasm/test.sh class_es5_tests` (all 204 pass).
 - [x] Added ES5 tests for Object.assign patterns (6 tests): basic merge, defaults, clone, mixin, constructor, immutable update. Ran `./wasm/test.sh class_es5_tests` (all 198 pass).
 - [x] Added ES5 tests for Reflect API patterns (6 tests): get/set, has/delete, construct, apply, ownKeys, defineProperty. Ran `./wasm/test.sh class_es5_tests` (all 192 pass).
 - [x] Added ES5 tests for WeakRef and FinalizationRegistry (6 tests): basic WeakRef, with deref, FinalizationRegistry basic, with unregister, cache pattern, combined. Ran `./wasm/test.sh class_es5_tests` (all 186 pass).
