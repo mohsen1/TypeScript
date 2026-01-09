@@ -59,6 +59,26 @@ enum EnumKind {
     String,
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+enum MemberAccessLevel {
+    Private,
+    Protected,
+}
+
+#[derive(Clone, Debug)]
+struct MemberAccessInfo {
+    level: MemberAccessLevel,
+    declaring_class_idx: NodeIndex,
+    declaring_class_name: String,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+enum MemberLookup {
+    NotFound,
+    Public,
+    Restricted(MemberAccessLevel),
+}
+
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 enum PropertyKey {
     Ident(String),
@@ -351,6 +371,7 @@ impl<'a> ThinCheckerState<'a> {
         let Some(node) = self.ctx.arena.get(idx) else {
             return TypeId::ANY;
         };
+        let is_function_declaration = node.kind == syntax_kind_ext::FUNCTION_DECLARATION;
 
         match node.kind {
             // Identifiers
@@ -538,6 +559,11 @@ impl<'a> ThinCheckerState<'a> {
                     // Ensure the base type symbol is resolved first so its type params
                     // are available in the type_env for Application expansion
                     let _ = self.get_type_of_symbol(sym_id);
+                    if let Some(args) = &type_ref.type_arguments {
+                        for &arg_idx in &args.nodes {
+                            let _ = self.get_type_from_type_node(arg_idx);
+                        }
+                    }
                     let type_param_bindings = self.get_type_param_bindings();
                     let type_resolver = |node_idx: NodeIndex| self.resolve_type_symbol_for_lowering(node_idx);
                     let value_resolver = |node_idx: NodeIndex| self.resolve_value_symbol_for_lowering(node_idx);
@@ -4417,6 +4443,20 @@ impl<'a> ThinCheckerState<'a> {
         // Get the type of the object
         let object_type = self.get_type_of_node(access.expression);
 
+        // Evaluate Application types to resolve generic type aliases/interfaces
+        let object_type = self.evaluate_application_type(object_type);
+
+        // Enforce private/protected access modifiers when possible
+        if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
+            let property_name = &ident.escaped_text;
+            self.check_property_accessibility(
+                access.expression,
+                property_name,
+                access.name_or_argument,
+                object_type,
+            );
+        }
+
         // Don't report errors for any/error types
         if object_type == TypeId::ANY || object_type == TypeId::ERROR {
             return TypeId::ANY;
@@ -4514,6 +4554,32 @@ impl<'a> ThinCheckerState<'a> {
 
         // Get the type of the object
         let object_type = self.get_type_of_node(access.expression);
+        let object_type = self.evaluate_application_type(object_type);
+
+        let literal_string = self.get_literal_string_from_node(access.name_or_argument)
+            .map(|name| name.to_string());
+        let numeric_string_index = literal_string
+            .as_deref()
+            .and_then(|name| self.get_numeric_index_from_string(name));
+        let literal_index = self.get_literal_index_from_node(access.name_or_argument)
+            .or(numeric_string_index);
+
+        if let Some(name) = literal_string.as_deref() {
+            self.check_property_accessibility(
+                access.expression,
+                name,
+                access.name_or_argument,
+                object_type,
+            );
+        } else if let Some(index) = literal_index {
+            let name = index.to_string();
+            self.check_property_accessibility(
+                access.expression,
+                &name,
+                access.name_or_argument,
+                object_type,
+            );
+        }
 
         // Don't report errors for any/error types
         if object_type == TypeId::ANY || object_type == TypeId::ERROR {
@@ -4537,14 +4603,7 @@ impl<'a> ThinCheckerState<'a> {
         };
 
         let index_type = self.get_type_of_node(access.name_or_argument);
-        let literal_string = self.get_literal_string_from_node(access.name_or_argument)
-            .map(|name| name.to_string());
         let literal_string_is_none = literal_string.is_none();
-        let numeric_string_index = literal_string
-            .as_deref()
-            .and_then(|name| self.get_numeric_index_from_string(name));
-        let literal_index = self.get_literal_index_from_node(access.name_or_argument)
-            .or(numeric_string_index);
 
         let mut result_type = None;
         let mut report_no_index = false;
@@ -5115,7 +5174,6 @@ impl<'a> ThinCheckerState<'a> {
     /// Get type of function declaration/expression/arrow.
     fn get_type_of_function(&mut self, idx: NodeIndex) -> TypeId {
         use crate::solver::{FunctionShape, ParamInfo};
-        use std::sync::Arc;
 
         let Some(node) = self.ctx.arena.get(idx) else {
             return TypeId::ANY;
@@ -5124,6 +5182,9 @@ impl<'a> ThinCheckerState<'a> {
         let Some(func) = self.ctx.arena.get_function(node) else {
             return TypeId::ANY;
         };
+
+        // Function declarations don't report implicit any for parameters (handled by check_statement)
+        let is_function_declaration = node.kind == syntax_kind_ext::FUNCTION_DECLARATION;
 
         let (type_params, type_param_updates) = self.push_type_parameters(&func.type_parameters);
 
@@ -5157,6 +5218,13 @@ impl<'a> ThinCheckerState<'a> {
 
                     let is_this_param = name == Some(this_atom);
 
+                    let contextual_type = if let Some(ref helper) = ctx_helper {
+                        helper.get_parameter_type(contextual_index)
+                    } else {
+                        None
+                    };
+                    let has_contextual_type = contextual_type.is_some();
+
                     // Use type annotation if present, otherwise infer from context
                     let type_id = if !param.type_annotation.is_none() {
                         // Check parameter type for parameter properties in function types
@@ -5170,11 +5238,7 @@ impl<'a> ThinCheckerState<'a> {
                         }
                     } else {
                         // Infer from contextual type
-                        if let Some(ref helper) = ctx_helper {
-                            helper.get_parameter_type(contextual_index).unwrap_or(TypeId::ANY)
-                        } else {
-                            TypeId::ANY
-                        }
+                        contextual_type.unwrap_or(TypeId::ANY)
                     };
 
                     if is_this_param {
@@ -5183,6 +5247,10 @@ impl<'a> ThinCheckerState<'a> {
                         }
                         param_types.push(None);
                         continue;
+                    }
+
+                    if !is_function_declaration {
+                        self.maybe_report_implicit_any_parameter(param, has_contextual_type);
                     }
 
                     // Check if optional or has initializer
@@ -5206,7 +5274,8 @@ impl<'a> ThinCheckerState<'a> {
         self.check_parameter_properties(&func.parameters.nodes);
 
         // Get return type from annotation or infer
-        let (mut return_type, type_predicate) = if !func.type_annotation.is_none() {
+        let has_type_annotation = !func.type_annotation.is_none();
+        let (mut return_type, type_predicate) = if has_type_annotation {
             // Check return type for parameter properties in function types
             self.check_type_for_parameter_properties(func.type_annotation);
             self.return_type_and_predicate(func.type_annotation)
@@ -5222,9 +5291,28 @@ impl<'a> ThinCheckerState<'a> {
         if !func.body.is_none() {
             self.cache_parameter_types(&func.parameters.nodes, Some(&param_types));
 
-            if func.type_annotation.is_none() {
+            let mut has_contextual_return = false;
+            if !has_type_annotation {
                 let return_context = ctx_helper.as_ref().and_then(|helper| helper.get_return_type());
+                has_contextual_return = return_context.is_some();
                 return_type = self.infer_return_type_from_body(func.body, return_context);
+            }
+
+            if !is_function_declaration {
+                let func_name = if !func.name.is_none() {
+                    self.get_function_name_from_node(idx)
+                } else {
+                    None
+                };
+                let name_node = if !func.name.is_none() { Some(func.name) } else { None };
+                self.maybe_report_implicit_any_return(
+                    func_name,
+                    name_node,
+                    return_type,
+                    has_type_annotation,
+                    has_contextual_return,
+                    idx,
+                );
             }
 
             self.push_return_type(return_type);
@@ -6151,6 +6239,18 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Get type parameters for a symbol (for generic type aliases and interfaces).
     fn get_type_params_for_symbol(&mut self, sym_id: SymbolId) -> Vec<crate::solver::TypeParamInfo> {
+        if let Some(symbol_arena) = self.ctx.binder.symbol_arenas.get(&sym_id) {
+            if !std::ptr::eq(symbol_arena.as_ref(), self.ctx.arena) {
+                let mut checker = ThinCheckerState::new(
+                    symbol_arena.as_ref(),
+                    self.ctx.binder,
+                    self.ctx.types,
+                    self.ctx.file_name.clone(),
+                );
+                return checker.get_type_params_for_symbol(sym_id);
+            }
+        }
+
         let Some(symbol) = self.ctx.binder.get_symbol(sym_id) else {
             return Vec::new();
         };
@@ -6592,6 +6692,16 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    /// Check if a node is a `super` expression.
+    fn is_super_expression(&self, idx: NodeIndex) -> bool {
+        use crate::scanner::SyntaxKind;
+        if let Some(node) = self.ctx.arena.get(idx) {
+            node.kind == SyntaxKind::SuperKeyword as u16
+        } else {
+            false
+        }
+    }
+
     /// Report an argument count mismatch error using solver diagnostics with source tracking.
     pub fn error_argument_count_mismatch_at(
         &mut self,
@@ -6792,6 +6902,48 @@ impl<'a> ThinCheckerState<'a> {
         formatter.format(type_id)
     }
 
+    fn resolve_no_implicit_any_from_source(&self, text: &str) -> bool {
+        if let Some(value) = Self::parse_test_option_bool(text, "@noimplicitany") {
+            return value;
+        }
+        if let Some(strict) = Self::parse_test_option_bool(text, "@strict") {
+            return strict;
+        }
+        true
+    }
+
+    fn parse_test_option_bool(text: &str, key: &str) -> Option<bool> {
+        for line in text.lines().take(32) {
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            let is_comment = trimmed.starts_with("//")
+                || trimmed.starts_with("/*")
+                || trimmed.starts_with('*');
+            if !is_comment {
+                break;
+            }
+
+            let lower = trimmed.to_ascii_lowercase();
+            let Some(pos) = lower.find(key) else {
+                continue;
+            };
+            let after_key = &lower[pos + key.len()..];
+            let Some(colon_pos) = after_key.find(':') else {
+                continue;
+            };
+            let value = after_key[colon_pos + 1..].trim();
+            if value.starts_with("true") {
+                return Some(true);
+            }
+            if value.starts_with("false") {
+                return Some(false);
+            }
+        }
+        None
+    }
+
     // =========================================================================
     // Source File Checking (Full Traversal)
     // =========================================================================
@@ -6804,6 +6956,8 @@ impl<'a> ThinCheckerState<'a> {
         };
 
         if let Some(sf) = self.ctx.arena.get_source_file(node) {
+            self.ctx.no_implicit_any = self.resolve_no_implicit_any_from_source(&sf.text);
+
             // Type check each top-level statement
             for &stmt_idx in &sf.statements.nodes {
                 self.check_statement(stmt_idx);
@@ -6815,6 +6969,136 @@ impl<'a> ThinCheckerState<'a> {
             // Check for export assignment with other exports (2309)
             self.check_export_assignment(&sf.statements.nodes);
 
+            // Check for duplicate identifiers (2300)
+            self.check_duplicate_identifiers();
+        }
+    }
+
+    /// Check for duplicate identifiers in the current file scope (TS2300).
+    /// This checks all symbols in file_locals and reports errors when symbols
+    /// have multiple declarations that can't be merged.
+    fn check_duplicate_identifiers(&mut self) {
+        use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages, format_message};
+        use crate::binder::symbol_flags;
+
+        // Collect symbols to check - we need to clone the keys to avoid borrowing issues
+        let symbol_ids: Vec<_> = self.ctx.binder.file_locals.iter()
+            .map(|(_, &id)| id)
+            .collect();
+
+        for sym_id in symbol_ids {
+            let Some(symbol) = self.ctx.binder.get_symbol(sym_id) else {
+                continue;
+            };
+
+            // Skip if only one declaration
+            if symbol.declarations.len() <= 1 {
+                continue;
+            }
+
+            let name = symbol.escaped_name.clone();
+            let declarations = symbol.declarations.clone();
+            let flags = symbol.flags;
+
+            // Check if any declarations conflict based on symbol flags
+            // Block-scoped variables (let/const) can never be duplicated
+            let is_block_scoped = (flags & symbol_flags::BLOCK_SCOPED_VARIABLE) != 0;
+
+            // Count declaration types
+            let mut function_count = 0;
+            let mut _interface_count = 0;  // Interfaces can merge, so we don't report duplicates
+            let mut class_count = 0;
+            let mut type_alias_count = 0;
+            let mut enum_count = 0;
+            let mut var_count = 0;
+
+            for &decl_idx in &declarations {
+                if let Some(decl_node) = self.ctx.arena.get(decl_idx) {
+                    match decl_node.kind {
+                        syntax_kind_ext::VARIABLE_DECLARATION => {
+                            var_count += 1;
+                        }
+                        syntax_kind_ext::FUNCTION_DECLARATION => {
+                            function_count += 1;
+                        }
+                        syntax_kind_ext::CLASS_DECLARATION => {
+                            class_count += 1;
+                        }
+                        syntax_kind_ext::INTERFACE_DECLARATION => {
+                            _interface_count += 1;
+                        }
+                        syntax_kind_ext::TYPE_ALIAS_DECLARATION => {
+                            type_alias_count += 1;
+                        }
+                        syntax_kind_ext::ENUM_DECLARATION => {
+                            enum_count += 1;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            // Determine if we should report duplicates
+            let should_report =
+                // Block-scoped variables (let/const) can never be duplicated
+                (is_block_scoped && declarations.len() > 1) ||
+                // Multiple type aliases are duplicates
+                type_alias_count > 1 ||
+                // Type alias with anything else is a duplicate
+                (type_alias_count >= 1 && declarations.len() > type_alias_count) ||
+                // Multiple classes are duplicates
+                class_count > 1 ||
+                // Class with function is a duplicate
+                (class_count >= 1 && function_count >= 1) ||
+                // Class with variable is a duplicate
+                (class_count >= 1 && var_count >= 1) ||
+                // Multiple variables (var) with different initialization aren't duplicates,
+                // but let/const with anything else is
+                (is_block_scoped && (function_count + class_count + enum_count) >= 1);
+
+            if should_report {
+                let message = format_message(diagnostic_messages::DUPLICATE_IDENTIFIER, &[&name]);
+
+                // Report on all declarations except the first one
+                for &decl_idx in declarations.iter().skip(1) {
+                    // Get the name node for better error location
+                    let error_node = self.get_declaration_name_node(decl_idx).unwrap_or(decl_idx);
+                    self.error_at_node(error_node, &message, diagnostic_codes::DUPLICATE_IDENTIFIER);
+                }
+            }
+        }
+    }
+
+    /// Get the name node of a declaration for error reporting.
+    fn get_declaration_name_node(&self, decl_idx: NodeIndex) -> Option<NodeIndex> {
+        let node = self.ctx.arena.get(decl_idx)?;
+
+        match node.kind {
+            syntax_kind_ext::VARIABLE_DECLARATION => {
+                let var_decl = self.ctx.arena.get_variable_declaration(node)?;
+                Some(var_decl.name)
+            }
+            syntax_kind_ext::FUNCTION_DECLARATION => {
+                let func = self.ctx.arena.get_function(node)?;
+                Some(func.name)
+            }
+            syntax_kind_ext::CLASS_DECLARATION => {
+                let class = self.ctx.arena.get_class(node)?;
+                Some(class.name)
+            }
+            syntax_kind_ext::INTERFACE_DECLARATION => {
+                let interface = self.ctx.arena.get_interface(node)?;
+                Some(interface.name)
+            }
+            syntax_kind_ext::TYPE_ALIAS_DECLARATION => {
+                let type_alias = self.ctx.arena.get_type_alias(node)?;
+                Some(type_alias.name)
+            }
+            syntax_kind_ext::ENUM_DECLARATION => {
+                let enum_decl = self.ctx.arena.get_enum(node)?;
+                Some(enum_decl.name)
+            }
+            _ => None,
         }
     }
 
@@ -6882,25 +7166,50 @@ impl<'a> ThinCheckerState<'a> {
                         }
                     }
 
+                    for &param_idx in &func.parameters.nodes {
+                        let Some(param_node) = self.ctx.arena.get(param_idx) else {
+                            continue;
+                        };
+                        let Some(param) = self.ctx.arena.get_parameter(param_node) else {
+                            continue;
+                        };
+                        self.maybe_report_implicit_any_parameter(param, false);
+                    }
+
                     // Check function body if present
                     if !func.body.is_none() {
-                        // Get declared return type
-                        let return_type = if !func.type_annotation.is_none() {
+                        let has_type_annotation = !func.type_annotation.is_none();
+                        let mut return_type = if has_type_annotation {
                             self.get_type_of_node(func.type_annotation)
                         } else {
                             TypeId::ANY
                         };
-                        self.push_return_type(return_type);
 
                         self.cache_parameter_types(&func.parameters.nodes, None);
 
+                        if !has_type_annotation {
+                            return_type = self.infer_return_type_from_body(func.body, None);
+                        }
+
+                        let func_name = self.get_function_name_from_node(stmt_idx);
+                        let name_node = if !func.name.is_none() { Some(func.name) } else { None };
+                        self.maybe_report_implicit_any_return(
+                            func_name,
+                            name_node,
+                            return_type,
+                            has_type_annotation,
+                            false,
+                            stmt_idx,
+                        );
+
+                        self.push_return_type(return_type);
                         self.check_statement(func.body);
 
                         // Check for error 2355: function with return type must return a value
                         // Only check if there's an explicit return type annotation
-                        let has_type_annotation = !func.type_annotation.is_none();
                         let requires_return = self.requires_return_value(return_type);
                         let has_return = self.body_has_return_with_value(func.body);
+                        let falls_through = self.function_body_falls_through(func.body);
 
                         if has_type_annotation && requires_return && !has_return {
                             use crate::checker::types::diagnostics::diagnostic_codes;
@@ -6908,6 +7217,13 @@ impl<'a> ThinCheckerState<'a> {
                                 func.type_annotation,
                                 "A function whose declared type is neither 'undefined', 'void', nor 'any' must return a value.",
                                 diagnostic_codes::FUNCTION_LACKS_RETURN_TYPE,
+                            );
+                        } else if has_type_annotation && requires_return && falls_through {
+                            use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
+                            self.error_at_node(
+                                func.type_annotation,
+                                diagnostic_messages::FUNCTION_LACKS_ENDING_RETURN_STATEMENT,
+                                diagnostic_codes::NOT_ALL_CODE_PATHS_RETURN_VALUE,
                             );
                         }
 
@@ -7331,11 +7647,176 @@ impl<'a> ThinCheckerState<'a> {
         None
     }
 
-    /// Get the class name from a TypeId if it represents a class instance.
-    fn get_class_name_from_type(&self, _type_id: TypeId) -> Option<String> {
-        // For now, we don't have class types in the solver, so return None
-        // This will be implemented when we add proper class types to the solver
+    fn get_class_declaration_from_symbol(&self, sym_id: SymbolId) -> Option<NodeIndex> {
+        let symbol = self.ctx.binder.get_symbol(sym_id)?;
+        if !symbol.value_declaration.is_none() {
+            let decl_idx = symbol.value_declaration;
+            if let Some(node) = self.ctx.arena.get(decl_idx) {
+                if self.ctx.arena.get_class(node).is_some() {
+                    return Some(decl_idx);
+                }
+            }
+        }
+
+        for &decl_idx in &symbol.declarations {
+            if let Some(node) = self.ctx.arena.get(decl_idx) {
+                if self.ctx.arena.get_class(node).is_some() {
+                    return Some(decl_idx);
+                }
+            }
+        }
+
         None
+    }
+
+    fn get_class_name_from_decl(&self, class_idx: NodeIndex) -> String {
+        let Some(node) = self.ctx.arena.get(class_idx) else {
+            return "<anonymous>".to_string();
+        };
+        let Some(class) = self.ctx.arena.get_class(node) else {
+            return "<anonymous>".to_string();
+        };
+
+        if !class.name.is_none() {
+            if let Some(name_node) = self.ctx.arena.get(class.name) {
+                if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
+                    return ident.escaped_text.clone();
+                }
+            }
+        }
+
+        "<anonymous>".to_string()
+    }
+
+    fn get_base_class_idx(&self, class_idx: NodeIndex) -> Option<NodeIndex> {
+        use crate::scanner::SyntaxKind;
+
+        let node = self.ctx.arena.get(class_idx)?;
+        let class = self.ctx.arena.get_class(node)?;
+        let heritage_clauses = class.heritage_clauses.as_ref()?;
+
+        for &clause_idx in &heritage_clauses.nodes {
+            let clause_node = self.ctx.arena.get(clause_idx)?;
+            let heritage = self.ctx.arena.get_heritage_clause(clause_node)?;
+            if heritage.token != SyntaxKind::ExtendsKeyword as u16 {
+                continue;
+            }
+            let &type_idx = heritage.types.nodes.first()?;
+            let type_node = self.ctx.arena.get(type_idx)?;
+            let expr_idx = if let Some(expr_type_args) = self.ctx.arena.get_expr_type_args(type_node) {
+                expr_type_args.expression
+            } else {
+                type_idx
+            };
+            let base_sym_id = self.resolve_heritage_symbol(expr_idx)?;
+            return self.get_class_declaration_from_symbol(base_sym_id);
+        }
+
+        None
+    }
+
+    fn is_class_derived_from(&self, derived_idx: NodeIndex, base_idx: NodeIndex) -> bool {
+        use rustc_hash::FxHashSet;
+
+        if derived_idx == base_idx {
+            return true;
+        }
+
+        let mut visited: FxHashSet<NodeIndex> = FxHashSet::default();
+        let mut current = derived_idx;
+
+        while visited.insert(current) {
+            let Some(parent) = self.get_base_class_idx(current) else {
+                return false;
+            };
+            if parent == base_idx {
+                return true;
+            }
+            current = parent;
+        }
+
+        false
+    }
+
+    fn get_class_decl_from_type(&self, type_id: TypeId) -> Option<NodeIndex> {
+        use crate::solver::TypeKey;
+
+        fn parse_brand_name(name: &str) -> Option<Result<SymbolId, NodeIndex>> {
+            const NODE_PREFIX: &str = "__private_brand_node_";
+            const PREFIX: &str = "__private_brand_";
+
+            if let Some(rest) = name.strip_prefix(NODE_PREFIX) {
+                let node_id: u32 = rest.parse().ok()?;
+                return Some(Err(NodeIndex(node_id)));
+            }
+            if let Some(rest) = name.strip_prefix(PREFIX) {
+                let sym_id: u32 = rest.parse().ok()?;
+                return Some(Ok(SymbolId(sym_id)));
+            }
+
+            None
+        }
+
+        fn collect_candidates<'a>(
+            checker: &ThinCheckerState<'a>,
+            type_id: TypeId,
+            out: &mut Vec<NodeIndex>,
+        ) {
+            let Some(key) = checker.ctx.types.lookup(type_id) else {
+                return;
+            };
+
+            match key {
+                TypeKey::Object(shape_id) | TypeKey::ObjectWithIndex(shape_id) => {
+                    let shape = checker.ctx.types.object_shape(shape_id);
+                    for prop in &shape.properties {
+                        let name = checker.ctx.types.resolve_atom_ref(prop.name);
+                        if let Some(parsed) = parse_brand_name(&name) {
+                            let class_idx = match parsed {
+                                Ok(sym_id) => checker.get_class_declaration_from_symbol(sym_id),
+                                Err(node_idx) => Some(node_idx),
+                            };
+                            if let Some(class_idx) = class_idx {
+                                out.push(class_idx);
+                            }
+                        }
+                    }
+                }
+                TypeKey::Union(list_id) | TypeKey::Intersection(list_id) => {
+                    let list = checker.ctx.types.type_list(list_id);
+                    for &member in list.iter() {
+                        collect_candidates(checker, member, out);
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        let mut candidates = Vec::new();
+        collect_candidates(self, type_id, &mut candidates);
+        if candidates.is_empty() {
+            return None;
+        }
+        if candidates.len() == 1 {
+            return Some(candidates[0]);
+        }
+
+        for &candidate in &candidates {
+            if candidates
+                .iter()
+                .all(|&other| candidate == other || self.is_class_derived_from(candidate, other))
+            {
+                return Some(candidate);
+            }
+        }
+
+        None
+    }
+
+    /// Get the class name from a TypeId if it represents a class instance.
+    fn get_class_name_from_type(&self, type_id: TypeId) -> Option<String> {
+        self.get_class_decl_from_type(type_id)
+            .map(|class_idx| self.get_class_name_from_decl(class_idx))
     }
 
     /// Check if a property is readonly in a class declaration (by looking at AST).
@@ -7698,6 +8179,7 @@ impl<'a> ThinCheckerState<'a> {
         if let Some(name) = class_name {
             self.ctx.enclosing_class = Some(EnclosingClassInfo {
                 name,
+                class_idx: stmt_idx,
                 member_nodes: class.members.nodes.clone(),
                 in_constructor: false,
                 is_declared,
@@ -8792,6 +9274,289 @@ impl<'a> ThinCheckerState<'a> {
         self.has_private_modifier(modifiers)
             || self.has_protected_modifier(modifiers)
             || self.is_private_identifier_name(name_idx)
+    }
+
+    fn member_access_level_from_modifiers(
+        &self,
+        modifiers: &Option<crate::parser::NodeList>,
+    ) -> Option<MemberAccessLevel> {
+        if self.has_private_modifier(modifiers) {
+            return Some(MemberAccessLevel::Private);
+        }
+        if self.has_protected_modifier(modifiers) {
+            return Some(MemberAccessLevel::Protected);
+        }
+        None
+    }
+
+    fn lookup_member_access_in_class(
+        &self,
+        class_idx: NodeIndex,
+        name: &str,
+        is_static: bool,
+    ) -> MemberLookup {
+        let Some(node) = self.ctx.arena.get(class_idx) else {
+            return MemberLookup::NotFound;
+        };
+        let Some(class) = self.ctx.arena.get_class(node) else {
+            return MemberLookup::NotFound;
+        };
+
+        for &member_idx in &class.members.nodes {
+            let Some(member_node) = self.ctx.arena.get(member_idx) else {
+                continue;
+            };
+
+            match member_node.kind {
+                k if k == syntax_kind_ext::PROPERTY_DECLARATION => {
+                    let Some(prop) = self.ctx.arena.get_property_decl(member_node) else {
+                        continue;
+                    };
+                    if self.has_static_modifier(&prop.modifiers) != is_static {
+                        continue;
+                    }
+                    let Some(prop_name) = self.get_property_name(prop.name) else {
+                        continue;
+                    };
+                    if prop_name == name {
+                        return match self.member_access_level_from_modifiers(&prop.modifiers) {
+                            Some(level) => MemberLookup::Restricted(level),
+                            None => MemberLookup::Public,
+                        };
+                    }
+                }
+                k if k == syntax_kind_ext::METHOD_DECLARATION => {
+                    let Some(method) = self.ctx.arena.get_method_decl(member_node) else {
+                        continue;
+                    };
+                    if self.has_static_modifier(&method.modifiers) != is_static {
+                        continue;
+                    }
+                    let Some(method_name) = self.get_property_name(method.name) else {
+                        continue;
+                    };
+                    if method_name == name {
+                        return match self.member_access_level_from_modifiers(&method.modifiers) {
+                            Some(level) => MemberLookup::Restricted(level),
+                            None => MemberLookup::Public,
+                        };
+                    }
+                }
+                k if k == syntax_kind_ext::GET_ACCESSOR || k == syntax_kind_ext::SET_ACCESSOR => {
+                    let Some(accessor) = self.ctx.arena.get_accessor(member_node) else {
+                        continue;
+                    };
+                    if self.has_static_modifier(&accessor.modifiers) != is_static {
+                        continue;
+                    }
+                    let Some(accessor_name) = self.get_property_name(accessor.name) else {
+                        continue;
+                    };
+                    if accessor_name == name {
+                        return match self.member_access_level_from_modifiers(&accessor.modifiers) {
+                            Some(level) => MemberLookup::Restricted(level),
+                            None => MemberLookup::Public,
+                        };
+                    }
+                }
+                k if k == syntax_kind_ext::CONSTRUCTOR => {
+                    if is_static {
+                        continue;
+                    }
+                    let Some(ctor) = self.ctx.arena.get_constructor(member_node) else {
+                        continue;
+                    };
+                    if ctor.body.is_none() {
+                        continue;
+                    }
+                    for &param_idx in &ctor.parameters.nodes {
+                        let Some(param_node) = self.ctx.arena.get(param_idx) else {
+                            continue;
+                        };
+                        let Some(param) = self.ctx.arena.get_parameter(param_node) else {
+                            continue;
+                        };
+                        if !self.has_parameter_property_modifier(&param.modifiers) {
+                            continue;
+                        }
+                        let Some(param_name) = self.get_property_name(param.name) else {
+                            continue;
+                        };
+                        if param_name == name {
+                            return match self.member_access_level_from_modifiers(&param.modifiers) {
+                                Some(level) => MemberLookup::Restricted(level),
+                                None => MemberLookup::Public,
+                            };
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        MemberLookup::NotFound
+    }
+
+    fn find_member_access_info(
+        &self,
+        class_idx: NodeIndex,
+        name: &str,
+        is_static: bool,
+    ) -> Option<MemberAccessInfo> {
+        use rustc_hash::FxHashSet;
+
+        let mut current = class_idx;
+        let mut visited: FxHashSet<NodeIndex> = FxHashSet::default();
+
+        while visited.insert(current) {
+            match self.lookup_member_access_in_class(current, name, is_static) {
+                MemberLookup::Restricted(level) => {
+                    return Some(MemberAccessInfo {
+                        level,
+                        declaring_class_idx: current,
+                        declaring_class_name: self.get_class_name_from_decl(current),
+                    });
+                }
+                MemberLookup::Public => return None,
+                MemberLookup::NotFound => {
+                    let Some(base_idx) = self.get_base_class_idx(current) else {
+                        return None;
+                    };
+                    current = base_idx;
+                }
+            }
+        }
+
+        None
+    }
+
+    fn resolve_class_for_access(
+        &mut self,
+        expr_idx: NodeIndex,
+        object_type: TypeId,
+    ) -> Option<(NodeIndex, bool)> {
+        if self.is_this_expression(expr_idx) {
+            if let Some(ref class_info) = self.ctx.enclosing_class {
+                return Some((class_info.class_idx, false));
+            }
+        }
+
+        if self.is_super_expression(expr_idx) {
+            if let Some(ref class_info) = self.ctx.enclosing_class {
+                if let Some(base_idx) = self.get_base_class_idx(class_info.class_idx) {
+                    return Some((base_idx, false));
+                }
+            }
+        }
+
+        if let Some(sym_id) = self.resolve_identifier_symbol(expr_idx) {
+            if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
+                if symbol.flags & symbol_flags::CLASS != 0 {
+                    if let Some(class_idx) = self.get_class_declaration_from_symbol(sym_id) {
+                        return Some((class_idx, true));
+                    }
+                }
+            }
+        }
+
+        if object_type != TypeId::ANY && object_type != TypeId::ERROR {
+            if let Some(class_idx) = self.get_class_decl_from_type(object_type) {
+                return Some((class_idx, false));
+            }
+        }
+
+        None
+    }
+
+    fn resolve_receiver_class_for_access(
+        &self,
+        expr_idx: NodeIndex,
+        object_type: TypeId,
+    ) -> Option<NodeIndex> {
+        if self.is_this_expression(expr_idx) || self.is_super_expression(expr_idx) {
+            return self.ctx.enclosing_class.as_ref().map(|info| info.class_idx);
+        }
+
+        if let Some(sym_id) = self.resolve_identifier_symbol(expr_idx) {
+            if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
+                if symbol.flags & symbol_flags::CLASS != 0 {
+                    return self.get_class_declaration_from_symbol(sym_id);
+                }
+            }
+        }
+
+        if object_type != TypeId::ANY && object_type != TypeId::ERROR {
+            if let Some(class_idx) = self.get_class_decl_from_type(object_type) {
+                return Some(class_idx);
+            }
+        }
+
+        None
+    }
+
+    fn check_property_accessibility(
+        &mut self,
+        object_expr: NodeIndex,
+        property_name: &str,
+        error_node: NodeIndex,
+        object_type: TypeId,
+    ) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+
+        let Some((class_idx, is_static)) =
+            self.resolve_class_for_access(object_expr, object_type) else {
+                return;
+            };
+        let Some(access_info) =
+            self.find_member_access_info(class_idx, property_name, is_static) else {
+                return;
+            };
+
+        let current_class_idx = self.ctx.enclosing_class.as_ref().map(|info| info.class_idx);
+        let allowed = match access_info.level {
+            MemberAccessLevel::Private => {
+                current_class_idx == Some(access_info.declaring_class_idx)
+            }
+            MemberAccessLevel::Protected => {
+                match current_class_idx {
+                    None => false,
+                    Some(current_class_idx) => {
+                        if current_class_idx == access_info.declaring_class_idx {
+                            true
+                        } else if !self.is_class_derived_from(current_class_idx, access_info.declaring_class_idx) {
+                            false
+                        } else {
+                            let receiver_class_idx =
+                                self.resolve_receiver_class_for_access(object_expr, object_type);
+                            receiver_class_idx
+                                .map(|receiver| self.is_class_derived_from(receiver, current_class_idx))
+                                .unwrap_or(false)
+                        }
+                    }
+                }
+            }
+        };
+
+        if allowed {
+            return;
+        }
+
+        match access_info.level {
+            MemberAccessLevel::Private => {
+                let message = format!(
+                    "Property '{}' is private and only accessible within class '{}'.",
+                    property_name, access_info.declaring_class_name
+                );
+                self.error_at_node(error_node, &message, diagnostic_codes::PROPERTY_IS_PRIVATE);
+            }
+            MemberAccessLevel::Protected => {
+                let message = format!(
+                    "Property '{}' is protected and only accessible within class '{}' and its subclasses.",
+                    property_name, access_info.declaring_class_name
+                );
+                self.error_at_node(error_node, &message, diagnostic_codes::PROPERTY_IS_PROTECTED);
+            }
+        }
     }
 
     /// Get the const modifier node from a list of modifiers, if present.
@@ -10314,6 +11079,70 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    fn node_text(&self, node_idx: NodeIndex) -> Option<String> {
+        let (start, end) = self.get_node_span(node_idx)?;
+        let source = self.ctx.arena.source_files.first()?.text.as_str();
+        let start = start as usize;
+        let end = end as usize;
+        if start >= end || end > source.len() {
+            return None;
+        }
+        Some(source[start..end].to_string())
+    }
+
+    fn parameter_name_for_error(&self, name_idx: NodeIndex) -> String {
+        if let Some(name_node) = self.ctx.arena.get(name_idx) {
+            if name_node.kind == SyntaxKind::ThisKeyword as u16 {
+                return "this".to_string();
+            }
+            if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
+                return ident.escaped_text.clone();
+            }
+            if let Some(lit) = self.ctx.arena.get_literal(name_node) {
+                return lit.text.clone();
+            }
+        }
+
+        self.node_text(name_idx)
+            .map(|text| text.trim().to_string())
+            .filter(|text| !text.is_empty())
+            .unwrap_or_else(|| "parameter".to_string())
+    }
+
+    fn is_this_parameter_name(&self, name_idx: NodeIndex) -> bool {
+        if let Some(name_node) = self.ctx.arena.get(name_idx) {
+            if name_node.kind == SyntaxKind::ThisKeyword as u16 {
+                return true;
+            }
+            if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
+                return ident.escaped_text == "this";
+            }
+        }
+        false
+    }
+
+    fn maybe_report_implicit_any_parameter(
+        &mut self,
+        param: &crate::parser::thin_node::ParameterData,
+        has_contextual_type: bool,
+    ) {
+        use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages, format_message};
+
+        if !self.ctx.no_implicit_any || has_contextual_type {
+            return;
+        }
+        if !param.type_annotation.is_none() || !param.initializer.is_none() || param.dot_dot_dot_token {
+            return;
+        }
+        if self.is_this_parameter_name(param.name) {
+            return;
+        }
+
+        let param_name = self.parameter_name_for_error(param.name);
+        let message = format_message(diagnostic_messages::PARAMETER_IMPLICIT_ANY, &[&param_name, "any"]);
+        self.error_at_node(param.name, &message, diagnostic_codes::IMPLICIT_ANY_PARAMETER);
+    }
+
     /// Report an error at a specific node.
     fn error_at_node(&mut self, node_idx: NodeIndex, message: &str, code: u32) {
         if let Some((start, end)) = self.get_node_span(node_idx) {
@@ -10613,13 +11442,12 @@ impl<'a> ThinCheckerState<'a> {
         // Push type parameters (like <U> in `fn<U>(id: U)`) before checking types
         let (_type_params, type_param_updates) = self.push_type_parameters(&method.type_parameters);
 
-        // Get declared return type
-        let return_type = if !method.type_annotation.is_none() {
+        let has_type_annotation = !method.type_annotation.is_none();
+        let mut return_type = if has_type_annotation {
             self.get_type_from_type_node(method.type_annotation)
         } else {
             TypeId::ANY
         };
-        self.push_return_type(return_type);
 
         self.cache_parameter_types(&method.parameters.nodes, None);
 
@@ -10634,6 +11462,7 @@ impl<'a> ThinCheckerState<'a> {
                     if !param.type_annotation.is_none() {
                         self.check_type_for_parameter_properties(param.type_annotation);
                     }
+                    self.maybe_report_implicit_any_parameter(param, false);
                 }
             }
         }
@@ -10645,10 +11474,45 @@ impl<'a> ThinCheckerState<'a> {
 
         // Check method body
         if !method.body.is_none() {
+            if !has_type_annotation {
+                return_type = self.infer_return_type_from_body(method.body, None);
+            }
+
+            let method_name = self.get_property_name(method.name);
+            self.maybe_report_implicit_any_return(
+                method_name,
+                Some(method.name),
+                return_type,
+                has_type_annotation,
+                false,
+                member_idx,
+            );
+
+            self.push_return_type(return_type);
             self.check_statement(method.body);
+
+            let requires_return = self.requires_return_value(return_type);
+            let has_return = self.body_has_return_with_value(method.body);
+            let falls_through = self.function_body_falls_through(method.body);
+
+            if has_type_annotation && requires_return && !has_return {
+                self.error_at_node(
+                    method.type_annotation,
+                    "A function whose declared type is neither 'undefined', 'void', nor 'any' must return a value.",
+                    diagnostic_codes::FUNCTION_LACKS_RETURN_TYPE,
+                );
+            } else if has_type_annotation && requires_return && falls_through {
+                use crate::checker::types::diagnostics::diagnostic_messages;
+                self.error_at_node(
+                    method.type_annotation,
+                    diagnostic_messages::FUNCTION_LACKS_ENDING_RETURN_STATEMENT,
+                    diagnostic_codes::NOT_ALL_CODE_PATHS_RETURN_VALUE,
+                );
+            }
+
+            self.pop_return_type();
         }
 
-        self.pop_return_type();
         self.pop_type_parameters(type_param_updates);
     }
 
@@ -10691,6 +11555,7 @@ impl<'a> ThinCheckerState<'a> {
                     if !param.type_annotation.is_none() {
                         self.check_type_for_parameter_properties(param.type_annotation);
                     }
+                    self.maybe_report_implicit_any_parameter(param, false);
                 }
             }
         }
@@ -10741,10 +11606,10 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
 
-        // For getters, get return type from annotation
-        // For setters, return type is void
-        let return_type = if node.kind == syntax_kind_ext::GET_ACCESSOR {
-            if !accessor.type_annotation.is_none() {
+        let is_getter = node.kind == syntax_kind_ext::GET_ACCESSOR;
+        let has_type_annotation = is_getter && !accessor.type_annotation.is_none();
+        let mut return_type = if is_getter {
+            if has_type_annotation {
                 self.get_type_from_type_node(accessor.type_annotation)
             } else {
                 TypeId::ANY
@@ -10752,13 +11617,20 @@ impl<'a> ThinCheckerState<'a> {
         } else {
             TypeId::VOID
         };
-        self.push_return_type(return_type);
 
         self.cache_parameter_types(&accessor.parameters.nodes, None);
 
         // Check for parameter properties (error 2369)
         // Parameter properties are only allowed in constructors, not in accessors
         self.check_parameter_properties(&accessor.parameters.nodes);
+
+        for &param_idx in &accessor.parameters.nodes {
+            if let Some(param_node) = self.ctx.arena.get(param_idx) {
+                if let Some(param) = self.ctx.arena.get_parameter(param_node) {
+                    self.maybe_report_implicit_any_parameter(param, false);
+                }
+            }
+        }
 
         // For setters, check parameter constraints (1052, 1053)
         if node.kind == syntax_kind_ext::SET_ACCESSOR {
@@ -10767,10 +11639,45 @@ impl<'a> ThinCheckerState<'a> {
 
         // Check accessor body
         if !accessor.body.is_none() {
-            self.check_statement(accessor.body);
-        }
+            if is_getter && !has_type_annotation {
+                return_type = self.infer_getter_return_type(accessor.body);
+            }
 
-        self.pop_return_type();
+            if is_getter {
+                let accessor_name = self.get_property_name(accessor.name);
+                self.maybe_report_implicit_any_return(
+                    accessor_name,
+                    Some(accessor.name),
+                    return_type,
+                    has_type_annotation,
+                    false,
+                    member_idx,
+                );
+            }
+
+            self.push_return_type(return_type);
+            self.check_statement(accessor.body);
+            if is_getter {
+                let requires_return = self.requires_return_value(return_type);
+                let has_return = self.body_has_return_with_value(accessor.body);
+                let falls_through = self.function_body_falls_through(accessor.body);
+                if has_type_annotation && requires_return && !has_return {
+                    self.error_at_node(
+                        accessor.type_annotation,
+                        "A function whose declared type is neither 'undefined', 'void', nor 'any' must return a value.",
+                        diagnostic_codes::FUNCTION_LACKS_RETURN_TYPE,
+                    );
+                } else if has_type_annotation && requires_return && falls_through {
+                    use crate::checker::types::diagnostics::diagnostic_messages;
+                    self.error_at_node(
+                        accessor.type_annotation,
+                        diagnostic_messages::FUNCTION_LACKS_ENDING_RETURN_STATEMENT,
+                        diagnostic_codes::NOT_ALL_CODE_PATHS_RETURN_VALUE,
+                    );
+                }
+            }
+            self.pop_return_type();
+        }
     }
 
     /// Check setter parameter constraints (1052, 1053).
@@ -10817,6 +11724,7 @@ impl<'a> ThinCheckerState<'a> {
             || return_type == TypeId::UNDEFINED
             || return_type == TypeId::ANY
             || return_type == TypeId::NEVER
+            || return_type == TypeId::UNKNOWN
         {
             return false;
         }
@@ -10832,6 +11740,463 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         true
+    }
+
+    fn is_null_or_undefined_only(&self, return_type: TypeId) -> bool {
+        use crate::solver::TypeKey;
+
+        if return_type == TypeId::NULL || return_type == TypeId::UNDEFINED {
+            return true;
+        }
+
+        if let Some(TypeKey::Union(members)) = self.ctx.types.lookup(return_type) {
+            let members = self.ctx.types.type_list(members);
+            if members.is_empty() {
+                return false;
+            }
+            return members
+                .iter()
+                .all(|&member| member == TypeId::NULL || member == TypeId::UNDEFINED);
+        }
+
+        false
+    }
+
+    fn type_contains_any(&self, type_id: TypeId) -> bool {
+        let mut visited = Vec::new();
+        self.type_contains_any_inner(type_id, &mut visited)
+    }
+
+    fn type_contains_any_inner(&self, type_id: TypeId, visited: &mut Vec<TypeId>) -> bool {
+        use crate::solver::{TemplateSpan, TypeKey};
+
+        if type_id == TypeId::ANY {
+            return true;
+        }
+        if visited.contains(&type_id) {
+            return false;
+        }
+        visited.push(type_id);
+
+        match self.ctx.types.lookup(type_id) {
+            Some(TypeKey::Array(elem)) => self.type_contains_any_inner(*elem, visited),
+            Some(TypeKey::Tuple(list_id)) => self
+                .ctx
+                .types
+                .tuple_list(*list_id)
+                .iter()
+                .any(|elem| self.type_contains_any_inner(elem.type_id, visited)),
+            Some(TypeKey::Union(list_id)) | Some(TypeKey::Intersection(list_id)) => self
+                .ctx
+                .types
+                .type_list(*list_id)
+                .iter()
+                .any(|&member| self.type_contains_any_inner(member, visited)),
+            Some(TypeKey::Object(shape_id)) | Some(TypeKey::ObjectWithIndex(shape_id)) => {
+                let shape = self.ctx.types.object_shape(*shape_id);
+                if shape
+                    .properties
+                    .iter()
+                    .any(|prop| self.type_contains_any_inner(prop.type_id, visited))
+                {
+                    return true;
+                }
+                if let Some(ref index) = shape.string_index {
+                    if self.type_contains_any_inner(index.value_type, visited) {
+                        return true;
+                    }
+                }
+                if let Some(ref index) = shape.number_index {
+                    if self.type_contains_any_inner(index.value_type, visited) {
+                        return true;
+                    }
+                }
+                false
+            }
+            Some(TypeKey::Function(shape_id)) => {
+                let shape = self.ctx.types.function_shape(*shape_id);
+                self.type_contains_any_inner(shape.return_type, visited)
+            }
+            Some(TypeKey::Callable(shape_id)) => {
+                let shape = self.ctx.types.callable_shape(*shape_id);
+                if shape
+                    .call_signatures
+                    .iter()
+                    .any(|sig| self.type_contains_any_inner(sig.return_type, visited))
+                {
+                    return true;
+                }
+                if shape
+                    .construct_signatures
+                    .iter()
+                    .any(|sig| self.type_contains_any_inner(sig.return_type, visited))
+                {
+                    return true;
+                }
+                shape
+                    .properties
+                    .iter()
+                    .any(|prop| self.type_contains_any_inner(prop.type_id, visited))
+            }
+            Some(TypeKey::Application(app_id)) => {
+                let app = self.ctx.types.type_application(*app_id);
+                if self.type_contains_any_inner(app.base, visited) {
+                    return true;
+                }
+                app.args
+                    .iter()
+                    .any(|&arg| self.type_contains_any_inner(arg, visited))
+            }
+            Some(TypeKey::Conditional(cond_id)) => {
+                let cond = self.ctx.types.conditional_type(*cond_id);
+                self.type_contains_any_inner(cond.check_type, visited)
+                    || self.type_contains_any_inner(cond.extends_type, visited)
+                    || self.type_contains_any_inner(cond.true_type, visited)
+                    || self.type_contains_any_inner(cond.false_type, visited)
+            }
+            Some(TypeKey::Mapped(mapped_id)) => {
+                let mapped = self.ctx.types.mapped_type(*mapped_id);
+                if self.type_contains_any_inner(mapped.constraint, visited) {
+                    return true;
+                }
+                if let Some(name_type) = mapped.name_type {
+                    if self.type_contains_any_inner(name_type, visited) {
+                        return true;
+                    }
+                }
+                self.type_contains_any_inner(mapped.template, visited)
+            }
+            Some(TypeKey::IndexAccess(base, index)) => {
+                self.type_contains_any_inner(*base, visited)
+                    || self.type_contains_any_inner(*index, visited)
+            }
+            Some(TypeKey::TemplateLiteral(template_id)) => self
+                .ctx
+                .types
+                .template_list(*template_id)
+                .iter()
+                .any(|span| match span {
+                    TemplateSpan::Type(span_type) => self.type_contains_any_inner(*span_type, visited),
+                    _ => false,
+                }),
+            Some(TypeKey::KeyOf(inner)) | Some(TypeKey::ReadonlyType(inner)) => {
+                self.type_contains_any_inner(*inner, visited)
+            }
+            Some(TypeKey::TypeParameter(info)) => {
+                if let Some(constraint) = info.constraint {
+                    if self.type_contains_any_inner(constraint, visited) {
+                        return true;
+                    }
+                }
+                if let Some(default) = info.default {
+                    if self.type_contains_any_inner(default, visited) {
+                        return true;
+                    }
+                }
+                false
+            }
+            Some(TypeKey::Infer(info)) => {
+                if let Some(constraint) = info.constraint {
+                    if self.type_contains_any_inner(constraint, visited) {
+                        return true;
+                    }
+                }
+                if let Some(default) = info.default {
+                    if self.type_contains_any_inner(default, visited) {
+                        return true;
+                    }
+                }
+                false
+            }
+            Some(TypeKey::TypeQuery(_))
+            | Some(TypeKey::UniqueSymbol(_))
+            | Some(TypeKey::ThisType)
+            | Some(TypeKey::Ref(_))
+            | Some(TypeKey::Literal(_))
+            | Some(TypeKey::Intrinsic(_))
+            | Some(TypeKey::Error)
+            | None => false,
+        }
+    }
+
+    fn implicit_any_return_display(&self, return_type: TypeId) -> String {
+        if self.is_null_or_undefined_only(return_type) {
+            return "any".to_string();
+        }
+        self.format_type(return_type)
+    }
+
+    fn should_report_implicit_any_return(&self, return_type: TypeId) -> bool {
+        self.type_contains_any(return_type) || self.is_null_or_undefined_only(return_type)
+    }
+
+    fn maybe_report_implicit_any_return(
+        &mut self,
+        name: Option<String>,
+        name_node: Option<NodeIndex>,
+        return_type: TypeId,
+        has_type_annotation: bool,
+        has_contextual_return: bool,
+        fallback_node: NodeIndex,
+    ) {
+        use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages, format_message};
+
+        if !self.ctx.no_implicit_any || has_type_annotation || has_contextual_return {
+            return;
+        }
+        if !self.should_report_implicit_any_return(return_type) {
+            return;
+        }
+
+        let return_text = self.implicit_any_return_display(return_type);
+        if let Some(name) = name {
+            let message = format_message(
+                diagnostic_messages::IMPLICIT_ANY_RETURN,
+                &[&name, &return_text],
+            );
+            self.error_at_node(
+                name_node.unwrap_or(fallback_node),
+                &message,
+                diagnostic_codes::IMPLICIT_ANY_RETURN,
+            );
+        } else {
+            let message = format_message(
+                diagnostic_messages::IMPLICIT_ANY_RETURN_FUNCTION_EXPRESSION,
+                &[&return_text],
+            );
+            self.error_at_node(
+                fallback_node,
+                &message,
+                diagnostic_codes::IMPLICIT_ANY_RETURN_FUNCTION_EXPRESSION,
+            );
+        }
+    }
+
+    fn function_body_falls_through(&self, body_idx: NodeIndex) -> bool {
+        let Some(body_node) = self.ctx.arena.get(body_idx) else {
+            return true;
+        };
+        if body_node.kind == syntax_kind_ext::BLOCK {
+            if let Some(block) = self.ctx.arena.get_block(body_node) {
+                return self.block_falls_through(&block.statements.nodes);
+            }
+        }
+        false
+    }
+
+    fn block_falls_through(&self, statements: &[NodeIndex]) -> bool {
+        for &stmt_idx in statements {
+            if !self.statement_falls_through(stmt_idx) {
+                return false;
+            }
+        }
+        true
+    }
+
+    fn statement_falls_through(&self, stmt_idx: NodeIndex) -> bool {
+        let Some(node) = self.ctx.arena.get(stmt_idx) else {
+            return true;
+        };
+
+        match node.kind {
+            syntax_kind_ext::RETURN_STATEMENT | syntax_kind_ext::THROW_STATEMENT => false,
+            syntax_kind_ext::BLOCK => self
+                .ctx
+                .arena
+                .get_block(node)
+                .map(|block| self.block_falls_through(&block.statements.nodes))
+                .unwrap_or(true),
+            syntax_kind_ext::IF_STATEMENT => {
+                let Some(if_data) = self.ctx.arena.get_if_statement(node) else {
+                    return true;
+                };
+                let then_falls = self.statement_falls_through(if_data.then_statement);
+                if if_data.else_statement.is_none() {
+                    return true;
+                }
+                let else_falls = self.statement_falls_through(if_data.else_statement);
+                then_falls || else_falls
+            }
+            syntax_kind_ext::SWITCH_STATEMENT => self.switch_falls_through(stmt_idx),
+            syntax_kind_ext::TRY_STATEMENT => self.try_falls_through(stmt_idx),
+            syntax_kind_ext::WHILE_STATEMENT | syntax_kind_ext::DO_STATEMENT | syntax_kind_ext::FOR_STATEMENT => {
+                self.loop_falls_through(node)
+            }
+            syntax_kind_ext::FOR_IN_STATEMENT | syntax_kind_ext::FOR_OF_STATEMENT => true,
+            syntax_kind_ext::LABELED_STATEMENT => self
+                .ctx
+                .arena
+                .get_labeled_statement(node)
+                .map(|labeled| self.statement_falls_through(labeled.statement))
+                .unwrap_or(true),
+            _ => true,
+        }
+    }
+
+    fn switch_falls_through(&self, switch_idx: NodeIndex) -> bool {
+        let Some(node) = self.ctx.arena.get(switch_idx) else {
+            return true;
+        };
+        let Some(switch_data) = self.ctx.arena.get_switch(node) else {
+            return true;
+        };
+        let Some(case_block_node) = self.ctx.arena.get(switch_data.case_block) else {
+            return true;
+        };
+        let Some(case_block) = self.ctx.arena.get_block(case_block_node) else {
+            return true;
+        };
+
+        let mut has_default = false;
+        for &clause_idx in &case_block.statements.nodes {
+            let Some(clause_node) = self.ctx.arena.get(clause_idx) else {
+                continue;
+            };
+            if clause_node.kind == syntax_kind_ext::DEFAULT_CLAUSE {
+                has_default = true;
+            }
+            let Some(clause) = self.ctx.arena.get_case_clause(clause_node) else {
+                continue;
+            };
+            if self.block_falls_through(&clause.statements.nodes) {
+                return true;
+            }
+        }
+
+        !has_default
+    }
+
+    fn try_falls_through(&self, try_idx: NodeIndex) -> bool {
+        let Some(node) = self.ctx.arena.get(try_idx) else {
+            return true;
+        };
+        let Some(try_data) = self.ctx.arena.get_try(node) else {
+            return true;
+        };
+
+        let try_falls = self.statement_falls_through(try_data.try_block);
+        let catch_falls = if !try_data.catch_clause.is_none() {
+            self.statement_falls_through(try_data.catch_clause)
+        } else {
+            false
+        };
+
+        if !try_data.finally_block.is_none() {
+            let finally_falls = self.statement_falls_through(try_data.finally_block);
+            if !finally_falls {
+                return false;
+            }
+        }
+
+        try_falls || catch_falls
+    }
+
+    fn loop_falls_through(&self, node: &crate::parser::thin_node::ThinNode) -> bool {
+        let Some(loop_data) = self.ctx.arena.get_loop(node) else {
+            return true;
+        };
+
+        let condition_always_true = if loop_data.condition.is_none() {
+            true
+        } else {
+            self.is_true_condition(loop_data.condition)
+        };
+
+        if condition_always_true && !self.contains_break_statement(loop_data.statement) {
+            return false;
+        }
+
+        true
+    }
+
+    fn is_true_condition(&self, condition_idx: NodeIndex) -> bool {
+        let Some(node) = self.ctx.arena.get(condition_idx) else {
+            return false;
+        };
+        node.kind == SyntaxKind::TrueKeyword as u16
+    }
+
+    fn contains_break_statement(&self, stmt_idx: NodeIndex) -> bool {
+        let Some(node) = self.ctx.arena.get(stmt_idx) else {
+            return false;
+        };
+
+        match node.kind {
+            syntax_kind_ext::BREAK_STATEMENT => true,
+            syntax_kind_ext::BLOCK => self
+                .ctx
+                .arena
+                .get_block(node)
+                .map(|block| block.statements.nodes.iter().any(|&stmt| self.contains_break_statement(stmt)))
+                .unwrap_or(false),
+            syntax_kind_ext::IF_STATEMENT => self
+                .ctx
+                .arena
+                .get_if_statement(node)
+                .map(|if_data| {
+                    self.contains_break_statement(if_data.then_statement)
+                        || (!if_data.else_statement.is_none()
+                            && self.contains_break_statement(if_data.else_statement))
+                })
+                .unwrap_or(false),
+            syntax_kind_ext::SWITCH_STATEMENT => {
+                let Some(switch_data) = self.ctx.arena.get_switch(node) else {
+                    return false;
+                };
+                let Some(case_block_node) = self.ctx.arena.get(switch_data.case_block) else {
+                    return false;
+                };
+                let Some(case_block) = self.ctx.arena.get_block(case_block_node) else {
+                    return false;
+                };
+                case_block.statements.nodes.iter().any(|&clause_idx| {
+                    let Some(clause_node) = self.ctx.arena.get(clause_idx) else {
+                        return false;
+                    };
+                    let Some(clause) = self.ctx.arena.get_case_clause(clause_node) else {
+                        return false;
+                    };
+                    clause
+                        .statements
+                        .nodes
+                        .iter()
+                        .any(|&stmt| self.contains_break_statement(stmt))
+                })
+            }
+            syntax_kind_ext::TRY_STATEMENT => self
+                .ctx
+                .arena
+                .get_try(node)
+                .map(|try_data| {
+                    self.contains_break_statement(try_data.try_block)
+                        || (!try_data.catch_clause.is_none()
+                            && self.contains_break_statement(try_data.catch_clause))
+                        || (!try_data.finally_block.is_none()
+                            && self.contains_break_statement(try_data.finally_block))
+                })
+                .unwrap_or(false),
+            syntax_kind_ext::WHILE_STATEMENT
+            | syntax_kind_ext::DO_STATEMENT
+            | syntax_kind_ext::FOR_STATEMENT => self
+                .ctx
+                .arena
+                .get_loop(node)
+                .map(|loop_data| self.contains_break_statement(loop_data.statement))
+                .unwrap_or(false),
+            syntax_kind_ext::FOR_IN_STATEMENT | syntax_kind_ext::FOR_OF_STATEMENT => self
+                .ctx
+                .arena
+                .get_for_in_of(node)
+                .map(|loop_data| self.contains_break_statement(loop_data.statement))
+                .unwrap_or(false),
+            syntax_kind_ext::LABELED_STATEMENT => self
+                .ctx
+                .arena
+                .get_labeled_statement(node)
+                .map(|labeled| self.contains_break_statement(labeled.statement))
+                .unwrap_or(false),
+            _ => false,
+        }
     }
 
     /// Infer the return type of a function body by collecting return expressions.
