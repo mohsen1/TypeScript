@@ -13812,3 +13812,334 @@ class MultiPatternSearcher {
         output
     );
 }
+
+// ============================================================================
+// Symbol.split Tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_symbol_split_basic() {
+    // Basic Symbol.split implementation for custom splitter
+    let source = r#"
+class SimpleSplitter {
+    private delimiter: string;
+
+    constructor(delimiter: string) {
+        this.delimiter = delimiter;
+    }
+
+    [Symbol.split](str: string, limit?: number): string[] {
+        return str.split(this.delimiter, limit);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function SimpleSplitter"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Symbol.split should be referenced
+    assert!(
+        output.contains("split") || output.contains("Symbol"),
+        "Expected Symbol.split reference: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_split_with_limit() {
+    // Symbol.split respecting limit parameter
+    let source = r#"
+class LimitedSplitter {
+    private separator: string;
+    readonly flags: string = "";
+
+    constructor(separator: string) {
+        this.separator = separator;
+    }
+
+    [Symbol.split](str: string, limit?: number): string[] {
+        const parts = str.split(this.separator);
+        if (limit !== undefined && limit >= 0) {
+            return parts.slice(0, limit);
+        }
+        return parts;
+    }
+
+    get source(): string {
+        return this.separator;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function LimitedSplitter"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Flags and source should be present
+    assert!(
+        output.contains("flags") && output.contains("source"),
+        "Expected flags and source properties: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_split_preserve_separators() {
+    // Symbol.split that preserves separators in output
+    let source = r#"
+class PreservingSplitter {
+    private separator: string;
+
+    constructor(separator: string) {
+        this.separator = separator;
+    }
+
+    [Symbol.split](str: string, limit?: number): string[] {
+        const result: string[] = [];
+        let lastIndex = 0;
+        let idx = 0;
+
+        while ((idx = str.indexOf(this.separator, lastIndex)) !== -1) {
+            result.push(str.substring(lastIndex, idx));
+            result.push(this.separator);
+            lastIndex = idx + this.separator.length;
+
+            if (limit !== undefined && result.length >= limit) {
+                return result.slice(0, limit);
+            }
+        }
+
+        result.push(str.substring(lastIndex));
+        return limit !== undefined ? result.slice(0, limit) : result;
+    }
+
+    getSeparator(): string {
+        return this.separator;
+    }
+
+    setSeparator(sep: string): void {
+        this.separator = sep;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function PreservingSplitter"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Helper methods should be present
+    assert!(
+        output.contains("getSeparator") && output.contains("setSeparator"),
+        "Expected getter and setter methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_split_with_inheritance() {
+    // Symbol.split with class inheritance
+    let source = r#"
+abstract class BaseSplitter {
+    abstract readonly separator: string;
+
+    abstract [Symbol.split](str: string, limit?: number): string[];
+
+    splitAndTrim(str: string): string[] {
+        return this[Symbol.split](str).map(s => s.trim());
+    }
+
+    splitAndFilter(str: string): string[] {
+        return this[Symbol.split](str).filter(s => s.length > 0);
+    }
+}
+
+class WhitespaceSplitter extends BaseSplitter {
+    readonly separator: string = " ";
+
+    [Symbol.split](str: string, limit?: number): string[] {
+        const parts = str.split(/\s+/);
+        return limit !== undefined ? parts.slice(0, limit) : parts;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Both classes should be converted
+    assert!(
+        output.contains("function BaseSplitter"),
+        "Expected BaseSplitter function: {}",
+        output
+    );
+    assert!(
+        output.contains("function WhitespaceSplitter"),
+        "Expected WhitespaceSplitter function: {}",
+        output
+    );
+
+    // Inheritance should be set up
+    assert!(
+        output.contains("__extends") || output.contains("extends"),
+        "Expected inheritance: {}",
+        output
+    );
+
+    // Helper methods should be present
+    assert!(
+        output.contains("splitAndTrim") && output.contains("splitAndFilter"),
+        "Expected helper methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_split_csv_parser() {
+    // Symbol.split for CSV-like parsing
+    let source = r#"
+class CSVSplitter {
+    private delimiter: string;
+    private quote: string;
+
+    constructor(delimiter: string = ",", quote: string = "\"") {
+        this.delimiter = delimiter;
+        this.quote = quote;
+    }
+
+    [Symbol.split](str: string, limit?: number): string[] {
+        const result: string[] = [];
+        let current = "";
+        let inQuotes = false;
+
+        for (let i = 0; i < str.length; i++) {
+            const char = str[i];
+
+            if (char === this.quote) {
+                inQuotes = !inQuotes;
+            } else if (char === this.delimiter && !inQuotes) {
+                result.push(current);
+                current = "";
+                if (limit !== undefined && result.length >= limit) {
+                    return result;
+                }
+            } else {
+                current += char;
+            }
+        }
+
+        result.push(current);
+        return limit !== undefined ? result.slice(0, limit) : result;
+    }
+
+    get delimiterChar(): string {
+        return this.delimiter;
+    }
+
+    get quoteChar(): string {
+        return this.quote;
+    }
+
+    parseRow(row: string): string[] {
+        return this[Symbol.split](row);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function CSVSplitter"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Getters should be present
+    assert!(
+        output.contains("delimiterChar") && output.contains("quoteChar"),
+        "Expected delimiter and quote getters: {}",
+        output
+    );
+
+    // parseRow method should be present
+    assert!(
+        output.contains("parseRow"),
+        "Expected parseRow method: {}",
+        output
+    );
+}
