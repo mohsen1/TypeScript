@@ -28,6 +28,7 @@ use crate::checker::types::diagnostics::{
 };
 use crate::checker::{CheckerContext, EnclosingClassInfo, FlowAnalyzer};
 use crate::interner::Atom;
+use rustc_hash::FxHashSet;
 
 // =============================================================================
 // ThinCheckerState
@@ -56,6 +57,27 @@ pub const MAX_CALL_DEPTH: u32 = 20;
 enum EnumKind {
     Numeric,
     String,
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+enum PropertyKey {
+    Ident(String),
+    Private(String),
+    Computed(ComputedKey),
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+enum ComputedKey {
+    Ident(String),
+    String(String),
+    Number(String),
+    Qualified(String),
+}
+
+#[derive(Clone, Debug)]
+struct FlowResult {
+    normal: Option<FxHashSet<PropertyKey>>,
+    exits: Option<FxHashSet<PropertyKey>>,
 }
 
 impl<'a> ThinCheckerState<'a> {
@@ -7687,6 +7709,9 @@ impl<'a> ThinCheckerState<'a> {
         // Getter return type must be assignable to setter parameter type
         self.check_accessor_type_compatibility(&class.members.nodes);
 
+        // Check strict property initialization (TS2564)
+        self.check_property_initialization(stmt_idx, &class, is_declared);
+
         // Check for property type compatibility with base class (error 2416)
         // Property type in derived class must be assignable to same property in base class
         self.check_property_inheritance_compatibility(stmt_idx, &class);
@@ -7698,6 +7723,924 @@ impl<'a> ThinCheckerState<'a> {
         self.ctx.enclosing_class = prev_enclosing_class;
 
         self.pop_type_parameters(type_param_updates);
+    }
+
+    fn check_property_initialization(
+        &mut self,
+        _class_idx: NodeIndex,
+        class: &crate::parser::thin_node::ClassData,
+        is_declared: bool,
+    ) {
+        use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
+
+        if is_declared {
+            return;
+        }
+
+        let mut properties = Vec::new();
+        let mut tracked = FxHashSet::default();
+
+        for &member_idx in &class.members.nodes {
+            let Some(node) = self.ctx.arena.get(member_idx) else {
+                continue;
+            };
+            if node.kind != syntax_kind_ext::PROPERTY_DECLARATION {
+                continue;
+            }
+
+            let Some(prop) = self.ctx.arena.get_property_decl(node) else {
+                continue;
+            };
+
+            if !self.property_requires_initialization(member_idx, prop) {
+                continue;
+            }
+
+            let Some(key) = self.property_key_from_name(prop.name) else {
+                continue;
+            };
+
+            let Some(name) = self.get_property_name(prop.name) else {
+                continue;
+            };
+
+            tracked.insert(key.clone());
+            properties.push((key, name, prop.name));
+        }
+
+        if properties.is_empty() {
+            return;
+        }
+
+        let requires_super = self.class_has_base(class);
+        let constructor_body = self.find_constructor_body(&class.members);
+        let assigned = if let Some(body_idx) = constructor_body {
+            self.analyze_constructor_assignments(body_idx, &tracked, requires_super)
+        } else {
+            FxHashSet::default()
+        };
+
+        for (key, name, name_node) in properties {
+            if assigned.contains(&key) {
+                continue;
+            }
+            use crate::checker::types::diagnostics::format_message;
+            self.error_at_node(
+                name_node,
+                &format_message(diagnostic_messages::PROPERTY_HAS_NO_INITIALIZER, &[&name]),
+                diagnostic_codes::PROPERTY_HAS_NO_INITIALIZER,
+            );
+        }
+    }
+
+    fn property_requires_initialization(
+        &mut self,
+        member_idx: NodeIndex,
+        prop: &crate::parser::thin_node::PropertyDeclData,
+    ) -> bool {
+        if !prop.initializer.is_none()
+            || prop.question_token
+            || prop.exclamation_token
+            || self.has_static_modifier(&prop.modifiers)
+            || self.has_abstract_modifier(&prop.modifiers)
+            || self.has_declare_modifier(&prop.modifiers)
+        {
+            return false;
+        }
+
+        let prop_type = if let Some(sym_id) = self.ctx.binder.get_node_symbol(member_idx) {
+            self.get_type_of_symbol(sym_id)
+        } else if !prop.type_annotation.is_none() {
+            self.get_type_from_type_node(prop.type_annotation)
+        } else {
+            TypeId::ANY
+        };
+
+        if prop_type == TypeId::ANY || prop_type == TypeId::UNKNOWN {
+            return false;
+        }
+
+        !self.type_includes_undefined(prop_type)
+    }
+
+    fn class_has_base(&self, class: &crate::parser::thin_node::ClassData) -> bool {
+        use crate::scanner::SyntaxKind;
+
+        let Some(ref heritage_clauses) = class.heritage_clauses else {
+            return false;
+        };
+
+        for &clause_idx in &heritage_clauses.nodes {
+            let Some(clause_node) = self.ctx.arena.get(clause_idx) else {
+                continue;
+            };
+            let Some(heritage) = self.ctx.arena.get_heritage_clause(clause_node) else {
+                continue;
+            };
+            if heritage.token == SyntaxKind::ExtendsKeyword as u16 {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    fn type_includes_undefined(&self, type_id: TypeId) -> bool {
+        use crate::solver::TypeKey;
+
+        if type_id == TypeId::UNDEFINED {
+            return true;
+        }
+
+        let Some(TypeKey::Union(members)) = self.ctx.types.lookup(type_id) else {
+            return false;
+        };
+
+        let members = self.ctx.types.type_list(members);
+        members.iter().any(|&member| member == TypeId::UNDEFINED)
+    }
+
+    fn find_constructor_body(&self, members: &crate::parser::NodeList) -> Option<NodeIndex> {
+        for &member_idx in &members.nodes {
+            let Some(node) = self.ctx.arena.get(member_idx) else {
+                continue;
+            };
+            if node.kind != syntax_kind_ext::CONSTRUCTOR {
+                continue;
+            }
+            let Some(ctor) = self.ctx.arena.get_constructor(node) else {
+                continue;
+            };
+            if !ctor.body.is_none() {
+                return Some(ctor.body);
+            }
+        }
+        None
+    }
+
+    fn analyze_constructor_assignments(
+        &self,
+        body_idx: NodeIndex,
+        tracked: &FxHashSet<PropertyKey>,
+        require_super: bool,
+    ) -> FxHashSet<PropertyKey> {
+        let result = if require_super {
+            self.analyze_constructor_body_after_super(body_idx, tracked)
+        } else {
+            self.analyze_statement(body_idx, &FxHashSet::default(), tracked)
+        };
+
+        self.flow_result_to_assigned(result)
+    }
+
+    fn analyze_constructor_body_after_super(
+        &self,
+        body_idx: NodeIndex,
+        tracked: &FxHashSet<PropertyKey>,
+    ) -> FlowResult {
+        let Some(body_node) = self.ctx.arena.get(body_idx) else {
+            return FlowResult {
+                normal: Some(FxHashSet::default()),
+                exits: None,
+            };
+        };
+
+        if body_node.kind != syntax_kind_ext::BLOCK {
+            return FlowResult {
+                normal: Some(FxHashSet::default()),
+                exits: None,
+            };
+        }
+
+        let Some(block) = self.ctx.arena.get_block(body_node) else {
+            return FlowResult {
+                normal: Some(FxHashSet::default()),
+                exits: None,
+            };
+        };
+
+        let Some(start_idx) = self.find_super_statement_start(&block.statements.nodes) else {
+            return FlowResult {
+                normal: Some(FxHashSet::default()),
+                exits: None,
+            };
+        };
+
+        self.analyze_block(&block.statements.nodes[start_idx..], &FxHashSet::default(), tracked)
+    }
+
+    fn find_super_statement_start(&self, statements: &[NodeIndex]) -> Option<usize> {
+        for (idx, &stmt_idx) in statements.iter().enumerate() {
+            if self.is_super_call_statement(stmt_idx) {
+                return Some(idx + 1);
+            }
+        }
+        None
+    }
+
+    fn is_super_call_statement(&self, stmt_idx: NodeIndex) -> bool {
+        let Some(node) = self.ctx.arena.get(stmt_idx) else {
+            return false;
+        };
+        if node.kind != syntax_kind_ext::EXPRESSION_STATEMENT {
+            return false;
+        }
+        let Some(expr_stmt) = self.ctx.arena.get_expression_statement(node) else {
+            return false;
+        };
+        let Some(expr_node) = self.ctx.arena.get(expr_stmt.expression) else {
+            return false;
+        };
+        if expr_node.kind != syntax_kind_ext::CALL_EXPRESSION {
+            return false;
+        };
+        let Some(call) = self.ctx.arena.get_call_expr(expr_node) else {
+            return false;
+        };
+        let Some(callee_node) = self.ctx.arena.get(call.expression) else {
+            return false;
+        };
+        callee_node.kind == SyntaxKind::SuperKeyword as u16
+    }
+
+    fn flow_result_to_assigned(&self, result: FlowResult) -> FxHashSet<PropertyKey> {
+        let mut assigned = None;
+        if let Some(normal) = result.normal {
+            assigned = Some(normal);
+        }
+        if let Some(exits) = result.exits {
+            assigned = Some(match assigned {
+                Some(current) => self.intersect_sets(&current, &exits),
+                None => exits,
+            });
+        }
+
+        assigned.unwrap_or_default()
+    }
+
+    fn analyze_statement(
+        &self,
+        stmt_idx: NodeIndex,
+        assigned_in: &FxHashSet<PropertyKey>,
+        tracked: &FxHashSet<PropertyKey>,
+    ) -> FlowResult {
+        if stmt_idx.is_none() {
+            return FlowResult {
+                normal: Some(assigned_in.clone()),
+                exits: None,
+            };
+        }
+
+        let Some(node) = self.ctx.arena.get(stmt_idx) else {
+            return FlowResult {
+                normal: Some(assigned_in.clone()),
+                exits: None,
+            };
+        };
+
+        match node.kind {
+            k if k == syntax_kind_ext::BLOCK => {
+                if let Some(block) = self.ctx.arena.get_block(node) {
+                    return self.analyze_block(&block.statements.nodes, assigned_in, tracked);
+                }
+            }
+            k if k == syntax_kind_ext::IF_STATEMENT => {
+                if let Some(if_stmt) = self.ctx.arena.get_if_statement(node) {
+                    let mut assigned = assigned_in.clone();
+                    self.collect_assignments_in_expression(if_stmt.expression, &mut assigned, tracked);
+
+                    let then_result = self.analyze_statement(if_stmt.then_statement, &assigned, tracked);
+
+                    let else_result = if !if_stmt.else_statement.is_none() {
+                        self.analyze_statement(if_stmt.else_statement, &assigned, tracked)
+                    } else {
+                        FlowResult {
+                            normal: Some(assigned),
+                            exits: None,
+                        }
+                    };
+
+                    return FlowResult {
+                        normal: self.combine_flow_sets(then_result.normal, else_result.normal),
+                        exits: self.combine_flow_sets(then_result.exits, else_result.exits),
+                    };
+                }
+            }
+            k if k == syntax_kind_ext::RETURN_STATEMENT => {
+                let mut assigned = assigned_in.clone();
+                if let Some(ret) = self.ctx.arena.get_return_statement(node) {
+                    if !ret.expression.is_none() {
+                        self.collect_assignments_in_expression(ret.expression, &mut assigned, tracked);
+                    }
+                }
+                return FlowResult {
+                    normal: None,
+                    exits: Some(assigned),
+                };
+            }
+            k if k == syntax_kind_ext::THROW_STATEMENT => {
+                let mut assigned = assigned_in.clone();
+                if let Some(ret) = self.ctx.arena.get_return_statement(node) {
+                    if !ret.expression.is_none() {
+                        self.collect_assignments_in_expression(ret.expression, &mut assigned, tracked);
+                    }
+                }
+                return FlowResult { normal: None, exits: None };
+            }
+            k if k == syntax_kind_ext::EXPRESSION_STATEMENT => {
+                if let Some(expr) = self.ctx.arena.get_expression_statement(node) {
+                    let mut assigned = assigned_in.clone();
+                    self.collect_assignments_in_expression(expr.expression, &mut assigned, tracked);
+                    return FlowResult {
+                        normal: Some(assigned),
+                        exits: None,
+                    };
+                }
+            }
+            k if k == syntax_kind_ext::VARIABLE_STATEMENT => {
+                if let Some(var_stmt) = self.ctx.arena.get_variable(node) {
+                    let mut assigned = assigned_in.clone();
+                    if let Some(&decl_list_idx) = var_stmt.declarations.nodes.first() {
+                        self.collect_assignments_in_variable_decl_list(decl_list_idx, &mut assigned, tracked);
+                    }
+                    return FlowResult {
+                        normal: Some(assigned),
+                        exits: None,
+                    };
+                }
+            }
+            k if k == syntax_kind_ext::TRY_STATEMENT => {
+                if let Some(try_data) = self.ctx.arena.get_try(node) {
+                    return self.analyze_try_statement(try_data, assigned_in, tracked);
+                }
+            }
+            k if k == syntax_kind_ext::SWITCH_STATEMENT => {
+                if let Some(switch_data) = self.ctx.arena.get_switch(node) {
+                    return self.analyze_switch_statement(switch_data, assigned_in, tracked);
+                }
+            }
+            k if k == syntax_kind_ext::WHILE_STATEMENT
+                || k == syntax_kind_ext::DO_STATEMENT
+                || k == syntax_kind_ext::FOR_STATEMENT
+            => {
+                if let Some(loop_data) = self.ctx.arena.get_loop(node) {
+                    let mut assigned = assigned_in.clone();
+                    if !loop_data.initializer.is_none() {
+                        if let Some(init_node) = self.ctx.arena.get(loop_data.initializer) {
+                            if init_node.kind == syntax_kind_ext::VARIABLE_DECLARATION_LIST {
+                                self.collect_assignments_in_variable_decl_list(
+                                    loop_data.initializer,
+                                    &mut assigned,
+                                    tracked,
+                                );
+                            } else {
+                                self.collect_assignments_in_expression(
+                                    loop_data.initializer,
+                                    &mut assigned,
+                                    tracked,
+                                );
+                            }
+                        }
+                    }
+                    if !loop_data.condition.is_none() {
+                        self.collect_assignments_in_expression(loop_data.condition, &mut assigned, tracked);
+                    }
+                    return FlowResult {
+                        normal: Some(assigned),
+                        exits: None,
+                    };
+                }
+            }
+            k if k == syntax_kind_ext::FOR_IN_STATEMENT || k == syntax_kind_ext::FOR_OF_STATEMENT => {
+                if let Some(for_data) = self.ctx.arena.get_for_in_of(node) {
+                    let mut assigned = assigned_in.clone();
+                    if !for_data.initializer.is_none() {
+                        if let Some(init_node) = self.ctx.arena.get(for_data.initializer) {
+                            if init_node.kind == syntax_kind_ext::VARIABLE_DECLARATION_LIST {
+                                self.collect_assignments_in_variable_decl_list(
+                                    for_data.initializer,
+                                    &mut assigned,
+                                    tracked,
+                                );
+                            } else {
+                                self.collect_assignments_in_expression(
+                                    for_data.initializer,
+                                    &mut assigned,
+                                    tracked,
+                                );
+                            }
+                        }
+                    }
+                    if !for_data.expression.is_none() {
+                        self.collect_assignments_in_expression(for_data.expression, &mut assigned, tracked);
+                    }
+                    return FlowResult {
+                        normal: Some(assigned),
+                        exits: None,
+                    };
+                }
+            }
+            _ => {}
+        }
+
+        FlowResult {
+            normal: Some(assigned_in.clone()),
+            exits: None,
+        }
+    }
+
+    fn analyze_block(
+        &self,
+        statements: &[NodeIndex],
+        assigned_in: &FxHashSet<PropertyKey>,
+        tracked: &FxHashSet<PropertyKey>,
+    ) -> FlowResult {
+        let mut assigned = assigned_in.clone();
+        let mut normal = Some(assigned.clone());
+        let mut exits: Option<FxHashSet<PropertyKey>> = None;
+
+        for &stmt_idx in statements {
+            if normal.is_none() {
+                break;
+            }
+            let result = self.analyze_statement(stmt_idx, &assigned, tracked);
+            exits = self.combine_flow_sets(exits, result.exits);
+            match result.normal {
+                Some(next) => {
+                    assigned = next;
+                    normal = Some(assigned.clone());
+                }
+                None => {
+                    normal = None;
+                }
+            }
+        }
+
+        FlowResult { normal, exits }
+    }
+
+    fn analyze_try_statement(
+        &self,
+        try_data: &crate::parser::thin_node::TryData,
+        assigned_in: &FxHashSet<PropertyKey>,
+        tracked: &FxHashSet<PropertyKey>,
+    ) -> FlowResult {
+        let try_result = self.analyze_statement(try_data.try_block, assigned_in, tracked);
+        let catch_result = if !try_data.catch_clause.is_none() {
+            if let Some(catch_node) = self.ctx.arena.get(try_data.catch_clause) {
+                if let Some(catch) = self.ctx.arena.get_catch_clause(catch_node) {
+                    self.analyze_statement(catch.block, assigned_in, tracked)
+                } else {
+                    FlowResult { normal: None, exits: None }
+                }
+            } else {
+                FlowResult { normal: None, exits: None }
+            }
+        } else {
+            FlowResult { normal: None, exits: None }
+        };
+
+        let mut normal = if try_data.catch_clause.is_none() {
+            try_result.normal
+        } else {
+            self.combine_flow_sets(try_result.normal, catch_result.normal)
+        };
+        let mut exits = if try_data.catch_clause.is_none() {
+            try_result.exits
+        } else {
+            self.combine_flow_sets(try_result.exits, catch_result.exits)
+        };
+
+        if !try_data.finally_block.is_none() {
+            let finally_result =
+                self.analyze_statement(try_data.finally_block, &FxHashSet::default(), tracked);
+            let finally_assigned = self
+                .combine_flow_sets(finally_result.normal, finally_result.exits)
+                .unwrap_or_default();
+
+            if let Some(ref mut normal_set) = normal {
+                normal_set.extend(finally_assigned.iter().cloned());
+            }
+            if let Some(ref mut exits_set) = exits {
+                exits_set.extend(finally_assigned.iter().cloned());
+            }
+        }
+
+        FlowResult { normal, exits }
+    }
+
+    fn analyze_switch_statement(
+        &self,
+        switch_data: &crate::parser::thin_node::SwitchData,
+        assigned_in: &FxHashSet<PropertyKey>,
+        tracked: &FxHashSet<PropertyKey>,
+    ) -> FlowResult {
+        let mut assigned = assigned_in.clone();
+        self.collect_assignments_in_expression(switch_data.expression, &mut assigned, tracked);
+
+        let Some(case_block_node) = self.ctx.arena.get(switch_data.case_block) else {
+            return FlowResult { normal: Some(assigned), exits: None };
+        };
+        let Some(case_block) = self.ctx.arena.get_block(case_block_node) else {
+            return FlowResult { normal: Some(assigned), exits: None };
+        };
+
+        let mut normal: Option<FxHashSet<PropertyKey>> = None;
+        let mut exits: Option<FxHashSet<PropertyKey>> = None;
+
+        for &clause_idx in &case_block.statements.nodes {
+            let Some(clause_node) = self.ctx.arena.get(clause_idx) else {
+                continue;
+            };
+            if let Some(clause) = self.ctx.arena.get_case_clause(clause_node) {
+                let result = self.analyze_block(&clause.statements.nodes, &assigned, tracked);
+                normal = self.combine_flow_sets(normal, result.normal);
+                exits = self.combine_flow_sets(exits, result.exits);
+            }
+        }
+
+        if normal.is_none() && exits.is_none() {
+            normal = Some(assigned);
+        }
+
+        FlowResult { normal, exits }
+    }
+
+    fn collect_assignments_in_variable_decl_list(
+        &self,
+        decl_list_idx: NodeIndex,
+        assigned: &mut FxHashSet<PropertyKey>,
+        tracked: &FxHashSet<PropertyKey>,
+    ) {
+        let Some(list_node) = self.ctx.arena.get(decl_list_idx) else {
+            return;
+        };
+        let Some(list) = self.ctx.arena.get_variable(list_node) else {
+            return;
+        };
+        for &decl_idx in &list.declarations.nodes {
+            let Some(decl_node) = self.ctx.arena.get(decl_idx) else {
+                continue;
+            };
+            let Some(decl) = self.ctx.arena.get_variable_declaration(decl_node) else {
+                continue;
+            };
+            if !decl.initializer.is_none() {
+                self.collect_assignments_in_expression(decl.initializer, assigned, tracked);
+            }
+        }
+    }
+
+    fn collect_assignments_in_expression(
+        &self,
+        expr_idx: NodeIndex,
+        assigned: &mut FxHashSet<PropertyKey>,
+        tracked: &FxHashSet<PropertyKey>,
+    ) {
+        if expr_idx.is_none() {
+            return;
+        }
+
+        let mut stack = vec![expr_idx];
+        while let Some(idx) = stack.pop() {
+            if idx.is_none() {
+                continue;
+            }
+            let Some(node) = self.ctx.arena.get(idx) else {
+                continue;
+            };
+
+            match node.kind {
+                k if k == syntax_kind_ext::FUNCTION_DECLARATION
+                    || k == syntax_kind_ext::FUNCTION_EXPRESSION
+                    || k == syntax_kind_ext::ARROW_FUNCTION
+                    || k == syntax_kind_ext::METHOD_DECLARATION
+                    || k == syntax_kind_ext::CLASS_DECLARATION
+                    || k == syntax_kind_ext::CLASS_EXPRESSION
+                    || k == syntax_kind_ext::GET_ACCESSOR
+                    || k == syntax_kind_ext::SET_ACCESSOR =>
+                {
+                    continue;
+                }
+                k if k == syntax_kind_ext::BINARY_EXPRESSION => {
+                    if let Some(bin) = self.ctx.arena.get_binary_expr(node) {
+                        if self.is_assignment_operator(bin.operator_token) {
+                            self.collect_assignment_target(bin.left, assigned, tracked);
+                        }
+                        if !bin.right.is_none() {
+                            stack.push(bin.right);
+                        }
+                        if !bin.left.is_none() {
+                            stack.push(bin.left);
+                        }
+                    }
+                }
+                k if k == syntax_kind_ext::PREFIX_UNARY_EXPRESSION
+                    || k == syntax_kind_ext::POSTFIX_UNARY_EXPRESSION =>
+                {
+                    if let Some(unary) = self.ctx.arena.get_unary_expr(node) {
+                        if unary.operator == SyntaxKind::PlusPlusToken as u16
+                            || unary.operator == SyntaxKind::MinusMinusToken as u16
+                        {
+                            self.collect_assignment_target(unary.operand, assigned, tracked);
+                        }
+                        if !unary.operand.is_none() {
+                            stack.push(unary.operand);
+                        }
+                    }
+                }
+                k if k == syntax_kind_ext::CALL_EXPRESSION
+                    || k == syntax_kind_ext::NEW_EXPRESSION =>
+                {
+                    if let Some(call) = self.ctx.arena.get_call_expr(node) {
+                        stack.push(call.expression);
+                        if let Some(ref args) = call.arguments {
+                            for &arg in &args.nodes {
+                                stack.push(arg);
+                            }
+                        }
+                    }
+                }
+                k if k == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION
+                    || k == syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION =>
+                {
+                    if let Some(access) = self.ctx.arena.get_access_expr(node) {
+                        stack.push(access.expression);
+                        stack.push(access.name_or_argument);
+                    }
+                }
+                k if k == syntax_kind_ext::PARENTHESIZED_EXPRESSION => {
+                    if let Some(paren) = self.ctx.arena.get_parenthesized(node) {
+                        stack.push(paren.expression);
+                    }
+                }
+                k if k == syntax_kind_ext::CONDITIONAL_EXPRESSION => {
+                    if let Some(cond) = self.ctx.arena.get_conditional_expr(node) {
+                        stack.push(cond.condition);
+                        stack.push(cond.when_true);
+                        stack.push(cond.when_false);
+                    }
+                }
+                k if k == syntax_kind_ext::ARRAY_LITERAL_EXPRESSION
+                    || k == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION =>
+                {
+                    if let Some(literal) = self.ctx.arena.get_literal_expr(node) {
+                        for &elem in &literal.elements.nodes {
+                            stack.push(elem);
+                        }
+                    }
+                }
+                k if k == syntax_kind_ext::PROPERTY_ASSIGNMENT => {
+                    if let Some(prop) = self.ctx.arena.get_property_assignment(node) {
+                        stack.push(prop.initializer);
+                    }
+                }
+                k if k == syntax_kind_ext::SPREAD_ELEMENT
+                    || k == syntax_kind_ext::SPREAD_ASSIGNMENT =>
+                {
+                    if let Some(spread) = self.ctx.arena.get_spread(node) {
+                        stack.push(spread.expression);
+                    }
+                }
+                k if k == syntax_kind_ext::AS_EXPRESSION
+                    || k == syntax_kind_ext::SATISFIES_EXPRESSION
+                    || k == syntax_kind_ext::TYPE_ASSERTION =>
+                {
+                    if let Some(assertion) = self.ctx.arena.get_type_assertion(node) {
+                        stack.push(assertion.expression);
+                    }
+                }
+                k if k == syntax_kind_ext::NON_NULL_EXPRESSION
+                    || k == syntax_kind_ext::AWAIT_EXPRESSION
+                    || k == syntax_kind_ext::YIELD_EXPRESSION =>
+                {
+                    if let Some(unary) = self.ctx.arena.get_unary_expr_ex(node) {
+                        stack.push(unary.expression);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    fn collect_assignment_target(
+        &self,
+        target_idx: NodeIndex,
+        assigned: &mut FxHashSet<PropertyKey>,
+        tracked: &FxHashSet<PropertyKey>,
+    ) {
+        if target_idx.is_none() {
+            return;
+        }
+        let Some(node) = self.ctx.arena.get(target_idx) else {
+            return;
+        };
+
+        match node.kind {
+            k if k == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION
+                || k == syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION =>
+            {
+                if let Some(key) = self.property_key_from_access(target_idx) {
+                    if tracked.contains(&key) {
+                        assigned.insert(key);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::PARENTHESIZED_EXPRESSION => {
+                if let Some(paren) = self.ctx.arena.get_parenthesized(node) {
+                    self.collect_assignment_target(paren.expression, assigned, tracked);
+                }
+            }
+            k if k == syntax_kind_ext::AS_EXPRESSION
+                || k == syntax_kind_ext::SATISFIES_EXPRESSION
+                || k == syntax_kind_ext::TYPE_ASSERTION =>
+            {
+                if let Some(assertion) = self.ctx.arena.get_type_assertion(node) {
+                    self.collect_assignment_target(assertion.expression, assigned, tracked);
+                }
+            }
+            k if k == syntax_kind_ext::NON_NULL_EXPRESSION => {
+                if let Some(unary) = self.ctx.arena.get_unary_expr_ex(node) {
+                    self.collect_assignment_target(unary.expression, assigned, tracked);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn property_key_from_name(&self, name_idx: NodeIndex) -> Option<PropertyKey> {
+        let Some(name_node) = self.ctx.arena.get(name_idx) else {
+            return None;
+        };
+
+        if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
+            if name_node.kind == SyntaxKind::PrivateIdentifier as u16 {
+                return Some(PropertyKey::Private(ident.escaped_text.clone()));
+            }
+            return Some(PropertyKey::Ident(ident.escaped_text.clone()));
+        }
+
+        if name_node.kind == syntax_kind_ext::COMPUTED_PROPERTY_NAME {
+            if let Some(computed) = self.ctx.arena.get_computed_property(name_node) {
+                return self
+                    .computed_key_from_expression(computed.expression)
+                    .map(PropertyKey::Computed);
+            }
+        }
+
+        None
+    }
+
+    fn property_key_from_access(&self, access_idx: NodeIndex) -> Option<PropertyKey> {
+        let Some(node) = self.ctx.arena.get(access_idx) else {
+            return None;
+        };
+        let Some(access) = self.ctx.arena.get_access_expr(node) else {
+            return None;
+        };
+        let Some(expr_node) = self.ctx.arena.get(access.expression) else {
+            return None;
+        };
+        if expr_node.kind != SyntaxKind::ThisKeyword as u16 {
+            return None;
+        }
+
+        if node.kind == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION {
+            let Some(name_node) = self.ctx.arena.get(access.name_or_argument) else {
+                return None;
+            };
+            if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
+                if name_node.kind == SyntaxKind::PrivateIdentifier as u16 {
+                    return Some(PropertyKey::Private(ident.escaped_text.clone()));
+                }
+                return Some(PropertyKey::Ident(ident.escaped_text.clone()));
+            }
+            return None;
+        }
+
+        if node.kind == syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION {
+            return self
+                .computed_key_from_expression(access.name_or_argument)
+                .map(PropertyKey::Computed);
+        }
+
+        None
+    }
+
+    fn computed_key_from_expression(&self, expr_idx: NodeIndex) -> Option<ComputedKey> {
+        let Some(expr_node) = self.ctx.arena.get(expr_idx) else {
+            return None;
+        };
+
+        if let Some(ident) = self.ctx.arena.get_identifier(expr_node) {
+            return Some(ComputedKey::Ident(ident.escaped_text.clone()));
+        }
+
+        if let Some(lit) = self.ctx.arena.get_literal(expr_node) {
+            match expr_node.kind {
+                k if k == SyntaxKind::StringLiteral as u16
+                    || k == SyntaxKind::NoSubstitutionTemplateLiteral as u16 =>
+                {
+                    return Some(ComputedKey::String(lit.text.clone()));
+                }
+                k if k == SyntaxKind::NumericLiteral as u16 => {
+                    return Some(ComputedKey::Number(lit.text.clone()));
+                }
+                _ => {}
+            }
+        }
+
+        if expr_node.kind == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION {
+            if let Some(access_name) = self.qualified_name_from_property_access(expr_idx) {
+                return Some(ComputedKey::Qualified(access_name));
+            }
+        }
+
+        None
+    }
+
+    fn qualified_name_from_property_access(&self, access_idx: NodeIndex) -> Option<String> {
+        let Some(node) = self.ctx.arena.get(access_idx) else {
+            return None;
+        };
+        let Some(access) = self.ctx.arena.get_access_expr(node) else {
+            return None;
+        };
+
+        let base_name = if let Some(base_node) = self.ctx.arena.get(access.expression) {
+            if let Some(ident) = self.ctx.arena.get_identifier(base_node) {
+                Some(ident.escaped_text.clone())
+            } else if base_node.kind == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION {
+                self.qualified_name_from_property_access(access.expression)
+            } else {
+                None
+            }
+        } else {
+            None
+        }?;
+
+        let Some(name_node) = self.ctx.arena.get(access.name_or_argument) else {
+            return None;
+        };
+        let Some(ident) = self.ctx.arena.get_identifier(name_node) else {
+            return None;
+        };
+
+        Some(format!("{}.{}", base_name, ident.escaped_text))
+    }
+
+    fn is_assignment_operator(&self, operator: u16) -> bool {
+        matches!(
+            operator,
+            k if k == SyntaxKind::EqualsToken as u16
+                || k == SyntaxKind::PlusEqualsToken as u16
+                || k == SyntaxKind::MinusEqualsToken as u16
+                || k == SyntaxKind::AsteriskEqualsToken as u16
+                || k == SyntaxKind::AsteriskAsteriskEqualsToken as u16
+                || k == SyntaxKind::SlashEqualsToken as u16
+                || k == SyntaxKind::PercentEqualsToken as u16
+                || k == SyntaxKind::LessThanLessThanEqualsToken as u16
+                || k == SyntaxKind::GreaterThanGreaterThanEqualsToken as u16
+                || k == SyntaxKind::GreaterThanGreaterThanGreaterThanEqualsToken as u16
+                || k == SyntaxKind::AmpersandEqualsToken as u16
+                || k == SyntaxKind::BarEqualsToken as u16
+                || k == SyntaxKind::BarBarEqualsToken as u16
+                || k == SyntaxKind::AmpersandAmpersandEqualsToken as u16
+                || k == SyntaxKind::QuestionQuestionEqualsToken as u16
+                || k == SyntaxKind::CaretEqualsToken as u16
+        )
+    }
+
+    fn combine_flow_sets(
+        &self,
+        left: Option<FxHashSet<PropertyKey>>,
+        right: Option<FxHashSet<PropertyKey>>,
+    ) -> Option<FxHashSet<PropertyKey>> {
+        match (left, right) {
+            (Some(a), Some(b)) => Some(self.intersect_sets(&a, &b)),
+            (Some(a), None) => Some(a),
+            (None, Some(b)) => Some(b),
+            (None, None) => None,
+        }
+    }
+
+    fn intersect_sets(
+        &self,
+        left: &FxHashSet<PropertyKey>,
+        right: &FxHashSet<PropertyKey>,
+    ) -> FxHashSet<PropertyKey> {
+        if left.len() <= right.len() {
+            left.iter()
+                .filter(|key| right.contains(*key))
+                .cloned()
+                .collect()
+        } else {
+            right
+                .iter()
+                .filter(|key| left.contains(*key))
+                .cloned()
+                .collect()
+        }
     }
 
     /// Check an interface declaration.
