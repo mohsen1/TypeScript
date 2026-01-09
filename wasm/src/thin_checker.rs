@@ -581,7 +581,7 @@ impl<'a> ThinCheckerState<'a> {
                     return array_type;
                 }
 
-                // Check for built-in types
+                // Check for built-in types (primitive keywords)
                 match name {
                     "number" => return TypeId::NUMBER,
                     "string" => return TypeId::STRING,
@@ -595,6 +595,12 @@ impl<'a> ThinCheckerState<'a> {
                     "object" => return TypeId::OBJECT,
                     "bigint" => return TypeId::BIGINT,
                     "symbol" => return TypeId::SYMBOL,
+                    // Global interfaces from lib.es5.d.ts - these accept primitives via boxing
+                    // Object/String/Number/Boolean are wide types that accept their primitive counterparts
+                    // We use UNKNOWN as a permissive stand-in when lib.d.ts is not loaded
+                    "Object" | "String" | "Number" | "Boolean" | "Symbol" | "Function" => {
+                        return TypeId::UNKNOWN
+                    }
                     _ => {}
                 }
 
@@ -624,6 +630,40 @@ impl<'a> ThinCheckerState<'a> {
         }
         if let Some(sym_id) = self.resolve_identifier_symbol(name_idx) {
             return Some(self.get_type_of_symbol(sym_id));
+        }
+        // Fall back to lib contexts for global type resolution
+        if let Some(type_id) = self.resolve_lib_type_by_name(name) {
+            return Some(type_id);
+        }
+        None
+    }
+
+    /// Resolve a type by name from lib file contexts.
+    /// This is used for global types like Object, Array, Promise, etc. from lib.d.ts.
+    fn resolve_lib_type_by_name(&mut self, name: &str) -> Option<TypeId> {
+        use crate::solver::TypeLowering;
+
+        for lib_ctx in &self.ctx.lib_contexts {
+            // Look up the symbol in this lib file's file_locals
+            if let Some(sym_id) = lib_ctx.binder.file_locals.get(name) {
+                // Get the symbol's declaration(s)
+                if let Some(symbol) = lib_ctx.binder.get_symbol(sym_id) {
+                    // Lower the type from the lib file's arena
+                    let lowering = TypeLowering::new(
+                        lib_ctx.arena.as_ref(),
+                        self.ctx.types,
+                    );
+                    // For interfaces, use all declarations (handles declaration merging)
+                    if !symbol.declarations.is_empty() {
+                        return Some(lowering.lower_interface_declarations(&symbol.declarations));
+                    }
+                    // For type aliases and other single-declaration types
+                    let decl_idx = symbol.value_declaration;
+                    if decl_idx.0 != u32::MAX {
+                        return Some(lowering.lower_type(decl_idx));
+                    }
+                }
+            }
         }
         None
     }
@@ -3407,6 +3447,11 @@ impl<'a> ThinCheckerState<'a> {
         let Some(var_decl) = self.ctx.arena.get_variable_declaration(node) else {
             return TypeId::ANY;
         };
+
+        // First check type annotation - this takes precedence
+        if !var_decl.type_annotation.is_none() {
+            return self.get_type_from_type_node(var_decl.type_annotation);
+        }
 
         // Infer from initializer
         if !var_decl.initializer.is_none() {
@@ -6381,47 +6426,54 @@ impl<'a> ThinCheckerState<'a> {
         };
 
         let compute_final_type = |checker: &mut ThinCheckerState| -> TypeId {
-            let declared_type = if !var_decl.type_annotation.is_none() {
+            let has_type_annotation = !var_decl.type_annotation.is_none();
+            let declared_type = if has_type_annotation {
                 checker.get_type_from_type_node(var_decl.type_annotation)
             } else {
                 TypeId::ANY
             };
 
+            // If there's a type annotation, that determines the type (even for 'any')
+            if has_type_annotation {
+                if !var_decl.initializer.is_none() {
+                    // Set contextual type for the initializer (but not for 'any')
+                    let prev_context = checker.ctx.contextual_type;
+                    if declared_type != TypeId::ANY {
+                        checker.ctx.contextual_type = Some(declared_type);
+                    }
+                    let init_type = checker.get_type_of_node(var_decl.initializer);
+                    checker.ctx.contextual_type = prev_context;
+
+                    // Check assignability (skip for 'any' since anything is assignable to any)
+                    if declared_type != TypeId::ANY {
+                        if !checker.is_assignable_to(init_type, declared_type) {
+                            checker.error_type_not_assignable_with_reason_at(init_type, declared_type, var_decl.initializer);
+                        }
+
+                        // For object literals, also check for excess properties
+                        if let Some(init_node) = checker.ctx.arena.get(var_decl.initializer) {
+                            if init_node.kind == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION {
+                                checker.check_object_literal_excess_properties(init_type, declared_type, var_decl.initializer);
+                            }
+                        }
+                    }
+                }
+                // Type annotation determines the final type
+                return declared_type;
+            }
+
+            // No type annotation - infer from initializer
             if !var_decl.initializer.is_none() {
-                let prev_context = checker.ctx.contextual_type;
-                if declared_type != TypeId::ANY {
-                    checker.ctx.contextual_type = Some(declared_type);
-                }
                 let init_type = checker.get_type_of_node(var_decl.initializer);
-                checker.ctx.contextual_type = prev_context;
-
-                // If there's a type annotation, check that initializer is assignable
-                if !var_decl.type_annotation.is_none() && declared_type != TypeId::ANY {
-                    if !checker.is_assignable_to(init_type, declared_type) {
-                        // Report type error with elaboration (e.g., "property 'x' is missing")
-                        checker.error_type_not_assignable_with_reason_at(init_type, declared_type, var_decl.initializer);
+                if let Some(literal_type) =
+                    checker.literal_type_from_initializer(var_decl.initializer)
+                {
+                    if checker.is_const_variable_declaration(decl_idx) {
+                        return literal_type;
                     }
-
-                    // For object literals, also check for excess properties
-                    // (missing properties are already handled by error_type_not_assignable_with_reason_at)
-                    if let Some(init_node) = checker.ctx.arena.get(var_decl.initializer) {
-                        if init_node.kind == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION {
-                            checker.check_object_literal_excess_properties(init_type, declared_type, var_decl.initializer);
-                        }
-                    }
-                    declared_type
-                } else {
-                    // No type annotation - use inferred type from initializer
-                    if let Some(literal_type) =
-                        checker.literal_type_from_initializer(var_decl.initializer)
-                    {
-                        if checker.is_const_variable_declaration(decl_idx) {
-                            return literal_type;
-                        }
-                        return checker.widen_literal_type(literal_type);
-                    }
-                    init_type
+                    return checker.widen_literal_type(literal_type);
                 }
+                init_type
             } else {
                 declared_type
             }
@@ -6477,6 +6529,13 @@ impl<'a> ThinCheckerState<'a> {
 
         let source_props = source_shape.properties.as_slice();
         let target_props = target_shape.properties.as_slice();
+
+        // Empty object {} accepts any properties - no excess property check needed.
+        // This is a key TypeScript behavior: {} means "any non-nullish value".
+        // See https://github.com/microsoft/TypeScript/issues/60582
+        if target_props.is_empty() {
+            return;
+        }
 
         // Check for excess properties in source that don't exist in target
         // This is the "freshness" or "strict object literal" check
