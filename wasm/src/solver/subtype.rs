@@ -808,7 +808,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
     /// Try to expand a Mapped type to its structural form.
     /// Returns None if the mapped type cannot be expanded (unresolvable constraint).
     fn try_expand_mapped(&mut self, mapped_id: MappedTypeId) -> Option<TypeId> {
-        use crate::solver::{PropertyInfo, LiteralValue, instantiate_type, TypeSubstitution, MappedModifier};
+        use crate::solver::{PropertyInfo, LiteralValue, instantiate_type, TypeSubstitution, MappedModifier, evaluate_type};
 
         let mapped = self.interner.mapped_type(mapped_id);
 
@@ -826,7 +826,9 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             let mut subst = TypeSubstitution::new();
             subst.insert(mapped.type_param.name, key_literal);
 
-            let property_type = instantiate_type(self.interner, mapped.template, &subst);
+            let instantiated_type = instantiate_type(self.interner, mapped.template, &subst);
+            // Evaluate the instantiated type to resolve conditionals like T[K] extends object ? ... : T[K]
+            let property_type = evaluate_type(self.interner, instantiated_type);
 
             let optional = matches!(mapped.optional_modifier, Some(MappedModifier::Add));
             let readonly = matches!(mapped.readonly_modifier, Some(MappedModifier::Add));
