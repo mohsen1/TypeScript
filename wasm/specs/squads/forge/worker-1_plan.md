@@ -40,9 +40,12 @@ Implement missing name diagnostics for unresolved identifiers.
 - Added TS2564 tests for required property errors and `undefined` union exemption.
 - Ran `./wasm/test.sh` (fails at `cli::driver_tests::compile_class_with_generic_constructor`).
 - Rebuilt WASM and reran conformance (debug runner): 79/446 exact, 102/446 same count; TS2564 no longer in top missing. OOB crashes persist for private name/decorators/etc.
+- Added TS2304 coverage for unresolved identifiers and type references (including nested function types) plus TS2339-only property access check.
+- Emitted TS2304 for missing names inside type aliases and interface members; added type-node traversal for complex types.
+- Ran `./wasm/test.sh missing_type_reference`, `./wasm/test.sh missing_identifier_emits_2304`, `./wasm/test.sh missing_property_access_emits_2339_not_2304`.
 
 ## Ready for Merge
-No
+Yes
 
 ## Notes
 - Run `./wasm/test.sh` before pushing
