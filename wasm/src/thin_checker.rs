@@ -604,6 +604,17 @@ impl<'a> ThinCheckerState<'a> {
                         self.error_cannot_find_name_at(name, type_name_idx);
                         return TypeId::ERROR;
                     }
+                    // For builtin generics that aren't defined in the file, return UNKNOWN
+                    // to avoid errors from the lowering process trying to resolve them
+                    if is_builtin_generic && self.resolve_identifier_symbol(type_name_idx).is_none() {
+                        // Still check the type arguments to ensure they're valid
+                        if let Some(args) = &type_ref.type_arguments {
+                            for &arg_idx in &args.nodes {
+                                let _ = self.get_type_from_type_node(arg_idx);
+                            }
+                        }
+                        return TypeId::UNKNOWN;
+                    }
                     if !is_builtin_generic {
                         if let Some(sym_id) = self.resolve_identifier_symbol(type_name_idx) {
                             if self.alias_resolves_to_value_only(sym_id) || self.symbol_is_value_only(sym_id) {
@@ -1432,11 +1443,12 @@ impl<'a> ThinCheckerState<'a> {
                 let name = ident.escaped_text.as_str();
 
                 if has_type_args {
-                    let is_builtin_array = name == "Array" || name == "ReadonlyArray";
+                    let is_builtin_generic = matches!(name, "Array" | "ReadonlyArray" | "Promise" | "PromiseLike" | "Partial" | "Required" | "Readonly" | "Pick" | "Omit" | "Record" | "Exclude" | "Extract" | "NonNullable" | "Parameters" | "ReturnType" | "ConstructorParameters" | "InstanceType" | "ThisParameterType" | "OmitThisParameter" | "ThisType" | "Awaited" | "Map" | "Set" | "WeakMap" | "WeakSet" | "Iterator" | "IterableIterator" | "AsyncIterator" | "AsyncIterableIterator" | "Generator" | "AsyncGenerator" | "Iterable" | "AsyncIterable" | "ArrayLike" | "PropertyKey");
                     let type_param = self.lookup_type_parameter(name);
                     let sym_id = self.resolve_identifier_symbol(type_name_idx);
 
-                    if is_builtin_array && type_param.is_none() && sym_id.is_none() {
+                    // Handle Array/ReadonlyArray specially - return proper array type
+                    if (name == "Array" || name == "ReadonlyArray") && type_param.is_none() && sym_id.is_none() {
                         let elem_type = type_ref.type_arguments
                             .as_ref()
                             .and_then(|args| args.nodes.first().copied())
@@ -1449,11 +1461,22 @@ impl<'a> ThinCheckerState<'a> {
                         return array_type;
                     }
 
-                    if !is_builtin_array && type_param.is_none() && sym_id.is_none() {
+                    // For other builtin generics, return UNKNOWN if not defined locally
+                    if is_builtin_generic && type_param.is_none() && sym_id.is_none() {
+                        // Check type arguments for validity
+                        if let Some(args) = &type_ref.type_arguments {
+                            for &arg_idx in &args.nodes {
+                                let _ = self.get_type_from_type_node_in_type_literal(arg_idx);
+                            }
+                        }
+                        return TypeId::UNKNOWN;
+                    }
+
+                    if !is_builtin_generic && type_param.is_none() && sym_id.is_none() {
                         self.error_cannot_find_name_at(name, type_name_idx);
                         return TypeId::ERROR;
                     }
-                    if !is_builtin_array {
+                    if !is_builtin_generic {
                         if let Some(sym_id) = sym_id {
                             if self.alias_resolves_to_value_only(sym_id) || self.symbol_is_value_only(sym_id) {
                                 self.error_value_only_type_at(name, type_name_idx);
@@ -8696,9 +8719,13 @@ impl<'a> ThinCheckerState<'a> {
             // Type alias declarations - check the type for accessor body and parameter property errors
             syntax_kind_ext::TYPE_ALIAS_DECLARATION => {
                 if let Some(type_alias) = self.ctx.arena.get_type_alias(node) {
+                    // Push type parameters into scope before checking the type body
+                    let (_, updates) = self.push_type_parameters(&type_alias.type_parameters);
                     // Check the type for accessor bodies in ambient context and parameter properties
                     self.check_type_for_missing_names(type_alias.type_node);
                     self.check_type_for_parameter_properties(type_alias.type_node);
+                    // Pop type parameters
+                    self.pop_type_parameters(updates);
                 }
             }
             // Other type declarations - just register them, no expression checking needed
