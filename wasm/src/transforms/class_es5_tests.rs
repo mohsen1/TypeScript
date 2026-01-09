@@ -17819,3 +17819,425 @@ class DataProcessor {
         output
     );
 }
+
+// ============================================================================
+// Class Field Decorators Pattern Tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_field_decorator_observable_pattern() {
+    // Observable field decorator pattern
+    let source = r#"
+function observable(target: any, propertyKey: string) {
+    let value: any;
+    Object.defineProperty(target, propertyKey, {
+        get() { return value; },
+        set(newValue) {
+            console.log(`Setting ${propertyKey} to ${newValue}`);
+            value = newValue;
+        },
+        enumerable: true,
+        configurable: true
+    });
+}
+
+class User {
+    @observable
+    name: string = "";
+
+    @observable
+    email: string = "";
+
+    constructor(name: string, email: string) {
+        this.name = name;
+        this.email = email;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function User") || output.contains("User"),
+        "Expected User class: {}",
+        output
+    );
+
+    // Decorator function should be present
+    assert!(
+        output.contains("observable"),
+        "Expected observable decorator: {}",
+        output
+    );
+
+    // Fields should be present
+    assert!(
+        output.contains("name") && output.contains("email"),
+        "Expected field names: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_field_decorator_stacked_pattern() {
+    // Stacked decorators on fields pattern
+    let source = r#"
+function validate(target: any, propertyKey: string) {
+    console.log(`Validating ${propertyKey}`);
+}
+
+function log(target: any, propertyKey: string) {
+    console.log(`Logging ${propertyKey}`);
+}
+
+function required(target: any, propertyKey: string) {
+    console.log(`Required ${propertyKey}`);
+}
+
+class FormData {
+    @validate
+    @log
+    @required
+    username: string = "";
+
+    @validate
+    @required
+    password: string = "";
+
+    @log
+    rememberMe: boolean = false;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function FormData") || output.contains("FormData"),
+        "Expected FormData class: {}",
+        output
+    );
+
+    // Decorator functions should be present
+    assert!(
+        output.contains("validate") && output.contains("log") && output.contains("required"),
+        "Expected decorator functions: {}",
+        output
+    );
+
+    // Fields should be present
+    assert!(
+        output.contains("username") && output.contains("password"),
+        "Expected field names: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_field_decorator_factory_pattern() {
+    // Field decorator with arguments (decorator factory)
+    let source = r#"
+function minLength(min: number) {
+    return function(target: any, propertyKey: string) {
+        let value: string = "";
+        Object.defineProperty(target, propertyKey, {
+            get() { return value; },
+            set(newValue: string) {
+                if (newValue.length < min) {
+                    throw new Error(`${propertyKey} must be at least ${min} characters`);
+                }
+                value = newValue;
+            }
+        });
+    };
+}
+
+function maxLength(max: number) {
+    return function(target: any, propertyKey: string) {
+        let value: string = "";
+        Object.defineProperty(target, propertyKey, {
+            get() { return value; },
+            set(newValue: string) {
+                if (newValue.length > max) {
+                    throw new Error(`${propertyKey} must be at most ${max} characters`);
+                }
+                value = newValue;
+            }
+        });
+    };
+}
+
+function range(min: number, max: number) {
+    return function(target: any, propertyKey: string) {
+        let value: number = min;
+        Object.defineProperty(target, propertyKey, {
+            get() { return value; },
+            set(newValue: number) {
+                if (newValue < min || newValue > max) {
+                    throw new Error(`${propertyKey} must be between ${min} and ${max}`);
+                }
+                value = newValue;
+            }
+        });
+    };
+}
+
+class Product {
+    @minLength(3)
+    @maxLength(100)
+    name: string = "";
+
+    @minLength(10)
+    description: string = "";
+
+    @range(0, 10000)
+    price: number = 0;
+
+    @range(0, 1000)
+    quantity: number = 0;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function Product") || output.contains("Product"),
+        "Expected Product class: {}",
+        output
+    );
+
+    // Decorator factory functions should be present
+    assert!(
+        output.contains("minLength") && output.contains("maxLength"),
+        "Expected decorator factories: {}",
+        output
+    );
+
+    // Fields should be present
+    assert!(
+        output.contains("name") && output.contains("price"),
+        "Expected field names: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_field_decorator_deep_inheritance() {
+    // Field decorators with deep inheritance chain
+    let source = r#"
+function tracked(target: any, propertyKey: string) {
+    console.log(`Tracking ${propertyKey}`);
+}
+
+function serializable(target: any, propertyKey: string) {
+    console.log(`Serializable ${propertyKey}`);
+}
+
+class BaseEntity {
+    @tracked
+    id: string = "";
+
+    @tracked
+    createdAt: Date = new Date();
+
+    @tracked
+    updatedAt: Date = new Date();
+}
+
+class Document extends BaseEntity {
+    @tracked
+    @serializable
+    title: string = "";
+
+    @tracked
+    @serializable
+    content: string = "";
+
+    @tracked
+    author: string = "";
+}
+
+class Article extends Document {
+    @tracked
+    @serializable
+    category: string = "";
+
+    @tracked
+    tags: string[] = [];
+
+    @serializable
+    publishedAt: Date | null = null;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("BaseEntity") || output.contains("function BaseEntity"),
+        "Expected BaseEntity class: {}",
+        output
+    );
+    assert!(
+        output.contains("Document") || output.contains("function Document"),
+        "Expected Document class: {}",
+        output
+    );
+    assert!(
+        output.contains("Article") || output.contains("function Article"),
+        "Expected Article class: {}",
+        output
+    );
+
+    // Decorator functions should be present
+    assert!(
+        output.contains("tracked") && output.contains("serializable"),
+        "Expected decorator functions: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_field_decorator_metadata() {
+    // Field decorators with metadata pattern
+    let source = r#"
+const METADATA_KEY = Symbol("metadata");
+
+function type(typeName: string) {
+    return function(target: any, propertyKey: string) {
+        const metadata = target[METADATA_KEY] || {};
+        metadata[propertyKey] = { ...metadata[propertyKey], type: typeName };
+        target[METADATA_KEY] = metadata;
+    };
+}
+
+function defaultValue(value: any) {
+    return function(target: any, propertyKey: string) {
+        const metadata = target[METADATA_KEY] || {};
+        metadata[propertyKey] = { ...metadata[propertyKey], default: value };
+        target[METADATA_KEY] = metadata;
+    };
+}
+
+function nullable(target: any, propertyKey: string) {
+    const metadata = target[METADATA_KEY] || {};
+    metadata[propertyKey] = { ...metadata[propertyKey], nullable: true };
+    target[METADATA_KEY] = metadata;
+}
+
+class Schema {
+    @type("string")
+    @defaultValue("")
+    name: string = "";
+
+    @type("number")
+    @defaultValue(0)
+    age: number = 0;
+
+    @type("string")
+    @nullable
+    @defaultValue(null)
+    nickname: string | null = null;
+
+    @type("boolean")
+    @defaultValue(true)
+    active: boolean = true;
+
+    static getMetadata(): Record<string, any> {
+        return (Schema.prototype as any)[METADATA_KEY] || {};
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function Schema") || output.contains("Schema"),
+        "Expected Schema class: {}",
+        output
+    );
+
+    // Decorator factory functions should be present
+    assert!(
+        output.contains("type") && output.contains("defaultValue"),
+        "Expected decorator factories: {}",
+        output
+    );
+
+    // Static method should be present
+    assert!(
+        output.contains("getMetadata"),
+        "Expected getMetadata method: {}",
+        output
+    );
+
+    // Symbol should be present
+    assert!(
+        output.contains("METADATA_KEY") || output.contains("Symbol"),
+        "Expected metadata symbol: {}",
+        output
+    );
+}
