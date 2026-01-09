@@ -40549,3 +40549,741 @@ class AsyncAccessorPattern {
         output
     );
 }
+
+// =============================================================================
+// CLASS EXPRESSION PATTERNS
+// =============================================================================
+
+/// Test anonymous class expression with multiple classes
+#[test]
+fn test_class_es5_class_expr_anonymous_multi() {
+    let source = r#"
+const Widget = class {
+    private value: number;
+
+    constructor(value: number) {
+        this.value = value;
+    }
+
+    getValue(): number {
+        return this.value;
+    }
+
+    setValue(value: number): void {
+        this.value = value;
+    }
+
+    double(): number {
+        return this.value * 2;
+    }
+};
+
+const Handler = class {
+    private callback: () => void;
+
+    constructor(callback: () => void) {
+        this.callback = callback;
+    }
+
+    execute(): void {
+        this.callback();
+    }
+
+    setCallback(callback: () => void): void {
+        this.callback = callback;
+    }
+};
+
+const items = [
+    new Widget(10),
+    new Widget(20),
+    new Widget(30)
+];
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Should have Widget variable assignment
+    assert!(
+        output.contains("Widget") && output.contains("var"),
+        "Expected Widget class expression: {}",
+        output
+    );
+
+    // Should have Handler variable
+    assert!(
+        output.contains("Handler"),
+        "Expected Handler class expression: {}",
+        output
+    );
+
+    // Methods should be on prototype
+    assert!(
+        output.contains("getValue") && output.contains("setValue") && output.contains("double"),
+        "Expected Widget methods: {}",
+        output
+    );
+
+    // Handler methods
+    assert!(
+        output.contains("execute") && output.contains("setCallback"),
+        "Expected Handler methods: {}",
+        output
+    );
+}
+
+/// Test named class expression with fluent API
+#[test]
+fn test_class_es5_class_expr_named_fluent() {
+    let source = r#"
+const Calculator = class CalculatorImpl {
+    private result: number;
+
+    constructor(initial: number = 0) {
+        this.result = initial;
+    }
+
+    add(value: number): CalculatorImpl {
+        this.result += value;
+        return this;
+    }
+
+    subtract(value: number): CalculatorImpl {
+        this.result -= value;
+        return this;
+    }
+
+    multiply(value: number): CalculatorImpl {
+        this.result *= value;
+        return this;
+    }
+
+    getResult(): number {
+        return this.result;
+    }
+
+    reset(): CalculatorImpl {
+        this.result = 0;
+        return this;
+    }
+};
+
+const Logger = class LoggerImpl {
+    private logs: string[];
+    private prefix: string;
+
+    constructor(prefix: string = "") {
+        this.logs = [];
+        this.prefix = prefix;
+    }
+
+    log(message: string): LoggerImpl {
+        this.logs.push(this.prefix + message);
+        return this;
+    }
+
+    getLogs(): string[] {
+        return this.logs;
+    }
+
+    clear(): LoggerImpl {
+        this.logs = [];
+        return this;
+    }
+
+    setPrefix(prefix: string): void {
+        this.prefix = prefix;
+    }
+};
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Should have Calculator variable
+    assert!(
+        output.contains("Calculator"),
+        "Expected Calculator class expression: {}",
+        output
+    );
+
+    // Should have Logger variable
+    assert!(
+        output.contains("Logger"),
+        "Expected Logger class expression: {}",
+        output
+    );
+
+    // Calculator methods should be present
+    assert!(
+        output.contains("add") && output.contains("subtract") && output.contains("multiply") && output.contains("getResult"),
+        "Expected Calculator methods: {}",
+        output
+    );
+
+    // Logger methods
+    assert!(
+        output.contains("log") && output.contains("getLogs") && output.contains("clear"),
+        "Expected Logger methods: {}",
+        output
+    );
+}
+
+/// Test class expression with extends and inheritance
+#[test]
+fn test_class_es5_class_expr_extends_component() {
+    let source = r#"
+class BaseComponent {
+    protected name: string;
+
+    constructor(name: string) {
+        this.name = name;
+    }
+
+    getName(): string {
+        return this.name;
+    }
+
+    render(): string {
+        return "<" + this.name + "/>";
+    }
+}
+
+const Button = class extends BaseComponent {
+    private label: string;
+
+    constructor(label: string) {
+        super("button");
+        this.label = label;
+    }
+
+    getLabel(): string {
+        return this.label;
+    }
+
+    setLabel(label: string): void {
+        this.label = label;
+    }
+
+    render(): string {
+        return "<button>" + this.label + "</button>";
+    }
+};
+
+const Input = class InputComponent extends BaseComponent {
+    private placeholder: string;
+    private value: string;
+
+    constructor(placeholder: string) {
+        super("input");
+        this.placeholder = placeholder;
+        this.value = "";
+    }
+
+    getValue(): string {
+        return this.value;
+    }
+
+    setValue(value: string): void {
+        this.value = value;
+    }
+
+    getPlaceholder(): string {
+        return this.placeholder;
+    }
+
+    render(): string {
+        return "<input placeholder='" + this.placeholder + "' value='" + this.value + "'/>";
+    }
+};
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // BaseComponent should be ES5 constructor
+    assert!(
+        output.contains("function BaseComponent"),
+        "Expected ES5 BaseComponent class: {}",
+        output
+    );
+
+    // Button class expression
+    assert!(
+        output.contains("Button"),
+        "Expected Button class expression: {}",
+        output
+    );
+
+    // Input class expression
+    assert!(
+        output.contains("Input"),
+        "Expected Input class expression: {}",
+        output
+    );
+
+    // Should have __extends pattern
+    assert!(
+        output.contains("__extends") || output.contains("extendStatics"),
+        "Expected __extends helper: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("getLabel") && output.contains("setLabel"),
+        "Expected Button methods: {}",
+        output
+    );
+
+    // Input methods
+    assert!(
+        output.contains("getValue") && output.contains("setValue") && output.contains("getPlaceholder"),
+        "Expected Input methods: {}",
+        output
+    );
+}
+
+/// Test class expression in function return with factory
+#[test]
+fn test_class_es5_class_expr_factory_return() {
+    let source = r#"
+function createCounter(initialValue: number) {
+    return class {
+        private count: number;
+
+        constructor() {
+            this.count = initialValue;
+        }
+
+        increment(): number {
+            return ++this.count;
+        }
+
+        decrement(): number {
+            return --this.count;
+        }
+
+        getCount(): number {
+            return this.count;
+        }
+
+        reset(): void {
+            this.count = initialValue;
+        }
+    };
+}
+
+function createStore<T>(initial: T) {
+    return class Store {
+        private state: T;
+        private listeners: Array<(state: T) => void>;
+
+        constructor() {
+            this.state = initial;
+            this.listeners = [];
+        }
+
+        getState(): T {
+            return this.state;
+        }
+
+        setState(newState: T): void {
+            this.state = newState;
+            this.notify();
+        }
+
+        subscribe(listener: (state: T) => void): void {
+            this.listeners.push(listener);
+        }
+
+        private notify(): void {
+            this.listeners.forEach(fn => fn(this.state));
+        }
+    };
+}
+
+const CounterClass = createCounter(0);
+const counter = new CounterClass();
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Function should be present
+    assert!(
+        output.contains("function createCounter"),
+        "Expected createCounter function: {}",
+        output
+    );
+
+    // createStore function
+    assert!(
+        output.contains("function createStore"),
+        "Expected createStore function: {}",
+        output
+    );
+
+    // Should have return statement with class
+    assert!(
+        output.contains("return"),
+        "Expected return statement: {}",
+        output
+    );
+
+    // Counter methods
+    assert!(
+        output.contains("increment") && output.contains("decrement") && output.contains("getCount"),
+        "Expected counter methods: {}",
+        output
+    );
+
+    // Store methods
+    assert!(
+        output.contains("getState") && output.contains("setState") && output.contains("subscribe"),
+        "Expected store methods: {}",
+        output
+    );
+}
+
+/// Test class expression with static members
+#[test]
+fn test_class_es5_class_expression_static_members() {
+    let source = r#"
+const Singleton = class {
+    private static instance: Singleton | null = null;
+    private value: number;
+
+    private constructor(value: number) {
+        this.value = value;
+    }
+
+    static getInstance(value: number = 0): Singleton {
+        if (!Singleton.instance) {
+            Singleton.instance = new Singleton(value);
+        }
+        return Singleton.instance;
+    }
+
+    static resetInstance(): void {
+        Singleton.instance = null;
+    }
+
+    getValue(): number {
+        return this.value;
+    }
+
+    setValue(value: number): void {
+        this.value = value;
+    }
+};
+
+const Registry = class RegistryImpl {
+    static entries: Map<string, any> = new Map();
+    static defaultKey: string = "default";
+
+    static register(key: string, value: any): void {
+        RegistryImpl.entries.set(key, value);
+    }
+
+    static get(key: string): any {
+        return RegistryImpl.entries.get(key);
+    }
+
+    static has(key: string): boolean {
+        return RegistryImpl.entries.has(key);
+    }
+
+    static remove(key: string): boolean {
+        return RegistryImpl.entries.delete(key);
+    }
+
+    static clear(): void {
+        RegistryImpl.entries.clear();
+    }
+
+    static getDefault(): any {
+        return RegistryImpl.entries.get(RegistryImpl.defaultKey);
+    }
+};
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Singleton class expression
+    assert!(
+        output.contains("Singleton"),
+        "Expected Singleton class expression: {}",
+        output
+    );
+
+    // Registry class expression
+    assert!(
+        output.contains("Registry"),
+        "Expected Registry class expression: {}",
+        output
+    );
+
+    // Static methods should be present
+    assert!(
+        output.contains("getInstance") && output.contains("resetInstance"),
+        "Expected Singleton static methods: {}",
+        output
+    );
+
+    // Registry static methods
+    assert!(
+        output.contains("register") && output.contains("get") && output.contains("has") && output.contains("remove"),
+        "Expected Registry static methods: {}",
+        output
+    );
+
+    // Instance methods
+    assert!(
+        output.contains("getValue") && output.contains("setValue"),
+        "Expected Singleton instance methods: {}",
+        output
+    );
+}
+
+/// Test combined class expression patterns
+#[test]
+fn test_class_es5_class_expression_combined() {
+    let source = r#"
+// Factory function returning class expression
+function createMixin<T extends new (...args: any[]) => any>(Base: T) {
+    return class extends Base {
+        private mixinValue: string = "mixin";
+
+        getMixinValue(): string {
+            return this.mixinValue;
+        }
+
+        setMixinValue(value: string): void {
+            this.mixinValue = value;
+        }
+    };
+}
+
+// Base class for composition
+class Entity {
+    protected id: string;
+
+    constructor(id: string) {
+        this.id = id;
+    }
+
+    getId(): string {
+        return this.id;
+    }
+}
+
+// Class expression extending base
+const User = class UserEntity extends Entity {
+    private name: string;
+    private email: string;
+    static userCount: number = 0;
+
+    constructor(id: string, name: string, email: string) {
+        super(id);
+        this.name = name;
+        this.email = email;
+        UserEntity.userCount++;
+    }
+
+    getName(): string {
+        return this.name;
+    }
+
+    getEmail(): string {
+        return this.email;
+    }
+
+    static getUserCount(): number {
+        return UserEntity.userCount;
+    }
+
+    static resetCount(): void {
+        UserEntity.userCount = 0;
+    }
+};
+
+// Anonymous class in array
+const handlers = [
+    class {
+        handle(data: any): void {
+            console.log("Handler 1:", data);
+        }
+    },
+    class {
+        handle(data: any): void {
+            console.log("Handler 2:", data);
+        }
+    }
+];
+
+// Class expression in object
+const components = {
+    Button: class {
+        private label: string;
+        constructor(label: string) { this.label = label; }
+        getLabel(): string { return this.label; }
+    },
+    Input: class {
+        private value: string;
+        constructor(value: string) { this.value = value; }
+        getValue(): string { return this.value; }
+    }
+};
+
+// IIFE with class expression
+const Utility = (function() {
+    return class {
+        static format(str: string): string {
+            return str.trim().toLowerCase();
+        }
+
+        static parse(str: string): string[] {
+            return str.split(",");
+        }
+
+        static join(arr: string[]): string {
+            return arr.join(",");
+        }
+    };
+})();
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Entity base class
+    assert!(
+        output.contains("function Entity"),
+        "Expected ES5 Entity class: {}",
+        output
+    );
+
+    // User class expression
+    assert!(
+        output.contains("User"),
+        "Expected User class expression: {}",
+        output
+    );
+
+    // createMixin function
+    assert!(
+        output.contains("function createMixin"),
+        "Expected createMixin function: {}",
+        output
+    );
+
+    // handlers array
+    assert!(
+        output.contains("handlers"),
+        "Expected handlers array: {}",
+        output
+    );
+
+    // components object
+    assert!(
+        output.contains("components"),
+        "Expected components object: {}",
+        output
+    );
+
+    // Utility IIFE
+    assert!(
+        output.contains("Utility"),
+        "Expected Utility IIFE: {}",
+        output
+    );
+
+    // User methods
+    assert!(
+        output.contains("getName") && output.contains("getEmail") && output.contains("getUserCount"),
+        "Expected User methods: {}",
+        output
+    );
+
+    // Utility static methods
+    assert!(
+        output.contains("format") && output.contains("parse") && output.contains("join"),
+        "Expected Utility static methods: {}",
+        output
+    );
+}
