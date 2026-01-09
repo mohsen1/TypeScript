@@ -43078,3 +43078,1440 @@ class SecureResource extends Lockable(DisposableMixin(Resource)) {
         output
     );
 }
+
+// =============================================================================
+// NEW.TARGET META-PROPERTY PATTERN TESTS
+// =============================================================================
+
+/// Test ES5 class with basic new.target in constructor
+#[test]
+fn test_class_es5_basic_new_target_constructor() {
+    let source = r#"
+class Shape {
+    name: string;
+
+    constructor() {
+        if (new.target === Shape) {
+            throw new Error("Shape is abstract");
+        }
+        this.name = new.target.name;
+    }
+
+    getName(): string {
+        return this.name;
+    }
+}
+
+class Circle extends Shape {
+    radius: number;
+
+    constructor(radius: number) {
+        super();
+        this.radius = radius;
+    }
+
+    getArea(): number {
+        return Math.PI * this.radius * this.radius;
+    }
+}
+
+class Rectangle extends Shape {
+    width: number;
+    height: number;
+
+    constructor(width: number, height: number) {
+        super();
+        this.width = width;
+        this.height = height;
+    }
+
+    getArea(): number {
+        return this.width * this.height;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("Shape") && output.contains("Circle") && output.contains("Rectangle"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("getName") && output.contains("getArea"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+/// Test ES5 class with new.target in derived class
+#[test]
+fn test_class_es5_new_target_derived_class() {
+    let source = r#"
+class BaseComponent {
+    componentName: string;
+    isBase: boolean;
+
+    constructor() {
+        this.componentName = new.target.name;
+        this.isBase = new.target === BaseComponent;
+    }
+
+    getInfo(): string {
+        return this.componentName + (this.isBase ? " (base)" : " (derived)");
+    }
+}
+
+class Button extends BaseComponent {
+    label: string;
+
+    constructor(label: string) {
+        super();
+        this.label = label;
+    }
+
+    render(): string {
+        return "<button>" + this.label + "</button>";
+    }
+}
+
+class IconButton extends Button {
+    icon: string;
+
+    constructor(label: string, icon: string) {
+        super(label);
+        this.icon = icon;
+    }
+
+    render(): string {
+        return "<button>" + this.icon + " " + this.label + "</button>";
+    }
+}
+
+class Input extends BaseComponent {
+    type: string;
+    value: string;
+
+    constructor(type: string) {
+        super();
+        this.type = type;
+        this.value = "";
+    }
+
+    render(): string {
+        return "<input type=\"" + this.type + "\" />";
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("BaseComponent") && output.contains("Button") && output.contains("IconButton") && output.contains("Input"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("getInfo") && output.contains("render"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+/// Test ES5 class with new.target with abstract pattern
+#[test]
+fn test_class_es5_new_target_abstract_service_pattern() {
+    let source = r#"
+class AbstractService {
+    serviceName: string;
+    private initialized: boolean = false;
+
+    constructor() {
+        if (new.target === AbstractService) {
+            throw new TypeError("Cannot instantiate abstract class AbstractService");
+        }
+        this.serviceName = new.target.name;
+    }
+
+    protected init(): void {
+        if (this.initialized) {
+            throw new Error("Already initialized");
+        }
+        this.initialized = true;
+    }
+
+    isInitialized(): boolean {
+        return this.initialized;
+    }
+
+    abstract process(data: any): any;
+}
+
+class DataService extends AbstractService {
+    private data: any[] = [];
+
+    constructor() {
+        super();
+        this.init();
+    }
+
+    process(data: any): any {
+        this.data.push(data);
+        return data;
+    }
+
+    getAll(): any[] {
+        return [...this.data];
+    }
+}
+
+class CacheService extends AbstractService {
+    private cache: Map<string, any> = new Map();
+
+    constructor() {
+        super();
+        this.init();
+    }
+
+    process(data: any): any {
+        const key = JSON.stringify(data);
+        if (!this.cache.has(key)) {
+            this.cache.set(key, data);
+        }
+        return this.cache.get(key);
+    }
+
+    clear(): void {
+        this.cache.clear();
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("AbstractService") && output.contains("DataService") && output.contains("CacheService"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("process") && output.contains("isInitialized"),
+        "Expected methods: {}",
+        output
+    );
+
+    // Abstract keyword should be stripped
+    assert!(
+        !output.contains("abstract process"),
+        "Expected abstract keyword to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with new.target in factory function
+#[test]
+fn test_class_es5_new_target_factory_function() {
+    let source = r#"
+class Entity {
+    id: string;
+    createdBy: string;
+
+    constructor(id: string) {
+        this.id = id;
+        this.createdBy = new.target ? new.target.name : "factory";
+    }
+
+    static create(id: string): Entity {
+        return new Entity(id);
+    }
+
+    getCreator(): string {
+        return this.createdBy;
+    }
+}
+
+class User extends Entity {
+    name: string;
+
+    constructor(id: string, name: string) {
+        super(id);
+        this.name = name;
+    }
+
+    static createUser(id: string, name: string): User {
+        return new User(id, name);
+    }
+}
+
+class Product extends Entity {
+    title: string;
+    price: number;
+
+    constructor(id: string, title: string, price: number) {
+        super(id);
+        this.title = title;
+        this.price = price;
+    }
+
+    static createProduct(id: string, title: string, price: number): Product {
+        return new Product(id, title, price);
+    }
+
+    getInfo(): string {
+        return this.title + " - $" + this.price;
+    }
+}
+
+function createEntity(id: string): Entity {
+    return new Entity(id);
+}
+
+function createTypedEntity<T extends Entity>(
+    Ctor: new (id: string) => T,
+    id: string
+): T {
+    return new Ctor(id);
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("Entity") && output.contains("User") && output.contains("Product"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Factory functions should exist
+    assert!(
+        output.contains("createEntity") && output.contains("createTypedEntity"),
+        "Expected factory functions: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("getCreator") && output.contains("getInfo"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+/// Test ES5 class with new.target with instanceof check
+#[test]
+fn test_class_es5_new_target_instanceof_check() {
+    let source = r#"
+class Singleton {
+    private static instance: Singleton | null = null;
+    name: string;
+
+    constructor() {
+        if (new.target === Singleton) {
+            if (Singleton.instance) {
+                return Singleton.instance;
+            }
+            Singleton.instance = this;
+        }
+        this.name = new.target.name;
+    }
+
+    static getInstance(): Singleton {
+        if (!Singleton.instance) {
+            new Singleton();
+        }
+        return Singleton.instance!;
+    }
+
+    getName(): string {
+        return this.name;
+    }
+}
+
+class ExtendedSingleton extends Singleton {
+    value: number;
+
+    constructor(value: number) {
+        super();
+        this.value = value;
+    }
+
+    getValue(): number {
+        return this.value;
+    }
+}
+
+class TypeChecker {
+    targetName: string;
+    isDirectInstantiation: boolean;
+
+    constructor() {
+        this.targetName = new.target.name;
+        this.isDirectInstantiation = new.target === TypeChecker;
+    }
+
+    checkType(): string {
+        if (this.isDirectInstantiation) {
+            return "Direct TypeChecker instance";
+        }
+        return "Instance of " + this.targetName;
+    }
+}
+
+class DerivedChecker extends TypeChecker {
+    category: string;
+
+    constructor(category: string) {
+        super();
+        this.category = category;
+    }
+
+    getCategory(): string {
+        return this.category;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("Singleton") && output.contains("ExtendedSingleton") && output.contains("TypeChecker") && output.contains("DerivedChecker"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("getInstance") && output.contains("getName") && output.contains("checkType"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+/// Test ES5 class with combined new.target patterns
+#[test]
+fn test_class_es5_combined_new_target_patterns() {
+    let source = r#"
+class AbstractFactory<T> {
+    factoryName: string;
+    productType: string;
+
+    constructor() {
+        if (new.target === AbstractFactory) {
+            throw new Error("AbstractFactory cannot be instantiated directly");
+        }
+        this.factoryName = new.target.name;
+        this.productType = "";
+    }
+
+    abstract create(...args: any[]): T;
+
+    getFactoryInfo(): string {
+        return this.factoryName + " produces " + this.productType;
+    }
+}
+
+interface Vehicle {
+    brand: string;
+    model: string;
+    start(): void;
+}
+
+class Car implements Vehicle {
+    brand: string;
+    model: string;
+
+    constructor(brand: string, model: string) {
+        this.brand = brand;
+        this.model = model;
+    }
+
+    start(): void {
+        console.log("Starting car: " + this.brand + " " + this.model);
+    }
+}
+
+class CarFactory extends AbstractFactory<Car> {
+    constructor() {
+        super();
+        this.productType = "Car";
+    }
+
+    create(brand: string, model: string): Car {
+        return new Car(brand, model);
+    }
+}
+
+class Motorcycle implements Vehicle {
+    brand: string;
+    model: string;
+    cc: number;
+
+    constructor(brand: string, model: string, cc: number) {
+        this.brand = brand;
+        this.model = model;
+        this.cc = cc;
+    }
+
+    start(): void {
+        console.log("Starting motorcycle: " + this.brand + " " + this.model);
+    }
+}
+
+class MotorcycleFactory extends AbstractFactory<Motorcycle> {
+    constructor() {
+        super();
+        this.productType = "Motorcycle";
+    }
+
+    create(brand: string, model: string, cc: number): Motorcycle {
+        return new Motorcycle(brand, model, cc);
+    }
+}
+
+class ServiceRegistry {
+    private static services: Map<string, any> = new Map();
+    serviceName: string;
+    registeredAt: number;
+
+    constructor() {
+        this.serviceName = new.target.name;
+        this.registeredAt = Date.now();
+
+        const existing = ServiceRegistry.services.get(this.serviceName);
+        if (existing && new.target === existing.constructor) {
+            return existing;
+        }
+
+        ServiceRegistry.services.set(this.serviceName, this);
+    }
+
+    static getService<T extends ServiceRegistry>(name: string): T | undefined {
+        return ServiceRegistry.services.get(name) as T | undefined;
+    }
+
+    static clearAll(): void {
+        ServiceRegistry.services.clear();
+    }
+
+    getRegistrationTime(): number {
+        return this.registeredAt;
+    }
+}
+
+class AuthService extends ServiceRegistry {
+    private token: string | null = null;
+
+    login(username: string, password: string): boolean {
+        this.token = "token_" + username;
+        return true;
+    }
+
+    logout(): void {
+        this.token = null;
+    }
+
+    isAuthenticated(): boolean {
+        return this.token !== null;
+    }
+}
+
+class DataService extends ServiceRegistry {
+    private data: any[] = [];
+
+    add(item: any): void {
+        this.data.push(item);
+    }
+
+    getAll(): any[] {
+        return [...this.data];
+    }
+
+    clear(): void {
+        this.data = [];
+    }
+}
+
+class Logger {
+    level: string;
+    prefix: string;
+    createdViaNew: boolean;
+
+    constructor(level: string = "info") {
+        this.level = level;
+        this.prefix = new.target ? "[" + new.target.name + "]" : "[Logger]";
+        this.createdViaNew = !!new.target;
+    }
+
+    log(message: string): void {
+        console.log(this.prefix + " [" + this.level + "] " + message);
+    }
+
+    static create(level: string): Logger {
+        return new Logger(level);
+    }
+}
+
+class DebugLogger extends Logger {
+    debugInfo: boolean = true;
+
+    constructor() {
+        super("debug");
+    }
+
+    debug(message: string): void {
+        if (this.debugInfo) {
+            this.log("[DEBUG] " + message);
+        }
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("AbstractFactory") && output.contains("CarFactory") && output.contains("MotorcycleFactory"),
+        "Expected factory classes: {}",
+        output
+    );
+
+    assert!(
+        output.contains("ServiceRegistry") && output.contains("AuthService") && output.contains("DataService"),
+        "Expected service classes: {}",
+        output
+    );
+
+    assert!(
+        output.contains("Logger") && output.contains("DebugLogger"),
+        "Expected logger classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("create") && output.contains("getFactoryInfo") && output.contains("getService"),
+        "Expected methods: {}",
+        output
+    );
+
+    // Interface should be stripped
+    assert!(
+        !output.contains("interface Vehicle"),
+        "Expected interface to be stripped: {}",
+        output
+    );
+
+    // Generic parameter should be stripped
+    assert!(
+        !output.contains("AbstractFactory<T>"),
+        "Expected generic parameter to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with private field via WeakMap pattern
+#[test]
+fn test_class_es5_weakmap_private_field_pattern() {
+    let source = r#"
+class SecureContainer {
+    #secret: string;
+    #counter: number = 0;
+
+    constructor(secret: string) {
+        this.#secret = secret;
+    }
+
+    getSecret(): string {
+        this.#counter++;
+        return this.#secret;
+    }
+
+    getAccessCount(): number {
+        return this.#counter;
+    }
+
+    updateSecret(newSecret: string): void {
+        this.#secret = newSecret;
+        this.#counter = 0;
+    }
+}
+
+class TokenVault {
+    #tokens: Map<string, string> = new Map();
+    #lastAccess: Date | null = null;
+
+    addToken(key: string, token: string): void {
+        this.#tokens.set(key, token);
+        this.#lastAccess = new Date();
+    }
+
+    getToken(key: string): string | undefined {
+        this.#lastAccess = new Date();
+        return this.#tokens.get(key);
+    }
+
+    hasToken(key: string): boolean {
+        return this.#tokens.has(key);
+    }
+
+    getLastAccess(): Date | null {
+        return this.#lastAccess;
+    }
+}
+
+const container = new SecureContainer("mySecret");
+const vault = new TokenVault();
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("SecureContainer") && output.contains("TokenVault"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("getSecret") && output.contains("getAccessCount") && output.contains("updateSecret"),
+        "Expected SecureContainer methods: {}",
+        output
+    );
+
+    assert!(
+        output.contains("addToken") && output.contains("getToken") && output.contains("hasToken"),
+        "Expected TokenVault methods: {}",
+        output
+    );
+
+    // Private field syntax should be transformed
+    assert!(
+        !output.contains("#secret") && !output.contains("#counter") && !output.contains("#tokens"),
+        "Expected private fields to be transformed: {}",
+        output
+    );
+}
+
+/// Test ES5 class with static private via WeakMap pattern
+#[test]
+fn test_class_es5_weakmap_static_private_pattern() {
+    let source = r#"
+class Configuration {
+    static #instance: Configuration | null = null;
+    static #settings: Map<string, any> = new Map();
+
+    #localSettings: Map<string, any> = new Map();
+
+    private constructor() {}
+
+    static getInstance(): Configuration {
+        if (Configuration.#instance === null) {
+            Configuration.#instance = new Configuration();
+        }
+        return Configuration.#instance;
+    }
+
+    static setSetting(key: string, value: any): void {
+        Configuration.#settings.set(key, value);
+    }
+
+    static getSetting(key: string): any {
+        return Configuration.#settings.get(key);
+    }
+
+    setLocalSetting(key: string, value: any): void {
+        this.#localSettings.set(key, value);
+    }
+
+    getLocalSetting(key: string): any {
+        return this.#localSettings.get(key);
+    }
+}
+
+class ConnectionPool {
+    static #pool: any[] = [];
+    static #maxSize: number = 10;
+
+    static acquire(): any | null {
+        if (ConnectionPool.#pool.length > 0) {
+            return ConnectionPool.#pool.pop();
+        }
+        return null;
+    }
+
+    static release(connection: any): void {
+        if (ConnectionPool.#pool.length < ConnectionPool.#maxSize) {
+            ConnectionPool.#pool.push(connection);
+        }
+    }
+
+    static getPoolSize(): number {
+        return ConnectionPool.#pool.length;
+    }
+}
+
+const config = Configuration.getInstance();
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("Configuration") && output.contains("ConnectionPool"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Static methods should exist
+    assert!(
+        output.contains("getInstance") && output.contains("setSetting") && output.contains("getSetting"),
+        "Expected Configuration static methods: {}",
+        output
+    );
+
+    assert!(
+        output.contains("acquire") && output.contains("release") && output.contains("getPoolSize"),
+        "Expected ConnectionPool static methods: {}",
+        output
+    );
+
+    // Instance private field should be transformed to WeakMap
+    assert!(
+        output.contains("_Configuration_localSettings") || output.contains("localSettings"),
+        "Expected instance private field to be handled: {}",
+        output
+    );
+}
+
+/// Test ES5 class with private method via WeakMap pattern
+#[test]
+fn test_class_es5_weakmap_private_method_pattern() {
+    let source = r#"
+class Validator {
+    #rules: Map<string, (value: any) => boolean> = new Map();
+
+    #validateRequired(value: any): boolean {
+        return value !== null && value !== undefined;
+    }
+
+    #validateString(value: any): boolean {
+        return typeof value === 'string';
+    }
+
+    #validateNumber(value: any): boolean {
+        return typeof value === 'number' && !isNaN(value);
+    }
+
+    addRule(name: string, rule: (value: any) => boolean): void {
+        this.#rules.set(name, rule);
+    }
+
+    validate(value: any, ruleName: string): boolean {
+        switch (ruleName) {
+            case 'required':
+                return this.#validateRequired(value);
+            case 'string':
+                return this.#validateString(value);
+            case 'number':
+                return this.#validateNumber(value);
+            default:
+                const rule = this.#rules.get(ruleName);
+                return rule ? rule(value) : false;
+        }
+    }
+}
+
+class Encryptor {
+    #key: string;
+
+    constructor(key: string) {
+        this.#key = key;
+    }
+
+    #encrypt(data: string): string {
+        return btoa(data + this.#key);
+    }
+
+    #decrypt(encrypted: string): string {
+        const decoded = atob(encrypted);
+        return decoded.slice(0, -this.#key.length);
+    }
+
+    encryptData(data: string): string {
+        return this.#encrypt(data);
+    }
+
+    decryptData(encrypted: string): string {
+        return this.#decrypt(encrypted);
+    }
+}
+
+const validator = new Validator();
+const encryptor = new Encryptor("secret-key");
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("Validator") && output.contains("Encryptor"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Public methods should exist
+    assert!(
+        output.contains("addRule") && output.contains("validate"),
+        "Expected Validator methods: {}",
+        output
+    );
+
+    assert!(
+        output.contains("encryptData") && output.contains("decryptData"),
+        "Expected Encryptor methods: {}",
+        output
+    );
+
+    // Private method syntax should be transformed
+    assert!(
+        !output.contains("#validateRequired") && !output.contains("#encrypt"),
+        "Expected private methods to be transformed: {}",
+        output
+    );
+}
+
+/// Test ES5 class with WeakSet membership check pattern
+#[test]
+fn test_class_es5_weakset_membership_check_pattern() {
+    let source = r#"
+class PermissionManager {
+    #authorizedUsers: WeakSet<object> = new WeakSet();
+    #admins: WeakSet<object> = new WeakSet();
+
+    authorize(user: object): void {
+        this.#authorizedUsers.add(user);
+    }
+
+    revokeAuthorization(user: object): void {
+        this.#authorizedUsers.delete(user);
+    }
+
+    isAuthorized(user: object): boolean {
+        return this.#authorizedUsers.has(user);
+    }
+
+    promoteToAdmin(user: object): void {
+        if (this.isAuthorized(user)) {
+            this.#admins.add(user);
+        }
+    }
+
+    isAdmin(user: object): boolean {
+        return this.#admins.has(user);
+    }
+}
+
+class VisitedTracker {
+    #visited: WeakSet<object> = new WeakSet();
+    #visitCount: WeakMap<object, number> = new WeakMap();
+
+    visit(item: object): void {
+        this.#visited.add(item);
+        const count = this.#visitCount.get(item) || 0;
+        this.#visitCount.set(item, count + 1);
+    }
+
+    hasVisited(item: object): boolean {
+        return this.#visited.has(item);
+    }
+
+    getVisitCount(item: object): number {
+        return this.#visitCount.get(item) || 0;
+    }
+
+    reset(item: object): void {
+        this.#visited.delete(item);
+        this.#visitCount.delete(item);
+    }
+}
+
+const permissions = new PermissionManager();
+const tracker = new VisitedTracker();
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("PermissionManager") && output.contains("VisitedTracker"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("authorize") && output.contains("isAuthorized") && output.contains("promoteToAdmin"),
+        "Expected PermissionManager methods: {}",
+        output
+    );
+
+    assert!(
+        output.contains("visit") && output.contains("hasVisited") && output.contains("getVisitCount"),
+        "Expected VisitedTracker methods: {}",
+        output
+    );
+
+    // Private field syntax should be transformed
+    assert!(
+        !output.contains("#authorizedUsers") && !output.contains("#admins") && !output.contains("#visited"),
+        "Expected private fields to be transformed: {}",
+        output
+    );
+}
+
+/// Test ES5 class with WeakRef advanced cache pattern
+#[test]
+fn test_class_es5_weakref_advanced_cache_pattern() {
+    let source = r#"
+class SmartCache<T extends object> {
+    #cache: Map<string, WeakRef<T>> = new Map();
+    #finalizationRegistry: FinalizationRegistry<string>;
+
+    constructor() {
+        this.#finalizationRegistry = new FinalizationRegistry((key: string) => {
+            this.#cache.delete(key);
+        });
+    }
+
+    set(key: string, value: T): void {
+        const ref = new WeakRef(value);
+        this.#cache.set(key, ref);
+        this.#finalizationRegistry.register(value, key);
+    }
+
+    get(key: string): T | undefined {
+        const ref = this.#cache.get(key);
+        if (ref) {
+            return ref.deref();
+        }
+        return undefined;
+    }
+
+    has(key: string): boolean {
+        const ref = this.#cache.get(key);
+        return ref !== undefined && ref.deref() !== undefined;
+    }
+
+    delete(key: string): boolean {
+        return this.#cache.delete(key);
+    }
+}
+
+class ObjectPool<T extends object> {
+    #available: WeakRef<T>[] = [];
+    #inUse: WeakSet<T> = new WeakSet();
+    #factory: () => T;
+
+    constructor(factory: () => T) {
+        this.#factory = factory;
+    }
+
+    acquire(): T {
+        while (this.#available.length > 0) {
+            const ref = this.#available.pop()!;
+            const obj = ref.deref();
+            if (obj && !this.#inUse.has(obj)) {
+                this.#inUse.add(obj);
+                return obj;
+            }
+        }
+        const newObj = this.#factory();
+        this.#inUse.add(newObj);
+        return newObj;
+    }
+
+    release(obj: T): void {
+        this.#inUse.delete(obj);
+        this.#available.push(new WeakRef(obj));
+    }
+
+    getAvailableCount(): number {
+        return this.#available.filter(ref => ref.deref() !== undefined).length;
+    }
+}
+
+const cache = new SmartCache<object>();
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("SmartCache") && output.contains("ObjectPool"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("set") && output.contains("get") && output.contains("has"),
+        "Expected SmartCache methods: {}",
+        output
+    );
+
+    assert!(
+        output.contains("acquire") && output.contains("release") && output.contains("getAvailableCount"),
+        "Expected ObjectPool methods: {}",
+        output
+    );
+
+    // Generic parameter should be stripped
+    assert!(
+        !output.contains("SmartCache<T") && !output.contains("ObjectPool<T"),
+        "Expected generic parameters to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with combined WeakMap/WeakSet patterns
+#[test]
+fn test_class_es5_weakmap_weakset_combined_pattern() {
+    let source = r#"
+class DependencyInjector {
+    static #instances: WeakMap<Function, object> = new WeakMap();
+    static #initialized: WeakSet<object> = new WeakSet();
+    static #dependencies: Map<Function, Function[]> = new Map();
+
+    #localInstances: WeakMap<Function, object> = new WeakMap();
+    #scope: string;
+
+    constructor(scope: string) {
+        this.#scope = scope;
+    }
+
+    static register(token: Function, deps: Function[] = []): void {
+        DependencyInjector.#dependencies.set(token, deps);
+    }
+
+    static resolve<T>(token: Function): T {
+        if (DependencyInjector.#instances.has(token)) {
+            return DependencyInjector.#instances.get(token) as T;
+        }
+
+        const deps = DependencyInjector.#dependencies.get(token) || [];
+        const resolvedDeps = deps.map(dep => DependencyInjector.resolve(dep));
+        const instance = Reflect.construct(token, resolvedDeps);
+
+        DependencyInjector.#instances.set(token, instance);
+        DependencyInjector.#initialized.add(instance);
+
+        return instance as T;
+    }
+
+    static isInitialized(instance: object): boolean {
+        return DependencyInjector.#initialized.has(instance);
+    }
+
+    resolveScoped<T>(token: Function): T {
+        if (this.#localInstances.has(token)) {
+            return this.#localInstances.get(token) as T;
+        }
+
+        const instance = DependencyInjector.resolve<T>(token);
+        this.#localInstances.set(token, instance as object);
+        return instance;
+    }
+
+    getScope(): string {
+        return this.#scope;
+    }
+}
+
+class EventEmitter {
+    #listeners: WeakMap<Function, Set<Function>> = new WeakMap();
+    #onceListeners: WeakSet<Function> = new WeakSet();
+    #eventCounts: Map<string, number> = new Map();
+
+    on(event: Function, listener: Function): void {
+        if (!this.#listeners.has(event)) {
+            this.#listeners.set(event, new Set());
+        }
+        this.#listeners.get(event)!.add(listener);
+    }
+
+    once(event: Function, listener: Function): void {
+        this.on(event, listener);
+        this.#onceListeners.add(listener);
+    }
+
+    emit(event: Function, ...args: any[]): void {
+        const listeners = this.#listeners.get(event);
+        if (listeners) {
+            const count = this.#eventCounts.get(event.name) || 0;
+            this.#eventCounts.set(event.name, count + 1);
+
+            for (const listener of listeners) {
+                listener(...args);
+                if (this.#onceListeners.has(listener)) {
+                    listeners.delete(listener);
+                    this.#onceListeners.delete(listener);
+                }
+            }
+        }
+    }
+
+    getEventCount(eventName: string): number {
+        return this.#eventCounts.get(eventName) || 0;
+    }
+}
+
+class CacheManager {
+    #strongCache: Map<string, object> = new Map();
+    #weakCache: WeakMap<object, string> = new WeakMap();
+    #trackedKeys: WeakSet<object> = new WeakSet();
+    #refs: Map<string, WeakRef<object>> = new Map();
+
+    store(key: string, value: object): void {
+        this.#strongCache.set(key, value);
+        this.#weakCache.set(value, key);
+        this.#trackedKeys.add(value);
+        this.#refs.set(key, new WeakRef(value));
+    }
+
+    retrieve(key: string): object | undefined {
+        const ref = this.#refs.get(key);
+        if (ref) {
+            const value = ref.deref();
+            if (value && this.#trackedKeys.has(value)) {
+                return value;
+            }
+        }
+        return this.#strongCache.get(key);
+    }
+
+    getKeyForValue(value: object): string | undefined {
+        return this.#weakCache.get(value);
+    }
+
+    isTracked(value: object): boolean {
+        return this.#trackedKeys.has(value);
+    }
+
+    clear(): void {
+        this.#strongCache.clear();
+        this.#refs.clear();
+    }
+}
+
+const injector = new DependencyInjector("root");
+const emitter = new EventEmitter();
+const cacheManager = new CacheManager();
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("DependencyInjector") && output.contains("EventEmitter") && output.contains("CacheManager"),
+        "Expected classes: {}",
+        output
+    );
+
+    // DependencyInjector methods
+    assert!(
+        output.contains("register") && output.contains("resolve") && output.contains("isInitialized"),
+        "Expected DependencyInjector methods: {}",
+        output
+    );
+
+    // EventEmitter methods
+    assert!(
+        output.contains("on") && output.contains("once") && output.contains("emit"),
+        "Expected EventEmitter methods: {}",
+        output
+    );
+
+    // CacheManager methods
+    assert!(
+        output.contains("store") && output.contains("retrieve") && output.contains("isTracked"),
+        "Expected CacheManager methods: {}",
+        output
+    );
+
+    // Instance private fields should be transformed to WeakMap pattern
+    assert!(
+        output.contains("_EventEmitter_listeners") || output.contains("_CacheManager_strongCache"),
+        "Expected instance private fields to be handled: {}",
+        output
+    );
+
+    // Type annotations should be stripped
+    assert!(
+        !output.contains(": WeakMap<") && !output.contains(": WeakSet<") && !output.contains(": WeakRef<"),
+        "Expected type annotations to be stripped: {}",
+        output
+    );
+}
