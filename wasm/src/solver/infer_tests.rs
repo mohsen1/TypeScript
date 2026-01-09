@@ -9101,3 +9101,883 @@ fn test_static_member_with_constraint() {
     let result = ctx.resolve_with_constraints(var_t).unwrap();
     assert_eq!(result, obj_type);
 }
+
+// =============================================================================
+// Higher-Order Function Inference Tests
+// =============================================================================
+// Tests for inferring types in generic HOFs (compose, pipe, curry),
+// method chaining, partial application, and overload selection
+
+// -----------------------------------------------------------------------------
+// Generic HOF Tests (compose, pipe, curry)
+// -----------------------------------------------------------------------------
+
+#[test]
+fn test_hof_compose_two_functions() {
+    // Test: compose<A, B, C>(f: (b: B) => C, g: (a: A) => B): (a: A) => C
+    // Given f: number => string, g: boolean => number
+    // Result: boolean => string
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let a_name = interner.intern_string("A");
+    let b_name = interner.intern_string("B");
+    let c_name = interner.intern_string("C");
+
+    let var_a = ctx.fresh_type_param(a_name);
+    let var_b = ctx.fresh_type_param(b_name);
+    let var_c = ctx.fresh_type_param(c_name);
+
+    // g: A => B means A is boolean, B is number
+    ctx.add_lower_bound(var_a, TypeId::BOOLEAN);
+    ctx.add_lower_bound(var_b, TypeId::NUMBER);
+    // f: B => C means C is string
+    ctx.add_lower_bound(var_c, TypeId::STRING);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+    assert_eq!(results.len(), 3);
+    assert_eq!(results[0].1, TypeId::BOOLEAN);
+    assert_eq!(results[1].1, TypeId::NUMBER);
+    assert_eq!(results[2].1, TypeId::STRING);
+}
+
+#[test]
+fn test_hof_compose_three_functions() {
+    // Test: compose3<A, B, C, D>(f, g, h): (a: A) => D
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let a_name = interner.intern_string("A");
+    let b_name = interner.intern_string("B");
+    let c_name = interner.intern_string("C");
+    let d_name = interner.intern_string("D");
+
+    let var_a = ctx.fresh_type_param(a_name);
+    let var_b = ctx.fresh_type_param(b_name);
+    let var_c = ctx.fresh_type_param(c_name);
+    let var_d = ctx.fresh_type_param(d_name);
+
+    ctx.add_lower_bound(var_a, TypeId::STRING);
+    ctx.add_lower_bound(var_b, TypeId::NUMBER);
+    ctx.add_lower_bound(var_c, TypeId::BOOLEAN);
+    ctx.add_lower_bound(var_d, TypeId::SYMBOL);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+    assert_eq!(results.len(), 4);
+    assert_eq!(results[0].1, TypeId::STRING);
+    assert_eq!(results[1].1, TypeId::NUMBER);
+    assert_eq!(results[2].1, TypeId::BOOLEAN);
+    assert_eq!(results[3].1, TypeId::SYMBOL);
+}
+
+#[test]
+fn test_hof_pipe_left_to_right() {
+    // Test: pipe<A, B, C>(g: (a: A) => B, f: (b: B) => C): (a: A) => C
+    // Opposite of compose - data flows left to right
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let a_name = interner.intern_string("A");
+    let b_name = interner.intern_string("B");
+    let c_name = interner.intern_string("C");
+
+    let var_a = ctx.fresh_type_param(a_name);
+    let var_b = ctx.fresh_type_param(b_name);
+    let var_c = ctx.fresh_type_param(c_name);
+
+    // g: A => B, f: B => C
+    ctx.add_lower_bound(var_a, TypeId::STRING);
+    ctx.add_lower_bound(var_b, TypeId::NUMBER);
+    ctx.add_lower_bound(var_c, TypeId::BOOLEAN);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+    assert_eq!(results.len(), 3);
+    assert_eq!(results[0].1, TypeId::STRING);
+    assert_eq!(results[1].1, TypeId::NUMBER);
+    assert_eq!(results[2].1, TypeId::BOOLEAN);
+}
+
+#[test]
+fn test_hof_pipe_with_value() {
+    // Test: pipeWith<A, B, C>(a: A, f: (a: A) => B, g: (b: B) => C): C
+    // Like pipe but starts with a value
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let a_name = interner.intern_string("A");
+    let b_name = interner.intern_string("B");
+    let c_name = interner.intern_string("C");
+
+    let var_a = ctx.fresh_type_param(a_name);
+    let var_b = ctx.fresh_type_param(b_name);
+    let var_c = ctx.fresh_type_param(c_name);
+
+    // Starting value determines A
+    let hello = interner.literal_string("hello");
+    ctx.add_lower_bound(var_a, hello);
+    // f transforms to B
+    ctx.add_lower_bound(var_b, TypeId::NUMBER);
+    // g transforms to C
+    ctx.add_lower_bound(var_c, TypeId::BOOLEAN);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+    assert_eq!(results.len(), 3);
+    assert_eq!(results[0].1, hello);
+    assert_eq!(results[1].1, TypeId::NUMBER);
+    assert_eq!(results[2].1, TypeId::BOOLEAN);
+}
+
+#[test]
+fn test_hof_curry_binary() {
+    // Test: curry<A, B, C>(fn: (a: A, b: B) => C): (a: A) => (b: B) => C
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let a_name = interner.intern_string("A");
+    let b_name = interner.intern_string("B");
+    let c_name = interner.intern_string("C");
+
+    let var_a = ctx.fresh_type_param(a_name);
+    let var_b = ctx.fresh_type_param(b_name);
+    let var_c = ctx.fresh_type_param(c_name);
+
+    // Original function (a: string, b: number) => boolean
+    ctx.add_lower_bound(var_a, TypeId::STRING);
+    ctx.add_lower_bound(var_b, TypeId::NUMBER);
+    ctx.add_lower_bound(var_c, TypeId::BOOLEAN);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+    assert_eq!(results.len(), 3);
+    assert_eq!(results[0].1, TypeId::STRING);
+    assert_eq!(results[1].1, TypeId::NUMBER);
+    assert_eq!(results[2].1, TypeId::BOOLEAN);
+}
+
+#[test]
+fn test_hof_curry_ternary() {
+    // Test: curry3<A, B, C, D>(fn: (a, b, c) => D): (a) => (b) => (c) => D
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let a_name = interner.intern_string("A");
+    let b_name = interner.intern_string("B");
+    let c_name = interner.intern_string("C");
+    let d_name = interner.intern_string("D");
+
+    let var_a = ctx.fresh_type_param(a_name);
+    let var_b = ctx.fresh_type_param(b_name);
+    let var_c = ctx.fresh_type_param(c_name);
+    let var_d = ctx.fresh_type_param(d_name);
+
+    ctx.add_lower_bound(var_a, TypeId::STRING);
+    ctx.add_lower_bound(var_b, TypeId::NUMBER);
+    ctx.add_lower_bound(var_c, TypeId::BOOLEAN);
+    ctx.add_lower_bound(var_d, TypeId::SYMBOL);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+    assert_eq!(results.len(), 4);
+    assert_eq!(results[0].1, TypeId::STRING);
+    assert_eq!(results[1].1, TypeId::NUMBER);
+    assert_eq!(results[2].1, TypeId::BOOLEAN);
+    assert_eq!(results[3].1, TypeId::SYMBOL);
+}
+
+#[test]
+fn test_hof_uncurry() {
+    // Test: uncurry<A, B, C>(fn: (a: A) => (b: B) => C): (a: A, b: B) => C
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let a_name = interner.intern_string("A");
+    let b_name = interner.intern_string("B");
+    let c_name = interner.intern_string("C");
+
+    let var_a = ctx.fresh_type_param(a_name);
+    let var_b = ctx.fresh_type_param(b_name);
+    let var_c = ctx.fresh_type_param(c_name);
+
+    // Curried function types
+    ctx.add_lower_bound(var_a, TypeId::STRING);
+    ctx.add_lower_bound(var_b, TypeId::NUMBER);
+    ctx.add_lower_bound(var_c, TypeId::BOOLEAN);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+    assert_eq!(results.len(), 3);
+    assert_eq!(results[0].1, TypeId::STRING);
+    assert_eq!(results[1].1, TypeId::NUMBER);
+    assert_eq!(results[2].1, TypeId::BOOLEAN);
+}
+
+#[test]
+fn test_hof_flip() {
+    // Test: flip<A, B, C>(fn: (a: A, b: B) => C): (b: B, a: A) => C
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let a_name = interner.intern_string("A");
+    let b_name = interner.intern_string("B");
+    let c_name = interner.intern_string("C");
+
+    let var_a = ctx.fresh_type_param(a_name);
+    let var_b = ctx.fresh_type_param(b_name);
+    let var_c = ctx.fresh_type_param(c_name);
+
+    ctx.add_lower_bound(var_a, TypeId::STRING);
+    ctx.add_lower_bound(var_b, TypeId::NUMBER);
+    ctx.add_lower_bound(var_c, TypeId::BOOLEAN);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+    assert_eq!(results[0].1, TypeId::STRING);
+    assert_eq!(results[1].1, TypeId::NUMBER);
+    assert_eq!(results[2].1, TypeId::BOOLEAN);
+}
+
+#[test]
+fn test_hof_constant() {
+    // Test: constant<T>(value: T): () => T
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    let hello = interner.literal_string("hello");
+    ctx.add_lower_bound(var_t, hello);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, hello);
+}
+
+#[test]
+fn test_hof_identity() {
+    // Test: identity<T>(x: T): T
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    ctx.add_lower_bound(var_t, TypeId::NUMBER);
+    ctx.add_upper_bound(var_t, TypeId::NUMBER);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+// -----------------------------------------------------------------------------
+// Method Chaining Type Propagation
+// -----------------------------------------------------------------------------
+
+#[test]
+fn test_chain_builder_pattern() {
+    // Test: Builder<T>.set(k, v).set(k, v).build() => T
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Builder accumulates to final type
+    let name_prop = interner.intern_string("name");
+    let age_prop = interner.intern_string("age");
+    let obj = interner.object(vec![
+        PropertyInfo {
+            name: name_prop,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: age_prop,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+    ctx.add_lower_bound(var_t, obj);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, obj);
+}
+
+#[test]
+fn test_chain_fluent_interface() {
+    // Test: Fluent<T>.map(f).filter(p).take(n) preserves/transforms T
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+
+    // Initial type
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+    // After map transformation
+    ctx.add_lower_bound(var_u, TypeId::NUMBER);
+
+    let result_t = ctx.resolve_with_constraints(var_t).unwrap();
+    let result_u = ctx.resolve_with_constraints(var_u).unwrap();
+
+    assert_eq!(result_t, TypeId::STRING);
+    assert_eq!(result_u, TypeId::NUMBER);
+}
+
+#[test]
+fn test_chain_optional_method() {
+    // Test: obj?.method()?.next() with optional chaining
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Optional chain may return undefined
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+    ctx.add_lower_bound(var_t, TypeId::UNDEFINED);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    let expected = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_chain_type_narrowing() {
+    // Test: Chain methods that narrow types
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let s_name = interner.intern_string("S");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_s = ctx.fresh_type_param(s_name);
+
+    // Original type is union
+    let union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    ctx.add_lower_bound(var_t, union);
+
+    // After filter/narrow, type is narrowed
+    ctx.add_lower_bound(var_s, TypeId::STRING);
+    ctx.add_upper_bound(var_s, union);
+
+    let result_t = ctx.resolve_with_constraints(var_t).unwrap();
+    let result_s = ctx.resolve_with_constraints(var_s).unwrap();
+
+    assert_eq!(result_t, union);
+    assert_eq!(result_s, TypeId::STRING);
+}
+
+#[test]
+fn test_chain_accumulator_type() {
+    // Test: scan/reduce-like chain that accumulates type
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let elem_name = interner.intern_string("Elem");
+    let acc_name = interner.intern_string("Acc");
+
+    let var_elem = ctx.fresh_type_param(elem_name);
+    let var_acc = ctx.fresh_type_param(acc_name);
+
+    // Element type from source
+    ctx.add_lower_bound(var_elem, TypeId::NUMBER);
+    // Accumulator type different from element
+    ctx.add_lower_bound(var_acc, TypeId::STRING);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+    assert_eq!(results[0].1, TypeId::NUMBER);
+    assert_eq!(results[1].1, TypeId::STRING);
+}
+
+#[test]
+fn test_chain_async_await() {
+    // Test: promise.then().then().then() async chain
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t1_name = interner.intern_string("T1");
+    let t2_name = interner.intern_string("T2");
+    let t3_name = interner.intern_string("T3");
+
+    let var_t1 = ctx.fresh_type_param(t1_name);
+    let var_t2 = ctx.fresh_type_param(t2_name);
+    let var_t3 = ctx.fresh_type_param(t3_name);
+
+    // Chain of transformations
+    ctx.add_lower_bound(var_t1, TypeId::STRING);
+    ctx.add_lower_bound(var_t2, TypeId::NUMBER);
+    ctx.add_lower_bound(var_t3, TypeId::BOOLEAN);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+    assert_eq!(results[0].1, TypeId::STRING);
+    assert_eq!(results[1].1, TypeId::NUMBER);
+    assert_eq!(results[2].1, TypeId::BOOLEAN);
+}
+
+#[test]
+fn test_chain_branching() {
+    // Test: chain.branch() creates two independent chains
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let base_name = interner.intern_string("Base");
+    let branch1_name = interner.intern_string("Branch1");
+    let branch2_name = interner.intern_string("Branch2");
+
+    let var_base = ctx.fresh_type_param(base_name);
+    let var_branch1 = ctx.fresh_type_param(branch1_name);
+    let var_branch2 = ctx.fresh_type_param(branch2_name);
+
+    // Base type shared
+    ctx.add_lower_bound(var_base, TypeId::STRING);
+    // Branch 1 transforms to number
+    ctx.add_lower_bound(var_branch1, TypeId::NUMBER);
+    // Branch 2 transforms to boolean
+    ctx.add_lower_bound(var_branch2, TypeId::BOOLEAN);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+    assert_eq!(results[0].1, TypeId::STRING);
+    assert_eq!(results[1].1, TypeId::NUMBER);
+    assert_eq!(results[2].1, TypeId::BOOLEAN);
+}
+
+#[test]
+fn test_chain_merge() {
+    // Test: Chain.merge(chain1, chain2) merges types
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Merging two chains with different types creates union
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+    ctx.add_lower_bound(var_t, TypeId::NUMBER);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    assert_eq!(result, expected);
+}
+
+// -----------------------------------------------------------------------------
+// Partial Application Inference
+// -----------------------------------------------------------------------------
+
+#[test]
+fn test_partial_first_arg() {
+    // Test: partial(fn, arg1) fixes first parameter
+    // partial<A, B, C>((a: A, b: B) => C, a: A): (b: B) => C
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let a_name = interner.intern_string("A");
+    let b_name = interner.intern_string("B");
+    let c_name = interner.intern_string("C");
+
+    let var_a = ctx.fresh_type_param(a_name);
+    let var_b = ctx.fresh_type_param(b_name);
+    let var_c = ctx.fresh_type_param(c_name);
+
+    // First arg fixed as string
+    let hello = interner.literal_string("hello");
+    ctx.add_lower_bound(var_a, hello);
+    // Remaining param is number
+    ctx.add_upper_bound(var_b, TypeId::NUMBER);
+    // Return is boolean
+    ctx.add_lower_bound(var_c, TypeId::BOOLEAN);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+    assert_eq!(results[0].1, hello);
+    assert_eq!(results[1].1, TypeId::NUMBER);
+    assert_eq!(results[2].1, TypeId::BOOLEAN);
+}
+
+#[test]
+fn test_partial_multiple_args() {
+    // Test: partial(fn, arg1, arg2) fixes first two parameters
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let a_name = interner.intern_string("A");
+    let b_name = interner.intern_string("B");
+    let c_name = interner.intern_string("C");
+    let d_name = interner.intern_string("D");
+
+    let var_a = ctx.fresh_type_param(a_name);
+    let var_b = ctx.fresh_type_param(b_name);
+    let var_c = ctx.fresh_type_param(c_name);
+    let var_d = ctx.fresh_type_param(d_name);
+
+    // First two args fixed
+    ctx.add_lower_bound(var_a, TypeId::STRING);
+    ctx.add_lower_bound(var_b, TypeId::NUMBER);
+    // Remaining param
+    ctx.add_upper_bound(var_c, TypeId::BOOLEAN);
+    // Return type
+    ctx.add_lower_bound(var_d, TypeId::SYMBOL);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+    assert_eq!(results[0].1, TypeId::STRING);
+    assert_eq!(results[1].1, TypeId::NUMBER);
+    assert_eq!(results[2].1, TypeId::BOOLEAN);
+    assert_eq!(results[3].1, TypeId::SYMBOL);
+}
+
+#[test]
+fn test_partial_right() {
+    // Test: partialRight fixes last parameters
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let a_name = interner.intern_string("A");
+    let b_name = interner.intern_string("B");
+    let c_name = interner.intern_string("C");
+
+    let var_a = ctx.fresh_type_param(a_name);
+    let var_b = ctx.fresh_type_param(b_name);
+    let var_c = ctx.fresh_type_param(c_name);
+
+    // First param remains free
+    ctx.add_upper_bound(var_a, TypeId::STRING);
+    // Last param fixed
+    let forty_two = interner.literal_number(42.0);
+    ctx.add_lower_bound(var_b, forty_two);
+    // Return type
+    ctx.add_lower_bound(var_c, TypeId::BOOLEAN);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+    assert_eq!(results[0].1, TypeId::STRING);
+    assert_eq!(results[1].1, forty_two);
+    assert_eq!(results[2].1, TypeId::BOOLEAN);
+}
+
+#[test]
+fn test_partial_with_placeholder() {
+    // Test: partial(fn, _, arg2) uses placeholder for first arg
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let a_name = interner.intern_string("A");
+    let b_name = interner.intern_string("B");
+    let c_name = interner.intern_string("C");
+
+    let var_a = ctx.fresh_type_param(a_name);
+    let var_b = ctx.fresh_type_param(b_name);
+    let var_c = ctx.fresh_type_param(c_name);
+
+    // First param placeholder (remains in signature)
+    ctx.add_upper_bound(var_a, TypeId::STRING);
+    // Second param fixed
+    let forty_two = interner.literal_number(42.0);
+    ctx.add_lower_bound(var_b, forty_two);
+    // Return type
+    ctx.add_lower_bound(var_c, TypeId::BOOLEAN);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+    assert_eq!(results[0].1, TypeId::STRING);
+    assert_eq!(results[1].1, forty_two);
+    assert_eq!(results[2].1, TypeId::BOOLEAN);
+}
+
+#[test]
+fn test_partial_bind_this() {
+    // Test: fn.bind(thisArg) fixes this parameter
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let this_name = interner.intern_string("This");
+    let a_name = interner.intern_string("A");
+    let r_name = interner.intern_string("R");
+
+    let var_this = ctx.fresh_type_param(this_name);
+    let var_a = ctx.fresh_type_param(a_name);
+    let var_r = ctx.fresh_type_param(r_name);
+
+    // This type fixed by bind
+    let obj = interner.object(vec![]);
+    ctx.add_lower_bound(var_this, obj);
+    // Parameter still free
+    ctx.add_upper_bound(var_a, TypeId::NUMBER);
+    // Return type
+    ctx.add_lower_bound(var_r, TypeId::STRING);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+    assert_eq!(results[0].1, obj);
+    assert_eq!(results[1].1, TypeId::NUMBER);
+    assert_eq!(results[2].1, TypeId::STRING);
+}
+
+#[test]
+fn test_partial_bind_this_and_args() {
+    // Test: fn.bind(thisArg, arg1, arg2) fixes this and first args
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let this_name = interner.intern_string("This");
+    let a_name = interner.intern_string("A");
+    let b_name = interner.intern_string("B");
+    let c_name = interner.intern_string("C");
+    let r_name = interner.intern_string("R");
+
+    let var_this = ctx.fresh_type_param(this_name);
+    let var_a = ctx.fresh_type_param(a_name);
+    let var_b = ctx.fresh_type_param(b_name);
+    let var_c = ctx.fresh_type_param(c_name);
+    let var_r = ctx.fresh_type_param(r_name);
+
+    // This fixed
+    let obj = interner.object(vec![]);
+    ctx.add_lower_bound(var_this, obj);
+    // First two params fixed
+    ctx.add_lower_bound(var_a, TypeId::STRING);
+    ctx.add_lower_bound(var_b, TypeId::NUMBER);
+    // Third param free
+    ctx.add_upper_bound(var_c, TypeId::BOOLEAN);
+    // Return type
+    ctx.add_lower_bound(var_r, TypeId::SYMBOL);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+    assert_eq!(results[0].1, obj);
+    assert_eq!(results[1].1, TypeId::STRING);
+    assert_eq!(results[2].1, TypeId::NUMBER);
+    assert_eq!(results[3].1, TypeId::BOOLEAN);
+    assert_eq!(results[4].1, TypeId::SYMBOL);
+}
+
+#[test]
+fn test_partial_preserves_rest_params() {
+    // Test: partial application with rest parameters
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let a_name = interner.intern_string("A");
+    let rest_name = interner.intern_string("Rest");
+    let r_name = interner.intern_string("R");
+
+    let var_a = ctx.fresh_type_param(a_name);
+    let var_rest = ctx.fresh_type_param(rest_name);
+    let var_r = ctx.fresh_type_param(r_name);
+
+    // First param fixed
+    ctx.add_lower_bound(var_a, TypeId::STRING);
+    // Rest params preserved as number[]
+    let number_array = interner.array(TypeId::NUMBER);
+    ctx.add_lower_bound(var_rest, number_array);
+    // Return type
+    ctx.add_lower_bound(var_r, TypeId::BOOLEAN);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+    assert_eq!(results[0].1, TypeId::STRING);
+    assert_eq!(results[1].1, number_array);
+    assert_eq!(results[2].1, TypeId::BOOLEAN);
+}
+
+// -----------------------------------------------------------------------------
+// Function Overload Selection
+// -----------------------------------------------------------------------------
+
+#[test]
+fn test_overload_select_by_arg_count() {
+    // Test: Overload selected based on argument count
+    // fn(a: string): number
+    // fn(a: string, b: number): boolean
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let r_name = interner.intern_string("R");
+
+    let var_r = ctx.fresh_type_param(r_name);
+
+    // With two arguments, second overload is selected
+    ctx.add_lower_bound(var_r, TypeId::BOOLEAN);
+
+    let result = ctx.resolve_with_constraints(var_r).unwrap();
+    assert_eq!(result, TypeId::BOOLEAN);
+}
+
+#[test]
+fn test_overload_select_by_arg_type() {
+    // Test: Overload selected based on argument type
+    // fn(a: string): string
+    // fn(a: number): number
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let r_name = interner.intern_string("R");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_r = ctx.fresh_type_param(r_name);
+
+    // Argument is number, so second overload
+    ctx.add_lower_bound(var_t, TypeId::NUMBER);
+    ctx.add_lower_bound(var_r, TypeId::NUMBER);
+
+    let result_t = ctx.resolve_with_constraints(var_t).unwrap();
+    let result_r = ctx.resolve_with_constraints(var_r).unwrap();
+
+    assert_eq!(result_t, TypeId::NUMBER);
+    assert_eq!(result_r, TypeId::NUMBER);
+}
+
+#[test]
+fn test_overload_select_by_callback_signature() {
+    // Test: Overload selected based on callback parameter types
+    // fn(cb: (x: string) => void): string
+    // fn(cb: (x: number) => void): number
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let cb_param_name = interner.intern_string("CbParam");
+    let r_name = interner.intern_string("R");
+
+    let var_cb_param = ctx.fresh_type_param(cb_param_name);
+    let var_r = ctx.fresh_type_param(r_name);
+
+    // Callback expects number param, so second overload
+    ctx.add_upper_bound(var_cb_param, TypeId::NUMBER);
+    ctx.add_lower_bound(var_r, TypeId::NUMBER);
+
+    let result_cb = ctx.resolve_with_constraints(var_cb_param).unwrap();
+    let result_r = ctx.resolve_with_constraints(var_r).unwrap();
+
+    assert_eq!(result_cb, TypeId::NUMBER);
+    assert_eq!(result_r, TypeId::NUMBER);
+}
+
+#[test]
+fn test_overload_select_by_return_context() {
+    // Test: Overload selected based on expected return type
+    // fn<T>(): T (with overloads for specific T)
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Return context expects string
+    ctx.add_upper_bound(var_t, TypeId::STRING);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_overload_select_most_specific() {
+    // Test: When multiple overloads match, most specific is selected
+    // fn(a: string): string
+    // fn(a: "hello"): "hello"
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Literal argument matches more specific overload
+    let hello = interner.literal_string("hello");
+    ctx.add_lower_bound(var_t, hello);
+    ctx.add_upper_bound(var_t, TypeId::STRING);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, hello);
+}
+
+#[test]
+fn test_overload_with_optional_params() {
+    // Test: Overload with optional parameters
+    // fn(a: string): string
+    // fn(a: string, b?: number): string | number
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let r_name = interner.intern_string("R");
+
+    let var_r = ctx.fresh_type_param(r_name);
+
+    // With optional param provided, second overload's return type
+    let union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    ctx.add_lower_bound(var_r, union);
+
+    let result = ctx.resolve_with_constraints(var_r).unwrap();
+    assert_eq!(result, union);
+}
+
+#[test]
+fn test_overload_with_rest_params() {
+    // Test: Overload with rest parameters
+    // fn(a: string): string
+    // fn(a: string, ...rest: number[]): number
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let r_name = interner.intern_string("R");
+
+    let var_r = ctx.fresh_type_param(r_name);
+
+    // With rest params provided, second overload
+    ctx.add_lower_bound(var_r, TypeId::NUMBER);
+
+    let result = ctx.resolve_with_constraints(var_r).unwrap();
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
+fn test_overload_generic_instantiation() {
+    // Test: Generic overload instantiation
+    // fn<T>(a: T): T
+    // fn<T>(a: T, b: T): T[]
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Two args of same type, second overload selected
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_overload_union_arg() {
+    // Test: Overload selection with union argument
+    // fn(a: string): "s"
+    // fn(a: number): "n"
+    // Called with string | number
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let r_name = interner.intern_string("R");
+
+    let var_r = ctx.fresh_type_param(r_name);
+
+    // Union arg may match either overload, result is union
+    let s = interner.literal_string("s");
+    let n = interner.literal_string("n");
+    ctx.add_lower_bound(var_r, s);
+    ctx.add_lower_bound(var_r, n);
+
+    let result = ctx.resolve_with_constraints(var_r).unwrap();
+    let expected = interner.union(vec![s, n]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_overload_fallback_to_implementation() {
+    // Test: When no overload matches, fallback to implementation signature
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Implementation signature is most general
+    ctx.add_upper_bound(var_t, TypeId::UNKNOWN);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::UNKNOWN);
+}
+
+#[test]
+fn test_overload_conditional_return() {
+    // Test: Overload with conditional return type
+    // fn<T>(a: T): T extends string ? number : boolean
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let r_name = interner.intern_string("R");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_r = ctx.fresh_type_param(r_name);
+
+    // T is string, so return is number
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+    ctx.add_lower_bound(var_r, TypeId::NUMBER);
+
+    let result_t = ctx.resolve_with_constraints(var_t).unwrap();
+    let result_r = ctx.resolve_with_constraints(var_r).unwrap();
+
+    assert_eq!(result_t, TypeId::STRING);
+    assert_eq!(result_r, TypeId::NUMBER);
+}
