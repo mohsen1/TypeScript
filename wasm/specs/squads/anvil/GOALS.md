@@ -5,6 +5,17 @@ Updated: 2026-01-09
 Priority: 2
 
 ---
+## ⚠️ TMUX REMINDER - CHECK FOR HANGING PROMPTS
+
+**NEVER forget to pause 1 second before pressing Enter in tmux!**
+
+1. After sending any message, wait 1 second, THEN send Enter (C-m)
+2. Check all worker panes for prompts that may be hanging (message sent but no activity)
+3. If a prompt is hanging, send Enter again: `sleep 1 && tmux send-keys -t <pane> C-m`
+
+**Do this check NOW and periodically throughout your session.**
+
+---
 ## 📢 EM-ANVIL: READ THIS - DIRECTIVE FROM DIRECTOR
 
 **Operation Crucible is NOW IN EFFECT.** Your squad has been restructured:

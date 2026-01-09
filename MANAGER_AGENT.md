@@ -147,16 +147,27 @@ Manager actions:
 
 
 ## Communication via tmux
+
+**⚠️ CRITICAL: Always pause 1 second before pressing Enter (C-m)!**
+
+Tmux key sending can fail if you don't pause. The message arrives but Enter doesn't register, leaving prompts hanging.
+
 - Cancel a worker's current run before sending a new directive (Esc stops Codex generation):
   - `tmux send-keys -t <session>:<window>.<pane> Escape`
-  - wait 1 second
+  - **wait 1 second**
 - Send message to a worker:
   - `tmux send-keys -t <session>:<window>.<pane> "your message"`
-  - wait 1 second
+  - **wait 1 second** (NEVER skip this!)
   - `tmux send-keys -t <session>:<window>.<pane> C-m`
 - Read a worker pane to decide next action:
   - `tmux capture-pane -p -t zang-hub:hub.<pane> -S -200`
   - Use the output to decide whether to nudge, pause, or redirect a worker.
+
+**⚠️ CHECK FOR HANGING PROMPTS:**
+- Periodically check all worker panes for prompts that are waiting for Enter
+- If you see a message was sent but the prompt is still waiting (no response), send Enter again:
+  - `sleep 1 && tmux send-keys -t <session>:<window>.<pane> C-m`
+- Common sign of hanging prompt: your message appears in the pane but there's no activity following it
 
 If sessions need to be recreated:
 - `tmux new-session -d -s <worker> -c <path>`
