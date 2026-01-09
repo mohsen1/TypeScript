@@ -45341,3 +45341,942 @@ asyncCollection.add("a", "b", "c");
         "expected mappings to reference source file"
     );
 }
+
+// =============================================================================
+// Decorator Metadata ES5 Source Map Tests
+// =============================================================================
+
+#[test]
+fn test_source_map_decorator_metadata_es5_reflect_metadata() {
+    let source = r#"// Simulating reflect-metadata patterns
+const metadataKey = Symbol("metadata");
+
+function Metadata(key: string, value: any): ClassDecorator & MethodDecorator & PropertyDecorator {
+    return function(target: any, propertyKey?: string | symbol, descriptor?: PropertyDescriptor) {
+        if (propertyKey === undefined) {
+            // Class decorator
+            Reflect.defineMetadata(key, value, target);
+        } else {
+            // Method or property decorator
+            Reflect.defineMetadata(key, value, target, propertyKey);
+        }
+        return descriptor as any;
+    };
+}
+
+function getMetadata(key: string, target: any, propertyKey?: string | symbol): any {
+    if (propertyKey === undefined) {
+        return Reflect.getMetadata(key, target);
+    }
+    return Reflect.getMetadata(key, target, propertyKey);
+}
+
+@Metadata("role", "admin")
+@Metadata("version", "1.0")
+class UserService {
+    @Metadata("column", "user_name")
+    name: string = "";
+
+    @Metadata("endpoint", "/users")
+    @Metadata("method", "GET")
+    getUsers(): string[] {
+        return [];
+    }
+}
+
+const service = new UserService();
+console.log(getMetadata("role", UserService));
+console.log(getMetadata("column", service, "name"));"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("UserService"),
+        "expected output to contain UserService class. output: {output}"
+    );
+    assert!(
+        output.contains("Metadata"),
+        "expected output to contain Metadata decorator. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for reflect-metadata"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_decorator_metadata_es5_parameter_decorators() {
+    let source = r#"const paramMetadata = new Map<string, Map<number, any>>();
+
+function Inject(token: string): ParameterDecorator {
+    return function(target: Object, propertyKey: string | symbol | undefined, parameterIndex: number) {
+        const key = propertyKey ? String(propertyKey) : "constructor";
+        if (!paramMetadata.has(key)) {
+            paramMetadata.set(key, new Map());
+        }
+        paramMetadata.get(key)!.set(parameterIndex, { token });
+    };
+}
+
+function Required(): ParameterDecorator {
+    return function(target: Object, propertyKey: string | symbol | undefined, parameterIndex: number) {
+        const key = propertyKey ? String(propertyKey) : "constructor";
+        if (!paramMetadata.has(key)) {
+            paramMetadata.set(key, new Map());
+        }
+        const existing = paramMetadata.get(key)!.get(parameterIndex) || {};
+        paramMetadata.get(key)!.set(parameterIndex, { ...existing, required: true });
+    };
+}
+
+function Validate(validator: (val: any) => boolean): ParameterDecorator {
+    return function(target: Object, propertyKey: string | symbol | undefined, parameterIndex: number) {
+        const key = propertyKey ? String(propertyKey) : "constructor";
+        if (!paramMetadata.has(key)) {
+            paramMetadata.set(key, new Map());
+        }
+        const existing = paramMetadata.get(key)!.get(parameterIndex) || {};
+        paramMetadata.get(key)!.set(parameterIndex, { ...existing, validator });
+    };
+}
+
+class ApiController {
+    constructor(
+        @Inject("HttpClient") private http: any,
+        @Inject("Logger") @Required() private logger: any
+    ) {}
+
+    fetchData(
+        @Required() @Validate(v => typeof v === "string") endpoint: string,
+        @Inject("Cache") cache?: any
+    ): Promise<any> {
+        return this.http.get(endpoint);
+    }
+}
+
+const controller = new ApiController({}, {});
+console.log(paramMetadata);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("ApiController"),
+        "expected output to contain ApiController class. output: {output}"
+    );
+    assert!(
+        output.contains("Inject"),
+        "expected output to contain Inject decorator. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for parameter decorators"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_decorator_metadata_es5_property_descriptors() {
+    let source = r#"function Observable(): PropertyDecorator {
+    return function(target: Object, propertyKey: string | symbol) {
+        let value: any;
+        const getter = function(this: any) {
+            console.log(`Getting ${String(propertyKey)}`);
+            return value;
+        };
+        const setter = function(this: any, newVal: any) {
+            console.log(`Setting ${String(propertyKey)} to ${newVal}`);
+            value = newVal;
+        };
+        Object.defineProperty(target, propertyKey, {
+            get: getter,
+            set: setter,
+            enumerable: true,
+            configurable: true
+        });
+    };
+}
+
+function DefaultValue(defaultVal: any): PropertyDecorator {
+    return function(target: Object, propertyKey: string | symbol) {
+        let value = defaultVal;
+        Object.defineProperty(target, propertyKey, {
+            get() { return value; },
+            set(newVal) { value = newVal; },
+            enumerable: true,
+            configurable: true
+        });
+    };
+}
+
+function Readonly(): PropertyDecorator {
+    return function(target: Object, propertyKey: string | symbol) {
+        Object.defineProperty(target, propertyKey, {
+            writable: false,
+            configurable: false
+        });
+    };
+}
+
+class Config {
+    @Observable()
+    @DefaultValue("development")
+    environment: string;
+
+    @Observable()
+    @DefaultValue(3000)
+    port: number;
+
+    @Readonly()
+    version: string = "1.0.0";
+}
+
+const config = new Config();
+console.log(config.environment);
+config.port = 8080;
+console.log(config.port);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("Config"),
+        "expected output to contain Config class. output: {output}"
+    );
+    assert!(
+        output.contains("Observable"),
+        "expected output to contain Observable decorator. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for property descriptors"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_decorator_metadata_es5_method_descriptors() {
+    let source = r#"function Log(prefix: string): MethodDecorator {
+    return function(target: Object, propertyKey: string | symbol, descriptor: PropertyDescriptor) {
+        const original = descriptor.value;
+        descriptor.value = function(...args: any[]) {
+            console.log(`${prefix} Calling ${String(propertyKey)} with`, args);
+            const result = original.apply(this, args);
+            console.log(`${prefix} Result:`, result);
+            return result;
+        };
+        return descriptor;
+    };
+}
+
+function Memoize(): MethodDecorator {
+    return function(target: Object, propertyKey: string | symbol, descriptor: PropertyDescriptor) {
+        const original = descriptor.value;
+        const cache = new Map<string, any>();
+        descriptor.value = function(...args: any[]) {
+            const key = JSON.stringify(args);
+            if (cache.has(key)) {
+                return cache.get(key);
+            }
+            const result = original.apply(this, args);
+            cache.set(key, result);
+            return result;
+        };
+        return descriptor;
+    };
+}
+
+function Throttle(ms: number): MethodDecorator {
+    return function(target: Object, propertyKey: string | symbol, descriptor: PropertyDescriptor) {
+        const original = descriptor.value;
+        let lastCall = 0;
+        descriptor.value = function(...args: any[]) {
+            const now = Date.now();
+            if (now - lastCall >= ms) {
+                lastCall = now;
+                return original.apply(this, args);
+            }
+        };
+        return descriptor;
+    };
+}
+
+class Calculator {
+    @Log("[CALC]")
+    @Memoize()
+    fibonacci(n: number): number {
+        if (n <= 1) return n;
+        return this.fibonacci(n - 1) + this.fibonacci(n - 2);
+    }
+
+    @Log("[CALC]")
+    @Throttle(1000)
+    expensiveOperation(x: number): number {
+        return x * x;
+    }
+}
+
+const calc = new Calculator();
+console.log(calc.fibonacci(10));
+console.log(calc.expensiveOperation(5));"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("Calculator"),
+        "expected output to contain Calculator class. output: {output}"
+    );
+    assert!(
+        output.contains("Memoize"),
+        "expected output to contain Memoize decorator. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for method descriptors"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_decorator_metadata_es5_accessor_descriptors() {
+    let source = r#"function Enumerable(value: boolean): MethodDecorator {
+    return function(target: Object, propertyKey: string | symbol, descriptor: PropertyDescriptor) {
+        descriptor.enumerable = value;
+        return descriptor;
+    };
+}
+
+function Configurable(value: boolean): MethodDecorator {
+    return function(target: Object, propertyKey: string | symbol, descriptor: PropertyDescriptor) {
+        descriptor.configurable = value;
+        return descriptor;
+    };
+}
+
+function ValidateSet(validator: (val: any) => boolean): MethodDecorator {
+    return function(target: Object, propertyKey: string | symbol, descriptor: PropertyDescriptor) {
+        const originalSet = descriptor.set;
+        if (originalSet) {
+            descriptor.set = function(value: any) {
+                if (!validator(value)) {
+                    throw new Error(`Invalid value for ${String(propertyKey)}`);
+                }
+                originalSet.call(this, value);
+            };
+        }
+        return descriptor;
+    };
+}
+
+class Person {
+    private _name: string = "";
+    private _age: number = 0;
+
+    @Enumerable(true)
+    @Configurable(false)
+    get name(): string {
+        return this._name;
+    }
+
+    @ValidateSet(v => typeof v === "string" && v.length > 0)
+    set name(value: string) {
+        this._name = value;
+    }
+
+    @Enumerable(true)
+    get age(): number {
+        return this._age;
+    }
+
+    @ValidateSet(v => typeof v === "number" && v >= 0 && v <= 150)
+    set age(value: number) {
+        this._age = value;
+    }
+}
+
+const person = new Person();
+person.name = "John";
+person.age = 30;
+console.log(person.name, person.age);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("Person"),
+        "expected output to contain Person class. output: {output}"
+    );
+    assert!(
+        output.contains("ValidateSet"),
+        "expected output to contain ValidateSet decorator. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for accessor descriptors"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_decorator_metadata_es5_class_constructor() {
+    let source = r#"interface ClassConstructor<T = any> {
+    new (...args: any[]): T;
+}
+
+function Injectable(): ClassDecorator {
+    return function<T extends ClassConstructor>(target: T) {
+        // Mark class as injectable
+        (target as any).__injectable__ = true;
+        return target;
+    };
+}
+
+function Singleton(): ClassDecorator {
+    return function<T extends ClassConstructor>(target: T) {
+        let instance: any = null;
+        const original = target;
+        const newConstructor: any = function(...args: any[]) {
+            if (instance === null) {
+                instance = new original(...args);
+            }
+            return instance;
+        };
+        newConstructor.prototype = original.prototype;
+        Object.setPrototypeOf(newConstructor, original);
+        return newConstructor;
+    };
+}
+
+function Registry(name: string): ClassDecorator {
+    return function<T extends ClassConstructor>(target: T) {
+        const registry = (globalThis as any).__registry__ || new Map();
+        registry.set(name, target);
+        (globalThis as any).__registry__ = registry;
+        return target;
+    };
+}
+
+@Injectable()
+@Singleton()
+@Registry("DatabaseService")
+class DatabaseService {
+    private connectionString: string;
+
+    constructor(connectionString: string = "default") {
+        this.connectionString = connectionString;
+        console.log("DatabaseService created");
+    }
+
+    query(sql: string): any[] {
+        return [];
+    }
+}
+
+@Injectable()
+@Registry("UserRepository")
+class UserRepository {
+    constructor(private db: DatabaseService) {}
+
+    findAll(): any[] {
+        return this.db.query("SELECT * FROM users");
+    }
+}
+
+const db1 = new DatabaseService("conn1");
+const db2 = new DatabaseService("conn2");
+console.log(db1 === db2);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("DatabaseService"),
+        "expected output to contain DatabaseService class. output: {output}"
+    );
+    assert!(
+        output.contains("Singleton"),
+        "expected output to contain Singleton decorator. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for class constructor metadata"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_decorator_metadata_es5_design_type() {
+    let source = r#"// Simulating design:type, design:paramtypes, design:returntype metadata
+const typeMetadata = new WeakMap<Object, Map<string, any>>();
+
+function Type(type: any): PropertyDecorator & ParameterDecorator {
+    return function(target: Object, propertyKey?: string | symbol, parameterIndex?: number) {
+        if (propertyKey !== undefined) {
+            if (!typeMetadata.has(target)) {
+                typeMetadata.set(target, new Map());
+            }
+            typeMetadata.get(target)!.set(String(propertyKey), { type });
+        }
+    };
+}
+
+function ReturnType(type: any): MethodDecorator {
+    return function(target: Object, propertyKey: string | symbol, descriptor: PropertyDescriptor) {
+        if (!typeMetadata.has(target)) {
+            typeMetadata.set(target, new Map());
+        }
+        const existing = typeMetadata.get(target)!.get(String(propertyKey)) || {};
+        typeMetadata.get(target)!.set(String(propertyKey), { ...existing, returnType: type });
+        return descriptor;
+    };
+}
+
+function ParamTypes(...types: any[]): MethodDecorator {
+    return function(target: Object, propertyKey: string | symbol, descriptor: PropertyDescriptor) {
+        if (!typeMetadata.has(target)) {
+            typeMetadata.set(target, new Map());
+        }
+        const existing = typeMetadata.get(target)!.get(String(propertyKey)) || {};
+        typeMetadata.get(target)!.set(String(propertyKey), { ...existing, paramTypes: types });
+        return descriptor;
+    };
+}
+
+class Entity {
+    @Type(String)
+    id: string = "";
+
+    @Type(String)
+    name: string = "";
+
+    @Type(Number)
+    age: number = 0;
+
+    @Type(Boolean)
+    active: boolean = true;
+
+    @ReturnType(String)
+    @ParamTypes(String, Number)
+    format(template: string, precision: number): string {
+        return `${this.name} (${this.age})`;
+    }
+}
+
+const entity = new Entity();
+console.log(typeMetadata.get(entity));"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("Entity"),
+        "expected output to contain Entity class. output: {output}"
+    );
+    assert!(
+        output.contains("ReturnType"),
+        "expected output to contain ReturnType decorator. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for design type metadata"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+#[test]
+fn test_source_map_decorator_metadata_es5_comprehensive() {
+    let source = r#"// Comprehensive decorator metadata test combining all patterns
+
+// Type metadata storage
+const classMetadata = new WeakMap<Function, Map<string, any>>();
+const propertyMetadata = new WeakMap<Object, Map<string | symbol, any>>();
+const methodMetadata = new WeakMap<Object, Map<string | symbol, any>>();
+const parameterMetadata = new WeakMap<Object, Map<string | symbol, Map<number, any>>>();
+
+// Class decorators
+function Controller(path: string): ClassDecorator {
+    return function(target: Function) {
+        if (!classMetadata.has(target)) {
+            classMetadata.set(target, new Map());
+        }
+        classMetadata.get(target)!.set("path", path);
+        classMetadata.get(target)!.set("type", "controller");
+    };
+}
+
+function Service(): ClassDecorator {
+    return function(target: Function) {
+        if (!classMetadata.has(target)) {
+            classMetadata.set(target, new Map());
+        }
+        classMetadata.get(target)!.set("type", "service");
+        classMetadata.get(target)!.set("injectable", true);
+    };
+}
+
+// Property decorators
+function Column(options?: { type?: string; nullable?: boolean }): PropertyDecorator {
+    return function(target: Object, propertyKey: string | symbol) {
+        if (!propertyMetadata.has(target)) {
+            propertyMetadata.set(target, new Map());
+        }
+        propertyMetadata.get(target)!.set(propertyKey, { column: true, ...options });
+    };
+}
+
+// Method decorators
+function Get(path: string): MethodDecorator {
+    return function(target: Object, propertyKey: string | symbol, descriptor: PropertyDescriptor) {
+        if (!methodMetadata.has(target)) {
+            methodMetadata.set(target, new Map());
+        }
+        methodMetadata.get(target)!.set(propertyKey, { method: "GET", path });
+        return descriptor;
+    };
+}
+
+function Post(path: string): MethodDecorator {
+    return function(target: Object, propertyKey: string | symbol, descriptor: PropertyDescriptor) {
+        if (!methodMetadata.has(target)) {
+            methodMetadata.set(target, new Map());
+        }
+        methodMetadata.get(target)!.set(propertyKey, { method: "POST", path });
+        return descriptor;
+    };
+}
+
+// Parameter decorators
+function Body(): ParameterDecorator {
+    return function(target: Object, propertyKey: string | symbol | undefined, parameterIndex: number) {
+        const key = propertyKey || "constructor";
+        if (!parameterMetadata.has(target)) {
+            parameterMetadata.set(target, new Map());
+        }
+        if (!parameterMetadata.get(target)!.has(key)) {
+            parameterMetadata.get(target)!.set(key, new Map());
+        }
+        parameterMetadata.get(target)!.get(key)!.set(parameterIndex, { source: "body" });
+    };
+}
+
+function Query(name: string): ParameterDecorator {
+    return function(target: Object, propertyKey: string | symbol | undefined, parameterIndex: number) {
+        const key = propertyKey || "constructor";
+        if (!parameterMetadata.has(target)) {
+            parameterMetadata.set(target, new Map());
+        }
+        if (!parameterMetadata.get(target)!.has(key)) {
+            parameterMetadata.get(target)!.set(key, new Map());
+        }
+        parameterMetadata.get(target)!.get(key)!.set(parameterIndex, { source: "query", name });
+    };
+}
+
+// Accessor decorator
+function Cached(): MethodDecorator {
+    return function(target: Object, propertyKey: string | symbol, descriptor: PropertyDescriptor) {
+        if (descriptor.get) {
+            const originalGet = descriptor.get;
+            let cached: any;
+            let hasCached = false;
+            descriptor.get = function() {
+                if (!hasCached) {
+                    cached = originalGet.call(this);
+                    hasCached = true;
+                }
+                return cached;
+            };
+        }
+        return descriptor;
+    };
+}
+
+// Entity class
+@Service()
+class UserEntity {
+    @Column({ type: "uuid" })
+    id: string = "";
+
+    @Column({ type: "varchar", nullable: false })
+    name: string = "";
+
+    @Column({ type: "varchar", nullable: true })
+    email: string = "";
+
+    @Cached()
+    get displayName(): string {
+        return `${this.name} <${this.email}>`;
+    }
+}
+
+// Controller class
+@Controller("/users")
+class UserController {
+    constructor(private userService: UserEntity) {}
+
+    @Get("/")
+    async getAll(@Query("limit") limit: number): Promise<UserEntity[]> {
+        return [];
+    }
+
+    @Get("/:id")
+    async getOne(@Query("id") id: string): Promise<UserEntity | null> {
+        return null;
+    }
+
+    @Post("/")
+    async create(@Body() data: Partial<UserEntity>): Promise<UserEntity> {
+        return new UserEntity();
+    }
+}
+
+// Usage
+const controller = new UserController(new UserEntity());
+console.log(classMetadata.get(UserController));
+console.log(classMetadata.get(UserEntity));
+console.log(methodMetadata.get(UserController.prototype));"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("UserController"),
+        "expected output to contain UserController class. output: {output}"
+    );
+    assert!(
+        output.contains("UserEntity"),
+        "expected output to contain UserEntity class. output: {output}"
+    );
+    assert!(
+        output.contains("Controller"),
+        "expected output to contain Controller decorator. output: {output}"
+    );
+    assert!(
+        output.contains("Service"),
+        "expected output to contain Service decorator. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for comprehensive decorator metadata"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}

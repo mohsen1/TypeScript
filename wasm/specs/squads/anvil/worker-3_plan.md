@@ -7,12 +7,13 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- [ ] Add ES5 source map tests for decorator metadata patterns: reflect-metadata, parameter decorators, property descriptors, method descriptors, accessor descriptors, class constructor metadata. Tests: `./wasm/test.sh source_map`
+- [ ] Add ES5 source map tests for module bundling patterns: CommonJS require, dynamic import, re-exports, barrel exports, circular imports, conditional imports. Tests: `./wasm/test.sh source_map`
 
 ## Task Queue
-- [ ] Add ES5 source map tests for module bundling patterns: CommonJS require, dynamic import, re-exports
+- [ ] Add ES5 source map tests for JSX transform patterns: JSX elements, fragments, spread attributes
 
 ## Completed
+- [x] Added decorator metadata ES5 source map tests (reflect-metadata, parameter decorators, property descriptors, method descriptors, accessor descriptors, class constructor metadata, design type metadata, comprehensive); 669 tests pass.
 - [x] Added Symbol-keyed member ES5 source map tests (Symbol.iterator, Symbol.asyncIterator, computed Symbol methods, Symbol.toStringTag, Symbol.hasInstance, Symbol.species, Symbol.toPrimitive, Symbol.isConcatSpreadable, comprehensive); 661 tests pass.
 - [x] Added private field ES5 source map tests (instance field access, static field access, private method calls, accessor patterns, derived class, WeakMap polyfill, in-check, static method, comprehensive); 652 tests pass.
 - [x] Added class inheritance ES5 source map tests (extends clause, super calls, method overrides, multi-level inheritance, mixin pattern, super property access, static inheritance, abstract class, interface implementation, comprehensive); 643 tests pass.
