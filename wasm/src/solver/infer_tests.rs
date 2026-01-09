@@ -12267,3 +12267,524 @@ fn test_extends_clause_array_constraint() {
     let result = ctx.resolve_with_constraints(var_t).unwrap();
     assert_eq!(result, string_array);
 }
+
+// ----------------------------------------------------------------------------
+// Additional circular constraint edge cases
+// ----------------------------------------------------------------------------
+
+#[test]
+fn test_circular_constraint_polymorphic_this() {
+    // Test: class Chain { next(): this }
+    // Polymorphic this type pattern
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let this_name = interner.intern_string("This");
+
+    let var_this = ctx.fresh_type_param(this_name);
+
+    let next_fn = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: Vec::new(),
+        this_type: None,
+        return_type: TypeId::OBJECT, // Returns this
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let chain_type = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("next"),
+            type_id: next_fn,
+            write_type: next_fn,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+        PropertyInfo {
+            name: interner.intern_string("value"),
+            type_id: TypeId::UNKNOWN,
+            write_type: TypeId::UNKNOWN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    ctx.add_lower_bound(var_this, chain_type);
+    ctx.add_upper_bound(var_this, TypeId::OBJECT);
+
+    let result = ctx.resolve_with_constraints(var_this).unwrap();
+    assert_eq!(result, chain_type);
+}
+
+#[test]
+fn test_circular_constraint_recursive_promise() {
+    // Test: type PromiseChain<T> = Promise<T | PromiseChain<T>>
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    let then_fn = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("callback")),
+            type_id: TypeId::OBJECT,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::OBJECT,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let promise_type = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("then"),
+        type_id: then_fn,
+        write_type: then_fn,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    ctx.add_lower_bound(var_t, promise_type);
+    ctx.add_upper_bound(var_t, TypeId::OBJECT);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, promise_type);
+}
+
+#[test]
+fn test_circular_constraint_event_emitter() {
+    // Test: interface EventEmitter<T extends EventEmitter<T>>
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    let on_fn = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: vec![
+            ParamInfo {
+                name: Some(interner.intern_string("event")),
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("handler")),
+                type_id: TypeId::OBJECT,
+                optional: false,
+                rest: false,
+            },
+        ],
+        this_type: None,
+        return_type: TypeId::OBJECT, // Returns this for chaining
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let emit_fn = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("event")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::BOOLEAN,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let emitter_type = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("on"),
+            type_id: on_fn,
+            write_type: on_fn,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+        PropertyInfo {
+            name: interner.intern_string("emit"),
+            type_id: emit_fn,
+            write_type: emit_fn,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+    ]);
+
+    ctx.add_lower_bound(var_t, emitter_type);
+    ctx.add_upper_bound(var_t, TypeId::OBJECT);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, emitter_type);
+}
+
+#[test]
+fn test_circular_constraint_fluent_interface() {
+    // Test: interface FluentBuilder<T extends FluentBuilder<T>> with method chaining
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    let with_fn = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: vec![
+            ParamInfo {
+                name: Some(interner.intern_string("key")),
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("value")),
+                type_id: TypeId::UNKNOWN,
+                optional: false,
+                rest: false,
+            },
+        ],
+        this_type: None,
+        return_type: TypeId::OBJECT, // Returns this
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fluent_type = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("withName"),
+            type_id: with_fn,
+            write_type: with_fn,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+        PropertyInfo {
+            name: interner.intern_string("withValue"),
+            type_id: with_fn,
+            write_type: with_fn,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+        PropertyInfo {
+            name: interner.intern_string("withConfig"),
+            type_id: with_fn,
+            write_type: with_fn,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+    ]);
+
+    ctx.add_lower_bound(var_t, fluent_type);
+    ctx.add_upper_bound(var_t, TypeId::OBJECT);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, fluent_type);
+}
+
+#[test]
+fn test_circular_constraint_recursive_json() {
+    // Test: type JSON = string | number | boolean | null | JSON[] | { [key: string]: JSON }
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let json_name = interner.intern_string("JSON");
+
+    let var_json = ctx.fresh_type_param(json_name);
+
+    // JSON is a union of primitives and recursive structures
+    let json_union = interner.union(vec![
+        TypeId::STRING,
+        TypeId::NUMBER,
+        TypeId::BOOLEAN,
+        TypeId::NULL,
+    ]);
+
+    ctx.add_lower_bound(var_json, json_union);
+    ctx.add_upper_bound(var_json, TypeId::UNKNOWN);
+
+    let result = ctx.resolve_with_constraints(var_json).unwrap();
+    assert_eq!(result, json_union);
+}
+
+#[test]
+fn test_circular_constraint_linked_list_generic() {
+    // Test: interface LinkedList<T, Self extends LinkedList<T, Self>>
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let self_name = interner.intern_string("Self");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_self = ctx.fresh_type_param(self_name);
+
+    let node_type = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("value"),
+            type_id: TypeId::UNKNOWN, // Would be T
+            write_type: TypeId::UNKNOWN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("next"),
+            type_id: TypeId::OBJECT, // Would be Self | null
+            write_type: TypeId::OBJECT,
+            optional: true,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+    ctx.add_lower_bound(var_self, node_type);
+    ctx.add_upper_bound(var_self, TypeId::OBJECT);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+    assert_eq!(results.len(), 2);
+}
+
+#[test]
+fn test_circular_constraint_state_machine() {
+    // Test: interface State<S extends State<S, E>, E extends Event>
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let s_name = interner.intern_string("S");
+    let e_name = interner.intern_string("E");
+
+    let var_s = ctx.fresh_type_param(s_name);
+    let var_e = ctx.fresh_type_param(e_name);
+
+    let transition_fn = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("event")),
+            type_id: TypeId::OBJECT,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::OBJECT, // Returns S
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let state_type = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("name"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: true,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("transition"),
+            type_id: transition_fn,
+            write_type: transition_fn,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+    ]);
+
+    let event_type = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("type"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    ctx.add_lower_bound(var_s, state_type);
+    ctx.add_lower_bound(var_e, event_type);
+    ctx.add_upper_bound(var_s, TypeId::OBJECT);
+    ctx.add_upper_bound(var_e, TypeId::OBJECT);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+    assert_eq!(results.len(), 2);
+}
+
+#[test]
+fn test_circular_constraint_visitor_pattern() {
+    // Test: interface Visitor<T extends Visitable<T>>
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    let accept_fn = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("visitor")),
+            type_id: TypeId::OBJECT,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let visitable_type = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("accept"),
+        type_id: accept_fn,
+        write_type: accept_fn,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    ctx.add_lower_bound(var_t, visitable_type);
+    ctx.add_upper_bound(var_t, TypeId::OBJECT);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, visitable_type);
+}
+
+#[test]
+fn test_circular_constraint_expression_tree() {
+    // Test: interface Expr<T extends Expr<T>> { eval(): number; combine(other: T): T }
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    let eval_fn = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: Vec::new(),
+        this_type: None,
+        return_type: TypeId::NUMBER,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let combine_fn = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("other")),
+            type_id: TypeId::OBJECT,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::OBJECT, // Returns T
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let expr_type = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("eval"),
+            type_id: eval_fn,
+            write_type: eval_fn,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+        PropertyInfo {
+            name: interner.intern_string("combine"),
+            type_id: combine_fn,
+            write_type: combine_fn,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+    ]);
+
+    ctx.add_lower_bound(var_t, expr_type);
+    ctx.add_upper_bound(var_t, TypeId::OBJECT);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, expr_type);
+}
+
+#[test]
+fn test_circular_constraint_repository_pattern() {
+    // Test: interface Repository<T, R extends Repository<T, R>>
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let r_name = interner.intern_string("R");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_r = ctx.fresh_type_param(r_name);
+
+    let find_fn = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("id")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::OBJECT, // Returns T | undefined
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let save_fn = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("entity")),
+            type_id: TypeId::OBJECT,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::OBJECT, // Returns R for chaining
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let entity_type = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("id"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let repo_type = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("find"),
+            type_id: find_fn,
+            write_type: find_fn,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+        PropertyInfo {
+            name: interner.intern_string("save"),
+            type_id: save_fn,
+            write_type: save_fn,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+    ]);
+
+    ctx.add_lower_bound(var_t, entity_type);
+    ctx.add_lower_bound(var_r, repo_type);
+    ctx.add_upper_bound(var_t, TypeId::OBJECT);
+    ctx.add_upper_bound(var_r, TypeId::OBJECT);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+    assert_eq!(results.len(), 2);
+}
