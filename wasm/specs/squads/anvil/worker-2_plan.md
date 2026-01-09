@@ -4,20 +4,21 @@
 Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transforms, cli, lsp).
 
 Status: Active
-Priority: 2
+Priority: 1
 
 ## Current Assignment
-Fix TS2403 false positives ("Subsequent variable declarations must have the same type") from `wasm/specs/squads/anvil/GOALS.md`.
+Reduce TS2355 false positives (return analysis) in the WASM checker.
 
-Focus:
-1. Capture 5-10 TS2403 failing samples from conformance output.
-2. Inspect symbol merge / variable declaration compatibility in `wasm/src/thin_binder.rs` and `wasm/src/thin_checker.rs`.
-3. Implement the smallest fix that reduces TS2403 count without new errors.
-4. Add regression tests (prefer `wasm/src/thin_checker_tests.rs` or `wasm/src/thin_binder_tests.rs`).
-5. Run conformance before/after and record exact match + extra errors here.
+Steps:
+1. Capture 5-10 TS2355 false-positive conformance samples (use `wasm/differential-test/run-conformance.sh --max=500 --sequential --verbose` or a small script).
+2. Audit return-path analysis in `wasm/src/thin_checker.rs` (return statements, implicit return, void/never).
+3. Implement minimal fix and add 1-2 regression tests in `wasm/src/thin_checker_tests.rs`.
+4. Run `./wasm/test.sh` for the new test(s) and a conformance slice; record deltas in this plan.
 
 ## Task Queue
-(empty - will receive new tasks from EM after completing current assignment)
+- Investigate TS2355 in async/arrow functions with conditional returns.
+- Check interactions with `never`/`void` return types and `@noImplicitReturns`.
+- Confirm no regression in existing TS2355 or return-path tests.
 
 ## Completed
 - [x] Added ES5 template literal type parity tests (basic, union, Uppercase/Lowercase, Capitalize/Uncapitalize, inference, combined) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` blocked by pre-existing errors in `solver/evaluate_tests.rs` (TemplateLiteralSpan not in scope).
@@ -195,7 +196,6 @@ Focus:
 - [x] Added integration coverage for computed `super[...]` in class field arrow initializers; `./wasm/test.sh` failed at `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports` (unrelated).
 - [x] Confirmed `super()` ordering remains stable with computed field initializers via regression; `./wasm/test.sh` failed at `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports` (unrelated).
 - [x] Updated emitter edge case and parity tests for CommonJS export/parse error tolerance; `./wasm/test.sh` now fails at `solver::compat::tests::test_explain_failure_reports_rest_mismatch` (unrelated).
-- [x] Fixed TS2322/TS2416 false positives for TypeQuery (typeof) comparisons in class property inheritance: added `resolve_type_query_to_structural` helper in `thin_checker.rs` to resolve `typeof x` to structural types before assignability check; updated SubtypeChecker to resolve TypeQuery symbols; TS2322 eliminated from top 10 extra errors.
 
 ## Ready for Merge
 Yes

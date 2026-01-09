@@ -1146,7 +1146,17 @@ impl<'a> ThinCheckerState<'a> {
         let is_identifier = self.ctx.arena.get(type_query.expr_name)
             .and_then(|node| self.ctx.arena.get_identifier(node))
             .is_some();
+        let has_type_args = type_query.type_arguments
+            .as_ref()
+            .map_or(false, |args| !args.nodes.is_empty());
+
         let base = if let Some(sym_id) = self.resolve_value_symbol_for_lowering(type_query.expr_name) {
+            if !has_type_args {
+                let resolved = self.get_type_of_symbol(crate::binder::SymbolId(sym_id));
+                if resolved != TypeId::ANY && resolved != TypeId::ERROR {
+                    return resolved;
+                }
+            }
             self.ctx.types.intern(TypeKey::TypeQuery(SymbolRef(sym_id)))
         } else if self.resolve_type_symbol_for_lowering(type_query.expr_name).is_some() {
             let name = name_text.as_deref().unwrap_or("<unknown>");
