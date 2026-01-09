@@ -8,12 +8,13 @@ Priority: 1
 Blocked: Awaiting next EM-Anvil assignment.
 
 ## Current Assignment
-- [ ] Add ES5 class tests for Number.isFinite/isNaN/isInteger/isSafeInteger patterns in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
+- [ ] (awaiting next assignment)
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added ES5 tests for Number.isFinite/isNaN/isInteger/isSafeInteger patterns (6 tests): isFinite basic, isNaN basic, isInteger basic, isSafeInteger basic, in constructor, combined. Ran `./wasm/test.sh class_es5_tests` (all 268 pass).
 - [x] Added ES5 tests for Reflect.construct/apply patterns (6 tests): construct basic, apply basic, construct with newTarget, apply with context, in constructor, combined. Ran `./wasm/test.sh class_es5_tests` (all 263 pass).
 - [x] Added ES5 tests for Object.getPrototypeOf/setPrototypeOf patterns (6 tests): getPrototypeOf basic, setPrototypeOf basic, inheritance checking, mixin pattern, in constructor, combined. Ran `./wasm/test.sh class_es5_tests` (all 258 pass).
 - [x] Added ES5 tests for Object.defineProperty patterns (6 tests): basic, accessor, defineProperties multiple, readonly, in constructor, combined. Ran `./wasm/test.sh class_es5_tests` (all 253 pass).
