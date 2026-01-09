@@ -3499,7 +3499,7 @@ impl<'a> ThinCheckerState<'a> {
 
         // Overload candidates need signature-specific contextual typing.
         if let Some(signatures) = overload_signatures.as_deref() {
-            if let Some(return_type) = self.resolve_overloaded_call_expression(call, signatures) {
+            if let Some(return_type) = self.resolve_overloaded_call_with_signatures(args, signatures) {
                 return return_type;
             }
         }
@@ -3609,9 +3609,9 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
-    fn resolve_overloaded_call_expression(
+    fn resolve_overloaded_call_with_signatures(
         &mut self,
-        call: &crate::parser::thin_node::CallExprData,
+        args: &[NodeIndex],
         signatures: &[crate::solver::CallSignature],
     ) -> Option<TypeId> {
         use crate::solver::{CallEvaluator, CallResult, CompatChecker, FunctionShape};
@@ -3620,7 +3620,6 @@ impl<'a> ThinCheckerState<'a> {
             return None;
         }
 
-        let args = call.arguments.as_ref().map(|a| &a.nodes).map(|n| n.as_slice()).unwrap_or(&[]);
         let mut checker = CompatChecker::new(self.ctx.types);
         let mut evaluator = CallEvaluator::new(self.ctx.types, &mut checker);
         let mut original_node_types = std::mem::take(&mut self.ctx.node_types);
