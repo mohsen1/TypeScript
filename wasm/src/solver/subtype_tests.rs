@@ -22002,3 +22002,917 @@ fn test_constructor_empty_vs_nonempty() {
     // empty is NOT subtype of nonempty
     assert!(!checker.is_subtype_of(ctor_empty, ctor_nonempty));
 }
+
+// ============================================================================
+// This type tests (this in classes, fluent interfaces)
+// ============================================================================
+
+#[test]
+fn test_this_type_basic() {
+    // Basic polymorphic this type
+    let interner = TypeInterner::new();
+
+    let this_type = interner.intern(TypeKey::ThisType);
+
+    // this type should be valid
+    assert!(this_type != TypeId::ERROR);
+    assert!(this_type != TypeId::NEVER);
+}
+
+#[test]
+fn test_this_type_in_method_return() {
+    // Method returning this for fluent interface
+    // method(): this
+    let interner = TypeInterner::new();
+
+    let this_type = interner.intern(TypeKey::ThisType);
+
+    let fluent_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: this_type,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("setName"),
+        type_id: fluent_method,
+        write_type: fluent_method,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    assert!(obj != TypeId::ERROR);
+}
+
+#[test]
+fn test_this_type_fluent_builder() {
+    // Builder pattern with multiple fluent methods
+    // { setName(name: string): this, setValue(value: number): this, build(): Result }
+    let interner = TypeInterner::new();
+
+    let this_type = interner.intern(TypeKey::ThisType);
+    let result_type = interner.reference(SymbolRef(100));
+
+    let set_name = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("name")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: this_type,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let set_value = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("value")),
+            type_id: TypeId::NUMBER,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: this_type,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let build = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: result_type,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let builder = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("setName"),
+            type_id: set_name,
+            write_type: set_name,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+        PropertyInfo {
+            name: interner.intern_string("setValue"),
+            type_id: set_value,
+            write_type: set_value,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+        PropertyInfo {
+            name: interner.intern_string("build"),
+            type_id: build,
+            write_type: build,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+    ]);
+
+    assert!(builder != TypeId::ERROR);
+}
+
+#[test]
+fn test_this_type_with_explicit_this_parameter() {
+    // Method with explicit this parameter
+    // method(this: MyClass): void
+    let interner = TypeInterner::new();
+
+    let my_class = interner.reference(SymbolRef(1));
+
+    let method_with_this = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: Some(my_class),
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    assert!(method_with_this != TypeId::ERROR);
+}
+
+#[test]
+fn test_this_type_with_this_constraint() {
+    // Method with constrained this
+    // method<T extends MyClass>(this: T): T
+    let interner = TypeInterner::new();
+
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: Some(interner.reference(SymbolRef(1))),
+        default: None,
+    }));
+
+    let constrained_method = interner.function(FunctionShape {
+        type_params: vec![SymbolRef(50)],
+        params: vec![],
+        this_type: Some(t_param),
+        return_type: t_param,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    assert!(constrained_method != TypeId::ERROR);
+}
+
+#[test]
+fn test_this_type_in_callback() {
+    // Callback with this type
+    // callback: (this: Context) => void
+    let interner = TypeInterner::new();
+
+    let context_type = interner.reference(SymbolRef(1));
+
+    let callback = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: Some(context_type),
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("onClick"),
+        type_id: callback,
+        write_type: callback,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert!(obj != TypeId::ERROR);
+}
+
+#[test]
+fn test_this_type_subtype_check() {
+    // this type subtype relationships
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let this_type = interner.intern(TypeKey::ThisType);
+
+    // this is subtype of unknown
+    assert!(checker.is_subtype_of(this_type, TypeId::UNKNOWN));
+
+    // this is not subtype of never (unless it IS never)
+    // this should not be subtype of specific types without context
+}
+
+#[test]
+fn test_this_type_in_class_method() {
+    // Class with method returning this
+    // class Chainable { chain(): this }
+    let interner = TypeInterner::new();
+
+    let this_type = interner.intern(TypeKey::ThisType);
+
+    let chain_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: this_type,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let chainable = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("chain"),
+        type_id: chain_method,
+        write_type: chain_method,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    assert!(chainable != TypeId::ERROR);
+}
+
+#[test]
+fn test_this_type_with_generic_method() {
+    // Generic method with this return
+    // method<T>(value: T): this
+    let interner = TypeInterner::new();
+
+    let this_type = interner.intern(TypeKey::ThisType);
+    let t_ref = interner.reference(SymbolRef(50));
+
+    let generic_fluent = interner.function(FunctionShape {
+        type_params: vec![SymbolRef(50)],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("value")),
+            type_id: t_ref,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: this_type,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    assert!(generic_fluent != TypeId::ERROR);
+}
+
+#[test]
+fn test_this_type_with_property_access() {
+    // Object with property of type this
+    // { self: this }
+    let interner = TypeInterner::new();
+
+    let this_type = interner.intern(TypeKey::ThisType);
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("self"),
+        type_id: this_type,
+        write_type: this_type,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    assert!(obj != TypeId::ERROR);
+}
+
+#[test]
+fn test_this_type_array() {
+    // Array of this type
+    // this[]
+    let interner = TypeInterner::new();
+
+    let this_type = interner.intern(TypeKey::ThisType);
+    let this_array = interner.array(this_type);
+
+    assert!(this_array != TypeId::ERROR);
+}
+
+#[test]
+fn test_this_type_in_union() {
+    // this | null
+    let interner = TypeInterner::new();
+
+    let this_type = interner.intern(TypeKey::ThisType);
+    let nullable_this = interner.union(vec![this_type, TypeId::NULL]);
+
+    assert!(nullable_this != TypeId::ERROR);
+}
+
+#[test]
+fn test_this_type_in_intersection() {
+    // this & HasId
+    let interner = TypeInterner::new();
+
+    let this_type = interner.intern(TypeKey::ThisType);
+    let has_id = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("id"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let this_with_id = interner.intersection(vec![this_type, has_id]);
+
+    assert!(this_with_id != TypeId::ERROR);
+}
+
+#[test]
+fn test_this_type_clone_method() {
+    // clone(): this pattern
+    let interner = TypeInterner::new();
+
+    let this_type = interner.intern(TypeKey::ThisType);
+
+    let clone_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: this_type,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let cloneable = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("clone"),
+        type_id: clone_method,
+        write_type: clone_method,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    assert!(cloneable != TypeId::ERROR);
+}
+
+#[test]
+fn test_this_type_with_optional_chaining() {
+    // Method returning this | undefined for optional operation
+    let interner = TypeInterner::new();
+
+    let this_type = interner.intern(TypeKey::ThisType);
+    let optional_this = interner.union(vec![this_type, TypeId::UNDEFINED]);
+
+    let optional_chain = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: optional_this,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    assert!(optional_chain != TypeId::ERROR);
+}
+
+#[test]
+fn test_this_type_with_promise() {
+    // Async method returning Promise<this>
+    let interner = TypeInterner::new();
+
+    let this_type = interner.intern(TypeKey::ThisType);
+    let promise_this = interner.intern(TypeKey::Application {
+        target: interner.reference(SymbolRef(100)), // Promise
+        args: vec![this_type],
+    });
+
+    let async_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: promise_this,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    assert!(async_method != TypeId::ERROR);
+}
+
+#[test]
+fn test_this_type_in_tuple() {
+    // [this, number] tuple
+    let interner = TypeInterner::new();
+
+    let this_type = interner.intern(TypeKey::ThisType);
+    let tuple_with_this = interner.tuple(vec![this_type, TypeId::NUMBER]);
+
+    assert!(tuple_with_this != TypeId::ERROR);
+}
+
+#[test]
+fn test_this_type_map_method() {
+    // map<U>(fn: (value: this) => U): U
+    let interner = TypeInterner::new();
+
+    let this_type = interner.intern(TypeKey::ThisType);
+    let u_ref = interner.reference(SymbolRef(50));
+
+    let mapper_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("value")),
+            type_id: this_type,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: u_ref,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let map_method = interner.function(FunctionShape {
+        type_params: vec![SymbolRef(50)],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("fn")),
+            type_id: mapper_fn,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: u_ref,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    assert!(map_method != TypeId::ERROR);
+}
+
+#[test]
+fn test_this_type_with_readonly() {
+    // Readonly<this>
+    let interner = TypeInterner::new();
+
+    let this_type = interner.intern(TypeKey::ThisType);
+
+    // Simulated Readonly<this> as application
+    let readonly_this = interner.intern(TypeKey::Application {
+        target: interner.reference(SymbolRef(100)), // Readonly
+        args: vec![this_type],
+    });
+
+    assert!(readonly_this != TypeId::ERROR);
+}
+
+#[test]
+fn test_this_type_partial() {
+    // Partial<this>
+    let interner = TypeInterner::new();
+
+    let this_type = interner.intern(TypeKey::ThisType);
+
+    let partial_this = interner.intern(TypeKey::Application {
+        target: interner.reference(SymbolRef(101)), // Partial
+        args: vec![this_type],
+    });
+
+    assert!(partial_this != TypeId::ERROR);
+}
+
+#[test]
+fn test_this_type_with_keyof() {
+    // keyof this
+    let interner = TypeInterner::new();
+
+    let this_type = interner.intern(TypeKey::ThisType);
+    let keyof_this = interner.intern(TypeKey::KeyOf(this_type));
+
+    assert!(keyof_this != TypeId::ERROR);
+}
+
+#[test]
+fn test_this_type_indexed_access() {
+    // this[K] indexed access
+    let interner = TypeInterner::new();
+
+    let this_type = interner.intern(TypeKey::ThisType);
+    let k_ref = interner.reference(SymbolRef(50));
+
+    let indexed = interner.intern(TypeKey::IndexedAccess {
+        object_type: this_type,
+        index_type: k_ref,
+    });
+
+    assert!(indexed != TypeId::ERROR);
+}
+
+#[test]
+fn test_this_type_with_extends() {
+    // this extends SomeInterface ? A : B
+    let interner = TypeInterner::new();
+
+    let this_type = interner.intern(TypeKey::ThisType);
+    let some_interface = interner.reference(SymbolRef(1));
+
+    let cond = ConditionalType {
+        check_type: this_type,
+        extends_type: some_interface,
+        true_type: TypeId::STRING,
+        false_type: TypeId::NUMBER,
+        is_distributive: false,
+    };
+
+    let conditional = interner.conditional(cond);
+
+    assert!(conditional != TypeId::ERROR);
+}
+
+#[test]
+fn test_this_type_method_decorator_pattern() {
+    // Decorator that preserves this type
+    // <T extends (...args: any[]) => any>(method: T): T
+    let interner = TypeInterner::new();
+
+    let this_type = interner.intern(TypeKey::ThisType);
+
+    // Method that takes this as explicit parameter
+    let decorated = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: Some(this_type),
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    assert!(decorated != TypeId::ERROR);
+}
+
+#[test]
+fn test_this_type_static_vs_instance() {
+    // Static method doesn't use this, instance method does
+    let interner = TypeInterner::new();
+
+    let this_type = interner.intern(TypeKey::ThisType);
+
+    // Static method - no this
+    let static_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // Instance method - returns this
+    let instance_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: this_type,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let class_type = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("staticMethod"),
+            type_id: static_method,
+            write_type: static_method,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+        PropertyInfo {
+            name: interner.intern_string("instanceMethod"),
+            type_id: instance_method,
+            write_type: instance_method,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+    ]);
+
+    assert!(class_type != TypeId::ERROR);
+}
+
+#[test]
+fn test_this_type_with_getter_setter() {
+    // Getter returns this, setter takes value
+    let interner = TypeInterner::new();
+
+    let this_type = interner.intern(TypeKey::ThisType);
+
+    // Simulating getter: get prop(): this
+    let getter = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: this_type,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("current"),
+        type_id: getter,
+        write_type: this_type,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert!(obj != TypeId::ERROR);
+}
+
+#[test]
+fn test_this_type_with_rest_params() {
+    // method(...args: Parameters<this["method"]>): this
+    let interner = TypeInterner::new();
+
+    let this_type = interner.intern(TypeKey::ThisType);
+
+    // Simplified: method with rest params returning this
+    let rest_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: interner.array(TypeId::ANY),
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: this_type,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    assert!(rest_method != TypeId::ERROR);
+}
+
+#[test]
+fn test_this_type_comparison() {
+    // Two this types should be equal
+    let interner = TypeInterner::new();
+
+    let this1 = interner.intern(TypeKey::ThisType);
+    let this2 = interner.intern(TypeKey::ThisType);
+
+    // Same interned type
+    assert_eq!(this1, this2);
+}
+
+#[test]
+fn test_this_type_with_method_overload() {
+    // Overloaded methods all returning this
+    let interner = TypeInterner::new();
+
+    let this_type = interner.intern(TypeKey::ThisType);
+
+    let overload1 = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: this_type,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let overload2 = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::NUMBER,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: this_type,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // Union of overloads
+    let overloaded = interner.intersection(vec![overload1, overload2]);
+
+    assert!(overloaded != TypeId::ERROR);
+}
+
+#[test]
+fn test_this_type_event_emitter_pattern() {
+    // on(event: string, handler: Function): this
+    // off(event: string, handler: Function): this
+    // emit(event: string, ...args: any[]): this
+    let interner = TypeInterner::new();
+
+    let this_type = interner.intern(TypeKey::ThisType);
+
+    let on_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo {
+                name: Some(interner.intern_string("event")),
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("handler")),
+                type_id: TypeId::FUNCTION,
+                optional: false,
+                rest: false,
+            },
+        ],
+        this_type: None,
+        return_type: this_type,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let off_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo {
+                name: Some(interner.intern_string("event")),
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("handler")),
+                type_id: TypeId::FUNCTION,
+                optional: false,
+                rest: false,
+            },
+        ],
+        this_type: None,
+        return_type: this_type,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let emit_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo {
+                name: Some(interner.intern_string("event")),
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("args")),
+                type_id: interner.array(TypeId::ANY),
+                optional: false,
+                rest: true,
+            },
+        ],
+        this_type: None,
+        return_type: this_type,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let emitter = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("on"),
+            type_id: on_method,
+            write_type: on_method,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+        PropertyInfo {
+            name: interner.intern_string("off"),
+            type_id: off_method,
+            write_type: off_method,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+        PropertyInfo {
+            name: interner.intern_string("emit"),
+            type_id: emit_method,
+            write_type: emit_method,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+    ]);
+
+    assert!(emitter != TypeId::ERROR);
+}
+
+#[test]
+fn test_this_type_query_builder() {
+    // Query builder with chainable methods
+    // where(condition: string): this
+    // orderBy(field: string): this
+    // limit(n: number): this
+    // execute(): Promise<Result[]>
+    let interner = TypeInterner::new();
+
+    let this_type = interner.intern(TypeKey::ThisType);
+    let result_array = interner.array(interner.reference(SymbolRef(100)));
+    let promise_results = interner.intern(TypeKey::Application {
+        target: interner.reference(SymbolRef(101)), // Promise
+        args: vec![result_array],
+    });
+
+    let where_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("condition")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: this_type,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let order_by_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("field")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: this_type,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let limit_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("n")),
+            type_id: TypeId::NUMBER,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: this_type,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let execute_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: promise_results,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let query_builder = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("where"),
+            type_id: where_method,
+            write_type: where_method,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+        PropertyInfo {
+            name: interner.intern_string("orderBy"),
+            type_id: order_by_method,
+            write_type: order_by_method,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+        PropertyInfo {
+            name: interner.intern_string("limit"),
+            type_id: limit_method,
+            write_type: limit_method,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+        PropertyInfo {
+            name: interner.intern_string("execute"),
+            type_id: execute_method,
+            write_type: execute_method,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+    ]);
+
+    assert!(query_builder != TypeId::ERROR);
+}
