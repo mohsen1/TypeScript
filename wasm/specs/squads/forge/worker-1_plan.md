@@ -43,6 +43,7 @@ Implement missing name diagnostics for unresolved identifiers.
 - Added TS2304 coverage for unresolved identifiers and type references (including nested function types) plus TS2339-only property access check.
 - Emitted TS2304 for missing names inside type aliases and interface members; added type-node traversal for complex types.
 - Ran `./wasm/test.sh missing_type_reference`, `./wasm/test.sh missing_identifier_emits_2304`, `./wasm/test.sh missing_property_access_emits_2339_not_2304`.
+- Rebuilt WASM and reran conformance (debug runner): 77/446 exact, 100/446 same count; TS2304 extra count 145 (up +2); OOB crashes persist.
 
 ## Ready for Merge
 Yes
