@@ -5013,3 +5013,454 @@ fn test_infer_generic_constraint_depends_on_prior_param() {
     );
     assert_eq!(result, TypeId::STRING);
 }
+
+// =============================================================================
+// REST PARAMETER INFERENCE TESTS
+// =============================================================================
+
+/// Test rest parameter type spreading with homogeneous arguments
+/// function foo<T>(...args: T[]): T with multiple same-type args
+#[test]
+fn test_rest_param_spreading_homogeneous_args() {
+    let interner = TypeInterner::new();
+    let mut subtype = CompatChecker::new(&interner);
+
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+    let array_t = interner.array(t_type);
+
+    let func = FunctionShape {
+        type_params: vec![t_param],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: array_t,
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: t_type,
+        type_predicate: None,
+        is_constructor: false,
+    };
+
+    // All args are number -> T inferred as number
+    let result = infer_generic_function(
+        &interner,
+        &mut subtype,
+        &func,
+        &[TypeId::NUMBER, TypeId::NUMBER, TypeId::NUMBER],
+    );
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+/// Test rest parameter type spreading with heterogeneous arguments creates union
+/// function foo<T>(...args: T[]): T with mixed-type args
+#[test]
+fn test_rest_param_spreading_heterogeneous_args() {
+    let interner = TypeInterner::new();
+    let mut subtype = CompatChecker::new(&interner);
+
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+    let array_t = interner.array(t_type);
+
+    let func = FunctionShape {
+        type_params: vec![t_param],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: array_t,
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: t_type,
+        type_predicate: None,
+        is_constructor: false,
+    };
+
+    // Mixed args -> T inferred as union
+    let result = infer_generic_function(
+        &interner,
+        &mut subtype,
+        &func,
+        &[TypeId::NUMBER, TypeId::STRING, TypeId::BOOLEAN],
+    );
+    let expected = interner.union(vec![TypeId::NUMBER, TypeId::STRING, TypeId::BOOLEAN]);
+    assert_eq!(result, expected);
+}
+
+/// Test rest parameter with leading fixed parameters
+/// function foo<T, U>(first: T, ...rest: U[]): [T, U]
+#[test]
+fn test_rest_param_with_leading_fixed() {
+    let interner = TypeInterner::new();
+    let mut subtype = CompatChecker::new(&interner);
+
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    let u_param = TypeParamInfo {
+        name: interner.intern_string("U"),
+        constraint: None,
+        default: None,
+    };
+    let u_type = interner.intern(TypeKey::TypeParameter(u_param.clone()));
+    let array_u = interner.array(u_type);
+
+    let return_tuple = interner.tuple(vec![
+        TupleElement { type_id: t_type, name: None, optional: false, rest: false },
+        TupleElement { type_id: u_type, name: None, optional: false, rest: false },
+    ]);
+
+    let func = FunctionShape {
+        type_params: vec![t_param, u_param],
+        params: vec![
+            ParamInfo {
+                name: Some(interner.intern_string("first")),
+                type_id: t_type,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("rest")),
+                type_id: array_u,
+                optional: false,
+                rest: true,
+            },
+        ],
+        this_type: None,
+        return_type: return_tuple,
+        type_predicate: None,
+        is_constructor: false,
+    };
+
+    // first: string, rest: number, number -> [string, number]
+    let result = infer_generic_function(
+        &interner,
+        &mut subtype,
+        &func,
+        &[TypeId::STRING, TypeId::NUMBER, TypeId::NUMBER],
+    );
+    let expected = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+    assert_eq!(result, expected);
+}
+
+// =============================================================================
+// TUPLE REST PATTERN TESTS
+// =============================================================================
+
+/// Test tuple rest element captures remaining elements
+/// function foo<T extends any[]>(...args: [number, ...T]): T
+#[test]
+fn test_tuple_rest_captures_remaining() {
+    let interner = TypeInterner::new();
+    let mut subtype = CompatChecker::new(&interner);
+
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: Some(interner.array(TypeId::ANY)),
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    let tuple_param = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: t_type, name: None, optional: false, rest: true },
+    ]);
+
+    let func = FunctionShape {
+        type_params: vec![t_param],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: tuple_param,
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: t_type,
+        type_predicate: None,
+        is_constructor: false,
+    };
+
+    // args: [1, "a", true] -> T = [string, boolean]
+    let result = infer_generic_function(
+        &interner,
+        &mut subtype,
+        &func,
+        &[TypeId::NUMBER, TypeId::STRING, TypeId::BOOLEAN],
+    );
+    let expected = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+    ]);
+    assert_eq!(result, expected);
+}
+
+/// Test tuple rest with multiple fixed prefix elements
+/// function foo<T extends any[]>(...args: [number, string, ...T]): T
+#[test]
+fn test_tuple_rest_with_multiple_prefix() {
+    let interner = TypeInterner::new();
+    let mut subtype = CompatChecker::new(&interner);
+
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: Some(interner.array(TypeId::ANY)),
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    // [number, string, ...T]
+    let tuple_param = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: t_type, name: None, optional: false, rest: true },
+    ]);
+
+    let func = FunctionShape {
+        type_params: vec![t_param],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: tuple_param,
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: t_type,
+        type_predicate: None,
+        is_constructor: false,
+    };
+
+    // args: [1, "a", true, false] -> T = [boolean, boolean]
+    let result = infer_generic_function(
+        &interner,
+        &mut subtype,
+        &func,
+        &[TypeId::NUMBER, TypeId::STRING, TypeId::BOOLEAN, TypeId::BOOLEAN],
+    );
+    let expected = interner.tuple(vec![
+        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+    ]);
+    assert_eq!(result, expected);
+}
+
+/// Test tuple rest with single element capture
+/// function foo<T extends any[]>(...args: [number, ...T]): T with one extra arg
+#[test]
+fn test_tuple_rest_single_capture() {
+    let interner = TypeInterner::new();
+    let mut subtype = CompatChecker::new(&interner);
+
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: Some(interner.array(TypeId::ANY)),
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    let tuple_param = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: t_type, name: None, optional: false, rest: true },
+    ]);
+
+    let func = FunctionShape {
+        type_params: vec![t_param],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: tuple_param,
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: t_type,
+        type_predicate: None,
+        is_constructor: false,
+    };
+
+    // args: [1, "a"] -> T = [string]
+    let result = infer_generic_function(
+        &interner,
+        &mut subtype,
+        &func,
+        &[TypeId::NUMBER, TypeId::STRING],
+    );
+    let expected = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+    ]);
+    assert_eq!(result, expected);
+}
+
+// =============================================================================
+// VARIADIC FUNCTION INFERENCE TESTS
+// =============================================================================
+
+/// Test variadic function with constrained type parameter
+/// function foo<T extends string | number>(...args: T[]): T[]
+#[test]
+fn test_variadic_with_constraint() {
+    let interner = TypeInterner::new();
+    let mut subtype = CompatChecker::new(&interner);
+
+    let constraint = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: Some(constraint),
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+    let array_t = interner.array(t_type);
+
+    let func = FunctionShape {
+        type_params: vec![t_param],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: array_t,
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: array_t,
+        type_predicate: None,
+        is_constructor: false,
+    };
+
+    // All strings -> T[] = string[]
+    let result = infer_generic_function(
+        &interner,
+        &mut subtype,
+        &func,
+        &[TypeId::STRING, TypeId::STRING],
+    );
+    let expected = interner.array(TypeId::STRING);
+    assert_eq!(result, expected);
+}
+
+/// Test variadic function inferring from multiple rest positions
+/// function zip<T, U>(...pairs: [T, U][]): [T[], U[]]
+#[test]
+fn test_variadic_zip_pattern() {
+    let interner = TypeInterner::new();
+    let mut subtype = CompatChecker::new(&interner);
+
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    let u_param = TypeParamInfo {
+        name: interner.intern_string("U"),
+        constraint: None,
+        default: None,
+    };
+    let u_type = interner.intern(TypeKey::TypeParameter(u_param.clone()));
+
+    // [T, U] tuple
+    let pair_tuple = interner.tuple(vec![
+        TupleElement { type_id: t_type, name: None, optional: false, rest: false },
+        TupleElement { type_id: u_type, name: None, optional: false, rest: false },
+    ]);
+    let array_pairs = interner.array(pair_tuple);
+
+    // Return type [T[], U[]]
+    let array_t = interner.array(t_type);
+    let array_u = interner.array(u_type);
+    let return_type = interner.tuple(vec![
+        TupleElement { type_id: array_t, name: None, optional: false, rest: false },
+        TupleElement { type_id: array_u, name: None, optional: false, rest: false },
+    ]);
+
+    let func = FunctionShape {
+        type_params: vec![t_param, u_param],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("pairs")),
+            type_id: array_pairs,
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type,
+        type_predicate: None,
+        is_constructor: false,
+    };
+
+    // Call with [number, string], [number, string]
+    let pair1 = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+    ]);
+    let pair2 = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+    ]);
+
+    let result = infer_generic_function(
+        &interner,
+        &mut subtype,
+        &func,
+        &[pair1, pair2],
+    );
+
+    // Expected: [number[], string[]]
+    let expected = interner.tuple(vec![
+        TupleElement { type_id: interner.array(TypeId::NUMBER), name: None, optional: false, rest: false },
+        TupleElement { type_id: interner.array(TypeId::STRING), name: None, optional: false, rest: false },
+    ]);
+    assert_eq!(result, expected);
+}
+
+/// Test variadic function with no arguments uses default/constraint
+#[test]
+fn test_variadic_empty_args_uses_constraint() {
+    let interner = TypeInterner::new();
+    let mut subtype = CompatChecker::new(&interner);
+
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: Some(TypeId::UNKNOWN),
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+    let array_t = interner.array(t_type);
+
+    let func = FunctionShape {
+        type_params: vec![t_param],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: array_t,
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: t_type,
+        type_predicate: None,
+        is_constructor: false,
+    };
+
+    // No args -> T inferred from constraint (unknown)
+    let result = infer_generic_function(
+        &interner,
+        &mut subtype,
+        &func,
+        &[],
+    );
+    // With no inference candidates, should fall back to constraint
+    assert_eq!(result, TypeId::UNKNOWN);
+}
