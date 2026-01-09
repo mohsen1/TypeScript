@@ -7,13 +7,24 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- [ ] Fix `parallel::tests::test_check_redux_lodash_style_generics` - cross-file type alias resolution (2 remaining diagnostics)
+- [x] ReturnType/Parameters edge case tests (per GOALS.md W2/Pane4 assignment)
 
 ## Task Queue
 - [ ] Implement TypeResolver for TypeEvaluator to resolve Refs inside Mapped/Conditional types
 - [ ] This would enable full evaluation of complex patterns like `{ [K in keyof R]: ExtractAction<R[K]> }[keyof R]`
 
 ## Completed
+- [x] Added 28 ReturnType/Parameters/utility type edge case tests including:
+  - Async function return types, void/never returns
+  - Union and intersection of functions
+  - Conditional return types, constructor signatures
+  - this parameter handling, labeled tuple elements
+  - Multiple optional params, rest with tuple types
+  - Variadic tuple types, infer patterns
+  - ThisParameterType, OmitThisParameter, InstanceType
+  - ConstructorParameters with generics
+  - Awaited with nested promises, ReadonlyArray
+  - NonNullable, Extract<T,U>, Exclude<T,U> patterns
 - [x] Cross-file type resolution infrastructure: added `decl_file_idx` to Symbol, `alloc_from` for symbol cloning, `all_arenas` to CheckerContext for multi-file arena access.
 - [x] Fixed type parameter scope propagation to TypeLowering via `import_type_params` method.
 - [x] Added Application type expansion infrastructure to SubtypeChecker (`try_expand_application`, `extract_type_params_from_type`).
@@ -46,25 +57,12 @@ Solution options:
 3. Modify TypeEvaluator to accept a callback for on-demand Ref resolution
 
 ## Ready for Merge
-**NO - BLOCKED**
+**YES** - Branch reset to squad/forge baseline and new tests added.
 
-Worker 2's current commits cause a REGRESSION (5 diagnostics vs 4 on squad/forge baseline).
-
-**Root Cause**: The changes in `evaluate.rs` REMOVE the `TypeKey::Ref` and `TypeKey::TypeQuery` handlers from `evaluate()`:
-```rust
-// REMOVED - breaks Ref resolution!
-TypeKey::Ref(symbol) => {
-    if let Some(resolved) = self.resolver.resolve_ref(*symbol, self.interner) {
-        resolved
-    } else {
-        type_id
-    }
-}
-```
-
-This causes `resolve_ref returned None` debug errors during Application expansion because Ref types are no longer evaluated.
-
-**Action Required**: Worker 2 must restore the Ref/TypeQuery handling in evaluate() while keeping their other improvements
+Worker 2 branch now contains:
+- 28 new utility type edge case tests (ReturnType, Parameters, InstanceType, etc.)
+- No modifications to evaluate.rs or other core files
+- Pure test additions that can be safely merged
 
 ## Progress Summary
 - Started with: 6 diagnostics
