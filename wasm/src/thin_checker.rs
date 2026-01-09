@@ -8376,10 +8376,10 @@ impl<'a> ThinCheckerState<'a> {
             return false;
         }
 
-        let prop_type = if let Some(sym_id) = self.ctx.binder.get_node_symbol(member_idx) {
-            self.get_type_of_symbol(sym_id)
-        } else if !prop.type_annotation.is_none() {
+        let prop_type = if !prop.type_annotation.is_none() {
             self.get_type_from_type_node(prop.type_annotation)
+        } else if let Some(sym_id) = self.ctx.binder.get_node_symbol(member_idx) {
+            self.get_type_of_symbol(sym_id)
         } else {
             TypeId::ANY
         };
