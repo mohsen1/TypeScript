@@ -7,12 +7,13 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-Add ES5 Iterator patterns parity tests: Symbol.iterator, next, return, throw. Tests: `./wasm/test.sh emitter_parity`
+(none)
 
 ## Task Queue
 - [ ] Add ES5 Generator patterns parity tests: yield, yield*, return, throw
 
 ## Completed
+- [x] Added ES5 Iterator patterns parity tests (Symbol.iterator, next, return, throw) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (383 tests).
 - [x] Added ES5 Promise patterns parity tests (all, race, allSettled, any) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (379 tests).
 - [x] Added ES5 WeakRef patterns parity tests (deref, FinalizationRegistry, weak-cache, async) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (375 tests).
 - [x] Added ES5 Proxy patterns parity tests (handler-traps, revocable, Reflect-integration, class-wrapper) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (371 tests).
