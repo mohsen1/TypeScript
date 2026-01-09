@@ -589,6 +589,7 @@ impl ThinParser {
                                     for (mi, &member_idx) in interface.members.nodes.iter().enumerate() {
                                         if let Some(member_node) = arena.get(member_idx) {
                                             result.push(format!("  Member {} (idx {}): kind={}", mi, member_idx.0, member_node.kind));
+                                            result.push(format!("    data_index: {}", member_node.data_index));
                                             if let Some(sig) = arena.get_signature(member_node) {
                                                 result.push(format!("    name_idx: {:?}", sig.name));
                                                 result.push(format!("    type_annotation_idx: {:?}", sig.type_annotation));
