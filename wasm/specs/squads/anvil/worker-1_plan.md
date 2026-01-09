@@ -6,10 +6,10 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-(none)
+- [ ] Add ES5 class tests for recursive type patterns: recursive type aliases, tree structures, linked list types. Tests: `./wasm/test.sh class_es5_tests`
 
 ## Task Queue
-- [ ] Add ES5 class tests for recursive type patterns: recursive type aliases, tree structures
+- [ ] Add ES5 class tests for intersection type patterns: object intersection, interface merging
 
 ## Completed
 - [x] Added ES5 tests for variadic tuple patterns (6 tests): spread in tuples, labeled tuple elements, rest elements in tuples, tuple manipulation, optional tuple elements, combined variadic tuple patterns. Ran `./wasm/test.sh class_es5_tests` (all 377 pass).
