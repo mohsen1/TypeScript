@@ -7,12 +7,14 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [x] Circular constraints in extends clauses - DONE (added 11 F-bounded polymorphism tests)
+- [x] Generic Inference Hardening per GOALS.md Objective 1 - IN PROGRESS
 
 ## Task Queue
 - [x] Fix `test_namespace_value_member_access` - DONE (tests were passing after fixing compilation error)
 - [x] Add coverage for namespace type member access patterns - DONE (added 5 tests)
 - [x] Add circular constraints in extends clauses tests - DONE (added 11 tests)
+- [x] Add inference from usage pattern tests - DONE (added 15 tests)
+- [x] Add context-sensitive typing tests - DONE (added 20 tests)
 
 ## Completed
 - [x] Fixed method type parameter scope in check_method_declaration
@@ -26,6 +28,8 @@ Priority: 4
 - [x] Added 5 namespace type member access pattern tests
 - [x] Added 11 circular constraints in extends clauses tests (F-bounded polymorphism)
 - [x] Added 10 additional circular constraint edge cases (polymorphic this, promise, event emitter, fluent interface, recursive JSON, linked list, state machine, visitor, expression tree, repository patterns)
+- [x] Added 15 inference from usage pattern tests
+- [x] Added 20 context-sensitive typing tests
 
 ## Ready for Merge
 Yes - 21+ circular constraint tests, namespace tests all passing
