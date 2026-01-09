@@ -8123,3 +8123,346 @@ class CustomPlugin extends BasePlugin {
         output
     );
 }
+
+// =============================================================================
+// Namespace Merging Tests
+// =============================================================================
+
+#[test]
+fn test_class_es5_namespace_merging_basic() {
+    // Class merged with namespace - adds static members
+    let source = r#"
+class Validator {
+    validate(input: string): boolean {
+        return input.length > 0;
+    }
+}
+
+namespace Validator {
+    export const minLength = 1;
+    export const maxLength = 100;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be present
+    assert!(
+        output.contains("Validator"),
+        "Expected Validator class: {}",
+        output
+    );
+
+    // Method should be present
+    assert!(
+        output.contains("validate"),
+        "Expected validate method: {}",
+        output
+    );
+
+    // Namespace exports should be present
+    assert!(
+        output.contains("minLength") && output.contains("maxLength"),
+        "Expected namespace exports: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_namespace_merging_with_functions() {
+    // Class merged with namespace containing functions
+    let source = r#"
+class StringUtils {
+    value: string;
+
+    constructor(value: string) {
+        this.value = value;
+    }
+
+    toUpper(): string {
+        return this.value.toUpperCase();
+    }
+}
+
+namespace StringUtils {
+    export function isEmpty(s: string): boolean {
+        return s.length === 0;
+    }
+
+    export function trim(s: string): string {
+        return s.trim();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be present
+    assert!(
+        output.contains("StringUtils"),
+        "Expected StringUtils class: {}",
+        output
+    );
+
+    // Instance method should be present
+    assert!(
+        output.contains("toUpper"),
+        "Expected toUpper method: {}",
+        output
+    );
+
+    // Namespace functions should be present
+    assert!(
+        output.contains("isEmpty") && output.contains("trim"),
+        "Expected namespace functions: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_namespace_merging_with_interface() {
+    // Class merged with namespace containing interface
+    let source = r#"
+class Point {
+    x: number;
+    y: number;
+
+    constructor(x: number, y: number) {
+        this.x = x;
+        this.y = y;
+    }
+
+    distanceTo(other: Point): number {
+        return Math.sqrt(Math.pow(this.x - other.x, 2) + Math.pow(this.y - other.y, 2));
+    }
+}
+
+namespace Point {
+    export interface Options {
+        x: number;
+        y: number;
+    }
+
+    export function origin(): Point {
+        return new Point(0, 0);
+    }
+
+    export const ZERO = new Point(0, 0);
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be present
+    assert!(
+        output.contains("Point"),
+        "Expected Point class: {}",
+        output
+    );
+
+    // Instance method should be present
+    assert!(
+        output.contains("distanceTo"),
+        "Expected distanceTo method: {}",
+        output
+    );
+
+    // Interface should be erased (not in output)
+    assert!(
+        !output.contains("interface"),
+        "Interface should be erased: {}",
+        output
+    );
+
+    // Namespace function and const should be present
+    assert!(
+        output.contains("origin") && output.contains("ZERO"),
+        "Expected namespace members: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_namespace_merging_with_nested() {
+    // Class merged with namespace containing nested namespace
+    let source = r#"
+class Logger {
+    log(message: string): void {
+        console.log(message);
+    }
+}
+
+namespace Logger {
+    export const level = "info";
+
+    export namespace Formatters {
+        export function json(obj: any): string {
+            return JSON.stringify(obj);
+        }
+
+        export function text(obj: any): string {
+            return String(obj);
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be present
+    assert!(
+        output.contains("Logger"),
+        "Expected Logger class: {}",
+        output
+    );
+
+    // Instance method should be present
+    assert!(
+        output.contains("log"),
+        "Expected log method: {}",
+        output
+    );
+
+    // Nested namespace should be present
+    assert!(
+        output.contains("Formatters"),
+        "Expected Formatters namespace: {}",
+        output
+    );
+
+    // Nested functions should be present
+    assert!(
+        output.contains("json") && output.contains("text"),
+        "Expected formatter functions: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_namespace_merging_with_inheritance() {
+    // Derived class merged with namespace
+    let source = r#"
+class BaseService {
+    name: string = "base";
+}
+
+class ApiService extends BaseService {
+    endpoint: string;
+
+    constructor(endpoint: string) {
+        super();
+        this.endpoint = endpoint;
+    }
+
+    fetch(): Promise<any> {
+        return Promise.resolve({});
+    }
+}
+
+namespace ApiService {
+    export const defaultTimeout = 5000;
+    export const defaultHeaders = { "Content-Type": "application/json" };
+
+    export function create(endpoint: string): ApiService {
+        return new ApiService(endpoint);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be present
+    assert!(
+        output.contains("BaseService") && output.contains("ApiService"),
+        "Expected BaseService and ApiService classes: {}",
+        output
+    );
+
+    // Inheritance should be present
+    assert!(
+        output.contains("__extends") || output.contains("prototype"),
+        "Expected inheritance pattern: {}",
+        output
+    );
+
+    // Instance method should be present
+    assert!(
+        output.contains("fetch"),
+        "Expected fetch method: {}",
+        output
+    );
+
+    // Namespace exports should be present
+    assert!(
+        output.contains("defaultTimeout") && output.contains("defaultHeaders"),
+        "Expected namespace constants: {}",
+        output
+    );
+
+    // Factory function should be present
+    assert!(
+        output.contains("create"),
+        "Expected create factory function: {}",
+        output
+    );
+}
