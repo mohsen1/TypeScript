@@ -7,7 +7,7 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- [ ] (none)
+- [ ] Add ES5 class static block parity tests in `wasm/src/emitter_parity_tests.rs`. Run `./wasm/test.sh emitter_parity`.
 
 ## Task Queue
 - [ ] (empty)
