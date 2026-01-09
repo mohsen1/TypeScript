@@ -30270,3 +30270,306 @@ const stack = new ImmutableStack([] as const);
         output
     );
 }
+
+/// Test ES5 class with JSON import assertions
+#[test]
+fn test_class_es5_import_assertion_json() {
+    let source = r#"
+// JSON import with assert syntax
+import configData from "./config.json" assert { type: "json" };
+
+// Class using imported JSON
+class ConfigLoader {
+    private config: typeof configData;
+
+    constructor() {
+        this.config = configData;
+    }
+
+    get(key: string): unknown {
+        return (this.config as Record<string, unknown>)[key];
+    }
+
+    getAll(): typeof configData {
+        return this.config;
+    }
+}
+
+// Class with JSON schema
+class SchemaValidator {
+    private schema: object;
+
+    constructor(schema: object) {
+        this.schema = schema;
+    }
+
+    validate(data: unknown): boolean {
+        return typeof data === "object" && data !== null;
+    }
+
+    getSchema(): object {
+        return this.schema;
+    }
+}
+
+// Export class that uses JSON
+export class JsonConfigManager {
+    private loader: ConfigLoader;
+
+    constructor() {
+        this.loader = new ConfigLoader();
+    }
+
+    getConfig(): unknown {
+        return this.loader.getAll();
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("ConfigLoader") && output.contains("SchemaValidator") && output.contains("JsonConfigManager"),
+        "Expected import assertion classes: {}",
+        output
+    );
+
+    // Methods should be preserved
+    assert!(
+        output.contains("getAll") && output.contains("validate") && output.contains("getConfig"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+/// Test ES5 class with type-only imports
+#[test]
+fn test_class_es5_import_assertion_type_imports() {
+    let source = r#"
+// Type-only import
+import type { User, Product, Order } from "./types";
+
+// Regular import with type modifier
+import { type Config, loadConfig } from "./config";
+
+// Class using type-only imports
+class UserService {
+    private users: User[];
+
+    constructor() {
+        this.users = [];
+    }
+
+    addUser(user: User): void {
+        this.users.push(user);
+    }
+
+    getUsers(): User[] {
+        return this.users;
+    }
+
+    findById(id: string): User | undefined {
+        return this.users.find(u => u.id === id);
+    }
+}
+
+// Class using multiple type imports
+class OrderProcessor {
+    private orders: Order[];
+    private products: Map<string, Product>;
+
+    constructor() {
+        this.orders = [];
+        this.products = new Map();
+    }
+
+    addProduct(product: Product): void {
+        this.products.set(product.id, product);
+    }
+
+    createOrder(order: Order): void {
+        this.orders.push(order);
+    }
+
+    getOrderTotal(orderId: string): number {
+        const order = this.orders.find(o => o.id === orderId);
+        return order ? order.total : 0;
+    }
+}
+
+// Class with config type
+class ConfigManager {
+    private config: Config | null;
+
+    constructor() {
+        this.config = null;
+    }
+
+    async load(): Promise<void> {
+        this.config = await loadConfig();
+    }
+
+    getConfig(): Config | null {
+        return this.config;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("UserService") && output.contains("OrderProcessor") && output.contains("ConfigManager"),
+        "Expected type import classes: {}",
+        output
+    );
+
+    // Type-only imports should be stripped
+    assert!(
+        !output.contains("import type"),
+        "Expected type-only imports to be stripped: {}",
+        output
+    );
+
+    // Methods should be preserved
+    assert!(
+        output.contains("addUser") && output.contains("createOrder") && output.contains("getConfig"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+/// Test ES5 class with import assertion syntax variations
+#[test]
+fn test_class_es5_import_assertion_syntax() {
+    let source = r#"
+// Import with assert keyword
+import settings from "./settings.json" assert { type: "json" };
+
+// Import with with keyword (newer syntax)
+import translations from "./translations.json" with { type: "json" };
+
+// Dynamic import with assertion
+async function loadData() {
+    const data = await import("./data.json", { assert: { type: "json" } });
+    return data;
+}
+
+// Class using asserted imports
+class SettingsManager {
+    private settings: typeof settings;
+    private translations: typeof translations;
+
+    constructor() {
+        this.settings = settings;
+        this.translations = translations;
+    }
+
+    getSetting(key: string): unknown {
+        return (this.settings as Record<string, unknown>)[key];
+    }
+
+    getTranslation(key: string): string {
+        return (this.translations as Record<string, string>)[key] || key;
+    }
+}
+
+// Class with dynamic JSON loading
+class DynamicLoader {
+    private cache: Map<string, unknown>;
+
+    constructor() {
+        this.cache = new Map();
+    }
+
+    async load(path: string): Promise<unknown> {
+        if (this.cache.has(path)) {
+            return this.cache.get(path);
+        }
+        const data = await loadData();
+        this.cache.set(path, data);
+        return data;
+    }
+
+    clearCache(): void {
+        this.cache.clear();
+    }
+}
+
+// Export with assertion reference
+export class LocaleManager {
+    private manager: SettingsManager;
+
+    constructor() {
+        this.manager = new SettingsManager();
+    }
+
+    translate(key: string): string {
+        return this.manager.getTranslation(key);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("SettingsManager") && output.contains("DynamicLoader") && output.contains("LocaleManager"),
+        "Expected import assertion syntax classes: {}",
+        output
+    );
+
+    // Methods should be preserved
+    assert!(
+        output.contains("getSetting") && output.contains("getTranslation") && output.contains("translate"),
+        "Expected methods: {}",
+        output
+    );
+
+    // Dynamic import function should be present
+    assert!(
+        output.contains("loadData"),
+        "Expected loadData function: {}",
+        output
+    );
+}

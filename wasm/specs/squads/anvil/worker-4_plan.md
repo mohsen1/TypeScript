@@ -7,12 +7,13 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [ ] Add ES5 class tests for import assertion patterns: json imports, type imports, assert syntax. Tests: `./wasm/test.sh class_es5_tests`
+(none)
 
 ## Task Queue
 - [ ] Add ES5 class tests for decorator metadata patterns: reflect metadata, design types
 
 ## Completed
+- [x] Add ES5 class tests for import assertion patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for const type parameter patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for satisfies expression patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for explicit resource management. Tests: `./wasm/test.sh class_es5_tests`
