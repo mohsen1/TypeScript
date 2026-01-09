@@ -183,6 +183,14 @@ Priority: 5
 ## Ready for Merge
 Yes
 
+## Resume Notes
+- Branch: `worker/anvil-5`
+- Last commit: `463cb7a181a` (`[wasm] transforms: add block scoping tests`)
+- New tests added: `wasm/src/transforms/block_scoping_es5_tests.rs` (loop var collection + closure capture)
+- Test status: `./wasm/test.sh block_scoping_es5_tests` failed to start because Docker socket EOF (`/Users/mohsenazimi/.orbstack/run/docker.sock`)
+- Worktree note: `wasm/src/transforms/async_es5_tests.rs` is modified but NOT part of the last commit; decide whether to stash/revert/commit before new work
+- Next step when resuming: fix Docker connectivity, rerun `./wasm/test.sh block_scoping_es5_tests`, then update plan with results
+
 ## TS2769 Overload Resolution Work (Latest)
 
 ### Progress
