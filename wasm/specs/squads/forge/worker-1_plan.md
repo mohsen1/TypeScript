@@ -7,28 +7,24 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-- [ ] Redux test (`test_check_redux_lodash_style_generics`) has 3 remaining diagnostics:
-  - store.ts:716 - Object literal not assignable to Store type
-  - app.ts:375 (x2) - Action type inference issues
-  - Root cause: `replaceState` property comparison fails
-    1. Source param is `Mapped` type (inline `DeepPartial<S>` evaluated)
-    2. Target param is `Application(DeepPartial, [S])` (unevaluated)
-    3. Cross-file type aliases don't have type params registered in type_env
+- [ ] Redux test (`test_check_redux_lodash_style_generics`) has 2 remaining diagnostics:
+  - store.ts:590 - Object literal with replaceState not assignable to Store type
+  - app.ts:508 - Property 'tags' does not exist on type 'S'
   - Progress made:
-    1. Added `ensure_application_refs_resolved` to recursively resolve cross-file refs
-    2. Extended to handle Function, Object, Conditional, Mapped types
-    3. Added fallback type param extraction for Mapped types in `collect_type_params`
-    4. Fallback now extracts 1 type param from DeepPartial's Mapped type
-  - Issue: `instantiate_generic` returns same TypeId as input (substitution not working)
-    - Extracted type param is `K` (mapped iteration var), not `T` (outer param)
-    - Need to find `T` in the `keyof T` constraint, not just the mapped type_param
-  - Next steps: Fix type param extraction to find outer type params from constraint
+    1. Fixed type param extraction for Mapped types in `collect_type_params`
+       - Removed incorrect addition of `mapped.type_param` (iteration var K)
+       - Added `TypeKey::KeyOf` handling to extract operand type param (T from keyof T)
+       - Added `TypeKey::IndexAccess` handling to extract both obj and idx type params
+    2. Reduced diagnostics from 3 to 2
+  - Remaining issue: replaceState param type comparison still fails
+  - Next steps: Investigate why Store type matching fails at store.ts:590
 
 ## Task Queue
 - [ ] Add callable-parameter inference regressions (e.g., union inputs, overload shapes) in `wasm/src/solver/evaluate_tests.rs`.
 - [ ] Validate function return inference in conditional types and fix any mismatches in `wasm/src/solver/evaluate.rs`.
 
 ## Completed
+- [x] Fixed type param extraction for Mapped types: removed iteration var (K), added KeyOf/IndexAccess handlers. Reduced redux diagnostics from 3 to 2.
 - [x] Added 5 template literal hyphen pattern tests for type inference (prefix/suffix extraction, two-part extraction, distributive union, no-match returns never).
 - [x] Application type expansion in TypeEvaluator with fallback extraction of type params from resolved Object properties (reduced redux test from 4 to 3 diagnostics).
 - [x] Fixed type predicate alias narrowing (`test_user_defined_type_predicate_alias_narrows` passes).
