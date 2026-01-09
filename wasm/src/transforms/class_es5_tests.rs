@@ -43080,202 +43080,53 @@ class SecureResource extends Lockable(DisposableMixin(Resource)) {
 }
 
 // =============================================================================
-// SYMBOL.SPECIES PATTERNS
+// NEW.TARGET META-PROPERTY PATTERN TESTS
 // =============================================================================
 
-/// Test basic Symbol.species getter
+/// Test ES5 class with basic new.target in constructor
 #[test]
-fn test_class_es5_symbol_species_basic_getter() {
+fn test_class_es5_basic_new_target_constructor() {
     let source = r#"
-class MyArray<T> {
-    private items: T[];
+class Shape {
+    name: string;
 
-    constructor(items: T[] = []) {
-        this.items = items;
-    }
-
-    static get [Symbol.species](): typeof MyArray {
-        return MyArray;
-    }
-
-    push(item: T): void {
-        this.items.push(item);
-    }
-
-    pop(): T | undefined {
-        return this.items.pop();
-    }
-
-    map<U>(fn: (item: T) => U): MyArray<U> {
-        const Constructor = (this.constructor as any)[Symbol.species] || MyArray;
-        return new Constructor(this.items.map(fn));
-    }
-
-    filter(fn: (item: T) => boolean): MyArray<T> {
-        const Constructor = (this.constructor as any)[Symbol.species] || MyArray;
-        return new Constructor(this.items.filter(fn));
-    }
-
-    getItems(): T[] {
-        return this.items;
-    }
-}
-
-class MySet<T> {
-    private values: Set<T>;
-
-    constructor(values?: Iterable<T>) {
-        this.values = new Set(values);
-    }
-
-    static get [Symbol.species](): typeof MySet {
-        return MySet;
-    }
-
-    add(value: T): this {
-        this.values.add(value);
-        return this;
-    }
-
-    delete(value: T): boolean {
-        return this.values.delete(value);
-    }
-
-    has(value: T): boolean {
-        return this.values.has(value);
-    }
-
-    size(): number {
-        return this.values.size;
-    }
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // MyArray class
-    assert!(
-        output.contains("MyArray"),
-        "Expected MyArray class: {}",
-        output
-    );
-
-    // MySet class
-    assert!(
-        output.contains("MySet"),
-        "Expected MySet class: {}",
-        output
-    );
-
-    // Symbol.species should be present
-    assert!(
-        output.contains("Symbol.species") || output.contains("[Symbol.species]"),
-        "Expected Symbol.species: {}",
-        output
-    );
-
-    // Methods should be present
-    assert!(
-        output.contains("push") && output.contains("pop") && output.contains("map") && output.contains("filter"),
-        "Expected MyArray methods: {}",
-        output
-    );
-
-    // MySet methods
-    assert!(
-        output.contains("add") && output.contains("delete") && output.contains("has"),
-        "Expected MySet methods: {}",
-        output
-    );
-}
-
-/// Test Symbol.species in derived class inheritance chain
-#[test]
-fn test_class_es5_symbol_species_inheritance_chain() {
-    let source = r#"
-class BaseCollection<T> {
-    protected items: T[];
-
-    constructor(items: T[] = []) {
-        this.items = items;
-    }
-
-    static get [Symbol.species](): typeof BaseCollection {
-        return BaseCollection;
-    }
-
-    getItems(): T[] {
-        return this.items;
-    }
-
-    size(): number {
-        return this.items.length;
-    }
-}
-
-class ExtendedCollection<T> extends BaseCollection<T> {
-    private name: string;
-
-    constructor(name: string, items: T[] = []) {
-        super(items);
-        this.name = name;
-    }
-
-    static get [Symbol.species](): typeof ExtendedCollection {
-        return ExtendedCollection;
+    constructor() {
+        if (new.target === Shape) {
+            throw new Error("Shape is abstract");
+        }
+        this.name = new.target.name;
     }
 
     getName(): string {
         return this.name;
     }
+}
 
-    clone(): ExtendedCollection<T> {
-        const Constructor = (this.constructor as any)[Symbol.species] || ExtendedCollection;
-        return new Constructor(this.name, [...this.items]);
+class Circle extends Shape {
+    radius: number;
+
+    constructor(radius: number) {
+        super();
+        this.radius = radius;
+    }
+
+    getArea(): number {
+        return Math.PI * this.radius * this.radius;
     }
 }
 
-class TrackedCollection<T> extends ExtendedCollection<T> {
-    private operations: string[];
+class Rectangle extends Shape {
+    width: number;
+    height: number;
 
-    constructor(name: string, items: T[] = []) {
-        super(name, items);
-        this.operations = [];
+    constructor(width: number, height: number) {
+        super();
+        this.width = width;
+        this.height = height;
     }
 
-    static get [Symbol.species](): typeof TrackedCollection {
-        return TrackedCollection;
-    }
-
-    addItem(item: T): void {
-        this.items.push(item);
-        this.operations.push("add");
-    }
-
-    removeItem(): T | undefined {
-        this.operations.push("remove");
-        return this.items.pop();
-    }
-
-    getOperations(): string[] {
-        return this.operations;
-    }
-
-    clearOperations(): void {
-        this.operations = [];
+    getArea(): number {
+        return this.width * this.height;
     }
 }
 "#;
@@ -43295,137 +43146,176 @@ class TrackedCollection<T> extends ExtendedCollection<T> {
 
     let output = printer.get_output().to_string();
 
-    // BaseCollection class
+    // Classes should be converted
     assert!(
-        output.contains("function BaseCollection") || output.contains("BaseCollection"),
-        "Expected BaseCollection class: {}",
+        output.contains("Shape") && output.contains("Circle") && output.contains("Rectangle"),
+        "Expected classes: {}",
         output
     );
 
-    // ExtendedCollection class
+    // Methods should exist
     assert!(
-        output.contains("ExtendedCollection"),
-        "Expected ExtendedCollection class: {}",
-        output
-    );
-
-    // TrackedCollection class
-    assert!(
-        output.contains("TrackedCollection"),
-        "Expected TrackedCollection class: {}",
-        output
-    );
-
-    // Should have __extends pattern
-    assert!(
-        output.contains("__extends") || output.contains("extendStatics"),
-        "Expected __extends helper: {}",
-        output
-    );
-
-    // Methods should be present
-    assert!(
-        output.contains("getItems") && output.contains("size"),
-        "Expected BaseCollection methods: {}",
-        output
-    );
-
-    // TrackedCollection methods
-    assert!(
-        output.contains("addItem") && output.contains("removeItem") && output.contains("getOperations"),
-        "Expected TrackedCollection methods: {}",
+        output.contains("getName") && output.contains("getArea"),
+        "Expected methods: {}",
         output
     );
 }
 
-/// Test Symbol.species with custom constructor
+/// Test ES5 class with new.target in derived class
 #[test]
-fn test_class_es5_symbol_species_custom_constructor() {
+fn test_class_es5_new_target_derived_class() {
     let source = r#"
-class CustomArray<T> {
-    private data: T[];
-    private readonly maxLength: number;
+class BaseComponent {
+    componentName: string;
+    isBase: boolean;
 
-    constructor(maxLength: number = 100) {
-        this.data = [];
-        this.maxLength = maxLength;
+    constructor() {
+        this.componentName = new.target.name;
+        this.isBase = new.target === BaseComponent;
     }
 
-    static get [Symbol.species](): { new(maxLength?: number): CustomArray<any> } {
-        return class extends CustomArray<any> {
-            constructor(maxLength: number = 50) {
-                super(maxLength);
-            }
-        };
-    }
-
-    push(item: T): boolean {
-        if (this.data.length >= this.maxLength) {
-            return false;
-        }
-        this.data.push(item);
-        return true;
-    }
-
-    slice(start?: number, end?: number): CustomArray<T> {
-        const Species = (this.constructor as any)[Symbol.species] || CustomArray;
-        const result = new Species(this.maxLength);
-        const sliced = this.data.slice(start, end);
-        sliced.forEach(item => result.push(item));
-        return result;
-    }
-
-    getMaxLength(): number {
-        return this.maxLength;
-    }
-
-    getLength(): number {
-        return this.data.length;
-    }
-
-    getData(): T[] {
-        return this.data;
+    getInfo(): string {
+        return this.componentName + (this.isBase ? " (base)" : " (derived)");
     }
 }
 
-class TypedBuffer {
-    private buffer: number[];
-    private readonly type: string;
+class Button extends BaseComponent {
+    label: string;
 
-    constructor(type: string = "default") {
-        this.buffer = [];
+    constructor(label: string) {
+        super();
+        this.label = label;
+    }
+
+    render(): string {
+        return "<button>" + this.label + "</button>";
+    }
+}
+
+class IconButton extends Button {
+    icon: string;
+
+    constructor(label: string, icon: string) {
+        super(label);
+        this.icon = icon;
+    }
+
+    render(): string {
+        return "<button>" + this.icon + " " + this.label + "</button>";
+    }
+}
+
+class Input extends BaseComponent {
+    type: string;
+    value: string;
+
+    constructor(type: string) {
+        super();
         this.type = type;
+        this.value = "";
     }
 
-    static get [Symbol.species](): typeof TypedBuffer {
-        return TypedBuffer;
+    render(): string {
+        return "<input type=\"" + this.type + "\" />";
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("BaseComponent") && output.contains("Button") && output.contains("IconButton") && output.contains("Input"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("getInfo") && output.contains("render"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+/// Test ES5 class with new.target with abstract pattern
+#[test]
+fn test_class_es5_new_target_abstract_service_pattern() {
+    let source = r#"
+class AbstractService {
+    serviceName: string;
+    private initialized: boolean = false;
+
+    constructor() {
+        if (new.target === AbstractService) {
+            throw new TypeError("Cannot instantiate abstract class AbstractService");
+        }
+        this.serviceName = new.target.name;
     }
 
-    write(value: number): void {
-        this.buffer.push(value);
+    protected init(): void {
+        if (this.initialized) {
+            throw new Error("Already initialized");
+        }
+        this.initialized = true;
     }
 
-    read(): number | undefined {
-        return this.buffer.shift();
+    isInitialized(): boolean {
+        return this.initialized;
     }
 
-    getType(): string {
-        return this.type;
+    abstract process(data: any): any;
+}
+
+class DataService extends AbstractService {
+    private data: any[] = [];
+
+    constructor() {
+        super();
+        this.init();
     }
 
-    getSize(): number {
-        return this.buffer.length;
+    process(data: any): any {
+        this.data.push(data);
+        return data;
+    }
+
+    getAll(): any[] {
+        return [...this.data];
+    }
+}
+
+class CacheService extends AbstractService {
+    private cache: Map<string, any> = new Map();
+
+    constructor() {
+        super();
+        this.init();
+    }
+
+    process(data: any): any {
+        const key = JSON.stringify(data);
+        if (!this.cache.has(key)) {
+            this.cache.set(key, data);
+        }
+        return this.cache.get(key);
     }
 
     clear(): void {
-        this.buffer = [];
-    }
-
-    clone(): TypedBuffer {
-        const Species = (this.constructor as any)[Symbol.species] || TypedBuffer;
-        const copy = new Species(this.type);
-        this.buffer.forEach(v => copy.write(v));
-        return copy;
+        this.cache.clear();
     }
 }
 "#;
@@ -43445,115 +43335,201 @@ class TypedBuffer {
 
     let output = printer.get_output().to_string();
 
-    // CustomArray class
+    // Classes should be converted
     assert!(
-        output.contains("CustomArray"),
-        "Expected CustomArray class: {}",
+        output.contains("AbstractService") && output.contains("DataService") && output.contains("CacheService"),
+        "Expected classes: {}",
         output
     );
 
-    // TypedBuffer class
+    // Methods should exist
     assert!(
-        output.contains("TypedBuffer"),
-        "Expected TypedBuffer class: {}",
+        output.contains("process") && output.contains("isInitialized"),
+        "Expected methods: {}",
         output
     );
 
-    // CustomArray methods
+    // Abstract keyword should be stripped
     assert!(
-        output.contains("push") && output.contains("slice") && output.contains("getMaxLength"),
-        "Expected CustomArray methods: {}",
-        output
-    );
-
-    // TypedBuffer methods
-    assert!(
-        output.contains("write") && output.contains("read") && output.contains("clone"),
-        "Expected TypedBuffer methods: {}",
+        !output.contains("abstract process"),
+        "Expected abstract keyword to be stripped: {}",
         output
     );
 }
 
-/// Test Symbol.species in Array subclass
+/// Test ES5 class with new.target in factory function
 #[test]
-fn test_class_es5_symbol_species_array_subclass() {
+fn test_class_es5_new_target_factory_function() {
     let source = r#"
-class ObservableArray<T> extends Array<T> {
-    private listeners: Array<(items: T[]) => void>;
+class Entity {
+    id: string;
+    createdBy: string;
 
-    constructor(...items: T[]) {
-        super(...items);
-        this.listeners = [];
+    constructor(id: string) {
+        this.id = id;
+        this.createdBy = new.target ? new.target.name : "factory";
     }
 
-    static get [Symbol.species](): typeof Array {
-        return Array;
+    static create(id: string): Entity {
+        return new Entity(id);
     }
 
-    subscribe(listener: (items: T[]) => void): void {
-        this.listeners.push(listener);
-    }
-
-    unsubscribe(listener: (items: T[]) => void): void {
-        const index = this.listeners.indexOf(listener);
-        if (index > -1) {
-            this.listeners.splice(index, 1);
-        }
-    }
-
-    notify(): void {
-        this.listeners.forEach(fn => fn([...this]));
-    }
-
-    pushAndNotify(...items: T[]): number {
-        const result = this.push(...items);
-        this.notify();
-        return result;
-    }
-
-    popAndNotify(): T | undefined {
-        const result = this.pop();
-        this.notify();
-        return result;
+    getCreator(): string {
+        return this.createdBy;
     }
 }
 
-class ValidatedArray<T> extends Array<T> {
-    private validator: (item: T) => boolean;
+class User extends Entity {
+    name: string;
 
-    constructor(validator: (item: T) => boolean, ...items: T[]) {
-        super(...items.filter(validator));
-        this.validator = validator;
+    constructor(id: string, name: string) {
+        super(id);
+        this.name = name;
     }
 
-    static get [Symbol.species](): typeof Array {
-        return Array;
+    static createUser(id: string, name: string): User {
+        return new User(id, name);
+    }
+}
+
+class Product extends Entity {
+    title: string;
+    price: number;
+
+    constructor(id: string, title: string, price: number) {
+        super(id);
+        this.title = title;
+        this.price = price;
     }
 
-    pushValid(item: T): boolean {
-        if (this.validator(item)) {
-            this.push(item);
-            return true;
-        }
-        return false;
+    static createProduct(id: string, title: string, price: number): Product {
+        return new Product(id, title, price);
     }
 
-    getValidator(): (item: T) => boolean {
-        return this.validator;
+    getInfo(): string {
+        return this.title + " - $" + this.price;
     }
+}
 
-    setValidator(validator: (item: T) => boolean): void {
-        this.validator = validator;
-    }
+function createEntity(id: string): Entity {
+    return new Entity(id);
+}
 
-    revalidate(): T[] {
-        const invalid: T[] = [];
-        for (let i = this.length - 1; i >= 0; i--) {
-            if (!this.validator(this[i])) {
-                invalid.push(this.splice(i, 1)[0]);
+function createTypedEntity<T extends Entity>(
+    Ctor: new (id: string) => T,
+    id: string
+): T {
+    return new Ctor(id);
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("Entity") && output.contains("User") && output.contains("Product"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Factory functions should exist
+    assert!(
+        output.contains("createEntity") && output.contains("createTypedEntity"),
+        "Expected factory functions: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("getCreator") && output.contains("getInfo"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+/// Test ES5 class with new.target with instanceof check
+#[test]
+fn test_class_es5_new_target_instanceof_check() {
+    let source = r#"
+class Singleton {
+    private static instance: Singleton | null = null;
+    name: string;
+
+    constructor() {
+        if (new.target === Singleton) {
+            if (Singleton.instance) {
+                return Singleton.instance;
             }
+            Singleton.instance = this;
         }
-        return invalid;
+        this.name = new.target.name;
+    }
+
+    static getInstance(): Singleton {
+        if (!Singleton.instance) {
+            new Singleton();
+        }
+        return Singleton.instance!;
+    }
+
+    getName(): string {
+        return this.name;
+    }
+}
+
+class ExtendedSingleton extends Singleton {
+    value: number;
+
+    constructor(value: number) {
+        super();
+        this.value = value;
+    }
+
+    getValue(): number {
+        return this.value;
+    }
+}
+
+class TypeChecker {
+    targetName: string;
+    isDirectInstantiation: boolean;
+
+    constructor() {
+        this.targetName = new.target.name;
+        this.isDirectInstantiation = new.target === TypeChecker;
+    }
+
+    checkType(): string {
+        if (this.isDirectInstantiation) {
+            return "Direct TypeChecker instance";
+        }
+        return "Instance of " + this.targetName;
+    }
+}
+
+class DerivedChecker extends TypeChecker {
+    category: string;
+
+    constructor(category: string) {
+        super();
+        this.category = category;
+    }
+
+    getCategory(): string {
+        return this.category;
     }
 }
 "#;
@@ -43573,292 +43549,198 @@ class ValidatedArray<T> extends Array<T> {
 
     let output = printer.get_output().to_string();
 
-    // ObservableArray class
+    // Classes should be converted
     assert!(
-        output.contains("ObservableArray"),
-        "Expected ObservableArray class: {}",
+        output.contains("Singleton") && output.contains("ExtendedSingleton") && output.contains("TypeChecker") && output.contains("DerivedChecker"),
+        "Expected classes: {}",
         output
     );
 
-    // ValidatedArray class
+    // Methods should exist
     assert!(
-        output.contains("ValidatedArray"),
-        "Expected ValidatedArray class: {}",
-        output
-    );
-
-    // ObservableArray methods
-    assert!(
-        output.contains("subscribe") && output.contains("unsubscribe") && output.contains("notify"),
-        "Expected ObservableArray methods: {}",
-        output
-    );
-
-    // ValidatedArray methods
-    assert!(
-        output.contains("pushValid") && output.contains("getValidator") && output.contains("revalidate"),
-        "Expected ValidatedArray methods: {}",
+        output.contains("getInstance") && output.contains("getName") && output.contains("checkType"),
+        "Expected methods: {}",
         output
     );
 }
 
-/// Test Symbol.species in Promise subclass
+/// Test ES5 class with combined new.target patterns
 #[test]
-fn test_class_es5_symbol_species_promise_subclass() {
+fn test_class_es5_combined_new_target_patterns() {
     let source = r#"
-class TrackedPromise<T> extends Promise<T> {
-    private startTime: number;
-    private endTime: number | null;
+class AbstractFactory<T> {
+    factoryName: string;
+    productType: string;
 
-    constructor(executor: (resolve: (value: T) => void, reject: (reason?: any) => void) => void) {
-        super((resolve, reject) => {
-            this.startTime = Date.now();
-            executor(
-                (value) => {
-                    this.endTime = Date.now();
-                    resolve(value);
-                },
-                (reason) => {
-                    this.endTime = Date.now();
-                    reject(reason);
-                }
-            );
-        });
-        this.startTime = Date.now();
-        this.endTime = null;
-    }
-
-    static get [Symbol.species](): typeof Promise {
-        return Promise;
-    }
-
-    getDuration(): number | null {
-        if (this.endTime === null) {
-            return null;
+    constructor() {
+        if (new.target === AbstractFactory) {
+            throw new Error("AbstractFactory cannot be instantiated directly");
         }
-        return this.endTime - this.startTime;
+        this.factoryName = new.target.name;
+        this.productType = "";
     }
 
-    getStartTime(): number {
-        return this.startTime;
-    }
+    abstract create(...args: any[]): T;
 
-    getEndTime(): number | null {
-        return this.endTime;
+    getFactoryInfo(): string {
+        return this.factoryName + " produces " + this.productType;
     }
 }
 
-class RetryablePromise<T> extends Promise<T> {
-    private retryCount: number;
-    private maxRetries: number;
+interface Vehicle {
+    brand: string;
+    model: string;
+    start(): void;
+}
 
-    constructor(
-        executor: (resolve: (value: T) => void, reject: (reason?: any) => void) => void,
-        maxRetries: number = 3
-    ) {
-        super(executor);
-        this.retryCount = 0;
-        this.maxRetries = maxRetries;
+class Car implements Vehicle {
+    brand: string;
+    model: string;
+
+    constructor(brand: string, model: string) {
+        this.brand = brand;
+        this.model = model;
     }
 
-    static get [Symbol.species](): typeof Promise {
-        return Promise;
+    start(): void {
+        console.log("Starting car: " + this.brand + " " + this.model);
+    }
+}
+
+class CarFactory extends AbstractFactory<Car> {
+    constructor() {
+        super();
+        this.productType = "Car";
     }
 
-    getRetryCount(): number {
-        return this.retryCount;
+    create(brand: string, model: string): Car {
+        return new Car(brand, model);
+    }
+}
+
+class Motorcycle implements Vehicle {
+    brand: string;
+    model: string;
+    cc: number;
+
+    constructor(brand: string, model: string, cc: number) {
+        this.brand = brand;
+        this.model = model;
+        this.cc = cc;
     }
 
-    getMaxRetries(): number {
-        return this.maxRetries;
+    start(): void {
+        console.log("Starting motorcycle: " + this.brand + " " + this.model);
+    }
+}
+
+class MotorcycleFactory extends AbstractFactory<Motorcycle> {
+    constructor() {
+        super();
+        this.productType = "Motorcycle";
     }
 
-    incrementRetry(): boolean {
-        if (this.retryCount < this.maxRetries) {
-            this.retryCount++;
-            return true;
+    create(brand: string, model: string, cc: number): Motorcycle {
+        return new Motorcycle(brand, model, cc);
+    }
+}
+
+class ServiceRegistry {
+    private static services: Map<string, any> = new Map();
+    serviceName: string;
+    registeredAt: number;
+
+    constructor() {
+        this.serviceName = new.target.name;
+        this.registeredAt = Date.now();
+
+        const existing = ServiceRegistry.services.get(this.serviceName);
+        if (existing && new.target === existing.constructor) {
+            return existing;
         }
-        return false;
+
+        ServiceRegistry.services.set(this.serviceName, this);
     }
 
-    resetRetries(): void {
-        this.retryCount = 0;
+    static getService<T extends ServiceRegistry>(name: string): T | undefined {
+        return ServiceRegistry.services.get(name) as T | undefined;
     }
 
-    canRetry(): boolean {
-        return this.retryCount < this.maxRetries;
-    }
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // TrackedPromise class
-    assert!(
-        output.contains("TrackedPromise"),
-        "Expected TrackedPromise class: {}",
-        output
-    );
-
-    // RetryablePromise class
-    assert!(
-        output.contains("RetryablePromise"),
-        "Expected RetryablePromise class: {}",
-        output
-    );
-
-    // TrackedPromise methods
-    assert!(
-        output.contains("getDuration") && output.contains("getStartTime") && output.contains("getEndTime"),
-        "Expected TrackedPromise methods: {}",
-        output
-    );
-
-    // RetryablePromise methods
-    assert!(
-        output.contains("getRetryCount") && output.contains("getMaxRetries") && output.contains("canRetry"),
-        "Expected RetryablePromise methods: {}",
-        output
-    );
-}
-
-/// Test combined Symbol.species patterns
-#[test]
-fn test_class_es5_symbol_species_combined() {
-    let source = r#"
-class BaseStream<T> {
-    protected data: T[];
-
-    constructor(data: T[] = []) {
-        this.data = data;
+    static clearAll(): void {
+        ServiceRegistry.services.clear();
     }
 
-    static get [Symbol.species](): typeof BaseStream {
-        return BaseStream;
-    }
-
-    map<U>(fn: (item: T) => U): BaseStream<U> {
-        const Species = (this.constructor as any)[Symbol.species] || BaseStream;
-        return new Species(this.data.map(fn));
-    }
-
-    filter(fn: (item: T) => boolean): BaseStream<T> {
-        const Species = (this.constructor as any)[Symbol.species] || BaseStream;
-        return new Species(this.data.filter(fn));
-    }
-
-    toArray(): T[] {
-        return [...this.data];
-    }
-
-    size(): number {
-        return this.data.length;
+    getRegistrationTime(): number {
+        return this.registeredAt;
     }
 }
 
-class TransformableStream<T> extends BaseStream<T> {
-    private transforms: Array<(item: T) => T>;
+class AuthService extends ServiceRegistry {
+    private token: string | null = null;
 
-    constructor(data: T[] = []) {
-        super(data);
-        this.transforms = [];
-    }
-
-    static get [Symbol.species](): typeof TransformableStream {
-        return TransformableStream;
-    }
-
-    addTransform(transform: (item: T) => T): this {
-        this.transforms.push(transform);
-        return this;
-    }
-
-    applyTransforms(): TransformableStream<T> {
-        const Species = (this.constructor as any)[Symbol.species] || TransformableStream;
-        let result = this.data;
-        for (const transform of this.transforms) {
-            result = result.map(transform);
-        }
-        return new Species(result);
-    }
-
-    getTransformCount(): number {
-        return this.transforms.length;
-    }
-
-    clearTransforms(): void {
-        this.transforms = [];
-    }
-}
-
-class BufferedStream<T> extends TransformableStream<T> {
-    private buffer: T[];
-    private bufferSize: number;
-
-    constructor(data: T[] = [], bufferSize: number = 10) {
-        super(data);
-        this.buffer = [];
-        this.bufferSize = bufferSize;
-    }
-
-    static get [Symbol.species](): typeof BufferedStream {
-        return BufferedStream;
-    }
-
-    write(item: T): boolean {
-        if (this.buffer.length >= this.bufferSize) {
-            return false;
-        }
-        this.buffer.push(item);
+    login(username: string, password: string): boolean {
+        this.token = "token_" + username;
         return true;
     }
 
-    flush(): T[] {
-        const items = [...this.buffer];
-        this.buffer = [];
-        return items;
+    logout(): void {
+        this.token = null;
     }
 
-    getBufferSize(): number {
-        return this.bufferSize;
-    }
-
-    getBufferLength(): number {
-        return this.buffer.length;
-    }
-
-    isBufferFull(): boolean {
-        return this.buffer.length >= this.bufferSize;
-    }
-
-    setBufferSize(size: number): void {
-        this.bufferSize = size;
+    isAuthenticated(): boolean {
+        return this.token !== null;
     }
 }
 
-// Factory function using Symbol.species
-function createDerivedStream<T, S extends BaseStream<T>>(
-    source: S,
-    filterFn: (item: T) => boolean
-): BaseStream<T> {
-    return source.filter(filterFn);
+class DataService extends ServiceRegistry {
+    private data: any[] = [];
+
+    add(item: any): void {
+        this.data.push(item);
+    }
+
+    getAll(): any[] {
+        return [...this.data];
+    }
+
+    clear(): void {
+        this.data = [];
+    }
 }
 
-const stream = new BufferedStream<number>([1, 2, 3, 4, 5], 20);
-const filtered = createDerivedStream(stream, n => n > 2);
+class Logger {
+    level: string;
+    prefix: string;
+    createdViaNew: boolean;
+
+    constructor(level: string = "info") {
+        this.level = level;
+        this.prefix = new.target ? "[" + new.target.name + "]" : "[Logger]";
+        this.createdViaNew = !!new.target;
+    }
+
+    log(message: string): void {
+        console.log(this.prefix + " [" + this.level + "] " + message);
+    }
+
+    static create(level: string): Logger {
+        return new Logger(level);
+    }
+}
+
+class DebugLogger extends Logger {
+    debugInfo: boolean = true;
+
+    constructor() {
+        super("debug");
+    }
+
+    debug(message: string): void {
+        if (this.debugInfo) {
+            this.log("[DEBUG] " + message);
+        }
+    }
+}
 "#;
 
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -43876,59 +43758,43 @@ const filtered = createDerivedStream(stream, n => n > 2);
 
     let output = printer.get_output().to_string();
 
-    // BaseStream class
+    // Classes should be converted
     assert!(
-        output.contains("function BaseStream") || output.contains("BaseStream"),
-        "Expected BaseStream class: {}",
+        output.contains("AbstractFactory") && output.contains("CarFactory") && output.contains("MotorcycleFactory"),
+        "Expected factory classes: {}",
         output
     );
 
-    // TransformableStream class
     assert!(
-        output.contains("TransformableStream"),
-        "Expected TransformableStream class: {}",
+        output.contains("ServiceRegistry") && output.contains("AuthService") && output.contains("DataService"),
+        "Expected service classes: {}",
         output
     );
 
-    // BufferedStream class
     assert!(
-        output.contains("BufferedStream"),
-        "Expected BufferedStream class: {}",
+        output.contains("Logger") && output.contains("DebugLogger"),
+        "Expected logger classes: {}",
         output
     );
 
-    // Factory function
+    // Methods should exist
     assert!(
-        output.contains("function createDerivedStream") || output.contains("createDerivedStream"),
-        "Expected createDerivedStream function: {}",
+        output.contains("create") && output.contains("getFactoryInfo") && output.contains("getService"),
+        "Expected methods: {}",
         output
     );
 
-    // BaseStream methods
+    // Interface should be stripped
     assert!(
-        output.contains("map") && output.contains("filter") && output.contains("toArray"),
-        "Expected BaseStream methods: {}",
+        !output.contains("interface Vehicle"),
+        "Expected interface to be stripped: {}",
         output
     );
 
-    // TransformableStream methods
+    // Generic parameter should be stripped
     assert!(
-        output.contains("addTransform") && output.contains("applyTransforms") && output.contains("getTransformCount"),
-        "Expected TransformableStream methods: {}",
-        output
-    );
-
-    // BufferedStream methods
-    assert!(
-        output.contains("write") && output.contains("flush") && output.contains("isBufferFull"),
-        "Expected BufferedStream methods: {}",
-        output
-    );
-
-    // Variables
-    assert!(
-        output.contains("stream") && output.contains("filtered"),
-        "Expected stream and filtered variables: {}",
+        !output.contains("AbstractFactory<T>"),
+        "Expected generic parameter to be stripped: {}",
         output
     );
 }
