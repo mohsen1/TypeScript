@@ -436,6 +436,18 @@ impl<'a> AsyncES5Emitter<'a> {
             }
         }
 
+        // Check with statements (stored as IfStatementData)
+        if node.kind == syntax_kind_ext::WITH_STATEMENT {
+            if let Some(with_data) = self.arena.get_with_statement(node) {
+                if self.contains_await_recursive(with_data.expression) {
+                    return true;
+                }
+                if self.contains_await_recursive(with_data.then_statement) {
+                    return true;
+                }
+            }
+        }
+
         false
     }
 
