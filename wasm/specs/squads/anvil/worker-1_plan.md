@@ -6,10 +6,10 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-(awaiting assignment)
+- [ ] Add ES5 class tests for mapped type patterns: Partial, Required, Readonly, Pick, Omit, Record. Tests: `./wasm/test.sh class_es5_tests`
 
 ## Task Queue
-(empty)
+- [ ] Add ES5 class tests for infer keyword patterns: array element, function return, promise unwrap
 
 ## Completed
 - [x] Added ES5 tests for union type patterns (6 tests): discriminated unions, type narrowing, string literal unions, number literal unions, nullable unions, combined union patterns. Ran `./wasm/test.sh class_es5_tests` (all 395 pass).
