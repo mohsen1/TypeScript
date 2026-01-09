@@ -7,10 +7,10 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-None - ready for next task.
+- [ ] Add ES5 class tests for class static block patterns: initialization order, multiple blocks. Tests: `./wasm/test.sh class_es5_tests`
 
 ## Task Queue
-- [ ] Add ES5 class tests for class static block patterns: initialization order, multiple blocks
+- [ ] Add ES5 class tests for abstract class implementation patterns: abstract methods, properties
 
 ## Completed
 - [x] Add ES5 class tests for decorator metadata patterns. Tests: `./wasm/test.sh class_es5_tests`
