@@ -12814,3 +12814,340 @@ class DataStream<T> {
         output
     );
 }
+
+// ============================================================================
+// Symbol.match Tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_symbol_match_basic() {
+    // Basic Symbol.match implementation for custom matcher
+    let source = r#"
+class WordMatcher {
+    private pattern: string;
+
+    constructor(pattern: string) {
+        this.pattern = pattern;
+    }
+
+    [Symbol.match](str: string): RegExpMatchArray | null {
+        const idx = str.indexOf(this.pattern);
+        if (idx === -1) return null;
+        const result: RegExpMatchArray = [this.pattern] as RegExpMatchArray;
+        result.index = idx;
+        result.input = str;
+        return result;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function WordMatcher"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Symbol.match should be referenced
+    assert!(
+        output.contains("match") || output.contains("Symbol"),
+        "Expected Symbol.match reference: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_match_with_flags() {
+    // Symbol.match with flags property like RegExp
+    let source = r#"
+class CaseInsensitiveMatcher {
+    private term: string;
+    readonly flags: string = "i";
+
+    constructor(term: string) {
+        this.term = term.toLowerCase();
+    }
+
+    [Symbol.match](str: string): RegExpMatchArray | null {
+        const lowerStr = str.toLowerCase();
+        const idx = lowerStr.indexOf(this.term);
+        if (idx === -1) return null;
+        const matched = str.substring(idx, idx + this.term.length);
+        const result: RegExpMatchArray = [matched] as RegExpMatchArray;
+        result.index = idx;
+        result.input = str;
+        return result;
+    }
+
+    get source(): string {
+        return this.term;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function CaseInsensitiveMatcher"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Flags property should be present
+    assert!(
+        output.contains("flags"),
+        "Expected flags property: {}",
+        output
+    );
+
+    // Source getter should be present
+    assert!(
+        output.contains("source") || output.contains("defineProperty"),
+        "Expected source getter: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_match_global() {
+    // Symbol.match returning all matches (global flag behavior)
+    let source = r#"
+class GlobalMatcher {
+    private pattern: string;
+    readonly global: boolean = true;
+
+    constructor(pattern: string) {
+        this.pattern = pattern;
+    }
+
+    [Symbol.match](str: string): string[] | null {
+        const matches: string[] = [];
+        let idx = 0;
+        while ((idx = str.indexOf(this.pattern, idx)) !== -1) {
+            matches.push(this.pattern);
+            idx += this.pattern.length;
+        }
+        return matches.length > 0 ? matches : null;
+    }
+
+    get lastIndex(): number {
+        return 0;
+    }
+
+    set lastIndex(value: number) {
+        // no-op for this implementation
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function GlobalMatcher"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Global property should be present
+    assert!(
+        output.contains("global"),
+        "Expected global property: {}",
+        output
+    );
+
+    // lastIndex getter/setter should be present
+    assert!(
+        output.contains("lastIndex"),
+        "Expected lastIndex accessor: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_match_with_inheritance() {
+    // Symbol.match with class inheritance
+    let source = r#"
+abstract class BaseMatcher {
+    abstract readonly pattern: string;
+
+    abstract [Symbol.match](str: string): RegExpMatchArray | null;
+
+    test(str: string): boolean {
+        return this[Symbol.match](str) !== null;
+    }
+}
+
+class PrefixMatcher extends BaseMatcher {
+    readonly pattern: string;
+
+    constructor(prefix: string) {
+        super();
+        this.pattern = prefix;
+    }
+
+    [Symbol.match](str: string): RegExpMatchArray | null {
+        if (str.startsWith(this.pattern)) {
+            const result: RegExpMatchArray = [this.pattern] as RegExpMatchArray;
+            result.index = 0;
+            result.input = str;
+            return result;
+        }
+        return null;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Both classes should be converted
+    assert!(
+        output.contains("function BaseMatcher"),
+        "Expected BaseMatcher function: {}",
+        output
+    );
+    assert!(
+        output.contains("function PrefixMatcher"),
+        "Expected PrefixMatcher function: {}",
+        output
+    );
+
+    // Inheritance should be set up
+    assert!(
+        output.contains("__extends") || output.contains("extends"),
+        "Expected inheritance: {}",
+        output
+    );
+
+    // Test method should be present
+    assert!(
+        output.contains("test"),
+        "Expected test method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_match_combined_protocols() {
+    // Class implementing multiple string protocol symbols
+    let source = r#"
+class CustomPattern {
+    private pattern: string;
+
+    constructor(pattern: string) {
+        this.pattern = pattern;
+    }
+
+    [Symbol.match](str: string): RegExpMatchArray | null {
+        const idx = str.indexOf(this.pattern);
+        if (idx === -1) return null;
+        const result: RegExpMatchArray = [this.pattern] as RegExpMatchArray;
+        result.index = idx;
+        result.input = str;
+        return result;
+    }
+
+    [Symbol.replace](str: string, replacement: string): string {
+        return str.split(this.pattern).join(replacement);
+    }
+
+    [Symbol.search](str: string): number {
+        return str.indexOf(this.pattern);
+    }
+
+    [Symbol.split](str: string, limit?: number): string[] {
+        return str.split(this.pattern, limit);
+    }
+
+    toString(): string {
+        return this.pattern;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function CustomPattern"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // toString method should be present
+    assert!(
+        output.contains("toString"),
+        "Expected toString method: {}",
+        output
+    );
+
+    // Multiple Symbol methods should be handled
+    assert!(
+        output.contains("Symbol") || output.contains("prototype"),
+        "Expected Symbol methods on prototype: {}",
+        output
+    );
+}
