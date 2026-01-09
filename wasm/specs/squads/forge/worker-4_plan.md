@@ -18,6 +18,7 @@ Priority: 4
 - [x] Add advanced generic inference tests - DONE (added 25 tests)
 - [x] Add distributive conditional types stress tests - DONE (added 20 tests)
 - [x] Add circular constraint edge case tests - DONE (added 20 tests)
+- [x] Add mapped type edge case tests - DONE (added 16 tests: homomorphic modifiers, key remapping)
 
 ## Completed
 - [x] Fixed method type parameter scope in check_method_declaration
@@ -36,9 +37,10 @@ Priority: 4
 - [x] Added 25 advanced generic inference tests (mapped types, conditional infer, variadic tuples)
 - [x] Added 20 distributive conditional types stress tests
 - [x] Added 20 circular constraint edge case tests (5-way cycles, diamond pattern, mutual recursion, index signatures)
+- [x] Added 16 mapped type edge case tests (homomorphic modifiers, key remapping, Pick/Omit/Record patterns)
 
 ## Ready for Merge
-Yes - 120+ solver tests added (circular constraints, inference from usage, context-sensitive typing, advanced generic inference, distributive conditional types, circular edge cases)
+Yes - 136+ solver tests added (circular constraints, inference from usage, context-sensitive typing, advanced generic inference, distributive conditional types, circular edge cases, mapped types)
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize solver correctness
