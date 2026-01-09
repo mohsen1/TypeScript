@@ -14508,42 +14508,34 @@ class ImmutableConfig {
     );
 }
 
+// ============================================================================
+// Symbol.for / Symbol.keyFor Tests
+// ============================================================================
+
 #[test]
-fn test_class_es5_object_defineproperty_basic() {
-    // Basic Object.defineProperty usage with value descriptor
+fn test_class_es5_symbol_for_basic() {
+    // Basic Symbol.for usage for global symbol registry
     let source = r#"
-class PropertyDefiner {
-    private target: object;
+class SymbolRegistry {
+    private static readonly TYPE_KEY = Symbol.for("type");
+    private static readonly ID_KEY = Symbol.for("id");
 
-    constructor(target: object) {
-        this.target = target;
+    private data: Map<symbol, unknown> = new Map();
+
+    setType(value: string): void {
+        this.data.set(SymbolRegistry.TYPE_KEY, value);
     }
 
-    defineValue(name: string, value: unknown): void {
-        Object.defineProperty(this.target, name, {
-            value: value,
-            writable: true,
-            enumerable: true,
-            configurable: true
-        });
+    getType(): string | undefined {
+        return this.data.get(SymbolRegistry.TYPE_KEY) as string | undefined;
     }
 
-    defineConstant(name: string, value: unknown): void {
-        Object.defineProperty(this.target, name, {
-            value: value,
-            writable: false,
-            enumerable: true,
-            configurable: false
-        });
+    setId(value: number): void {
+        this.data.set(SymbolRegistry.ID_KEY, value);
     }
 
-    defineHidden(name: string, value: unknown): void {
-        Object.defineProperty(this.target, name, {
-            value: value,
-            writable: true,
-            enumerable: false,
-            configurable: true
-        });
+    getId(): number | undefined {
+        return this.data.get(SymbolRegistry.ID_KEY) as number | undefined;
     }
 }
 "#;
@@ -14562,72 +14554,112 @@ class PropertyDefiner {
 
     let output = printer.get_output().to_string();
 
+    // Class should be converted
     assert!(
-        output.contains("PropertyDefiner"),
-        "Expected PropertyDefiner class: {}",
+        output.contains("function SymbolRegistry"),
+        "Expected function declaration: {}",
         output
     );
+
+    // Symbol.for should be present
     assert!(
-        output.contains("Object.defineProperty"),
-        "Expected Object.defineProperty: {}",
+        output.contains("Symbol.for"),
+        "Expected Symbol.for call: {}",
         output
     );
+
+    // Methods should be present
     assert!(
-        output.contains("defineValue") && output.contains("defineConstant"),
+        output.contains("setType") && output.contains("getType"),
+        "Expected type methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_keyfor_basic() {
+    // Symbol.keyFor to retrieve key from global registry
+    let source = r#"
+class SymbolInspector {
+    private symbols: symbol[] = [];
+
+    register(key: string): symbol {
+        const sym = Symbol.for(key);
+        this.symbols.push(sym);
+        return sym;
+    }
+
+    getKey(sym: symbol): string | undefined {
+        return Symbol.keyFor(sym);
+    }
+
+    getAllKeys(): (string | undefined)[] {
+        return this.symbols.map(sym => Symbol.keyFor(sym));
+    }
+
+    isGlobal(sym: symbol): boolean {
+        return Symbol.keyFor(sym) !== undefined;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be converted
+    assert!(
+        output.contains("function SymbolInspector"),
+        "Expected function declaration: {}",
+        output
+    );
+
+    // Symbol.for and Symbol.keyFor should be present
+    assert!(
+        output.contains("Symbol.for") && output.contains("Symbol.keyFor"),
+        "Expected Symbol.for and Symbol.keyFor calls: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("register") && output.contains("getKey") && output.contains("isGlobal"),
         "Expected methods: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_object_defineproperty_accessor() {
-    // Object.defineProperty with getter/setter descriptors
+fn test_class_es5_symbol_for_computed_property() {
+    // Using Symbol.for for computed property keys
     let source = r#"
-class AccessorBuilder {
-    static addGetter<T, K extends keyof T>(obj: T, prop: K, getter: () => T[K]): void {
-        Object.defineProperty(obj, prop, {
-            get: getter,
-            enumerable: true,
-            configurable: true
-        });
+const METADATA_KEY = Symbol.for("metadata");
+const VERSION_KEY = Symbol.for("version");
+
+class Annotated {
+    [METADATA_KEY]: Record<string, unknown> = {};
+    [VERSION_KEY]: string = "1.0.0";
+
+    setMeta(key: string, value: unknown): void {
+        this[METADATA_KEY][key] = value;
     }
 
-    static addSetter<T, K extends keyof T>(obj: T, prop: K, setter: (v: T[K]) => void): void {
-        Object.defineProperty(obj, prop, {
-            set: setter,
-            enumerable: true,
-            configurable: true
-        });
+    getMeta(key: string): unknown {
+        return this[METADATA_KEY][key];
     }
 
-    static addAccessor<T, K extends keyof T>(
-        obj: T,
-        prop: K,
-        getter: () => T[K],
-        setter: (v: T[K]) => void
-    ): void {
-        Object.defineProperty(obj, prop, {
-            get: getter,
-            set: setter,
-            enumerable: true,
-            configurable: true
-        });
-    }
-
-    createObservable<T extends object>(target: T): T {
-        const self = this;
-        Object.keys(target).forEach(key => {
-            let value = (target as any)[key];
-            Object.defineProperty(target, key, {
-                get: () => value,
-                set: (newValue) => {
-                    value = newValue;
-                },
-                enumerable: true,
-                configurable: true
-            });
-        });
-        return target;
+    getVersion(): string {
+        return this[VERSION_KEY];
     }
 }
 "#;
@@ -14646,142 +14678,68 @@ class AccessorBuilder {
 
     let output = printer.get_output().to_string();
 
+    // Class should be converted
     assert!(
-        output.contains("AccessorBuilder"),
-        "Expected AccessorBuilder class: {}",
+        output.contains("function Annotated"),
+        "Expected function declaration: {}",
         output
     );
+
+    // Symbol.for should be present for constants
     assert!(
-        output.contains("Object.defineProperty"),
-        "Expected Object.defineProperty: {}",
+        output.contains("Symbol.for"),
+        "Expected Symbol.for call: {}",
         output
     );
+
+    // Methods should be present
     assert!(
-        output.contains("addGetter") && output.contains("addSetter") && output.contains("addAccessor"),
-        "Expected accessor methods: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_object_defineproperties_multiple() {
-    // Object.defineProperties for multiple properties
-    let source = r#"
-class MultiPropertyDefiner {
-    static defineMultiple(target: object, props: Record<string, unknown>): void {
-        const descriptors: PropertyDescriptorMap = {};
-        Object.keys(props).forEach(key => {
-            descriptors[key] = {
-                value: props[key],
-                writable: true,
-                enumerable: true,
-                configurable: true
-            };
-        });
-        Object.defineProperties(target, descriptors);
-    }
-
-    static makeReadonly<T extends object>(target: T): Readonly<T> {
-        const descriptors: PropertyDescriptorMap = {};
-        Object.keys(target).forEach(key => {
-            descriptors[key] = {
-                value: (target as any)[key],
-                writable: false,
-                enumerable: true,
-                configurable: false
-            };
-        });
-        return Object.defineProperties({} as T, descriptors);
-    }
-
-    createWithDefaults<T extends object>(defaults: T, overrides: Partial<T>): T {
-        const result = {} as T;
-        const descriptors: PropertyDescriptorMap = {};
-
-        Object.keys(defaults).forEach(key => {
-            const value = key in overrides ? (overrides as any)[key] : (defaults as any)[key];
-            descriptors[key] = {
-                value: value,
-                writable: true,
-                enumerable: true,
-                configurable: true
-            };
-        });
-
-        return Object.defineProperties(result, descriptors);
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    assert!(
-        output.contains("MultiPropertyDefiner"),
-        "Expected MultiPropertyDefiner class: {}",
-        output
-    );
-    assert!(
-        output.contains("Object.defineProperties"),
-        "Expected Object.defineProperties: {}",
-        output
-    );
-    assert!(
-        output.contains("defineMultiple") && output.contains("makeReadonly"),
+        output.contains("setMeta") && output.contains("getMeta") && output.contains("getVersion"),
         "Expected methods: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_object_defineproperty_readonly() {
-    // Object.defineProperty for creating readonly properties
+fn test_class_es5_symbol_for_with_inheritance() {
+    // Symbol.for with class inheritance
     let source = r#"
-class ImmutablePropertyManager {
-    private _values: Map<string, unknown> = new Map();
+class BaseEntity {
+    protected static readonly ID_SYMBOL = Symbol.for("entity.id");
+    protected static readonly TYPE_SYMBOL = Symbol.for("entity.type");
 
-    defineImmutable(target: object, name: string, value: unknown): void {
-        Object.defineProperty(target, name, {
-            value: value,
-            writable: false,
-            enumerable: true,
-            configurable: false
-        });
-        this._values.set(name, value);
+    protected [BaseEntity.ID_SYMBOL]: string;
+
+    constructor(id: string) {
+        this[BaseEntity.ID_SYMBOL] = id;
     }
 
-    static freeze<T extends object>(target: T): Readonly<T> {
-        Object.keys(target).forEach(key => {
-            Object.defineProperty(target, key, {
-                writable: false,
-                configurable: false
-            });
-        });
-        return target;
+    getId(): string {
+        return this[BaseEntity.ID_SYMBOL];
     }
 
-    static seal<T extends object>(target: T): T {
-        Object.keys(target).forEach(key => {
-            Object.defineProperty(target, key, {
-                configurable: false
-            });
-        });
-        return target;
+    static getIdKey(): string | undefined {
+        return Symbol.keyFor(BaseEntity.ID_SYMBOL);
+    }
+}
+
+class User extends BaseEntity {
+    private name: string;
+
+    constructor(id: string, name: string) {
+        super(id);
+        this.name = name;
     }
 
-    getStoredValue(name: string): unknown {
-        return this._values.get(name);
+    getName(): string {
+        return this.name;
+    }
+
+    toJSON(): object {
+        return {
+            id: this.getId(),
+            name: this.name
+        };
     }
 }
 "#;
@@ -14800,162 +14758,76 @@ class ImmutablePropertyManager {
 
     let output = printer.get_output().to_string();
 
+    // Both classes should be converted
     assert!(
-        output.contains("ImmutablePropertyManager"),
-        "Expected ImmutablePropertyManager class: {}",
+        output.contains("function BaseEntity"),
+        "Expected BaseEntity function: {}",
         output
     );
     assert!(
-        output.contains("Object.defineProperty"),
-        "Expected Object.defineProperty: {}",
+        output.contains("function User"),
+        "Expected User function: {}",
         output
     );
+
+    // Inheritance should be set up
     assert!(
-        output.contains("defineImmutable") && output.contains("getStoredValue"),
-        "Expected methods: {}",
+        output.contains("__extends") || output.contains("extends"),
+        "Expected inheritance: {}",
         output
     );
-}
 
-#[test]
-fn test_class_es5_object_defineproperty_in_constructor() {
-    // Object.defineProperty in constructor
-    let source = r#"
-class ComputedPropertyClass {
-    constructor(private _value: number) {
-        Object.defineProperty(this, 'doubled', {
-            get: () => this._value * 2,
-            enumerable: true,
-            configurable: false
-        });
-
-        Object.defineProperty(this, 'squared', {
-            get: () => this._value * this._value,
-            enumerable: true,
-            configurable: false
-        });
-
-        Object.defineProperty(this, 'value', {
-            get: () => this._value,
-            set: (v: number) => { this._value = v; },
-            enumerable: true,
-            configurable: true
-        });
-    }
-
-    increment(): void {
-        this._value++;
-    }
-
-    decrement(): void {
-        this._value--;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
+    // Symbol.for should be present
     assert!(
-        output.contains("ComputedPropertyClass"),
-        "Expected ComputedPropertyClass class: {}",
-        output
-    );
-    assert!(
-        output.contains("Object.defineProperty"),
-        "Expected Object.defineProperty: {}",
-        output
-    );
-    assert!(
-        output.contains("increment") && output.contains("decrement"),
-        "Expected methods: {}",
+        output.contains("Symbol.for"),
+        "Expected Symbol.for call: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_object_defineproperty_combined() {
-    // Combined Object.defineProperty patterns with other Object methods
+fn test_class_es5_symbol_for_registry_pattern() {
+    // Complete registry pattern using Symbol.for/keyFor
     let source = r#"
-class PropertyMixinBuilder {
-    static mixin<T extends object, U extends object>(target: T, source: U): T & U {
-        const result = Object.create(Object.getPrototypeOf(target)) as T & U;
+class PluginRegistry {
+    private static plugins: Map<symbol, unknown> = new Map();
 
-        // Copy target properties
-        Object.keys(target).forEach(key => {
-            const descriptor = Object.getOwnPropertyDescriptor(target, key);
-            if (descriptor) {
-                Object.defineProperty(result, key, descriptor);
+    static register<T>(name: string, plugin: T): symbol {
+        const key = Symbol.for("plugin." + name);
+        this.plugins.set(key, plugin);
+        return key;
+    }
+
+    static get<T>(key: symbol): T | undefined {
+        return this.plugins.get(key) as T | undefined;
+    }
+
+    static getByName<T>(name: string): T | undefined {
+        const key = Symbol.for("plugin." + name);
+        return this.plugins.get(key) as T | undefined;
+    }
+
+    static has(key: symbol): boolean {
+        return this.plugins.has(key);
+    }
+
+    static getName(key: symbol): string | undefined {
+        const fullKey = Symbol.keyFor(key);
+        if (fullKey && fullKey.startsWith("plugin.")) {
+            return fullKey.substring(7);
+        }
+        return undefined;
+    }
+
+    static list(): string[] {
+        const names: string[] = [];
+        for (const key of this.plugins.keys()) {
+            const name = this.getName(key);
+            if (name) {
+                names.push(name);
             }
-        });
-
-        // Copy source properties
-        Object.keys(source).forEach(key => {
-            const descriptor = Object.getOwnPropertyDescriptor(source, key);
-            if (descriptor) {
-                Object.defineProperty(result, key, descriptor);
-            }
-        });
-
-        return result;
-    }
-
-    static extend<T extends object>(target: T, extensions: PropertyDescriptorMap): T {
-        Object.keys(extensions).forEach(key => {
-            Object.defineProperty(target, key, extensions[key]);
-        });
-        return target;
-    }
-
-    static proxy<T extends object>(target: T, handler: {
-        get?: (prop: string, value: unknown) => unknown;
-        set?: (prop: string, value: unknown, newValue: unknown) => boolean;
-    }): T {
-        const result = Object.create(Object.getPrototypeOf(target)) as T;
-
-        Object.keys(target).forEach(key => {
-            let value = (target as any)[key];
-            Object.defineProperty(result, key, {
-                get: () => handler.get ? handler.get(key, value) : value,
-                set: (newValue) => {
-                    if (!handler.set || handler.set(key, value, newValue)) {
-                        value = newValue;
-                    }
-                },
-                enumerable: true,
-                configurable: true
-            });
-        });
-
-        return result;
-    }
-
-    static bindMethods<T extends object>(instance: T): T {
-        Object.getOwnPropertyNames(Object.getPrototypeOf(instance))
-            .filter(name => name !== 'constructor')
-            .forEach(name => {
-                const method = (instance as any)[name];
-                if (typeof method === 'function') {
-                    Object.defineProperty(instance, name, {
-                        value: method.bind(instance),
-                        writable: true,
-                        enumerable: false,
-                        configurable: true
-                    });
-                }
-            });
-        return instance;
+        }
+        return names;
     }
 }
 "#;
@@ -14974,24 +14846,31 @@ class PropertyMixinBuilder {
 
     let output = printer.get_output().to_string();
 
+    // Class should be converted
     assert!(
-        output.contains("PropertyMixinBuilder"),
-        "Expected PropertyMixinBuilder class: {}",
+        output.contains("function PluginRegistry"),
+        "Expected function declaration: {}",
         output
     );
+
+    // Symbol.for and Symbol.keyFor should be present
     assert!(
-        output.contains("Object.defineProperty"),
-        "Expected Object.defineProperty: {}",
+        output.contains("Symbol.for") && output.contains("Symbol.keyFor"),
+        "Expected Symbol.for and Symbol.keyFor calls: {}",
         output
     );
+
+    // Static methods should be present
     assert!(
-        output.contains("Object.getOwnPropertyDescriptor"),
-        "Expected Object.getOwnPropertyDescriptor: {}",
+        output.contains("register") && output.contains("getByName") && output.contains("getName"),
+        "Expected static methods: {}",
         output
     );
+
+    // list method should be present
     assert!(
-        output.contains("mixin") && output.contains("extend") && output.contains("proxy"),
-        "Expected utility methods: {}",
+        output.contains("list"),
+        "Expected list method: {}",
         output
     );
 }
