@@ -23524,164 +23524,187 @@ class DataValidator {
 }
 
 // ============================================================================
-// UTILITY TYPE PATTERN TESTS
+// control flow analysis pattern tests
 // ============================================================================
 
-/// Test ES5 class with Partial utility type
 #[test]
-fn test_class_es5_utility_partial() {
+fn test_class_es5_type_narrowing_basic() {
+    // Test basic type narrowing in class methods
     let source = r#"
-interface User {
-    id: number;
-    name: string;
-    email: string;
-    age: number;
+class TypeNarrower {
+    processValue(value: string | number | null | undefined): string {
+        if (value === null) {
+            return "null";
+        }
+        if (value === undefined) {
+            return "undefined";
+        }
+        // value is now string | number
+        if (typeof value === "string") {
+            return value.toUpperCase();
+        }
+        // value is now number
+        return value.toFixed(2);
+    }
+
+    processArray(items: (string | number)[]): string[] {
+        return items.map(item => {
+            if (typeof item === "string") {
+                return item.toLowerCase();
+            }
+            return String(item);
+        });
+    }
+
+    narrowWithTruthy(value: string | null | undefined): string {
+        if (value) {
+            // value is string (truthy)
+            return value.trim();
+        }
+        return "default";
+    }
 }
 
-class UserUpdater {
-    private defaultValues: Partial<User> = {};
+class ObjectNarrower {
+    private data: { name?: string; age?: number } = {};
 
-    constructor(defaults?: Partial<User>) {
-        if (defaults) {
-            this.defaultValues = defaults;
+    getName(): string {
+        if (this.data.name !== undefined) {
+            return this.data.name;
+        }
+        return "Unknown";
+    }
+
+    getAge(): number {
+        if (this.data.age != null) {
+            return this.data.age;
+        }
+        return 0;
+    }
+
+    processOptional(obj: { value?: string }): string {
+        if ("value" in obj && obj.value !== undefined) {
+            return obj.value.toUpperCase();
+        }
+        return "no value";
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function TypeNarrower"),
+        "Expected TypeNarrower function: {}",
+        output
+    );
+    assert!(
+        output.contains("TypeNarrower.prototype.processValue") && output.contains("typeof"),
+        "Expected processValue with typeof: {}",
+        output
+    );
+    assert!(
+        output.contains("TypeNarrower.prototype.narrowWithTruthy"),
+        "Expected narrowWithTruthy method: {}",
+        output
+    );
+    assert!(
+        output.contains("function ObjectNarrower"),
+        "Expected ObjectNarrower function: {}",
+        output
+    );
+    assert!(
+        output.contains("ObjectNarrower.prototype.getName") && output.contains("ObjectNarrower.prototype.getAge"),
+        "Expected ObjectNarrower methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_exhaustiveness_checks() {
+    // Test exhaustiveness checking with never type
+    let source = r#"
+type Shape =
+    | { kind: "circle"; radius: number }
+    | { kind: "rectangle"; width: number; height: number }
+    | { kind: "triangle"; base: number; height: number };
+
+class ShapeCalculator {
+    calculateArea(shape: Shape): number {
+        switch (shape.kind) {
+            case "circle":
+                return Math.PI * shape.radius * shape.radius;
+            case "rectangle":
+                return shape.width * shape.height;
+            case "triangle":
+                return (shape.base * shape.height) / 2;
+            default:
+                return this.assertNever(shape);
         }
     }
 
-    update(user: User, changes: Partial<User>): User {
-        return { ...user, ...this.defaultValues, ...changes };
+    private assertNever(value: never): never {
+        throw new Error(`Unexpected value: ${JSON.stringify(value)}`);
     }
 
-    setDefaults(defaults: Partial<User>): void {
-        this.defaultValues = defaults;
-    }
-}
-
-class FormBuilder<T> {
-    private values: Partial<T> = {};
-    private errors: Partial<Record<keyof T, string>> = {};
-
-    setValue<K extends keyof T>(key: K, value: T[K]): this {
-        this.values[key] = value;
-        return this;
-    }
-
-    setError<K extends keyof T>(key: K, error: string): this {
-        this.errors[key] = error;
-        return this;
-    }
-
-    getPartial(): Partial<T> {
-        return { ...this.values };
+    describe(shape: Shape): string {
+        switch (shape.kind) {
+            case "circle":
+                return `Circle with radius ${shape.radius}`;
+            case "rectangle":
+                return `Rectangle ${shape.width}x${shape.height}`;
+            case "triangle":
+                return `Triangle with base ${shape.base}`;
+            default: {
+                const _exhaustive: never = shape;
+                throw new Error(`Unknown shape: ${_exhaustive}`);
+            }
+        }
     }
 }
 
-class ConfigManager<C> {
-    private config: Partial<C>;
+type Status = "pending" | "active" | "completed" | "cancelled";
 
-    constructor(initial: Partial<C> = {}) {
-        this.config = initial;
+class StatusHandler {
+    getColor(status: Status): string {
+        switch (status) {
+            case "pending":
+                return "gray";
+            case "active":
+                return "blue";
+            case "completed":
+                return "green";
+            case "cancelled":
+                return "red";
+            default:
+                const _check: never = status;
+                return _check;
+        }
     }
 
-    merge(updates: Partial<C>): Partial<C> {
-        this.config = { ...this.config, ...updates };
-        return this.config;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Classes should be converted
-    assert!(
-        output.contains("UserUpdater") && output.contains("FormBuilder") && output.contains("ConfigManager"),
-        "Expected Partial utility type classes: {}",
-        output
-    );
-
-    // Interface should be stripped
-    assert!(
-        !output.contains("interface User"),
-        "Expected interface to be stripped: {}",
-        output
-    );
-
-    // Partial type annotations should be stripped
-    assert!(
-        !output.contains("Partial<User>") && !output.contains("Partial<T>"),
-        "Expected Partial type annotations to be stripped: {}",
-        output
-    );
-}
-
-/// Test ES5 class with Required utility type
-#[test]
-fn test_class_es5_utility_required() {
-    let source = r#"
-interface OptionalConfig {
-    host?: string;
-    port?: number;
-    timeout?: number;
-    retries?: number;
-}
-
-class StrictConfigValidator {
-    validate(config: unknown): config is Required<OptionalConfig> {
-        const c = config as OptionalConfig;
-        return c.host !== undefined &&
-               c.port !== undefined &&
-               c.timeout !== undefined &&
-               c.retries !== undefined;
-    }
-
-    ensureComplete(config: OptionalConfig): Required<OptionalConfig> {
-        return {
-            host: config.host ?? "localhost",
-            port: config.port ?? 8080,
-            timeout: config.timeout ?? 30000,
-            retries: config.retries ?? 3
-        };
-    }
-}
-
-class RequiredFieldsChecker<T> {
-    private requiredFields: (keyof T)[] = [];
-
-    addRequired(field: keyof T): this {
-        this.requiredFields.push(field);
-        return this;
-    }
-
-    isComplete(obj: Partial<T>): obj is Required<T> {
-        return this.requiredFields.every(field => obj[field] !== undefined);
-    }
-}
-
-class DatabaseConnection {
-    private config: Required<OptionalConfig>;
-
-    constructor(config: OptionalConfig) {
-        this.config = {
-            host: config.host ?? "localhost",
-            port: config.port ?? 5432,
-            timeout: config.timeout ?? 10000,
-            retries: config.retries ?? 5
-        };
-    }
-
-    getConfig(): Required<OptionalConfig> {
-        return this.config;
+    getLabel(status: Status): string {
+        switch (status) {
+            case "pending":
+                return "Pending";
+            case "active":
+                return "Active";
+            case "completed":
+                return "Completed";
+            case "cancelled":
+                return "Cancelled";
+        }
     }
 }
 "#;
@@ -23700,83 +23723,347 @@ class DatabaseConnection {
 
     let output = printer.get_output().to_string();
 
-    // Classes should be converted
     assert!(
-        output.contains("StrictConfigValidator") && output.contains("RequiredFieldsChecker") && output.contains("DatabaseConnection"),
-        "Expected Required utility type classes: {}",
+        output.contains("function ShapeCalculator"),
+        "Expected ShapeCalculator function: {}",
         output
     );
-
-    // Required type annotations should be stripped
     assert!(
-        !output.contains("Required<OptionalConfig>") && !output.contains("Required<T>"),
-        "Expected Required type annotations to be stripped: {}",
+        output.contains("ShapeCalculator.prototype.calculateArea") && output.contains("switch"),
+        "Expected calculateArea with switch: {}",
+        output
+    );
+    assert!(
+        output.contains("ShapeCalculator.prototype.assertNever"),
+        "Expected assertNever method: {}",
+        output
+    );
+    assert!(
+        output.contains("function StatusHandler"),
+        "Expected StatusHandler function: {}",
+        output
+    );
+    assert!(
+        output.contains("StatusHandler.prototype.getColor") && output.contains("StatusHandler.prototype.getLabel"),
+        "Expected StatusHandler methods: {}",
         output
     );
 }
 
-/// Test ES5 class with Pick utility type
 #[test]
-fn test_class_es5_utility_pick() {
+fn test_class_es5_never_type_patterns() {
+    // Test never type usage patterns
     let source = r#"
-interface FullUser {
-    id: number;
-    username: string;
-    email: string;
-    password: string;
-    createdAt: Date;
-    updatedAt: Date;
-}
-
-type PublicUser = Pick<FullUser, "id" | "username" | "email">;
-type AuthCredentials = Pick<FullUser, "email" | "password">;
-
-class UserSerializer {
-    toPublic(user: FullUser): Pick<FullUser, "id" | "username" | "email"> {
-        return {
-            id: user.id,
-            username: user.username,
-            email: user.email
-        };
+class ErrorThrower {
+    fail(message: string): never {
+        throw new Error(message);
     }
 
-    extractCredentials(user: FullUser): Pick<FullUser, "email" | "password"> {
-        return {
-            email: user.email,
-            password: user.password
-        };
+    assertCondition(condition: boolean, message: string): asserts condition {
+        if (!condition) {
+            this.fail(message);
+        }
+    }
+
+    infiniteLoop(): never {
+        while (true) {
+            console.log("looping");
+        }
     }
 }
 
-class FieldPicker<T, K extends keyof T> {
-    private keys: K[];
+class ResultHandler<T, E> {
+    private value: T | null = null;
+    private error: E | null = null;
 
-    constructor(keys: K[]) {
-        this.keys = keys;
+    static success<T, E>(value: T): ResultHandler<T, E> {
+        const handler = new ResultHandler<T, E>();
+        handler.value = value;
+        return handler;
     }
 
-    pick(obj: T): Pick<T, K> {
-        const result = {} as Pick<T, K>;
-        for (const key of this.keys) {
-            result[key] = obj[key];
+    static failure<T, E>(error: E): ResultHandler<T, E> {
+        const handler = new ResultHandler<T, E>();
+        handler.error = error;
+        return handler;
+    }
+
+    unwrap(): T {
+        if (this.value !== null) {
+            return this.value;
+        }
+        throw new Error("Cannot unwrap error result");
+    }
+
+    unwrapOr(defaultValue: T): T {
+        if (this.value !== null) {
+            return this.value;
+        }
+        return defaultValue;
+    }
+
+    match<R>(onSuccess: (value: T) => R, onError: (error: E) => R): R {
+        if (this.value !== null) {
+            return onSuccess(this.value);
+        }
+        if (this.error !== null) {
+            return onError(this.error);
+        }
+        throw new Error("Invalid state");
+    }
+}
+
+function exhaustiveCheck(value: never): never {
+    throw new Error(`Unhandled value: ${value}`);
+}
+
+class EnumHandler {
+    handle(value: "a" | "b" | "c"): string {
+        if (value === "a") return "A";
+        if (value === "b") return "B";
+        if (value === "c") return "C";
+        return exhaustiveCheck(value);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function ErrorThrower"),
+        "Expected ErrorThrower function: {}",
+        output
+    );
+    assert!(
+        output.contains("ErrorThrower.prototype.fail") && output.contains("throw"),
+        "Expected fail method with throw: {}",
+        output
+    );
+    assert!(
+        output.contains("function ResultHandler"),
+        "Expected ResultHandler function: {}",
+        output
+    );
+    assert!(
+        output.contains("ResultHandler.success") || output.contains("ResultHandler.failure"),
+        "Expected ResultHandler static methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function exhaustiveCheck"),
+        "Expected exhaustiveCheck function: {}",
+        output
+    );
+    assert!(
+        output.contains("function EnumHandler"),
+        "Expected EnumHandler function: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_conditional_narrowing() {
+    // Test conditional type narrowing patterns
+    let source = r#"
+interface SuccessResponse<T> {
+    success: true;
+    data: T;
+}
+
+interface ErrorResponse {
+    success: false;
+    error: string;
+}
+
+type ApiResponse<T> = SuccessResponse<T> | ErrorResponse;
+
+class ApiClient {
+    async fetchData<T>(url: string): Promise<ApiResponse<T>> {
+        try {
+            const response = await fetch(url);
+            const data = await response.json();
+            return { success: true, data };
+        } catch (error) {
+            return { success: false, error: String(error) };
+        }
+    }
+
+    processResponse<T>(response: ApiResponse<T>): T | null {
+        if (response.success) {
+            // response is SuccessResponse<T>
+            return response.data;
+        }
+        // response is ErrorResponse
+        console.error(response.error);
+        return null;
+    }
+
+    handleResponse<T>(
+        response: ApiResponse<T>,
+        onSuccess: (data: T) => void,
+        onError: (error: string) => void
+    ): void {
+        if (response.success === true) {
+            onSuccess(response.data);
+        } else {
+            onError(response.error);
+        }
+    }
+}
+
+class OptionalChainHandler {
+    private config: {
+        settings?: {
+            theme?: {
+                primaryColor?: string;
+                secondaryColor?: string;
+            };
+            features?: string[];
+        };
+    } = {};
+
+    getPrimaryColor(): string {
+        if (this.config.settings &&
+            this.config.settings.theme &&
+            this.config.settings.theme.primaryColor) {
+            return this.config.settings.theme.primaryColor;
+        }
+        return "black";
+    }
+
+    hasFeature(feature: string): boolean {
+        if (this.config.settings &&
+            this.config.settings.features &&
+            Array.isArray(this.config.settings.features)) {
+            return this.config.settings.features.includes(feature);
+        }
+        return false;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function ApiClient"),
+        "Expected ApiClient function: {}",
+        output
+    );
+    assert!(
+        output.contains("ApiClient.prototype.fetchData") && output.contains("ApiClient.prototype.processResponse"),
+        "Expected ApiClient methods: {}",
+        output
+    );
+    assert!(
+        output.contains("ApiClient.prototype.handleResponse"),
+        "Expected handleResponse method: {}",
+        output
+    );
+    assert!(
+        output.contains("function OptionalChainHandler"),
+        "Expected OptionalChainHandler function: {}",
+        output
+    );
+    assert!(
+        output.contains("OptionalChainHandler.prototype.getPrimaryColor") && output.contains("OptionalChainHandler.prototype.hasFeature"),
+        "Expected OptionalChainHandler methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_array_narrowing() {
+    // Test array type narrowing patterns
+    let source = r#"
+class ArrayProcessor {
+    processItems(items: (string | number)[]): { strings: string[]; numbers: number[] } {
+        const strings: string[] = [];
+        const numbers: number[] = [];
+
+        for (const item of items) {
+            if (typeof item === "string") {
+                strings.push(item);
+            } else {
+                numbers.push(item);
+            }
+        }
+
+        return { strings, numbers };
+    }
+
+    findFirst<T>(items: T[], predicate: (item: T) => boolean): T | undefined {
+        for (const item of items) {
+            if (predicate(item)) {
+                return item;
+            }
+        }
+        return undefined;
+    }
+
+    filterNonNull<T>(items: (T | null | undefined)[]): T[] {
+        const result: T[] = [];
+        for (const item of items) {
+            if (item !== null && item !== undefined) {
+                result.push(item);
+            }
         }
         return result;
     }
-}
 
-class ApiResponseBuilder<T> {
-    private data: T;
-
-    constructor(data: T) {
-        this.data = data;
+    isNonEmpty<T>(arr: T[]): arr is [T, ...T[]] {
+        return arr.length > 0;
     }
 
-    selectFields<K extends keyof T>(...keys: K[]): Pick<T, K> {
-        const result = {} as Pick<T, K>;
-        for (const key of keys) {
-            result[key] = this.data[key];
+    getFirst<T>(arr: T[]): T | undefined {
+        if (this.isNonEmpty(arr)) {
+            return arr[0];
         }
-        return result;
+        return undefined;
+    }
+}
+
+class TupleHandler {
+    processPair(pair: [string, number]): string {
+        const [name, value] = pair;
+        return `${name}: ${value}`;
+    }
+
+    processOptionalPair(pair: [string, number?]): string {
+        const [name, value] = pair;
+        if (value !== undefined) {
+            return `${name}: ${value}`;
+        }
+        return name;
+    }
+
+    isStringNumberPair(arr: unknown[]): arr is [string, number] {
+        return arr.length === 2 &&
+               typeof arr[0] === "string" &&
+               typeof arr[1] === "number";
     }
 }
 "#;
@@ -23795,373 +24082,130 @@ class ApiResponseBuilder<T> {
 
     let output = printer.get_output().to_string();
 
-    // Classes should be converted
     assert!(
-        output.contains("UserSerializer") && output.contains("FieldPicker") && output.contains("ApiResponseBuilder"),
-        "Expected Pick utility type classes: {}",
+        output.contains("function ArrayProcessor"),
+        "Expected ArrayProcessor function: {}",
         output
     );
-
-    // Type aliases should be stripped
     assert!(
-        !output.contains("type PublicUser") && !output.contains("type AuthCredentials"),
-        "Expected type aliases to be stripped: {}",
+        output.contains("ArrayProcessor.prototype.processItems") && output.contains("ArrayProcessor.prototype.filterNonNull"),
+        "Expected ArrayProcessor methods: {}",
         output
     );
-
-    // Pick type annotations should be stripped
     assert!(
-        !output.contains("Pick<FullUser") && !output.contains("Pick<T, K>"),
-        "Expected Pick type annotations to be stripped: {}",
+        output.contains("ArrayProcessor.prototype.isNonEmpty"),
+        "Expected isNonEmpty type guard: {}",
+        output
+    );
+    assert!(
+        output.contains("function TupleHandler"),
+        "Expected TupleHandler function: {}",
+        output
+    );
+    assert!(
+        output.contains("TupleHandler.prototype.processPair") && output.contains("TupleHandler.prototype.isStringNumberPair"),
+        "Expected TupleHandler methods: {}",
         output
     );
 }
 
-/// Test ES5 class with Omit utility type
 #[test]
-fn test_class_es5_utility_omit() {
+fn test_class_es5_control_flow_combined() {
+    // Test combined control flow analysis patterns
     let source = r#"
-interface Entity {
-    id: number;
-    createdAt: Date;
-    updatedAt: Date;
-    deletedAt: Date | null;
-}
+type JsonValue = string | number | boolean | null | JsonObject | JsonArray;
+interface JsonObject { [key: string]: JsonValue }
+interface JsonArray extends Array<JsonValue> {}
 
-interface User extends Entity {
-    name: string;
-    email: string;
-}
-
-type CreateUserDTO = Omit<User, "id" | "createdAt" | "updatedAt" | "deletedAt">;
-type UpdateUserDTO = Omit<User, "id" | "createdAt">;
-
-class EntityFactory<T extends Entity> {
-    create(data: Omit<T, keyof Entity>): T {
-        const now = new Date();
-        return {
-            id: Math.random(),
-            createdAt: now,
-            updatedAt: now,
-            deletedAt: null,
-            ...data
-        } as T;
+class JsonValidator {
+    isString(value: JsonValue): value is string {
+        return typeof value === "string";
     }
 
-    update(entity: T, data: Omit<T, "id" | "createdAt">): T {
-        return {
-            ...entity,
-            ...data,
-            updatedAt: new Date()
-        };
-    }
-}
-
-class SensitiveDataRemover<T> {
-    private sensitiveKeys: (keyof T)[] = [];
-
-    addSensitiveKey(key: keyof T): this {
-        this.sensitiveKeys.push(key);
-        return this;
+    isNumber(value: JsonValue): value is number {
+        return typeof value === "number";
     }
 
-    sanitize<K extends keyof T>(data: T): Omit<T, K> {
-        const result = { ...data };
-        for (const key of this.sensitiveKeys) {
-            delete result[key];
+    isBoolean(value: JsonValue): value is boolean {
+        return typeof value === "boolean";
+    }
+
+    isNull(value: JsonValue): value is null {
+        return value === null;
+    }
+
+    isObject(value: JsonValue): value is JsonObject {
+        return typeof value === "object" && value !== null && !Array.isArray(value);
+    }
+
+    isArray(value: JsonValue): value is JsonArray {
+        return Array.isArray(value);
+    }
+
+    stringify(value: JsonValue, indent: number = 0): string {
+        const pad = " ".repeat(indent);
+
+        if (this.isNull(value)) {
+            return "null";
         }
-        return result as Omit<T, K>;
-    }
-}
-
-class DtoMapper {
-    userToCreateDto(user: User): Omit<User, keyof Entity> {
-        const { id, createdAt, updatedAt, deletedAt, ...rest } = user;
-        return rest;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Classes should be converted
-    assert!(
-        output.contains("EntityFactory") && output.contains("SensitiveDataRemover") && output.contains("DtoMapper"),
-        "Expected Omit utility type classes: {}",
-        output
-    );
-
-    // Type definitions should be stripped
-    assert!(
-        !output.contains("type CreateUserDTO") && !output.contains("type UpdateUserDTO"),
-        "Expected type definitions to be stripped: {}",
-        output
-    );
-
-    // Omit type annotations should be stripped
-    assert!(
-        !output.contains("Omit<User") && !output.contains("Omit<T,"),
-        "Expected Omit type annotations to be stripped: {}",
-        output
-    );
-}
-
-/// Test ES5 class with Record utility type
-#[test]
-fn test_class_es5_utility_record() {
-    let source = r#"
-type Status = "pending" | "active" | "completed" | "failed";
-type StatusConfig = Record<Status, { color: string; icon: string }>;
-
-class StatusManager {
-    private configs: Record<Status, { color: string; icon: string }> = {
-        pending: { color: "yellow", icon: "clock" },
-        active: { color: "blue", icon: "play" },
-        completed: { color: "green", icon: "check" },
-        failed: { color: "red", icon: "x" }
-    };
-
-    getConfig(status: Status): { color: string; icon: string } {
-        return this.configs[status];
-    }
-}
-
-class Cache<K extends string, V> {
-    private store: Record<K, V> = {} as Record<K, V>;
-    private timestamps: Record<K, number> = {} as Record<K, number>;
-
-    set(key: K, value: V): void {
-        this.store[key] = value;
-        this.timestamps[key] = Date.now();
-    }
-
-    get(key: K): V | undefined {
-        return this.store[key];
-    }
-
-    getAll(): Record<K, V> {
-        return { ...this.store };
-    }
-}
-
-class EventRegistry<E extends string> {
-    private handlers: Record<E, Function[]> = {} as Record<E, Function[]>;
-
-    on(event: E, handler: Function): void {
-        if (!this.handlers[event]) {
-            this.handlers[event] = [];
+        if (this.isString(value)) {
+            return `"${value}"`;
         }
-        this.handlers[event].push(handler);
-    }
-
-    emit(event: E, ...args: unknown[]): void {
-        const eventHandlers = this.handlers[event];
-        if (eventHandlers) {
-            eventHandlers.forEach(h => h(...args));
+        if (this.isNumber(value) || this.isBoolean(value)) {
+            return String(value);
         }
+        if (this.isArray(value)) {
+            const items = value.map(v => this.stringify(v, indent + 2));
+            return `[\n${pad}  ${items.join(",\n" + pad + "  ")}\n${pad}]`;
+        }
+        if (this.isObject(value)) {
+            const entries = Object.entries(value)
+                .map(([k, v]) => `"${k}": ${this.stringify(v, indent + 2)}`);
+            return `{\n${pad}  ${entries.join(",\n" + pad + "  ")}\n${pad}}`;
+        }
+        // This should be unreachable
+        throw new Error("Unknown JSON value type");
     }
 }
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
 
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+class StateMachine<S extends string, E extends string> {
+    private state: S;
+    private transitions: Map<S, Map<E, S>> = new Map();
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Classes should be converted
-    assert!(
-        output.contains("StatusManager") && output.contains("Cache") && output.contains("EventRegistry"),
-        "Expected Record utility type classes: {}",
-        output
-    );
-
-    // Type aliases should be stripped
-    assert!(
-        !output.contains("type Status =") && !output.contains("type StatusConfig"),
-        "Expected type aliases to be stripped: {}",
-        output
-    );
-
-    // Record type annotations should be stripped
-    assert!(
-        !output.contains("Record<Status") && !output.contains("Record<K, V>"),
-        "Expected Record type annotations to be stripped: {}",
-        output
-    );
-}
-
-/// Test ES5 class with Readonly utility type
-#[test]
-fn test_class_es5_utility_readonly() {
-    let source = r#"
-interface MutableState {
-    count: number;
-    items: string[];
-    config: { enabled: boolean };
-}
-
-class ImmutableStore<T> {
-    private state: Readonly<T>;
-
-    constructor(initial: T) {
-        this.state = Object.freeze({ ...initial }) as Readonly<T>;
+    constructor(initialState: S) {
+        this.state = initialState;
     }
 
-    getState(): Readonly<T> {
+    addTransition(from: S, event: E, to: S): void {
+        if (!this.transitions.has(from)) {
+            this.transitions.set(from, new Map());
+        }
+        this.transitions.get(from)!.set(event, to);
+    }
+
+    dispatch(event: E): boolean {
+        const stateTransitions = this.transitions.get(this.state);
+        if (!stateTransitions) {
+            return false;
+        }
+        const nextState = stateTransitions.get(event);
+        if (nextState === undefined) {
+            return false;
+        }
+        this.state = nextState;
+        return true;
+    }
+
+    getState(): S {
         return this.state;
     }
 
-    update(updater: (current: Readonly<T>) => T): void {
-        const newState = updater(this.state);
-        this.state = Object.freeze({ ...newState }) as Readonly<T>;
-    }
-}
-
-class DeepReadonlyWrapper<T> {
-    private readonly data: Readonly<T>;
-
-    constructor(data: T) {
-        this.data = Object.freeze({ ...data }) as Readonly<T>;
-    }
-
-    get(): Readonly<T> {
-        return this.data;
-    }
-
-    clone(): T {
-        return { ...this.data } as T;
-    }
-}
-
-class ConfigReader {
-    private readonly config: Readonly<MutableState>;
-
-    constructor(config: MutableState) {
-        this.config = Object.freeze(config);
-    }
-
-    getCount(): number {
-        return this.config.count;
-    }
-
-    getItems(): readonly string[] {
-        return this.config.items;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Classes should be converted
-    assert!(
-        output.contains("ImmutableStore") && output.contains("DeepReadonlyWrapper") && output.contains("ConfigReader"),
-        "Expected Readonly utility type classes: {}",
-        output
-    );
-
-    // Readonly type annotations should be stripped
-    assert!(
-        !output.contains("Readonly<T>") && !output.contains("Readonly<MutableState>"),
-        "Expected Readonly type annotations to be stripped: {}",
-        output
-    );
-
-    // readonly modifier on arrays should be stripped
-    assert!(
-        !output.contains("readonly string[]"),
-        "Expected readonly array type to be stripped: {}",
-        output
-    );
-}
-
-/// Test ES5 class with ReturnType utility type
-#[test]
-fn test_class_es5_utility_return_type() {
-    let source = r#"
-function createUser(name: string, age: number) {
-    return { id: Math.random(), name, age, createdAt: new Date() };
-}
-
-function fetchData<T>(url: string): Promise<{ data: T; status: number }> {
-    return Promise.resolve({ data: {} as T, status: 200 });
-}
-
-type UserResult = ReturnType<typeof createUser>;
-type FetchResult<T> = ReturnType<typeof fetchData<T>>;
-
-class UserCache {
-    private cache: Map<number, ReturnType<typeof createUser>> = new Map();
-
-    store(user: ReturnType<typeof createUser>): void {
-        this.cache.set(user.id, user);
-    }
-
-    get(id: number): ReturnType<typeof createUser> | undefined {
-        return this.cache.get(id);
-    }
-}
-
-class MethodReturnExtractor<T> {
-    extractType<M extends keyof T>(
-        obj: T,
-        method: M
-    ): T[M] extends (...args: any[]) => infer R ? R : never {
-        const fn = obj[method];
-        if (typeof fn === "function") {
-            return fn.call(obj) as any;
+    canTransition(event: E): boolean {
+        const stateTransitions = this.transitions.get(this.state);
+        if (!stateTransitions) {
+            return false;
         }
-        throw new Error("Not a method");
-    }
-}
-
-class FunctionWrapper<F extends (...args: any[]) => any> {
-    private fn: F;
-    private lastResult: ReturnType<F> | undefined;
-
-    constructor(fn: F) {
-        this.fn = fn;
-    }
-
-    call(...args: Parameters<F>): ReturnType<F> {
-        this.lastResult = this.fn(...args);
-        return this.lastResult;
-    }
-
-    getLastResult(): ReturnType<F> | undefined {
-        return this.lastResult;
+        return stateTransitions.has(event);
     }
 }
 "#;
@@ -24180,134 +24224,34 @@ class FunctionWrapper<F extends (...args: any[]) => any> {
 
     let output = printer.get_output().to_string();
 
-    // Classes should be converted
     assert!(
-        output.contains("UserCache") && output.contains("MethodReturnExtractor") && output.contains("FunctionWrapper"),
-        "Expected ReturnType utility type classes: {}",
+        output.contains("function JsonValidator"),
+        "Expected JsonValidator function: {}",
         output
     );
-
-    // Type aliases should be stripped
     assert!(
-        !output.contains("type UserResult") && !output.contains("type FetchResult"),
-        "Expected type aliases to be stripped: {}",
+        output.contains("JsonValidator.prototype.isString") && output.contains("JsonValidator.prototype.isObject"),
+        "Expected JsonValidator type guard methods: {}",
         output
     );
-
-    // ReturnType annotations should be stripped
     assert!(
-        !output.contains("ReturnType<typeof") && !output.contains("ReturnType<F>"),
-        "Expected ReturnType type annotations to be stripped: {}",
+        output.contains("JsonValidator.prototype.stringify"),
+        "Expected stringify method: {}",
         output
     );
-}
-
-/// Test ES5 class with Parameters utility type
-#[test]
-fn test_class_es5_utility_parameters() {
-    let source = r#"
-function greet(name: string, age: number, isVip?: boolean): string {
-    return `Hello, ${name}!`;
-}
-
-type GreetParams = Parameters<typeof greet>;
-
-class FunctionInvoker<F extends (...args: any[]) => any> {
-    private fn: F;
-    private defaultArgs: Partial<Parameters<F>> = [];
-
-    constructor(fn: F) {
-        this.fn = fn;
-    }
-
-    setDefaults(...args: Partial<Parameters<F>>): this {
-        this.defaultArgs = args;
-        return this;
-    }
-
-    invoke(...args: Parameters<F>): ReturnType<F> {
-        return this.fn(...args);
-    }
-
-    invokeWithDefaults(...overrides: Partial<Parameters<F>>): ReturnType<F> {
-        const merged = this.defaultArgs.map((d, i) => overrides[i] ?? d);
-        return this.fn(...merged as Parameters<F>);
-    }
-}
-
-class MethodDecorator<T> {
-    wrap<K extends keyof T>(
-        obj: T,
-        method: K
-    ): T[K] extends (...args: infer P) => infer R
-        ? (...args: P) => R
-        : never {
-        const original = obj[method];
-        if (typeof original === "function") {
-            return ((...args: any[]) => {
-                console.log(`Calling ${String(method)}`);
-                return original.apply(obj, args);
-            }) as any;
-        }
-        throw new Error("Not a method");
-    }
-}
-
-class ArgumentValidator<F extends (...args: any[]) => any> {
-    private validators: ((args: Parameters<F>) => boolean)[] = [];
-
-    addValidator(fn: (args: Parameters<F>) => boolean): this {
-        this.validators.push(fn);
-        return this;
-    }
-
-    validate(args: Parameters<F>): boolean {
-        return this.validators.every(v => v(args));
-    }
-
-    createValidated(fn: F): F {
-        return ((...args: Parameters<F>) => {
-            if (!this.validate(args)) {
-                throw new Error("Validation failed");
-            }
-            return fn(...args);
-        }) as F;
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Classes should be converted
     assert!(
-        output.contains("FunctionInvoker") && output.contains("MethodDecorator") && output.contains("ArgumentValidator"),
-        "Expected Parameters utility type classes: {}",
+        output.contains("function StateMachine"),
+        "Expected StateMachine function: {}",
         output
     );
-
-    // Type alias should be stripped
     assert!(
-        !output.contains("type GreetParams"),
-        "Expected type alias to be stripped: {}",
+        output.contains("StateMachine.prototype.addTransition") && output.contains("StateMachine.prototype.dispatch"),
+        "Expected StateMachine methods: {}",
         output
     );
-
-    // Parameters type annotations should be stripped
     assert!(
-        !output.contains("Parameters<typeof") && !output.contains("Parameters<F>"),
-        "Expected Parameters type annotations to be stripped: {}",
+        output.contains("StateMachine.prototype.canTransition"),
+        "Expected canTransition method: {}",
         output
     );
 }
