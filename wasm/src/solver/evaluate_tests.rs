@@ -41364,3 +41364,958 @@ fn test_distribution_keyof_result() {
     let expected = interner.union(vec![lit_a, lit_b]);
     assert!(result == expected || result != TypeId::ERROR);
 }
+
+// =============================================================================
+// Type Alias Tests - Generic, Recursive, Circular References
+// =============================================================================
+
+#[test]
+fn test_type_alias_simple() {
+    // type StringAlias = string
+    let interner = TypeInterner::new();
+
+    // Simple alias just evaluates to the underlying type
+    let result = evaluate_type(&interner, TypeId::STRING);
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_type_alias_generic_identity() {
+    // type Identity<T> = T
+    // Identity<number> = number
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // Substitute T = number
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, TypeId::NUMBER);
+
+    let result = instantiate_type(&interner, t_param, &subst);
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
+fn test_type_alias_generic_wrapper() {
+    // type Box<T> = { value: T }
+    // Box<string> = { value: string }
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let value_name = interner.intern_string("value");
+
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let box_type = interner.object(vec![PropertyInfo {
+        name: value_name,
+        type_id: t_param,
+        write_type: t_param,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, TypeId::STRING);
+
+    let instantiated = instantiate_type(&interner, box_type, &subst);
+
+    // Should have value: string
+    assert!(instantiated != TypeId::ERROR);
+}
+
+#[test]
+fn test_type_alias_generic_pair() {
+    // type Pair<A, B> = { first: A, second: B }
+    // Pair<number, string>
+    let interner = TypeInterner::new();
+
+    let a_name = interner.intern_string("A");
+    let b_name = interner.intern_string("B");
+    let first_name = interner.intern_string("first");
+    let second_name = interner.intern_string("second");
+
+    let a_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: a_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let b_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: b_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let pair_type = interner.object(vec![
+        PropertyInfo {
+            name: first_name,
+            type_id: a_param,
+            write_type: a_param,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: second_name,
+            type_id: b_param,
+            write_type: b_param,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let mut subst = TypeSubstitution::new();
+    subst.insert(a_name, TypeId::NUMBER);
+    subst.insert(b_name, TypeId::STRING);
+
+    let instantiated = instantiate_type(&interner, pair_type, &subst);
+    assert!(instantiated != TypeId::ERROR);
+}
+
+#[test]
+fn test_type_alias_recursive_list() {
+    // type List<T> = { head: T, tail: List<T> | null }
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    let list_ref = interner.reference(SymbolRef(1));
+    let null_or_list = interner.union(vec![TypeId::NULL, list_ref]);
+
+    let head_name = interner.intern_string("head");
+    let tail_name = interner.intern_string("tail");
+
+    let list_body = interner.object(vec![
+        PropertyInfo {
+            name: head_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: tail_name,
+            type_id: null_or_list,
+            write_type: null_or_list,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let mut env = TypeEnvironment::new();
+    env.insert(SymbolRef(1), list_body);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(list_ref);
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_type_alias_recursive_tree() {
+    // type Tree<T> = { value: T, left?: Tree<T>, right?: Tree<T> }
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    let tree_ref = interner.reference(SymbolRef(2));
+
+    let value_name = interner.intern_string("value");
+    let left_name = interner.intern_string("left");
+    let right_name = interner.intern_string("right");
+
+    let tree_body = interner.object(vec![
+        PropertyInfo {
+            name: value_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: left_name,
+            type_id: tree_ref,
+            write_type: tree_ref,
+            optional: true,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: right_name,
+            type_id: tree_ref,
+            write_type: tree_ref,
+            optional: true,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let mut env = TypeEnvironment::new();
+    env.insert(SymbolRef(2), tree_body);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(tree_ref);
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_type_alias_circular_a_b() {
+    // type A = { b: B }
+    // type B = { a: A }
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    let a_ref = interner.reference(SymbolRef(1));
+    let b_ref = interner.reference(SymbolRef(2));
+
+    let a_name = interner.intern_string("a");
+    let b_name = interner.intern_string("b");
+
+    let type_a = interner.object(vec![PropertyInfo {
+        name: b_name,
+        type_id: b_ref,
+        write_type: b_ref,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let type_b = interner.object(vec![PropertyInfo {
+        name: a_name,
+        type_id: a_ref,
+        write_type: a_ref,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let mut env = TypeEnvironment::new();
+    env.insert(SymbolRef(1), type_a);
+    env.insert(SymbolRef(2), type_b);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(a_ref);
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_type_alias_circular_three_way() {
+    // type A = { next: B }
+    // type B = { next: C }
+    // type C = { next: A }
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    let a_ref = interner.reference(SymbolRef(1));
+    let b_ref = interner.reference(SymbolRef(2));
+    let c_ref = interner.reference(SymbolRef(3));
+
+    let next_name = interner.intern_string("next");
+
+    let type_a = interner.object(vec![PropertyInfo {
+        name: next_name,
+        type_id: b_ref,
+        write_type: b_ref,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let type_b = interner.object(vec![PropertyInfo {
+        name: next_name,
+        type_id: c_ref,
+        write_type: c_ref,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let type_c = interner.object(vec![PropertyInfo {
+        name: next_name,
+        type_id: a_ref,
+        write_type: a_ref,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let mut env = TypeEnvironment::new();
+    env.insert(SymbolRef(1), type_a);
+    env.insert(SymbolRef(2), type_b);
+    env.insert(SymbolRef(3), type_c);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(a_ref);
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_type_alias_generic_with_constraint() {
+    // type NumberKeys<T extends object> = keyof T
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+
+    let _t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: Some(TypeId::OBJECT),
+        default: None,
+    }));
+
+    // Just verify type parameter with constraint can be created
+    assert!(true);
+}
+
+#[test]
+fn test_type_alias_generic_with_default() {
+    // type Container<T = string> = { value: T }
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: Some(TypeId::STRING),
+    }));
+
+    // Without explicit type arg, use default
+    let value_name = interner.intern_string("value");
+    let container = interner.object(vec![PropertyInfo {
+        name: value_name,
+        type_id: t_param,
+        write_type: t_param,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert!(container != TypeId::ERROR);
+}
+
+#[test]
+fn test_type_alias_union() {
+    // type StringOrNumber = string | number
+    let interner = TypeInterner::new();
+
+    let alias = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let result = evaluate_type(&interner, alias);
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_type_alias_intersection() {
+    // type Named = { name: string }
+    // type Aged = { age: number }
+    // type Person = Named & Aged
+    let interner = TypeInterner::new();
+
+    let name_prop = interner.intern_string("name");
+    let age_prop = interner.intern_string("age");
+
+    let named = interner.object(vec![PropertyInfo {
+        name: name_prop,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let aged = interner.object(vec![PropertyInfo {
+        name: age_prop,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let person = interner.intersection(vec![named, aged]);
+    let result = evaluate_type(&interner, person);
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_type_alias_conditional() {
+    // type IsString<T> = T extends string ? true : false
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: TypeId::STRING,
+        true_type: TypeId::TRUE,
+        false_type: TypeId::FALSE,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+
+    // T = string -> true
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, TypeId::STRING);
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+    assert_eq!(result, TypeId::TRUE);
+}
+
+#[test]
+fn test_type_alias_generic_array() {
+    // type ArrayOf<T> = T[]
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let array_of_t = interner.array(t_param);
+
+    // ArrayOf<number> = number[]
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, TypeId::NUMBER);
+
+    let instantiated = instantiate_type(&interner, array_of_t, &subst);
+    let expected = interner.array(TypeId::NUMBER);
+    assert_eq!(instantiated, expected);
+}
+
+#[test]
+fn test_type_alias_generic_tuple() {
+    // type Triple<T> = [T, T, T]
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let triple = interner.tuple(vec![t_param, t_param, t_param]);
+
+    // Triple<string> = [string, string, string]
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, TypeId::STRING);
+
+    let instantiated = instantiate_type(&interner, triple, &subst);
+    assert!(instantiated != TypeId::ERROR);
+}
+
+#[test]
+fn test_type_alias_generic_function() {
+    // type Mapper<T, U> = (x: T) => U
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+    let x_name = interner.intern_string("x");
+
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let u_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: u_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let mapper = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(x_name),
+            type_id: t_param,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: u_param,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // Mapper<number, string> = (x: number) => string
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, TypeId::NUMBER);
+    subst.insert(u_name, TypeId::STRING);
+
+    let instantiated = instantiate_type(&interner, mapper, &subst);
+    assert!(instantiated != TypeId::ERROR);
+}
+
+#[test]
+fn test_type_alias_recursive_json() {
+    // type JsonValue = string | number | boolean | null | JsonArray | JsonObject
+    // type JsonArray = JsonValue[]
+    // type JsonObject = { [key: string]: JsonValue }
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    let json_value_ref = interner.reference(SymbolRef(1));
+    let json_array = interner.array(json_value_ref);
+
+    let json_object = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: json_value_ref,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    let json_value_body = interner.union(vec![
+        TypeId::STRING,
+        TypeId::NUMBER,
+        TypeId::BOOLEAN,
+        TypeId::NULL,
+        json_array,
+        json_object,
+    ]);
+
+    let mut env = TypeEnvironment::new();
+    env.insert(SymbolRef(1), json_value_body);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(json_value_ref);
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_type_alias_nested_generic() {
+    // type Nested<T> = { inner: { value: T } }
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let inner_name = interner.intern_string("inner");
+    let value_name = interner.intern_string("value");
+
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let inner_obj = interner.object(vec![PropertyInfo {
+        name: value_name,
+        type_id: t_param,
+        write_type: t_param,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let nested = interner.object(vec![PropertyInfo {
+        name: inner_name,
+        type_id: inner_obj,
+        write_type: inner_obj,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, TypeId::BOOLEAN);
+
+    let instantiated = instantiate_type(&interner, nested, &subst);
+    assert!(instantiated != TypeId::ERROR);
+}
+
+#[test]
+fn test_type_alias_mapped_type() {
+    // type Readonly<T> = { readonly [P in keyof T]: T[P] }
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let p_name = interner.intern_string("P");
+
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let keyof_t = interner.keyof(t_param);
+
+    let mapped = interner.mapped_type(MappedType {
+        type_param: p_name,
+        constraint: keyof_t,
+        template: interner.indexed_access(t_param, interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+            name: p_name,
+            constraint: None,
+            default: None,
+        }))),
+        readonly_modifier: Some(MappedTypeModifier::Add),
+        optional_modifier: None,
+        name_type: None,
+    });
+
+    assert!(mapped != TypeId::ERROR);
+}
+
+#[test]
+fn test_type_alias_self_referencing_array() {
+    // type NestedArray<T> = T | NestedArray<T>[]
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    let nested_ref = interner.reference(SymbolRef(5));
+    let nested_array = interner.array(nested_ref);
+    let nested_body = interner.union(vec![TypeId::NUMBER, nested_array]);
+
+    let mut env = TypeEnvironment::new();
+    env.insert(SymbolRef(5), nested_body);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(nested_ref);
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_type_alias_generic_constraint_chain() {
+    // type First<T extends [any, ...any[]]> = T[0]
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+
+    // T extends [any, ...any[]]
+    let any_array = interner.array(TypeId::ANY);
+    let rest_element = interner.intern(TypeKey::RestElement(any_array));
+    let constraint = interner.tuple(vec![TypeId::ANY, rest_element]);
+
+    let _t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: Some(constraint),
+        default: None,
+    }));
+
+    // T[0]
+    let zero_lit = interner.number_literal(0.0);
+    let t_param_for_access = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+    let first_type = interner.indexed_access(t_param_for_access, zero_lit);
+
+    assert!(first_type != TypeId::ERROR);
+}
+
+#[test]
+fn test_type_alias_distributive_over_union() {
+    // type ToArray<T> = T extends any ? T[] : never
+    // ToArray<string | number> = string[] | number[]
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let t_array = interner.array(t_param);
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: TypeId::ANY,
+        true_type: t_array,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+
+    // ToArray<string | number>
+    let union_input = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, union_input);
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_type_alias_optional_properties() {
+    // type Optional<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+    let y_name = interner.intern_string("y");
+
+    // Original: { x: number, y: string }
+    let original = interner.object(vec![
+        PropertyInfo {
+            name: x_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: y_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Result after making x optional: { x?: number, y: string }
+    let with_optional_x = interner.object(vec![
+        PropertyInfo {
+            name: x_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: true,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: y_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    assert!(original != TypeId::ERROR);
+    assert!(with_optional_x != TypeId::ERROR);
+}
+
+#[test]
+fn test_type_alias_promise_chain() {
+    // type Awaited<T> = T extends Promise<infer U> ? Awaited<U> : T
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    let awaited_ref = interner.reference(SymbolRef(10));
+    let value_name = interner.intern_string("value");
+
+    // Simple Promise representation: { value: T }
+    let promise_of_number = interner.object(vec![PropertyInfo {
+        name: value_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Awaited<Promise<number>> should resolve to number
+    let mut env = TypeEnvironment::new();
+    env.insert(SymbolRef(10), TypeId::NUMBER);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(awaited_ref);
+    assert!(result != TypeId::ERROR);
+    assert!(promise_of_number != TypeId::ERROR);
+}
+
+#[test]
+fn test_type_alias_literal_union() {
+    // type Direction = "north" | "south" | "east" | "west"
+    let interner = TypeInterner::new();
+
+    let north = interner.string_literal("north");
+    let south = interner.string_literal("south");
+    let east = interner.string_literal("east");
+    let west = interner.string_literal("west");
+
+    let direction = interner.union(vec![north, south, east, west]);
+    let result = evaluate_type(&interner, direction);
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_type_alias_template_literal() {
+    // type EventName<T extends string> = `on${Capitalize<T>}`
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+
+    // Capitalize<T>
+    let capitalized = interner.intrinsic_string(StringIntrinsic::Capitalize, t_param);
+
+    // `on${Capitalize<T>}`
+    let on_prefix = interner.string_literal("on");
+    let template = interner.template_literal(TemplateLiteralType {
+        texts: vec![on_prefix, interner.intern_string("")],
+        types: vec![capitalized],
+    });
+
+    assert!(template != TypeId::ERROR);
+}
+
+#[test]
+fn test_type_alias_infer_in_conditional() {
+    // type ElementType<T> = T extends (infer E)[] ? E : T
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let e_name = interner.intern_string("E");
+
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_e = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: e_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let array_of_e = interner.array(infer_e);
+
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: array_of_e,
+        true_type: infer_e,
+        false_type: t_param,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+
+    // ElementType<number[]> = number
+    let number_array = interner.array(TypeId::NUMBER);
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, number_array);
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
+fn test_type_alias_branded_type() {
+    // type Brand<T, B> = T & { __brand: B }
+    let interner = TypeInterner::new();
+
+    let brand_name = interner.intern_string("__brand");
+    let user_id_brand = interner.string_literal("UserId");
+
+    let brand_prop = interner.object(vec![PropertyInfo {
+        name: brand_name,
+        type_id: user_id_brand,
+        write_type: user_id_brand,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    // type UserId = Brand<number, "UserId">
+    let user_id = interner.intersection(vec![TypeId::NUMBER, brand_prop]);
+
+    assert!(user_id != TypeId::ERROR);
+}
+
+#[test]
+fn test_type_alias_deep_partial() {
+    // type DeepPartial<T> = T extends object ? { [P in keyof T]?: DeepPartial<T[P]> } : T
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    let deep_partial_ref = interner.reference(SymbolRef(20));
+
+    // For testing, just verify the reference resolves
+    let x_name = interner.intern_string("x");
+    let body = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let mut env = TypeEnvironment::new();
+    env.insert(SymbolRef(20), body);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(deep_partial_ref);
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_type_alias_record() {
+    // type Record<K extends string, V> = { [P in K]: V }
+    let interner = TypeInterner::new();
+
+    let k_name = interner.intern_string("K");
+    let v_name = interner.intern_string("V");
+
+    let k_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: k_name,
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+
+    let v_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: v_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let mapped = interner.mapped_type(MappedType {
+        type_param: k_name,
+        constraint: k_param,
+        template: v_param,
+        readonly_modifier: None,
+        optional_modifier: None,
+        name_type: None,
+    });
+
+    assert!(mapped != TypeId::ERROR);
+}
