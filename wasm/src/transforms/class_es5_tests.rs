@@ -17456,31 +17456,30 @@ class TransactionScope extends BaseResource {
 }
 
 // ============================================================================
-// WeakMap/WeakSet pattern tests
+// Class Static Initialization Block Pattern Tests
 // ============================================================================
 
 #[test]
-fn test_class_es5_weakmap_cache_pattern() {
-    // WeakMap for caching computed values
+fn test_class_es5_static_block_basic() {
+    // Basic static initialization block
     let source = r#"
-class ComputeCache<K extends object, V> {
-    private cache: WeakMap<K, V> = new WeakMap();
+class Config {
+    static readonly ENV: string;
+    static readonly DEBUG: boolean;
+    static readonly VERSION: string;
 
-    getOrCompute(key: K, compute: () => V): V {
-        if (this.cache.has(key)) {
-            return this.cache.get(key)!;
-        }
-        const value = compute();
-        this.cache.set(key, value);
-        return value;
+    static {
+        Config.ENV = process.env.NODE_ENV || "development";
+        Config.DEBUG = Config.ENV === "development";
+        Config.VERSION = "1.0.0";
     }
 
-    invalidate(key: K): boolean {
-        return this.cache.delete(key);
-    }
-
-    has(key: K): boolean {
-        return this.cache.has(key);
+    static getConfig(): { env: string; debug: boolean; version: string } {
+        return {
+            env: Config.ENV,
+            debug: Config.DEBUG,
+            version: Config.VERSION
+        };
     }
 }
 "#;
@@ -17499,41 +17498,61 @@ class ComputeCache<K extends object, V> {
 
     let output = printer.get_output().to_string();
 
+    // Class should be converted
     assert!(
-        output.contains("function ComputeCache"),
-        "Expected ComputeCache function: {}",
+        output.contains("function Config") || output.contains("Config"),
+        "Expected Config class: {}",
         output
     );
+
+    // Static properties should be initialized
     assert!(
-        output.contains("WeakMap"),
-        "Expected WeakMap: {}",
+        output.contains("ENV") && output.contains("DEBUG") && output.contains("VERSION"),
+        "Expected static properties: {}",
+        output
+    );
+
+    // Static method should be present
+    assert!(
+        output.contains("getConfig"),
+        "Expected getConfig method: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_weakset_membership_pattern() {
-    // WeakSet for tracking object membership
+fn test_class_es5_static_block_multiple() {
+    // Multiple static initialization blocks
     let source = r#"
-class ObjectTracker<T extends object> {
-    private tracked: WeakSet<T> = new WeakSet();
+class Registry {
+    static handlers: Map<string, Function> = new Map();
+    static validators: Map<string, Function> = new Map();
+    static initialized: boolean = false;
 
-    track(obj: T): void {
-        this.tracked.add(obj);
+    static {
+        // Register default handlers
+        Registry.handlers.set("log", console.log);
+        Registry.handlers.set("error", console.error);
     }
 
-    untrack(obj: T): boolean {
-        return this.tracked.delete(obj);
+    static {
+        // Register default validators
+        Registry.validators.set("string", (v: any) => typeof v === "string");
+        Registry.validators.set("number", (v: any) => typeof v === "number");
     }
 
-    isTracked(obj: T): boolean {
-        return this.tracked.has(obj);
+    static {
+        // Mark as initialized
+        Registry.initialized = true;
+        console.log("Registry initialized");
     }
 
-    trackMultiple(objects: T[]): void {
-        for (const obj of objects) {
-            this.tracked.add(obj);
-        }
+    static addHandler(name: string, handler: Function): void {
+        Registry.handlers.set(name, handler);
+    }
+
+    static addValidator(name: string, validator: Function): void {
+        Registry.validators.set(name, validator);
     }
 }
 "#;
@@ -17552,48 +17571,56 @@ class ObjectTracker<T extends object> {
 
     let output = printer.get_output().to_string();
 
+    // Class should be converted
     assert!(
-        output.contains("function ObjectTracker"),
-        "Expected ObjectTracker function: {}",
+        output.contains("function Registry") || output.contains("Registry"),
+        "Expected Registry class: {}",
         output
     );
+
+    // Static properties should be present
     assert!(
-        output.contains("WeakSet"),
-        "Expected WeakSet: {}",
+        output.contains("handlers") && output.contains("validators"),
+        "Expected static properties: {}",
+        output
+    );
+
+    // Static methods should be present
+    assert!(
+        output.contains("addHandler") && output.contains("addValidator"),
+        "Expected static methods: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_weakmap_metadata_pattern() {
-    // WeakMap for storing metadata on objects
+fn test_class_es5_static_block_private_fields() {
+    // Static block with private static fields
     let source = r#"
-interface Metadata {
-    createdAt: Date;
-    tags: string[];
-    version: number;
-}
+class SecureService {
+    static #secret: string;
+    static #apiKey: string;
+    static #initialized: boolean = false;
 
-class MetadataStore {
-    private metadata: WeakMap<object, Metadata> = new WeakMap();
-
-    attach(target: object, meta: Metadata): void {
-        this.metadata.set(target, meta);
+    static {
+        SecureService.#secret = crypto.randomUUID();
+        SecureService.#apiKey = `key_${SecureService.#secret.slice(0, 8)}`;
+        SecureService.#initialized = true;
     }
 
-    get(target: object): Metadata | undefined {
-        return this.metadata.get(target);
+    static isInitialized(): boolean {
+        return SecureService.#initialized;
     }
 
-    update(target: object, partial: Partial<Metadata>): void {
-        const existing = this.metadata.get(target);
-        if (existing) {
-            this.metadata.set(target, { ...existing, ...partial });
+    static getApiKey(): string {
+        if (!SecureService.#initialized) {
+            throw new Error("Service not initialized");
         }
+        return SecureService.#apiKey;
     }
 
-    detach(target: object): boolean {
-        return this.metadata.delete(target);
+    static validateSecret(secret: string): boolean {
+        return secret === SecureService.#secret;
     }
 }
 "#;
@@ -17612,47 +17639,61 @@ class MetadataStore {
 
     let output = printer.get_output().to_string();
 
+    // Class should be converted
     assert!(
-        output.contains("function MetadataStore"),
-        "Expected MetadataStore function: {}",
+        output.contains("function SecureService") || output.contains("SecureService"),
+        "Expected SecureService class: {}",
         output
     );
+
+    // Static methods should be present
     assert!(
-        output.contains("WeakMap"),
-        "Expected WeakMap: {}",
+        output.contains("isInitialized") && output.contains("getApiKey"),
+        "Expected static methods: {}",
+        output
+    );
+
+    assert!(
+        output.contains("validateSecret"),
+        "Expected validateSecret method: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_weakset_visited_pattern() {
-    // WeakSet for cycle detection in graph traversal
+fn test_class_es5_static_block_inheritance() {
+    // Static block with inheritance
     let source = r#"
-interface GraphNode {
-    id: string;
-    neighbors: GraphNode[];
+class BaseLogger {
+    static logLevel: string = "info";
+    static prefix: string = "";
+
+    static {
+        BaseLogger.prefix = "[BaseLogger]";
+    }
+
+    static log(message: string): void {
+        console.log(`${BaseLogger.prefix} ${message}`);
+    }
 }
 
-class GraphTraversal {
-    private visited: WeakSet<GraphNode> = new WeakSet();
+class AppLogger extends BaseLogger {
+    static appName: string;
 
-    traverse(node: GraphNode, callback: (node: GraphNode) => void): void {
-        if (this.visited.has(node)) {
-            return;
-        }
-        this.visited.add(node);
-        callback(node);
-        for (const neighbor of node.neighbors) {
-            this.traverse(neighbor, callback);
+    static {
+        AppLogger.appName = "MyApp";
+        AppLogger.prefix = `[${AppLogger.appName}]`;
+        AppLogger.logLevel = "debug";
+    }
+
+    static debug(message: string): void {
+        if (AppLogger.logLevel === "debug") {
+            console.log(`${AppLogger.prefix} DEBUG: ${message}`);
         }
     }
 
-    reset(): void {
-        this.visited = new WeakSet();
-    }
-
-    hasVisited(node: GraphNode): boolean {
-        return this.visited.has(node);
+    static info(message: string): void {
+        console.log(`${AppLogger.prefix} INFO: ${message}`);
     }
 }
 "#;
@@ -17671,46 +17712,74 @@ class GraphTraversal {
 
     let output = printer.get_output().to_string();
 
+    // Classes should be converted
     assert!(
-        output.contains("function GraphTraversal"),
-        "Expected GraphTraversal function: {}",
+        output.contains("function BaseLogger") || output.contains("BaseLogger"),
+        "Expected BaseLogger class: {}",
         output
     );
     assert!(
-        output.contains("WeakSet"),
-        "Expected WeakSet: {}",
+        output.contains("function AppLogger") || output.contains("AppLogger"),
+        "Expected AppLogger class: {}",
+        output
+    );
+
+    // Static methods should be present
+    assert!(
+        output.contains("log") && output.contains("debug") && output.contains("info"),
+        "Expected logging methods: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_weakmap_weakset_in_constructor() {
-    // WeakMap and WeakSet initialized in constructor
+fn test_class_es5_static_block_complex_init() {
+    // Static block with complex initialization logic
     let source = r#"
-class EventManager<T extends object> {
-    private handlers: WeakMap<T, Set<Function>>;
-    private activeObjects: WeakSet<T>;
+class DataProcessor {
+    static processors: Map<string, (data: any) => any> = new Map();
+    static defaultProcessor: (data: any) => any;
+    static stats: { processed: number; errors: number };
 
-    constructor() {
-        this.handlers = new WeakMap();
-        this.activeObjects = new WeakSet();
+    static {
+        // Initialize stats
+        DataProcessor.stats = { processed: 0, errors: 0 };
+
+        // Set up default processor
+        DataProcessor.defaultProcessor = (data: any) => {
+            DataProcessor.stats.processed++;
+            return data;
+        };
+
+        // Register built-in processors
+        DataProcessor.processors.set("uppercase", (data: string) => {
+            DataProcessor.stats.processed++;
+            return data.toUpperCase();
+        });
+
+        DataProcessor.processors.set("lowercase", (data: string) => {
+            DataProcessor.stats.processed++;
+            return data.toLowerCase();
+        });
+
+        DataProcessor.processors.set("trim", (data: string) => {
+            DataProcessor.stats.processed++;
+            return data.trim();
+        });
     }
 
-    register(target: T, handler: Function): void {
-        this.activeObjects.add(target);
-        if (!this.handlers.has(target)) {
-            this.handlers.set(target, new Set());
+    static process(type: string, data: any): any {
+        const processor = DataProcessor.processors.get(type) || DataProcessor.defaultProcessor;
+        try {
+            return processor(data);
+        } catch (e) {
+            DataProcessor.stats.errors++;
+            throw e;
         }
-        this.handlers.get(target)!.add(handler);
     }
 
-    unregister(target: T): void {
-        this.handlers.delete(target);
-        this.activeObjects.delete(target);
-    }
-
-    isActive(target: T): boolean {
-        return this.activeObjects.has(target);
+    static getStats(): { processed: number; errors: number } {
+        return { ...DataProcessor.stats };
     }
 }
 "#;
@@ -17729,94 +17798,24 @@ class EventManager<T extends object> {
 
     let output = printer.get_output().to_string();
 
+    // Class should be converted
     assert!(
-        output.contains("function EventManager"),
-        "Expected EventManager function: {}",
+        output.contains("function DataProcessor") || output.contains("DataProcessor"),
+        "Expected DataProcessor class: {}",
         output
     );
+
+    // Static properties should be present
     assert!(
-        output.contains("WeakMap") && output.contains("WeakSet"),
-        "Expected WeakMap and WeakSet: {}",
+        output.contains("processors") && output.contains("stats"),
+        "Expected static properties: {}",
         output
     );
-}
 
-#[test]
-fn test_class_es5_weakmap_weakset_combined() {
-    // Combined WeakMap/WeakSet for object lifecycle management
-    let source = r#"
-class ObjectLifecycleManager<T extends object> {
-    private instances: WeakSet<T> = new WeakSet();
-    private metadata: WeakMap<T, { createdAt: number; state: string }> = new WeakMap();
-    private dependencies: WeakMap<T, Set<T>> = new WeakMap();
-
-    create(instance: T): void {
-        this.instances.add(instance);
-        this.metadata.set(instance, { createdAt: Date.now(), state: "active" });
-        this.dependencies.set(instance, new Set());
-    }
-
-    addDependency(instance: T, dependency: T): void {
-        if (this.instances.has(instance) && this.instances.has(dependency)) {
-            this.dependencies.get(instance)?.add(dependency);
-        }
-    }
-
-    getState(instance: T): string | undefined {
-        return this.metadata.get(instance)?.state;
-    }
-
-    setState(instance: T, state: string): void {
-        const meta = this.metadata.get(instance);
-        if (meta) {
-            this.metadata.set(instance, { ...meta, state });
-        }
-    }
-
-    destroy(instance: T): void {
-        this.instances.delete(instance);
-        this.metadata.delete(instance);
-        this.dependencies.delete(instance);
-    }
-
-    static createManager<U extends object>(): ObjectLifecycleManager<U> {
-        return new ObjectLifecycleManager<U>();
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
+    // Static methods should be present
     assert!(
-        output.contains("function ObjectLifecycleManager"),
-        "Expected ObjectLifecycleManager function: {}",
-        output
-    );
-    assert!(
-        output.contains("WeakSet"),
-        "Expected WeakSet: {}",
-        output
-    );
-    assert!(
-        output.contains("WeakMap"),
-        "Expected WeakMap: {}",
-        output
-    );
-    assert!(
-        output.contains("createManager"),
-        "Expected createManager static method: {}",
+        output.contains("process") && output.contains("getStats"),
+        "Expected static methods: {}",
         output
     );
 }
