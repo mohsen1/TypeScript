@@ -20105,3 +20105,331 @@ const createPipeline = <T>() => ({
         output
     );
 }
+
+// =============================================================================
+// ES5 Destructuring Patterns Parity Tests
+// =============================================================================
+
+/// Test: complex function parameter destructuring
+#[test]
+fn test_parity_es5_destructuring_function_params_complex() {
+    let source = r#"
+interface Options {
+    host: string;
+    port: number;
+    ssl?: boolean;
+}
+
+function connect(
+    { host, port, ssl = false }: Options,
+    [primary, secondary]: [string, string],
+    { timeout = 5000, retries = 3 }: { timeout?: number; retries?: number } = {}
+): void {
+    console.log(host, port, ssl, primary, secondary, timeout, retries);
+}
+
+const processData = (
+    { data: { items, metadata: { count } } }: { data: { items: string[]; metadata: { count: number } } },
+    [first, ...rest]: string[]
+): string[] => {
+    console.log(count, first);
+    return [...items, ...rest];
+};
+
+class ConfigParser {
+    parse(
+        { config: { name, values = [] } }: { config: { name: string; values?: number[] } }
+    ): { name: string; sum: number } {
+        return { name, sum: values.reduce((a, b) => a + b, 0) };
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions should be present
+    assert!(
+        output.contains("connect") && output.contains("processData"),
+        "Output should contain functions: {}",
+        output
+    );
+    // Class should be present
+    assert!(
+        output.contains("ConfigParser"),
+        "Output should contain class: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface Options"),
+        "Interface should be erased: {}",
+        output
+    );
+}
+
+/// Test: mixing array and object destructuring in various contexts
+#[test]
+fn test_parity_es5_destructuring_mixed_patterns() {
+    let source = r#"
+type DataTuple = [{ id: number; name: string }, string[], { active: boolean }];
+
+function processMixed([first, items, { active }]: DataTuple): string {
+    const { id, name } = first;
+    const [primary, ...others] = items;
+    return active ? `${id}:${name}:${primary}` : others.join(",");
+}
+
+const extractNested = ({
+    user: { profile: [firstName, lastName] },
+    settings: { theme: { primary: primaryColor } }
+}: {
+    user: { profile: [string, string] };
+    settings: { theme: { primary: string } };
+}): string => {
+    return `${firstName} ${lastName} - ${primaryColor}`;
+};
+
+class DataExtractor<T> {
+    extract(
+        { items: [first, second, ...rest] }: { items: T[] }
+    ): { first: T; second: T; rest: T[] } {
+        return { first, second, rest };
+    }
+
+    transform(
+        [{ value: v1 }, { value: v2 }]: Array<{ value: T }>
+    ): [T, T] {
+        return [v1, v2];
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions should be present
+    assert!(
+        output.contains("processMixed") && output.contains("extractNested"),
+        "Output should contain functions: {}",
+        output
+    );
+    // Class should be present
+    assert!(
+        output.contains("DataExtractor"),
+        "Output should contain class: {}",
+        output
+    );
+    // Type alias should be erased
+    assert!(
+        !output.contains("type DataTuple"),
+        "Type alias should be erased: {}",
+        output
+    );
+}
+
+/// Test: defaults with computed values and expressions
+#[test]
+fn test_parity_es5_destructuring_computed_defaults() {
+    let source = r#"
+const DEFAULT_HOST = "localhost";
+const DEFAULT_PORT = 8080;
+const getDefaultTimeout = (): number => 5000;
+
+function configure({
+    host = DEFAULT_HOST,
+    port = DEFAULT_PORT,
+    timeout = getDefaultTimeout(),
+    retries = Math.max(1, 3)
+}: {
+    host?: string;
+    port?: number;
+    timeout?: number;
+    retries?: number;
+} = {}): void {
+    console.log(host, port, timeout, retries);
+}
+
+const processWithDefaults = ({
+    items = [] as string[],
+    transform = ((x: string) => x.toUpperCase()),
+    filter = ((x: string) => x.length > 0)
+}: {
+    items?: string[];
+    transform?: (x: string) => string;
+    filter?: (x: string) => boolean;
+}): string[] => {
+    return items.filter(filter).map(transform);
+};
+
+class Builder {
+    private defaults = { name: "default", value: 0 };
+
+    build({
+        name = this.defaults.name,
+        value = this.defaults.value,
+        multiplier = 1
+    }: {
+        name?: string;
+        value?: number;
+        multiplier?: number;
+    } = {}): { name: string; result: number } {
+        return { name, result: value * multiplier };
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions should be present
+    assert!(
+        output.contains("configure") && output.contains("processWithDefaults"),
+        "Output should contain functions: {}",
+        output
+    );
+    // Class should be present
+    assert!(
+        output.contains("Builder"),
+        "Output should contain class: {}",
+        output
+    );
+    // Constants should be present
+    assert!(
+        output.contains("DEFAULT_HOST") && output.contains("DEFAULT_PORT"),
+        "Output should contain constants: {}",
+        output
+    );
+}
+
+/// Test: destructuring in class methods and constructors
+#[test]
+fn test_parity_es5_destructuring_class_methods() {
+    let source = r#"
+interface Point {
+    x: number;
+    y: number;
+}
+
+interface Rectangle {
+    topLeft: Point;
+    bottomRight: Point;
+}
+
+class Geometry {
+    constructor(
+        private { x: originX, y: originY }: Point = { x: 0, y: 0 }
+    ) {}
+
+    distance({ x: x1, y: y1 }: Point, { x: x2, y: y2 }: Point): number {
+        return Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+    }
+
+    area({ topLeft: { x: left, y: top }, bottomRight: { x: right, y: bottom } }: Rectangle): number {
+        return Math.abs(right - left) * Math.abs(bottom - top);
+    }
+
+    static fromArray([x, y]: [number, number]): Point {
+        return { x, y };
+    }
+
+    *iteratePoints([first, ...rest]: Point[]): Generator<Point, void, unknown> {
+        yield first;
+        for (const point of rest) {
+            yield point;
+        }
+    }
+}
+
+class Transform extends Geometry {
+    translate(
+        { x, y }: Point,
+        { dx = 0, dy = 0 }: { dx?: number; dy?: number } = {}
+    ): Point {
+        return { x: x + dx, y: y + dy };
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Classes should be present
+    assert!(
+        output.contains("Geometry") && output.contains("Transform"),
+        "Output should contain classes: {}",
+        output
+    );
+    // Methods should be present
+    assert!(
+        output.contains("distance") && output.contains("area") && output.contains("translate"),
+        "Output should contain methods: {}",
+        output
+    );
+    // Interfaces should be erased
+    assert!(
+        !output.contains("interface Point") && !output.contains("interface Rectangle"),
+        "Interfaces should be erased: {}",
+        output
+    );
+}
