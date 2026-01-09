@@ -114,9 +114,17 @@ Priority: 5
 - Tests: `./wasm/test.sh test_check_redux_lodash_style_generics`
 - Result: PASS (1 test run, 4960 skipped).
 - Tests: `./wasm/test.sh`
-- Result: FAIL (Docker permission denied to `/Users/mohsenazimi/.orbstack/run/docker.sock`).
-- Tests: `./wasm/test.sh thin_checker_tests`
-- Result: FAIL (`thin_checker_tests::test_abstract_constructor_assignability` expected 4 errors, got 2).
+- Result: FAIL (`cli::driver_tests::compile_class_with_generic_constructor` - pre-existing type checking bug).
+
+### Pre-existing Test Failure Analysis
+**Test**: `compile_class_with_generic_constructor`
+**Issue**: TS2322 errors for `return this` and `new Builder(fn(this.value))`:
+- `Type '{ build: { (): T }; set: { (value: T): Builder<T> }; readonly __private_brand_0: any; ... }' is not assignable to type 'Builder<T>'`
+- `Type '{ build: { (): U }; set: { (value: U): Builder<U> }; readonly __private_brand_0: any; ... }' is not assignable to type 'Builder<U>'`
+
+**Root Cause**: Class instance types are being compared structurally with private brand markers instead of being recognized as the same class type. The `this` keyword in methods and generic constructor returns aren't properly typed as the class type.
+
+**Fix Location**: Likely needs work in thin_checker's `this` typing and generic class instantiation code.
 
 ### Distributive Conditional Type Stress Tests Added
 Added 40 comprehensive stress tests in `evaluate_tests.rs` covering:
@@ -165,6 +173,7 @@ Added 40 comprehensive stress tests in `evaluate_tests.rs` covering:
 - `test_distributive_numeric_literal_filter` - numeric literal range filtering
 
 ## Completed
+- [x] **Subtype.rs Compilation Fix**: Removed dead code in `(_, TypeKey::TypeQuery(t_sym))` match arm that referenced undefined `s_sym` variable; code was unreachable since resolve_ref would return None in both places.
 - [x] **Redux/Lodash Generics Fix**: Cross-file type param resolution for Application expansion; allow mapped keys with `symbol` in unions; treat `any[K]` index access as `any` to satisfy ReducersMapObject constraints and unblock redux test.
 - [x] Added `@noImplicitAny: false` regression test to ensure implicit-any diagnostics are suppressed in `thin_checker_tests.rs`.
 - [x] Added `@strict: false` regression test to ensure implicit-any diagnostics are suppressed in `thin_checker_tests.rs`.
