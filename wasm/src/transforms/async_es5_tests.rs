@@ -10230,3 +10230,106 @@ fn test_async_module_pattern_ignores_nested_async() {
     );
     assert!(!result, "Should not detect await inside nested async in module function");
 }
+
+// ============================================================================
+// ASYNC RESOURCE MANAGEMENT PATTERN TESTS
+// ============================================================================
+
+// Tests for async resource management patterns: using declarations simulation,
+// async dispose, Symbol.dispose patterns.
+
+#[test]
+fn test_async_resource_pattern_dispose_basic() {
+    let result = async_error_propagation_contains_await(
+        "async function useResource() { await resource.dispose(); }",
+    );
+    assert!(result, "Should detect await in dispose call");
+}
+
+#[test]
+fn test_async_resource_pattern_try_finally_cleanup() {
+    let result = async_error_propagation_contains_await(
+        "async function useResource() { try { await doWork(); } finally { await cleanup(); } }",
+    );
+    assert!(result, "Should detect await in try-finally cleanup pattern");
+}
+
+#[test]
+fn test_async_resource_pattern_acquire_release() {
+    let result = async_error_propagation_contains_await(
+        "async function withLock() { await lock.acquire(); await lock.release(); }",
+    );
+    assert!(result, "Should detect await in acquire-release pattern");
+}
+
+#[test]
+fn test_async_resource_pattern_connection_close() {
+    let result = async_error_propagation_contains_await(
+        "async function withConnection() { await connection.close(); }",
+    );
+    assert!(result, "Should detect await in connection close pattern");
+}
+
+#[test]
+fn test_async_resource_pattern_file_handle() {
+    let result = async_error_propagation_contains_await(
+        "async function readFile() { await handle.close(); }",
+    );
+    assert!(result, "Should detect await in file handle close");
+}
+
+#[test]
+fn test_async_resource_pattern_transaction() {
+    let result = async_error_propagation_contains_await(
+        "async function transaction() { try { await db.commit(); } catch (e) { await db.rollback(); } }",
+    );
+    assert!(result, "Should detect await in transaction pattern");
+}
+
+#[test]
+fn test_async_resource_pattern_pool_return() {
+    let result = async_error_propagation_contains_await(
+        "async function usePooled() { await pool.release(resource); }",
+    );
+    assert!(result, "Should detect await in pool release pattern");
+}
+
+#[test]
+fn test_async_resource_pattern_stream_close() {
+    let result = async_error_propagation_contains_await(
+        "async function processStream() { await stream.close(); }",
+    );
+    assert!(result, "Should detect await in stream close pattern");
+}
+
+#[test]
+fn test_async_resource_pattern_multiple_cleanup() {
+    let result = async_error_propagation_contains_await(
+        "async function cleanup() { await resource1.dispose(); await resource2.dispose(); }",
+    );
+    assert!(result, "Should detect await in multiple dispose calls");
+}
+
+#[test]
+fn test_async_resource_pattern_conditional_cleanup() {
+    let result = async_error_propagation_contains_await(
+        "async function cleanup(resource: any) { if (resource) { await resource.dispose(); } }",
+    );
+    assert!(result, "Should detect await in conditional cleanup");
+}
+
+#[test]
+fn test_async_resource_pattern_no_await() {
+    let result = async_error_propagation_contains_await(
+        "async function syncDispose() { resource.dispose(); }",
+    );
+    assert!(!result, "Should not detect await when dispose is sync");
+}
+
+#[test]
+fn test_async_resource_pattern_ignores_nested_async() {
+    let result = async_error_propagation_contains_await(
+        "async function outer() { const cleanup = async () => await resource.dispose(); }",
+    );
+    assert!(!result, "Should not detect await inside nested async in resource function");
+}
