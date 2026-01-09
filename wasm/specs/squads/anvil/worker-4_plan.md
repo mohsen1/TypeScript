@@ -7,7 +7,7 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- (none – awaiting assignment)
+- [ ] Add ES5 tests for property decorator patterns (property initialization, lazy initialization, validation decorators, observable patterns) in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
 
 ## Task Queue
 - [ ] (empty)
