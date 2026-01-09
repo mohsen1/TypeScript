@@ -11854,3 +11854,104 @@ fn test_async_timeout_ignores_nested_async() {
     );
     assert!(!result, "Should not detect await inside nested async in timeout function");
 }
+
+// ============================================================================
+// ASYNC ITERATOR PATTERN TESTS
+// Tests for iterator patterns: next, return, throw, for-await-of
+// ============================================================================
+
+#[test]
+fn test_async_iterator_next() {
+    let result = async_error_propagation_contains_await(
+        "async function iterNext() { return await iterator.next(); }",
+    );
+    assert!(result, "Should detect await in iterator next");
+}
+
+#[test]
+fn test_async_iterator_return() {
+    let result = async_error_propagation_contains_await(
+        "async function iterReturn() { return await iterator.return(value); }",
+    );
+    assert!(result, "Should detect await in iterator return");
+}
+
+#[test]
+fn test_async_iterator_throw() {
+    let result = async_error_propagation_contains_await(
+        "async function iterThrow() { return await iterator.throw(error); }",
+    );
+    assert!(result, "Should detect await in iterator throw");
+}
+
+#[test]
+fn test_async_iterator_for_await() {
+    let result = async_error_propagation_contains_await(
+        "async function forAwait() { for await (const item of iterable) { await process(item); } }",
+    );
+    assert!(result, "Should detect await in for-await-of loop");
+}
+
+#[test]
+fn test_async_iterator_symbol() {
+    let result = async_error_propagation_contains_await(
+        "async function getIterator() { return await obj[Symbol.asyncIterator](); }",
+    );
+    assert!(result, "Should detect await in Symbol.asyncIterator");
+}
+
+#[test]
+fn test_async_iterator_done() {
+    let result = async_error_propagation_contains_await(
+        "async function checkDone() { return (await iterator.next()).done; }",
+    );
+    assert!(result, "Should detect await in check if done");
+}
+
+#[test]
+fn test_async_iterator_value() {
+    let result = async_error_propagation_contains_await(
+        "async function getValue() { return (await iterator.next()).value; }",
+    );
+    assert!(result, "Should detect await in get value");
+}
+
+#[test]
+fn test_async_iterator_from() {
+    let result = async_error_propagation_contains_await(
+        "async function fromIterable() { return await AsyncIterator.from(source); }",
+    );
+    assert!(result, "Should detect await in create from iterable");
+}
+
+#[test]
+fn test_async_iterator_map() {
+    let result = async_error_propagation_contains_await(
+        "async function mapIterator() { return await asyncIter.map(fn).toArray(); }",
+    );
+    assert!(result, "Should detect await in map over iterator");
+}
+
+#[test]
+fn test_async_iterator_filter() {
+    let result = async_error_propagation_contains_await(
+        "async function filterIterator() { return await asyncIter.filter(predicate).toArray(); }",
+    );
+    assert!(result, "Should detect await in filter iterator");
+}
+
+#[test]
+fn test_async_iterator_no_await() {
+    let result = async_error_propagation_contains_await(
+        "async function syncIterator() { return iterator[Symbol.asyncIterator]; }",
+    );
+    assert!(!result, "Should not detect await when iterator access is sync");
+}
+
+#[test]
+fn test_async_iterator_ignores_nested_async() {
+    let result = async_error_propagation_contains_await(
+        "async function outer() { const iter = async () => await iterator.next(); }",
+    );
+    assert!(!result, "Should not detect await inside nested async in iterator function");
+}
