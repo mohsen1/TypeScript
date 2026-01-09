@@ -19261,3 +19261,627 @@ class ApplicationService {
         output
     );
 }
+
+#[test]
+fn test_class_es5_property_decorator_initialization() {
+    // Property initialization decorator pattern
+    let source = r#"
+function defaultValue(value: any) {
+    return function(target: any, propertyKey: string) {
+        let val = value;
+        Object.defineProperty(target, propertyKey, {
+            get() { return val; },
+            set(newVal) { val = newVal; },
+            enumerable: true,
+            configurable: true
+        });
+    };
+}
+
+function readonly(target: any, propertyKey: string) {
+    Object.defineProperty(target, propertyKey, {
+        writable: false,
+        configurable: false
+    });
+}
+
+function enumerable(isEnumerable: boolean) {
+    return function(target: any, propertyKey: string, descriptor?: PropertyDescriptor) {
+        if (descriptor) {
+            descriptor.enumerable = isEnumerable;
+        }
+    };
+}
+
+class Configuration {
+    @defaultValue("localhost")
+    host: string;
+
+    @defaultValue(3000)
+    port: number;
+
+    @readonly
+    version: string = "1.0.0";
+
+    @enumerable(false)
+    secret: string = "hidden";
+}
+
+class UserSettings {
+    @defaultValue([])
+    preferences: string[];
+
+    @defaultValue({})
+    metadata: Record<string, any>;
+
+    @readonly
+    @defaultValue("user")
+    role: string;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("Configuration") && output.contains("UserSettings"),
+        "Expected Configuration and UserSettings classes: {}",
+        output
+    );
+
+    // Decorator functions should be present
+    assert!(
+        output.contains("defaultValue") && output.contains("readonly"),
+        "Expected property decorators: {}",
+        output
+    );
+
+    // Class IIFE pattern should be present
+    assert!(
+        output.contains("(function ()") || output.contains("(function()"),
+        "Expected class IIFE pattern: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_property_decorator_lazy_init() {
+    // Lazy initialization decorator pattern
+    let source = r#"
+function lazy<T>(initializer: () => T) {
+    return function(target: any, propertyKey: string) {
+        let value: T | undefined;
+        let initialized = false;
+
+        Object.defineProperty(target, propertyKey, {
+            get() {
+                if (!initialized) {
+                    value = initializer();
+                    initialized = true;
+                }
+                return value;
+            },
+            enumerable: true,
+            configurable: true
+        });
+    };
+}
+
+function cached(target: any, propertyKey: string) {
+    const cacheKey = Symbol(`__cache_${propertyKey}`);
+    const originalDescriptor = Object.getOwnPropertyDescriptor(target, propertyKey);
+
+    if (originalDescriptor && originalDescriptor.get) {
+        Object.defineProperty(target, propertyKey, {
+            get() {
+                if (!(cacheKey in this)) {
+                    (this as any)[cacheKey] = originalDescriptor.get!.call(this);
+                }
+                return (this as any)[cacheKey];
+            },
+            enumerable: true,
+            configurable: true
+        });
+    }
+}
+
+function memoize(target: any, propertyKey: string) {
+    const memoKey = `__memo_${propertyKey}`;
+    return {
+        get() {
+            if (!this[memoKey]) {
+                this[memoKey] = this[`compute${propertyKey}`]();
+            }
+            return this[memoKey];
+        }
+    };
+}
+
+class ExpensiveComputation {
+    @lazy(() => {
+        console.log("Computing heavy data...");
+        return Array.from({ length: 10000 }, (_, i) => i * 2);
+    })
+    heavyData: number[];
+
+    @lazy(() => new Map<string, any>())
+    cache: Map<string, any>;
+
+    @cached
+    get computedValue(): number {
+        return Math.random() * 1000;
+    }
+}
+
+class DatabaseConnection {
+    @lazy(() => {
+        console.log("Establishing connection...");
+        return { connected: true, pool: [] };
+    })
+    connection: { connected: boolean; pool: any[] };
+
+    @lazy(() => new WeakMap())
+    queryCache: WeakMap<object, any>;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("ExpensiveComputation") && output.contains("DatabaseConnection"),
+        "Expected ExpensiveComputation and DatabaseConnection classes: {}",
+        output
+    );
+
+    // Decorator functions should be present
+    assert!(
+        output.contains("lazy") && output.contains("cached"),
+        "Expected lazy decorators: {}",
+        output
+    );
+
+    // Class IIFE pattern should be present
+    assert!(
+        output.contains("(function ()") || output.contains("(function()"),
+        "Expected class IIFE pattern: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_property_decorator_validation() {
+    // Validation decorator pattern for properties
+    let source = r#"
+function minLength(min: number) {
+    return function(target: any, propertyKey: string) {
+        let value: string;
+        Object.defineProperty(target, propertyKey, {
+            get() { return value; },
+            set(newVal: string) {
+                if (newVal.length < min) {
+                    throw new Error(`${propertyKey} must be at least ${min} characters`);
+                }
+                value = newVal;
+            },
+            enumerable: true,
+            configurable: true
+        });
+    };
+}
+
+function maxLength(max: number) {
+    return function(target: any, propertyKey: string) {
+        let value: string;
+        Object.defineProperty(target, propertyKey, {
+            get() { return value; },
+            set(newVal: string) {
+                if (newVal.length > max) {
+                    throw new Error(`${propertyKey} must be at most ${max} characters`);
+                }
+                value = newVal;
+            },
+            enumerable: true,
+            configurable: true
+        });
+    };
+}
+
+function pattern(regex: RegExp) {
+    return function(target: any, propertyKey: string) {
+        let value: string;
+        Object.defineProperty(target, propertyKey, {
+            get() { return value; },
+            set(newVal: string) {
+                if (!regex.test(newVal)) {
+                    throw new Error(`${propertyKey} does not match pattern`);
+                }
+                value = newVal;
+            },
+            enumerable: true,
+            configurable: true
+        });
+    };
+}
+
+function range(min: number, max: number) {
+    return function(target: any, propertyKey: string) {
+        let value: number;
+        Object.defineProperty(target, propertyKey, {
+            get() { return value; },
+            set(newVal: number) {
+                if (newVal < min || newVal > max) {
+                    throw new Error(`${propertyKey} must be between ${min} and ${max}`);
+                }
+                value = newVal;
+            },
+            enumerable: true,
+            configurable: true
+        });
+    };
+}
+
+class UserForm {
+    @minLength(3)
+    @maxLength(50)
+    username: string;
+
+    @pattern(/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/)
+    email: string;
+
+    @minLength(8)
+    password: string;
+
+    @range(18, 120)
+    age: number;
+}
+
+class ProductForm {
+    @minLength(1)
+    @maxLength(100)
+    name: string;
+
+    @maxLength(500)
+    description: string;
+
+    @range(0.01, 999999.99)
+    price: number;
+
+    @range(0, 10000)
+    quantity: number;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("UserForm") && output.contains("ProductForm"),
+        "Expected UserForm and ProductForm classes: {}",
+        output
+    );
+
+    // Validation decorators should be present
+    assert!(
+        output.contains("minLength") && output.contains("maxLength") && output.contains("range"),
+        "Expected validation decorators: {}",
+        output
+    );
+
+    // Class IIFE pattern should be present
+    assert!(
+        output.contains("(function ()") || output.contains("(function()"),
+        "Expected class IIFE pattern: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_property_decorator_observable() {
+    // Observable pattern decorator
+    let source = r#"
+type Subscriber<T> = (value: T) => void;
+
+function observable(target: any, propertyKey: string) {
+    const subscribersKey = Symbol(`${propertyKey}_subscribers`);
+    let value: any;
+
+    Object.defineProperty(target, propertyKey, {
+        get() { return value; },
+        set(newVal) {
+            const oldVal = value;
+            value = newVal;
+            const subscribers = (this as any)[subscribersKey] || [];
+            subscribers.forEach((sub: Subscriber<any>) => sub(newVal));
+        },
+        enumerable: true,
+        configurable: true
+    });
+}
+
+function computed(dependencies: string[]) {
+    return function(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+        const originalGet = descriptor.get;
+        let cachedValue: any;
+        let isDirty = true;
+
+        dependencies.forEach(dep => {
+            const originalSet = Object.getOwnPropertyDescriptor(target, dep)?.set;
+            if (originalSet) {
+                Object.defineProperty(target, dep, {
+                    set(val) {
+                        originalSet.call(this, val);
+                        isDirty = true;
+                    }
+                });
+            }
+        });
+
+        descriptor.get = function() {
+            if (isDirty) {
+                cachedValue = originalGet?.call(this);
+                isDirty = false;
+            }
+            return cachedValue;
+        };
+    };
+}
+
+function watch(callback: string) {
+    return function(target: any, propertyKey: string) {
+        let value: any;
+        Object.defineProperty(target, propertyKey, {
+            get() { return value; },
+            set(newVal) {
+                const oldVal = value;
+                value = newVal;
+                if (typeof this[callback] === 'function') {
+                    this[callback](newVal, oldVal, propertyKey);
+                }
+            },
+            enumerable: true,
+            configurable: true
+        });
+    };
+}
+
+class ReactiveState {
+    @observable
+    count: number = 0;
+
+    @observable
+    name: string = "";
+
+    @observable
+    items: string[] = [];
+
+    @computed(["count", "name"])
+    get summary(): string {
+        return `${this.name}: ${this.count}`;
+    }
+}
+
+class FormModel {
+    @watch("onFieldChange")
+    firstName: string;
+
+    @watch("onFieldChange")
+    lastName: string;
+
+    @watch("onFieldChange")
+    email: string;
+
+    onFieldChange(newVal: any, oldVal: any, field: string) {
+        console.log(`${field} changed from ${oldVal} to ${newVal}`);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("ReactiveState") && output.contains("FormModel"),
+        "Expected ReactiveState and FormModel classes: {}",
+        output
+    );
+
+    // Observable decorators should be present
+    assert!(
+        output.contains("observable") && output.contains("watch"),
+        "Expected observable decorators: {}",
+        output
+    );
+
+    // Class IIFE pattern should be present
+    assert!(
+        output.contains("(function ()") || output.contains("(function()"),
+        "Expected class IIFE pattern: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_property_decorator_combined() {
+    // Combined property decorator patterns
+    let source = r#"
+function logged(target: any, propertyKey: string) {
+    let value: any;
+    Object.defineProperty(target, propertyKey, {
+        get() {
+            console.log(`Getting ${propertyKey}`);
+            return value;
+        },
+        set(newVal) {
+            console.log(`Setting ${propertyKey} to ${newVal}`);
+            value = newVal;
+        },
+        enumerable: true,
+        configurable: true
+    });
+}
+
+function serializable(target: any, propertyKey: string) {
+    const metadata = Reflect.getMetadata("serializable", target) || [];
+    metadata.push(propertyKey);
+    Reflect.defineMetadata("serializable", metadata, target);
+}
+
+function jsonProperty(name?: string) {
+    return function(target: any, propertyKey: string) {
+        const props = Reflect.getMetadata("jsonProperties", target) || {};
+        props[propertyKey] = name || propertyKey;
+        Reflect.defineMetadata("jsonProperties", props, target);
+    };
+}
+
+function transient(target: any, propertyKey: string) {
+    const transients = Reflect.getMetadata("transient", target) || [];
+    transients.push(propertyKey);
+    Reflect.defineMetadata("transient", transients, target);
+}
+
+function deprecated(message?: string) {
+    return function(target: any, propertyKey: string) {
+        let value: any;
+        Object.defineProperty(target, propertyKey, {
+            get() {
+                console.warn(`${propertyKey} is deprecated. ${message || ''}`);
+                return value;
+            },
+            set(newVal) {
+                value = newVal;
+            },
+            enumerable: true,
+            configurable: true
+        });
+    };
+}
+
+class Entity {
+    @serializable
+    @jsonProperty("id")
+    @logged
+    entityId: string;
+
+    @serializable
+    @jsonProperty()
+    name: string;
+
+    @transient
+    @logged
+    temporaryState: any;
+
+    @deprecated("Use newField instead")
+    @serializable
+    oldField: string;
+
+    @serializable
+    newField: string;
+}
+
+class ApiResponse<T> {
+    @serializable
+    @jsonProperty("status_code")
+    statusCode: number;
+
+    @serializable
+    @jsonProperty()
+    data: T;
+
+    @transient
+    rawResponse: any;
+
+    @serializable
+    @jsonProperty("error_message")
+    errorMessage?: string;
+
+    @logged
+    @serializable
+    timestamp: Date;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("Entity") && output.contains("ApiResponse"),
+        "Expected Entity and ApiResponse classes: {}",
+        output
+    );
+
+    // Various property decorators should be present
+    assert!(
+        output.contains("serializable") && output.contains("jsonProperty"),
+        "Expected serialization decorators: {}",
+        output
+    );
+
+    // Class IIFE pattern should be present
+    assert!(
+        output.contains("(function ()") || output.contains("(function()"),
+        "Expected class IIFE pattern: {}",
+        output
+    );
+}
