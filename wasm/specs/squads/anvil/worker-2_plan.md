@@ -7,7 +7,22 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-Awaiting new assignment from EM-Anvil.
+Add ES5 tuple type patterns parity tests
+
+Per GOALS.md Objective 1: ES5 downleveling correctness
+
+Steps:
+1. Add 6 ES5 tuple type parity tests to `wasm/src/thin_emitter/emitter_parity_tests.rs`:
+   - Basic tuple type
+   - Tuple with optional elements
+   - Tuple with rest elements
+   - Named tuple elements
+   - Variadic tuple types
+   - Combined tuple patterns
+2. Run `./wasm/test.sh emitter_parity` to verify all tests pass
+3. Commit with message: `[wasm] emitter: add tuple type parity tests`
+4. Push to `origin/worker/anvil-2`
+5. Update this plan file and push
 
 ## Task Queue
 (empty)
