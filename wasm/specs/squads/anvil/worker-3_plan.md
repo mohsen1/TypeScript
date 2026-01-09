@@ -7,12 +7,13 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- [ ] Add ES5 source map tests for destructuring transform patterns: array destructuring, object destructuring, nested. Tests: `./wasm/test.sh source_map`
+(awaiting assignment)
 
 ## Task Queue
 (empty)
 
 ## Completed
+- [x] Added destructuring transform ES5 source map tests (array basic, object basic, nested array, nested object, mixed, defaults, function params, rest patterns, loop patterns, comprehensive); 737 tests pass.
 - [x] Added generator transform ES5 source map tests (basic yield, yield with values, delegation, return value, try/catch, infinite, class iterator, class methods, async generator, comprehensive); 727 tests pass.
 - [x] Added async/await transform ES5 source map tests (try/catch basic, try/catch/finally, Promise chain, arrow functions, class methods, IIFE, nested try/catch, parallel await, error rethrow, comprehensive); 717 tests pass.
 - [x] Added for-of/for-in loop ES5 source map tests (basic for-of, basic for-in, for-of destructuring, for-in destructuring, for-of string, for-of Map/Set, nested for-of, break/continue, iterator, comprehensive); 707 tests pass.
