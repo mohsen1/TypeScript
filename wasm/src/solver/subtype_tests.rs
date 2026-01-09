@@ -12050,3 +12050,417 @@ fn test_tuple_labeled_mixed() {
     assert!(checker.is_subtype_of(mixed, all_unlabeled));
     assert!(checker.is_subtype_of(all_unlabeled, mixed));
 }
+
+// =============================================================================
+// NEVER AS BOTTOM TYPE TESTS
+// =============================================================================
+
+#[test]
+fn test_never_is_bottom_type_for_primitives() {
+    // never is subtype of all primitive types
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    // never <: string
+    assert!(checker.is_subtype_of(TypeId::NEVER, TypeId::STRING));
+    // never <: number
+    assert!(checker.is_subtype_of(TypeId::NEVER, TypeId::NUMBER));
+    // never <: boolean
+    assert!(checker.is_subtype_of(TypeId::NEVER, TypeId::BOOLEAN));
+    // never <: symbol
+    assert!(checker.is_subtype_of(TypeId::NEVER, TypeId::SYMBOL));
+    // never <: bigint
+    assert!(checker.is_subtype_of(TypeId::NEVER, TypeId::BIGINT));
+
+    // But primitives are NOT subtypes of never
+    assert!(!checker.is_subtype_of(TypeId::STRING, TypeId::NEVER));
+    assert!(!checker.is_subtype_of(TypeId::NUMBER, TypeId::NEVER));
+    assert!(!checker.is_subtype_of(TypeId::BOOLEAN, TypeId::NEVER));
+}
+
+#[test]
+fn test_never_is_bottom_type_for_object_types() {
+    // never is subtype of object types
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let name = interner.intern_string("name");
+    let obj = interner.object(vec![PropertyInfo {
+        name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // never <: { name: string }
+    assert!(checker.is_subtype_of(TypeId::NEVER, obj));
+    // { name: string } is NOT subtype of never
+    assert!(!checker.is_subtype_of(obj, TypeId::NEVER));
+}
+
+#[test]
+fn test_never_is_bottom_type_for_function_types() {
+    // never is subtype of function types
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let fn_type = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::NUMBER,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // never <: (x: string) => number
+    assert!(checker.is_subtype_of(TypeId::NEVER, fn_type));
+    // (x: string) => number is NOT subtype of never
+    assert!(!checker.is_subtype_of(fn_type, TypeId::NEVER));
+}
+
+#[test]
+fn test_never_is_bottom_type_for_tuple_types() {
+    // never is subtype of tuple types
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    // never <: [string, number]
+    assert!(checker.is_subtype_of(TypeId::NEVER, tuple));
+    // [string, number] is NOT subtype of never
+    assert!(!checker.is_subtype_of(tuple, TypeId::NEVER));
+}
+
+#[test]
+fn test_never_is_bottom_type_for_union_types() {
+    // never is subtype of union types
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    // never <: string | number
+    assert!(checker.is_subtype_of(TypeId::NEVER, union));
+    // string | number is NOT subtype of never
+    assert!(!checker.is_subtype_of(union, TypeId::NEVER));
+}
+
+// =============================================================================
+// UNKNOWN AS TOP TYPE TESTS
+// =============================================================================
+
+#[test]
+fn test_unknown_is_top_type_for_primitives() {
+    // All primitive types are subtypes of unknown
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    // string <: unknown
+    assert!(checker.is_subtype_of(TypeId::STRING, TypeId::UNKNOWN));
+    // number <: unknown
+    assert!(checker.is_subtype_of(TypeId::NUMBER, TypeId::UNKNOWN));
+    // boolean <: unknown
+    assert!(checker.is_subtype_of(TypeId::BOOLEAN, TypeId::UNKNOWN));
+    // symbol <: unknown
+    assert!(checker.is_subtype_of(TypeId::SYMBOL, TypeId::UNKNOWN));
+    // bigint <: unknown
+    assert!(checker.is_subtype_of(TypeId::BIGINT, TypeId::UNKNOWN));
+
+    // But unknown is NOT subtype of primitives
+    assert!(!checker.is_subtype_of(TypeId::UNKNOWN, TypeId::STRING));
+    assert!(!checker.is_subtype_of(TypeId::UNKNOWN, TypeId::NUMBER));
+    assert!(!checker.is_subtype_of(TypeId::UNKNOWN, TypeId::BOOLEAN));
+}
+
+#[test]
+fn test_unknown_is_top_type_for_object_types() {
+    // Object types are subtypes of unknown
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let name = interner.intern_string("name");
+    let obj = interner.object(vec![PropertyInfo {
+        name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // { name: string } <: unknown
+    assert!(checker.is_subtype_of(obj, TypeId::UNKNOWN));
+    // unknown is NOT subtype of { name: string }
+    assert!(!checker.is_subtype_of(TypeId::UNKNOWN, obj));
+}
+
+#[test]
+fn test_unknown_is_top_type_for_function_types() {
+    // Function types are subtypes of unknown
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let fn_type = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::NUMBER,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // (x: number) => string <: unknown
+    assert!(checker.is_subtype_of(fn_type, TypeId::UNKNOWN));
+    // unknown is NOT subtype of (x: number) => string
+    assert!(!checker.is_subtype_of(TypeId::UNKNOWN, fn_type));
+}
+
+#[test]
+fn test_unknown_is_top_type_for_tuple_types() {
+    // Tuple types are subtypes of unknown
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    // [boolean, string] <: unknown
+    assert!(checker.is_subtype_of(tuple, TypeId::UNKNOWN));
+    // unknown is NOT subtype of [boolean, string]
+    assert!(!checker.is_subtype_of(TypeId::UNKNOWN, tuple));
+}
+
+#[test]
+fn test_unknown_is_top_type_for_never() {
+    // never is subtype of unknown (bottom <: top)
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    // never <: unknown
+    assert!(checker.is_subtype_of(TypeId::NEVER, TypeId::UNKNOWN));
+    // unknown is NOT subtype of never
+    assert!(!checker.is_subtype_of(TypeId::UNKNOWN, TypeId::NEVER));
+}
+
+// =============================================================================
+// UNION WITH NEVER SIMPLIFICATION TESTS
+// =============================================================================
+
+#[test]
+fn test_union_never_with_primitive_simplifies() {
+    // T | never simplifies to T
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    // string | never should behave like string
+    let union_with_never = interner.union(vec![TypeId::STRING, TypeId::NEVER]);
+
+    // string | never <: string (via simplification)
+    assert!(checker.is_subtype_of(union_with_never, TypeId::STRING));
+    // string <: string | never
+    assert!(checker.is_subtype_of(TypeId::STRING, union_with_never));
+}
+
+#[test]
+fn test_union_never_with_multiple_types_simplifies() {
+    // (A | B | never) should behave like (A | B)
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let union_with_never = interner.union(vec![TypeId::STRING, TypeId::NUMBER, TypeId::NEVER]);
+    let union_without_never = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    // (string | number | never) <: (string | number)
+    assert!(checker.is_subtype_of(union_with_never, union_without_never));
+    // (string | number) <: (string | number | never)
+    assert!(checker.is_subtype_of(union_without_never, union_with_never));
+}
+
+#[test]
+fn test_union_never_with_object_simplifies() {
+    // { x: T } | never should behave like { x: T }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let x_name = interner.intern_string("x");
+    let obj = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let union_with_never = interner.union(vec![obj, TypeId::NEVER]);
+
+    // { x: number } | never <: { x: number }
+    assert!(checker.is_subtype_of(union_with_never, obj));
+    // { x: number } <: { x: number } | never
+    assert!(checker.is_subtype_of(obj, union_with_never));
+}
+
+#[test]
+fn test_union_only_never_remains_never() {
+    // never | never should still be never
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let union_of_nevers = interner.union(vec![TypeId::NEVER, TypeId::NEVER]);
+
+    // never | never <: never
+    assert!(checker.is_subtype_of(union_of_nevers, TypeId::NEVER));
+    // never <: never | never
+    assert!(checker.is_subtype_of(TypeId::NEVER, union_of_nevers));
+}
+
+#[test]
+fn test_union_never_first_position_simplifies() {
+    // never | T should behave like T (never in first position)
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let union_never_first = interner.union(vec![TypeId::NEVER, TypeId::BOOLEAN]);
+
+    // never | boolean <: boolean
+    assert!(checker.is_subtype_of(union_never_first, TypeId::BOOLEAN));
+    // boolean <: never | boolean
+    assert!(checker.is_subtype_of(TypeId::BOOLEAN, union_never_first));
+}
+
+// =============================================================================
+// INTERSECTION WITH UNKNOWN SIMPLIFICATION TESTS
+// =============================================================================
+
+#[test]
+fn test_intersection_unknown_with_primitive_simplifies() {
+    // T & unknown simplifies to T
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let intersection = interner.intersection(vec![TypeId::STRING, TypeId::UNKNOWN]);
+
+    // string & unknown <: string
+    assert!(checker.is_subtype_of(intersection, TypeId::STRING));
+    // string <: string & unknown
+    assert!(checker.is_subtype_of(TypeId::STRING, intersection));
+}
+
+#[test]
+fn test_intersection_unknown_with_object_simplifies() {
+    // { x: T } & unknown should behave like { x: T }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let x_name = interner.intern_string("x");
+    let obj = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let intersection = interner.intersection(vec![obj, TypeId::UNKNOWN]);
+
+    // { x: string } & unknown <: { x: string }
+    assert!(checker.is_subtype_of(intersection, obj));
+    // { x: string } <: { x: string } & unknown
+    assert!(checker.is_subtype_of(obj, intersection));
+}
+
+#[test]
+fn test_intersection_unknown_with_function_simplifies() {
+    // ((x: T) => U) & unknown should behave like (x: T) => U
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let fn_type = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::BOOLEAN,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let intersection = interner.intersection(vec![fn_type, TypeId::UNKNOWN]);
+
+    // ((x: string) => boolean) & unknown <: (x: string) => boolean
+    assert!(checker.is_subtype_of(intersection, fn_type));
+    // (x: string) => boolean <: ((x: string) => boolean) & unknown
+    assert!(checker.is_subtype_of(fn_type, intersection));
+}
+
+#[test]
+fn test_intersection_unknown_first_position_simplifies() {
+    // unknown & T should behave like T (unknown in first position)
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let intersection = interner.intersection(vec![TypeId::UNKNOWN, TypeId::NUMBER]);
+
+    // unknown & number <: number
+    assert!(checker.is_subtype_of(intersection, TypeId::NUMBER));
+    // number <: unknown & number
+    assert!(checker.is_subtype_of(TypeId::NUMBER, intersection));
+}
+
+#[test]
+fn test_intersection_multiple_unknowns_simplifies() {
+    // unknown & unknown & T should behave like T
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let intersection = interner.intersection(vec![TypeId::UNKNOWN, TypeId::STRING, TypeId::UNKNOWN]);
+
+    // unknown & string & unknown <: string
+    assert!(checker.is_subtype_of(intersection, TypeId::STRING));
+    // string <: unknown & string & unknown
+    assert!(checker.is_subtype_of(TypeId::STRING, intersection));
+}
