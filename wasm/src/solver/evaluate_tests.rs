@@ -15582,3 +15582,151 @@ fn test_template_literal_hyphen_no_match_returns_never() {
     // "other-value" doesn't match pattern "prefix-${infer R}", so returns never
     assert_eq!(result, TypeId::NEVER);
 }
+
+#[test]
+fn test_template_literal_prefix_infer_suffix_extraction() {
+    let interner = TypeInterner::new();
+
+    // Pattern: T extends `start-${infer M}-end` ? M : never
+    // Input: "start-middle-end" => M = "middle"
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("M");
+    let infer_m = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends `start-${infer M}-end` ? M : never
+    let extends_template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("start-")),
+        TemplateSpan::Type(infer_m),
+        TemplateSpan::Text(interner.intern_string("-end")),
+    ]);
+
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_template,
+        true_type: infer_m,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, interner.literal_string("start-middle-end"));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    let expected = interner.literal_string("middle");
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_template_literal_prefix_infer_suffix_multiple_hyphens() {
+    let interner = TypeInterner::new();
+
+    // Pattern: T extends `api-${infer Route}-handler` ? Route : never
+    // Input: "api-user-profile-handler" => Route = "user-profile"
+    // The infer captures everything between "api-" and "-handler"
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("Route");
+    let infer_route = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends `api-${infer Route}-handler` ? Route : never
+    let extends_template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("api-")),
+        TemplateSpan::Type(infer_route),
+        TemplateSpan::Text(interner.intern_string("-handler")),
+    ]);
+
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_template,
+        true_type: infer_route,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, interner.literal_string("api-user-profile-handler"));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    // Captures everything between "api-" and "-handler"
+    let expected = interner.literal_string("user-profile");
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_template_literal_prefix_infer_suffix_distributive() {
+    let interner = TypeInterner::new();
+
+    // Pattern: T extends `on-${infer E}-event` ? E : never (distributive)
+    // Input: "on-click-event" | "on-load-event" => "click" | "load"
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("E");
+    let infer_e = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends `on-${infer E}-event` ? E : never
+    let extends_template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("on-")),
+        TemplateSpan::Type(infer_e),
+        TemplateSpan::Text(interner.intern_string("-event")),
+    ]);
+
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_template,
+        true_type: infer_e,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let lit_click = interner.literal_string("on-click-event");
+    let lit_load = interner.literal_string("on-load-event");
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, interner.union(vec![lit_click, lit_load]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    let expected = interner.union(vec![
+        interner.literal_string("click"),
+        interner.literal_string("load"),
+    ]);
+    assert_eq!(result, expected);
+}
