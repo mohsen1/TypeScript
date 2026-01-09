@@ -7,7 +7,7 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- [ ] (awaiting assignment)
+- [ ] Add ES5 object spread parity tests (basic spread, multiple spreads, spread with overrides, nested spreads, computed properties with spread) in `wasm/src/emitter_parity_tests.rs`. Run `./wasm/test.sh emitter_parity`.
 
 ## Task Queue
 - [ ] (empty)
