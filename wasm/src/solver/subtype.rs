@@ -601,12 +601,9 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
             // Target is Application, source is structural - try to expand and compare
             (_, TypeKey::Application(_)) => {
-                eprintln!("[DEBUG] check_subtype: target is Application {:?}", target);
                 if let Some(expanded) = self.try_expand_application(target) {
-                    eprintln!("[DEBUG] check_subtype: expanded target to {:?}", expanded);
                     self.check_subtype(source, expanded)
                 } else {
-                    eprintln!("[DEBUG] check_subtype: failed to expand target Application");
                     // Can't expand - assume not a subtype
                     SubtypeResult::False
                 }
@@ -877,17 +874,12 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         // Check if base is a Ref
         let base_key = self.interner.lookup(app.base)?;
         let TypeKey::Ref(sym_ref) = base_key else {
-            eprintln!("[DEBUG] try_expand_application: base is not Ref, it's {:?}", base_key);
             // Base is not a Ref, can't expand
             return None;
         };
 
-        eprintln!("[DEBUG] try_expand_application: base is Ref({}) with {} args", sym_ref.0, app.args.len());
-
         // Resolve the Ref to get the underlying type
-        let resolved = self.resolver.resolve_ref(sym_ref, self.interner);
-        eprintln!("[DEBUG] try_expand_application: resolve_ref returned {:?}", resolved);
-        let resolved = resolved?;
+        let resolved = self.resolver.resolve_ref(sym_ref, self.interner)?;
 
         // First, try to get type parameters from the resolver (if implemented)
         if let Some(type_params) = self.resolver.get_type_params(sym_ref) {
@@ -904,11 +896,27 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         }
 
         // Fallback: extract type parameters from the resolved type itself
-        // by scanning for TypeParameter types in declaration order
-        let type_params = self.extract_type_params_from_type(resolved);
+        // by scanning for TypeParameter types in declaration order.
+        // For class constructor types (Callable with construct signatures),
+        // we need to use the instance type (construct signature return type)
+        // instead of the constructor type for type parameter extraction.
+        let working_type = match self.interner.lookup(resolved) {
+            Some(TypeKey::Callable(callable_id)) => {
+                let callable = self.interner.callable_shape(callable_id);
+                if !callable.construct_signatures.is_empty() {
+                    // This is a class constructor - use the instance type
+                    callable.construct_signatures[0].return_type
+                } else {
+                    resolved
+                }
+            }
+            _ => resolved,
+        };
+
+        let type_params = self.extract_type_params_from_type(working_type);
         if type_params.is_empty() || type_params.len() != app.args.len() {
             // No type params or mismatch - just return resolved without substitution
-            return Some(resolved);
+            return Some(working_type);
         }
 
         // Build substitution: map type param names to type arguments
@@ -920,7 +928,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         }
 
         // Instantiate the resolved type with the substitution
-        Some(instantiate_type(self.interner, resolved, &substitution))
+        Some(instantiate_type(self.interner, working_type, &substitution))
     }
 
     /// Try to expand a type argument that is a TypeQuery or Application.
