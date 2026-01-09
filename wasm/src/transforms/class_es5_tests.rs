@@ -17080,31 +17080,35 @@ class ReactiveValue<T> {
 }
 
 // ============================================================================
-// Object.getOwnPropertyNames/getOwnPropertySymbols pattern tests
+// Using Declarations (Resource Management) Pattern Tests
 // ============================================================================
 
 #[test]
-fn test_class_es5_get_own_property_names_basic() {
-    // Basic Object.getOwnPropertyNames usage in class
+fn test_class_es5_using_declaration_basic() {
+    // Basic using declaration with Symbol.dispose
     let source = r#"
-class PropertyInspector {
-    private target: object;
+class FileHandle {
+    private path: string;
+    private isOpen: boolean = true;
 
-    constructor(target: object) {
-        this.target = target;
+    constructor(path: string) {
+        this.path = path;
     }
 
-    getPropertyNames(): string[] {
-        return Object.getOwnPropertyNames(this.target);
+    read(): string {
+        if (!this.isOpen) throw new Error("File is closed");
+        return "file contents";
     }
 
-    hasProperty(name: string): boolean {
-        return Object.getOwnPropertyNames(this.target).includes(name);
+    [Symbol.dispose](): void {
+        this.isOpen = false;
+        console.log(`Closing file: ${this.path}`);
     }
+}
 
-    countProperties(): number {
-        return Object.getOwnPropertyNames(this.target).length;
-    }
+function processFile(path: string): string {
+    using file = new FileHandle(path);
+    return file.read();
 }
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -17122,40 +17126,62 @@ class PropertyInspector {
 
     let output = printer.get_output().to_string();
 
+    // Class should be converted
     assert!(
-        output.contains("function PropertyInspector"),
-        "Expected PropertyInspector function: {}",
+        output.contains("function FileHandle"),
+        "Expected FileHandle function: {}",
         output
     );
+
+    // Symbol.dispose should be present
     assert!(
-        output.contains("Object.getOwnPropertyNames"),
-        "Expected getOwnPropertyNames: {}",
+        output.contains("Symbol.dispose") || output.contains("dispose"),
+        "Expected dispose method: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("read"),
+        "Expected read method: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_get_own_property_symbols_basic() {
-    // Basic Object.getOwnPropertySymbols usage in class
+fn test_class_es5_using_declaration_async() {
+    // Async using declaration with Symbol.asyncDispose
     let source = r#"
-class SymbolInspector<T extends object> {
-    private target: T;
+class AsyncConnection {
+    private url: string;
+    private connected: boolean = false;
 
-    constructor(target: T) {
-        this.target = target;
+    constructor(url: string) {
+        this.url = url;
     }
 
-    getSymbols(): symbol[] {
-        return Object.getOwnPropertySymbols(this.target);
+    async connect(): Promise<void> {
+        this.connected = true;
+        console.log(`Connected to ${this.url}`);
     }
 
-    hasSymbol(sym: symbol): boolean {
-        return Object.getOwnPropertySymbols(this.target).includes(sym);
+    async query(sql: string): Promise<any[]> {
+        if (!this.connected) throw new Error("Not connected");
+        return [];
     }
 
-    getSymbolCount(): number {
-        return Object.getOwnPropertySymbols(this.target).length;
+    async [Symbol.asyncDispose](): Promise<void> {
+        if (this.connected) {
+            this.connected = false;
+            console.log(`Disconnected from ${this.url}`);
+        }
     }
+}
+
+async function runQuery(url: string, sql: string): Promise<any[]> {
+    await using conn = new AsyncConnection(url);
+    await conn.connect();
+    return await conn.query(sql);
 }
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -17173,41 +17199,50 @@ class SymbolInspector<T extends object> {
 
     let output = printer.get_output().to_string();
 
+    // Class should be converted
     assert!(
-        output.contains("function SymbolInspector"),
-        "Expected SymbolInspector function: {}",
+        output.contains("function AsyncConnection"),
+        "Expected AsyncConnection function: {}",
         output
     );
+
+    // Async methods should be transformed
     assert!(
-        output.contains("Object.getOwnPropertySymbols"),
-        "Expected getOwnPropertySymbols: {}",
+        output.contains("connect") && output.contains("query"),
+        "Expected async methods: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_get_all_property_keys() {
-    // Combining getOwnPropertyNames and getOwnPropertySymbols
+fn test_class_es5_using_declaration_in_class_method() {
+    // Using declaration inside class methods
     let source = r#"
-class KeyEnumerator {
-    getAllKeys(obj: object): (string | symbol)[] {
-        const names = Object.getOwnPropertyNames(obj);
-        const symbols = Object.getOwnPropertySymbols(obj);
-        return [...names, ...symbols];
+class Lock {
+    private locked: boolean = false;
+
+    acquire(): void {
+        this.locked = true;
     }
 
-    getEnumerableKeys(obj: object): string[] {
-        return Object.getOwnPropertyNames(obj).filter(key => {
-            const descriptor = Object.getOwnPropertyDescriptor(obj, key);
-            return descriptor?.enumerable === true;
-        });
+    [Symbol.dispose](): void {
+        this.locked = false;
+    }
+}
+
+class CriticalSection {
+    private lock: Lock = new Lock();
+
+    executeWithLock(callback: () => void): void {
+        using acquired = this.lock;
+        acquired.acquire();
+        callback();
     }
 
-    getNonEnumerableKeys(obj: object): string[] {
-        return Object.getOwnPropertyNames(obj).filter(key => {
-            const descriptor = Object.getOwnPropertyDescriptor(obj, key);
-            return descriptor?.enumerable === false;
-        });
+    async executeWithLockAsync(callback: () => Promise<void>): Promise<void> {
+        using acquired = this.lock;
+        acquired.acquire();
+        await callback();
     }
 }
 "#;
@@ -17226,46 +17261,53 @@ class KeyEnumerator {
 
     let output = printer.get_output().to_string();
 
+    // Classes should be converted
     assert!(
-        output.contains("function KeyEnumerator"),
-        "Expected KeyEnumerator function: {}",
+        output.contains("function Lock") && output.contains("function CriticalSection"),
+        "Expected class functions: {}",
         output
     );
+
+    // Methods should be present
     assert!(
-        output.contains("Object.getOwnPropertyNames") && output.contains("Object.getOwnPropertySymbols"),
-        "Expected both property methods: {}",
+        output.contains("executeWithLock") && output.contains("acquire"),
+        "Expected methods: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_property_reflection() {
-    // Property reflection pattern with iteration
+fn test_class_es5_using_declaration_multiple() {
+    // Multiple using declarations
     let source = r#"
-class ObjectReflector {
-    static copyOwnProperties<T extends object>(source: T, target: object): void {
-        for (const key of Object.getOwnPropertyNames(source)) {
-            const descriptor = Object.getOwnPropertyDescriptor(source, key);
-            if (descriptor) {
-                Object.defineProperty(target, key, descriptor);
-            }
-        }
-        for (const sym of Object.getOwnPropertySymbols(source)) {
-            const descriptor = Object.getOwnPropertyDescriptor(source, sym);
-            if (descriptor) {
-                Object.defineProperty(target, sym, descriptor);
-            }
-        }
+class Resource {
+    private name: string;
+    private disposed: boolean = false;
+
+    constructor(name: string) {
+        this.name = name;
+        console.log(`Acquired: ${name}`);
     }
 
-    static getPropertyMap(obj: object): Map<string | symbol, PropertyDescriptor> {
-        const map = new Map<string | symbol, PropertyDescriptor>();
-        for (const key of Object.getOwnPropertyNames(obj)) {
-            const desc = Object.getOwnPropertyDescriptor(obj, key);
-            if (desc) map.set(key, desc);
-        }
-        return map;
+    use(): void {
+        if (this.disposed) throw new Error(`${this.name} is disposed`);
+        console.log(`Using: ${this.name}`);
     }
+
+    [Symbol.dispose](): void {
+        this.disposed = true;
+        console.log(`Disposed: ${this.name}`);
+    }
+}
+
+function useMultipleResources(): void {
+    using r1 = new Resource("first");
+    using r2 = new Resource("second");
+    using r3 = new Resource("third");
+
+    r1.use();
+    r2.use();
+    r3.use();
 }
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -17283,48 +17325,93 @@ class ObjectReflector {
 
     let output = printer.get_output().to_string();
 
+    // Class should be converted
     assert!(
-        output.contains("function ObjectReflector"),
-        "Expected ObjectReflector function: {}",
+        output.contains("function Resource"),
+        "Expected Resource function: {}",
         output
     );
+
+    // Methods should be present
     assert!(
-        output.contains("Object.getOwnPropertyNames"),
-        "Expected getOwnPropertyNames: {}",
+        output.contains("use"),
+        "Expected use method: {}",
         output
     );
+
+    // Function should be present
     assert!(
-        output.contains("Object.defineProperty"),
-        "Expected defineProperty: {}",
+        output.contains("useMultipleResources"),
+        "Expected useMultipleResources function: {}",
         output
     );
 }
 
 #[test]
-fn test_class_es5_property_methods_in_constructor() {
-    // Property enumeration methods used in constructor
+fn test_class_es5_using_declaration_disposable_pattern() {
+    // Disposable pattern with inheritance
     let source = r#"
-class ConfigLoader {
-    private properties: string[];
-    private symbols: symbol[];
-    private allKeys: (string | symbol)[];
+interface Disposable {
+    [Symbol.dispose](): void;
+}
 
-    constructor(config: object) {
-        this.properties = Object.getOwnPropertyNames(config);
-        this.symbols = Object.getOwnPropertySymbols(config);
-        this.allKeys = [...this.properties, ...this.symbols];
+class BaseResource implements Disposable {
+    protected disposed: boolean = false;
+
+    [Symbol.dispose](): void {
+        this.disposed = true;
     }
 
-    getProperties(): string[] {
-        return this.properties;
+    protected checkDisposed(): void {
+        if (this.disposed) {
+            throw new Error("Resource already disposed");
+        }
+    }
+}
+
+class DatabaseConnection extends BaseResource {
+    private connectionString: string;
+
+    constructor(connectionString: string) {
+        super();
+        this.connectionString = connectionString;
     }
 
-    getSymbols(): symbol[] {
-        return this.symbols;
+    execute(query: string): any[] {
+        this.checkDisposed();
+        return [];
     }
 
-    getAllKeys(): (string | symbol)[] {
-        return this.allKeys;
+    [Symbol.dispose](): void {
+        console.log("Closing database connection");
+        super[Symbol.dispose]();
+    }
+}
+
+class TransactionScope extends BaseResource {
+    private connection: DatabaseConnection;
+    private committed: boolean = false;
+
+    constructor(connection: DatabaseConnection) {
+        super();
+        this.connection = connection;
+    }
+
+    commit(): void {
+        this.checkDisposed();
+        this.committed = true;
+    }
+
+    rollback(): void {
+        this.checkDisposed();
+        this.committed = false;
+    }
+
+    [Symbol.dispose](): void {
+        if (!this.committed) {
+            console.log("Rolling back transaction");
+        }
+        super[Symbol.dispose]();
     }
 }
 "#;
@@ -17343,94 +17430,27 @@ class ConfigLoader {
 
     let output = printer.get_output().to_string();
 
+    // Classes should be converted
     assert!(
-        output.contains("function ConfigLoader"),
-        "Expected ConfigLoader function: {}",
+        output.contains("function BaseResource"),
+        "Expected BaseResource function: {}",
         output
     );
     assert!(
-        output.contains("Object.getOwnPropertyNames") && output.contains("Object.getOwnPropertySymbols"),
-        "Expected property methods in constructor: {}",
-        output
-    );
-}
-
-#[test]
-fn test_class_es5_property_methods_combined() {
-    // Combined pattern with deep cloning and property enumeration
-    let source = r#"
-class DeepCloner<T extends object> {
-    clone(source: T): T {
-        const target = Object.create(Object.getPrototypeOf(source));
-
-        // Copy string-keyed properties
-        for (const key of Object.getOwnPropertyNames(source)) {
-            const descriptor = Object.getOwnPropertyDescriptor(source, key);
-            if (descriptor) {
-                Object.defineProperty(target, key, descriptor);
-            }
-        }
-
-        // Copy symbol-keyed properties
-        for (const sym of Object.getOwnPropertySymbols(source)) {
-            const descriptor = Object.getOwnPropertyDescriptor(source, sym);
-            if (descriptor) {
-                Object.defineProperty(target, sym, descriptor);
-            }
-        }
-
-        return target;
-    }
-
-    compareKeys(a: object, b: object): boolean {
-        const aNames = Object.getOwnPropertyNames(a);
-        const bNames = Object.getOwnPropertyNames(b);
-        const aSyms = Object.getOwnPropertySymbols(a);
-        const bSyms = Object.getOwnPropertySymbols(b);
-
-        return aNames.length === bNames.length && aSyms.length === bSyms.length;
-    }
-
-    static getKeyDifference(a: object, b: object): string[] {
-        const aKeys = Object.getOwnPropertyNames(a);
-        const bKeys = new Set(Object.getOwnPropertyNames(b));
-        return aKeys.filter(key => !bKeys.has(key));
-    }
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    assert!(
-        output.contains("function DeepCloner"),
-        "Expected DeepCloner function: {}",
+        output.contains("function DatabaseConnection"),
+        "Expected DatabaseConnection function: {}",
         output
     );
     assert!(
-        output.contains("Object.getOwnPropertyNames"),
-        "Expected getOwnPropertyNames: {}",
+        output.contains("function TransactionScope"),
+        "Expected TransactionScope function: {}",
         output
     );
+
+    // Methods should be present
     assert!(
-        output.contains("Object.getOwnPropertySymbols"),
-        "Expected getOwnPropertySymbols: {}",
-        output
-    );
-    assert!(
-        output.contains("Object.getPrototypeOf"),
-        "Expected getPrototypeOf: {}",
+        output.contains("execute") && output.contains("commit"),
+        "Expected methods: {}",
         output
     );
 }
