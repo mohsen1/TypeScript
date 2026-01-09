@@ -31148,3 +31148,391 @@ function getCode<K extends keyof typeof lookup.codes>(key: K): typeof lookup.cod
         output
     );
 }
+
+// =============================================================================
+// Template Literal Type Parity Tests
+// =============================================================================
+
+/// Test basic template literal type - simple string interpolation type.
+/// Template literal types should be completely erased.
+#[test]
+fn test_parity_es5_template_literal_type_basic() {
+    let source = r#"
+type Greeting = `Hello, ${string}!`;
+type Id = `id_${number}`;
+type Key = `${string}_key`;
+
+const greeting: Greeting = "Hello, World!";
+const id: Id = "id_123";
+const key: Key = "test_key";
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Variables should be present
+    assert!(
+        output.contains("greeting") && output.contains("id") && output.contains("key"),
+        "Variables should be present: {}",
+        output
+    );
+    // Type aliases should be erased
+    assert!(
+        !output.contains("type Greeting") && !output.contains("type Id") && !output.contains("type Key"),
+        "Type aliases should be erased: {}",
+        output
+    );
+    // Template literal type syntax should be erased
+    assert!(
+        !output.contains("`Hello, ${string}!`") && !output.contains("`id_${number}`"),
+        "Template literal type syntax should be erased: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": Greeting") && !output.contains(": Id") && !output.contains(": Key"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test template literal type with union - union of template literals.
+/// Template literal types with unions should be completely erased.
+#[test]
+fn test_parity_es5_template_literal_type_union() {
+    let source = r#"
+type EventName = "click" | "hover" | "focus";
+type EventHandler = `on${EventName}`;
+type Status = "loading" | "success" | "error";
+type StatusMessage = `${Status}_message`;
+type Combined = `${EventName}_${Status}`;
+
+const handler: EventHandler = "onclick";
+const message: StatusMessage = "loading_message";
+const combined: Combined = "click_success";
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Variables should be present with string values
+    assert!(
+        output.contains("handler") && output.contains("onclick"),
+        "Handler variable should be present: {}",
+        output
+    );
+    assert!(
+        output.contains("message") && output.contains("loading_message"),
+        "Message variable should be present: {}",
+        output
+    );
+    // Type aliases should be erased
+    assert!(
+        !output.contains("type EventName") && !output.contains("type EventHandler"),
+        "Type aliases should be erased: {}",
+        output
+    );
+    // Template literal union syntax should be erased
+    assert!(
+        !output.contains("`on${EventName}`") && !output.contains("`${Status}_message`"),
+        "Template literal union syntax should be erased: {}",
+        output
+    );
+}
+
+/// Test Uppercase/Lowercase intrinsic template literal types.
+/// These TypeScript intrinsic types should be completely erased.
+#[test]
+fn test_parity_es5_template_literal_type_uppercase_lowercase() {
+    let source = r#"
+type BaseEvent = "click" | "hover";
+type UpperEvent = Uppercase<BaseEvent>;
+type LowerEvent = Lowercase<"CLICK" | "HOVER">;
+type MixedCase = Uppercase<"hello"> | Lowercase<"WORLD">;
+
+const upper: UpperEvent = "CLICK";
+const lower: LowerEvent = "click";
+const mixed: MixedCase = "HELLO";
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Variables should be present
+    assert!(
+        output.contains("upper") && output.contains("CLICK"),
+        "Upper variable should be present: {}",
+        output
+    );
+    assert!(
+        output.contains("lower") && output.contains("click"),
+        "Lower variable should be present: {}",
+        output
+    );
+    // Type aliases should be erased
+    assert!(
+        !output.contains("type UpperEvent") && !output.contains("type LowerEvent"),
+        "Type aliases should be erased: {}",
+        output
+    );
+    // Intrinsic type syntax should be erased
+    assert!(
+        !output.contains("Uppercase<") && !output.contains("Lowercase<"),
+        "Intrinsic type syntax should be erased: {}",
+        output
+    );
+}
+
+/// Test Capitalize/Uncapitalize intrinsic template literal types.
+/// These TypeScript intrinsic types should be completely erased.
+#[test]
+fn test_parity_es5_template_literal_type_capitalize_uncapitalize() {
+    let source = r#"
+type BaseWord = "hello" | "world";
+type CapWord = Capitalize<BaseWord>;
+type UncapWord = Uncapitalize<"Hello" | "World">;
+type Mixed = Capitalize<"test"> | Uncapitalize<"TEST">;
+
+const cap: CapWord = "Hello";
+const uncap: UncapWord = "hello";
+const mixedVal: Mixed = "Test";
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Variables should be present
+    assert!(
+        output.contains("cap") && output.contains("Hello"),
+        "Cap variable should be present: {}",
+        output
+    );
+    assert!(
+        output.contains("uncap") && output.contains("hello"),
+        "Uncap variable should be present: {}",
+        output
+    );
+    // Type aliases should be erased
+    assert!(
+        !output.contains("type CapWord") && !output.contains("type UncapWord"),
+        "Type aliases should be erased: {}",
+        output
+    );
+    // Intrinsic type syntax should be erased
+    assert!(
+        !output.contains("Capitalize<") && !output.contains("Uncapitalize<"),
+        "Intrinsic type syntax should be erased: {}",
+        output
+    );
+}
+
+/// Test template literal type inference patterns.
+/// Type inference with template literals should be erased.
+#[test]
+fn test_parity_es5_template_literal_type_inference() {
+    let source = r#"
+type ParseRoute<S extends string> = S extends `${infer Action}/${infer Id}`
+    ? { action: Action; id: Id }
+    : never;
+
+type ExtractPrefix<S extends string> = S extends `${infer P}_${string}` ? P : never;
+
+function parseRoute<S extends string>(route: S): ParseRoute<S> {
+    const parts = route.split('/');
+    return { action: parts[0], id: parts[1] } as any;
+}
+
+const result = parseRoute("users/123");
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Function and result should be present
+    assert!(
+        output.contains("parseRoute") && output.contains("result"),
+        "Function and result should be present: {}",
+        output
+    );
+    // Type aliases should be erased
+    assert!(
+        !output.contains("type ParseRoute") && !output.contains("type ExtractPrefix"),
+        "Type aliases should be erased: {}",
+        output
+    );
+    // Template literal inference syntax should be erased
+    assert!(
+        !output.contains("${infer") && !output.contains("extends `"),
+        "Template literal inference syntax should be erased: {}",
+        output
+    );
+    // Generic type parameters in type annotations should be erased
+    assert!(
+        !output.contains("<S extends string>") || output.contains("function parseRoute(route)"),
+        "Type parameters in annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test combined template literal patterns - complex real-world usage.
+/// All template literal type constructs should be erased.
+#[test]
+fn test_parity_es5_template_literal_type_combined() {
+    let source = r#"
+type HTTPMethod = "GET" | "POST" | "PUT" | "DELETE";
+type Endpoint = "/users" | "/posts" | "/comments";
+type APIRoute = `${HTTPMethod} ${Endpoint}`;
+type RouteHandler<R extends APIRoute> = (route: R) => void;
+
+type CSSProperty = "margin" | "padding";
+type CSSUnit = "px" | "em" | "rem";
+type CSSValue = `${number}${CSSUnit}`;
+type CSSDeclaration = `${CSSProperty}: ${CSSValue}`;
+
+interface RouteConfig<T extends APIRoute = "GET /users"> {
+    route: T;
+    handler: RouteHandler<T>;
+}
+
+const config: RouteConfig = {
+    route: "GET /users",
+    handler: (r) => console.log(r)
+};
+
+const style: CSSDeclaration = "margin: 10px";
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Variables should be present
+    assert!(
+        output.contains("config") && output.contains("GET /users"),
+        "Config variable should be present: {}",
+        output
+    );
+    assert!(
+        output.contains("style") && output.contains("margin: 10px"),
+        "Style variable should be present: {}",
+        output
+    );
+    // Type aliases should be erased
+    assert!(
+        !output.contains("type HTTPMethod") && !output.contains("type APIRoute"),
+        "Type aliases should be erased: {}",
+        output
+    );
+    assert!(
+        !output.contains("type CSSProperty") && !output.contains("type CSSDeclaration"),
+        "CSS type aliases should be erased: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface RouteConfig"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Template literal type syntax should be erased
+    assert!(
+        !output.contains("`${HTTPMethod}") && !output.contains("`${number}${CSSUnit}`"),
+        "Template literal type syntax should be erased: {}",
+        output
+    );
+    // Generic constraints should be erased
+    assert!(
+        !output.contains("<T extends APIRoute"),
+        "Generic constraints should be erased: {}",
+        output
+    );
+}

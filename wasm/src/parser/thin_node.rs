@@ -1370,12 +1370,20 @@ impl ThinNodeArena {
 
     /// Add a qualified name node
     pub fn add_qualified_name(&mut self, kind: u16, pos: u32, end: u32, data: QualifiedNameData) -> NodeIndex {
+        let left = data.left;
+        let right = data.right;
+
         let data_index = self.qualified_names.len() as u32;
         self.qualified_names.push(data);
         let index = self.nodes.len() as u32;
         self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
-        NodeIndex(index)
+
+        let parent = NodeIndex(index);
+        self.set_parent(left, parent);
+        self.set_parent(right, parent);
+
+        parent
     }
 
     /// Add a computed property name node
@@ -1807,12 +1815,24 @@ impl ThinNodeArena {
 
     /// Add a type parameter declaration node
     pub fn add_type_parameter(&mut self, kind: u16, pos: u32, end: u32, data: TypeParameterData) -> NodeIndex {
+        let modifiers = data.modifiers.clone();
+        let name = data.name;
+        let constraint = data.constraint;
+        let default = data.default;
+
         let data_index = self.type_parameters.len() as u32;
         self.type_parameters.push(data);
         let index = self.nodes.len() as u32;
         self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
-        NodeIndex(index)
+
+        let parent = NodeIndex(index);
+        self.set_parent_opt_list(&modifiers, parent);
+        self.set_parent(name, parent);
+        self.set_parent(constraint, parent);
+        self.set_parent(default, parent);
+
+        parent
     }
 
     /// Add a decorator node
@@ -2031,22 +2051,38 @@ impl ThinNodeArena {
 
     /// Add a union/intersection type node
     pub fn add_composite_type(&mut self, kind: u16, pos: u32, end: u32, data: CompositeTypeData) -> NodeIndex {
+        let types = data.types.clone();
+
         let data_index = self.composite_types.len() as u32;
         self.composite_types.push(data);
         let index = self.nodes.len() as u32;
         self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
-        NodeIndex(index)
+
+        let parent = NodeIndex(index);
+        self.set_parent_list(&types, parent);
+
+        parent
     }
 
     /// Add a function/constructor type node
     pub fn add_function_type(&mut self, kind: u16, pos: u32, end: u32, data: FunctionTypeData) -> NodeIndex {
+        let type_parameters = data.type_parameters.clone();
+        let parameters = data.parameters.clone();
+        let type_annotation = data.type_annotation;
+
         let data_index = self.function_types.len() as u32;
         self.function_types.push(data);
         let index = self.nodes.len() as u32;
         self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
-        NodeIndex(index)
+
+        let parent = NodeIndex(index);
+        self.set_parent_opt_list(&type_parameters, parent);
+        self.set_parent_list(&parameters, parent);
+        self.set_parent(type_annotation, parent);
+
+        parent
     }
 
     /// Add a type query node (typeof)
