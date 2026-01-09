@@ -6,12 +6,13 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-- [ ] Add ES5 class tests for intersection type patterns: object intersection, interface merging, conditional intersection, generic intersection. Tests: `./wasm/test.sh class_es5_tests`
-
-## Task Queue
 - [ ] Add ES5 class tests for union type patterns: discriminated unions, type narrowing
 
+## Task Queue
+(empty)
+
 ## Completed
+- [x] Added ES5 tests for intersection type patterns (6 tests): object intersection, interface merging, conditional intersection, generic intersection, mixin intersection patterns, combined intersection patterns. Ran `./wasm/test.sh class_es5_tests` (all 389 pass).
 - [x] Added ES5 tests for recursive type patterns (6 tests): recursive type aliases, tree structure types, linked list types, JSON recursive types, nested object types, combined recursive patterns. Ran `./wasm/test.sh class_es5_tests` (all 383 pass).
 - [x] Added ES5 tests for variadic tuple patterns (6 tests): spread in tuples, labeled tuple elements, rest elements in tuples, tuple manipulation, optional tuple elements, combined variadic tuple patterns. Ran `./wasm/test.sh class_es5_tests` (all 377 pass).
 - [x] Added ES5 tests for template literal type patterns (6 tests): Uppercase/Lowercase types, Capitalize/Uncapitalize types, key remapping patterns, template literal unions, string manipulation types, combined template literal patterns. Ran `./wasm/test.sh class_es5_tests` (all 374 pass).

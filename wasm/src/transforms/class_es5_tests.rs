@@ -27598,83 +27598,57 @@ class RecursiveFlattener {
     );
 }
 
-// ============================================================================
-// ACCESSOR KEYWORD PATTERN TESTS
-// ============================================================================
+// =============================================================================
+// INTERSECTION TYPE PATTERNS - ES5 TRANSFORMATION TESTS
+// =============================================================================
 
-/// Test ES5 class with auto-accessor fields
+/// Test: object intersection types
+/// Verifies that classes using object intersection types transform correctly to ES5
 #[test]
-fn test_class_es5_accessor_auto_accessor() {
+fn test_class_es5_object_intersection_types() {
     let source = r#"
-// Auto-accessor fields
-class Person {
-    accessor name: string;
-    accessor age: number;
-    accessor email: string = "default@example.com";
+type Named = { name: string };
+type Aged = { age: number };
+type Person = Named & Aged;
 
-    constructor(name: string, age: number) {
-        this.name = name;
-        this.age = age;
+type Timestamped = { createdAt: Date; updatedAt: Date };
+type Identifiable = { id: string };
+type Entity = Identifiable & Timestamped;
+
+class PersonFactory {
+    create(name: string, age: number): Person {
+        return { name, age };
+    }
+
+    merge<T extends Named, U extends Aged>(named: T, aged: U): T & U {
+        return { ...named, ...aged };
+    }
+
+    extend<T extends Person>(person: T, extra: object): T & typeof extra {
+        return { ...person, ...extra };
     }
 }
 
-class Counter {
-    accessor value: number = 0;
-    accessor min: number = 0;
-    accessor max: number = 100;
+class EntityManager {
+    private entities: Map<string, Entity> = new Map();
 
-    increment(): void {
-        if (this.value < this.max) {
-            this.value++;
+    create(id: string): Entity {
+        const now = new Date();
+        const entity: Entity = { id, createdAt: now, updatedAt: now };
+        this.entities.set(id, entity);
+        return entity;
+    }
+
+    update(id: string): Entity | undefined {
+        const entity = this.entities.get(id);
+        if (entity) {
+            entity.updatedAt = new Date();
         }
+        return entity;
     }
 
-    decrement(): void {
-        if (this.value > this.min) {
-            this.value--;
-        }
-    }
-
-    reset(): void {
-        this.value = this.min;
-    }
-}
-
-class ConfigurableWidget {
-    accessor width: number = 100;
-    accessor height: number = 100;
-    accessor visible: boolean = true;
-    accessor opacity: number = 1.0;
-
-    resize(width: number, height: number): void {
-        this.width = width;
-        this.height = height;
-    }
-
-    hide(): void {
-        this.visible = false;
-        this.opacity = 0;
-    }
-
-    show(): void {
-        this.visible = true;
-        this.opacity = 1.0;
-    }
-}
-
-class UserProfile {
-    accessor firstName: string;
-    accessor lastName: string;
-    accessor bio: string = "";
-    accessor avatarUrl: string = "/default-avatar.png";
-
-    constructor(firstName: string, lastName: string) {
-        this.firstName = firstName;
-        this.lastName = lastName;
-    }
-
-    get fullName(): string {
-        return `${this.firstName} ${this.lastName}`;
+    addMetadata<T extends Entity>(entity: T, metadata: object): T & { metadata: typeof metadata } {
+        return { ...entity, metadata };
     }
 }
 "#;
@@ -27693,247 +27667,113 @@ class UserProfile {
 
     let output = printer.get_output().to_string();
 
-    // Classes should be converted
     assert!(
-        output.contains("Person") && output.contains("Counter") && output.contains("ConfigurableWidget"),
-        "Expected auto-accessor classes: {}",
+        output.contains("function PersonFactory"),
+        "Expected PersonFactory function: {}",
         output
     );
-
-    // UserProfile should be present
     assert!(
-        output.contains("UserProfile"),
-        "Expected UserProfile class: {}",
+        output.contains("PersonFactory.prototype.create"),
+        "Expected create method: {}",
         output
     );
-
-    // accessor keyword should be transformed (not present in output)
     assert!(
-        !output.contains("accessor name") && !output.contains("accessor value"),
-        "Expected accessor keyword to be transformed: {}",
+        output.contains("PersonFactory.prototype.merge") && output.contains("PersonFactory.prototype.extend"),
+        "Expected merge and extend methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function EntityManager"),
+        "Expected EntityManager function: {}",
+        output
+    );
+    assert!(
+        output.contains("EntityManager.prototype.create") && output.contains("EntityManager.prototype.update"),
+        "Expected EntityManager create and update methods: {}",
+        output
+    );
+    assert!(
+        output.contains("EntityManager.prototype.addMetadata"),
+        "Expected addMetadata method: {}",
         output
     );
 }
 
-/// Test ES5 class with accessor decorators
+/// Test: interface merging patterns
+/// Verifies that classes using interface merging transform correctly to ES5
 #[test]
-fn test_class_es5_accessor_decorators() {
+fn test_class_es5_interface_merging() {
     let source = r#"
-// Accessor decorators
-function logged(target: any, context: ClassAccessorDecoratorContext) {
-    return {
-        get(this: any) {
-            console.log(`Getting ${String(context.name)}`);
-            return target.get.call(this);
-        },
-        set(this: any, value: any) {
-            console.log(`Setting ${String(context.name)} to ${value}`);
-            target.set.call(this, value);
-        }
-    };
+interface Base {
+    id: string;
+    name: string;
 }
 
-function validated(min: number, max: number) {
-    return function(target: any, context: ClassAccessorDecoratorContext) {
+interface WithTimestamp {
+    createdAt: Date;
+}
+
+interface WithVersion {
+    version: number;
+}
+
+interface Document extends Base, WithTimestamp, WithVersion {
+    content: string;
+}
+
+class DocumentBuilder {
+    private doc: Partial<Document> = {};
+
+    setId(id: string): this {
+        this.doc.id = id;
+        return this;
+    }
+
+    setName(name: string): this {
+        this.doc.name = name;
+        return this;
+    }
+
+    setContent(content: string): this {
+        this.doc.content = content;
+        return this;
+    }
+
+    setVersion(version: number): this {
+        this.doc.version = version;
+        return this;
+    }
+
+    build(): Document {
         return {
-            get(this: any) {
-                return target.get.call(this);
-            },
-            set(this: any, value: number) {
-                if (value < min || value > max) {
-                    throw new RangeError(`Value must be between ${min} and ${max}`);
-                }
-                target.set.call(this, value);
-            }
-        };
-    };
-}
-
-function cached(target: any, context: ClassAccessorDecoratorContext) {
-    const cache = new WeakMap<object, any>();
-    return {
-        get(this: any) {
-            if (cache.has(this)) {
-                return cache.get(this);
-            }
-            const value = target.get.call(this);
-            cache.set(this, value);
-            return value;
-        },
-        set(this: any, value: any) {
-            cache.delete(this);
-            target.set.call(this, value);
-        }
-    };
-}
-
-class TrackedValue {
-    @logged
-    accessor value: number = 0;
-
-    @logged
-    accessor name: string = "default";
-}
-
-class BoundedNumber {
-    @validated(0, 100)
-    accessor percentage: number = 0;
-
-    @validated(-273.15, Infinity)
-    accessor temperature: number = 20;
-}
-
-class CachedComputation {
-    @cached
-    accessor result: number = 0;
-
-    @cached
-    accessor data: string = "";
-
-    compute(input: number): void {
-        this.result = input * input;
-    }
-}
-
-class MixedDecorators {
-    @logged
-    @validated(0, 1000)
-    accessor quantity: number = 0;
-
-    @cached
-    @logged
-    accessor expensiveValue: string = "";
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Decorator functions should be present
-    assert!(
-        output.contains("logged") && output.contains("validated") && output.contains("cached"),
-        "Expected decorator functions: {}",
-        output
-    );
-
-    // Classes should be converted
-    assert!(
-        output.contains("TrackedValue") && output.contains("BoundedNumber") && output.contains("CachedComputation"),
-        "Expected accessor decorator classes: {}",
-        output
-    );
-
-    // MixedDecorators should be present
-    assert!(
-        output.contains("MixedDecorators"),
-        "Expected MixedDecorators class: {}",
-        output
-    );
-}
-
-/// Test ES5 class with static accessors
-#[test]
-fn test_class_es5_accessor_static_patterns() {
-    let source = r#"
-// Static accessors
-class Configuration {
-    static accessor debug: boolean = false;
-    static accessor logLevel: string = "info";
-    static accessor maxRetries: number = 3;
-    static accessor timeout: number = 30000;
-
-    static enableDebug(): void {
-        Configuration.debug = true;
-        Configuration.logLevel = "debug";
-    }
-
-    static disableDebug(): void {
-        Configuration.debug = false;
-        Configuration.logLevel = "info";
-    }
-}
-
-class Singleton {
-    private static _instance: Singleton | null = null;
-    static accessor instanceCount: number = 0;
-
-    private constructor() {
-        Singleton.instanceCount++;
-    }
-
-    static getInstance(): Singleton {
-        if (!Singleton._instance) {
-            Singleton._instance = new Singleton();
-        }
-        return Singleton._instance;
-    }
-
-    static resetInstance(): void {
-        Singleton._instance = null;
-    }
-}
-
-class Registry<T> {
-    private static items: Map<string, any> = new Map();
-    static accessor count: number = 0;
-
-    static register<U>(key: string, item: U): void {
-        Registry.items.set(key, item);
-        Registry.count++;
-    }
-
-    static get<U>(key: string): U | undefined {
-        return Registry.items.get(key);
-    }
-
-    static unregister(key: string): boolean {
-        const deleted = Registry.items.delete(key);
-        if (deleted) {
-            Registry.count--;
-        }
-        return deleted;
-    }
-
-    static clear(): void {
-        Registry.items.clear();
-        Registry.count = 0;
-    }
-}
-
-class FeatureFlags {
-    static accessor enableNewUI: boolean = false;
-    static accessor enableDarkMode: boolean = true;
-    static accessor enableAnalytics: boolean = true;
-    static accessor betaFeatures: boolean = false;
-
-    static isEnabled(flag: keyof typeof FeatureFlags): boolean {
-        return (FeatureFlags as any)[flag] === true;
-    }
-
-    static setFlag(flag: keyof typeof FeatureFlags, value: boolean): void {
-        (FeatureFlags as any)[flag] = value;
-    }
-
-    static getAllFlags(): Record<string, boolean> {
-        return {
-            enableNewUI: FeatureFlags.enableNewUI,
-            enableDarkMode: FeatureFlags.enableDarkMode,
-            enableAnalytics: FeatureFlags.enableAnalytics,
-            betaFeatures: FeatureFlags.betaFeatures
+            id: this.doc.id || "",
+            name: this.doc.name || "",
+            content: this.doc.content || "",
+            createdAt: this.doc.createdAt || new Date(),
+            version: this.doc.version || 1
         };
     }
 }
+
+interface Serializable {
+    serialize(): string;
+}
+
+interface Deserializable<T> {
+    deserialize(data: string): T;
+}
+
+class JSONCodec<T> implements Serializable {
+    constructor(private data: T) {}
+
+    serialize(): string {
+        return JSON.stringify(this.data);
+    }
+
+    static deserialize<T>(data: string): T {
+        return JSON.parse(data);
+    }
+}
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
@@ -27950,121 +27790,82 @@ class FeatureFlags {
 
     let output = printer.get_output().to_string();
 
-    // Classes should be converted
     assert!(
-        output.contains("Configuration") && output.contains("Singleton") && output.contains("Registry"),
-        "Expected static accessor classes: {}",
+        output.contains("function DocumentBuilder"),
+        "Expected DocumentBuilder function: {}",
         output
     );
-
-    // FeatureFlags should be present
     assert!(
-        output.contains("FeatureFlags"),
-        "Expected FeatureFlags class: {}",
+        output.contains("DocumentBuilder.prototype.setId") && output.contains("DocumentBuilder.prototype.setName"),
+        "Expected setId and setName methods: {}",
         output
     );
-
-    // Static methods should be preserved
     assert!(
-        output.contains("enableDebug") && output.contains("getInstance") && output.contains("register"),
-        "Expected static methods: {}",
+        output.contains("DocumentBuilder.prototype.setContent") && output.contains("DocumentBuilder.prototype.setVersion"),
+        "Expected setContent and setVersion methods: {}",
         output
     );
-
-    // static accessor keyword should be transformed
     assert!(
-        !output.contains("static accessor debug") && !output.contains("static accessor count"),
-        "Expected static accessor keyword to be transformed: {}",
+        output.contains("DocumentBuilder.prototype.build"),
+        "Expected build method: {}",
+        output
+    );
+    assert!(
+        output.contains("function JSONCodec"),
+        "Expected JSONCodec function: {}",
+        output
+    );
+    assert!(
+        output.contains("JSONCodec.prototype.serialize"),
+        "Expected serialize method: {}",
         output
     );
 }
 
-/// Test ES5 class with await using declarations
+/// Test: conditional intersection types
+/// Verifies that classes using conditional intersection types transform correctly to ES5
 #[test]
-fn test_class_es5_explicit_resource_await_using() {
+fn test_class_es5_conditional_intersection() {
     let source = r#"
-// Async disposable resource
-class AsyncFileHandle {
-    private handle: number;
+type WithId<T> = T & { id: string };
+type WithTimestamps<T> = T & { createdAt: Date; updatedAt: Date };
+type Auditable<T> = T extends { id: string } ? T & { auditLog: string[] } : never;
 
-    constructor(path: string) {
-        this.handle = 0;
+class DataEnhancer {
+    addId<T extends object>(data: T, id: string): WithId<T> {
+        return { ...data, id };
     }
 
-    async [Symbol.asyncDispose](): Promise<void> {
-        await this.close();
+    addTimestamps<T extends object>(data: T): WithTimestamps<T> {
+        const now = new Date();
+        return { ...data, createdAt: now, updatedAt: now };
     }
 
-    async close(): Promise<void> {
-        console.log("Closing async handle");
+    makeAuditable<T extends { id: string }>(data: T): Auditable<T> {
+        return { ...data, auditLog: [] } as Auditable<T>;
     }
 
-    async read(): Promise<string> {
-        return "data";
+    enhance<T extends object>(data: T, id: string): WithId<WithTimestamps<T>> {
+        const withTimestamps = this.addTimestamps(data);
+        return this.addId(withTimestamps, id);
     }
 }
 
-// Database connection with async dispose
-class DatabaseConnection {
-    private connectionString: string;
-    private isOpen: boolean = false;
+type NonNullableIntersection<T, U> = NonNullable<T> & NonNullable<U>;
 
-    constructor(connectionString: string) {
-        this.connectionString = connectionString;
-    }
-
-    async [Symbol.asyncDispose](): Promise<void> {
-        if (this.isOpen) {
-            await this.disconnect();
+class SafeMerger {
+    mergeNonNull<T, U>(a: T | null, b: U | null): NonNullableIntersection<T, U> | null {
+        if (a === null || b === null) {
+            return null;
         }
+        return { ...a, ...b } as NonNullableIntersection<T, U>;
     }
 
-    async connect(): Promise<void> {
-        this.isOpen = true;
+    mergeWithDefaults<T extends object, D extends Partial<T>>(data: T, defaults: D): T & Required<D> {
+        return { ...defaults, ...data } as T & Required<D>;
     }
-
-    async disconnect(): Promise<void> {
-        this.isOpen = false;
-    }
-
-    async query(sql: string): Promise<any[]> {
-        return [];
-    }
-}
-
-// Stream with async disposal
-class AsyncStream {
-    private buffer: Uint8Array[] = [];
-
-    async [Symbol.asyncDispose](): Promise<void> {
-        await this.flush();
-        this.buffer = [];
-    }
-
-    async write(data: Uint8Array): Promise<void> {
-        this.buffer.push(data);
-    }
-
-    async flush(): Promise<void> {
-        console.log("Flushing buffer");
-    }
-}
-
-// Usage with await using
-async function processFiles() {
-    await using file = new AsyncFileHandle("/path/to/file");
-    const data = await file.read();
-    return data;
-}
-
-async function queryDatabase() {
-    await using db = new DatabaseConnection("postgres://localhost");
-    await db.connect();
-    const results = await db.query("SELECT * FROM users");
-    return results;
 }
 "#;
-
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -28080,278 +27881,187 @@ async function queryDatabase() {
 
     let output = printer.get_output().to_string();
 
-    // Classes should be converted
     assert!(
-        output.contains("AsyncFileHandle") && output.contains("DatabaseConnection") && output.contains("AsyncStream"),
-        "Expected async disposable classes: {}",
+        output.contains("function DataEnhancer"),
+        "Expected DataEnhancer function: {}",
         output
     );
-
-    // Symbol.asyncDispose methods should be present
     assert!(
-        output.contains("Symbol.asyncDispose"),
-        "Expected Symbol.asyncDispose: {}",
+        output.contains("DataEnhancer.prototype.addId") && output.contains("DataEnhancer.prototype.addTimestamps"),
+        "Expected addId and addTimestamps methods: {}",
         output
     );
-
-    // Async functions should be preserved
     assert!(
-        output.contains("processFiles") && output.contains("queryDatabase"),
-        "Expected async functions: {}",
+        output.contains("DataEnhancer.prototype.makeAuditable") && output.contains("DataEnhancer.prototype.enhance"),
+        "Expected makeAuditable and enhance methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function SafeMerger"),
+        "Expected SafeMerger function: {}",
+        output
+    );
+    assert!(
+        output.contains("SafeMerger.prototype.mergeNonNull") && output.contains("SafeMerger.prototype.mergeWithDefaults"),
+        "Expected SafeMerger methods: {}",
         output
     );
 }
 
-/// Test ES5 class with Symbol.dispose (sync disposal)
+/// Test: generic intersection types
+/// Verifies that classes using generic intersection types transform correctly to ES5
 #[test]
-fn test_class_es5_explicit_resource_symbol_dispose() {
+fn test_class_es5_generic_intersection() {
     let source = r#"
-// Sync disposable resource
-class FileHandle {
-    private fd: number;
+type Merge<T, U> = T & U;
 
-    constructor(path: string) {
-        this.fd = 0;
+class GenericMerger {
+    private base: object;
+
+    constructor(base: object) {
+        this.base = base;
     }
 
-    [Symbol.dispose](): void {
-        this.close();
+    merge(other: object): object {
+        return Object.assign({}, this.base, other);
     }
 
-    close(): void {
-        console.log("Closing handle");
-    }
-
-    read(): string {
-        return "data";
+    getBase(): object {
+        return this.base;
     }
 }
 
-// Lock with dispose
-class Lock {
-    private isLocked: boolean = false;
-    private name: string;
+type Mixin<T, U> = T & U;
+
+class MixinApplicator {
+    apply(target: object, mixin: object): object {
+        return Object.assign({}, target, mixin);
+    }
+
+    applyTwo(target: object, m1: object, m2: object): object {
+        return Object.assign({}, target, m1, m2);
+    }
+
+    combine(a: object, b: object): object {
+        return Object.assign({}, a, b);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function GenericMerger"),
+        "Expected GenericMerger function: {}",
+        output
+    );
+    assert!(
+        output.contains("this.base = base"),
+        "Expected constructor assignment: {}",
+        output
+    );
+    assert!(
+        output.contains("GenericMerger.prototype.merge") && output.contains("GenericMerger.prototype.getBase"),
+        "Expected merge and getBase methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function MixinApplicator"),
+        "Expected MixinApplicator function: {}",
+        output
+    );
+    assert!(
+        output.contains("MixinApplicator.prototype.apply") && output.contains("MixinApplicator.prototype.applyTwo"),
+        "Expected MixinApplicator apply methods: {}",
+        output
+    );
+    assert!(
+        output.contains("MixinApplicator.prototype.combine"),
+        "Expected MixinApplicator combine method: {}",
+        output
+    );
+}
+
+/// Test: mixin patterns with intersection
+/// Verifies that classes using mixin patterns with intersection types transform correctly to ES5
+#[test]
+fn test_class_es5_mixin_intersection_patterns() {
+    let source = r#"
+type Disposable = {
+    dispose(): void;
+    isDisposed: boolean;
+};
+
+type Activatable = {
+    activate(): void;
+    deactivate(): void;
+    isActive: boolean;
+};
+
+type Component = Disposable & Activatable & { name: string };
+
+class ComponentBase implements Component {
+    name: string;
+    isDisposed: boolean = false;
+    isActive: boolean = false;
 
     constructor(name: string) {
         this.name = name;
     }
 
-    [Symbol.dispose](): void {
-        this.unlock();
+    dispose(): void {
+        this.isDisposed = true;
+        this.isActive = false;
     }
 
-    acquire(): void {
-        this.isLocked = true;
-    }
-
-    unlock(): void {
-        this.isLocked = false;
-    }
-}
-
-// Timer with dispose
-class Timer {
-    private id: number | null = null;
-
-    [Symbol.dispose](): void {
-        if (this.id !== null) {
-            clearInterval(this.id);
-            this.id = null;
+    activate(): void {
+        if (!this.isDisposed) {
+            this.isActive = true;
         }
     }
 
-    start(callback: () => void, interval: number): void {
-        this.id = setInterval(callback, interval) as any;
+    deactivate(): void {
+        this.isActive = false;
     }
 }
 
-// Memory pool with dispose
-class MemoryPool {
-    private blocks: ArrayBuffer[] = [];
-    private size: number;
+type Logger = { log(message: string): void };
+type ErrorHandler = { handleError(error: Error): void };
+type Service = Logger & ErrorHandler & { name: string };
 
-    constructor(size: number) {
-        this.size = size;
-    }
-
-    [Symbol.dispose](): void {
-        this.blocks = [];
-    }
-
-    allocate(): ArrayBuffer {
-        const block = new ArrayBuffer(this.size);
-        this.blocks.push(block);
-        return block;
-    }
-}
-
-// Usage with using
-function processFile() {
-    using file = new FileHandle("/path/to/file");
-    const data = file.read();
-    return data;
-}
-
-function withLock() {
-    using lock = new Lock("resource");
-    lock.acquire();
-    // Do work
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Classes should be converted
-    assert!(
-        output.contains("FileHandle") && output.contains("Lock") && output.contains("Timer"),
-        "Expected disposable classes: {}",
-        output
-    );
-
-    // Symbol.dispose should be present
-    assert!(
-        output.contains("Symbol.dispose"),
-        "Expected Symbol.dispose: {}",
-        output
-    );
-
-    // MemoryPool should be present
-    assert!(
-        output.contains("MemoryPool"),
-        "Expected MemoryPool class: {}",
-        output
-    );
-
-    // Functions should be preserved
-    assert!(
-        output.contains("processFile") && output.contains("withLock"),
-        "Expected usage functions: {}",
-        output
-    );
-}
-
-/// Test ES5 class with mixed disposal patterns
-#[test]
-fn test_class_es5_explicit_resource_mixed_disposal() {
-    let source = r#"
-// Class with both sync and async dispose
-class DualDisposable {
-    private syncResource: string;
-    private asyncResource: Promise<string>;
-
-    constructor() {
-        this.syncResource = "sync";
-        this.asyncResource = Promise.resolve("async");
-    }
-
-    [Symbol.dispose](): void {
-        console.log("Sync cleanup");
-    }
-
-    async [Symbol.asyncDispose](): Promise<void> {
-        await this.asyncResource;
-        console.log("Async cleanup");
-    }
-}
-
-// Disposable with inheritance
-class BaseResource {
-    protected name: string;
+class ServiceBase implements Service {
+    name: string;
+    private logs: string[] = [];
 
     constructor(name: string) {
         this.name = name;
     }
 
-    [Symbol.dispose](): void {
-        console.log(`Disposing ${this.name}`);
-    }
-}
-
-class DerivedResource extends BaseResource {
-    private extra: number;
-
-    constructor(name: string, extra: number) {
-        super(name);
-        this.extra = extra;
+    log(message: string): void {
+        this.logs.push("[" + this.name + "] " + message);
     }
 
-    [Symbol.dispose](): void {
-        console.log(`Extra cleanup: ${this.extra}`);
-        super[Symbol.dispose]();
-    }
-}
-
-// Generic disposable
-class DisposableContainer<T> {
-    private value: T;
-    private disposed: boolean = false;
-
-    constructor(value: T) {
-        this.value = value;
+    handleError(error: Error): void {
+        this.log("Error: " + error.message);
     }
 
-    [Symbol.dispose](): void {
-        this.disposed = true;
+    getLogs(): string[] {
+        return [...this.logs];
     }
-
-    get(): T {
-        if (this.disposed) {
-            throw new Error("Already disposed");
-        }
-        return this.value;
-    }
-}
-
-// Static dispose method
-class StaticDisposable {
-    private static instances: StaticDisposable[] = [];
-
-    constructor() {
-        StaticDisposable.instances.push(this);
-    }
-
-    [Symbol.dispose](): void {
-        const index = StaticDisposable.instances.indexOf(this);
-        if (index > -1) {
-            StaticDisposable.instances.splice(index, 1);
-        }
-    }
-
-    static disposeAll(): void {
-        for (const instance of StaticDisposable.instances) {
-            instance[Symbol.dispose]();
-        }
-    }
-}
-
-// Multiple resources in one block
-function multipleResources() {
-    using a = new BaseResource("a");
-    using b = new DerivedResource("b", 42);
-    using c = new DisposableContainer<number>(100);
-    return c.get();
-}
-
-async function mixedResources() {
-    using sync = new BaseResource("sync");
-    await using dual = new DualDisposable();
-    return "done";
 }
 "#;
-
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -28367,38 +28077,152 @@ async function mixedResources() {
 
     let output = printer.get_output().to_string();
 
-    // Classes should be converted
     assert!(
-        output.contains("DualDisposable") && output.contains("BaseResource") && output.contains("DerivedResource"),
-        "Expected mixed disposal classes: {}",
+        output.contains("function ComponentBase"),
+        "Expected ComponentBase function: {}",
         output
     );
-
-    // Generic disposable should be present
     assert!(
-        output.contains("DisposableContainer"),
-        "Expected DisposableContainer class: {}",
+        output.contains("this.name = name"),
+        "Expected constructor assignment: {}",
         output
     );
-
-    // Static disposable should be present
     assert!(
-        output.contains("StaticDisposable") && output.contains("disposeAll"),
-        "Expected StaticDisposable with disposeAll: {}",
+        output.contains("ComponentBase.prototype.dispose") && output.contains("ComponentBase.prototype.activate"),
+        "Expected dispose and activate methods: {}",
         output
     );
-
-    // Both Symbol.dispose and Symbol.asyncDispose should be present
     assert!(
-        output.contains("Symbol.dispose") && output.contains("Symbol.asyncDispose"),
-        "Expected both dispose symbols: {}",
+        output.contains("ComponentBase.prototype.deactivate"),
+        "Expected deactivate method: {}",
         output
     );
-
-    // Functions should be preserved
     assert!(
-        output.contains("multipleResources") && output.contains("mixedResources"),
-        "Expected usage functions: {}",
+        output.contains("function ServiceBase"),
+        "Expected ServiceBase function: {}",
+        output
+    );
+    assert!(
+        output.contains("ServiceBase.prototype.log") && output.contains("ServiceBase.prototype.handleError"),
+        "Expected log and handleError methods: {}",
+        output
+    );
+}
+
+/// Test: combined intersection type patterns
+/// Verifies that classes using multiple intersection type patterns together transform correctly to ES5
+#[test]
+fn test_class_es5_combined_intersection_patterns() {
+    let source = r#"
+type HasId = { id: string };
+type HasName = { name: string };
+type HasCreated = { createdAt: Date };
+type HasUpdated = { updatedAt: Date };
+
+type BaseEntity = HasId & HasName;
+type TimestampedEntity = BaseEntity & HasCreated & HasUpdated;
+type AuditableEntity = TimestampedEntity & { auditLog: string[]; lastModifiedBy: string };
+
+class EntityFactory {
+    createBase(id: string, name: string): BaseEntity {
+        return { id, name };
+    }
+
+    createTimestamped(id: string, name: string): TimestampedEntity {
+        const now = new Date();
+        return { id, name, createdAt: now, updatedAt: now };
+    }
+
+    createAuditable(id: string, name: string, user: string): AuditableEntity {
+        const now = new Date();
+        return {
+            id,
+            name,
+            createdAt: now,
+            updatedAt: now,
+            auditLog: ["Created by " + user],
+            lastModifiedBy: user
+        };
+    }
+
+    upgrade<T extends BaseEntity>(entity: T): T & HasCreated & HasUpdated {
+        const now = new Date();
+        return { ...entity, createdAt: now, updatedAt: now };
+    }
+}
+
+type Validator<T> = { validate(data: T): boolean };
+type Transformer<T, U> = { transform(data: T): U };
+type Processor<T, U> = Validator<T> & Transformer<T, U>;
+
+class DataProcessor<T extends object, U extends object> implements Processor<T, U> {
+    private validator: (data: T) => boolean;
+    private transformer: (data: T) => U;
+
+    constructor(validator: (data: T) => boolean, transformer: (data: T) => U) {
+        this.validator = validator;
+        this.transformer = transformer;
+    }
+
+    validate(data: T): boolean {
+        return this.validator(data);
+    }
+
+    transform(data: T): U {
+        return this.transformer(data);
+    }
+
+    process(data: T): U | null {
+        if (this.validate(data)) {
+            return this.transform(data);
+        }
+        return null;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function EntityFactory"),
+        "Expected EntityFactory function: {}",
+        output
+    );
+    assert!(
+        output.contains("EntityFactory.prototype.createBase") && output.contains("EntityFactory.prototype.createTimestamped"),
+        "Expected createBase and createTimestamped methods: {}",
+        output
+    );
+    assert!(
+        output.contains("EntityFactory.prototype.createAuditable") && output.contains("EntityFactory.prototype.upgrade"),
+        "Expected createAuditable and upgrade methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function DataProcessor"),
+        "Expected DataProcessor function: {}",
+        output
+    );
+    assert!(
+        output.contains("DataProcessor.prototype.validate") && output.contains("DataProcessor.prototype.transform"),
+        "Expected validate and transform methods: {}",
+        output
+    );
+    assert!(
+        output.contains("DataProcessor.prototype.process"),
+        "Expected process method: {}",
         output
     );
 }

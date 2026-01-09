@@ -7,12 +7,14 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- [ ] Add ES5 module patterns parity tests: dynamic import, top-level await, import.meta. Tests: `./wasm/test.sh emitter_parity`
+- [ ] Add ES5 class accessor patterns parity tests: auto-accessors, computed accessors, inherited accessors. Tests: `./wasm/test.sh emitter_parity`
 
 ## Task Queue
 (empty)
 
 ## Completed
+- [x] Added ES5 template literal patterns parity tests (tagged-complex, spans-complex, deeply-nested, raw-strings) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (309 tests).
+- [x] Added ES5 module patterns parity tests (dynamic-import, top-level-await, import-meta) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (305 tests).
 - [x] Added ES5 async iteration patterns parity tests (for-await-generator, async-iterator-protocol, symbol-asyncIterator) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (302 tests).
 - [x] Added ES5 decorator patterns parity tests (class-chaining, method-descriptor, parameter-injection) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (299 tests).
 - [x] Added ES5 class inheritance patterns parity tests (extends-clause, super-calls, method-overrides, abstract-class) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (296 tests).
