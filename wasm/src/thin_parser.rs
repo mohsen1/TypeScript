@@ -34,6 +34,15 @@ use crate::parser::{
     syntax_kind_ext,
 };
 // =============================================================================
+// Parser Context Flags
+// =============================================================================
+
+/// Context flag: inside an async function/method/arrow
+const CONTEXT_FLAG_ASYNC: u32 = 1;
+/// Context flag: inside a generator function/method
+const CONTEXT_FLAG_GENERATOR: u32 = 2;
+
+// =============================================================================
 // Parse Diagnostic
 // =============================================================================
 
@@ -191,6 +200,32 @@ impl ThinParserState {
             // Any keyword can be used as a property name
             _ => self.is_identifier_or_keyword()
         }
+    }
+
+    /// Check if we're inside an async function/method/arrow
+    #[inline]
+    fn in_async_context(&self) -> bool {
+        (self.context_flags & CONTEXT_FLAG_ASYNC) != 0
+    }
+
+    /// Check if we're inside a generator function/method
+    #[inline]
+    fn in_generator_context(&self) -> bool {
+        (self.context_flags & CONTEXT_FLAG_GENERATOR) != 0
+    }
+
+    /// Set context flags and return the old value (for restoring later)
+    #[inline]
+    fn set_context_flags(&mut self, flags: u32) -> u32 {
+        let old = self.context_flags;
+        self.context_flags |= flags;
+        old
+    }
+
+    /// Restore context flags to a previous value
+    #[inline]
+    fn restore_context_flags(&mut self, flags: u32) {
+        self.context_flags = flags;
     }
 
     /// Parse optional token, returns true if found
@@ -1118,6 +1153,15 @@ impl ThinParserState {
         };
 
         // Parse body - may be missing for overload signatures (just a semicolon)
+        // Set context flags for async/generator to properly parse await/yield
+        let saved_flags = self.context_flags;
+        if is_async {
+            self.context_flags |= CONTEXT_FLAG_ASYNC;
+        }
+        if asterisk_token {
+            self.context_flags |= CONTEXT_FLAG_GENERATOR;
+        }
+
         let body = if self.is_token(SyntaxKind::OpenBraceToken) {
             self.parse_block()
         } else {
@@ -1125,6 +1169,9 @@ impl ThinParserState {
             self.parse_optional(SyntaxKind::SemicolonToken);
             NodeIndex::NONE
         };
+
+        // Restore context flags
+        self.context_flags = saved_flags;
 
         let end_pos = self.token_end();
         self.arena.add_function(
@@ -1201,8 +1248,19 @@ impl ThinParserState {
             NodeIndex::NONE
         };
 
-        // Parse body
+        // Parse body with context flags for async/generator
+        let saved_flags = self.context_flags;
+        if is_async {
+            self.context_flags |= CONTEXT_FLAG_ASYNC;
+        }
+        if asterisk_token {
+            self.context_flags |= CONTEXT_FLAG_GENERATOR;
+        }
+
         let body = self.parse_block();
+
+        // Restore context flags
+        self.context_flags = saved_flags;
 
         let end_pos = self.token_end();
         self.arena.add_function(
@@ -2124,6 +2182,14 @@ impl ThinParserState {
         use crate::checker::types::diagnostics::diagnostic_codes;
         let start_pos = self.token_pos();
 
+        // Handle empty statement (semicolon) in class body - this is valid TypeScript/JavaScript
+        // A standalone semicolon in a class body is an empty class element
+        if self.is_token(SyntaxKind::SemicolonToken) {
+            // Consume the semicolon and return NONE (empty class element)
+            self.next_token();
+            return NodeIndex::NONE;
+        }
+
         // Handle static block: static { ... }
         if self.is_token(SyntaxKind::StaticKeyword) && self.look_ahead_is_static_block() {
             return self.parse_static_block();
@@ -2218,12 +2284,29 @@ impl ThinParserState {
                 NodeIndex::NONE
             };
 
+            // Check if method has async modifier
+            let is_async = modifiers.as_ref().map_or(false, |mods| {
+                mods.nodes.iter().any(|&idx| {
+                    self.arena.nodes.get(idx.0 as usize)
+                        .map_or(false, |node| node.kind == SyntaxKind::AsyncKeyword as u16)
+                })
+            });
+
+            // Set context flags for async method body
+            let saved_flags = self.context_flags;
+            if is_async {
+                self.context_flags |= CONTEXT_FLAG_ASYNC;
+            }
+
             // Parse body
             let body = if self.is_token(SyntaxKind::OpenBraceToken) {
                 self.parse_block()
             } else {
                 NodeIndex::NONE
             };
+
+            // Restore context flags
+            self.context_flags = saved_flags;
 
             let end_pos = self.token_end();
             self.arena.add_method_decl(
@@ -4581,12 +4664,21 @@ impl ThinParserState {
         // Parse =>
         self.parse_expected(SyntaxKind::EqualsGreaterThanToken);
 
+        // Set async context for body parsing
+        let saved_flags = self.context_flags;
+        if is_async {
+            self.context_flags |= CONTEXT_FLAG_ASYNC;
+        }
+
         // Parse body (block or expression)
         let body = if self.is_token(SyntaxKind::OpenBraceToken) {
             self.parse_block()
         } else {
             self.parse_assignment_expression()
         };
+
+        // Restore context flags
+        self.context_flags = saved_flags;
 
         let end_pos = self.token_end();
 
@@ -4845,17 +4937,24 @@ impl ThinParserState {
                 )
             }
             SyntaxKind::AwaitKeyword => {
-                let start_pos = self.token_pos();
-                self.next_token();
-                let expression = self.parse_unary_expression();
-                let end_pos = self.token_end();
+                // Only parse as await expression if we're in an async context
+                // Outside async context, 'await' is a valid identifier
+                if self.in_async_context() {
+                    let start_pos = self.token_pos();
+                    self.next_token();
+                    let expression = self.parse_unary_expression();
+                    let end_pos = self.token_end();
 
-                self.arena.add_unary_expr_ex(
-                    syntax_kind_ext::AWAIT_EXPRESSION,
-                    start_pos,
-                    end_pos,
-                    UnaryExprDataEx { expression, asterisk_token: false },
-                )
+                    self.arena.add_unary_expr_ex(
+                        syntax_kind_ext::AWAIT_EXPRESSION,
+                        start_pos,
+                        end_pos,
+                        UnaryExprDataEx { expression, asterisk_token: false },
+                    )
+                } else {
+                    // Outside async context, parse 'await' as an identifier
+                    self.parse_postfix_expression()
+                }
             }
             SyntaxKind::YieldKeyword => {
                 let start_pos = self.token_pos();
@@ -6607,6 +6706,7 @@ impl ThinParserState {
         }
 
         // Check for type keywords (string, number, boolean, etc.)
+        // Also handle contextual keywords (await, yield) which are valid as type names
         let first_name = match self.token() {
             SyntaxKind::StringKeyword
             | SyntaxKind::NumberKeyword
@@ -6619,7 +6719,9 @@ impl ThinParserState {
             | SyntaxKind::NeverKeyword
             | SyntaxKind::AnyKeyword
             | SyntaxKind::UnknownKeyword
-            | SyntaxKind::ObjectKeyword => {
+            | SyntaxKind::ObjectKeyword
+            | SyntaxKind::AwaitKeyword
+            | SyntaxKind::YieldKeyword => {
                 // Parse keyword as identifier for type reference
                 self.parse_keyword_as_identifier()
             }

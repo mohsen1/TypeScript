@@ -1227,7 +1227,7 @@ pub fn create_thin_parser(file_name: String, source_text: String) -> ThinParser 
 // WasmProgram - Multi-file TypeScript Program Support
 // =============================================================================
 
-use crate::parallel::{parse_and_bind_parallel, merge_bind_results, MergedProgram, check_functions_parallel};
+use crate::parallel::{parse_and_bind_parallel, merge_bind_results, MergedProgram, check_functions_parallel, BindResult};
 
 /// Result of checking a single file in a multi-file program
 #[derive(serde::Serialize)]
