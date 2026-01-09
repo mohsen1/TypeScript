@@ -1375,6 +1375,35 @@ impl<'a> ThinCheckerState<'a> {
         TypeId::ANY
     }
 
+    /// Get type from a type operator node (keyof T, readonly T, unique symbol).
+    /// Resolves the operand type first to ensure it's available in type_env for evaluation.
+    fn get_type_from_type_operator(&mut self, idx: NodeIndex) -> TypeId {
+        use crate::solver::{TypeKey, SymbolRef};
+
+        let Some(node) = self.ctx.arena.get(idx) else {
+            return TypeId::ANY;
+        };
+
+        let Some(type_op) = self.ctx.arena.get_type_operator(node) else {
+            return TypeId::ANY;
+        };
+
+        // Resolve the operand type using checker's get_type_from_type_node
+        // This ensures type references are resolved and available in type_env
+        let inner_type = self.get_type_from_type_node(type_op.type_node);
+
+        // Create the appropriate type based on the operator
+        match type_op.operator {
+            // KeyOfKeyword = 143
+            143 => self.ctx.types.intern(TypeKey::KeyOf(inner_type)),
+            // ReadonlyKeyword = 148
+            148 => self.ctx.types.intern(TypeKey::ReadonlyType(inner_type)),
+            // UniqueKeyword = 158 - unique symbol
+            158 => self.ctx.types.intern(TypeKey::UniqueSymbol(SymbolRef(idx.0))),
+            _ => inner_type,
+        }
+    }
+
     /// Get type from a type query node (typeof X).
     /// Creates a TypeQuery type with the actual SymbolId from the binder.
     fn get_type_from_type_query(&mut self, idx: NodeIndex) -> TypeId {
@@ -5066,6 +5095,51 @@ impl<'a> ThinCheckerState<'a> {
                 }
             }
             Some(TypeKey::Function(_)) => Some(constructor_type),
+            Some(TypeKey::Intersection(members)) => {
+                // For intersection of constructors (mixins), collect construct signatures
+                // and create intersection of return types
+                let members = self.ctx.types.type_list(members);
+                let mut all_construct_sigs = Vec::new();
+                let mut return_types = Vec::new();
+
+                for &member in members.iter() {
+                    if let Some(TypeKey::Callable(shape_id)) = self.ctx.types.lookup(member) {
+                        let shape = self.ctx.types.callable_shape(shape_id);
+                        for sig in &shape.construct_signatures {
+                            all_construct_sigs.push(sig.clone());
+                            return_types.push(sig.return_type);
+                        }
+                    }
+                }
+
+                if all_construct_sigs.is_empty() {
+                    None
+                } else {
+                    // Create new construct signatures with intersected return types
+                    let intersected_return = if return_types.len() == 1 {
+                        return_types[0]
+                    } else {
+                        self.ctx.types.intersection(return_types)
+                    };
+
+                    // Use the first signature's parameters (simplified approach)
+                    // A more complete implementation would merge parameters
+                    let first_sig = &all_construct_sigs[0];
+                    let combined_sig = crate::solver::CallSignature {
+                        type_params: first_sig.type_params.clone(),
+                        params: first_sig.params.clone(),
+                        this_type: first_sig.this_type,
+                        return_type: intersected_return,
+                        type_predicate: None,
+                    };
+
+                    Some(self.ctx.types.callable(CallableShape {
+                        call_signatures: vec![combined_sig],
+                        construct_signatures: Vec::new(),
+                        properties: Vec::new(),
+                    }))
+                }
+            }
             _ => None,
         };
 
@@ -8749,6 +8823,11 @@ impl<'a> ThinCheckerState<'a> {
             if node.kind == syntax_kind_ext::TYPE_LITERAL {
                 // Type literals should use checker resolution so type parameters resolve correctly.
                 return self.get_type_from_type_literal(idx);
+            }
+            if node.kind == syntax_kind_ext::TYPE_OPERATOR {
+                // Handle type operators (keyof, readonly, unique) specially to ensure
+                // the operand type is resolved and available in type_env for evaluation.
+                return self.get_type_from_type_operator(idx);
             }
         }
 

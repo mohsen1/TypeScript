@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Find TS2339 false positives and missing errors in conformance tests.
- * Compares WASM diagnostics to tsc, supports multi-file tests.
+ * Find TS2339 false positives in conformance tests.
+ * Compares WASM diagnostics to tsc, supports single-file tests.
  */
 
 import { createRequire } from 'module';
@@ -152,46 +152,7 @@ function runTscSingle(code, fileName, testOptions) {
     code: d.code,
     message: ts.flattenDiagnosticMessageText(d.messageText, '\n'),
     category: ts.DiagnosticCategory[d.category],
-  }));
-}
-
-function runTscMulti(files, testOptions) {
-  const compilerOptions = buildCompilerOptions(testOptions);
-  const sourceFiles = new Map();
-  const fileNames = [];
-
-  for (const file of files) {
-    const sf = ts.createSourceFile(file.name, file.content, ts.ScriptTarget.ES2020, true);
-    sourceFiles.set(file.name, sf);
-    fileNames.push(file.name);
-  }
-
-  const host = ts.createCompilerHost(compilerOptions);
-  const originalGetSourceFile = host.getSourceFile;
-  host.getSourceFile = (name, languageVersion, onError) => {
-    if (sourceFiles.has(name)) {
-      return sourceFiles.get(name);
-    }
-    return originalGetSourceFile.call(host, name, languageVersion, onError);
-  };
-  host.fileExists = name => sourceFiles.has(name) || ts.sys.fileExists(name);
-  host.readFile = name => {
-    const file = files.find(f => f.name === name);
-    if (file) return file.content;
-    return ts.sys.readFile(name);
-  };
-
-  const program = ts.createProgram(fileNames, compilerOptions, host);
-  const allDiagnostics = [];
-  for (const sf of sourceFiles.values()) {
-    allDiagnostics.push(...program.getSyntacticDiagnostics(sf));
-    allDiagnostics.push(...program.getSemanticDiagnostics(sf));
-  }
-
-  return allDiagnostics.map(d => ({
-    code: d.code,
-    message: ts.flattenDiagnosticMessageText(d.messageText, '\n'),
-    category: ts.DiagnosticCategory[d.category],
+    line: d.file ? ts.getLineAndCharacterOfPosition(d.file, d.start).line + 1 : 0,
   }));
 }
 
@@ -205,42 +166,29 @@ function runWasmSingle(code, fileName, wasm) {
       code: d.code,
       message: d.message,
       category: 'Error',
+      line: d.line || 0,
     })),
     ...(checkResult.diagnostics || []).map(d => ({
       code: d.code,
       message: d.message_text,
       category: d.category,
+      line: d.line || 0,
     })),
   ];
   return wasmDiags;
 }
 
-function runWasmMulti(files, wasm) {
-  const program = new wasm.WasmProgram();
-  for (const file of files) {
-    program.addFile(file.name, file.content);
-  }
-  const codes = program.getAllDiagnosticCodes();
-  return Array.from(codes).map(code => ({ code, message: '', category: 'Error' }));
-}
-
 async function main() {
   const args = process.argv.slice(2);
-  const maxTests = parseInt(args.find(a => a.startsWith('--max='))?.split('=')[1] || '5000', 10);
-  const maxSamples = parseInt(args.find(a => a.startsWith('--samples='))?.split('=')[1] || '50', 10);
-  const showMissing = args.includes('--missing');
-  const showExtra = args.includes('--extra');
-  const showBoth = !showMissing && !showExtra; // Default: show both
+  const maxTests = parseInt(args.find(a => a.startsWith('--max='))?.split('=')[1] || '2000', 10);
+  const maxSamples = parseInt(args.find(a => a.startsWith('--samples='))?.split('=')[1] || '20', 10);
 
   const wasm = await import(join(CONFIG.wasmPkgPath, 'wasm.js'));
   const testFiles = getTestFiles(CONFIG.conformanceDir, maxTests);
 
-  const extraMatches = [];
-  const missingMatches = [];
-  let processed = 0;
+  const matches = [];
 
   for (const filePath of testFiles) {
-    processed++;
     let rawCode;
     try {
       rawCode = readFileSync(filePath, 'utf-8');
@@ -249,107 +197,49 @@ async function main() {
     }
 
     const { options, isMultiFile, cleanCode, files } = parseTestDirectives(rawCode);
+
+    // Skip multi-file tests for simplicity
+    if (isMultiFile) continue;
+
     let tscDiags = [];
     let wasmDiags = [];
 
     try {
-      if (isMultiFile && files.length > 0) {
-        tscDiags = runTscMulti(files, options);
-        wasmDiags = runWasmMulti(files, wasm);
-      } else {
-        const fileName = basename(filePath);
-        tscDiags = runTscSingle(cleanCode, fileName, options);
-        wasmDiags = runWasmSingle(cleanCode, fileName, wasm);
-      }
-    } catch {
+      const fileName = basename(filePath);
+      tscDiags = runTscSingle(cleanCode, fileName, options);
+      wasmDiags = runWasmSingle(cleanCode, fileName, wasm);
+    } catch (e) {
       continue;
     }
 
     const tscCodes = new Set(tscDiags.map(d => d.code));
     const wasmCodes = new Set(wasmDiags.map(d => d.code));
-    const relPath = filePath.replace(CONFIG.conformanceDir + '/', '');
+    const extraCodes = [...wasmCodes].filter(code => !tscCodes.has(code));
 
-    // Extra: WASM reports TS2339 but tsc doesn't
-    if ((showExtra || showBoth) && wasmCodes.has(2339) && !tscCodes.has(2339)) {
-      const messages = wasmDiags.filter(d => d.code === 2339).map(d => d.message).filter(Boolean);
-      if (extraMatches.length < maxSamples) {
-        extraMatches.push({ path: relPath, messages, code: rawCode.slice(0, 600) });
+    if (extraCodes.includes(2339)) {
+      const relPath = filePath.replace(CONFIG.conformanceDir + '/', '');
+      const wasmMessages = wasmDiags.filter(d => d.code === 2339);
+      console.log(`\n=== EXTRA TS2339: ${relPath} ===`);
+      console.log('WASM TS2339 errors:');
+      for (const m of wasmMessages.slice(0, 5)) {
+        console.log(`  Line ${m.line}: ${m.message}`);
       }
+      console.log('\nCode snippet:');
+      const lines = cleanCode.split('\n');
+      console.log(lines.slice(0, 30).map((l, i) => `${i + 1}: ${l}`).join('\n'));
+      matches.push({ path: relPath, messages: wasmMessages });
     }
 
-    // Missing: tsc reports TS2339 but WASM doesn't
-    if ((showMissing || showBoth) && tscCodes.has(2339) && !wasmCodes.has(2339)) {
-      const messages = tscDiags.filter(d => d.code === 2339).map(d => d.message).filter(Boolean);
-      if (missingMatches.length < maxSamples) {
-        missingMatches.push({ path: relPath, messages, code: rawCode.slice(0, 600) });
-      }
-    }
-
-    // Early exit if we have enough samples
-    if (extraMatches.length >= maxSamples && missingMatches.length >= maxSamples) {
+    if (matches.length >= maxSamples) {
       break;
     }
   }
 
-  // Print results
-  if (showExtra || showBoth) {
-    console.log('\n========================================');
-    console.log('EXTRA TS2339 (WASM reports, tsc does not)');
-    console.log('========================================');
-    for (const match of extraMatches) {
-      console.log(`\n--- ${match.path} ---`);
-      if (match.messages.length > 0) {
-        for (const msg of match.messages.slice(0, 3)) {
-          console.log(`  ${msg}`);
-        }
-      }
-    }
-    console.log(`\nTotal extra: ${extraMatches.length}`);
+  console.log('\n\n=== SUMMARY ===');
+  console.log(`Total files with extra TS2339: ${matches.length}`);
+  for (const m of matches) {
+    console.log(`  ${m.path}: ${m.messages.length} extra TS2339 errors`);
   }
-
-  if (showMissing || showBoth) {
-    console.log('\n========================================');
-    console.log('MISSING TS2339 (tsc reports, WASM does not)');
-    console.log('========================================');
-    for (const match of missingMatches) {
-      console.log(`\n--- ${match.path} ---`);
-      if (match.messages.length > 0) {
-        for (const msg of match.messages.slice(0, 3)) {
-          console.log(`  ${msg}`);
-        }
-      }
-    }
-    console.log(`\nTotal missing: ${missingMatches.length}`);
-  }
-
-  console.log('\n========================================');
-  console.log('SUMMARY');
-  console.log('========================================');
-  console.log(`Files processed: ${processed}`);
-  console.log(`Extra TS2339 files: ${extraMatches.length}`);
-  console.log(`Missing TS2339 files: ${missingMatches.length}`);
-
-  // List file paths for easy reference
-  if (extraMatches.length > 0) {
-    console.log('\nExtra files:');
-    for (const m of extraMatches.slice(0, 20)) {
-      console.log(`  ${m.path}`);
-    }
-    if (extraMatches.length > 20) {
-      console.log(`  ... and ${extraMatches.length - 20} more`);
-    }
-  }
-
-  if (missingMatches.length > 0) {
-    console.log('\nMissing files:');
-    for (const m of missingMatches.slice(0, 20)) {
-      console.log(`  ${m.path}`);
-    }
-    if (missingMatches.length > 20) {
-      console.log(`  ... and ${missingMatches.length - 20} more`);
-    }
-  }
-
   process.exit(0);
 }
 
