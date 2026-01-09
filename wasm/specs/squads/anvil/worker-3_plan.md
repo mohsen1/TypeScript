@@ -152,3 +152,23 @@ Active
 - Added default `tests/lib/lib.d.ts` loading in conformance harness scripts
 
 Ready for Merge: Yes
+
+## Current Task: TS2339 property access fixes (new assignment)
+
+### Failing Samples (extra TS2339)
+Collected from `node wasm/differential-test/conformance-runner.mjs --max=1000 -v ... | awk ...`:
+- `tests/cases/conformance/classes/members/privateNames/privateNameStaticAccessorsAccess.ts`
+- `tests/cases/conformance/classes/members/privateNames/privateNameStaticsAndStaticMethods.ts`
+- `tests/cases/conformance/classes/members/privateNames/privateNamesAndStaticMethods.ts`
+- `tests/cases/conformance/classes/mixinAbstractClasses.ts`
+- `tests/cases/conformance/classes/mixinClassesAnonymous.ts`
+
+### Emit Sites (thin_checker.rs)
+- Property access miss → TS2339: `wasm/src/thin_checker.rs:4901` / `wasm/src/thin_checker.rs:4902`
+  - Branch: `PropertyAccessResult::PropertyNotFound { .. }` → `error_property_not_exist_at`
+- Diagnostic builder: `wasm/src/thin_checker.rs:7071` (`error_property_not_exist_at`)
+
+### Next Steps
+1. Re-run conformance with higher `--max` if needed to confirm failing set.
+2. Inspect private name / mixin samples for property lookup path (likely class static/private handling in property access).
+3. Trace property access in `get_type_of_property_access_expression` and related type resolution helpers for static/private members.
