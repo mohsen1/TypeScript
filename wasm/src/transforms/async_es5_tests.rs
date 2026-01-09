@@ -13565,3 +13565,53 @@ fn test_async_yielddeleg_ignores_nested() {
     );
     assert!(!result, "Should not detect await inside nested async generator");
 }
+
+// FOR-AWAIT-OF EDGE CASE TESTS
+
+#[test]
+fn test_async_forawait_edge_break() {
+    let result = async_error_propagation_contains_await(
+        "async function process() { for (const x of items) { await handle(x); if (x.done) break; } }",
+    );
+    assert!(result, "Should detect await in for-await-of with break");
+}
+
+#[test]
+fn test_async_forawait_edge_continue() {
+    let result = async_error_propagation_contains_await(
+        "async function process() { for (const x of items) { if (x.skip) continue; await handle(x); } }",
+    );
+    assert!(result, "Should detect await in for-await-of with continue");
+}
+
+#[test]
+fn test_async_forawait_edge_return() {
+    let result = async_error_propagation_contains_await(
+        "async function findFirst() { for (const x of items) { if (await matches(x)) return x; } }",
+    );
+    assert!(result, "Should detect await in for-await-of with return");
+}
+
+#[test]
+fn test_async_forawait_edge_nested() {
+    let result = async_error_propagation_contains_await(
+        "async function process() { for (const a of outer) { for (const b of inner) { await handle(a, b); } } }",
+    );
+    assert!(result, "Should detect await in for-await-of nested loops");
+}
+
+#[test]
+fn test_async_forawait_edge_try_catch() {
+    let result = async_error_propagation_contains_await(
+        "async function process() { for (const x of items) { try { await handle(x); } catch (e) { console.error(e); } } }",
+    );
+    assert!(result, "Should detect await in for-await-of with try/catch");
+}
+
+#[test]
+fn test_async_forawait_edge_combined() {
+    let result = async_error_propagation_contains_await(
+        "async function process() { for (const x of items) { try { if (await check(x)) continue; await handle(x); } catch (e) { break; } } }",
+    );
+    assert!(result, "Should detect await in combined for-await-of patterns");
+}
