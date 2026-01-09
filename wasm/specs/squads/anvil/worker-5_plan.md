@@ -7,7 +7,22 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-(none - awaiting new task from EM)
+Add ES5 async tests for async class static block patterns
+
+Per GOALS.md Objective 1: ES5 downleveling correctness
+
+Steps:
+1. Add 6 ES5 async tests for async class static block patterns to `wasm/src/transforms/async_es5_tests.rs`:
+   - Basic async in static block
+   - Static block with await
+   - Static block initialization order
+   - Static block with private field access
+   - Static block error handling
+   - Combined static block patterns
+2. Run `./wasm/test.sh async_es5_tests` to verify all tests pass
+3. Commit with message: `[wasm] async_es5: add async class static block pattern tests`
+4. Push to `origin/worker/anvil-5`
+5. Update this plan file and push
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)
