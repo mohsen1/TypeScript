@@ -7,10 +7,10 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- (none – awaiting assignment)
+- [ ] Add ES5 class tests for class decorator patterns: class decorator basic, class decorator with metadata, class decorator factory, multiple class decorators, class decorator with inheritance, class decorator with static members. Tests: `./wasm/test.sh class_es5_tests`
 
 ## Task Queue
-- [ ] (empty)
+- [ ] Add ES5 class tests for accessor decorator patterns: accessor decorator basic, accessor decorator with metadata, static accessor decorators
 
 ## Completed
 - [x] Add ES5 class tests for property decorator patterns. Tests: `./wasm/test.sh class_es5_tests`

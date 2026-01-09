@@ -6,10 +6,10 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-- [ ] (empty - awaiting next task)
+- [ ] Add ES5 class tests for super() call patterns: super with conditional expressions, super in try/catch, super with Promise.resolve, super with async/await context, super with spread in derived constructor, super with complex argument expressions. Tests: `./wasm/test.sh class_es5_tests`
 
 ## Task Queue
-- [ ] (empty)
+- [ ] Add ES5 class tests for abstract class patterns: abstract method inheritance, abstract with decorators, abstract static methods, abstract getters/setters
 
 ## Completed
 - [x] Added ES5 tests for class expression patterns (6 tests): anonymous class, named class expression, class in return statement, class in array, IIFE class, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 319 pass).
