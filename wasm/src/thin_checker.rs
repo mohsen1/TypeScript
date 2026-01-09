@@ -1828,8 +1828,8 @@ impl<'a> ThinCheckerState<'a> {
                 call_signatures,
                 construct_signatures,
                 properties,
-                string_index: None,
-                number_index: None,
+                string_index: string_index.clone(),
+                number_index: number_index.clone(),
             });
         }
 
@@ -2054,8 +2054,8 @@ impl<'a> ThinCheckerState<'a> {
                 call_signatures,
                 construct_signatures,
                 properties,
-                string_index: None,
-                number_index: None,
+                string_index: string_index.clone(),
+                number_index: number_index.clone(),
             };
             self.ctx.types.callable(shape)
         } else if string_index.is_some() || number_index.is_some() {
@@ -2253,8 +2253,8 @@ impl<'a> ThinCheckerState<'a> {
                     call_signatures,
                     construct_signatures,
                     properties,
-                    string_index: None,
-                    number_index: None,
+                    string_index: derived_shape.string_index.clone().or(base_shape.string_index.clone()),
+                    number_index: derived_shape.number_index.clone().or(base_shape.number_index.clone()),
                 })
             }
             (Some(TypeKey::Callable(derived_shape_id)), Some(TypeKey::Object(base_shape_id))) => {
@@ -2265,8 +2265,8 @@ impl<'a> ThinCheckerState<'a> {
                     call_signatures: derived_shape.call_signatures.clone(),
                     construct_signatures: derived_shape.construct_signatures.clone(),
                     properties,
-                    string_index: None,
-                    number_index: None,
+                    string_index: derived_shape.string_index.clone(),
+                    number_index: derived_shape.number_index.clone(),
                 })
             }
             (Some(TypeKey::Callable(derived_shape_id)), Some(TypeKey::ObjectWithIndex(base_shape_id))) => {
@@ -2277,8 +2277,8 @@ impl<'a> ThinCheckerState<'a> {
                     call_signatures: derived_shape.call_signatures.clone(),
                     construct_signatures: derived_shape.construct_signatures.clone(),
                     properties,
-                    string_index: None,
-                    number_index: None,
+                    string_index: derived_shape.string_index.clone().or(base_shape.string_index.clone()),
+                    number_index: derived_shape.number_index.clone().or(base_shape.number_index.clone()),
                 })
             }
             (Some(TypeKey::Object(derived_shape_id)), Some(TypeKey::Callable(base_shape_id))) => {
@@ -2289,8 +2289,8 @@ impl<'a> ThinCheckerState<'a> {
                     call_signatures: base_shape.call_signatures.clone(),
                     construct_signatures: base_shape.construct_signatures.clone(),
                     properties,
-                    string_index: None,
-                    number_index: None,
+                    string_index: base_shape.string_index.clone(),
+                    number_index: base_shape.number_index.clone(),
                 })
             }
             (Some(TypeKey::ObjectWithIndex(derived_shape_id)), Some(TypeKey::Callable(base_shape_id))) => {
@@ -2301,8 +2301,8 @@ impl<'a> ThinCheckerState<'a> {
                     call_signatures: base_shape.call_signatures.clone(),
                     construct_signatures: base_shape.construct_signatures.clone(),
                     properties,
-                    string_index: None,
-                    number_index: None,
+                    string_index: derived_shape.string_index.clone().or(base_shape.string_index.clone()),
+                    number_index: derived_shape.number_index.clone().or(base_shape.number_index.clone()),
                 })
             }
             (Some(TypeKey::Object(derived_shape_id)), Some(TypeKey::Object(base_shape_id))) => {
@@ -5011,6 +5011,52 @@ impl<'a> ThinCheckerState<'a> {
                 }
             }
             Some(TypeKey::Function(_)) => Some(constructor_type),
+            Some(TypeKey::Intersection(members)) => {
+                // For intersection of constructors (mixins), collect construct signatures
+                // and create intersection of return types
+                let members = self.ctx.types.type_list(members);
+                let mut all_construct_sigs = Vec::new();
+                let mut return_types = Vec::new();
+
+                for &member in members.iter() {
+                    if let Some(TypeKey::Callable(shape_id)) = self.ctx.types.lookup(member) {
+                        let shape = self.ctx.types.callable_shape(shape_id);
+                        for sig in &shape.construct_signatures {
+                            all_construct_sigs.push(sig.clone());
+                            return_types.push(sig.return_type);
+                        }
+                    }
+                }
+
+                if all_construct_sigs.is_empty() {
+                    None
+                } else {
+                    // Create new construct signatures with intersected return types
+                    let intersected_return = if return_types.len() == 1 {
+                        return_types[0]
+                    } else {
+                        self.ctx.types.intersection(return_types)
+                    };
+
+                    // Use the first signature's parameters (simplified approach)
+                    // A more complete implementation would merge parameters
+                    let first_sig = &all_construct_sigs[0];
+                    let combined_sig = crate::solver::CallSignature {
+                        type_params: first_sig.type_params.clone(),
+                        params: first_sig.params.clone(),
+                        this_type: first_sig.this_type,
+                        return_type: intersected_return,
+                        type_predicate: None,
+                    };
+
+                    Some(self.ctx.types.callable(CallableShape {
+                        call_signatures: vec![combined_sig],
+                        construct_signatures: Vec::new(),
+                        properties: Vec::new(),
+                        ..Default::default()
+                    }))
+                }
+            }
             _ => None,
         };
 
