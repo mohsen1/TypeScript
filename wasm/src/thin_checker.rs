@@ -694,11 +694,15 @@ impl<'a> ThinCheckerState<'a> {
     }
 
     fn class_instance_type_from_symbol(&mut self, sym_id: SymbolId) -> Option<TypeId> {
-        // Check for circular reference to prevent infinite recursion with
-        // self-referential types like `method(): cls`
-        if self.ctx.symbol_resolution_set.contains(&sym_id) {
-            return None;
-        }
+        self.class_instance_type_with_params_from_symbol(sym_id)
+            .map(|(instance_type, _)| instance_type)
+    }
+
+    fn class_instance_type_with_params_from_symbol(
+        &mut self,
+        sym_id: SymbolId,
+    ) -> Option<(TypeId, Vec<crate::solver::TypeParamInfo>)> {
+        use crate::solver::{SymbolRef, TypeKey};
 
         let symbol = self.ctx.binder.get_symbol(sym_id)?;
         let decl_idx = if !symbol.value_declaration.is_none() {
@@ -712,17 +716,16 @@ impl<'a> ThinCheckerState<'a> {
         let node = self.ctx.arena.get(decl_idx)?;
         let class = self.ctx.arena.get_class(node)?;
 
-        // Mark this symbol as being resolved
-        self.ctx.symbol_resolution_set.insert(sym_id);
+        if !self.ctx.class_instance_resolution_set.insert(sym_id) {
+            let fallback = self.ctx.types.intern(TypeKey::Ref(SymbolRef(sym_id.0)));
+            return Some((fallback, Vec::new()));
+        }
 
-        let (_params, updates) = self.push_type_parameters(&class.type_parameters);
+        let (params, updates) = self.push_type_parameters(&class.type_parameters);
         let instance_type = self.get_class_instance_type(decl_idx, class);
         self.pop_type_parameters(updates);
-
-        // Remove from resolution set
-        self.ctx.symbol_resolution_set.remove(&sym_id);
-
-        Some(instance_type)
+        self.ctx.class_instance_resolution_set.remove(&sym_id);
+        Some((instance_type, params))
     }
 
     fn type_reference_symbol_type(&mut self, sym_id: SymbolId) -> TypeId {
@@ -3476,8 +3479,22 @@ impl<'a> ThinCheckerState<'a> {
         // because those are the same TypeIds used when lowering the type body.
         // Calling get_type_params_for_symbol would create fresh TypeIds that don't match.
         if result != TypeId::ANY && result != TypeId::ERROR {
+            let class_env_entry = self.ctx.binder.get_symbol(sym_id).and_then(|symbol| {
+                if symbol.flags & symbol_flags::CLASS != 0 {
+                    self.class_instance_type_with_params_from_symbol(sym_id)
+                } else {
+                    None
+                }
+            });
+
             let mut env = self.ctx.type_env.borrow_mut();
-            if type_params.is_empty() {
+            if let Some((instance_type, class_params)) = class_env_entry {
+                if class_params.is_empty() {
+                    env.insert(SymbolRef(sym_id.0), instance_type);
+                } else {
+                    env.insert_with_params(SymbolRef(sym_id.0), instance_type, class_params);
+                }
+            } else if type_params.is_empty() {
                 env.insert(SymbolRef(sym_id.0), result);
             } else {
                 env.insert_with_params(SymbolRef(sym_id.0), result, type_params);
@@ -6065,6 +6082,17 @@ impl<'a> ThinCheckerState<'a> {
                     type_id
                 } else {
                     self.resolve_type_for_property_access_inner(evaluated, visited)
+                }
+            }
+            TypeKey::TypeParameter(info) | TypeKey::Infer(info) => {
+                if let Some(constraint) = info.constraint {
+                    if constraint == type_id {
+                        type_id
+                    } else {
+                        self.resolve_type_for_property_access_inner(constraint, visited)
+                    }
+                } else {
+                    type_id
                 }
             }
             TypeKey::Union(members_id) => {

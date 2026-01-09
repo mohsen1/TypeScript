@@ -27,6 +27,8 @@ Reduce false positives for property access errors by aligning TS2339 behavior wi
 
 ### Key Files
 - `wasm/src/thin_checker.rs`
+- `wasm/src/solver/operations.rs`
+- `wasm/src/checker/context.rs`
 - `wasm/src/checker/types/diagnostics.rs`
 - `wasm/src/thin_checker_tests.rs`
 
@@ -40,24 +42,19 @@ Reduce false positives for property access errors by aligning TS2339 behavior wi
 - Verify no regressions in existing TS2339 tests.
 
 ## Completed
-- Added 5 additional edge case tests for TS2564:
-  - Optional properties (?)
-  - Definite assignment assertion (!)
-  - Properties with initializers
-  - Static properties
-  - Simple constructor assignment
-- Fixed missing BindResult import in lib.rs
-- Fixed format! macro usage with format_message helper
-- Fixed NodeList vs Vec type mismatch in find_constructor_body call
-
-Note: Worker 1 had already implemented comprehensive TS2564 checking including
-control flow analysis. My contribution adds complementary edge case tests and
-compilation fixes.
+- Implemented property access on constrained type parameters in checker and solver.
+- Stored class instance types + type params in type_env to expand Application types.
+- Added recursion guard for class instance type resolution to avoid stack overflow.
+- Updated cross-scope generic constraints test to expect no errors.
+- Added TS2339 tests for any/unknown/union optional property access.
+- Ran `./wasm/test.sh test_ts2339` (passes; full run still fails: TS2792 module resolution in multi-file import tests).
 
 ## Ready for Merge
-No
+Yes
 
 ## Notes
+- Full test run failing in `cli::driver_tests::compile_multi_file_project_with_imports`
+  and `cli::driver_tests::compile_multi_file_project_with_default_and_named_imports` (TS2792).
 - Run `./wasm/test.sh` before pushing
 - Commit format: `[wasm] checker: improve TS2339 property access diagnostics`
 - Push to: `origin/worker/forge-2`

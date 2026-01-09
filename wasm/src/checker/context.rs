@@ -145,6 +145,8 @@ pub struct CheckerContext<'a> {
     pub symbol_resolution_stack: Vec<SymbolId>,
     /// O(1) lookup set for symbol resolution stack.
     pub symbol_resolution_set: HashSet<SymbolId>,
+    /// O(1) lookup set for class instance type resolution to avoid recursion.
+    pub class_instance_resolution_set: HashSet<SymbolId>,
 
     /// Stack of nodes being resolved.
     pub node_resolution_stack: Vec<NodeIndex>,
@@ -217,6 +219,7 @@ impl<'a> CheckerContext<'a> {
             diagnostics: Vec::new(),
             symbol_resolution_stack: Vec::new(),
             symbol_resolution_set: HashSet::new(),
+            class_instance_resolution_set: HashSet::new(),
             node_resolution_stack: Vec::new(),
             node_resolution_set: HashSet::new(),
             type_parameter_scope: HashMap::new(),
@@ -256,6 +259,7 @@ impl<'a> CheckerContext<'a> {
             diagnostics: Vec::new(),
             symbol_resolution_stack: Vec::new(),
             symbol_resolution_set: HashSet::new(),
+            class_instance_resolution_set: HashSet::new(),
             node_resolution_stack: Vec::new(),
             node_resolution_set: HashSet::new(),
             type_parameter_scope: HashMap::new(),
