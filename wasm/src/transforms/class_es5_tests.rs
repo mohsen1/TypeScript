@@ -18241,3 +18241,410 @@ class EventBus {
         output
     );
 }
+
+// ============================================================================
+// Iterator/Iterable pattern tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_custom_iterator_basic() {
+    // Basic custom iterator implementation
+    let source = r#"
+class Range {
+    private start: number;
+    private end: number;
+
+    constructor(start: number, end: number) {
+        this.start = start;
+        this.end = end;
+    }
+
+    *[Symbol.iterator](): Iterator<number> {
+        for (let i = this.start; i <= this.end; i++) {
+            yield i;
+        }
+    }
+
+    toArray(): number[] {
+        return [...this];
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function Range"),
+        "Expected Range function: {}",
+        output
+    );
+    assert!(
+        output.contains("Symbol.iterator"),
+        "Expected Symbol.iterator: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_iterable_class_pattern() {
+    // Iterable class with explicit iterator method
+    let source = r#"
+interface IterableCollection<T> {
+    [Symbol.iterator](): Iterator<T>;
+}
+
+class LinkedList<T> implements IterableCollection<T> {
+    private items: T[] = [];
+
+    add(item: T): void {
+        this.items.push(item);
+    }
+
+    *[Symbol.iterator](): Iterator<T> {
+        for (const item of this.items) {
+            yield item;
+        }
+    }
+
+    map<U>(fn: (item: T) => U): U[] {
+        const result: U[] = [];
+        for (const item of this) {
+            result.push(fn(item));
+        }
+        return result;
+    }
+
+    filter(predicate: (item: T) => boolean): T[] {
+        const result: T[] = [];
+        for (const item of this) {
+            if (predicate(item)) {
+                result.push(item);
+            }
+        }
+        return result;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function LinkedList"),
+        "Expected LinkedList function: {}",
+        output
+    );
+    assert!(
+        output.contains("Symbol.iterator"),
+        "Expected Symbol.iterator: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_iterator_with_state() {
+    // Iterator with internal state tracking
+    let source = r#"
+class Fibonacci {
+    private limit: number;
+
+    constructor(limit: number) {
+        this.limit = limit;
+    }
+
+    *[Symbol.iterator](): Iterator<number> {
+        let prev = 0;
+        let curr = 1;
+        let count = 0;
+
+        while (count < this.limit) {
+            yield prev;
+            const next = prev + curr;
+            prev = curr;
+            curr = next;
+            count++;
+        }
+    }
+
+    take(n: number): number[] {
+        const result: number[] = [];
+        let count = 0;
+        for (const value of this) {
+            if (count >= n) break;
+            result.push(value);
+            count++;
+        }
+        return result;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function Fibonacci"),
+        "Expected Fibonacci function: {}",
+        output
+    );
+    assert!(
+        output.contains("Symbol.iterator"),
+        "Expected Symbol.iterator: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_for_of_with_iterator() {
+    // Class using for-of with custom iterators
+    let source = r#"
+class DataProcessor<T> {
+    private data: T[];
+
+    constructor(data: T[]) {
+        this.data = data;
+    }
+
+    *[Symbol.iterator](): Iterator<T> {
+        for (const item of this.data) {
+            yield item;
+        }
+    }
+
+    processAll(processor: (item: T) => void): void {
+        for (const item of this) {
+            processor(item);
+        }
+    }
+
+    collectWhere(predicate: (item: T) => boolean): T[] {
+        const result: T[] = [];
+        for (const item of this) {
+            if (predicate(item)) {
+                result.push(item);
+            }
+        }
+        return result;
+    }
+
+    reduce<U>(fn: (acc: U, item: T) => U, initial: U): U {
+        let acc = initial;
+        for (const item of this) {
+            acc = fn(acc, item);
+        }
+        return acc;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function DataProcessor"),
+        "Expected DataProcessor function: {}",
+        output
+    );
+    assert!(
+        output.contains("Symbol.iterator"),
+        "Expected Symbol.iterator: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_iterator_in_constructor() {
+    // Iterator usage patterns in constructor
+    let source = r#"
+class Collection<T> {
+    private items: T[];
+    private size: number;
+
+    constructor(iterable: Iterable<T>) {
+        this.items = [];
+        for (const item of iterable) {
+            this.items.push(item);
+        }
+        this.size = this.items.length;
+    }
+
+    *[Symbol.iterator](): Iterator<T> {
+        yield* this.items;
+    }
+
+    get length(): number {
+        return this.size;
+    }
+
+    first(): T | undefined {
+        return this.items[0];
+    }
+
+    last(): T | undefined {
+        return this.items[this.items.length - 1];
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function Collection"),
+        "Expected Collection function: {}",
+        output
+    );
+    assert!(
+        output.contains("Symbol.iterator"),
+        "Expected Symbol.iterator: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_iterator_combined_patterns() {
+    // Combined iterator patterns with multiple generators
+    let source = r#"
+class TreeNode<T> {
+    value: T;
+    children: TreeNode<T>[] = [];
+
+    constructor(value: T) {
+        this.value = value;
+    }
+
+    addChild(child: TreeNode<T>): void {
+        this.children.push(child);
+    }
+
+    *[Symbol.iterator](): Iterator<T> {
+        yield this.value;
+        for (const child of this.children) {
+            yield* child;
+        }
+    }
+
+    *depthFirst(): Iterator<T> {
+        yield this.value;
+        for (const child of this.children) {
+            yield* child.depthFirst();
+        }
+    }
+
+    *breadthFirst(): Iterator<T> {
+        const queue: TreeNode<T>[] = [this];
+        while (queue.length > 0) {
+            const node = queue.shift()!;
+            yield node.value;
+            for (const child of node.children) {
+                queue.push(child);
+            }
+        }
+    }
+
+    collectAll(): T[] {
+        return [...this];
+    }
+
+    static fromArray<U>(values: U[]): TreeNode<U> | undefined {
+        if (values.length === 0) return undefined;
+        const root = new TreeNode(values[0]);
+        for (let i = 1; i < values.length; i++) {
+            root.addChild(new TreeNode(values[i]));
+        }
+        return root;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function TreeNode"),
+        "Expected TreeNode function: {}",
+        output
+    );
+    assert!(
+        output.contains("Symbol.iterator"),
+        "Expected Symbol.iterator: {}",
+        output
+    );
+    assert!(
+        output.contains("depthFirst") && output.contains("breadthFirst"),
+        "Expected traversal methods: {}",
+        output
+    );
+    assert!(
+        output.contains("fromArray"),
+        "Expected fromArray static method: {}",
+        output
+    );
+}
