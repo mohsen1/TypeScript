@@ -25988,3 +25988,335 @@ class MetadataReader {
         output
     );
 }
+
+// ============================================================================
+// CLASS FIELD INITIALIZER PATTERN TESTS
+// ============================================================================
+
+/// Test ES5 class with complex field initializers
+#[test]
+fn test_class_es5_field_initializer_complex() {
+    let source = r#"
+// Complex field initializers
+class ConfigService {
+    private readonly defaultConfig = {
+        host: "localhost",
+        port: 8080,
+        timeout: 30000,
+        retries: 3,
+        headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+        }
+    };
+
+    private connections: Map<string, { active: boolean; lastUsed: Date }> = new Map();
+
+    private validators = [
+        (x: number) => x > 0,
+        (x: number) => x < 100,
+        (x: number) => Number.isInteger(x)
+    ];
+
+    private readonly now = Date.now();
+
+    private lazyValue = (() => {
+        console.log("Initializing lazy value");
+        return Math.random();
+    })();
+}
+
+class DataProcessor {
+    private buffer: ArrayBuffer = new ArrayBuffer(1024);
+    private view = new DataView(this.buffer);
+    private encoder = new TextEncoder();
+    private decoder = new TextDecoder("utf-8");
+
+    private readonly metadata = Object.freeze({
+        version: "1.0.0",
+        format: "binary",
+        encoding: "utf-8"
+    });
+
+    private cache = new WeakMap<object, any>();
+}
+
+class StateManager {
+    private state = {
+        count: 0,
+        items: [] as string[],
+        nested: {
+            level1: {
+                level2: {
+                    value: 42
+                }
+            }
+        }
+    };
+
+    private reducers = new Map<string, (state: any, action: any) => any>([
+        ["INCREMENT", (s, a) => ({ ...s, count: s.count + 1 })],
+        ["DECREMENT", (s, a) => ({ ...s, count: s.count - 1 })],
+        ["ADD_ITEM", (s, a) => ({ ...s, items: [...s.items, a.payload] })]
+    ]);
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("ConfigService") && output.contains("DataProcessor") && output.contains("StateManager"),
+        "Expected complex initializer classes: {}",
+        output
+    );
+
+    // Object literals and Map should be present
+    assert!(
+        output.contains("Map") && output.contains("localhost"),
+        "Expected complex initializer values: {}",
+        output
+    );
+}
+
+/// Test ES5 class with computed field names
+#[test]
+fn test_class_es5_field_initializer_computed() {
+    let source = r#"
+// Computed field names
+const FIELD_PREFIX = "data_";
+const VERSION = "v1";
+
+const fieldName = Symbol("fieldName");
+const privateKey = Symbol.for("privateKey");
+
+class DynamicFields {
+    [FIELD_PREFIX + "name"] = "default";
+    [FIELD_PREFIX + "value"] = 42;
+    [`${VERSION}_config`] = { enabled: true };
+
+    [fieldName] = "symbol field value";
+    [privateKey] = "symbol private value";
+
+    ["computed" + "Method"]() {
+        return this[FIELD_PREFIX + "name"];
+    }
+}
+
+class SymbolProperties {
+    static [Symbol.toStringTag] = "SymbolProperties";
+    [Symbol.iterator] = function* () {
+        yield 1;
+        yield 2;
+        yield 3;
+    };
+
+    private [Symbol.for("hidden")] = "secret";
+}
+
+class DynamicAccessor {
+    private _values: Record<string, any> = {};
+
+    ["get" + "Value"](key: string): any {
+        return this._values[key];
+    }
+
+    ["set" + "Value"](key: string, value: any): void {
+        this._values[key] = value;
+    }
+}
+
+const keys = ["a", "b", "c"] as const;
+
+class MultipleComputed {
+    [keys[0]] = 1;
+    [keys[1]] = 2;
+    [keys[2]] = 3;
+
+    getAll() {
+        return [this[keys[0]], this[keys[1]], this[keys[2]]];
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("DynamicFields") && output.contains("SymbolProperties") && output.contains("DynamicAccessor"),
+        "Expected computed field classes: {}",
+        output
+    );
+
+    // Symbol usage should be present
+    assert!(
+        output.contains("Symbol") || output.contains("fieldName"),
+        "Expected Symbol usage: {}",
+        output
+    );
+}
+
+/// Test ES5 class with arrow function field initializers
+#[test]
+fn test_class_es5_field_initializer_arrow() {
+    let source = r#"
+// Arrow function field initializers
+class EventHandler {
+    onClick = (event: MouseEvent) => {
+        console.log("Clicked at", event.clientX, event.clientY);
+        this.handleEvent(event);
+    };
+
+    onKeyDown = (event: KeyboardEvent) => {
+        if (event.key === "Enter") {
+            this.submit();
+        }
+    };
+
+    onScroll = (event: Event) => {
+        requestAnimationFrame(() => {
+            this.updatePosition();
+        });
+    };
+
+    private handleEvent(event: Event) {
+        console.log("Event handled:", event.type);
+    }
+
+    private submit() {
+        console.log("Submitting...");
+    }
+
+    private updatePosition() {
+        console.log("Position updated");
+    }
+}
+
+class ReactiveComponent {
+    render = () => {
+        return `<div>${this.state.value}</div>`;
+    };
+
+    setState = (newState: Partial<typeof this.state>) => {
+        this.state = { ...this.state, ...newState };
+        this.render();
+    };
+
+    private state = { value: 0 };
+
+    componentDidMount = () => {
+        this.initialize();
+    };
+
+    private initialize = () => {
+        console.log("Component initialized");
+    };
+}
+
+class AsyncHandler {
+    fetchData = async (url: string) => {
+        const response = await fetch(url);
+        return response.json();
+    };
+
+    processData = async (data: any) => {
+        return new Promise((resolve) => {
+            setTimeout(() => resolve(data), 100);
+        });
+    };
+
+    handleError = (error: Error) => {
+        console.error("Error:", error.message);
+        this.logError(error);
+    };
+
+    private logError = (error: Error) => {
+        console.log("Logged:", error);
+    };
+}
+
+class BoundMethods {
+    private value = 0;
+
+    increment = () => {
+        this.value++;
+        return this.value;
+    };
+
+    decrement = () => {
+        this.value--;
+        return this.value;
+    };
+
+    reset = () => {
+        this.value = 0;
+        return this.value;
+    };
+
+    getValue = () => this.value;
+
+    setValue = (v: number) => {
+        this.value = v;
+    };
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("EventHandler") && output.contains("ReactiveComponent") && output.contains("AsyncHandler"),
+        "Expected arrow initializer classes: {}",
+        output
+    );
+
+    // BoundMethods class should be present
+    assert!(
+        output.contains("BoundMethods"),
+        "Expected BoundMethods class: {}",
+        output
+    );
+
+    // Arrow functions should be transformed (either kept as arrows or converted to functions with this capture)
+    assert!(
+        output.contains("onClick") && output.contains("increment"),
+        "Expected arrow field names to be preserved: {}",
+        output
+    );
+}
