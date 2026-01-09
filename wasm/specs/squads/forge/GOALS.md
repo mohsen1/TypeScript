@@ -5,6 +5,19 @@ Updated: 2026-01-09
 Priority: 1
 
 ---
+## 🛑 GRACEFUL EXIT - WRAP UP NOW
+
+**Director has called for graceful exit. Wrap up all worker tasks NOW.**
+
+1. Let workers finish their current atomic task (commit what's done)
+2. Do NOT assign new tasks
+3. Ensure all work is committed and pushed to worker branches
+4. Mark workers as complete when done
+5. Final merge to squad branch
+
+**Session is ending. No new work assignments.**
+
+---
 ## ⚠️ TMUX REMINDER - CHECK FOR HANGING PROMPTS
 
 **NEVER forget to pause 1 second before pressing Enter in tmux!**
