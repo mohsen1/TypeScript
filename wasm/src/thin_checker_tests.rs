@@ -2882,6 +2882,204 @@ function read(value: A | B) {
 }
 
 #[test]
+fn test_ts2339_class_static_inheritance() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Base {
+    static foo: number;
+}
+
+class Derived extends Base {}
+
+Derived.foo;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2339),
+        "Did not expect 2339 for inherited static property access, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_ts2339_class_instance_object_members() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class C {
+    x: number = 1;
+}
+
+const c = new C();
+c.toString();
+c.hasOwnProperty("x");
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2339),
+        "Did not expect 2339 for Object prototype member access, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_ts2339_this_missing_property_in_class() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class C {
+    constructor() {
+        this.missing;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        codes.contains(&2339),
+        "Expected 2339 for missing property on this, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_ts2339_static_property_access_from_instance() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class C {
+    static foo: number;
+    static get bar() { return 1; }
+    value = 1;
+}
+
+const c = new C();
+c.foo;
+c.bar;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        codes.contains(&2339),
+        "Expected 2339 for static property access on instance, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_ts2339_computed_name_this_missing_static() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class C {
+    static [this.missing] = 123;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        codes.contains(&2339),
+        "Expected 2339 for missing property in computed name, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_ts2339_class_interface_merge() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+interface C {
+    x: number;
+}
+
+class C {
+    y = 1;
+}
+
+const c = new C();
+c.x;
+c.y;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2339),
+        "Did not expect 2339 for class/interface merge, got: {:?}",
+        codes
+    );
+}
+
+#[test]
 fn test_strict_null_checks_property_access() {
     use crate::solver::{PropertyAccessEvaluator, PropertyAccessResult, PropertyInfo};
     use std::sync::Arc;

@@ -1078,11 +1078,14 @@ impl BinderState {
             return true;
         }
 
-        // Class and interface can merge (declaration merging)
-        if (existing_flags & symbol_flags::CLASS != 0
-            && (new_flags & symbol_flags::INTERFACE) != 0)
-            || (existing_flags & symbol_flags::INTERFACE != 0
-                && (new_flags & symbol_flags::CLASS) != 0)
+        // Interface can merge with class
+        if (existing_flags & symbol_flags::INTERFACE) != 0
+            && (new_flags & symbol_flags::CLASS) != 0
+        {
+            return true;
+        }
+        if (existing_flags & symbol_flags::CLASS) != 0
+            && (new_flags & symbol_flags::INTERFACE) != 0
         {
             return true;
         }

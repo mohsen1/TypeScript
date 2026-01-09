@@ -378,6 +378,9 @@ impl<'a> ThinCheckerState<'a> {
             k if k == SyntaxKind::Identifier as u16 => {
                 self.get_type_of_identifier(idx)
             }
+            k if k == SyntaxKind::ThisKeyword as u16 => {
+                self.current_this_type().unwrap_or(TypeId::ANY)
+            }
 
             // Literals - use compile-time constant TypeIds
             k if k == SyntaxKind::NumericLiteral as u16 => TypeId::NUMBER,
@@ -737,6 +740,59 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
         self.get_type_of_symbol(sym_id)
+    }
+
+    fn merge_namespace_exports_into_constructor(
+        &mut self,
+        sym_id: SymbolId,
+        ctor_type: TypeId,
+    ) -> TypeId {
+        use crate::solver::{CallableShape, PropertyInfo, TypeKey};
+        use rustc_hash::FxHashMap;
+
+        let Some(symbol) = self.ctx.binder.get_symbol(sym_id) else {
+            return ctor_type;
+        };
+        let Some(exports) = symbol.exports.as_ref() else {
+            return ctor_type;
+        };
+        let Some(TypeKey::Callable(shape_id)) = self.ctx.types.lookup(ctor_type) else {
+            return ctor_type;
+        };
+        let shape = self.ctx.types.callable_shape(shape_id);
+
+        let mut props: FxHashMap<Atom, PropertyInfo> = shape
+            .properties
+            .iter()
+            .map(|prop| (prop.name, prop.clone()))
+            .collect();
+
+        for (name, member_id) in exports.iter() {
+            if let Some(member_symbol) = self.ctx.binder.get_symbol(*member_id) {
+                if member_symbol.flags & symbol_flags::VALUE == 0
+                    && member_symbol.flags & symbol_flags::ALIAS == 0
+                {
+                    continue;
+                }
+            }
+            let type_id = self.get_type_of_symbol(*member_id);
+            let name_atom = self.ctx.types.intern_string(name);
+            props.entry(name_atom).or_insert(PropertyInfo {
+                name: name_atom,
+                type_id,
+                write_type: type_id,
+                optional: false,
+                readonly: false,
+                is_method: false,
+            });
+        }
+
+        let properties: Vec<PropertyInfo> = props.into_values().collect();
+        self.ctx.types.callable(CallableShape {
+            call_signatures: shape.call_signatures.clone(),
+            construct_signatures: shape.construct_signatures.clone(),
+            properties,
+        })
     }
 
     fn resolve_named_type_reference(&mut self, name: &str, name_idx: NodeIndex) -> Option<TypeId> {
@@ -3049,10 +3105,7 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         let props: Vec<PropertyInfo> = properties.into_values().collect();
-        if let Some(sym_id) = current_sym {
-            visited.remove(&sym_id);
-        }
-        if string_index.is_some() || number_index.is_some() {
+        let mut instance_type = if string_index.is_some() || number_index.is_some() {
             self.ctx.types.object_with_index(ObjectShape {
                 properties: props,
                 string_index,
@@ -3060,7 +3113,41 @@ impl<'a> ThinCheckerState<'a> {
             })
         } else {
             self.ctx.types.object(props)
+        };
+
+        if let Some(sym_id) = current_sym {
+            if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
+                let interface_decls: Vec<NodeIndex> = symbol.declarations
+                    .iter()
+                    .copied()
+                    .filter(|decl_idx| {
+                        self.ctx
+                            .arena
+                            .get(*decl_idx)
+                            .and_then(|node| self.ctx.arena.get_interface(node))
+                            .is_some()
+                    })
+                    .collect();
+
+                if !interface_decls.is_empty() {
+                    let type_param_bindings = self.get_type_param_bindings();
+                    let type_resolver = |node_idx: NodeIndex| self.resolve_type_symbol_for_lowering(node_idx);
+                    let value_resolver = |node_idx: NodeIndex| self.resolve_value_symbol_for_lowering(node_idx);
+                    let lowering = TypeLowering::with_resolvers(
+                        self.ctx.arena,
+                        self.ctx.types,
+                        &type_resolver,
+                        &value_resolver,
+                    )
+                    .with_type_param_bindings(type_param_bindings);
+                    let interface_type = lowering.lower_interface_declarations(&interface_decls);
+                    let interface_type = self.merge_interface_heritage_types(&interface_decls, interface_type);
+                    instance_type = self.merge_interface_types(instance_type, interface_type);
+                }
+            }
+            visited.remove(&sym_id);
         }
+        instance_type
     }
 
     fn get_class_constructor_type(
@@ -3246,7 +3333,6 @@ impl<'a> ThinCheckerState<'a> {
                 if heritage.token != SyntaxKind::ExtendsKeyword as u16 {
                     continue;
                 }
-
                 let Some(&type_idx) = heritage.types.nodes.first() else {
                     break;
                 };
@@ -3871,6 +3957,28 @@ impl<'a> ThinCheckerState<'a> {
         let flags = symbol.flags;
         let value_decl = symbol.value_declaration;
 
+        // Class - return class constructor type (merging namespace exports when present)
+        if flags & symbol_flags::CLASS != 0 {
+            let decl_idx = if !value_decl.is_none() {
+                value_decl
+            } else {
+                symbol.declarations.first().copied().unwrap_or(NodeIndex::NONE)
+            };
+            if !decl_idx.is_none() {
+                if let Some(node) = self.ctx.arena.get(decl_idx) {
+                    if let Some(class) = self.ctx.arena.get_class(node) {
+                        let ctor_type = self.get_class_constructor_type(decl_idx, class);
+                        if flags & (symbol_flags::NAMESPACE_MODULE | symbol_flags::VALUE_MODULE) != 0 {
+                            let merged = self.merge_namespace_exports_into_constructor(sym_id, ctor_type);
+                            return (merged, Vec::new());
+                        }
+                        return (ctor_type, Vec::new());
+                    }
+                }
+            }
+            return (TypeId::ANY, Vec::new());
+        }
+
         // Namespace / Module
         // Return a Ref type so resolve_qualified_name can access the symbol's exports
         if flags & (symbol_flags::NAMESPACE_MODULE | symbol_flags::VALUE_MODULE) != 0 {
@@ -3922,23 +4030,6 @@ impl<'a> ThinCheckerState<'a> {
                 return (self.get_type_of_function(implementation_decl), Vec::new());
             }
 
-            return (TypeId::ANY, Vec::new());
-        }
-
-        // Class - return class constructor type
-        if flags & symbol_flags::CLASS != 0 {
-            let decl_idx = if !value_decl.is_none() {
-                value_decl
-            } else {
-                symbol.declarations.first().copied().unwrap_or(NodeIndex::NONE)
-            };
-            if !decl_idx.is_none() {
-                if let Some(node) = self.ctx.arena.get(decl_idx) {
-                    if let Some(class) = self.ctx.arena.get_class(node) {
-                        return (self.get_class_constructor_type(decl_idx, class), Vec::new());
-                    }
-                }
-            }
             return (TypeId::ANY, Vec::new());
         }
 
@@ -7955,6 +8046,21 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    fn current_this_type(&self) -> Option<TypeId> {
+        self.ctx.this_type_stack.last().copied()
+    }
+
+    fn is_constructor_type(&self, type_id: TypeId) -> bool {
+        use crate::solver::TypeKey;
+        match self.ctx.types.lookup(type_id) {
+            Some(TypeKey::Callable(shape_id)) => {
+                let shape = self.ctx.types.callable_shape(shape_id);
+                !shape.construct_signatures.is_empty()
+            }
+            _ => false,
+        }
+    }
+
     /// Check if a node is a `super` expression.
     fn is_super_expression(&self, idx: NodeIndex) -> bool {
         use crate::scanner::SyntaxKind;
@@ -10758,14 +10864,14 @@ impl<'a> ThinCheckerState<'a> {
     ) -> Option<(NodeIndex, bool)> {
         if self.is_this_expression(expr_idx) {
             if let Some(ref class_info) = self.ctx.enclosing_class {
-                return Some((class_info.class_idx, false));
+                return Some((class_info.class_idx, self.is_constructor_type(object_type)));
             }
         }
 
         if self.is_super_expression(expr_idx) {
             if let Some(ref class_info) = self.ctx.enclosing_class {
                 if let Some(base_idx) = self.get_base_class_idx(class_info.class_idx) {
-                    return Some((base_idx, false));
+                    return Some((base_idx, self.is_constructor_type(object_type)));
                 }
             }
         }
@@ -12744,11 +12850,106 @@ impl<'a> ThinCheckerState<'a> {
         });
     }
 
+    fn class_member_is_static(&self, member_idx: NodeIndex) -> bool {
+        let Some(node) = self.ctx.arena.get(member_idx) else {
+            return false;
+        };
+
+        match node.kind {
+            k if k == syntax_kind_ext::PROPERTY_DECLARATION => {
+                self.ctx.arena.get_property_decl(node)
+                    .map(|prop| self.has_static_modifier(&prop.modifiers))
+                    .unwrap_or(false)
+            }
+            k if k == syntax_kind_ext::METHOD_DECLARATION => {
+                self.ctx.arena.get_method_decl(node)
+                    .map(|method| self.has_static_modifier(&method.modifiers))
+                    .unwrap_or(false)
+            }
+            k if k == syntax_kind_ext::GET_ACCESSOR || k == syntax_kind_ext::SET_ACCESSOR => {
+                self.ctx.arena.get_accessor(node)
+                    .map(|accessor| self.has_static_modifier(&accessor.modifiers))
+                    .unwrap_or(false)
+            }
+            _ => false,
+        }
+    }
+
+    fn class_member_this_type(&mut self, member_idx: NodeIndex) -> Option<TypeId> {
+        let class_info = self.ctx.enclosing_class.as_ref()?;
+        let class_idx = class_info.class_idx;
+        let is_static = self.class_member_is_static(member_idx);
+
+        if let Some(sym_id) = self.ctx.binder.get_node_symbol(class_idx) {
+            if is_static {
+                return Some(self.get_type_of_symbol(sym_id));
+            }
+            return self.class_instance_type_from_symbol(sym_id);
+        }
+
+        let node = self.ctx.arena.get(class_idx)?;
+        let class = self.ctx.arena.get_class(node)?;
+        Some(if is_static {
+            self.get_class_constructor_type(class_idx, class)
+        } else {
+            self.get_class_instance_type(class_idx, class)
+        })
+    }
+
+    fn check_computed_property_name(&mut self, name_idx: NodeIndex) {
+        let Some(name_node) = self.ctx.arena.get(name_idx) else {
+            return;
+        };
+
+        if name_node.kind != syntax_kind_ext::COMPUTED_PROPERTY_NAME {
+            return;
+        }
+
+        let Some(computed) = self.ctx.arena.get_computed_property(name_node) else {
+            return;
+        };
+
+        let _ = self.get_type_of_node(computed.expression);
+    }
+
+    fn check_class_member_name(&mut self, member_idx: NodeIndex) {
+        let Some(node) = self.ctx.arena.get(member_idx) else {
+            return;
+        };
+
+        match node.kind {
+            k if k == syntax_kind_ext::PROPERTY_DECLARATION => {
+                if let Some(prop) = self.ctx.arena.get_property_decl(node) {
+                    self.check_computed_property_name(prop.name);
+                }
+            }
+            k if k == syntax_kind_ext::METHOD_DECLARATION => {
+                if let Some(method) = self.ctx.arena.get_method_decl(node) {
+                    self.check_computed_property_name(method.name);
+                }
+            }
+            k if k == syntax_kind_ext::GET_ACCESSOR || k == syntax_kind_ext::SET_ACCESSOR => {
+                if let Some(accessor) = self.ctx.arena.get_accessor(node) {
+                    self.check_computed_property_name(accessor.name);
+                }
+            }
+            _ => {}
+        }
+    }
+
     /// Check a class member (property, method, constructor, accessor).
     fn check_class_member(&mut self, member_idx: NodeIndex) {
         let Some(node) = self.ctx.arena.get(member_idx) else {
             return;
         };
+
+        let mut pushed_this = false;
+        if let Some(this_type) = self.class_member_this_type(member_idx) {
+            self.ctx.this_type_stack.push(this_type);
+            pushed_this = true;
+        }
+
+        self.check_class_member_name(member_idx);
 
         match node.kind {
             syntax_kind_ext::PROPERTY_DECLARATION => {
@@ -12767,6 +12968,10 @@ impl<'a> ThinCheckerState<'a> {
                 // Other class member types (static blocks, index signatures, etc.)
                 self.get_type_of_node(member_idx);
             }
+        }
+
+        if pushed_this {
+            self.ctx.this_type_stack.pop();
         }
     }
 
