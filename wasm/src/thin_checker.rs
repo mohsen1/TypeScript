@@ -7120,7 +7120,7 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         let requires_super = self.class_has_base(class);
-        let constructor_body = self.find_constructor_body(&class.members.nodes);
+        let constructor_body = self.find_constructor_body(&class.members);
         let assigned = if let Some(body_idx) = constructor_body {
             self.analyze_constructor_assignments(body_idx, &tracked, requires_super)
         } else {
@@ -7131,9 +7131,10 @@ impl<'a> ThinCheckerState<'a> {
             if assigned.contains(&key) {
                 continue;
             }
+            use crate::checker::types::diagnostics::format_message;
             self.error_at_node(
                 name_node,
-                &format!(diagnostic_messages::PROPERTY_HAS_NO_INITIALIZER, name),
+                &format_message(diagnostic_messages::PROPERTY_HAS_NO_INITIALIZER, &[&name]),
                 diagnostic_codes::PROPERTY_HAS_NO_INITIALIZER,
             );
         }

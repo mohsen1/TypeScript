@@ -11525,3 +11525,171 @@ class Foo {
         codes
     );
 }
+
+// =============================================================================
+// TS2564 Additional Edge Case Tests (Worker 2)
+// =============================================================================
+
+/// Test that optional properties skip TS2564 check
+#[test]
+fn test_ts2564_optional_property_skips_check() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Foo {
+    name?: string;
+    value?: number;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Optional properties should not have TS2564 errors
+    let has_2564 = checker.ctx.diagnostics.iter().any(|d| d.code == 2564);
+    assert!(
+        !has_2564,
+        "Expected no TS2564 errors for optional properties, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// Test that definite assignment assertion (!) skips TS2564 check
+#[test]
+fn test_ts2564_definite_assignment_assertion_skips_check() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Foo {
+    name!: string;
+    value!: number;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Definite assignment assertion should not have TS2564 errors
+    let has_2564 = checker.ctx.diagnostics.iter().any(|d| d.code == 2564);
+    assert!(
+        !has_2564,
+        "Expected no TS2564 errors for definite assignment assertion, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// Test that properties with initializers skip TS2564 check
+#[test]
+fn test_ts2564_property_with_initializer_skips_check() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Foo {
+    name: string = "default";
+    value: number = 42;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Properties with initializers should not have TS2564 errors
+    let has_2564 = checker.ctx.diagnostics.iter().any(|d| d.code == 2564);
+    assert!(
+        !has_2564,
+        "Expected no TS2564 errors for properties with initializers, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// Test that static properties skip TS2564 check (static fields have different semantics)
+#[test]
+fn test_ts2564_static_property_skips_check() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Foo {
+    static name: string;
+    static value: number;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Static properties should not have TS2564 errors (different initialization semantics)
+    let has_2564 = checker.ctx.diagnostics.iter().any(|d| d.code == 2564);
+    assert!(
+        !has_2564,
+        "Expected no TS2564 errors for static properties, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// Test that properties assigned directly in constructor skip TS2564 check
+#[test]
+fn test_ts2564_simple_constructor_assignment() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Foo {
+    name: string;
+    value: number;
+    constructor() {
+        this.name = "assigned";
+        this.value = 123;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Properties assigned in constructor should not have TS2564 errors
+    let has_2564 = checker.ctx.diagnostics.iter().any(|d| d.code == 2564);
+    assert!(
+        !has_2564,
+        "Expected no TS2564 errors for properties assigned in constructor, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
