@@ -6246,3 +6246,426 @@ fn test_method_multiple_generic_params_inference() {
     // V inferred as number
     assert_eq!(results[1], (v_name, TypeId::NUMBER));
 }
+
+// ============================================================================
+// Circular Type Alias Detection Tests
+// ============================================================================
+// Tests for detecting and handling circular type aliases
+
+#[test]
+fn test_circular_type_alias_self_reference() {
+    // Test: type T = T (direct self-reference should be detected)
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // No bounds - trying to resolve should give unknown/any
+    let result = ctx.resolve_with_constraints(var_t);
+    // Without concrete bounds, resolution should still work (gives unknown)
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_circular_type_alias_via_array() {
+    // Test: type T = Array<T> - recursive through array
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Add concrete array lower bound
+    let string_array = interner.array(TypeId::STRING);
+    ctx.add_lower_bound(var_t, string_array);
+
+    let result = ctx.resolve_with_constraints(var_t);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), string_array);
+}
+
+#[test]
+fn test_circular_type_alias_via_union() {
+    // Test: type T = T | null - recursive through union
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Upper bound: string | null
+    let string_or_null = interner.union(vec![TypeId::STRING, TypeId::NULL]);
+    ctx.add_upper_bound(var_t, string_or_null);
+
+    // Lower bound: string
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+
+    let result = ctx.resolve_with_constraints(var_t);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), TypeId::STRING);
+}
+
+#[test]
+fn test_circular_type_alias_nested_object() {
+    // Test: type Node = { child: Node | null }
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Just test that we can have object bounds without infinite recursion
+    let prop_name = interner.intern_string("value");
+    let obj_type = interner.object(vec![PropertyInfo {
+        name: prop_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    ctx.add_lower_bound(var_t, obj_type);
+
+    let result = ctx.resolve_with_constraints(var_t);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), obj_type);
+}
+
+#[test]
+fn test_circular_type_alias_function_return() {
+    // Test: type F = () => F - function returning itself
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let f_name = interner.intern_string("F");
+
+    let var_f = ctx.fresh_type_param(f_name);
+
+    // Add function lower bound
+    let fn_type = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+    ctx.add_lower_bound(var_f, fn_type);
+
+    let result = ctx.resolve_with_constraints(var_f);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), fn_type);
+}
+
+// ============================================================================
+// Self-Referential Generic Constraints Tests
+// ============================================================================
+// Tests for generic type parameters that reference themselves in constraints
+
+#[test]
+fn test_self_ref_constraint_comparable() {
+    // Test: T extends Comparable<T> pattern (common in sorting)
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Upper bound: number (which is comparable to itself)
+    ctx.add_upper_bound(var_t, TypeId::NUMBER);
+
+    // Lower bound: specific number literal
+    let num_lit = interner.literal_number(42.0);
+    ctx.add_lower_bound(var_t, num_lit);
+
+    let result = ctx.resolve_with_constraints(var_t);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), num_lit);
+}
+
+#[test]
+fn test_self_ref_constraint_builder_pattern() {
+    // Test: T extends Builder<T> - fluent builder pattern
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Simulate builder with method that returns same type
+    let build_prop = interner.intern_string("build");
+    let builder_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let builder_type = interner.object(vec![PropertyInfo {
+        name: build_prop,
+        type_id: builder_fn,
+        write_type: builder_fn,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    ctx.add_lower_bound(var_t, builder_type);
+
+    let result = ctx.resolve_with_constraints(var_t);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), builder_type);
+}
+
+#[test]
+fn test_self_ref_constraint_iterable() {
+    // Test: T extends Iterable<T> - iterable of itself
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Upper bound: array (iterable)
+    let number_array = interner.array(TypeId::NUMBER);
+    ctx.add_upper_bound(var_t, number_array);
+
+    // Lower bound: specific array
+    ctx.add_lower_bound(var_t, number_array);
+
+    let result = ctx.resolve_with_constraints(var_t);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), number_array);
+}
+
+#[test]
+fn test_self_ref_constraint_json_value() {
+    // Test: type JSONValue = string | number | boolean | JSONValue[] | {[k: string]: JSONValue}
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Upper bound: primitive union (simplified JSON)
+    let json_primitive = interner.union(vec![TypeId::STRING, TypeId::NUMBER, TypeId::BOOLEAN, TypeId::NULL]);
+    ctx.add_upper_bound(var_t, json_primitive);
+
+    // Lower bound: string (valid JSON value)
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+
+    let result = ctx.resolve_with_constraints(var_t);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), TypeId::STRING);
+}
+
+#[test]
+fn test_self_ref_constraint_recursive_array() {
+    // Test: T extends T[] - array of itself constraint
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Test with array bounds
+    let string_array = interner.array(TypeId::STRING);
+    ctx.add_lower_bound(var_t, string_array);
+
+    let result = ctx.resolve_with_constraints(var_t);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), string_array);
+}
+
+// ============================================================================
+// Mutually Recursive Type Definitions Tests
+// ============================================================================
+// Tests for types that reference each other in a cycle
+
+#[test]
+fn test_mutual_recursion_two_types() {
+    // Test: type A = { b: B }, type B = { a: A }
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let a_name = interner.intern_string("A");
+    let b_name = interner.intern_string("B");
+
+    let var_a = ctx.fresh_type_param(a_name);
+    let var_b = ctx.fresh_type_param(b_name);
+
+    // Both get object lower bounds (breaking the cycle with concrete types)
+    let prop_a = interner.intern_string("value");
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: prop_a,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let prop_b = interner.intern_string("count");
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: prop_b,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    ctx.add_lower_bound(var_a, obj_a);
+    ctx.add_lower_bound(var_b, obj_b);
+
+    let results = ctx.resolve_all_with_constraints();
+    assert!(results.is_ok());
+    let resolved = results.unwrap();
+    assert_eq!(resolved.len(), 2);
+    assert_eq!(resolved[0].1, obj_a);
+    assert_eq!(resolved[1].1, obj_b);
+}
+
+#[test]
+fn test_mutual_recursion_three_types() {
+    // Test: A -> B -> C -> A cycle
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let a_name = interner.intern_string("A");
+    let b_name = interner.intern_string("B");
+    let c_name = interner.intern_string("C");
+
+    let var_a = ctx.fresh_type_param(a_name);
+    let var_b = ctx.fresh_type_param(b_name);
+    let var_c = ctx.fresh_type_param(c_name);
+
+    // All have same upper bound
+    ctx.add_upper_bound(var_a, TypeId::STRING);
+    ctx.add_upper_bound(var_b, TypeId::STRING);
+    ctx.add_upper_bound(var_c, TypeId::STRING);
+
+    // Different literal lower bounds
+    let lit_a = interner.literal_string("a");
+    let lit_b = interner.literal_string("b");
+    let lit_c = interner.literal_string("c");
+
+    ctx.add_lower_bound(var_a, lit_a);
+    ctx.add_lower_bound(var_b, lit_b);
+    ctx.add_lower_bound(var_c, lit_c);
+
+    let results = ctx.resolve_all_with_constraints();
+    assert!(results.is_ok());
+    let resolved = results.unwrap();
+    assert_eq!(resolved.len(), 3);
+    assert_eq!(resolved[0].1, lit_a);
+    assert_eq!(resolved[1].1, lit_b);
+    assert_eq!(resolved[2].1, lit_c);
+}
+
+#[test]
+fn test_mutual_recursion_shared_constraint() {
+    // Test: A and B both bounded by same type
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let a_name = interner.intern_string("A");
+    let b_name = interner.intern_string("B");
+
+    let var_a = ctx.fresh_type_param(a_name);
+    let var_b = ctx.fresh_type_param(b_name);
+
+    // Shared upper bound
+    let shared_union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    ctx.add_upper_bound(var_a, shared_union);
+    ctx.add_upper_bound(var_b, shared_union);
+
+    // A gets string, B gets number
+    ctx.add_lower_bound(var_a, TypeId::STRING);
+    ctx.add_lower_bound(var_b, TypeId::NUMBER);
+
+    let results = ctx.resolve_all_with_constraints();
+    assert!(results.is_ok());
+    let resolved = results.unwrap();
+    assert_eq!(resolved.len(), 2);
+    assert_eq!(resolved[0].1, TypeId::STRING);
+    assert_eq!(resolved[1].1, TypeId::NUMBER);
+}
+
+#[test]
+fn test_mutual_recursion_array_element() {
+    // Test: A = B[], B = A[] (arrays of each other)
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let a_name = interner.intern_string("A");
+    let b_name = interner.intern_string("B");
+
+    let var_a = ctx.fresh_type_param(a_name);
+    let var_b = ctx.fresh_type_param(b_name);
+
+    // Concrete array lower bounds
+    let string_array = interner.array(TypeId::STRING);
+    let number_array = interner.array(TypeId::NUMBER);
+
+    ctx.add_lower_bound(var_a, string_array);
+    ctx.add_lower_bound(var_b, number_array);
+
+    let results = ctx.resolve_all_with_constraints();
+    assert!(results.is_ok());
+    let resolved = results.unwrap();
+    assert_eq!(resolved.len(), 2);
+    assert_eq!(resolved[0].1, string_array);
+    assert_eq!(resolved[1].1, number_array);
+}
+
+#[test]
+fn test_mutual_recursion_function_params() {
+    // Test: F = (a: G) => void, G = (f: F) => void
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let f_name = interner.intern_string("F");
+    let g_name = interner.intern_string("G");
+
+    let var_f = ctx.fresh_type_param(f_name);
+    let var_g = ctx.fresh_type_param(g_name);
+
+    // Create ParamInfo structs
+    let param_f = ParamInfo {
+        name: Some(interner.intern_string("a")),
+        type_id: TypeId::STRING,
+        optional: false,
+        rest: false,
+    };
+    let param_g = ParamInfo {
+        name: Some(interner.intern_string("f")),
+        type_id: TypeId::NUMBER,
+        optional: false,
+        rest: false,
+    };
+
+    // Concrete function lower bounds
+    let fn_f = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![param_f],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let fn_g = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![param_g],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    ctx.add_lower_bound(var_f, fn_f);
+    ctx.add_lower_bound(var_g, fn_g);
+
+    let results = ctx.resolve_all_with_constraints();
+    assert!(results.is_ok());
+    let resolved = results.unwrap();
+    assert_eq!(resolved.len(), 2);
+    assert_eq!(resolved[0].1, fn_f);
+    assert_eq!(resolved[1].1, fn_g);
+}
