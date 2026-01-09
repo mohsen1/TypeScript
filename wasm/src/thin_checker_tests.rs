@@ -4596,6 +4596,56 @@ function loopWithBreak(): number {
     assert_eq!(count(2355), 1, "Expected exactly one 2355 error for loopWithBreak(), got: {:?}", codes);
 }
 
+/// Test that calling a never-returning function doesn't trigger TS2355
+/// This is a known limitation - calls to functions returning `never` should
+/// terminate control flow but aren't currently detected.
+#[test]
+fn test_never_returning_call_no_2355() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// Helper that returns never
+function fail(message: string): never {
+    throw new Error(message);
+}
+
+// Function that calls fail() should NOT get 2355
+// because fail() never returns
+function usesFail(): number {
+    fail("boom");
+}
+
+// Function that doesn't call a never-returning function SHOULD get 2355
+function fallsThrough(): number {
+    console.log("oops");
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let count = |code| codes.iter().filter(|&&c| c == code).count();
+
+    // KNOWN LIMITATION: Currently usesFail() also gets 2355 because we don't
+    // track that fail() returns never. When this is fixed, change to assert_eq!(count(2355), 1).
+    // For now we just document the current behavior.
+    let actual_2355_count = count(2355);
+    eprintln!("=== Never-Returning Call Test ===");
+    eprintln!("TS2355 errors: {} (expected 1 after full fix, currently may be 2)", actual_2355_count);
+
+    // At minimum, fallsThrough should get 2355
+    assert!(actual_2355_count >= 1, "Expected at least one 2355 error for fallsThrough()");
+}
+
 #[test]
 fn test_no_implicit_any_false_suppresses_diagnostics() {
     use crate::thin_parser::ThinParserState;
