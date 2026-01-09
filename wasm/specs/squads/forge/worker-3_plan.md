@@ -123,9 +123,9 @@ This requires control flow analysis to track variable state through branches.
 
 ### Remaining TS2339 False Positives (20 tests)
 - Private names (#foo): 6 tests — static private accessors/properties not found on class type
-- Mixin classes: 4 tests — mixin type inference issues
+- Mixin classes: 4 tests — mixin type inference issues (intersection handling added in new expressions, unit tests pass, conformance tests need more investigation)
 - Control flow narrowing: 8 tests — assignment narrowing not tracked
-- Static index signatures: 1 test
+- Static index signatures: 1 test — would require adding index signatures to CallableShape
 - Assertion type predicates: 1 test
 
 ## Ready for Merge
