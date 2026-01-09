@@ -7,12 +7,13 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- [ ] Add ES5 nullish coalescing patterns parity tests: assignment, defaults, nested. Tests: `./wasm/test.sh emitter_parity`
+(none)
 
 ## Task Queue
 (empty)
 
 ## Completed
+- [x] Added ES5 nullish coalescing patterns parity tests (complex-expressions, class-context, function-calls, nested-defaults) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (359 tests).
 - [x] Added ES5 optional chaining patterns parity tests (deep-nested, class-methods, generics, mixed-access) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (355 tests).
 - [x] Added ES5 spread/rest patterns parity tests (object-literal-methods, async-error-handling, custom-iterables, generic-signatures) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (351 tests).
 - [x] Added ES5 destructuring patterns parity tests (function-params-complex, mixed-patterns, computed-defaults, class-methods) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (347 tests).

@@ -21183,3 +21183,392 @@ const chainedOperations = (data: DataStore | null): string[] => {
         output
     );
 }
+
+// =============================================================================
+// ES5 Nullish Coalescing Patterns Parity Tests
+// =============================================================================
+
+/// Test: nullish coalescing with complex expressions
+#[test]
+fn test_parity_es5_nullish_complex_expressions() {
+    let source = r#"
+interface Config {
+    value?: number;
+    compute?: () => number;
+}
+
+function getComputedValue(config: Config | null): number {
+    return config?.compute?.() ?? config?.value ?? 0;
+}
+
+const complexDefault = (
+    a: number | null,
+    b: number | undefined,
+    c: number | null | undefined
+): number => {
+    return (a ?? 0) + (b ?? 0) + (c ?? 0);
+};
+
+function conditionalNullish(
+    condition: boolean,
+    primary: string | null,
+    secondary: string | undefined
+): string {
+    return condition
+        ? (primary ?? "default-primary")
+        : (secondary ?? "default-secondary");
+}
+
+const ternaryWithNullish = (value: number | null | undefined): string => {
+    const result = value ?? -1;
+    return result >= 0 ? `positive: ${result}` : `negative: ${result}`;
+};
+
+class ExpressionProcessor {
+    process(
+        input: { value?: number; fallback?: number } | null
+    ): number {
+        return input?.value ?? input?.fallback ?? 0;
+    }
+
+    compute(
+        fn: (() => number) | null,
+        defaultValue: number
+    ): number {
+        return fn?.() ?? defaultValue;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions should be present
+    assert!(
+        output.contains("getComputedValue") && output.contains("complexDefault") && output.contains("conditionalNullish"),
+        "Output should contain functions: {}",
+        output
+    );
+    // Class should be present
+    assert!(
+        output.contains("ExpressionProcessor"),
+        "Output should contain class: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface Config"),
+        "Interface should be erased: {}",
+        output
+    );
+}
+
+/// Test: nullish coalescing in class context
+#[test]
+fn test_parity_es5_nullish_class_context() {
+    let source = r#"
+class DefaultValueService<T> {
+    private cache: Map<string, T> = new Map();
+    private defaultValue: T;
+
+    constructor(defaultValue: T) {
+        this.defaultValue = defaultValue;
+    }
+
+    get(key: string): T {
+        return this.cache.get(key) ?? this.defaultValue;
+    }
+
+    getOrCompute(key: string, compute: () => T): T {
+        const cached = this.cache.get(key);
+        return cached ?? compute();
+    }
+
+    getWithFallbacks(key: string, ...fallbacks: T[]): T {
+        let result: T | undefined = this.cache.get(key);
+        for (const fallback of fallbacks) {
+            if (result !== undefined && result !== null) break;
+            result = fallback;
+        }
+        return result ?? this.defaultValue;
+    }
+}
+
+class ConfigManager {
+    private config: Record<string, unknown> = {};
+
+    getString(key: string, defaultVal: string = ""): string {
+        const value = this.config[key];
+        return (value as string | null | undefined) ?? defaultVal;
+    }
+
+    getNumber(key: string, defaultVal: number = 0): number {
+        const value = this.config[key];
+        return (value as number | null | undefined) ?? defaultVal;
+    }
+
+    getArray<T>(key: string, defaultVal: T[] = []): T[] {
+        const value = this.config[key];
+        return (value as T[] | null | undefined) ?? defaultVal;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Classes should be present
+    assert!(
+        output.contains("DefaultValueService") && output.contains("ConfigManager"),
+        "Output should contain classes: {}",
+        output
+    );
+    // Methods should be present
+    assert!(
+        output.contains("getOrCompute") && output.contains("getString") && output.contains("getNumber"),
+        "Output should contain methods: {}",
+        output
+    );
+    // Type parameters should be erased
+    assert!(
+        !output.contains("<T>"),
+        "Type parameters should be erased: {}",
+        output
+    );
+}
+
+/// Test: nullish coalescing with function calls
+#[test]
+fn test_parity_es5_nullish_function_calls() {
+    let source = r#"
+type Resolver<T> = () => T | null | undefined;
+
+function resolveWithDefault<T>(
+    resolver: Resolver<T>,
+    defaultValue: T
+): T {
+    return resolver() ?? defaultValue;
+}
+
+function chainResolvers<T>(...resolvers: Resolver<T>[]): T | undefined {
+    for (const resolver of resolvers) {
+        const result = resolver();
+        if (result !== null && result !== undefined) {
+            return result;
+        }
+    }
+    return undefined;
+}
+
+const createResolver = <T>(value: T | null): Resolver<T> => {
+    return () => value;
+};
+
+async function asyncResolve<T>(
+    asyncResolver: () => Promise<T | null>,
+    defaultValue: T
+): Promise<T> {
+    const result = await asyncResolver();
+    return result ?? defaultValue;
+}
+
+class ResolverChain<T> {
+    private resolvers: Resolver<T>[] = [];
+
+    add(resolver: Resolver<T>): this {
+        this.resolvers.push(resolver);
+        return this;
+    }
+
+    resolve(defaultValue: T): T {
+        for (const resolver of this.resolvers) {
+            const result = resolver();
+            if (result !== null && result !== undefined) {
+                return result;
+            }
+        }
+        return defaultValue;
+    }
+
+    resolveFirst(): T | undefined {
+        return this.resolvers[0]?.() ?? undefined;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions should be present
+    assert!(
+        output.contains("resolveWithDefault") && output.contains("chainResolvers") && output.contains("asyncResolve"),
+        "Output should contain functions: {}",
+        output
+    );
+    // Class should be present
+    assert!(
+        output.contains("ResolverChain"),
+        "Output should contain class: {}",
+        output
+    );
+    // Type alias should be erased
+    assert!(
+        !output.contains("type Resolver"),
+        "Type alias should be erased: {}",
+        output
+    );
+}
+
+/// Test: deeply nested nullish coalescing with default chains
+#[test]
+fn test_parity_es5_nullish_nested_defaults() {
+    let source = r#"
+interface NestedConfig {
+    level1?: {
+        level2?: {
+            level3?: {
+                value?: string;
+            };
+        };
+    };
+}
+
+function getNestedWithDefaults(config: NestedConfig | null): string {
+    return config?.level1?.level2?.level3?.value
+        ?? config?.level1?.level2?.level3?.value
+        ?? config?.level1?.level2?.level3?.value
+        ?? "default";
+}
+
+const multiLevelDefaults = (
+    a: string | null,
+    b: string | undefined,
+    c: string | null,
+    d: string
+): string => {
+    return a ?? b ?? c ?? d;
+};
+
+function defaultChainWithTransform(
+    values: Array<string | null | undefined>,
+    transform: (s: string) => string
+): string {
+    let result: string | null | undefined;
+    for (const v of values) {
+        result = v ?? result;
+        if (result !== null && result !== undefined) break;
+    }
+    return transform(result ?? "");
+}
+
+class NestedDefaultResolver {
+    private defaults: NestedConfig = {
+        level1: {
+            level2: {
+                level3: {
+                    value: "nested-default"
+                }
+            }
+        }
+    };
+
+    resolve(config: NestedConfig | null): string {
+        return config?.level1?.level2?.level3?.value
+            ?? this.defaults.level1?.level2?.level3?.value
+            ?? "fallback";
+    }
+
+    resolveWithOverrides(
+        primary: NestedConfig | null,
+        secondary: NestedConfig | null
+    ): string {
+        return primary?.level1?.level2?.level3?.value
+            ?? secondary?.level1?.level2?.level3?.value
+            ?? this.defaults.level1?.level2?.level3?.value
+            ?? "final-fallback";
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions should be present
+    assert!(
+        output.contains("getNestedWithDefaults") && output.contains("multiLevelDefaults"),
+        "Output should contain functions: {}",
+        output
+    );
+    // Class should be present
+    assert!(
+        output.contains("NestedDefaultResolver"),
+        "Output should contain class: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface NestedConfig"),
+        "Interface should be erased: {}",
+        output
+    );
+}
