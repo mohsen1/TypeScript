@@ -7,9 +7,10 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-None - awaiting new task
+- [ ] Add async ES5 tests for async caching patterns: memoize, cache, invalidate, ttl. Tests: `./wasm/test.sh async_es5_tests`
 
 ## Task Queue
+- [ ] Add async ES5 tests for async batching patterns: batch, debounce, throttle, coalesce
 
 
 ## Completed
