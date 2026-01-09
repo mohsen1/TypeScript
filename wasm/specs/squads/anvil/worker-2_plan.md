@@ -7,7 +7,22 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-(none - awaiting new assignment from EM-Anvil)
+Add ES5 mixin patterns parity tests
+
+Per GOALS.md Objective 1: ES5 downleveling correctness
+
+Steps:
+1. Add 6 ES5 mixin patterns parity tests to `wasm/src/thin_emitter/emitter_parity_tests.rs`:
+   - Basic mixin function pattern
+   - Mixin with generics
+   - Multiple mixin composition
+   - Mixin with static members
+   - Mixin with private fields
+   - Combined mixin patterns
+2. Run `./wasm/test.sh emitter_parity` to verify all tests pass
+3. Commit with message: `[wasm] emitter: add mixin patterns parity tests`
+4. Push to `origin/worker/anvil-2`
+5. Update this plan file and push
 
 ## Task Queue
 (empty)

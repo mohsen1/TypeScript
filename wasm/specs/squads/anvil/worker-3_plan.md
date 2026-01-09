@@ -7,7 +7,22 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-(awaiting next task from EM-Anvil)
+Add ES5 conditional type expression source map tests
+
+Per GOALS.md Objective 2: Source map validation
+
+Steps:
+1. Add 6 ES5 conditional type expression source map tests to `wasm/src/source_map_tests.rs`:
+   - Conditional type with infer
+   - Distributive conditional type
+   - Nested conditional types
+   - Conditional type in function return
+   - Conditional type with union
+   - Combined conditional patterns
+2. Run `./wasm/test.sh source_map` to verify all tests pass
+3. Commit with message: `[wasm] source_map: add conditional type expression tests`
+4. Push to `origin/worker/anvil-3`
+5. Update this plan file and push
 
 **Sync instructions**: Use squad/anvil (not origin/rust):
 ```
