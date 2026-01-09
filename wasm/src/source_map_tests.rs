@@ -64859,3 +64859,497 @@ registry.update("user1", { age: 31 });"#;
         "expected mappings to reference source file"
     );
 }
+
+// =============================================================================
+// ES5 SOURCE MAP TESTS: IMPORT/EXPORT ALIASES
+// =============================================================================
+
+/// Test source map generation for named imports with aliases in ES5 output.
+/// Validates that `import { foo as bar }` generates proper source mappings.
+#[test]
+fn test_source_map_import_named_alias_es5() {
+    let source = r#"// Named import with alias
+import { useState as useStateHook } from "react";
+import { Component as ReactComponent, createElement as h } from "react";
+import { map as arrayMap, filter as arrayFilter, reduce as arrayReduce } from "lodash";
+
+// Using aliased imports
+function MyComponent() {
+    const [count, setCount] = useStateHook(0);
+    return h("div", null, count);
+}
+
+const numbers = [1, 2, 3, 4, 5];
+const doubled = arrayMap(numbers, (n: number) => n * 2);
+const evens = arrayFilter(numbers, (n: number) => n % 2 === 0);
+const sum = arrayReduce(numbers, (acc: number, n: number) => acc + n, 0);
+
+console.log(doubled, evens, sum);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("MyComponent"),
+        "expected MyComponent function in output. output: {output}"
+    );
+    assert!(
+        output.contains("doubled"),
+        "expected doubled variable in output. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for named import aliases"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+/// Test source map generation for named exports with aliases in ES5 output.
+/// Validates that `export { foo as bar }` generates proper source mappings.
+#[test]
+fn test_source_map_export_named_alias_es5() {
+    let source = r#"// Internal implementations
+function internalAdd(a: number, b: number): number {
+    return a + b;
+}
+
+function internalSubtract(a: number, b: number): number {
+    return a - b;
+}
+
+const internalPI = 3.14159;
+const internalE = 2.71828;
+
+class InternalCalculator {
+    add(a: number, b: number): number {
+        return internalAdd(a, b);
+    }
+
+    subtract(a: number, b: number): number {
+        return internalSubtract(a, b);
+    }
+}
+
+// Export with aliases
+export { internalAdd as add };
+export { internalSubtract as subtract };
+export { internalPI as PI, internalE as E };
+export { InternalCalculator as Calculator };
+
+// Also export with different alias
+export { internalAdd as sum, internalSubtract as difference };"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("internalAdd"),
+        "expected internalAdd function in output. output: {output}"
+    );
+    assert!(
+        output.contains("InternalCalculator"),
+        "expected InternalCalculator class in output. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for named export aliases"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+/// Test source map generation for re-exports with aliases in ES5 output.
+/// Validates that `export { foo as bar } from "module"` generates proper source mappings.
+#[test]
+fn test_source_map_reexport_alias_es5() {
+    let source = r#"// Re-export with aliases from other modules
+export { useState as useStateHook } from "react";
+export { Component as ReactComponent } from "react";
+export { map as lodashMap, filter as lodashFilter } from "lodash";
+
+// Re-export default as named
+export { default as axios } from "axios";
+export { default as express } from "express";
+
+// Mixed re-exports with and without aliases
+export { readFile as readFileAsync, writeFile as writeFileAsync } from "fs/promises";
+
+// Re-export everything with namespace alias handled separately
+// export * as utils from "./utils";
+
+// Local function that uses re-exports conceptually
+function useLibraries(): void {
+    console.log("Libraries configured");
+}
+
+export { useLibraries };"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("useLibraries"),
+        "expected useLibraries function in output. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for re-export aliases"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+/// Test source map generation for default import aliases in ES5 output.
+/// Validates that `import MyAlias from "module"` generates proper source mappings.
+#[test]
+fn test_source_map_import_default_alias_es5() {
+    let source = r#"// Default imports (which are essentially aliases for the default export)
+import React from "react";
+import Express from "express";
+import Lodash from "lodash";
+
+// Using default imports
+const app = Express();
+const element = React.createElement("div", null, "Hello");
+const sorted = Lodash.sortBy([3, 1, 2]);
+
+// Default import with named imports
+import Axios, { AxiosResponse, AxiosError } from "axios";
+
+async function fetchData(): Promise<AxiosResponse> {
+    try {
+        return await Axios.get("/api/data");
+    } catch (error) {
+        throw error as AxiosError;
+    }
+}
+
+// Re-assigning default imports
+const MyReact = React;
+const MyExpress = Express;
+
+console.log(app, element, sorted);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("fetchData"),
+        "expected fetchData function in output. output: {output}"
+    );
+    assert!(
+        output.contains("MyReact"),
+        "expected MyReact variable in output. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for default import aliases"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+/// Test source map generation for namespace import aliases in ES5 output.
+/// Validates that `import * as ns from "module"` generates proper source mappings.
+#[test]
+fn test_source_map_import_namespace_alias_es5() {
+    let source = r#"// Namespace imports
+import * as React from "react";
+import * as ReactDOM from "react-dom";
+import * as Lodash from "lodash";
+import * as Utils from "./utils";
+
+// Using namespace imports
+const element = React.createElement("div", { className: "container" }, "Hello");
+const root = ReactDOM.createRoot(document.getElementById("root")!);
+
+// Destructuring from namespace
+const { map, filter, reduce } = Lodash;
+const { formatDate, parseDate } = Utils;
+
+// Using destructured values
+const doubled = map([1, 2, 3], (n: number) => n * 2);
+const evens = filter([1, 2, 3, 4], (n: number) => n % 2 === 0);
+
+// Aliasing namespace members
+const lodashMap = Lodash.map;
+const lodashFilter = Lodash.filter;
+
+function renderApp(): void {
+    root.render(element);
+}
+
+console.log(doubled, evens);
+renderApp();"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("renderApp"),
+        "expected renderApp function in output. output: {output}"
+    );
+    assert!(
+        output.contains("doubled"),
+        "expected doubled variable in output. output: {output}"
+    );
+    assert!(
+        output.contains("lodashMap"),
+        "expected lodashMap variable in output. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for namespace import aliases"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
+
+/// Comprehensive test combining multiple import/export alias patterns.
+/// Tests named, default, namespace imports and exports with various alias combinations.
+#[test]
+fn test_source_map_import_export_alias_es5_comprehensive() {
+    let source = r#"// Comprehensive import/export alias patterns
+
+// Namespace imports
+import * as path from "path";
+import * as fs from "fs";
+
+// Default imports
+import express from "express";
+import cors from "cors";
+
+// Named imports with aliases
+import { readFile as readFileAsync, writeFile as writeFileAsync } from "fs/promises";
+import { join as joinPath, resolve as resolvePath, dirname as getDirname } from "path";
+
+// Mixed default and named with aliases
+import axios, { AxiosInstance as HttpClient, AxiosResponse as HttpResponse } from "axios";
+
+// Internal implementations
+class ApiClient {
+    private client: HttpClient;
+    private basePath: string;
+
+    constructor(baseUrl: string) {
+        this.client = axios.create({ baseURL: baseUrl });
+        this.basePath = resolvePath(getDirname(""), "api");
+    }
+
+    async get<T>(endpoint: string): Promise<HttpResponse<T>> {
+        const fullPath = joinPath(this.basePath, endpoint);
+        console.log(`Fetching from: ${fullPath}`);
+        return this.client.get(endpoint);
+    }
+
+    async loadConfig(configPath: string): Promise<string> {
+        const absolutePath = path.resolve(configPath);
+        const content = await readFileAsync(absolutePath, "utf-8");
+        return content;
+    }
+
+    async saveConfig(configPath: string, data: string): Promise<void> {
+        const absolutePath = path.resolve(configPath);
+        await writeFileAsync(absolutePath, data, "utf-8");
+    }
+}
+
+// Create app with middleware
+const app = express();
+app.use(cors());
+
+// Export with aliases
+export { ApiClient as Client };
+export { app as application };
+
+// Re-export with aliases
+export { readFileAsync as readFile, writeFileAsync as writeFile };
+export { joinPath, resolvePath, getDirname };
+
+// Export default with alias pattern
+const defaultClient = new ApiClient("https://api.example.com");
+export { defaultClient as default };"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    assert!(
+        output.contains("ApiClient"),
+        "expected ApiClient class in output. output: {output}"
+    );
+    assert!(
+        output.contains("loadConfig"),
+        "expected loadConfig method in output. output: {output}"
+    );
+    assert!(
+        output.contains("saveConfig"),
+        "expected saveConfig method in output. output: {output}"
+    );
+    assert!(
+        output.contains("defaultClient"),
+        "expected defaultClient variable in output. output: {output}"
+    );
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for comprehensive import/export aliases"
+    );
+    let has_source_mapping = decoded.iter().any(|entry| entry.source_index == 0);
+    assert!(
+        has_source_mapping,
+        "expected mappings to reference source file"
+    );
+}
