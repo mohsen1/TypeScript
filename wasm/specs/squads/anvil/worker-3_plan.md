@@ -7,12 +7,13 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- [ ] Add switch-case ES5 source map tests in `wasm/src/source_map_tests.rs`. Run `./wasm/test.sh source_map`.
+(none)
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added switch-case ES5 source map tests (basic, default, fall-through, break, return, nested, in function, expression cases, class method, combined); `./wasm/test.sh source_map` passes.
 - [x] Added try-catch-finally ES5 source map tests (basic, try-catch-finally, try-finally, nested, typed catch, rethrow, async, expression, class method, combined); `./wasm/test.sh source_map` passes.
 - [x] Added for-await-of ES5 source map tests (basic, destructuring, nested, try-catch, break/continue, class method, with await, labels, return, combined); `./wasm/test.sh source_map` passes.
 - [x] Added async generator ES5 source map tests (basic, with await, yield* and await, try-catch, class method, for-await-of, return value, expression, nested, combined); `./wasm/test.sh source_map` passes.
