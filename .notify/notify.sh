@@ -14,7 +14,20 @@
 #
 # The script auto-detects the sender from environment variables.
 
-NOTIFY_DIR="${NOTIFY_DIR:-$(dirname "$0")}"
+if [[ -z "${NOTIFY_DIR:-}" ]]; then
+    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+    NOTIFY_DIR="$SCRIPT_DIR"
+    GIT_COMMON_DIR="$(git -C "$SCRIPT_DIR" rev-parse --git-common-dir 2>/dev/null || true)"
+    if [[ -n "$GIT_COMMON_DIR" ]]; then
+        if [[ "$GIT_COMMON_DIR" != /* ]]; then
+            GIT_COMMON_DIR="$SCRIPT_DIR/$GIT_COMMON_DIR"
+        fi
+        ROOT_DIR="$(cd "$GIT_COMMON_DIR/.." && pwd)"
+        if [[ -d "$ROOT_DIR/.notify" ]]; then
+            NOTIFY_DIR="$ROOT_DIR/.notify"
+        fi
+    fi
+fi
 
 # Determine sender
 if [[ -n "$WORKER_NUM" && -n "$SQUAD_NAME" ]]; then
