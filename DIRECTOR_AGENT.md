@@ -245,6 +245,16 @@ origin/worker/<squad>-<N>  <- Individual worker branches
 
 ## Communication via Tmux
 
+### Send Message to EM (Recommended)
+Use the send-prompt script - it handles timing automatically:
+```bash
+# To EM-Forge (director window, pane 1)
+.notify/send-prompt.sh zang-org:director.1 "your message"
+
+# To EM-Anvil (director window, pane 2)
+.notify/send-prompt.sh zang-org:director.2 "your message"
+```
+
 ### Check EM Status
 EMs are in the director window (pane 1 = EM-Forge, pane 2 = EM-Anvil):
 ```bash
@@ -255,17 +265,17 @@ tmux capture-pane -p -t zang-org:director.1 -S -100
 tmux capture-pane -p -t zang-org:director.2 -S -100
 ```
 
-### Send Message to EM
+### Manual Send (if script fails)
 ```bash
 # To EM-Forge (director window, pane 1)
 tmux send-keys -t zang-org:director.1 "your message"
 sleep 1
-tmux send-keys -t zang-org:director.1 C-m
+tmux send-keys -t zang-org:director.1 Enter
 
 # To EM-Anvil (director window, pane 2)
 tmux send-keys -t zang-org:director.2 "your message"
 sleep 1
-tmux send-keys -t zang-org:director.2 C-m
+tmux send-keys -t zang-org:director.2 Enter
 ```
 
 ### Cancel EM Operation (if needed)
@@ -282,6 +292,49 @@ Escalate or coordinate when:
 - A critical objective is blocked across squads
 - Project Direction changes significantly
 - Risk identified that affects multiple squads
+- **Both EMs are trying to fix the same build error** (see below)
+
+### Arbiter Role: Prevent Duplicate EM Work
+
+**CRITICAL**: If you notice both EMs working on the same issue (e.g., both fixing build errors):
+1. **Immediately tell one to stop**: Pick the EM who started later or is less suited for the task
+2. **Be decisive**: "STOP - EM-Forge is handling build errors. Focus on your squad's workers instead."
+3. **Assign clear ownership**: "EM-Forge owns shared build fixes. EM-Anvil owns output/transform issues."
+
+Example intervention:
+```bash
+.notify/send-prompt.sh zang-org:director.2 "STOP fixing build errors - EM-Forge is already handling them. Focus on checking your workers and assigning tasks."
+```
+
+Watch for these duplicate-work signals:
+- Both EMs mention the same error message
+- Both EMs editing the same file
+- Both EMs saying "fixing build" at the same time
+
+## 🔔 Notification System (CRITICAL)
+
+**Your EMs will notify you when they need attention. You receive notifications automatically via tmux.**
+
+When you receive a notification:
+1. **Read the notification** - It tells you what the EM needs
+2. **Take action** - Help with blockers, acknowledge merges, or provide guidance
+3. **The notification watcher handles routing** - You don't need to poll or check manually
+
+**You will receive notifications like:**
+```
+[10:30:15] NOTIFICATION from em/forge: Merge ready. Merged workers 1,3,4 into squad/forge, pushed
+[10:45:22] STATUS from em/anvil: Resolved build blocker, all workers unblocked
+[11:00:00] NOTIFICATION from em/forge: BLOCKED - Cross-squad conflict with Anvil on types.rs
+```
+
+**No need to send notifications yourself** - You are at the top of the hierarchy. The notification system is for upward communication (workers → EMs → Director).
+
+**Your response to notifications:**
+- **merge**: Run the coordinated merge (see "MERGE TIME!" section)
+- **status**: Acknowledge and log if needed
+- **blocked**: Help resolve the cross-squad issue
+
+The notification system replaces the old time-based idle monitoring. EMs will proactively notify you when they have updates.
 
 ## Safety Rules
 - Never run `cargo test` or `cargo bench` directly
