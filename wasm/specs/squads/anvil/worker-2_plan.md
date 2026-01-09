@@ -7,12 +7,13 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- [ ] Add ES5 for-of/for-in patterns parity tests: destructuring, iterator protocol. Tests: `./wasm/test.sh emitter_parity`
+(awaiting assignment)
 
 ## Task Queue
 (empty)
 
 ## Completed
+- [x] Added ES5 for-of/for-in patterns parity tests (for-in-typed, for-in-computed, custom-iterator, map-set-destruct) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (335 tests).
 - [x] Added ES5 async function patterns parity tests (arrow-destructuring, method-computed-this, generator-symbol-iterator, await-advanced) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (331 tests).
 - [x] Added ES5 generator method patterns parity tests (yield-conditional, yield-argument, delegation-nested, async-promise-all) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (327 tests).
 - [x] Added ES5 super call patterns parity tests (property-access, method-computed, async-method, in-arrow) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (323 tests).
