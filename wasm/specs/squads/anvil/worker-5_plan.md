@@ -7,10 +7,27 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-None - awaiting new task
+Add async ES5 tests for async transaction patterns: begin, commit, rollback, savepoint
+
+Steps:
+1. Add 12 async transaction pattern tests to `wasm/src/transforms/async_es5_tests.rs`:
+   - begin transaction
+   - commit transaction
+   - rollback transaction
+   - savepoint
+   - nested transactions
+   - transaction timeout
+   - body_contains_await tests
+   - try/catch patterns
+   - conditional transactions
+   - Combined transaction patterns
+2. Run `./wasm/test.sh async_es5_tests` to verify all tests pass
+3. Commit with message: `[wasm] async_es5: add async transaction pattern tests`
+4. Push to `origin/worker/anvil-5`
+5. Update this plan file and push
 
 ## Task Queue
-- [ ] Add async ES5 tests for async transaction patterns: begin, commit, rollback, savepoint
+(empty - this is Worker 5's final assigned task)
 
 
 ## Completed

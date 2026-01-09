@@ -7,10 +7,23 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-(none)
+Add ES5 Generator patterns parity tests: yield, yield*, return, throw
+
+Steps:
+1. Add 6 ES5 Generator patterns parity tests to `wasm/src/emitter_parity_tests.rs`:
+   - Basic yield expression
+   - yield* delegation
+   - Generator return value
+   - Generator throw
+   - Generator with try/catch
+   - Combined generator patterns
+2. Run `./wasm/test.sh emitter_parity` to verify all tests pass
+3. Commit with message: `[wasm] emitter: add ES5 Generator patterns parity tests`
+4. Push to `origin/worker/anvil-2`
+5. Update this plan file and push
 
 ## Task Queue
-- [ ] Add ES5 Generator patterns parity tests: yield, yield*, return, throw
+(empty - this is Worker 2's final assigned task)
 
 ## Completed
 - [x] Added ES5 Iterator patterns parity tests (Symbol.iterator, next, return, throw) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (383 tests).
