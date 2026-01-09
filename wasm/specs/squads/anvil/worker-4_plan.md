@@ -44,3 +44,16 @@
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/anvil-4`
 - Ready for Merge: Yes
+
+## Follow-up (2025-01-09) - Recursive Mapped Types
+
+**Mission**: Add mapped type resolution guard/memoization and deepen regression coverage.
+
+**Status**: COMPLETED
+
+### Checklist
+
+- [x] Re-ran conformance: `node wasm/differential-test/conformance-runner.mjs types/mapped --max=200 -v` (no crash; `recursiveMappedTypes.ts` still missing errors)
+- [x] Added mapped eval cache + guard in `thin_checker` mapped resolution
+- [x] Added regression test: `test_recursive_mapped_type_list_widget_guard`
+- [x] Tests: `./wasm/test.sh test_recursive_mapped_type_list_widget_guard` (PASS)

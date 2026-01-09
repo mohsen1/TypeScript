@@ -134,6 +134,12 @@ pub struct CheckerContext<'a> {
     /// Recursion guard for application evaluation.
     pub application_eval_set: FxHashSet<TypeId>,
 
+    /// Cache for evaluated mapped types with symbol resolution.
+    pub mapped_eval_cache: FxHashMap<TypeId, TypeId>,
+
+    /// Recursion guard for mapped type evaluation with resolution.
+    pub mapped_eval_set: FxHashSet<TypeId>,
+
     /// Symbol dependency graph (symbol -> referenced symbols).
     pub symbol_dependencies: FxHashMap<SymbolId, FxHashSet<SymbolId>>,
 
@@ -220,6 +226,8 @@ impl<'a> CheckerContext<'a> {
             type_environment: RefCell::new(None),
             application_eval_cache: FxHashMap::default(),
             application_eval_set: FxHashSet::default(),
+            mapped_eval_cache: FxHashMap::default(),
+            mapped_eval_set: FxHashSet::default(),
             symbol_dependencies: FxHashMap::default(),
             symbol_dependency_stack: Vec::new(),
             diagnostics: Vec::new(),
@@ -261,6 +269,8 @@ impl<'a> CheckerContext<'a> {
             type_environment: RefCell::new(None),
             application_eval_cache: FxHashMap::default(),
             application_eval_set: FxHashSet::default(),
+            mapped_eval_cache: FxHashMap::default(),
+            mapped_eval_set: FxHashSet::default(),
             symbol_dependencies: cache.symbol_dependencies,
             symbol_dependency_stack: Vec::new(),
             diagnostics: Vec::new(),

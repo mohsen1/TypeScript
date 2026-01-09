@@ -12291,3 +12291,37 @@ foo.a;
     let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
     checker.check_source_file(root);
 }
+
+#[test]
+fn test_recursive_mapped_type_list_widget_guard() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type NonOptionalKeys<T> = { [P in keyof T]: undefined extends T[P] ? never : P }[keyof T];
+type Child<T> = { [P in NonOptionalKeys<T>]: T[P] };
+
+interface ListWidget {
+    "type": "list",
+    "minimum_count": number,
+    "maximum_count": number,
+    "collapsable"?: boolean,
+    "each": Child<ListWidget>;
+}
+
+type ListChild = Child<ListWidget>;
+
+declare let x: ListChild;
+x.type;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+}
