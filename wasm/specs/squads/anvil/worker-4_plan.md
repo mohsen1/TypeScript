@@ -7,7 +7,22 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-(none - awaiting assignment from EM)
+Add ES5 class tests for reflect-metadata patterns
+
+Per GOALS.md Objective 1: ES5 downleveling correctness
+
+Steps:
+1. Add 6 ES5 class tests for reflect-metadata patterns to `wasm/src/transforms/class_es5_tests.rs`:
+   - Basic Reflect.metadata decorator
+   - Design type metadata
+   - Parameter type metadata
+   - Return type metadata
+   - Custom metadata keys
+   - Combined reflect-metadata patterns
+2. Run `./wasm/test.sh class_es5_tests` to verify all tests pass
+3. Commit with message: `[wasm] transforms: add reflect-metadata ES5 class tests`
+4. Push to `origin/worker/anvil-4`
+5. Update this plan file and push
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)

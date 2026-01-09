@@ -6,10 +6,25 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-(awaiting assignment)
+Add ES5 class tests for observable/event emitter patterns
+
+Per GOALS.md Objective 1: ES5 downleveling correctness
+
+Steps:
+1. Add 6 ES5 class tests for observable/event emitter patterns to `wasm/src/transforms/class_es5_tests.rs`:
+   - Basic event emitter class
+   - Observable with subscribe/unsubscribe
+   - Event delegation pattern
+   - Typed event emitter
+   - Async event handling
+   - Combined observable patterns
+2. Run `./wasm/test.sh class_es5_tests` to verify all tests pass
+3. Commit with message: `[wasm] transforms: add observable/event emitter ES5 class tests`
+4. Push to `origin/worker/anvil-1`
+5. Update this plan file and push
 
 ## Task Queue
-(empty)
+(empty - will receive new tasks from EM after completing current assignment)
 
 ## Completed
 - [x] Added ES5 tests for error boundary patterns (6 tests): try/catch, componentDidCatch, getDerivedStateFromError, nested boundaries, async error handling, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 530 pass).

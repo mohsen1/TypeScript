@@ -7,9 +7,22 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-(none - awaiting new task from EM-Anvil)
+Add ES5 decorator source map tests
 
-ES5 string template literal source map tests were already completed in a previous session. 10 template literal ES5 tests exist and all 905 source map tests pass.
+Per GOALS.md Objective 2: Source Map Validation
+
+Steps:
+1. Add 6 ES5 decorator source map tests to `wasm/src/source_map_tests.rs`:
+   - Class decorator source maps
+   - Method decorator source maps
+   - Property decorator source maps
+   - Parameter decorator source maps
+   - Multiple decorator source maps
+   - Combined decorator source maps
+2. Run `./wasm/test.sh source_map` to verify all tests pass
+3. Commit with message: `[wasm] source_map: add decorator source map tests`
+4. Push to `origin/worker/anvil-3`
+5. Update this plan file and push
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)
