@@ -58,8 +58,11 @@ Yes
 
 ## Resume Notes
 - Branch: `worker/forge-1`
-- Unit tests after merge with squad/forge: 4913 total, 4852 passed, 61 failed, 1 skipped (improved from 4840/73).
+- Unit tests after merge with squad/forge: 4918 total, 4852 passed, 65 failed, 1 skipped.
 - Merged type parameter scope fix from EM (origin/squad/forge).
 - TS2304 work complete: added utility type handling to reduce false positives.
-- Now working on TS2454: Variable used before assigned (573 conformance tests affected).
-- Key files for TS2454: thin_checker.rs, checker/control_flow.rs.
+- TS2454 basic implementation done:
+  - Fixed `get_type_of_call_expression` to process arguments even when callee is `any`
+  - This ensures definite assignment checking for args like `console.log(x)`
+  - Added 4 tests for TS2454 (all passing)
+- Next: Add more TS2454 tests for conditional branches (if/else, loops).

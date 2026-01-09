@@ -13048,3 +13048,101 @@ function foo(x: number) {
         checker.ctx.diagnostics
     );
 }
+
+/// Test that variable assigned in both if/else branches doesn't emit TS2454
+#[test]
+fn test_ts2454_assigned_in_both_branches_no_error() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let x: number;
+if (Math.random() > 0.5) {
+    x = 1;
+} else {
+    x = 2;
+}
+console.log(x);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2454).count();
+    assert_eq!(
+        count,
+        0,
+        "Expected no TS2454 when assigned in both branches, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// Test that variable assigned in only if branch emits TS2454
+#[test]
+fn test_ts2454_assigned_in_only_if_branch_error() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let x: number;
+if (Math.random() > 0.5) {
+    x = 1;
+}
+console.log(x);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2454).count();
+    assert_eq!(
+        count,
+        1,
+        "Expected TS2454 when only assigned in if branch, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// Test that `var` declaration doesn't emit TS2454 (only let/const require definite assignment)
+#[test]
+fn test_ts2454_var_declaration_no_error() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+var x: number;
+console.log(x);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2454).count();
+    assert_eq!(
+        count,
+        0,
+        "Expected no TS2454 for var declaration (only let/const), got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
