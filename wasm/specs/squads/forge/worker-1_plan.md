@@ -17,7 +17,11 @@ Priority: 1
        - Added `TypeKey::IndexAccess` handling to extract both obj and idx type params
     2. Reduced diagnostics from 3 to 2
   - Remaining issue: replaceState param type comparison still fails
-  - Next steps: Investigate why Store type matching fails at store.ts:590
+  - Analysis of remaining issues:
+    1. store.ts:590: `DeepPartial<StateFromReducer<R>>` param not matching Store interface
+    2. app.ts:508: State type 'S' not being resolved to RootState (missing 'tags' property)
+  - Root cause: Conditional type `StateFromReducer<R>` not fully evaluating through the generic chain
+  - Next steps: Debug conditional type evaluation in `evaluate_conditional`
 
 ## Task Queue
 - [ ] Add callable-parameter inference regressions (e.g., union inputs, overload shapes) in `wasm/src/solver/evaluate_tests.rs`.
