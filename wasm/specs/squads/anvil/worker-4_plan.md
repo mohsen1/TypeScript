@@ -7,27 +7,13 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-Add ES5 class tests for Symbol.iterator/Symbol.asyncIterator patterns
-
-Per GOALS.md Objective 1: ES5 downleveling correctness
-
-Steps:
-1. Add 6 ES5 class tests for Symbol.iterator/Symbol.asyncIterator patterns to `wasm/src/transforms/class_es5_tests.rs`:
-   - Basic Symbol.iterator implementation
-   - Symbol.asyncIterator implementation
-   - Iterable class pattern
-   - Generator-based iterator
-   - Async iterator with for-await-of
-   - Combined iterator patterns
-2. Run `./wasm/test.sh class_es5_tests` to verify all tests pass
-3. Commit with message: `[wasm] transforms: add Symbol.iterator/asyncIterator ES5 class tests`
-4. Push to `origin/worker/anvil-4`
-5. Update this plan file and push
+(none - awaiting assignment from EM)
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)
 
 ## Completed
+- [x] Add ES5 class tests for Symbol.iterator/asyncIterator patterns: basic iterator, async iterator, iterable class, generator-based, async for-await-of, combined. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for WeakMap/WeakSet private field patterns: private field via WeakMap, static private, private method, WeakSet membership, WeakRef cache, combined. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for new.target meta-property patterns: basic constructor, derived class, abstract pattern, factory function, instanceof check, combined. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for mixin pattern variations: basic, static members, multiple composition, generic constraints, private fields, combined. Tests: `./wasm/test.sh class_es5_tests`
