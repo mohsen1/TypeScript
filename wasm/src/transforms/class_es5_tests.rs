@@ -33427,3 +33427,766 @@ class ArrayProcessor<T extends any[]> {
         output
     );
 }
+
+// ============================================================================
+// TYPE ALIAS PATTERN TESTS
+// ============================================================================
+
+/// Test ES5 class downleveling with union type alias patterns
+#[test]
+fn test_class_es5_type_alias_union() {
+    let source = r#"
+type StringOrNumber = string | number;
+type Primitive = string | number | boolean | null | undefined;
+type Result<T> = T | Error;
+type AsyncResult<T> = T | Promise<T>;
+
+class ValueHolder<T extends StringOrNumber> {
+    private value: T;
+
+    constructor(value: T) {
+        this.value = value;
+    }
+
+    getValue(): T {
+        return this.value;
+    }
+
+    isString(): boolean {
+        return typeof this.value === "string";
+    }
+
+    isNumber(): boolean {
+        return typeof this.value === "number";
+    }
+
+    toString(): string {
+        return String(this.value);
+    }
+}
+
+class ResultHandler<T> {
+    private result: Result<T>;
+
+    constructor(result: Result<T>) {
+        this.result = result;
+    }
+
+    isError(): boolean {
+        return this.result instanceof Error;
+    }
+
+    getValue(): T | null {
+        if (this.result instanceof Error) {
+            return null;
+        }
+        return this.result;
+    }
+
+    getError(): Error | null {
+        if (this.result instanceof Error) {
+            return this.result;
+        }
+        return null;
+    }
+
+    map<U>(fn: (value: T) => U): ResultHandler<U> {
+        if (this.result instanceof Error) {
+            return new ResultHandler<U>(this.result);
+        }
+        return new ResultHandler<U>(fn(this.result));
+    }
+}
+
+class PrimitiveParser {
+    parse(value: Primitive): string {
+        if (value === null) return "null";
+        if (value === undefined) return "undefined";
+        return String(value);
+    }
+
+    parseAll(values: Primitive[]): string[] {
+        return values.map(v => this.parse(v));
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("ValueHolder") && output.contains("ResultHandler") && output.contains("PrimitiveParser"),
+        "Expected union type alias classes: {}",
+        output
+    );
+
+    // ValueHolder methods
+    assert!(
+        output.contains("getValue") && output.contains("isString") && output.contains("isNumber"),
+        "Expected ValueHolder methods: {}",
+        output
+    );
+
+    // ResultHandler methods
+    assert!(
+        output.contains("isError") && output.contains("getError"),
+        "Expected ResultHandler methods: {}",
+        output
+    );
+
+    // PrimitiveParser methods
+    assert!(
+        output.contains("parse") && output.contains("parseAll"),
+        "Expected PrimitiveParser methods: {}",
+        output
+    );
+}
+
+/// Test ES5 class downleveling with intersection type alias patterns
+#[test]
+fn test_class_es5_type_alias_intersection() {
+    let source = r#"
+type Named = { name: string };
+type Aged = { age: number };
+type Identified = { id: string };
+
+type Person = Named & Aged;
+type IdentifiedPerson = Person & Identified;
+type Timestamped = { createdAt: Date; updatedAt: Date };
+type Entity = Identified & Timestamped;
+
+class PersonBuilder {
+    private data: Partial<IdentifiedPerson> = {};
+
+    setId(id: string): this {
+        this.data.id = id;
+        return this;
+    }
+
+    setName(name: string): this {
+        this.data.name = name;
+        return this;
+    }
+
+    setAge(age: number): this {
+        this.data.age = age;
+        return this;
+    }
+
+    build(): IdentifiedPerson {
+        return this.data as IdentifiedPerson;
+    }
+
+    reset(): void {
+        this.data = {};
+    }
+}
+
+class EntityManager<T extends Entity> {
+    private entities: Map<string, T> = new Map();
+
+    add(entity: T): void {
+        this.entities.set(entity.id, entity);
+    }
+
+    get(id: string): T | undefined {
+        return this.entities.get(id);
+    }
+
+    getAll(): T[] {
+        return Array.from(this.entities.values());
+    }
+
+    findByDateRange(start: Date, end: Date): T[] {
+        return this.getAll().filter(
+            e => e.createdAt >= start && e.createdAt <= end
+        );
+    }
+}
+
+class MixinApplier<T extends object> {
+    private base: T;
+
+    constructor(base: T) {
+        this.base = base;
+    }
+
+    with<U extends object>(mixin: U): T & U {
+        return { ...this.base, ...mixin };
+    }
+
+    withAll<U extends object[]>(...mixins: U): T {
+        return Object.assign({}, this.base, ...mixins);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("PersonBuilder") && output.contains("EntityManager") && output.contains("MixinApplier"),
+        "Expected intersection type alias classes: {}",
+        output
+    );
+
+    // PersonBuilder methods
+    assert!(
+        output.contains("setId") && output.contains("setName") && output.contains("setAge") && output.contains("build"),
+        "Expected PersonBuilder methods: {}",
+        output
+    );
+
+    // EntityManager methods
+    assert!(
+        output.contains("add") && output.contains("getAll") && output.contains("findByDateRange"),
+        "Expected EntityManager methods: {}",
+        output
+    );
+
+    // MixinApplier methods
+    assert!(
+        output.contains("withAll"),
+        "Expected MixinApplier methods: {}",
+        output
+    );
+}
+
+/// Test ES5 class downleveling with conditional type alias patterns
+#[test]
+fn test_class_es5_type_alias_conditional() {
+    let source = r#"
+type NonNullable<T> = T extends null | undefined ? never : T;
+type ExtractArray<T> = T extends (infer U)[] ? U : T;
+type ReturnType<T> = T extends (...args: any[]) => infer R ? R : never;
+type PromiseValue<T> = T extends Promise<infer V> ? V : T;
+
+class NullableHandler<T> {
+    private value: T | null | undefined;
+
+    constructor(value: T | null | undefined) {
+        this.value = value;
+    }
+
+    isNull(): boolean {
+        return this.value === null;
+    }
+
+    isUndefined(): boolean {
+        return this.value === undefined;
+    }
+
+    isDefined(): boolean {
+        return this.value !== null && this.value !== undefined;
+    }
+
+    getOrDefault(defaultValue: T): T {
+        if (this.value === null || this.value === undefined) {
+            return defaultValue;
+        }
+        return this.value;
+    }
+
+    map<U>(fn: (value: T) => U): NullableHandler<U> {
+        if (this.value === null || this.value === undefined) {
+            return new NullableHandler<U>(null);
+        }
+        return new NullableHandler<U>(fn(this.value));
+    }
+}
+
+class ArrayExtractor<T> {
+    private array: T[];
+
+    constructor(array: T[]) {
+        this.array = array;
+    }
+
+    extract(): T[] {
+        return [...this.array];
+    }
+
+    head(): T | undefined {
+        return this.array[0];
+    }
+
+    tail(): T[] {
+        return this.array.slice(1);
+    }
+
+    flatten<U>(this: ArrayExtractor<U[]>): U[] {
+        return this.array.flat();
+    }
+}
+
+class FunctionAnalyzer<T extends (...args: any[]) => any> {
+    private fn: T;
+
+    constructor(fn: T) {
+        this.fn = fn;
+    }
+
+    call(...args: Parameters<T>): ReturnType<T> {
+        return this.fn(...args);
+    }
+
+    bind<U>(thisArg: U): (...args: Parameters<T>) => ReturnType<T> {
+        return this.fn.bind(thisArg);
+    }
+
+    getArity(): number {
+        return this.fn.length;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("NullableHandler") && output.contains("ArrayExtractor") && output.contains("FunctionAnalyzer"),
+        "Expected conditional type alias classes: {}",
+        output
+    );
+
+    // NullableHandler methods
+    assert!(
+        output.contains("isNull") && output.contains("isUndefined") && output.contains("isDefined") && output.contains("getOrDefault"),
+        "Expected NullableHandler methods: {}",
+        output
+    );
+
+    // ArrayExtractor methods
+    assert!(
+        output.contains("extract") && output.contains("head") && output.contains("tail"),
+        "Expected ArrayExtractor methods: {}",
+        output
+    );
+
+    // FunctionAnalyzer methods
+    assert!(
+        output.contains("call") && output.contains("bind") && output.contains("getArity"),
+        "Expected FunctionAnalyzer methods: {}",
+        output
+    );
+}
+
+// ============================================================================
+// MAPPED TYPE PATTERN TESTS
+// ============================================================================
+
+/// Test ES5 class downleveling with Partial mapped type patterns
+#[test]
+fn test_class_es5_mapped_type_partial() {
+    let source = r#"
+interface UserConfig {
+    name: string;
+    email: string;
+    age: number;
+    theme: string;
+}
+
+class ConfigBuilder<T extends object> {
+    private config: Partial<T> = {};
+
+    set<K extends keyof T>(key: K, value: T[K]): this {
+        this.config[key] = value;
+        return this;
+    }
+
+    get<K extends keyof T>(key: K): T[K] | undefined {
+        return this.config[key];
+    }
+
+    merge(partial: Partial<T>): this {
+        Object.assign(this.config, partial);
+        return this;
+    }
+
+    build(): T {
+        return this.config as T;
+    }
+
+    reset(): void {
+        this.config = {};
+    }
+}
+
+class PartialUpdater<T extends object> {
+    private original: T;
+
+    constructor(original: T) {
+        this.original = original;
+    }
+
+    update(changes: Partial<T>): T {
+        return { ...this.original, ...changes };
+    }
+
+    updateField<K extends keyof T>(key: K, value: T[K]): T {
+        return { ...this.original, [key]: value };
+    }
+
+    diff(other: Partial<T>): Partial<T> {
+        const result: Partial<T> = {};
+        for (const key in other) {
+            if (this.original[key] !== other[key]) {
+                result[key] = other[key];
+            }
+        }
+        return result;
+    }
+}
+
+class FormState<T extends object> {
+    private values: Partial<T> = {};
+    private touched: Partial<Record<keyof T, boolean>> = {};
+    private errors: Partial<Record<keyof T, string>> = {};
+
+    setValue<K extends keyof T>(key: K, value: T[K]): void {
+        this.values[key] = value;
+        this.touched[key] = true;
+    }
+
+    setError<K extends keyof T>(key: K, error: string): void {
+        this.errors[key] = error;
+    }
+
+    getValues(): Partial<T> {
+        return { ...this.values };
+    }
+
+    isValid(): boolean {
+        return Object.keys(this.errors).length === 0;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("ConfigBuilder") && output.contains("PartialUpdater") && output.contains("FormState"),
+        "Expected Partial mapped type classes: {}",
+        output
+    );
+
+    // ConfigBuilder methods
+    assert!(
+        output.contains("set") && output.contains("get") && output.contains("merge") && output.contains("build"),
+        "Expected ConfigBuilder methods: {}",
+        output
+    );
+
+    // PartialUpdater methods
+    assert!(
+        output.contains("update") && output.contains("updateField") && output.contains("diff"),
+        "Expected PartialUpdater methods: {}",
+        output
+    );
+
+    // FormState methods
+    assert!(
+        output.contains("setValue") && output.contains("setError") && output.contains("getValues") && output.contains("isValid"),
+        "Expected FormState methods: {}",
+        output
+    );
+}
+
+/// Test ES5 class downleveling with Required mapped type patterns
+#[test]
+fn test_class_es5_mapped_type_required() {
+    let source = r#"
+interface OptionalConfig {
+    host?: string;
+    port?: number;
+    timeout?: number;
+    retries?: number;
+}
+
+type RequiredConfig = Required<OptionalConfig>;
+
+class ConfigValidator<T extends object> {
+    validate(partial: Partial<T>, required: (keyof T)[]): Required<T> | null {
+        for (const key of required) {
+            if (partial[key] === undefined) {
+                return null;
+            }
+        }
+        return partial as Required<T>;
+    }
+
+    isComplete(partial: Partial<T>, keys: (keyof T)[]): boolean {
+        return keys.every(key => partial[key] !== undefined);
+    }
+
+    fillDefaults(partial: Partial<T>, defaults: Required<T>): Required<T> {
+        return { ...defaults, ...partial };
+    }
+}
+
+class RequiredFieldsChecker<T extends object> {
+    private requiredFields: (keyof T)[];
+
+    constructor(requiredFields: (keyof T)[]) {
+        this.requiredFields = requiredFields;
+    }
+
+    check(obj: Partial<T>): boolean {
+        return this.requiredFields.every(field => obj[field] !== undefined);
+    }
+
+    getMissing(obj: Partial<T>): (keyof T)[] {
+        return this.requiredFields.filter(field => obj[field] === undefined);
+    }
+
+    getPresent(obj: Partial<T>): (keyof T)[] {
+        return this.requiredFields.filter(field => obj[field] !== undefined);
+    }
+}
+
+class DefaultsApplier<T extends object> {
+    private defaults: Required<T>;
+
+    constructor(defaults: Required<T>) {
+        this.defaults = defaults;
+    }
+
+    apply(partial: Partial<T>): Required<T> {
+        return { ...this.defaults, ...partial };
+    }
+
+    getDefault<K extends keyof T>(key: K): T[K] {
+        return this.defaults[key];
+    }
+
+    setDefault<K extends keyof T>(key: K, value: T[K]): void {
+        this.defaults[key] = value;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("ConfigValidator") && output.contains("RequiredFieldsChecker") && output.contains("DefaultsApplier"),
+        "Expected Required mapped type classes: {}",
+        output
+    );
+
+    // ConfigValidator methods
+    assert!(
+        output.contains("validate") && output.contains("isComplete") && output.contains("fillDefaults"),
+        "Expected ConfigValidator methods: {}",
+        output
+    );
+
+    // RequiredFieldsChecker methods
+    assert!(
+        output.contains("check") && output.contains("getMissing") && output.contains("getPresent"),
+        "Expected RequiredFieldsChecker methods: {}",
+        output
+    );
+
+    // DefaultsApplier methods
+    assert!(
+        output.contains("apply") && output.contains("getDefault") && output.contains("setDefault"),
+        "Expected DefaultsApplier methods: {}",
+        output
+    );
+}
+
+/// Test ES5 class downleveling with Readonly mapped type patterns
+#[test]
+fn test_class_es5_mapped_type_readonly() {
+    let source = r#"
+interface MutableState {
+    count: number;
+    name: string;
+    items: string[];
+}
+
+type ImmutableState = Readonly<MutableState>;
+
+class ImmutableWrapper<T extends object> {
+    private readonly data: Readonly<T>;
+
+    constructor(data: T) {
+        this.data = Object.freeze({ ...data });
+    }
+
+    get<K extends keyof T>(key: K): T[K] {
+        return this.data[key];
+    }
+
+    toMutable(): T {
+        return { ...this.data };
+    }
+
+    with<K extends keyof T>(key: K, value: T[K]): ImmutableWrapper<T> {
+        return new ImmutableWrapper({ ...this.data, [key]: value });
+    }
+}
+
+class ReadonlyCollection<T> {
+    private readonly items: ReadonlyArray<T>;
+
+    constructor(items: T[]) {
+        this.items = Object.freeze([...items]);
+    }
+
+    get(index: number): T | undefined {
+        return this.items[index];
+    }
+
+    size(): number {
+        return this.items.length;
+    }
+
+    map<U>(fn: (item: T) => U): ReadonlyCollection<U> {
+        return new ReadonlyCollection(this.items.map(fn));
+    }
+
+    filter(predicate: (item: T) => boolean): ReadonlyCollection<T> {
+        return new ReadonlyCollection(this.items.filter(predicate));
+    }
+
+    toArray(): T[] {
+        return [...this.items];
+    }
+}
+
+class FrozenState<T extends object> {
+    private state: Readonly<T>;
+
+    constructor(initial: T) {
+        this.state = Object.freeze({ ...initial });
+    }
+
+    getState(): Readonly<T> {
+        return this.state;
+    }
+
+    setState(newState: T): void {
+        this.state = Object.freeze({ ...newState });
+    }
+
+    updateState(partial: Partial<T>): void {
+        this.state = Object.freeze({ ...this.state, ...partial });
+    }
+
+    getValue<K extends keyof T>(key: K): T[K] {
+        return this.state[key];
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("ImmutableWrapper") && output.contains("ReadonlyCollection") && output.contains("FrozenState"),
+        "Expected Readonly mapped type classes: {}",
+        output
+    );
+
+    // ImmutableWrapper methods
+    assert!(
+        output.contains("get") && output.contains("toMutable"),
+        "Expected ImmutableWrapper methods: {}",
+        output
+    );
+
+    // ReadonlyCollection methods
+    assert!(
+        output.contains("size") && output.contains("filter") && output.contains("toArray"),
+        "Expected ReadonlyCollection methods: {}",
+        output
+    );
+
+    // FrozenState methods
+    assert!(
+        output.contains("getState") && output.contains("setState") && output.contains("updateState"),
+        "Expected FrozenState methods: {}",
+        output
+    );
+}

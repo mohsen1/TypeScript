@@ -12,12 +12,21 @@ Priority: 2
 - [x] Context-sensitive typing tests (generic function call inference, contextual parameter types)
 - [x] Function return type inference tests for conditional types
 - [x] Variadic tuple type tests
+- [x] Rest parameter inference tests
 
 ## Task Queue
 - [ ] Implement TypeResolver for TypeEvaluator to resolve Refs inside Mapped/Conditional types
 - [ ] This would enable full evaluation of complex patterns like `{ [K in keyof R]: ExtractAction<R[K]> }[keyof R]`
 
 ## Completed
+- [x] Added 26 rest parameter inference tests including:
+  - Basic array and generic inference
+  - Mixed types union, leading fixed params
+  - Tuple spread, array spread, callback inference
+  - Bind/call/apply, event handler patterns
+  - Compose, partial application, promisify
+  - Curry, middleware, zipWith, reduce
+  - Constructor spread, decorator, Object.assign
 - [x] Added 28 variadic tuple type tests including:
   - Basic rest element at end/start/middle positions
   - Inference from spread calls and contexts
@@ -107,6 +116,7 @@ Worker 2 branch now contains:
 - 24 context-sensitive typing tests (generic inference, contextual typing)
 - 24 function return type inference tests for conditional types
 - 28 variadic tuple type tests
+- 26 rest parameter inference tests
 - No modifications to evaluate.rs or other core files
 - Pure test additions that can be safely merged
 

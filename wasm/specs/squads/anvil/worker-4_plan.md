@@ -7,12 +7,14 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-Add ES5 class tests for type alias patterns: union, intersection, conditional. Tests: `./wasm/test.sh class_es5_tests`
+None - awaiting assignment from EM-Anvil
 
 ## Task Queue
-- [ ] Add ES5 class tests for mapped type patterns: Partial, Required, Readonly
+- [ ] Add ES5 class tests for conditional type patterns: Exclude, Extract, NonNullable
 
 ## Completed
+- [x] Add ES5 class tests for mapped type patterns: Partial, Required, Readonly. Tests: `./wasm/test.sh class_es5_tests`
+- [x] Add ES5 class tests for type alias patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for generic constraint patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for constructor signature patterns. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for interface implementation patterns. Tests: `./wasm/test.sh class_es5_tests`
