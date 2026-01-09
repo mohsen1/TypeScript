@@ -9000,6 +9000,9 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
 
+        // Push type parameters (like <U> in `fn<U>(id: U)`) before checking types
+        let (_type_params, type_param_updates) = self.push_type_parameters(&method.type_parameters);
+
         // Get declared return type
         let return_type = if !method.type_annotation.is_none() {
             self.get_type_from_type_node(method.type_annotation)
@@ -9036,6 +9039,7 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         self.pop_return_type();
+        self.pop_type_parameters(type_param_updates);
     }
 
     /// Check a constructor declaration.
