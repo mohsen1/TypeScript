@@ -12,7 +12,6 @@
 use std::collections::HashSet;
 use crate::interner::Atom;
 use crate::solver::infer::InferenceContext;
-use crate::solver::instantiate::{TypeSubstitution, instantiate_type};
 use crate::solver::types::*;
 use crate::solver::{apparent_primitive_members, ApparentMemberKind, AssignabilityChecker, TypeDatabase};
 
@@ -859,8 +858,6 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
     /// Try to get keys from keyof an operand type.
     fn try_get_keyof_keys(&self, operand: TypeId) -> Option<Vec<crate::interner::Atom>> {
-        use crate::solver::LiteralValue;
-
         let key = self.interner.lookup(operand)?;
 
         match key {
