@@ -22795,3 +22795,440 @@ const proxy = reactive.createProxy();
         output
     );
 }
+
+// =============================================================================
+// ES5 WeakRef patterns parity tests
+// =============================================================================
+
+/// Test WeakRef deref with type annotations
+#[test]
+fn test_parity_es5_weakref_deref() {
+    let source = r#"
+interface CacheableObject {
+    id: string;
+    data: unknown;
+}
+
+class WeakRefHolder<T extends object> {
+    private ref: WeakRef<T>;
+
+    constructor(target: T) {
+        this.ref = new WeakRef(target);
+    }
+
+    get(): T | undefined {
+        return this.ref.deref();
+    }
+
+    isAlive(): boolean {
+        return this.ref.deref() !== undefined;
+    }
+}
+
+function createWeakRef<T extends object>(obj: T): WeakRef<T> {
+    return new WeakRef(obj);
+}
+
+function tryDeref<T extends object>(ref: WeakRef<T>): T | undefined {
+    const value: T | undefined = ref.deref();
+    return value;
+}
+
+const obj: CacheableObject = { id: "test", data: {} };
+const weakRef: WeakRef<CacheableObject> = new WeakRef(obj);
+const holder = new WeakRefHolder<CacheableObject>(obj);
+const derefed: CacheableObject | undefined = weakRef.deref();
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Interface should be erased
+    assert!(
+        !output.contains("interface CacheableObject"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Class should be present
+    assert!(
+        output.contains("WeakRefHolder"),
+        "Class should be present: {}",
+        output
+    );
+    // Functions should be present
+    assert!(
+        output.contains("createWeakRef") && output.contains("tryDeref"),
+        "Functions should be present: {}",
+        output
+    );
+    // WeakRef constructor should be preserved
+    assert!(
+        output.contains("new WeakRef"),
+        "WeakRef constructor should be preserved: {}",
+        output
+    );
+    // deref method should be preserved
+    assert!(
+        output.contains(".deref()"),
+        "deref method should be preserved: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": WeakRef<") && !output.contains(": CacheableObject"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test FinalizationRegistry with type annotations
+#[test]
+fn test_parity_es5_finalization_registry() {
+    let source = r#"
+interface CleanupContext {
+    resourceId: string;
+    timestamp: number;
+}
+
+type CleanupCallback = (heldValue: string) => void;
+
+class ResourceTracker {
+    private registry: FinalizationRegistry<string>;
+    private cleanupCount: number = 0;
+
+    constructor() {
+        this.registry = new FinalizationRegistry((heldValue: string) => {
+            console.log(`Cleaning up: ${heldValue}`);
+            this.cleanupCount++;
+        });
+    }
+
+    track(obj: object, resourceId: string): void {
+        this.registry.register(obj, resourceId);
+    }
+
+    trackWithUnregister(obj: object, resourceId: string, token: object): void {
+        this.registry.register(obj, resourceId, token);
+    }
+
+    untrack(token: object): void {
+        this.registry.unregister(token);
+    }
+
+    getCleanupCount(): number {
+        return this.cleanupCount;
+    }
+}
+
+function createRegistry<T>(callback: (value: T) => void): FinalizationRegistry<T> {
+    return new FinalizationRegistry(callback);
+}
+
+const tracker = new ResourceTracker();
+const resource = { data: "important" };
+tracker.track(resource, "resource-1");
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Interface should be erased
+    assert!(
+        !output.contains("interface CleanupContext"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Type alias should be erased
+    assert!(
+        !output.contains("type CleanupCallback"),
+        "Type alias should be erased: {}",
+        output
+    );
+    // Class should be present
+    assert!(
+        output.contains("ResourceTracker"),
+        "Class should be present: {}",
+        output
+    );
+    // FinalizationRegistry constructor should be preserved
+    assert!(
+        output.contains("new FinalizationRegistry"),
+        "FinalizationRegistry constructor should be preserved: {}",
+        output
+    );
+    // Registry methods should be preserved
+    assert!(
+        output.contains(".register(") || output.contains(".unregister("),
+        "Registry methods should be preserved: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": FinalizationRegistry") && !output.contains(": CleanupCallback"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test weak cache pattern with WeakRef and Map
+#[test]
+fn test_parity_es5_weak_cache() {
+    let source = r#"
+interface Cacheable {
+    readonly id: string;
+}
+
+interface CacheEntry<T> {
+    ref: WeakRef<T>;
+    metadata: Map<string, unknown>;
+}
+
+class WeakCache<K, V extends object> {
+    private cache: Map<K, WeakRef<V>> = new Map();
+    private registry: FinalizationRegistry<K>;
+
+    constructor() {
+        this.registry = new FinalizationRegistry((key: K) => {
+            this.cache.delete(key);
+        });
+    }
+
+    set(key: K, value: V): void {
+        const ref = new WeakRef(value);
+        this.cache.set(key, ref);
+        this.registry.register(value, key, ref);
+    }
+
+    get(key: K): V | undefined {
+        const ref = this.cache.get(key);
+        if (ref) {
+            const value = ref.deref();
+            if (value === undefined) {
+                this.cache.delete(key);
+            }
+            return value;
+        }
+        return undefined;
+    }
+
+    has(key: K): boolean {
+        const ref = this.cache.get(key);
+        return ref !== undefined && ref.deref() !== undefined;
+    }
+
+    delete(key: K): boolean {
+        const ref = this.cache.get(key);
+        if (ref) {
+            this.registry.unregister(ref);
+            return this.cache.delete(key);
+        }
+        return false;
+    }
+}
+
+const cache = new WeakCache<string, Cacheable>();
+const item: Cacheable = { id: "item-1" };
+cache.set("key1", item);
+const retrieved: Cacheable | undefined = cache.get("key1");
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Interfaces should be erased
+    assert!(
+        !output.contains("interface Cacheable") && !output.contains("interface CacheEntry"),
+        "Interfaces should be erased: {}",
+        output
+    );
+    // Class should be present
+    assert!(
+        output.contains("WeakCache"),
+        "Class should be present: {}",
+        output
+    );
+    // WeakRef should be preserved
+    assert!(
+        output.contains("new WeakRef") && output.contains(".deref()"),
+        "WeakRef usage should be preserved: {}",
+        output
+    );
+    // FinalizationRegistry should be preserved
+    assert!(
+        output.contains("new FinalizationRegistry"),
+        "FinalizationRegistry should be preserved: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": Cacheable") && !output.contains(": WeakRef<"),
+        "Type annotations should be erased: {}",
+        output
+    );
+    // Readonly modifier should be erased
+    assert!(
+        !output.contains("readonly id"),
+        "Readonly modifier should be erased: {}",
+        output
+    );
+}
+
+/// Test WeakRef with async patterns
+#[test]
+fn test_parity_es5_weakref_async() {
+    let source = r#"
+interface AsyncResource {
+    fetch(): Promise<string>;
+}
+
+class AsyncWeakRefManager<T extends object> {
+    private refs: Map<string, WeakRef<T>> = new Map();
+
+    register(id: string, obj: T): void {
+        this.refs.set(id, new WeakRef(obj));
+    }
+
+    async getOrFetch(id: string, fetcher: () => Promise<T>): Promise<T | undefined> {
+        const ref = this.refs.get(id);
+        if (ref) {
+            const existing = ref.deref();
+            if (existing !== undefined) {
+                return existing;
+            }
+        }
+        const newObj = await fetcher();
+        this.register(id, newObj);
+        return newObj;
+    }
+
+    async processAll(processor: (obj: T) => Promise<void>): Promise<void> {
+        for (const [id, ref] of this.refs) {
+            const obj = ref.deref();
+            if (obj !== undefined) {
+                await processor(obj);
+            } else {
+                this.refs.delete(id);
+            }
+        }
+    }
+}
+
+async function withWeakRef<T extends object>(
+    ref: WeakRef<T>,
+    action: (obj: T) => Promise<void>
+): Promise<boolean> {
+    const obj = ref.deref();
+    if (obj !== undefined) {
+        await action(obj);
+        return true;
+    }
+    return false;
+}
+
+const manager = new AsyncWeakRefManager<AsyncResource>();
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Interface should be erased
+    assert!(
+        !output.contains("interface AsyncResource"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Class should be present
+    assert!(
+        output.contains("AsyncWeakRefManager"),
+        "Class should be present: {}",
+        output
+    );
+    // Function should be present
+    assert!(
+        output.contains("withWeakRef"),
+        "Function should be present: {}",
+        output
+    );
+    // WeakRef should be preserved
+    assert!(
+        output.contains("new WeakRef") && output.contains(".deref()"),
+        "WeakRef usage should be preserved: {}",
+        output
+    );
+    // Async should be transformed (awaiter helper or similar)
+    assert!(
+        output.contains("__awaiter") || output.contains("return") || output.contains("Promise"),
+        "Async patterns should be present: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": Promise<") && !output.contains(": WeakRef<"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
