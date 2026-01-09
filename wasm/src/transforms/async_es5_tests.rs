@@ -10126,3 +10126,416 @@ fn test_async_decorator_pattern_ignores_nested_async() {
     );
     assert!(!result, "Should not detect await inside nested async in decorated method");
 }
+
+// ============================================================================
+// ASYNC MODULE PATTERN TESTS
+// ============================================================================
+
+// Tests for async module patterns: dynamic import with await, top-level await
+// simulation, module-scoped async.
+
+#[test]
+fn test_async_module_pattern_dynamic_import() {
+    let result = async_error_propagation_contains_await(
+        "async function loadModule() { return await import('./module'); }",
+    );
+    assert!(result, "Should detect await in dynamic import");
+}
+
+#[test]
+fn test_async_module_pattern_dynamic_import_call() {
+    let result = async_error_propagation_contains_await(
+        "async function loadModule() { return (await import('./module')).default; }",
+    );
+    assert!(result, "Should detect await in dynamic import with property access");
+}
+
+#[test]
+fn test_async_module_pattern_conditional_import() {
+    let result = async_error_propagation_contains_await(
+        "async function loadModule(name: string) { if (name === 'a') { return await import('./a'); } return await import('./b'); }",
+    );
+    assert!(result, "Should detect await in conditional dynamic import");
+}
+
+#[test]
+fn test_async_module_pattern_top_level_simulation() {
+    // Simulating top-level await via wrapper function
+    let result = async_error_propagation_contains_await(
+        "async function main() { await loadConfig(); }",
+    );
+    assert!(result, "Should detect await in top-level await simulation");
+}
+
+#[test]
+fn test_async_module_pattern_module_init() {
+    let result = async_error_propagation_contains_await(
+        "async function initModule() { await loadDependencies(); await setupHandlers(); }",
+    );
+    assert!(result, "Should detect await in module initialization");
+}
+
+#[test]
+fn test_async_module_pattern_lazy_load() {
+    let result = async_error_propagation_contains_await(
+        "async function lazyLoad(path: string) { return (await import(path)).default; }",
+    );
+    assert!(result, "Should detect await in lazy module loading");
+}
+
+#[test]
+fn test_async_module_pattern_parallel_imports() {
+    let result = async_error_propagation_contains_await(
+        "async function loadAll() { return await Promise.all([import('./a'), import('./b')]); }",
+    );
+    assert!(result, "Should detect await in parallel dynamic imports");
+}
+
+#[test]
+fn test_async_module_pattern_module_factory() {
+    let result = async_error_propagation_contains_await(
+        "async function createModule() { return await loadDeps(); }",
+    );
+    assert!(result, "Should detect await in module factory pattern");
+}
+
+#[test]
+fn test_async_module_pattern_export_async() {
+    let result = async_error_propagation_contains_await(
+        "async function getData() { return await fetchData('/api'); }",
+    );
+    assert!(result, "Should detect await in exportable async function");
+}
+
+#[test]
+fn test_async_module_pattern_import_then_use() {
+    let result = async_error_propagation_contains_await(
+        "async function process() { return (await import('./parser')).parse(data); }",
+    );
+    assert!(result, "Should detect await in import-then-use pattern");
+}
+
+#[test]
+fn test_async_module_pattern_no_await() {
+    let result = async_error_propagation_contains_await(
+        "async function getModule() { return cachedModule; }",
+    );
+    assert!(!result, "Should not detect await when module function has no await");
+}
+
+#[test]
+fn test_async_module_pattern_ignores_nested_async() {
+    let result = async_error_propagation_contains_await(
+        "async function setup() { const loader = async () => await import('./mod'); }",
+    );
+    assert!(!result, "Should not detect await inside nested async in module function");
+}
+
+// ============================================================================
+// ASYNC RESOURCE MANAGEMENT PATTERN TESTS
+// ============================================================================
+
+// Tests for async resource management patterns: using declarations simulation,
+// async dispose, Symbol.dispose patterns.
+
+#[test]
+fn test_async_resource_pattern_dispose_basic() {
+    let result = async_error_propagation_contains_await(
+        "async function useResource() { await resource.dispose(); }",
+    );
+    assert!(result, "Should detect await in dispose call");
+}
+
+#[test]
+fn test_async_resource_pattern_try_finally_cleanup() {
+    let result = async_error_propagation_contains_await(
+        "async function useResource() { try { await doWork(); } finally { await cleanup(); } }",
+    );
+    assert!(result, "Should detect await in try-finally cleanup pattern");
+}
+
+#[test]
+fn test_async_resource_pattern_acquire_release() {
+    let result = async_error_propagation_contains_await(
+        "async function withLock() { await lock.acquire(); await lock.release(); }",
+    );
+    assert!(result, "Should detect await in acquire-release pattern");
+}
+
+#[test]
+fn test_async_resource_pattern_connection_close() {
+    let result = async_error_propagation_contains_await(
+        "async function withConnection() { await connection.close(); }",
+    );
+    assert!(result, "Should detect await in connection close pattern");
+}
+
+#[test]
+fn test_async_resource_pattern_file_handle() {
+    let result = async_error_propagation_contains_await(
+        "async function readFile() { await handle.close(); }",
+    );
+    assert!(result, "Should detect await in file handle close");
+}
+
+#[test]
+fn test_async_resource_pattern_transaction() {
+    let result = async_error_propagation_contains_await(
+        "async function transaction() { try { await db.commit(); } catch (e) { await db.rollback(); } }",
+    );
+    assert!(result, "Should detect await in transaction pattern");
+}
+
+#[test]
+fn test_async_resource_pattern_pool_return() {
+    let result = async_error_propagation_contains_await(
+        "async function usePooled() { await pool.release(resource); }",
+    );
+    assert!(result, "Should detect await in pool release pattern");
+}
+
+#[test]
+fn test_async_resource_pattern_stream_close() {
+    let result = async_error_propagation_contains_await(
+        "async function processStream() { await stream.close(); }",
+    );
+    assert!(result, "Should detect await in stream close pattern");
+}
+
+#[test]
+fn test_async_resource_pattern_multiple_cleanup() {
+    let result = async_error_propagation_contains_await(
+        "async function cleanup() { await resource1.dispose(); await resource2.dispose(); }",
+    );
+    assert!(result, "Should detect await in multiple dispose calls");
+}
+
+#[test]
+fn test_async_resource_pattern_conditional_cleanup() {
+    let result = async_error_propagation_contains_await(
+        "async function cleanup(resource: any) { if (resource) { await resource.dispose(); } }",
+    );
+    assert!(result, "Should detect await in conditional cleanup");
+}
+
+#[test]
+fn test_async_resource_pattern_no_await() {
+    let result = async_error_propagation_contains_await(
+        "async function syncDispose() { resource.dispose(); }",
+    );
+    assert!(!result, "Should not detect await when dispose is sync");
+}
+
+#[test]
+fn test_async_resource_pattern_ignores_nested_async() {
+    let result = async_error_propagation_contains_await(
+        "async function outer() { const cleanup = async () => await resource.dispose(); }",
+    );
+    assert!(!result, "Should not detect await inside nested async in resource function");
+}
+
+// ============================================================================
+// ASYNC CONTEXT PATTERN TESTS
+// ============================================================================
+
+// Tests for async context patterns: AsyncLocalStorage simulation, context
+// propagation, zone-like patterns.
+
+#[test]
+fn test_async_context_pattern_run_basic() {
+    let result = async_error_propagation_contains_await(
+        "async function runWithContext() { return await context.run(fn); }",
+    );
+    assert!(result, "Should detect await in context run");
+}
+
+#[test]
+fn test_async_context_pattern_get_store() {
+    let result = async_error_propagation_contains_await(
+        "async function getContext() { return await storage.getStore(); }",
+    );
+    assert!(result, "Should detect await in storage getStore");
+}
+
+#[test]
+fn test_async_context_pattern_enter_exit() {
+    let result = async_error_propagation_contains_await(
+        "async function withZone() { await zone.enter(); await zone.exit(); }",
+    );
+    assert!(result, "Should detect await in zone enter/exit");
+}
+
+#[test]
+fn test_async_context_pattern_propagation() {
+    let result = async_error_propagation_contains_await(
+        "async function propagate() { return await context.propagate(task); }",
+    );
+    assert!(result, "Should detect await in context propagation");
+}
+
+#[test]
+fn test_async_context_pattern_wrap() {
+    let result = async_error_propagation_contains_await(
+        "async function wrapTask() { return await context.wrap(asyncFn)(); }",
+    );
+    assert!(result, "Should detect await in context wrap");
+}
+
+#[test]
+fn test_async_context_pattern_fork() {
+    let result = async_error_propagation_contains_await(
+        "async function forkContext() { return await context.fork().run(task); }",
+    );
+    assert!(result, "Should detect await in context fork");
+}
+
+#[test]
+fn test_async_context_pattern_bind() {
+    let result = async_error_propagation_contains_await(
+        "async function bindContext() { return await context.bind(handler)(); }",
+    );
+    assert!(result, "Should detect await in context bind");
+}
+
+#[test]
+fn test_async_context_pattern_scheduler() {
+    let result = async_error_propagation_contains_await(
+        "async function schedule() { return await scheduler.schedule(task); }",
+    );
+    assert!(result, "Should detect await in scheduler pattern");
+}
+
+#[test]
+fn test_async_context_pattern_trace() {
+    let result = async_error_propagation_contains_await(
+        "async function traced() { return await tracer.trace(operation); }",
+    );
+    assert!(result, "Should detect await in tracer pattern");
+}
+
+#[test]
+fn test_async_context_pattern_scope() {
+    let result = async_error_propagation_contains_await(
+        "async function scoped() { return await scope.execute(fn); }",
+    );
+    assert!(result, "Should detect await in scope execute");
+}
+
+#[test]
+fn test_async_context_pattern_no_await() {
+    let result = async_error_propagation_contains_await(
+        "async function syncContext() { return context.get(); }",
+    );
+    assert!(!result, "Should not detect await when context access is sync");
+}
+
+#[test]
+fn test_async_context_pattern_ignores_nested_async() {
+    let result = async_error_propagation_contains_await(
+        "async function outer() { const runner = async () => await context.run(fn); }",
+    );
+    assert!(!result, "Should not detect await inside nested async in context function");
+}
+
+// ============================================================================
+// ASYNC STREAM PATTERN TESTS
+// ============================================================================
+
+// Tests for async stream patterns: readable stream, writable stream,
+// transform stream, pipe chains.
+
+#[test]
+fn test_async_stream_pattern_read_basic() {
+    let result = async_error_propagation_contains_await(
+        "async function readStream() { return await stream.read(); }",
+    );
+    assert!(result, "Should detect await in stream read");
+}
+
+#[test]
+fn test_async_stream_pattern_write_basic() {
+    let result = async_error_propagation_contains_await(
+        "async function writeStream() { await stream.write(data); }",
+    );
+    assert!(result, "Should detect await in stream write");
+}
+
+#[test]
+fn test_async_stream_pattern_pipe() {
+    let result = async_error_propagation_contains_await(
+        "async function pipeStream() { await source.pipeTo(destination); }",
+    );
+    assert!(result, "Should detect await in stream pipe");
+}
+
+#[test]
+fn test_async_stream_pattern_transform() {
+    let result = async_error_propagation_contains_await(
+        "async function transform() { return await stream.pipeThrough(transformer); }",
+    );
+    assert!(result, "Should detect await in stream transform");
+}
+
+#[test]
+fn test_async_stream_pattern_reader() {
+    let result = async_error_propagation_contains_await(
+        "async function readAll() { return await reader.read(); }",
+    );
+    assert!(result, "Should detect await in reader read");
+}
+
+#[test]
+fn test_async_stream_pattern_writer() {
+    let result = async_error_propagation_contains_await(
+        "async function writeAll() { await writer.write(chunk); await writer.close(); }",
+    );
+    assert!(result, "Should detect await in writer operations");
+}
+
+#[test]
+fn test_async_stream_pattern_getReader() {
+    let result = async_error_propagation_contains_await(
+        "async function consume() { return await readable.getReader().read(); }",
+    );
+    assert!(result, "Should detect await in getReader chain");
+}
+
+#[test]
+fn test_async_stream_pattern_cancel() {
+    let result = async_error_propagation_contains_await(
+        "async function cancelStream() { await stream.cancel(); }",
+    );
+    assert!(result, "Should detect await in stream cancel");
+}
+
+#[test]
+fn test_async_stream_pattern_abort() {
+    let result = async_error_propagation_contains_await(
+        "async function abortStream() { await stream.abort(); }",
+    );
+    assert!(result, "Should detect await in stream abort");
+}
+
+#[test]
+fn test_async_stream_pattern_tee() {
+    let result = async_error_propagation_contains_await(
+        "async function teeStream() { return await Promise.all(stream.tee().map(s => s.getReader().read())); }",
+    );
+    assert!(result, "Should detect await in stream tee");
+}
+
+#[test]
+fn test_async_stream_pattern_no_await() {
+    let result = async_error_propagation_contains_await(
+        "async function syncStream() { return stream.getReader(); }",
+    );
+    assert!(!result, "Should not detect await when stream access is sync");
+}
+
+#[test]
+fn test_async_stream_pattern_ignores_nested_async() {
+    let result = async_error_propagation_contains_await(
+        "async function outer() { const reader = async () => await stream.read(); }",
+    );
+    assert!(!result, "Should not detect await inside nested async in stream function");
+}
