@@ -7,12 +7,13 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-Add ES5 WeakRef patterns parity tests: deref, FinalizationRegistry, weak cache. Tests: `./wasm/test.sh emitter_parity`
+(none)
 
 ## Task Queue
 - [ ] Add ES5 Promise patterns parity tests: all, race, allSettled, any
 
 ## Completed
+- [x] Added ES5 WeakRef patterns parity tests (deref, FinalizationRegistry, weak-cache, async) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (375 tests).
 - [x] Added ES5 Proxy patterns parity tests (handler-traps, revocable, Reflect-integration, class-wrapper) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (371 tests).
 - [x] Added ES5 Symbol patterns parity tests (well-known, Symbol.for, Symbol.keyFor, computed-class) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (367 tests).
 - [x] Added ES5 BigInt patterns parity tests (literal, arithmetic, comparison, method-calls) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (363 tests).
