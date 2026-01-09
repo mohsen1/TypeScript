@@ -130,11 +130,19 @@ bash run-conformance.sh --sequential --max=100
 ---
 ## Worker Workflow (CRITICAL)
 
-**Before every PR, workers MUST run ALL 5655 conformance tests:**
+**Before starting work, run ALL conformance tests to establish baseline:**
 
 ```bash
 cd wasm/differential-test
 bash run-conformance.sh --all --workers=14
+# Record: exact match %, missing error count, extra error count, crash count
+```
+
+**Before completing work, run ALL tests again to verify no regressions:**
+
+```bash
+bash run-conformance.sh --all --workers=14
+# Compare against your baseline
 ```
 
 **Why:** Implementing one error check can easily break others. For example:
@@ -144,10 +152,10 @@ bash run-conformance.sh --all --workers=14
 
 **Acceptance Criteria:**
 1. Target error code occurrences must be implemented correctly
-2. Overall exact match % must NOT decrease (currently 23.3%)
+2. Overall exact match % must NOT decrease from YOUR baseline
 3. No new crashes introduced
 4. Extra error count must NOT increase significantly
-5. Document any trade-offs in PR description
+5. Document any trade-offs in commit messages
 
 ---
 ## Squad Status

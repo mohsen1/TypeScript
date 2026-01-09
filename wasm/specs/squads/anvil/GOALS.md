@@ -138,11 +138,19 @@ node conformance-runner.mjs expressions --max=500
 ---
 ## Worker Workflow (CRITICAL)
 
-**Before every PR, workers MUST run ALL 5655 conformance tests:**
+**Before starting work, run ALL conformance tests to establish baseline:**
 
 ```bash
 cd wasm/differential-test
 bash run-conformance.sh --all --workers=14
+# Record: exact match %, extra error count, crash count
+```
+
+**Before completing work, run ALL tests again to verify no regressions:**
+
+```bash
+bash run-conformance.sh --all --workers=14
+# Compare against your baseline
 ```
 
 **Why:** Fixing one error code can easily break another. For example:
@@ -152,9 +160,9 @@ bash run-conformance.sh --all --workers=14
 
 **Acceptance Criteria:**
 1. Target error code occurrences must decrease
-2. Overall exact match % must NOT decrease (currently 23.3%)
+2. Overall exact match % must NOT decrease from YOUR baseline
 3. No new crashes introduced
-4. Document any trade-offs in PR description
+4. Document any trade-offs in commit messages
 
 ---
 ## Squad Status
