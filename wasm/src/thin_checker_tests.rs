@@ -1518,6 +1518,116 @@ fn test_for_loop_variable_scope() {
 }
 
 #[test]
+fn test_missing_identifier_emits_2304() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let x = MissingName;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        codes.contains(&2304),
+        "Expected TS2304 for unresolved identifier, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_missing_type_reference_emits_2304() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let x: MissingType;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        codes.contains(&2304),
+        "Expected TS2304 for unresolved type reference, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_missing_type_reference_in_function_type_emits_2304() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type Fn = (value: MissingType) => void;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        codes.contains(&2304),
+        "Expected TS2304 for unresolved type in function type, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_missing_property_access_emits_2339_not_2304() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+const obj = { value: 1 };
+obj.missing;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        codes.contains(&2339),
+        "Expected TS2339 for missing property access, got: {:?}",
+        codes
+    );
+    assert!(
+        !codes.contains(&2304),
+        "Unexpected TS2304 for missing property access, got: {:?}",
+        codes
+    );
+}
+
+#[test]
 fn test_abstract_class_in_local_scope_2511() {
     use crate::thin_parser::ThinParserState;
     use crate::binder::symbol_flags;
