@@ -7,12 +7,13 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [ ] Add ES5 class tests for WeakMap/WeakSet private field polyfill in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
+- [ ] (none)
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Add ES5 class tests for WeakMap/WeakSet private field polyfill. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for private static methods. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for class expressions with generics. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for namespace merging. Tests: `./wasm/test.sh class_es5_tests`
