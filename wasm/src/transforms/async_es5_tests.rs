@@ -4638,3 +4638,212 @@ fn test_async_private_access_conditional() {
         output
     );
 }
+
+// ============================================================================
+// ASYNC STATIC FIELD ACCESS TESTS
+// ============================================================================
+
+fn parse_and_emit_async_static_access(source: &str) -> String {
+    use crate::parser::syntax_kind_ext;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            for &class_idx in &source_file.statements.nodes {
+                if let Some(class_node) = parser.arena.get(class_idx) {
+                    if class_node.kind == syntax_kind_ext::CLASS_DECLARATION {
+                        if let Some(class_data) = parser.arena.get_class(class_node) {
+                            for &member_idx in &class_data.members.nodes {
+                                if let Some(member_node) = parser.arena.get(member_idx) {
+                                    if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
+                                        if let Some(method_data) = parser.arena.get_method_decl(member_node) {
+                                            let emitter = AsyncES5Emitter::new(&parser.arena);
+                                            let has_await = emitter.body_contains_await(method_data.body);
+                                            let mut emitter = AsyncES5Emitter::new(&parser.arena);
+                                            if has_await {
+                                                return emitter.emit_generator_body_with_await(method_data.body);
+                                            } else {
+                                                return emitter.emit_simple_generator_body(method_data.body);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    String::new()
+}
+
+fn static_access_method_contains_await(source: &str) -> bool {
+    use crate::parser::syntax_kind_ext;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            for &class_idx in &source_file.statements.nodes {
+                if let Some(class_node) = parser.arena.get(class_idx) {
+                    if class_node.kind == syntax_kind_ext::CLASS_DECLARATION {
+                        if let Some(class_data) = parser.arena.get_class(class_node) {
+                            for &member_idx in &class_data.members.nodes {
+                                if let Some(member_node) = parser.arena.get(member_idx) {
+                                    if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
+                                        if let Some(method_data) = parser.arena.get_method_decl(member_node) {
+                                            let emitter = AsyncES5Emitter::new(&parser.arena);
+                                            return emitter.body_contains_await(method_data.body);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
+#[test]
+fn test_async_static_access_read_after_await() {
+    let output = parse_and_emit_async_static_access(
+        "class Foo { static data = 42; async bar() { await init(); return Foo.data; } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Static read after await should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_static_access_write_after_await() {
+    let output = parse_and_emit_async_static_access(
+        "class Foo { static count = 0; async bar() { const v = await getValue(); Foo.count = v; } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Static write after await should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_static_access_no_await() {
+    let output = parse_and_emit_async_static_access(
+        "class Foo { static data = 42; async bar() { return Foo.data; } }",
+    );
+    assert!(
+        output.contains("[2 /*return*/"),
+        "Sync static access should have return: {}",
+        output
+    );
+    assert!(
+        !output.contains("switch"),
+        "No await should skip switch: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_static_access_with_return() {
+    let output = parse_and_emit_async_static_access(
+        "class Foo { static value = 10; async bar() { await setup(); return Foo.value * 2; } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Static access with return should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_static_access_body_contains_await() {
+    assert!(
+        static_access_method_contains_await(
+            "class Foo { static data = 0; async bar() { await process(); Foo.data = 1; } }"
+        ),
+        "Should detect await with static field access"
+    );
+}
+
+#[test]
+fn test_async_static_access_body_no_await() {
+    assert!(
+        !static_access_method_contains_await(
+            "class Foo { static data = 42; async bar() { return Foo.data; } }"
+        ),
+        "Should not detect await when none present"
+    );
+}
+
+#[test]
+fn test_async_static_access_ignores_nested_async() {
+    assert!(
+        !static_access_method_contains_await(
+            "class Foo { static data = 0; async bar() { const fn = async () => { await x; Foo.data = 1; }; return 1; } }"
+        ),
+        "Should ignore await in nested async"
+    );
+}
+
+#[test]
+fn test_async_static_access_in_loop() {
+    let output = parse_and_emit_async_static_access(
+        "class Foo { static items: number[] = []; async bar() { for (const item of Foo.items) { await process(item); } } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Static access in loop should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_static_access_with_try_catch() {
+    assert!(
+        static_access_method_contains_await(
+            "class Foo { static data = 0; async bar() { try { await riskyOp(); Foo.data = 1; } catch (e) { Foo.data = -1; } } }"
+        ),
+        "Should detect await in try block with static access"
+    );
+}
+
+#[test]
+fn test_async_static_access_multiple_fields() {
+    let output = parse_and_emit_async_static_access(
+        "class Foo { static a = 1; static b = 2; async bar() { await init(); return Foo.a + Foo.b; } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Multiple static field access should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_static_access_static_method_call() {
+    let output = parse_and_emit_async_static_access(
+        "class Foo { async bar() { await setup(); return Foo.helper(); } static helper() { return 42; } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Static method call after await should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_static_access_conditional() {
+    let output = parse_and_emit_async_static_access(
+        "class Foo { static value = 0; async bar(cond: boolean) { if (cond) { await process(); Foo.value = 1; } return Foo.value; } }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Conditional static access should have switch or yield: {}",
+        output
+    );
+}

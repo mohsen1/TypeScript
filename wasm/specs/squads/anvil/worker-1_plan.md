@@ -8,12 +8,13 @@ Priority: 1
 Blocked: Awaiting next EM-Anvil assignment.
 
 ## Current Assignment
-- [ ] Add ES5 class tests for Proxy patterns in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
+- [ ] Add ES5 class tests for WeakRef and FinalizationRegistry in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added ES5 tests for Proxy patterns (6 tests): basic proxy, handler traps, apply trap, factory, with Reflect, revocable. Ran `./wasm/test.sh class_es5_tests` (all 180 pass).
 - [x] Added ES5 tests for new.target (6 tests): basic new.target, derived class, abstract pattern, with static, inheritance chain, undefined check. Ran `./wasm/test.sh class_es5_tests` (all 174 pass).
 - [x] Added ES5 tests for Symbol.species (6 tests): basic Symbol.species, derived class, with methods, returning base, with static members, returning null. Ran `./wasm/test.sh class_es5_tests` (all 163 pass).
 - [x] Added ES5 tests for async generator methods (6 tests): basic async generator, with await, static, with try/catch, in derived class, with yield delegation. Ran `./wasm/test.sh class_es5_tests` (all 164 pass).
