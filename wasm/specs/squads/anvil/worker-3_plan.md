@@ -7,7 +7,22 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-(awaiting next task from EM-Anvil)
+Add ES5 type parameter constraint source map tests
+
+Per GOALS.md Objective 2: Source map validation
+
+Steps:
+1. Add 6 ES5 type parameter constraint source map tests to `wasm/src/source_map_tests.rs`:
+   - Generic function with constraint
+   - Generic class with constraint
+   - Generic interface with constraint
+   - Multiple type parameters with constraints
+   - Constraint extends union type
+   - Combined constraint patterns
+2. Run `./wasm/test.sh source_map` to verify all tests pass
+3. Commit with message: `[wasm] source_map: add type parameter constraint tests`
+4. Push to `origin/worker/anvil-3`
+5. Update this plan file and push
 
 **Sync instructions**: Use squad/anvil (not origin/rust):
 ```

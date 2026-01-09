@@ -6,20 +6,20 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-Add ES5 class tests for class expression patterns
+Add ES5 class tests for auto-accessor decorator patterns
 
 Per GOALS.md Objective 1: ES5 downleveling correctness
 
 Steps:
-1. Add 6 ES5 class tests for class expression patterns to `wasm/src/transforms/class_es5_tests.rs`:
-   - Anonymous class expression
-   - Named class expression
-   - Class expression with extends
-   - Class expression in function return
-   - Class expression with static members
-   - Combined class expression patterns
+1. Add 6 ES5 class tests for auto-accessor decorator patterns to `wasm/src/transforms/class_es5_tests.rs`:
+   - Basic auto-accessor with decorator
+   - Static auto-accessor with decorator
+   - Auto-accessor with multiple decorators
+   - Auto-accessor in derived class
+   - Auto-accessor with initializer
+   - Combined auto-accessor patterns
 2. Run `./wasm/test.sh class_es5_tests` to verify all tests pass
-3. Commit with message: `[wasm] transforms: add class expression ES5 class tests`
+3. Commit with message: `[wasm] transforms: add auto-accessor decorator ES5 class tests`
 4. Push to `origin/worker/anvil-1`
 5. Update this plan file and push
 
