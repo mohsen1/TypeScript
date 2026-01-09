@@ -9769,7 +9769,7 @@ impl<'a> ThinCheckerState<'a> {
             syntax_kind_ext::LABELED_STATEMENT => self
                 .ctx
                 .arena
-                .get_labeled(node)
+                .get_labeled_statement(node)
                 .map(|labeled| self.statement_falls_through(labeled.statement))
                 .unwrap_or(true),
             _ => true,
