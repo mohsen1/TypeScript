@@ -17,6 +17,8 @@ vi.mock('node:fs', () => ({
   existsSync: vi.fn().mockReturnValue(true),
   mkdirSync: vi.fn(),
   copyFileSync: vi.fn(),
+  readFileSync: vi.fn().mockReturnValue(''),
+  writeFileSync: vi.fn(),
 }));
 
 vi.mock('node:fs/promises', () => ({
