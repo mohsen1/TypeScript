@@ -16773,3 +16773,750 @@ class Car extends Vehicle {
         output
     );
 }
+
+/// Parity test for ES5 class decorator chaining.
+/// Multiple class decorators should be applied in reverse order.
+#[test]
+fn test_parity_es5_decorator_class_chaining() {
+    let source = r#"function first<T extends { new(...args: any[]): {} }>(target: T) {
+    return class extends target {
+        first = true;
+    };
+}
+
+function second<T extends { new(...args: any[]): {} }>(target: T) {
+    return class extends target {
+        second = true;
+    };
+}
+
+@first
+@second
+class Example {
+    value: number = 42;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Class and decorator functions should be present
+    assert!(
+        output.contains("Example") && output.contains("first") && output.contains("second"),
+        "Output should contain class and decorators: {}",
+        output
+    );
+    // No @ decorator syntax
+    assert!(
+        !output.contains("@first") && !output.contains("@second"),
+        "ES5 output should not contain @ decorator syntax: {}",
+        output
+    );
+    // Type parameters should be erased
+    assert!(
+        !output.contains("<T extends"),
+        "Type parameters should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 method decorator with descriptor.
+/// Method decorators should receive property descriptor.
+#[test]
+fn test_parity_es5_decorator_method_descriptor() {
+    let source = r#"function log(target: any, key: string, descriptor: PropertyDescriptor) {
+    const original = descriptor.value;
+    descriptor.value = function(...args: any[]) {
+        console.log(`Calling ${key}`);
+        return original.apply(this, args);
+    };
+    return descriptor;
+}
+
+class Calculator {
+    @log
+    add(a: number, b: number): number {
+        return a + b;
+    }
+
+    @log
+    multiply(a: number, b: number): number {
+        return a * b;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Class and methods should be present
+    assert!(
+        output.contains("Calculator") && output.contains("add") && output.contains("multiply"),
+        "Output should contain class and methods: {}",
+        output
+    );
+    // Decorator function should be present
+    assert!(
+        output.contains("log"),
+        "Output should contain log decorator: {}",
+        output
+    );
+    // No @ decorator syntax
+    assert!(
+        !output.contains("@log"),
+        "ES5 output should not contain @ decorator syntax: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number") && !output.contains(": PropertyDescriptor"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 parameter decorator with injection.
+/// Parameter decorators for dependency injection pattern.
+#[test]
+fn test_parity_es5_decorator_parameter_injection() {
+    let source = r#"function inject(token: string) {
+    return function(target: any, key: string | symbol, index: number) {
+        const existing = Reflect.getMetadata("inject", target, key) || [];
+        existing.push({ index, token });
+        Reflect.defineMetadata("inject", existing, target, key);
+    };
+}
+
+class UserService {
+    constructor(
+        @inject("Database") private db: any,
+        @inject("Logger") private logger: any
+    ) {}
+
+    getUser(@inject("UserId") id: string): any {
+        return this.db.find(id);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Class and decorator should be present
+    assert!(
+        output.contains("UserService") && output.contains("inject"),
+        "Output should contain class and decorator: {}",
+        output
+    );
+    // No @ decorator syntax
+    assert!(
+        !output.contains("@inject"),
+        "ES5 output should not contain @ decorator syntax: {}",
+        output
+    );
+    // Private modifier should be erased
+    assert!(
+        !output.contains("private db") && !output.contains("private logger"),
+        "Private modifier should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 for-await-of with async generators.
+/// Async generators with for-await-of should be transformed properly.
+#[test]
+fn test_parity_es5_for_await_of_async_generator() {
+    let source = r#"async function* asyncRange(start: number, end: number): AsyncGenerator<number> {
+    for (let i = start; i <= end; i++) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        yield i;
+    }
+}
+
+async function consumeRange(): Promise<number[]> {
+    const results: number[] = [];
+    for await (const num of asyncRange(1, 5)) {
+        results.push(num);
+    }
+    return results;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions should be present
+    assert!(
+        output.contains("asyncRange") && output.contains("consumeRange"),
+        "Output should contain functions: {}",
+        output
+    );
+    // Should have async helpers
+    assert!(
+        output.contains("__awaiter") || output.contains("__asyncGenerator"),
+        "ES5 output should use async helpers: {}",
+        output
+    );
+    // No async function* syntax
+    assert!(
+        !output.contains("async function*"),
+        "ES5 output should not contain async function* syntax: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number") && !output.contains(": AsyncGenerator") && !output.contains(": Promise"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 async iterator protocol.
+/// Custom async iterators implementing Symbol.asyncIterator.
+#[test]
+fn test_parity_es5_async_iterator_protocol() {
+    let source = r#"class AsyncQueue<T> {
+    private items: T[] = [];
+
+    async *[Symbol.asyncIterator](): AsyncGenerator<T> {
+        while (this.items.length > 0) {
+            yield this.items.shift()!;
+        }
+    }
+
+    enqueue(item: T): void {
+        this.items.push(item);
+    }
+}
+
+async function processQueue(): Promise<void> {
+    const queue = new AsyncQueue<string>();
+    queue.enqueue("first");
+    queue.enqueue("second");
+
+    for await (const item of queue) {
+        console.log(item);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Class and function should be present
+    assert!(
+        output.contains("AsyncQueue") && output.contains("processQueue"),
+        "Output should contain class and function: {}",
+        output
+    );
+    // Should reference Symbol.asyncIterator
+    assert!(
+        output.contains("Symbol.asyncIterator"),
+        "Output should reference Symbol.asyncIterator: {}",
+        output
+    );
+    // Type parameters should be erased
+    assert!(
+        !output.contains("<T>") && !output.contains("<string>"),
+        "Type parameters should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 Symbol.asyncIterator implementation.
+/// Object implementing async iterable interface.
+#[test]
+fn test_parity_es5_symbol_async_iterator() {
+    let source = r#"const asyncIterable = {
+    data: [1, 2, 3, 4, 5],
+    [Symbol.asyncIterator](): AsyncIterator<number> {
+        let index = 0;
+        const data = this.data;
+        return {
+            async next(): Promise<IteratorResult<number>> {
+                if (index < data.length) {
+                    return { value: data[index++], done: false };
+                }
+                return { value: undefined, done: true };
+            }
+        };
+    }
+};
+
+async function iterate(): Promise<void> {
+    for await (const num of asyncIterable) {
+        console.log(num);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Variables and function should be present
+    assert!(
+        output.contains("asyncIterable") && output.contains("iterate"),
+        "Output should contain variable and function: {}",
+        output
+    );
+    // Should reference Symbol.asyncIterator
+    assert!(
+        output.contains("Symbol.asyncIterator"),
+        "Output should reference Symbol.asyncIterator: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": AsyncIterator") && !output.contains(": Promise<IteratorResult"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 dynamic import.
+/// Dynamic import() expressions should be preserved or polyfilled.
+#[test]
+fn test_parity_es5_dynamic_import() {
+    let source = r#"async function loadModule(name: string): Promise<any> {
+    const module = await import(`./modules/${name}`);
+    return module.default;
+}
+
+async function conditionalLoad(condition: boolean): Promise<void> {
+    if (condition) {
+        const { helper } = await import('./helpers');
+        helper();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::CommonJS;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions should be present
+    assert!(
+        output.contains("loadModule") && output.contains("conditionalLoad"),
+        "Output should contain functions: {}",
+        output
+    );
+    // Should have async helpers
+    assert!(
+        output.contains("__awaiter"),
+        "ES5 output should use __awaiter helper: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string") && !output.contains(": Promise") && !output.contains(": boolean"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 top-level await simulation.
+/// Top-level await in async IIFE pattern.
+#[test]
+fn test_parity_es5_top_level_await_iife() {
+    let source = r#"const config = await import('./config');
+const data: string = await fetch('/api/data').then(r => r.text());
+
+export async function initialize(): Promise<void> {
+    console.log(config, data);
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::CommonJS;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Variables and function should be present
+    assert!(
+        output.contains("config") && output.contains("data") && output.contains("initialize"),
+        "Output should contain variables and function: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string") && !output.contains(": Promise"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 import.meta usage.
+/// import.meta should be handled appropriately for target.
+#[test]
+fn test_parity_es5_import_meta() {
+    let source = r#"const currentUrl: string = import.meta.url;
+const baseDir: string = new URL('.', import.meta.url).pathname;
+
+function getModulePath(): string {
+    return import.meta.url;
+}
+
+export { currentUrl, baseDir, getModulePath };
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::CommonJS;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Variables and function should be present
+    assert!(
+        output.contains("currentUrl") && output.contains("baseDir") && output.contains("getModulePath"),
+        "Output should contain variables and function: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 tagged template with complex arguments.
+/// Tagged templates with typed tag functions and complex expressions.
+#[test]
+fn test_parity_es5_tagged_template_complex() {
+    let source = r#"function sql<T>(strings: TemplateStringsArray, ...values: any[]): T {
+    return strings.reduce((acc, str, i) => acc + str + (values[i] || ''), '') as T;
+}
+
+interface User {
+    id: number;
+    name: string;
+}
+
+const userId: number = 42;
+const userName: string = "Alice";
+const query = sql<User[]>`SELECT * FROM users WHERE id = ${userId} AND name = ${userName}`;
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Function and variables should be present
+    assert!(
+        output.contains("sql") && output.contains("userId") && output.contains("userName"),
+        "Output should contain function and variables: {}",
+        output
+    );
+    // No backtick template syntax
+    assert!(
+        !output.contains('`'),
+        "ES5 output should not contain backtick syntax: {}",
+        output
+    );
+    // Type annotations and interface should be erased
+    assert!(
+        !output.contains("interface User") && !output.contains(": TemplateStringsArray"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 template spans with complex expressions.
+/// Template literals with method calls, ternaries, and nested expressions.
+#[test]
+fn test_parity_es5_template_spans_complex() {
+    let source = r#"function formatUser(user: { name: string; age: number }): string {
+    return `User: ${user.name.toUpperCase()} is ${user.age >= 18 ? 'adult' : 'minor'} (${user.age} years old)`;
+}
+
+function buildUrl(base: string, params: Record<string, string>): string {
+    const queryString = Object.entries(params)
+        .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+        .join('&');
+    return `${base}?${queryString}`;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions should be present
+    assert!(
+        output.contains("formatUser") && output.contains("buildUrl"),
+        "Output should contain functions: {}",
+        output
+    );
+    // No backtick template syntax
+    assert!(
+        !output.contains('`'),
+        "ES5 output should not contain backtick syntax: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string") && !output.contains(": Record"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 deeply nested templates.
+/// Templates inside templates with multiple nesting levels.
+#[test]
+fn test_parity_es5_template_deeply_nested() {
+    let source = r#"function createHtml(items: string[]): string {
+    return `<ul>${items.map(item => `<li>${item.includes('!') ? `<strong>${item}</strong>` : item}</li>`).join('')}</ul>`;
+}
+
+const result: string = createHtml(['Hello', 'World!', 'Test']);
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Function and variable should be present
+    assert!(
+        output.contains("createHtml") && output.contains("result"),
+        "Output should contain function and variable: {}",
+        output
+    );
+    // No backtick template syntax
+    assert!(
+        !output.contains('`'),
+        "ES5 output should not contain backtick syntax: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string[]") && !output.contains(": string"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 String.raw tagged template.
+/// String.raw for raw string handling without escape processing.
+#[test]
+fn test_parity_es5_template_raw_strings() {
+    let source = r#"const path: string = String.raw`C:\Users\Documents\file.txt`;
+const regex: string = String.raw`\d+\.\d+`;
+
+function makeRaw(input: string): string {
+    return String.raw`Raw: ${input}\n\t`;
+}
+
+const multiline: string = String.raw`First line
+Second line
+Third line`;
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Variables and function should be present
+    assert!(
+        output.contains("path") && output.contains("regex") && output.contains("makeRaw"),
+        "Output should contain variables and function: {}",
+        output
+    );
+    // Should reference String.raw
+    assert!(
+        output.contains("String.raw"),
+        "Output should reference String.raw: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": string"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}

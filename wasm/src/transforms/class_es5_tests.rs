@@ -26893,96 +26893,57 @@ class PipelineBuilder<T extends unknown[]> {
     );
 }
 
-// ============================================================================
-// USING DECLARATIONS PATTERN TESTS
-// ============================================================================
+// =============================================================================
+// RECURSIVE TYPE PATTERNS - ES5 TRANSFORMATION TESTS
+// =============================================================================
 
-/// Test ES5 class with sync using declarations
+/// Test: recursive type aliases
+/// Verifies that classes using recursive type aliases transform correctly to ES5
 #[test]
-fn test_class_es5_using_sync() {
+fn test_class_es5_recursive_type_aliases() {
     let source = r#"
-// Sync using declarations
-class FileHandle {
-    private path: string;
-    private isOpen = true;
+type NestedArray<T> = T | NestedArray<T>[];
+type DeepPartial<T> = T extends object ? { [P in keyof T]?: DeepPartial<T[P]> } : T;
+type DeepReadonly<T> = T extends object ? { readonly [P in keyof T]: DeepReadonly<T[P]> } : T;
 
-    constructor(path: string) {
-        this.path = path;
-        console.log(`Opening file: ${path}`);
-    }
-
-    read(): string {
-        if (!this.isOpen) throw new Error("File is closed");
-        return `Contents of ${this.path}`;
-    }
-
-    write(content: string): void {
-        if (!this.isOpen) throw new Error("File is closed");
-        console.log(`Writing to ${this.path}: ${content}`);
-    }
-
-    [Symbol.dispose](): void {
-        if (this.isOpen) {
-            console.log(`Closing file: ${this.path}`);
-            this.isOpen = false;
+class NestedArrayHandler<T> {
+    flatten(nested: NestedArray<T>): T[] {
+        if (Array.isArray(nested)) {
+            return nested.flatMap(item => this.flatten(item));
         }
-    }
-}
-
-class DatabaseConnection {
-    private connectionString: string;
-    private connected = true;
-
-    constructor(connectionString: string) {
-        this.connectionString = connectionString;
-        console.log(`Connecting to: ${connectionString}`);
+        return [nested];
     }
 
-    query(sql: string): any[] {
-        if (!this.connected) throw new Error("Not connected");
-        return [{ result: sql }];
-    }
-
-    [Symbol.dispose](): void {
-        if (this.connected) {
-            console.log(`Disconnecting from: ${this.connectionString}`);
-            this.connected = false;
+    depth(nested: NestedArray<T>): number {
+        if (Array.isArray(nested)) {
+            if (nested.length === 0) return 1;
+            return 1 + Math.max(...nested.map(item => this.depth(item)));
         }
-    }
-}
-
-class LockManager {
-    private resource: string;
-    private locked = true;
-
-    constructor(resource: string) {
-        this.resource = resource;
-        console.log(`Acquiring lock on: ${resource}`);
+        return 0;
     }
 
-    execute<T>(fn: () => T): T {
-        if (!this.locked) throw new Error("Lock released");
-        return fn();
-    }
-
-    [Symbol.dispose](): void {
-        if (this.locked) {
-            console.log(`Releasing lock on: ${this.resource}`);
-            this.locked = false;
+    wrap(value: T, levels: number): NestedArray<T> {
+        let result: NestedArray<T> = value;
+        for (let i = 0; i < levels; i++) {
+            result = [result];
         }
+        return result;
     }
 }
 
-function processFiles() {
-    using file = new FileHandle("/tmp/test.txt");
-    file.write("Hello");
-    return file.read();
-}
-
-function transactionalQuery() {
-    using db = new DatabaseConnection("postgres://localhost/test");
-    using lock = new LockManager("users_table");
-    return lock.execute(() => db.query("SELECT * FROM users"));
+class DeepTransformHandler {
+    makeDeepPartial<T extends object>(obj: T): DeepPartial<T> {
+        const result: any = {};
+        for (const key of Object.keys(obj)) {
+            const value = (obj as any)[key];
+            if (value && typeof value === "object" && !Array.isArray(value)) {
+                result[key] = this.makeDeepPartial(value);
+            } else {
+                result[key] = value;
+            }
+        }
+        return result;
+    }
 }
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -27000,273 +26961,1105 @@ function transactionalQuery() {
 
     let output = printer.get_output().to_string();
 
-    // Classes should be converted
     assert!(
-        output.contains("FileHandle") && output.contains("DatabaseConnection") && output.contains("LockManager"),
-        "Expected sync using declaration classes: {}",
+        output.contains("function NestedArrayHandler"),
+        "Expected NestedArrayHandler function: {}",
         output
     );
-
-    // Functions with using should be present
     assert!(
-        output.contains("processFiles") && output.contains("transactionalQuery"),
-        "Expected functions with using declarations: {}",
+        output.contains("NestedArrayHandler.prototype.flatten"),
+        "Expected flatten method: {}",
         output
     );
-
-    // Symbol.dispose should be present in output
     assert!(
-        output.contains("Symbol.dispose") || output.contains("dispose"),
-        "Expected Symbol.dispose pattern: {}",
+        output.contains("NestedArrayHandler.prototype.depth") && output.contains("NestedArrayHandler.prototype.wrap"),
+        "Expected depth and wrap methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function DeepTransformHandler"),
+        "Expected DeepTransformHandler function: {}",
+        output
+    );
+    assert!(
+        output.contains("DeepTransformHandler.prototype.makeDeepPartial"),
+        "Expected makeDeepPartial method: {}",
         output
     );
 }
 
-/// Test ES5 class with async using declarations
+/// Test: tree structure types
+/// Verifies that classes using tree structure types transform correctly to ES5
 #[test]
-fn test_class_es5_using_async() {
+fn test_class_es5_tree_structure_types() {
     let source = r#"
-// Async using declarations
-class AsyncFileHandle {
-    private path: string;
-    private isOpen = true;
-
-    constructor(path: string) {
-        this.path = path;
-    }
-
-    static async open(path: string): Promise<AsyncFileHandle> {
-        await new Promise(r => setTimeout(r, 10));
-        console.log(`Async opening file: ${path}`);
-        return new AsyncFileHandle(path);
-    }
-
-    async read(): Promise<string> {
-        if (!this.isOpen) throw new Error("File is closed");
-        await new Promise(r => setTimeout(r, 10));
-        return `Contents of ${this.path}`;
-    }
-
-    async write(content: string): Promise<void> {
-        if (!this.isOpen) throw new Error("File is closed");
-        await new Promise(r => setTimeout(r, 10));
-        console.log(`Async writing to ${this.path}: ${content}`);
-    }
-
-    async [Symbol.asyncDispose](): Promise<void> {
-        if (this.isOpen) {
-            await new Promise(r => setTimeout(r, 10));
-            console.log(`Async closing file: ${this.path}`);
-            this.isOpen = false;
-        }
-    }
+interface TreeNode<T> {
+    value: T;
+    children: TreeNode<T>[];
 }
 
-class AsyncDatabaseConnection {
-    private connectionString: string;
-    private connected = true;
-
-    private constructor(connectionString: string) {
-        this.connectionString = connectionString;
-    }
-
-    static async connect(connectionString: string): Promise<AsyncDatabaseConnection> {
-        await new Promise(r => setTimeout(r, 50));
-        console.log(`Async connecting to: ${connectionString}`);
-        return new AsyncDatabaseConnection(connectionString);
-    }
-
-    async query(sql: string): Promise<any[]> {
-        if (!this.connected) throw new Error("Not connected");
-        await new Promise(r => setTimeout(r, 20));
-        return [{ result: sql }];
-    }
-
-    async [Symbol.asyncDispose](): Promise<void> {
-        if (this.connected) {
-            await new Promise(r => setTimeout(r, 30));
-            console.log(`Async disconnecting from: ${this.connectionString}`);
-            this.connected = false;
-        }
-    }
+interface BinaryNode<T> {
+    value: T;
+    left: BinaryNode<T> | null;
+    right: BinaryNode<T> | null;
 }
 
-class AsyncTransaction {
-    private db: AsyncDatabaseConnection;
-    private committed = false;
-    private rolledBack = false;
-
-    constructor(db: AsyncDatabaseConnection) {
-        this.db = db;
+class TreeBuilder<T> {
+    createNode(value: T, children: TreeNode<T>[] = []): TreeNode<T> {
+        return { value, children };
     }
 
-    async commit(): Promise<void> {
-        await new Promise(r => setTimeout(r, 10));
-        this.committed = true;
-        console.log("Transaction committed");
+    addChild(parent: TreeNode<T>, child: TreeNode<T>): void {
+        parent.children.push(child);
     }
 
-    async rollback(): Promise<void> {
-        await new Promise(r => setTimeout(r, 10));
-        this.rolledBack = true;
-        console.log("Transaction rolled back");
-    }
-
-    async [Symbol.asyncDispose](): Promise<void> {
-        if (!this.committed && !this.rolledBack) {
-            await this.rollback();
-        }
-    }
-}
-
-async function asyncProcessFiles() {
-    await using file = await AsyncFileHandle.open("/tmp/async.txt");
-    await file.write("Async Hello");
-    return await file.read();
-}
-
-async function asyncTransactionalQuery() {
-    await using db = await AsyncDatabaseConnection.connect("postgres://localhost/test");
-    await using tx = new AsyncTransaction(db);
-    const result = await db.query("SELECT * FROM users");
-    await tx.commit();
-    return result;
-}
-"#;
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Classes should be converted
-    assert!(
-        output.contains("AsyncFileHandle") && output.contains("AsyncDatabaseConnection") && output.contains("AsyncTransaction"),
-        "Expected async using declaration classes: {}",
-        output
-    );
-
-    // Async functions should be present
-    assert!(
-        output.contains("asyncProcessFiles") && output.contains("asyncTransactionalQuery"),
-        "Expected async functions: {}",
-        output
-    );
-}
-
-/// Test ES5 class with dispose patterns
-#[test]
-fn test_class_es5_using_dispose_patterns() {
-    let source = r#"
-// Dispose patterns
-interface Disposable {
-    [Symbol.dispose](): void;
-}
-
-interface AsyncDisposable {
-    [Symbol.asyncDispose](): Promise<void>;
-}
-
-class ResourcePool<T extends Disposable> {
-    private resources: T[] = [];
-    private available: T[] = [];
-
-    constructor(private factory: () => T, private maxSize: number) {
-        for (let i = 0; i < maxSize; i++) {
-            const resource = factory();
-            this.resources.push(resource);
-            this.available.push(resource);
+    traverse(node: TreeNode<T>, callback: (value: T) => void): void {
+        callback(node.value);
+        for (const child of node.children) {
+            this.traverse(child, callback);
         }
     }
 
-    acquire(): T {
-        const resource = this.available.pop();
-        if (!resource) throw new Error("No available resources");
-        return resource;
-    }
-
-    release(resource: T): void {
-        if (this.resources.includes(resource)) {
-            this.available.push(resource);
+    find(node: TreeNode<T>, predicate: (value: T) => boolean): TreeNode<T> | null {
+        if (predicate(node.value)) {
+            return node;
         }
-    }
-
-    [Symbol.dispose](): void {
-        for (const resource of this.resources) {
-            resource[Symbol.dispose]();
+        for (const child of node.children) {
+            const found = this.find(child, predicate);
+            if (found) return found;
         }
-        this.resources = [];
-        this.available = [];
+        return null;
     }
 }
 
-class DisposableStack {
-    private stack: Disposable[] = [];
-
-    use<T extends Disposable>(resource: T): T {
-        this.stack.push(resource);
-        return resource;
+class BinaryTreeBuilder<T> {
+    createNode(value: T): BinaryNode<T> {
+        return { value, left: null, right: null };
     }
 
-    defer(fn: () => void): void {
-        this.stack.push({ [Symbol.dispose]: fn });
-    }
-
-    [Symbol.dispose](): void {
-        while (this.stack.length > 0) {
-            const resource = this.stack.pop()!;
-            try {
-                resource[Symbol.dispose]();
-            } catch (e) {
-                console.error("Error during disposal:", e);
+    insert(root: BinaryNode<number>, value: number): void {
+        if (value < root.value) {
+            if (root.left === null) {
+                root.left = this.createNode(value) as any;
+            } else {
+                this.insert(root.left as any, value);
+            }
+        } else {
+            if (root.right === null) {
+                root.right = this.createNode(value) as any;
+            } else {
+                this.insert(root.right as any, value);
             }
         }
     }
+
+    inOrder(node: BinaryNode<T> | null, result: T[] = []): T[] {
+        if (node === null) return result;
+        this.inOrder(node.left, result);
+        result.push(node.value);
+        this.inOrder(node.right, result);
+        return result;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function TreeBuilder"),
+        "Expected TreeBuilder function: {}",
+        output
+    );
+    assert!(
+        output.contains("TreeBuilder.prototype.createNode") && output.contains("TreeBuilder.prototype.addChild"),
+        "Expected createNode and addChild methods: {}",
+        output
+    );
+    assert!(
+        output.contains("TreeBuilder.prototype.traverse") && output.contains("TreeBuilder.prototype.find"),
+        "Expected traverse and find methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function BinaryTreeBuilder"),
+        "Expected BinaryTreeBuilder function: {}",
+        output
+    );
+    assert!(
+        output.contains("BinaryTreeBuilder.prototype.insert") && output.contains("BinaryTreeBuilder.prototype.inOrder"),
+        "Expected insert and inOrder methods: {}",
+        output
+    );
 }
 
-class Timer implements Disposable {
-    private startTime: number;
-    private name: string;
+/// Test: linked list types
+/// Verifies that classes using linked list types transform correctly to ES5
+#[test]
+fn test_class_es5_linked_list_types() {
+    let source = r#"
+interface ListNode<T> {
+    value: T;
+    next: ListNode<T> | null;
+}
+
+interface DoublyLinkedNode<T> {
+    value: T;
+    prev: DoublyLinkedNode<T> | null;
+    next: DoublyLinkedNode<T> | null;
+}
+
+class LinkedList<T> {
+    private head: ListNode<T> | null = null;
+    private tail: ListNode<T> | null = null;
+
+    append(value: T): void {
+        const node: ListNode<T> = { value, next: null };
+        if (this.tail === null) {
+            this.head = node;
+            this.tail = node;
+        } else {
+            this.tail.next = node;
+            this.tail = node;
+        }
+    }
+
+    prepend(value: T): void {
+        const node: ListNode<T> = { value, next: this.head };
+        this.head = node;
+        if (this.tail === null) {
+            this.tail = node;
+        }
+    }
+
+    toArray(): T[] {
+        const result: T[] = [];
+        let current = this.head;
+        while (current !== null) {
+            result.push(current.value);
+            current = current.next;
+        }
+        return result;
+    }
+
+    find(predicate: (value: T) => boolean): T | undefined {
+        let current = this.head;
+        while (current !== null) {
+            if (predicate(current.value)) {
+                return current.value;
+            }
+            current = current.next;
+        }
+        return undefined;
+    }
+}
+
+class DoublyLinkedList<T> {
+    private head: DoublyLinkedNode<T> | null = null;
+    private tail: DoublyLinkedNode<T> | null = null;
+
+    append(value: T): void {
+        const node: DoublyLinkedNode<T> = { value, prev: this.tail, next: null };
+        if (this.tail !== null) {
+            this.tail.next = node;
+        }
+        this.tail = node;
+        if (this.head === null) {
+            this.head = node;
+        }
+    }
+
+    reverse(): T[] {
+        const result: T[] = [];
+        let current = this.tail;
+        while (current !== null) {
+            result.push(current.value);
+            current = current.prev;
+        }
+        return result;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function LinkedList"),
+        "Expected LinkedList function: {}",
+        output
+    );
+    assert!(
+        output.contains("LinkedList.prototype.append") && output.contains("LinkedList.prototype.prepend"),
+        "Expected append and prepend methods: {}",
+        output
+    );
+    assert!(
+        output.contains("LinkedList.prototype.toArray") && output.contains("LinkedList.prototype.find"),
+        "Expected toArray and find methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function DoublyLinkedList"),
+        "Expected DoublyLinkedList function: {}",
+        output
+    );
+    assert!(
+        output.contains("DoublyLinkedList.prototype.append") && output.contains("DoublyLinkedList.prototype.reverse"),
+        "Expected DoublyLinkedList methods: {}",
+        output
+    );
+}
+
+/// Test: JSON-like recursive types
+/// Verifies that classes using JSON-like recursive types transform correctly to ES5
+#[test]
+fn test_class_es5_json_recursive_types() {
+    let source = r#"
+type JSONValue = string | number | boolean | null | JSONObject | JSONArray;
+interface JSONObject { [key: string]: JSONValue }
+interface JSONArray extends Array<JSONValue> {}
+
+type DeepJSON<T> = T extends object
+    ? { [K in keyof T]: DeepJSON<T[K]> }
+    : T;
+
+class JSONProcessor {
+    stringify(value: JSONValue): string {
+        return JSON.stringify(value);
+    }
+
+    parse(text: string): JSONValue {
+        return JSON.parse(text);
+    }
+
+    deepClone(value: JSONValue): JSONValue {
+        if (value === null || typeof value !== "object") {
+            return value;
+        }
+        if (Array.isArray(value)) {
+            return value.map(item => this.deepClone(item));
+        }
+        const result: JSONObject = {};
+        for (const key of Object.keys(value)) {
+            result[key] = this.deepClone(value[key]);
+        }
+        return result;
+    }
+
+    merge(target: JSONObject, source: JSONObject): JSONObject {
+        const result: JSONObject = { ...target };
+        for (const key of Object.keys(source)) {
+            const targetVal = target[key];
+            const sourceVal = source[key];
+            if (
+                targetVal && typeof targetVal === "object" && !Array.isArray(targetVal) &&
+                sourceVal && typeof sourceVal === "object" && !Array.isArray(sourceVal)
+            ) {
+                result[key] = this.merge(targetVal as JSONObject, sourceVal as JSONObject);
+            } else {
+                result[key] = sourceVal;
+            }
+        }
+        return result;
+    }
+}
+
+class JSONValidator {
+    isValidJSON(value: unknown): value is JSONValue {
+        if (value === null) return true;
+        const type = typeof value;
+        if (type === "string" || type === "number" || type === "boolean") return true;
+        if (Array.isArray(value)) {
+            return value.every(item => this.isValidJSON(item));
+        }
+        if (type === "object") {
+            return Object.values(value as object).every(v => this.isValidJSON(v));
+        }
+        return false;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function JSONProcessor"),
+        "Expected JSONProcessor function: {}",
+        output
+    );
+    assert!(
+        output.contains("JSONProcessor.prototype.stringify") && output.contains("JSONProcessor.prototype.parse"),
+        "Expected stringify and parse methods: {}",
+        output
+    );
+    assert!(
+        output.contains("JSONProcessor.prototype.deepClone") && output.contains("JSONProcessor.prototype.merge"),
+        "Expected deepClone and merge methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function JSONValidator"),
+        "Expected JSONValidator function: {}",
+        output
+    );
+    assert!(
+        output.contains("JSONValidator.prototype.isValidJSON"),
+        "Expected isValidJSON method: {}",
+        output
+    );
+}
+
+/// Test: nested object recursive types
+/// Verifies that classes using nested object types transform correctly to ES5
+#[test]
+fn test_class_es5_nested_object_types() {
+    let source = r#"
+type NestedRecord<T> = {
+    [key: string]: T | NestedRecord<T>;
+};
+
+type PathValue<T, P extends string> = P extends `${infer K}.${infer R}`
+    ? K extends keyof T
+        ? PathValue<T[K], R>
+        : never
+    : P extends keyof T
+        ? T[P]
+        : never;
+
+class NestedObjectHandler<T> {
+    private data: NestedRecord<T>;
+
+    constructor(data: NestedRecord<T>) {
+        this.data = data;
+    }
+
+    get(path: string): T | NestedRecord<T> | undefined {
+        const parts = path.split(".");
+        let current: any = this.data;
+        for (const part of parts) {
+            if (current === undefined || current === null) return undefined;
+            current = current[part];
+        }
+        return current;
+    }
+
+    set(path: string, value: T): void {
+        const parts = path.split(".");
+        let current: any = this.data;
+        for (let i = 0; i < parts.length - 1; i++) {
+            const part = parts[i];
+            if (!(part in current)) {
+                current[part] = {};
+            }
+            current = current[part];
+        }
+        current[parts[parts.length - 1]] = value;
+    }
+
+    flatten(prefix: string = ""): Record<string, T> {
+        const result: Record<string, T> = {};
+        const flatten = (obj: NestedRecord<T>, path: string) => {
+            for (const key of Object.keys(obj)) {
+                const fullPath = path ? path + "." + key : key;
+                const value = obj[key];
+                if (value && typeof value === "object" && !Array.isArray(value)) {
+                    flatten(value as NestedRecord<T>, fullPath);
+                } else {
+                    result[fullPath] = value as T;
+                }
+            }
+        };
+        flatten(this.data, prefix);
+        return result;
+    }
+}
+
+class PathAccessor {
+    getPath<T, P extends string>(obj: T, path: P): unknown {
+        const parts = (path as string).split(".");
+        let current: any = obj;
+        for (const part of parts) {
+            if (current === undefined) return undefined;
+            current = current[part];
+        }
+        return current;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function NestedObjectHandler"),
+        "Expected NestedObjectHandler function: {}",
+        output
+    );
+    assert!(
+        output.contains("this.data = data"),
+        "Expected constructor assignment: {}",
+        output
+    );
+    assert!(
+        output.contains("NestedObjectHandler.prototype.get") && output.contains("NestedObjectHandler.prototype.set"),
+        "Expected get and set methods: {}",
+        output
+    );
+    assert!(
+        output.contains("NestedObjectHandler.prototype.flatten"),
+        "Expected flatten method: {}",
+        output
+    );
+    assert!(
+        output.contains("function PathAccessor"),
+        "Expected PathAccessor function: {}",
+        output
+    );
+    assert!(
+        output.contains("PathAccessor.prototype.getPath"),
+        "Expected getPath method: {}",
+        output
+    );
+}
+
+/// Test: combined recursive type patterns
+/// Verifies that classes using multiple recursive type patterns together transform correctly to ES5
+#[test]
+fn test_class_es5_combined_recursive_patterns() {
+    let source = r#"
+interface FileSystemNode {
+    name: string;
+    type: "file" | "directory";
+    children?: FileSystemNode[];
+    size?: number;
+}
+
+type DeepMutable<T> = {
+    -readonly [P in keyof T]: DeepMutable<T[P]>;
+};
+
+type Flatten<T> = T extends Array<infer U> ? Flatten<U> : T;
+
+class FileSystem {
+    private root: FileSystemNode;
+
+    constructor() {
+        this.root = { name: "/", type: "directory", children: [] };
+    }
+
+    createFile(path: string, size: number): void {
+        const parts = path.split("/").filter(p => p);
+        let current = this.root;
+        for (let i = 0; i < parts.length - 1; i++) {
+            const dir = current.children?.find(c => c.name === parts[i] && c.type === "directory");
+            if (!dir) throw new Error("Directory not found");
+            current = dir;
+        }
+        current.children = current.children || [];
+        current.children.push({ name: parts[parts.length - 1], type: "file", size });
+    }
+
+    createDirectory(path: string): void {
+        const parts = path.split("/").filter(p => p);
+        let current = this.root;
+        for (const part of parts) {
+            let dir = current.children?.find(c => c.name === part && c.type === "directory");
+            if (!dir) {
+                dir = { name: part, type: "directory", children: [] };
+                current.children = current.children || [];
+                current.children.push(dir);
+            }
+            current = dir;
+        }
+    }
+
+    getTotalSize(node: FileSystemNode = this.root): number {
+        if (node.type === "file") {
+            return node.size || 0;
+        }
+        return (node.children || []).reduce((sum, child) => sum + this.getTotalSize(child), 0);
+    }
+
+    listAll(node: FileSystemNode = this.root, path: string = ""): string[] {
+        const currentPath = path + "/" + node.name;
+        if (node.type === "file") {
+            return [currentPath];
+        }
+        const files: string[] = [];
+        for (const child of node.children || []) {
+            files.push(...this.listAll(child, currentPath));
+        }
+        return files;
+    }
+}
+
+class RecursiveFlattener {
+    flattenDeep<T>(arr: T[]): Flatten<T>[] {
+        const result: any[] = [];
+        const flatten = (items: any[]) => {
+            for (const item of items) {
+                if (Array.isArray(item)) {
+                    flatten(item);
+                } else {
+                    result.push(item);
+                }
+            }
+        };
+        flatten(arr);
+        return result;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function FileSystem"),
+        "Expected FileSystem function: {}",
+        output
+    );
+    assert!(
+        output.contains("FileSystem.prototype.createFile") && output.contains("FileSystem.prototype.createDirectory"),
+        "Expected createFile and createDirectory methods: {}",
+        output
+    );
+    assert!(
+        output.contains("FileSystem.prototype.getTotalSize") && output.contains("FileSystem.prototype.listAll"),
+        "Expected getTotalSize and listAll methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function RecursiveFlattener"),
+        "Expected RecursiveFlattener function: {}",
+        output
+    );
+    assert!(
+        output.contains("RecursiveFlattener.prototype.flattenDeep"),
+        "Expected flattenDeep method: {}",
+        output
+    );
+}
+
+// =============================================================================
+// INTERSECTION TYPE PATTERNS - ES5 TRANSFORMATION TESTS
+// =============================================================================
+
+/// Test: object intersection types
+/// Verifies that classes using object intersection types transform correctly to ES5
+#[test]
+fn test_class_es5_object_intersection_types() {
+    let source = r#"
+type Named = { name: string };
+type Aged = { age: number };
+type Person = Named & Aged;
+
+type Timestamped = { createdAt: Date; updatedAt: Date };
+type Identifiable = { id: string };
+type Entity = Identifiable & Timestamped;
+
+class PersonFactory {
+    create(name: string, age: number): Person {
+        return { name, age };
+    }
+
+    merge<T extends Named, U extends Aged>(named: T, aged: U): T & U {
+        return { ...named, ...aged };
+    }
+
+    extend<T extends Person>(person: T, extra: object): T & typeof extra {
+        return { ...person, ...extra };
+    }
+}
+
+class EntityManager {
+    private entities: Map<string, Entity> = new Map();
+
+    create(id: string): Entity {
+        const now = new Date();
+        const entity: Entity = { id, createdAt: now, updatedAt: now };
+        this.entities.set(id, entity);
+        return entity;
+    }
+
+    update(id: string): Entity | undefined {
+        const entity = this.entities.get(id);
+        if (entity) {
+            entity.updatedAt = new Date();
+        }
+        return entity;
+    }
+
+    addMetadata<T extends Entity>(entity: T, metadata: object): T & { metadata: typeof metadata } {
+        return { ...entity, metadata };
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function PersonFactory"),
+        "Expected PersonFactory function: {}",
+        output
+    );
+    assert!(
+        output.contains("PersonFactory.prototype.create"),
+        "Expected create method: {}",
+        output
+    );
+    assert!(
+        output.contains("PersonFactory.prototype.merge") && output.contains("PersonFactory.prototype.extend"),
+        "Expected merge and extend methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function EntityManager"),
+        "Expected EntityManager function: {}",
+        output
+    );
+    assert!(
+        output.contains("EntityManager.prototype.create") && output.contains("EntityManager.prototype.update"),
+        "Expected EntityManager create and update methods: {}",
+        output
+    );
+    assert!(
+        output.contains("EntityManager.prototype.addMetadata"),
+        "Expected addMetadata method: {}",
+        output
+    );
+}
+
+/// Test: interface merging patterns
+/// Verifies that classes using interface merging transform correctly to ES5
+#[test]
+fn test_class_es5_interface_merging() {
+    let source = r#"
+interface Base {
+    id: string;
+    name: string;
+}
+
+interface WithTimestamp {
+    createdAt: Date;
+}
+
+interface WithVersion {
+    version: number;
+}
+
+interface Document extends Base, WithTimestamp, WithVersion {
+    content: string;
+}
+
+class DocumentBuilder {
+    private doc: Partial<Document> = {};
+
+    setId(id: string): this {
+        this.doc.id = id;
+        return this;
+    }
+
+    setName(name: string): this {
+        this.doc.name = name;
+        return this;
+    }
+
+    setContent(content: string): this {
+        this.doc.content = content;
+        return this;
+    }
+
+    setVersion(version: number): this {
+        this.doc.version = version;
+        return this;
+    }
+
+    build(): Document {
+        return {
+            id: this.doc.id || "",
+            name: this.doc.name || "",
+            content: this.doc.content || "",
+            createdAt: this.doc.createdAt || new Date(),
+            version: this.doc.version || 1
+        };
+    }
+}
+
+interface Serializable {
+    serialize(): string;
+}
+
+interface Deserializable<T> {
+    deserialize(data: string): T;
+}
+
+class JSONCodec<T> implements Serializable {
+    constructor(private data: T) {}
+
+    serialize(): string {
+        return JSON.stringify(this.data);
+    }
+
+    static deserialize<T>(data: string): T {
+        return JSON.parse(data);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function DocumentBuilder"),
+        "Expected DocumentBuilder function: {}",
+        output
+    );
+    assert!(
+        output.contains("DocumentBuilder.prototype.setId") && output.contains("DocumentBuilder.prototype.setName"),
+        "Expected setId and setName methods: {}",
+        output
+    );
+    assert!(
+        output.contains("DocumentBuilder.prototype.setContent") && output.contains("DocumentBuilder.prototype.setVersion"),
+        "Expected setContent and setVersion methods: {}",
+        output
+    );
+    assert!(
+        output.contains("DocumentBuilder.prototype.build"),
+        "Expected build method: {}",
+        output
+    );
+    assert!(
+        output.contains("function JSONCodec"),
+        "Expected JSONCodec function: {}",
+        output
+    );
+    assert!(
+        output.contains("JSONCodec.prototype.serialize"),
+        "Expected serialize method: {}",
+        output
+    );
+}
+
+/// Test: conditional intersection types
+/// Verifies that classes using conditional intersection types transform correctly to ES5
+#[test]
+fn test_class_es5_conditional_intersection() {
+    let source = r#"
+type WithId<T> = T & { id: string };
+type WithTimestamps<T> = T & { createdAt: Date; updatedAt: Date };
+type Auditable<T> = T extends { id: string } ? T & { auditLog: string[] } : never;
+
+class DataEnhancer {
+    addId<T extends object>(data: T, id: string): WithId<T> {
+        return { ...data, id };
+    }
+
+    addTimestamps<T extends object>(data: T): WithTimestamps<T> {
+        const now = new Date();
+        return { ...data, createdAt: now, updatedAt: now };
+    }
+
+    makeAuditable<T extends { id: string }>(data: T): Auditable<T> {
+        return { ...data, auditLog: [] } as Auditable<T>;
+    }
+
+    enhance<T extends object>(data: T, id: string): WithId<WithTimestamps<T>> {
+        const withTimestamps = this.addTimestamps(data);
+        return this.addId(withTimestamps, id);
+    }
+}
+
+type NonNullableIntersection<T, U> = NonNullable<T> & NonNullable<U>;
+
+class SafeMerger {
+    mergeNonNull<T, U>(a: T | null, b: U | null): NonNullableIntersection<T, U> | null {
+        if (a === null || b === null) {
+            return null;
+        }
+        return { ...a, ...b } as NonNullableIntersection<T, U>;
+    }
+
+    mergeWithDefaults<T extends object, D extends Partial<T>>(data: T, defaults: D): T & Required<D> {
+        return { ...defaults, ...data } as T & Required<D>;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function DataEnhancer"),
+        "Expected DataEnhancer function: {}",
+        output
+    );
+    assert!(
+        output.contains("DataEnhancer.prototype.addId") && output.contains("DataEnhancer.prototype.addTimestamps"),
+        "Expected addId and addTimestamps methods: {}",
+        output
+    );
+    assert!(
+        output.contains("DataEnhancer.prototype.makeAuditable") && output.contains("DataEnhancer.prototype.enhance"),
+        "Expected makeAuditable and enhance methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function SafeMerger"),
+        "Expected SafeMerger function: {}",
+        output
+    );
+    assert!(
+        output.contains("SafeMerger.prototype.mergeNonNull") && output.contains("SafeMerger.prototype.mergeWithDefaults"),
+        "Expected SafeMerger methods: {}",
+        output
+    );
+}
+
+/// Test: generic intersection types
+/// Verifies that classes using generic intersection types transform correctly to ES5
+#[test]
+fn test_class_es5_generic_intersection() {
+    let source = r#"
+type Merge<T, U> = T & U;
+
+class GenericMerger {
+    private base: object;
+
+    constructor(base: object) {
+        this.base = base;
+    }
+
+    merge(other: object): object {
+        return Object.assign({}, this.base, other);
+    }
+
+    getBase(): object {
+        return this.base;
+    }
+}
+
+type Mixin<T, U> = T & U;
+
+class MixinApplicator {
+    apply(target: object, mixin: object): object {
+        return Object.assign({}, target, mixin);
+    }
+
+    applyTwo(target: object, m1: object, m2: object): object {
+        return Object.assign({}, target, m1, m2);
+    }
+
+    combine(a: object, b: object): object {
+        return Object.assign({}, a, b);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function GenericMerger"),
+        "Expected GenericMerger function: {}",
+        output
+    );
+    assert!(
+        output.contains("this.base = base"),
+        "Expected constructor assignment: {}",
+        output
+    );
+    assert!(
+        output.contains("GenericMerger.prototype.merge") && output.contains("GenericMerger.prototype.getBase"),
+        "Expected merge and getBase methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function MixinApplicator"),
+        "Expected MixinApplicator function: {}",
+        output
+    );
+    assert!(
+        output.contains("MixinApplicator.prototype.apply") && output.contains("MixinApplicator.prototype.applyTwo"),
+        "Expected MixinApplicator apply methods: {}",
+        output
+    );
+    assert!(
+        output.contains("MixinApplicator.prototype.combine"),
+        "Expected MixinApplicator combine method: {}",
+        output
+    );
+}
+
+/// Test: mixin patterns with intersection
+/// Verifies that classes using mixin patterns with intersection types transform correctly to ES5
+#[test]
+fn test_class_es5_mixin_intersection_patterns() {
+    let source = r#"
+type Disposable = {
+    dispose(): void;
+    isDisposed: boolean;
+};
+
+type Activatable = {
+    activate(): void;
+    deactivate(): void;
+    isActive: boolean;
+};
+
+type Component = Disposable & Activatable & { name: string };
+
+class ComponentBase implements Component {
+    name: string;
+    isDisposed: boolean = false;
+    isActive: boolean = false;
 
     constructor(name: string) {
         this.name = name;
-        this.startTime = Date.now();
-        console.log(`Timer '${name}' started`);
     }
 
-    elapsed(): number {
-        return Date.now() - this.startTime;
+    dispose(): void {
+        this.isDisposed = true;
+        this.isActive = false;
     }
 
-    [Symbol.dispose](): void {
-        console.log(`Timer '${this.name}' stopped: ${this.elapsed()}ms`);
+    activate(): void {
+        if (!this.isDisposed) {
+            this.isActive = true;
+        }
+    }
+
+    deactivate(): void {
+        this.isActive = false;
     }
 }
 
-function timedOperation() {
-    using timer = new Timer("operation");
-    using stack = new DisposableStack();
+type Logger = { log(message: string): void };
+type ErrorHandler = { handleError(error: Error): void };
+type Service = Logger & ErrorHandler & { name: string };
 
-    stack.defer(() => console.log("Cleanup 1"));
-    stack.defer(() => console.log("Cleanup 2"));
+class ServiceBase implements Service {
+    name: string;
+    private logs: string[] = [];
 
-    // Do some work
-    let sum = 0;
-    for (let i = 0; i < 1000; i++) {
-        sum += i;
+    constructor(name: string) {
+        this.name = name;
     }
 
-    console.log(`Operation completed: ${timer.elapsed()}ms`);
-    return sum;
+    log(message: string): void {
+        this.logs.push("[" + this.name + "] " + message);
+    }
+
+    handleError(error: Error): void {
+        this.log("Error: " + error.message);
+    }
+
+    getLogs(): string[] {
+        return [...this.logs];
+    }
 }
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -27284,136 +28077,107 @@ function timedOperation() {
 
     let output = printer.get_output().to_string();
 
-    // Classes should be converted
     assert!(
-        output.contains("ResourcePool") && output.contains("DisposableStack") && output.contains("Timer"),
-        "Expected dispose pattern classes: {}",
+        output.contains("function ComponentBase"),
+        "Expected ComponentBase function: {}",
         output
     );
-
-    // Function should be present
     assert!(
-        output.contains("timedOperation"),
-        "Expected timedOperation function: {}",
+        output.contains("this.name = name"),
+        "Expected constructor assignment: {}",
         output
     );
-
-    // Interfaces should be stripped
     assert!(
-        !output.contains("interface Disposable") && !output.contains("interface AsyncDisposable"),
-        "Expected interfaces to be stripped: {}",
+        output.contains("ComponentBase.prototype.dispose") && output.contains("ComponentBase.prototype.activate"),
+        "Expected dispose and activate methods: {}",
+        output
+    );
+    assert!(
+        output.contains("ComponentBase.prototype.deactivate"),
+        "Expected deactivate method: {}",
+        output
+    );
+    assert!(
+        output.contains("function ServiceBase"),
+        "Expected ServiceBase function: {}",
+        output
+    );
+    assert!(
+        output.contains("ServiceBase.prototype.log") && output.contains("ServiceBase.prototype.handleError"),
+        "Expected log and handleError methods: {}",
         output
     );
 }
 
-/// Test ES5 class with Symbol.dispose implementation
+/// Test: combined intersection type patterns
+/// Verifies that classes using multiple intersection type patterns together transform correctly to ES5
 #[test]
-fn test_class_es5_using_symbol_dispose() {
+fn test_class_es5_combined_intersection_patterns() {
     let source = r#"
-// Symbol.dispose implementation patterns
-class ManagedBuffer {
-    private buffer: ArrayBuffer;
-    private view: DataView;
-    private disposed = false;
+type HasId = { id: string };
+type HasName = { name: string };
+type HasCreated = { createdAt: Date };
+type HasUpdated = { updatedAt: Date };
 
-    constructor(size: number) {
-        this.buffer = new ArrayBuffer(size);
-        this.view = new DataView(this.buffer);
-        console.log(`Allocated ${size} bytes`);
+type BaseEntity = HasId & HasName;
+type TimestampedEntity = BaseEntity & HasCreated & HasUpdated;
+type AuditableEntity = TimestampedEntity & { auditLog: string[]; lastModifiedBy: string };
+
+class EntityFactory {
+    createBase(id: string, name: string): BaseEntity {
+        return { id, name };
     }
 
-    write(offset: number, value: number): void {
-        if (this.disposed) throw new Error("Buffer disposed");
-        this.view.setInt32(offset, value);
+    createTimestamped(id: string, name: string): TimestampedEntity {
+        const now = new Date();
+        return { id, name, createdAt: now, updatedAt: now };
     }
 
-    read(offset: number): number {
-        if (this.disposed) throw new Error("Buffer disposed");
-        return this.view.getInt32(offset);
+    createAuditable(id: string, name: string, user: string): AuditableEntity {
+        const now = new Date();
+        return {
+            id,
+            name,
+            createdAt: now,
+            updatedAt: now,
+            auditLog: ["Created by " + user],
+            lastModifiedBy: user
+        };
     }
 
-    get size(): number {
-        return this.buffer.byteLength;
+    upgrade<T extends BaseEntity>(entity: T): T & HasCreated & HasUpdated {
+        const now = new Date();
+        return { ...entity, createdAt: now, updatedAt: now };
+    }
+}
+
+type Validator<T> = { validate(data: T): boolean };
+type Transformer<T, U> = { transform(data: T): U };
+type Processor<T, U> = Validator<T> & Transformer<T, U>;
+
+class DataProcessor<T extends object, U extends object> implements Processor<T, U> {
+    private validator: (data: T) => boolean;
+    private transformer: (data: T) => U;
+
+    constructor(validator: (data: T) => boolean, transformer: (data: T) => U) {
+        this.validator = validator;
+        this.transformer = transformer;
     }
 
-    [Symbol.dispose](): void {
-        if (!this.disposed) {
-            console.log(`Freeing ${this.size} bytes`);
-            this.disposed = true;
+    validate(data: T): boolean {
+        return this.validator(data);
+    }
+
+    transform(data: T): U {
+        return this.transformer(data);
+    }
+
+    process(data: T): U | null {
+        if (this.validate(data)) {
+            return this.transform(data);
         }
+        return null;
     }
-}
-
-class EventSubscription {
-    private target: EventTarget;
-    private type: string;
-    private handler: EventListener;
-    private active = true;
-
-    constructor(target: EventTarget, type: string, handler: EventListener) {
-        this.target = target;
-        this.type = type;
-        this.handler = handler;
-        target.addEventListener(type, handler);
-    }
-
-    [Symbol.dispose](): void {
-        if (this.active) {
-            this.target.removeEventListener(this.type, this.handler);
-            this.active = false;
-        }
-    }
-}
-
-class IntervalHandle {
-    private id: number;
-    private active = true;
-
-    constructor(callback: () => void, ms: number) {
-        this.id = setInterval(callback, ms) as unknown as number;
-    }
-
-    [Symbol.dispose](): void {
-        if (this.active) {
-            clearInterval(this.id);
-            this.active = false;
-        }
-    }
-}
-
-class TimeoutHandle {
-    private id: number;
-    private active = true;
-
-    constructor(callback: () => void, ms: number) {
-        this.id = setTimeout(callback, ms) as unknown as number;
-    }
-
-    cancel(): void {
-        if (this.active) {
-            clearTimeout(this.id);
-            this.active = false;
-        }
-    }
-
-    [Symbol.dispose](): void {
-        this.cancel();
-    }
-}
-
-function managedBufferDemo() {
-    using buffer = new ManagedBuffer(1024);
-    buffer.write(0, 42);
-    buffer.write(4, 100);
-    return buffer.read(0) + buffer.read(4);
-}
-
-function intervalDemo(callback: () => void) {
-    using interval = new IntervalHandle(callback, 100);
-    using timeout = new TimeoutHandle(() => {
-        console.log("Timeout completed");
-    }, 500);
-    // The handles will be disposed when the function returns
 }
 "#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -27431,24 +28195,34 @@ function intervalDemo(callback: () => void) {
 
     let output = printer.get_output().to_string();
 
-    // Classes should be converted
     assert!(
-        output.contains("ManagedBuffer") && output.contains("EventSubscription") && output.contains("IntervalHandle"),
-        "Expected Symbol.dispose classes: {}",
+        output.contains("function EntityFactory"),
+        "Expected EntityFactory function: {}",
         output
     );
-
-    // TimeoutHandle should be present
     assert!(
-        output.contains("TimeoutHandle"),
-        "Expected TimeoutHandle class: {}",
+        output.contains("EntityFactory.prototype.createBase") && output.contains("EntityFactory.prototype.createTimestamped"),
+        "Expected createBase and createTimestamped methods: {}",
         output
     );
-
-    // Functions should be present
     assert!(
-        output.contains("managedBufferDemo") && output.contains("intervalDemo"),
-        "Expected demo functions: {}",
+        output.contains("EntityFactory.prototype.createAuditable") && output.contains("EntityFactory.prototype.upgrade"),
+        "Expected createAuditable and upgrade methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function DataProcessor"),
+        "Expected DataProcessor function: {}",
+        output
+    );
+    assert!(
+        output.contains("DataProcessor.prototype.validate") && output.contains("DataProcessor.prototype.transform"),
+        "Expected validate and transform methods: {}",
+        output
+    );
+    assert!(
+        output.contains("DataProcessor.prototype.process"),
+        "Expected process method: {}",
         output
     );
 }
