@@ -56,3 +56,14 @@ Yes
 - Commit format: `[wasm] checker: implement TS2304 missing name diagnostics`
 - Push to: `origin/worker/forge-1`
 - **NEVER edit**: `STRUCTURE.md`, `GOALS.md`, other workers' plan files, or anything in `orchestrator/`
+
+## Resume Notes
+- Branch: `worker/forge-1`
+- Last full conformance (Docker): `wasm/differential-test/run-conformance.sh --all --workers=6`
+  - 4928 tests run; 17.6% exact (869); 20.2% same count (994)
+  - Crashes: 1936; Skipped: 727
+  - Top missing: TS2322(135), TS7010(84), TS2339(76), TS2304(66), TS2695(46)
+  - Top extra: TS2304(494), TS1005(288), TS1109(171), TS7011(165), TS7010(164)
+- Full run with 14 workers OOM/killed (exit 137). Sample run at 1000 tests with 6 workers logged above.
+- Known high-impact areas to consider next: TS2304 extra (missing lib/globals), TS2322 missing (assignability), TS1005/TS1109 parse errors, TS7010/TS7011/TS2355 return-path/implicit-any.
+- Local debug helpers present (untracked): `wasm/differential-test/test_debug.mjs`, `wasm/differential-test/test_debug2.mjs`.
