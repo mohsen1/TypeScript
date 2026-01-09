@@ -27568,3 +27568,599 @@ const user = new UserModel("user-1");
         output
     );
 }
+
+// ============================================================================
+// ES5 Generic Class Patterns Parity Tests
+// ============================================================================
+
+/// Test ES5 generic class with single type parameter
+#[test]
+fn test_parity_es5_generic_class_single_param() {
+    let source = r#"
+class Container<T> {
+    private value: T;
+
+    constructor(value: T) {
+        this.value = value;
+    }
+
+    getValue(): T {
+        return this.value;
+    }
+
+    setValue(value: T): void {
+        this.value = value;
+    }
+}
+
+class StringContainer extends Container<string> {
+    getLength(): number {
+        return this.getValue().length;
+    }
+}
+
+const numContainer = new Container<number>(42);
+const strContainer = new StringContainer("hello");
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Classes should be present
+    assert!(
+        output.contains("Container") && output.contains("StringContainer"),
+        "Classes should be present: {}",
+        output
+    );
+    // Generic type parameter should be erased
+    assert!(
+        !output.contains("<T>") && !output.contains("<string>") && !output.contains("<number>"),
+        "Generic type parameters should be erased: {}",
+        output
+    );
+    // Return type annotations should be erased
+    assert!(
+        !output.contains(": T") && !output.contains(": number") && !output.contains(": void"),
+        "Return type annotations should be erased: {}",
+        output
+    );
+    // Private modifier should be erased
+    assert!(
+        !output.contains("private value"),
+        "Private modifier should be erased: {}",
+        output
+    );
+}
+
+/// Test ES5 generic class with multiple type parameters
+#[test]
+fn test_parity_es5_generic_class_multi_params() {
+    let source = r#"
+class Pair<K, V> {
+    constructor(public key: K, public value: V) {}
+
+    getKey(): K { return this.key; }
+    getValue(): V { return this.value; }
+    swap(): Pair<V, K> { return new Pair(this.value, this.key); }
+}
+
+class Triple<A, B, C> {
+    constructor(
+        private first: A,
+        private second: B,
+        private third: C
+    ) {}
+
+    toArray(): [A, B, C] {
+        return [this.first, this.second, this.third];
+    }
+}
+
+class Dictionary<K extends string, V> {
+    private items: Map<K, V> = new Map();
+
+    set(key: K, value: V): void {
+        this.items.set(key, value);
+    }
+
+    get(key: K): V | undefined {
+        return this.items.get(key);
+    }
+}
+
+const pair = new Pair<string, number>("age", 25);
+const triple = new Triple<number, string, boolean>(1, "two", true);
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Classes should be present
+    assert!(
+        output.contains("Pair") && output.contains("Triple") && output.contains("Dictionary"),
+        "Classes should be present: {}",
+        output
+    );
+    // Generic type parameters should be erased
+    assert!(
+        !output.contains("<K,") && !output.contains("<A,") && !output.contains("<K extends"),
+        "Generic type parameters should be erased: {}",
+        output
+    );
+    // Return type annotations should be erased
+    assert!(
+        !output.contains("): K") && !output.contains("): V") && !output.contains("): [A,"),
+        "Return type annotations should be erased: {}",
+        output
+    );
+    // Public/private modifiers should be erased
+    assert!(
+        !output.contains("public key") && !output.contains("private first"),
+        "Access modifiers should be erased: {}",
+        output
+    );
+}
+
+/// Test ES5 generic class with constraints
+#[test]
+fn test_parity_es5_generic_class_constraints() {
+    let source = r#"
+interface Comparable<T> {
+    compareTo(other: T): number;
+}
+
+interface Serializable {
+    serialize(): string;
+}
+
+class SortedList<T extends Comparable<T>> {
+    private items: T[] = [];
+
+    add(item: T): void {
+        this.items.push(item);
+        this.items.sort((a, b) => a.compareTo(b));
+    }
+
+    get(index: number): T {
+        return this.items[index];
+    }
+}
+
+class Repository<T extends { id: string } & Serializable> {
+    private data: Map<string, T> = new Map();
+
+    save(item: T): void {
+        this.data.set(item.id, item);
+    }
+
+    find(id: string): T | undefined {
+        return this.data.get(id);
+    }
+
+    exportAll(): string[] {
+        return Array.from(this.data.values()).map(v => v.serialize());
+    }
+}
+
+class KeyValueStore<K extends string | number, V extends object> {
+    private store: Record<string, V> = {};
+
+    put(key: K, value: V): void {
+        this.store[String(key)] = value;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Classes should be present
+    assert!(
+        output.contains("SortedList") && output.contains("Repository") && output.contains("KeyValueStore"),
+        "Classes should be present: {}",
+        output
+    );
+    // Interfaces should be erased
+    assert!(
+        !output.contains("interface Comparable") && !output.contains("interface Serializable"),
+        "Interfaces should be erased: {}",
+        output
+    );
+    // Generic constraints should be erased
+    assert!(
+        !output.contains("<T extends Comparable") && !output.contains("<T extends {"),
+        "Generic constraints should be erased: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": T[]") && !output.contains(": Map<") && !output.contains(": Record<"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test ES5 generic class extending generic base
+#[test]
+fn test_parity_es5_generic_class_extends_generic() {
+    let source = r#"
+abstract class BaseRepository<T, ID> {
+    protected items: Map<ID, T> = new Map();
+
+    abstract create(data: Partial<T>): T;
+
+    findById(id: ID): T | undefined {
+        return this.items.get(id);
+    }
+
+    save(id: ID, item: T): void {
+        this.items.set(id, item);
+    }
+}
+
+interface User {
+    id: string;
+    name: string;
+    email: string;
+}
+
+class UserRepository extends BaseRepository<User, string> {
+    create(data: Partial<User>): User {
+        const user: User = {
+            id: Math.random().toString(36),
+            name: data.name || "",
+            email: data.email || ""
+        };
+        return user;
+    }
+
+    findByEmail(email: string): User | undefined {
+        for (const user of this.items.values()) {
+            if (user.email === email) return user;
+        }
+        return undefined;
+    }
+}
+
+class CachedRepository<T, ID> extends BaseRepository<T, ID> {
+    private cache: Map<ID, { value: T; timestamp: number }> = new Map();
+
+    create(data: Partial<T>): T {
+        return data as T;
+    }
+
+    getCached(id: ID, maxAge: number): T | undefined {
+        const cached = this.cache.get(id);
+        if (cached && Date.now() - cached.timestamp < maxAge) {
+            return cached.value;
+        }
+        return this.findById(id);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Classes should be present
+    assert!(
+        output.contains("BaseRepository") && output.contains("UserRepository") && output.contains("CachedRepository"),
+        "Classes should be present: {}",
+        output
+    );
+    // Abstract keyword should be erased
+    assert!(
+        !output.contains("abstract class") && !output.contains("abstract create"),
+        "Abstract keyword should be erased: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface User"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Generic type parameters should be erased
+    assert!(
+        !output.contains("<T, ID>") && !output.contains("<User, string>"),
+        "Generic type parameters should be erased: {}",
+        output
+    );
+    // Protected modifier should be erased
+    assert!(
+        !output.contains("protected items"),
+        "Protected modifier should be erased: {}",
+        output
+    );
+}
+
+/// Test ES5 generic class with default type parameters
+#[test]
+fn test_parity_es5_generic_class_default_params() {
+    let source = r#"
+class EventEmitter<T = any> {
+    private listeners: Array<(data: T) => void> = [];
+
+    on(callback: (data: T) => void): void {
+        this.listeners.push(callback);
+    }
+
+    emit(data: T): void {
+        this.listeners.forEach(cb => cb(data));
+    }
+}
+
+class TypedMap<K = string, V = unknown> {
+    private map: Map<K, V> = new Map();
+
+    set(key: K, value: V): this {
+        this.map.set(key, value);
+        return this;
+    }
+
+    get(key: K): V | undefined {
+        return this.map.get(key);
+    }
+}
+
+class ConfigStore<T extends object = Record<string, any>> {
+    private config: T;
+
+    constructor(initial: T) {
+        this.config = initial;
+    }
+
+    get<K extends keyof T>(key: K): T[K] {
+        return this.config[key];
+    }
+
+    set<K extends keyof T>(key: K, value: T[K]): void {
+        this.config[key] = value;
+    }
+}
+
+// Usage with defaults
+const emitter1 = new EventEmitter();
+const emitter2 = new EventEmitter<string>();
+const map1 = new TypedMap();
+const map2 = new TypedMap<number, boolean>();
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Classes should be present
+    assert!(
+        output.contains("EventEmitter") && output.contains("TypedMap") && output.contains("ConfigStore"),
+        "Classes should be present: {}",
+        output
+    );
+    // Generic type parameters with defaults should be erased
+    assert!(
+        !output.contains("<T = any>") && !output.contains("<K = string") && !output.contains("<T extends object ="),
+        "Generic type parameters with defaults should be erased: {}",
+        output
+    );
+    // Instantiation type arguments should be erased
+    assert!(
+        !output.contains("EventEmitter<string>") && !output.contains("TypedMap<number"),
+        "Instantiation type arguments should be erased: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": this") && !output.contains(": T[K]"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test ES5 combined generic class patterns
+#[test]
+fn test_parity_es5_generic_class_combined() {
+    let source = r#"
+interface Entity {
+    id: string;
+    createdAt: Date;
+}
+
+interface Service<T> {
+    process(item: T): Promise<T>;
+}
+
+abstract class BaseService<T extends Entity, R = void> implements Service<T> {
+    protected readonly serviceName: string;
+
+    constructor(name: string) {
+        this.serviceName = name;
+    }
+
+    abstract validate(item: T): boolean;
+    abstract transform(item: T): R;
+
+    async process(item: T): Promise<T> {
+        if (!this.validate(item)) {
+            throw new Error("Validation failed");
+        }
+        return item;
+    }
+}
+
+class CompositeService<T extends Entity, U extends Entity = T> extends BaseService<T, U[]> {
+    private services: Array<BaseService<T, any>> = [];
+
+    validate(item: T): boolean {
+        return item.id !== undefined;
+    }
+
+    transform(item: T): U[] {
+        return [item as unknown as U];
+    }
+
+    addService<S extends BaseService<T, any>>(service: S): this {
+        this.services.push(service);
+        return this;
+    }
+}
+
+class GenericFactory<T extends new (...args: any[]) => any> {
+    constructor(private readonly ctor: T) {}
+
+    create(...args: ConstructorParameters<T>): InstanceType<T> {
+        return new this.ctor(...args);
+    }
+}
+
+type Handler<T, R> = (input: T) => R;
+
+class Pipeline<TInput, TOutput = TInput> {
+    private handlers: Array<Handler<any, any>> = [];
+
+    pipe<TNext>(handler: Handler<TOutput, TNext>): Pipeline<TInput, TNext> {
+        const next = new Pipeline<TInput, TNext>();
+        next.handlers = [...this.handlers, handler];
+        return next;
+    }
+
+    execute(input: TInput): TOutput {
+        return this.handlers.reduce((acc, handler) => handler(acc), input as any);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Classes should be present
+    assert!(
+        output.contains("BaseService") && output.contains("CompositeService") && output.contains("GenericFactory") && output.contains("Pipeline"),
+        "Classes should be present: {}",
+        output
+    );
+    // Interfaces should be erased
+    assert!(
+        !output.contains("interface Entity") && !output.contains("interface Service"),
+        "Interfaces should be erased: {}",
+        output
+    );
+    // Type aliases should be erased
+    assert!(
+        !output.contains("type Handler"),
+        "Type aliases should be erased: {}",
+        output
+    );
+    // Abstract keyword should be erased
+    assert!(
+        !output.contains("abstract class") && !output.contains("abstract validate"),
+        "Abstract keyword should be erased: {}",
+        output
+    );
+    // Implements clause should be erased
+    assert!(
+        !output.contains("implements Service"),
+        "Implements clause should be erased: {}",
+        output
+    );
+    // Generic type parameters should be erased
+    assert!(
+        !output.contains("<T extends Entity") && !output.contains("<TInput,") && !output.contains("<T extends new"),
+        "Generic type parameters should be erased: {}",
+        output
+    );
+    // Protected/readonly modifiers should be erased
+    assert!(
+        !output.contains("protected readonly") && !output.contains("private readonly ctor"),
+        "Access modifiers should be erased: {}",
+        output
+    );
+}
