@@ -9779,3 +9779,332 @@ class AppConfig {
         output
     );
 }
+
+// =============================================================================
+// Iterator Protocol Tests
+// =============================================================================
+
+#[test]
+fn test_class_es5_iterator_protocol_basic() {
+    // Basic iterator implementation with Symbol.iterator
+    let source = r#"
+class Range {
+    constructor(private start: number, private end: number) {}
+
+    [Symbol.iterator](): Iterator<number> {
+        let current = this.start;
+        const end = this.end;
+        return {
+            next(): IteratorResult<number> {
+                if (current <= end) {
+                    return { value: current++, done: false };
+                }
+                return { value: undefined, done: true };
+            }
+        };
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be present
+    assert!(
+        output.contains("Range"),
+        "Expected Range class: {}",
+        output
+    );
+
+    // Symbol.iterator should be present
+    assert!(
+        output.contains("Symbol.iterator") || output.contains("iterator"),
+        "Expected iterator symbol: {}",
+        output
+    );
+
+    // Iterator pattern should return an object
+    assert!(
+        output.contains("return {") || output.contains("return{"),
+        "Expected iterator return pattern: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_iterator_protocol_iterable_class() {
+    // Class implementing Iterable interface
+    let source = r#"
+class Collection<T> {
+    private items: T[] = [];
+
+    add(item: T): void {
+        this.items.push(item);
+    }
+
+    [Symbol.iterator](): Iterator<T> {
+        let index = 0;
+        const items = this.items;
+        return {
+            next(): IteratorResult<T> {
+                if (index < items.length) {
+                    return { value: items[index++], done: false };
+                }
+                return { value: undefined, done: true };
+            }
+        };
+    }
+
+    size(): number {
+        return this.items.length;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be present
+    assert!(
+        output.contains("Collection"),
+        "Expected Collection class: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("add") && output.contains("size"),
+        "Expected add and size methods: {}",
+        output
+    );
+
+    // Iterator pattern should be present
+    assert!(
+        output.contains("Symbol.iterator") || output.contains("iterator"),
+        "Expected iterator pattern: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_iterator_protocol_generator_method() {
+    // Generator method as iterator
+    let source = r#"
+class NumberSequence {
+    constructor(private values: number[]) {}
+
+    *[Symbol.iterator](): Generator<number> {
+        for (const value of this.values) {
+            yield value;
+        }
+    }
+
+    *doubled(): Generator<number> {
+        for (const value of this.values) {
+            yield value * 2;
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be present
+    assert!(
+        output.contains("NumberSequence"),
+        "Expected NumberSequence class: {}",
+        output
+    );
+
+    // Generator method should be present
+    assert!(
+        output.contains("doubled"),
+        "Expected doubled method: {}",
+        output
+    );
+
+    // Generator helpers or yield patterns should be present
+    assert!(
+        output.contains("__generator") || output.contains("yield") || output.contains("return"),
+        "Expected generator pattern: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_iterator_protocol_async_iterator() {
+    // Async iterator with Symbol.asyncIterator
+    let source = r#"
+class AsyncDataSource {
+    private data: string[] = ["a", "b", "c"];
+
+    async *[Symbol.asyncIterator](): AsyncGenerator<string> {
+        for (const item of this.data) {
+            await Promise.resolve();
+            yield item;
+        }
+    }
+
+    async fetchNext(): Promise<string | undefined> {
+        return this.data.shift();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Class should be present
+    assert!(
+        output.contains("AsyncDataSource"),
+        "Expected AsyncDataSource class: {}",
+        output
+    );
+
+    // Async iterator symbol should be referenced
+    assert!(
+        output.contains("asyncIterator") || output.contains("Symbol"),
+        "Expected asyncIterator reference: {}",
+        output
+    );
+
+    // Async method should be present
+    assert!(
+        output.contains("fetchNext"),
+        "Expected fetchNext method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_iterator_protocol_with_inheritance() {
+    // Iterator protocol with inheritance
+    let source = r#"
+abstract class BaseIterator<T> {
+    protected items: T[] = [];
+
+    abstract [Symbol.iterator](): Iterator<T>;
+
+    add(item: T): void {
+        this.items.push(item);
+    }
+}
+
+class ForwardIterator<T> extends BaseIterator<T> {
+    [Symbol.iterator](): Iterator<T> {
+        let index = 0;
+        const items = this.items;
+        return {
+            next(): IteratorResult<T> {
+                if (index < items.length) {
+                    return { value: items[index++], done: false };
+                }
+                return { value: undefined, done: true };
+            }
+        };
+    }
+}
+
+class ReverseIterator<T> extends BaseIterator<T> {
+    [Symbol.iterator](): Iterator<T> {
+        let index = this.items.length - 1;
+        const items = this.items;
+        return {
+            next(): IteratorResult<T> {
+                if (index >= 0) {
+                    return { value: items[index--], done: false };
+                }
+                return { value: undefined, done: true };
+            }
+        };
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be present
+    assert!(
+        output.contains("BaseIterator") && output.contains("ForwardIterator") && output.contains("ReverseIterator"),
+        "Expected iterator classes: {}",
+        output
+    );
+
+    // Inheritance should be present
+    assert!(
+        output.contains("__extends") || output.contains("prototype"),
+        "Expected inheritance pattern: {}",
+        output
+    );
+
+    // Add method should be present
+    assert!(
+        output.contains("add"),
+        "Expected add method: {}",
+        output
+    );
+
+    // Iterator symbol should be present
+    assert!(
+        output.contains("Symbol.iterator") || output.contains("iterator"),
+        "Expected iterator symbol: {}",
+        output
+    );
+}
