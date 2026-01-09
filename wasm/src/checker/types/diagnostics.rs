@@ -148,6 +148,7 @@ pub mod diagnostic_messages {
 
     // Implicit any errors
     pub const PARAMETER_IMPLICIT_ANY: &str = "Parameter '{0}' implicitly has an '{1}' type.";
+    pub const MEMBER_IMPLICIT_ANY: &str = "Member '{0}' implicitly has an '{1}' type.";
     pub const IMPLICIT_ANY_RETURN: &str =
         "'{0}', which lacks return-type annotation, implicitly has an '{1}' return type.";
     pub const IMPLICIT_ANY_RETURN_FUNCTION_EXPRESSION: &str =
@@ -351,6 +352,7 @@ pub mod diagnostic_codes {
     pub const UNUSED_IMPORT: u32 = 6133;
     pub const IMPLICIT_ANY: u32 = 7005;
     pub const IMPLICIT_ANY_PARAMETER: u32 = 7006;
+    pub const IMPLICIT_ANY_MEMBER: u32 = 7008;
     pub const IMPLICIT_ANY_RETURN: u32 = 7010;
     pub const IMPLICIT_ANY_RETURN_FUNCTION_EXPRESSION: u32 = 7011;
     pub const COULD_NOT_RESOLVE_TYPE: u32 = 7016;

@@ -19,6 +19,8 @@ engine on top to match TypeScript behavior while preserving correctness where po
 We need to keep working on our project and while maintaining the architectural integrity of our codebase, increase conformance with TypeScript.
 
 
+Output of `wasm/differential-test/run-conformance.sh --max=10000` dictates where we are and where should we go from here
+
 ### Anti-Priorities (Do Not Work On)
 *   **New Emitter transforms** (ES3, obscure module formats) - we have enough
 *   New LSP features (Semantic Tokens, Code Actions) unless they expose a Solver bug
