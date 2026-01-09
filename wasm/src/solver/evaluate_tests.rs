@@ -37625,7 +37625,7 @@ fn test_distributive_with_object_types() {
     let obj_with_x = interner.object(vec![PropertyInfo {
         name: interner.intern_string("x"),
         type_id: TypeId::NUMBER,
-        write_type: None,
+        write_type: TypeId::NUMBER,
         optional: false,
         readonly: false,
         is_method: false,
@@ -37634,7 +37634,7 @@ fn test_distributive_with_object_types() {
     let obj_with_y = interner.object(vec![PropertyInfo {
         name: interner.intern_string("y"),
         type_id: TypeId::STRING,
-        write_type: None,
+        write_type: TypeId::STRING,
         optional: false,
         readonly: false,
         is_method: false,
@@ -37644,7 +37644,7 @@ fn test_distributive_with_object_types() {
     let pattern = interner.object(vec![PropertyInfo {
         name: interner.intern_string("x"),
         type_id: TypeId::NUMBER,
-        write_type: None,
+        write_type: TypeId::NUMBER,
         optional: false,
         readonly: false,
         is_method: false,
@@ -37754,7 +37754,7 @@ fn test_distributive_with_any_in_union() {
 }
 
 #[test]
-fn test_distributive_with_unknown() {
+fn test_distributive_with_unknown_direct() {
     // unknown in distribution: T extends unknown is always true
     let interner = TypeInterner::new();
 
