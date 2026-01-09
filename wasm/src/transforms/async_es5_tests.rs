@@ -5812,3 +5812,196 @@ fn test_async_destructuring_conditional() {
         output
     );
 }
+
+// ============================================================================
+// ASYNC TEMPLATE LITERAL TESTS
+// ============================================================================
+
+fn parse_and_emit_async_template_literal(source: &str) -> String {
+    use crate::parser::syntax_kind_ext;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            for &stmt_idx in &source_file.statements.nodes {
+                if let Some(stmt_node) = parser.arena.get(stmt_idx) {
+                    if stmt_node.kind == syntax_kind_ext::FUNCTION_DECLARATION {
+                        if let Some(func_data) = parser.arena.get_function(stmt_node) {
+                            let emitter = AsyncES5Emitter::new(&parser.arena);
+                            let has_await = emitter.body_contains_await(func_data.body);
+                            let mut emitter = AsyncES5Emitter::new(&parser.arena);
+                            if has_await {
+                                return emitter.emit_generator_body_with_await(func_data.body);
+                            } else {
+                                return emitter.emit_simple_generator_body(func_data.body);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    String::new()
+}
+
+fn template_literal_contains_await(source: &str) -> bool {
+    use crate::parser::syntax_kind_ext;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    if let Some(root_node) = parser.arena.get(root) {
+        if let Some(source_file) = parser.arena.get_source_file(root_node) {
+            for &stmt_idx in &source_file.statements.nodes {
+                if let Some(stmt_node) = parser.arena.get(stmt_idx) {
+                    if stmt_node.kind == syntax_kind_ext::FUNCTION_DECLARATION {
+                        if let Some(func_data) = parser.arena.get_function(stmt_node) {
+                            let emitter = AsyncES5Emitter::new(&parser.arena);
+                            return emitter.body_contains_await(func_data.body);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
+#[test]
+fn test_async_template_literal_basic() {
+    let output = parse_and_emit_async_template_literal(
+        "async function foo(name: string) { await init(); return `Hello ${name}`; }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Template literal after await should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_template_literal_with_await_expr() {
+    let output = parse_and_emit_async_template_literal(
+        "async function foo() { const data = await getData(); return `Result: ${data}`; }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Template literal with await expression should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_template_literal_no_await() {
+    let output = parse_and_emit_async_template_literal(
+        "async function foo(name: string) { return `Hello ${name}`; }",
+    );
+    assert!(
+        output.contains("[2 /*return*/"),
+        "Sync template literal should have return: {}",
+        output
+    );
+    assert!(
+        !output.contains("switch"),
+        "No await should skip switch: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_template_literal_multiple_expressions() {
+    let output = parse_and_emit_async_template_literal(
+        "async function foo(a: string, b: number) { await setup(); return `${a} is ${b}`; }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Template with multiple expressions should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_template_literal_body_contains_await() {
+    assert!(
+        template_literal_contains_await(
+            "async function foo() { await process(); return `done`; }"
+        ),
+        "Should detect await with template literal"
+    );
+}
+
+#[test]
+fn test_async_template_literal_body_no_await() {
+    assert!(
+        !template_literal_contains_await(
+            "async function foo(x: number) { return `value: ${x}`; }"
+        ),
+        "Should not detect await when none present"
+    );
+}
+
+#[test]
+fn test_async_template_literal_ignores_nested_async() {
+    assert!(
+        !template_literal_contains_await(
+            "async function foo() { const fn = async () => { return `${await x}`; }; return 1; }"
+        ),
+        "Should ignore await in nested async"
+    );
+}
+
+#[test]
+fn test_async_template_literal_tagged() {
+    let output = parse_and_emit_async_template_literal(
+        "async function foo(val: string) { await init(); return tag`value: ${val}`; }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Tagged template literal should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_template_literal_with_try_catch() {
+    assert!(
+        template_literal_contains_await(
+            "async function foo() { try { await riskyOp(); return `success`; } catch (e) { return `error`; } }"
+        ),
+        "Should detect await in try block with template literal"
+    );
+}
+
+#[test]
+fn test_async_template_literal_nested() {
+    let output = parse_and_emit_async_template_literal(
+        "async function foo(x: number) { await init(); return `outer ${`inner ${x}`}`; }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Nested template literal should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_template_literal_in_expression() {
+    let output = parse_and_emit_async_template_literal(
+        "async function foo(name: string) { await init(); const msg = `Hello ${name}!`; return msg.length; }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Template literal in expression should have switch or yield: {}",
+        output
+    );
+}
+
+#[test]
+fn test_async_template_literal_conditional() {
+    let output = parse_and_emit_async_template_literal(
+        "async function foo(cond: boolean, x: number) { if (cond) { await process(); } return `value: ${x}`; }",
+    );
+    assert!(
+        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/"),
+        "Conditional template literal should have switch or yield: {}",
+        output
+    );
+}
