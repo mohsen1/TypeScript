@@ -16468,3 +16468,132 @@ fn test_variadic_tuple_empty_rest() {
     let expected = interner.tuple(Vec::new());
     assert_eq!(result, expected);
 }
+
+// =========================================================================
+// KeyOf and Indexed Access Type Tests - Additional Scenarios
+// =========================================================================
+// Tests for keyof and indexed access types in complex scenarios
+
+#[test]
+fn test_keyof_with_index_access_combination() {
+    let interner = TypeInterner::new();
+
+    // Pattern: { [K in keyof T]: T[K] } - identity mapped type
+    // Object: { name: string, age: number }
+    // keyof T = "name" | "age", T[K] produces the value types
+
+    let name_prop = interner.intern_string("name");
+    let age_prop = interner.intern_string("age");
+
+    let obj = interner.object(vec![
+        PropertyInfo {
+            name: name_prop,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: age_prop,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let result = evaluate_keyof(&interner, obj);
+
+    // Should produce "age" | "name" (order determined by interner)
+    let expected = interner.union(vec![
+        interner.literal_string("age"),
+        interner.literal_string("name"),
+    ]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_index_access_with_keyof() {
+    let interner = TypeInterner::new();
+
+    // Pattern: T[keyof T] - get all value types from object
+    // Object: { x: string, y: number }
+    // T[keyof T] = string | number
+
+    let x_prop = interner.intern_string("x");
+    let y_prop = interner.intern_string("y");
+
+    let obj = interner.object(vec![
+        PropertyInfo {
+            name: x_prop,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: y_prop,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Access with "x" key
+    let key_x = interner.literal_string("x");
+    let result_x = evaluate_index_access(&interner, obj, key_x);
+    assert_eq!(result_x, TypeId::STRING);
+
+    // Access with "y" key
+    let key_y = interner.literal_string("y");
+    let result_y = evaluate_index_access(&interner, obj, key_y);
+    assert_eq!(result_y, TypeId::NUMBER);
+}
+
+#[test]
+fn test_index_access_nested_object() {
+    let interner = TypeInterner::new();
+
+    // Pattern: T["outer"]["inner"]
+    // Object: { outer: { inner: string } }
+
+    let inner_prop = interner.intern_string("inner");
+    let inner_obj = interner.object(vec![PropertyInfo {
+        name: inner_prop,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let outer_prop = interner.intern_string("outer");
+    let outer_obj = interner.object(vec![PropertyInfo {
+        name: outer_prop,
+        type_id: inner_obj,
+        write_type: inner_obj,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // First access: T["outer"]
+    let outer_key = interner.literal_string("outer");
+    let first_result = evaluate_index_access(&interner, outer_obj, outer_key);
+
+    // First result should be the inner object
+    assert_eq!(first_result, inner_obj);
+
+    // Second access: T["outer"]["inner"]
+    let inner_key = interner.literal_string("inner");
+    let final_result = evaluate_index_access(&interner, first_result, inner_key);
+
+    // Final result should be string
+    assert_eq!(final_result, TypeId::STRING);
+}
+
