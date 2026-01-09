@@ -1,96 +1,42 @@
 # Worker 4 Plan - Squad Forge
 
 ## Mission
-Implement TS2341/TS2445 access modifier enforcement.
+Implement TS2322 improvements (type not assignable) for conformance.
 
-Status: Complete
+Status: Active
 Priority: 1
 
 ## Current Assignment
-Enforce private and protected access modifiers on property/method access.
+Improve assignability diagnostics and reduce false positives/negatives for TS2322.
 
-**Error Codes:**
-- TS2341 - "Property 'X' is private and only accessible within class 'Y'"
-- TS2445 - "Property 'X' is protected and only accessible within class 'Y' and its subclasses"
+**Error Code:** TS2322 - "Type 'X' is not assignable to type 'Y'"
 
-**Impact:** 63 conformance tests affected
-
-### Background
-TypeScript enforces visibility modifiers:
-```typescript
-class Foo {
-  private secret = 42;
-  protected shared = "hello";
-}
-
-const f = new Foo();
-f.secret;  // TS2341: private
-f.shared;  // TS2445: protected
-```
-
-The WASM checker has `has_private_modifier()` and `has_protected_modifier()` functions but does NOT emit errors. The infrastructure exists but enforcement is missing.
+**Impact:** 310 conformance tests affected
 
 ### Steps
-1. **Find existing infrastructure** in `thin_checker.rs`:
-   - Search for `has_private_modifier`, `has_protected_modifier` (around line 7081, 7096)
-   - Find property access checking code
-   - Look for `check_property_access` or similar
-
-2. **Add test cases first**:
-   ```typescript
-   // Should error: TS2341
-   class Foo {
-     private x = 1;
-   }
-   new Foo().x;  // error
-
-   // Should error: TS2445
-   class Bar {
-     protected y = 2;
-   }
-   new Bar().y;  // error
-
-   // Should NOT error: protected access in subclass
-   class Base {
-     protected z = 3;
-   }
-   class Derived extends Base {
-     test() { return this.z; }  // OK
-   }
-
-   // Should NOT error: private access within class
-   class Baz {
-     private w = 4;
-     getW() { return this.w; }  // OK
-   }
-   ```
-
-3. **Implement enforcement**:
-   - In property access checking, get the property's containing class
-   - Check if property has private/protected modifier
-   - Compare access location to property's class:
-     - Private: must be same class
-     - Protected: must be same class or subclass
-   - Emit TS2341/TS2445 on violation
-
-4. **Handle edge cases**:
-   - Static members
-   - Constructor parameters with modifiers
-   - Private fields (`#field` syntax) - different from `private` keyword
-
-5. **Run conformance tests** and report numbers.
+1. **Audit TS2322 emit points** in `thin_checker.rs` and related helpers to ensure we:
+   - Use the correct target type for contextual typing
+   - Avoid cascading errors when a source expression already has `error` type
+2. **Add tests first** in `wasm/src/thin_checker_tests.rs`:
+   - Assignability across unions/intersections with contextual typing
+   - Optional vs required properties in object literals
+   - `any`/`unknown` assignability edge cases
+3. **Implement fixes** in assignability checks and rerun tests.
+4. **Run conformance tests** and record delta.
 
 ### Key Files
-- `wasm/src/thin_checker.rs` - `has_private_modifier()`, `has_protected_modifier()`, property access
-- `wasm/src/checker/expr.rs` - expression checking
+- `wasm/src/thin_checker.rs`
+- `wasm/src/checker/types/assignability.rs` (if present)
+- `wasm/src/thin_checker_tests.rs`
 
 ### Success Criteria
-- TS2341 emitted for private access violations
-- TS2445 emitted for protected access violations
-- No errors for valid access within class/subclass
+- TS2322 missing errors reduced
+- Extra errors do not increase (no regressions)
 
 ## Task Queue
-(empty - single focused task)
+- Add TS2322 regression tests for object literal excess property and optionality.
+- Validate assignability for unions with contextual typing.
+- Confirm no regressions in existing assignability tests.
 
 ## Completed
 
@@ -132,10 +78,10 @@ The WASM checker has `has_private_modifier()` and `has_protected_modifier()` fun
 - [x] Fixed let...else syntax error in protected access check (converted to match expression)
 
 ## Ready for Merge
-Yes
+No
 
 ## Notes
-- Added receiver-based protected access checks and tests (base instance + static constructor).
-- Tests not run in this session (docker required).
-- Be careful with `#private` fields (different mechanism).
+- Run `./wasm/test.sh` before pushing.
+- Commit format: `[wasm] checker: improve TS2322 assignability diagnostics`
+- Push to: `origin/worker/forge-4`
 - **NEVER edit**: `STRUCTURE.md`, `GOALS.md`, other workers' plan files, or anything in `orchestrator/`
