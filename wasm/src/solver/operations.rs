@@ -1513,11 +1513,6 @@ impl<'a> PropertyAccessEvaluator<'a> {
                         from_index_signature: false,
                     };
                 }
-                let apparent =
-                    self.resolve_apparent_property(IntrinsicKind::Object, obj_type, prop_name, prop_atom);
-                if let PropertyAccessResult::Success { .. } = apparent {
-                    return apparent;
-                }
                 if let Some(result) = self.resolve_object_member(prop_name, prop_atom) {
                     return result;
                 }
@@ -1539,11 +1534,6 @@ impl<'a> PropertyAccessEvaluator<'a> {
                     };
                 }
 
-                let apparent =
-                    self.resolve_apparent_property(IntrinsicKind::Object, obj_type, prop_name, prop_atom);
-                if let PropertyAccessResult::Success { .. } = apparent {
-                    return apparent;
-                }
                 if let Some(result) = self.resolve_object_member(prop_name, prop_atom) {
                     return result;
                 }
@@ -1789,11 +1779,6 @@ impl<'a> PropertyAccessEvaluator<'a> {
 
             TypeKey::Intrinsic(IntrinsicKind::Object) => {
                 let prop_atom = prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name));
-                let apparent =
-                    self.resolve_apparent_property(IntrinsicKind::Object, obj_type, prop_name, prop_atom);
-                if let PropertyAccessResult::Success { .. } = apparent {
-                    return apparent;
-                }
                 self.resolve_object_member(prop_name, prop_atom)
                     .unwrap_or(PropertyAccessResult::PropertyNotFound {
                         type_id: obj_type,

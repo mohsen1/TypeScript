@@ -3373,8 +3373,8 @@ impl ThinNodeArena {
     /// Get function type data.
     #[inline]
     pub fn get_function_type(&self, node: &ThinNode) -> Option<&FunctionTypeData> {
-        use super::syntax_kind_ext::FUNCTION_TYPE;
-        if node.has_data() && node.kind == FUNCTION_TYPE {
+        use super::syntax_kind_ext::{CONSTRUCTOR_TYPE, FUNCTION_TYPE};
+        if node.has_data() && (node.kind == FUNCTION_TYPE || node.kind == CONSTRUCTOR_TYPE) {
             self.function_types.get(node.data_index as usize)
         } else {
             None

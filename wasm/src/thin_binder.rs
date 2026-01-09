@@ -1703,11 +1703,11 @@ impl ThinBinderState {
             return true;
         }
 
-        if (existing_flags & symbol_flags::CLASS != 0
-            && (new_flags & symbol_flags::INTERFACE) != 0)
-            || (existing_flags & symbol_flags::INTERFACE != 0
-                && (new_flags & symbol_flags::CLASS) != 0)
-        {
+        let existing_is_interface = (existing_flags & symbol_flags::INTERFACE) != 0;
+        let new_is_interface = (new_flags & symbol_flags::INTERFACE) != 0;
+        let existing_is_value = (existing_flags & symbol_flags::VALUE) != 0;
+        let new_is_value = (new_flags & symbol_flags::VALUE) != 0;
+        if (existing_is_interface && new_is_value) || (new_is_interface && existing_is_value) {
             return true;
         }
 

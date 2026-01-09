@@ -3508,8 +3508,9 @@ export type DeepPartial<T> = {
 
 export type Nullable<T> = T | null;
 
-export type NonNullableProps<T> = {
-    [P in keyof T]: NonNullable<T[P]>;
+// Mapped type that uses index access (T[P])
+export type ValueTypes<T> = {
+    [P in keyof T]: T[P];
 };
 
 // Runtime function using these types
