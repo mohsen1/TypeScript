@@ -6,12 +6,13 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-- [ ] Add ES5 class tests for keyof/typeof patterns: keyof object, typeof value, indexed access types. Tests: `./wasm/test.sh class_es5_tests`
-
-## Task Queue
 - [ ] Add ES5 class tests for template string type patterns: string interpolation, pattern matching
 
+## Task Queue
+(empty)
+
 ## Completed
+- [x] Added ES5 tests for keyof/typeof patterns (6 tests): keyof object, typeof value, indexed access types, keyof generics, typeof const assertions, combined keyof/typeof. Ran `./wasm/test.sh class_es5_tests` (all 416 pass).
 - [x] Added ES5 tests for infer keyword patterns (6 tests): array element, function return, promise unwrap, constructor params, tuple elements, combined infer patterns. Ran `./wasm/test.sh class_es5_tests` (all 407 pass).
 - [x] Added ES5 tests for mapped type patterns (6 tests): Partial, Required, Readonly, Pick, Omit, Record. Ran `./wasm/test.sh class_es5_tests` (all 401 pass).
 - [x] Added ES5 tests for union type patterns (6 tests): discriminated unions, type narrowing, string literal unions, number literal unions, nullable unions, combined union patterns. Ran `./wasm/test.sh class_es5_tests` (all 395 pass).
