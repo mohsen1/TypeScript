@@ -1,82 +1,43 @@
 # Worker 2 Plan - Squad Forge
 
 ## Mission
-Implement TS2564 property initialization checking (class field analysis - edge cases).
+Implement TS2339 property access checking improvements (property does not exist).
 
-Status: Complete
+Status: Active
 Priority: 1
 
 ## Current Assignment
-Handle edge cases for property initialization: control flow in constructors, inheritance, and special patterns.
+Reduce false positives for property access errors by aligning TS2339 behavior with TypeScript.
 
-**Error Code:** TS2564 - "Property 'X' has no initializer and is not definitely assigned in the constructor"
+**Error Code:** TS2339 - "Property 'X' does not exist on type 'Y'"
 
-**Impact:** 135 conformance tests affected (shared with Worker 1)
-
-### Background
-Worker 1 handles the basic case. Worker 2 handles edge cases:
-- Properties assigned in `if` branches (need all paths)
-- Properties assigned via method calls in constructor
-- Inherited properties from base class
-- Properties with `declare` modifier (should skip)
-- Abstract properties (should skip)
+**Impact:** 142 conformance tests affected
 
 ### Steps
-1. **Add edge case test cases**:
-   ```typescript
-   // Should error: not assigned in all paths
-   class Foo {
-     name: string;
-     constructor(flag: boolean) {
-       if (flag) { this.name = "yes"; }
-       // missing else branch
-     }
-   }
-
-   // Should NOT error: assigned in all paths
-   class Bar {
-     name: string;
-     constructor(flag: boolean) {
-       if (flag) { this.name = "yes"; }
-       else { this.name = "no"; }
-     }
-   }
-
-   // Should NOT error: declare modifier
-   declare class External {
-     name: string;
-   }
-
-   // Should NOT error: abstract property
-   abstract class Base {
-     abstract name: string;
-   }
-   ```
-
-2. **Extend control flow analysis**:
-   - Use existing `checker/control_flow.rs` infrastructure
-   - Track property assignments across all code paths
-   - Handle try/catch/finally blocks
-   - Handle early returns
-
-3. **Handle inheritance**:
-   - If base class constructor assigns a property, derived class shouldn't re-require it
-   - Check for `super()` call location
-
-4. **Run conformance tests** and report numbers.
+1. **Audit TS2339 emit points** in `thin_checker.rs` to ensure we skip diagnostics for:
+   - `any` and `unknown` flows
+   - `error` type (suppress cascades)
+   - Union members where at least one contains the property
+2. **Add tests first** in `wasm/src/thin_checker_tests.rs`:
+   - `any` access should not error
+   - `unknown` access should error only when narrowed
+   - Optional properties on unions should not error when present in some members
+3. **Implement fixes** and ensure existing TS2339 tests still pass.
+4. **Run conformance tests** and record delta.
 
 ### Key Files
-- `wasm/src/thin_checker.rs` - main checker
-- `wasm/src/checker/control_flow.rs` - flow analysis
-- `wasm/src/ast.rs` - AST node types for modifiers
+- `wasm/src/thin_checker.rs`
+- `wasm/src/checker/types/diagnostics.rs`
+- `wasm/src/thin_checker_tests.rs`
 
 ### Success Criteria
-- Control flow analysis for constructor property assignment
-- No false positives for edge cases
-- Works correctly with inheritance
+- TS2339 missing errors reduced
+- Extra errors do not increase (no regressions)
 
 ## Task Queue
-(empty - single focused task)
+- Add targeted tests for union property access and `any`/`unknown` behavior.
+- Confirm behavior for property access on intersection types.
+- Verify no regressions in existing TS2339 tests.
 
 ## Completed
 - Added 5 additional edge case tests for TS2564:
@@ -94,12 +55,10 @@ control flow analysis. My contribution adds complementary edge case tests and
 compilation fixes.
 
 ## Ready for Merge
-Yes
+No
 
 ## Notes
-- Coordinate with Worker 1 (basic TS2564 implementation)
-- Build on Worker 1's work, don't duplicate
 - Run `./wasm/test.sh` before pushing
-- Commit format: `[wasm] checker: TS2564 control flow and edge cases`
+- Commit format: `[wasm] checker: improve TS2339 property access diagnostics`
 - Push to: `origin/worker/forge-2`
 - **NEVER edit**: `STRUCTURE.md`, `GOALS.md`, other workers' plan files, or anything in `orchestrator/`

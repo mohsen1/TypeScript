@@ -5,6 +5,7 @@
  * environment variables and startup prompts.
  */
 
+import { join } from 'node:path';
 import { TmuxClient } from '../tmux/index.js';
 import { commandExists, shellEscape } from '../utils/index.js';
 import type {
@@ -167,6 +168,7 @@ export class AgentManager {
     worktreeDir?: string
   ): Record<string, string> {
     const vars: Record<string, string> = {};
+    vars['NOTIFY_DIR'] = process.env['NOTIFY_DIR'] ?? join(this.config.rootDir, '.notify');
 
     if (squad) {
       vars['SQUAD_NAME'] = squad;
