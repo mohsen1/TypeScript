@@ -7,9 +7,22 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-(none - awaiting new task from EM-Anvil)
+Add ES5 class expression source map tests
 
-ES5 decorator source map tests were already completed in a previous session. 28 decorator ES5 tests exist (class, method, property, parameter, multiple, combined patterns) and all 905 source map tests pass.
+Per GOALS.md Objective 2: Source Map Validation
+
+Steps:
+1. Add 6 ES5 class expression source map tests to `wasm/src/source_map_tests.rs`:
+   - Anonymous class expression
+   - Named class expression
+   - Class expression in return statement
+   - Class expression with extends
+   - Class expression in array
+   - Combined class expression patterns
+2. Run `./wasm/test.sh source_map` to verify all tests pass
+3. Commit with message: `[wasm] source_map: add class expression source map tests`
+4. Push to `origin/worker/anvil-3`
+5. Update this plan file and push
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)
