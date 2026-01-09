@@ -29415,3 +29415,547 @@ class RecordStore<K extends string, V> {
         output
     );
 }
+
+/// Test: infer keyword with array element type
+/// Verifies that classes using infer for array element extraction transform correctly to ES5
+#[test]
+fn test_class_es5_infer_array_element() {
+    let source = r#"
+type ElementType<T> = T extends Array<infer E> ? E : never;
+type FirstElement<T> = T extends [infer F, ...any[]] ? F : never;
+
+class ArrayProcessor<T extends any[]> {
+    private items: T;
+
+    constructor(items: T) {
+        this.items = items;
+    }
+
+    getFirst(): FirstElement<T> {
+        return this.items[0] as FirstElement<T>;
+    }
+
+    getLast(): ElementType<T> {
+        return this.items[this.items.length - 1] as ElementType<T>;
+    }
+
+    map<U>(fn: (item: ElementType<T>) => U): U[] {
+        var result = [];
+        for (var i = 0; i < this.items.length; i++) {
+            result.push(fn(this.items[i]));
+        }
+        return result;
+    }
+
+    getItems(): T {
+        return this.items;
+    }
+}
+
+class TypeExtractor {
+    extractElement<T extends any[]>(arr: T): ElementType<T> {
+        return arr[0];
+    }
+
+    extractFirst<T extends any[]>(arr: T): FirstElement<T> {
+        return arr[0] as FirstElement<T>;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function ArrayProcessor"),
+        "Expected ArrayProcessor function: {}",
+        output
+    );
+    assert!(
+        output.contains("ArrayProcessor.prototype.getFirst") && output.contains("ArrayProcessor.prototype.getLast"),
+        "Expected getFirst and getLast methods: {}",
+        output
+    );
+    assert!(
+        output.contains("ArrayProcessor.prototype.map") && output.contains("ArrayProcessor.prototype.getItems"),
+        "Expected map and getItems methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function TypeExtractor"),
+        "Expected TypeExtractor function: {}",
+        output
+    );
+    assert!(
+        output.contains("TypeExtractor.prototype.extractElement") && output.contains("TypeExtractor.prototype.extractFirst"),
+        "Expected extractElement and extractFirst methods: {}",
+        output
+    );
+}
+
+/// Test: infer keyword with function return type
+/// Verifies that classes using infer for function return type extraction transform correctly to ES5
+#[test]
+fn test_class_es5_infer_function_return() {
+    let source = r#"
+type ReturnType<T> = T extends (...args: any[]) => infer R ? R : never;
+type Parameters<T> = T extends (...args: infer P) => any ? P : never;
+
+class FunctionWrapper<T extends (...args: any[]) => any> {
+    private fn: T;
+
+    constructor(fn: T) {
+        this.fn = fn;
+    }
+
+    call(...args: Parameters<T>): ReturnType<T> {
+        return this.fn.apply(null, args);
+    }
+
+    bind(thisArg: any): T {
+        return this.fn.bind(thisArg);
+    }
+
+    getFunction(): T {
+        return this.fn;
+    }
+}
+
+class ReturnExtractor {
+    getReturnValue<T extends (...args: any[]) => any>(fn: T, args: Parameters<T>): ReturnType<T> {
+        return fn.apply(null, args);
+    }
+
+    wrapReturn<T extends (...args: any[]) => any>(fn: T): () => ReturnType<T> {
+        return function() {
+            return fn();
+        };
+    }
+
+    createCaller<T extends (...args: any[]) => any>(fn: T): (args: Parameters<T>) => ReturnType<T> {
+        return function(args) {
+            return fn.apply(null, args);
+        };
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function FunctionWrapper"),
+        "Expected FunctionWrapper function: {}",
+        output
+    );
+    assert!(
+        output.contains("FunctionWrapper.prototype.call") && output.contains("FunctionWrapper.prototype.bind"),
+        "Expected call and bind methods: {}",
+        output
+    );
+    assert!(
+        output.contains("FunctionWrapper.prototype.getFunction"),
+        "Expected getFunction method: {}",
+        output
+    );
+    assert!(
+        output.contains("function ReturnExtractor"),
+        "Expected ReturnExtractor function: {}",
+        output
+    );
+    assert!(
+        output.contains("ReturnExtractor.prototype.getReturnValue") && output.contains("ReturnExtractor.prototype.wrapReturn"),
+        "Expected getReturnValue and wrapReturn methods: {}",
+        output
+    );
+}
+
+/// Test: infer keyword with Promise unwrap
+/// Verifies that classes using infer for Promise unwrapping transform correctly to ES5
+#[test]
+fn test_class_es5_infer_promise_unwrap() {
+    let source = r#"
+type Awaited<T> = T extends Promise<infer U> ? Awaited<U> : T;
+type PromiseValue<T> = T extends Promise<infer V> ? V : T;
+
+class PromiseHandler<T> {
+    private promise: Promise<T>;
+
+    constructor(value: T) {
+        this.promise = Promise.resolve(value);
+    }
+
+    then<U>(fn: (value: T) => U): PromiseHandler<U> {
+        var result = this.promise.then(fn);
+        return new PromiseHandler(result as any);
+    }
+
+    getPromise(): Promise<T> {
+        return this.promise;
+    }
+
+    getValue(): Promise<T> {
+        return this.promise;
+    }
+}
+
+class AsyncUnwrapper {
+    unwrap<T>(promise: Promise<T>): Promise<PromiseValue<Promise<T>>> {
+        return promise;
+    }
+
+    unwrapNested<T>(promise: Promise<Promise<T>>): Promise<T> {
+        return promise.then(function(inner) { return inner; });
+    }
+
+    createResolved<T>(value: T): Promise<T> {
+        return Promise.resolve(value);
+    }
+
+    createRejected<T>(reason: any): Promise<T> {
+        return Promise.reject(reason);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function PromiseHandler"),
+        "Expected PromiseHandler function: {}",
+        output
+    );
+    assert!(
+        output.contains("PromiseHandler.prototype.then") && output.contains("PromiseHandler.prototype.getPromise"),
+        "Expected then and getPromise methods: {}",
+        output
+    );
+    assert!(
+        output.contains("PromiseHandler.prototype.getValue"),
+        "Expected getValue method: {}",
+        output
+    );
+    assert!(
+        output.contains("function AsyncUnwrapper"),
+        "Expected AsyncUnwrapper function: {}",
+        output
+    );
+    assert!(
+        output.contains("AsyncUnwrapper.prototype.unwrap") && output.contains("AsyncUnwrapper.prototype.unwrapNested"),
+        "Expected unwrap and unwrapNested methods: {}",
+        output
+    );
+}
+
+/// Test: infer keyword with constructor parameters
+/// Verifies that classes using infer for constructor parameter extraction transform correctly to ES5
+#[test]
+fn test_class_es5_infer_constructor_params() {
+    let source = r#"
+type ConstructorParameters<T> = T extends new (...args: infer P) => any ? P : never;
+type InstanceType<T> = T extends new (...args: any[]) => infer R ? R : never;
+
+class FactoryBuilder<T extends new (...args: any[]) => any> {
+    private ctor: T;
+
+    constructor(ctor: T) {
+        this.ctor = ctor;
+    }
+
+    create(...args: ConstructorParameters<T>): InstanceType<T> {
+        return new (this.ctor as any)(...args);
+    }
+
+    getConstructor(): T {
+        return this.ctor;
+    }
+
+    createDefault(): InstanceType<T> {
+        return new (this.ctor as any)();
+    }
+}
+
+class InstanceCreator {
+    instantiate<T extends new (...args: any[]) => any>(ctor: T, args: ConstructorParameters<T>): InstanceType<T> {
+        return new (ctor as any)(...args);
+    }
+
+    createEmpty<T extends new () => any>(ctor: T): InstanceType<T> {
+        return new ctor();
+    }
+
+    getParamCount<T extends new (...args: any[]) => any>(ctor: T): number {
+        return ctor.length;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function FactoryBuilder"),
+        "Expected FactoryBuilder function: {}",
+        output
+    );
+    assert!(
+        output.contains("FactoryBuilder.prototype.create") && output.contains("FactoryBuilder.prototype.getConstructor"),
+        "Expected create and getConstructor methods: {}",
+        output
+    );
+    assert!(
+        output.contains("FactoryBuilder.prototype.createDefault"),
+        "Expected createDefault method: {}",
+        output
+    );
+    assert!(
+        output.contains("function InstanceCreator"),
+        "Expected InstanceCreator function: {}",
+        output
+    );
+    assert!(
+        output.contains("InstanceCreator.prototype.instantiate") && output.contains("InstanceCreator.prototype.createEmpty"),
+        "Expected instantiate and createEmpty methods: {}",
+        output
+    );
+}
+
+/// Test: infer keyword with tuple elements
+/// Verifies that classes using infer for tuple element extraction transform correctly to ES5
+#[test]
+fn test_class_es5_infer_tuple_elements() {
+    let source = r#"
+type Head<T> = T extends [infer H, ...any[]] ? H : never;
+type Tail<T> = T extends [any, ...infer R] ? R : never;
+type Last<T> = T extends [...any[], infer L] ? L : never;
+
+class TupleProcessor<T extends any[]> {
+    private tuple: T;
+
+    constructor(tuple: T) {
+        this.tuple = tuple;
+    }
+
+    head(): Head<T> {
+        return this.tuple[0] as Head<T>;
+    }
+
+    last(): Last<T> {
+        return this.tuple[this.tuple.length - 1] as Last<T>;
+    }
+
+    length(): number {
+        return this.tuple.length;
+    }
+
+    getTuple(): T {
+        return this.tuple;
+    }
+}
+
+class TupleExtractor {
+    getHead<T extends [any, ...any[]]>(tuple: T): Head<T> {
+        return tuple[0];
+    }
+
+    getLast<T extends [...any[], any]>(tuple: T): Last<T> {
+        return tuple[tuple.length - 1];
+    }
+
+    split<T extends [any, ...any[]]>(tuple: T): { head: Head<T>; tail: Tail<T> } {
+        var head = tuple[0];
+        var tail = tuple.slice(1);
+        return { head: head as Head<T>, tail: tail as Tail<T> };
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function TupleProcessor"),
+        "Expected TupleProcessor function: {}",
+        output
+    );
+    assert!(
+        output.contains("TupleProcessor.prototype.head") && output.contains("TupleProcessor.prototype.last"),
+        "Expected head and last methods: {}",
+        output
+    );
+    assert!(
+        output.contains("TupleProcessor.prototype.length") && output.contains("TupleProcessor.prototype.getTuple"),
+        "Expected length and getTuple methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function TupleExtractor"),
+        "Expected TupleExtractor function: {}",
+        output
+    );
+    assert!(
+        output.contains("TupleExtractor.prototype.getHead") && output.contains("TupleExtractor.prototype.getLast"),
+        "Expected getHead and getLast methods: {}",
+        output
+    );
+}
+
+/// Test: combined infer patterns
+/// Verifies that classes using combined infer patterns transform correctly to ES5
+#[test]
+fn test_class_es5_combined_infer_patterns() {
+    let source = r#"
+type UnpackArray<T> = T extends Array<infer U> ? U : T;
+type UnpackPromise<T> = T extends Promise<infer U> ? U : T;
+type UnpackFunction<T> = T extends (...args: any[]) => infer R ? R : T;
+
+class TypeUnpacker {
+    unpackArrayValue<T extends any[]>(arr: T, index: number): UnpackArray<T> {
+        return arr[index];
+    }
+
+    wrapInArray<T>(value: T): Array<T> {
+        return [value];
+    }
+
+    wrapInPromise<T>(value: T): Promise<T> {
+        return Promise.resolve(value);
+    }
+
+    identity<T>(value: T): T {
+        return value;
+    }
+}
+
+type DeepUnwrap<T> = T extends Promise<infer U>
+    ? DeepUnwrap<U>
+    : T extends Array<infer E>
+    ? DeepUnwrap<E>[]
+    : T;
+
+class DeepProcessor {
+    processArray<T>(arr: T[]): T[] {
+        return arr.slice();
+    }
+
+    processPromise<T>(promise: Promise<T>): Promise<T> {
+        return promise.then(function(v) { return v; });
+    }
+
+    flatten<T>(nested: T[][]): T[] {
+        var result = [];
+        for (var i = 0; i < nested.length; i++) {
+            for (var j = 0; j < nested[i].length; j++) {
+                result.push(nested[i][j]);
+            }
+        }
+        return result;
+    }
+
+    createPair<A, B>(a: A, b: B): [A, B] {
+        return [a, b];
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function TypeUnpacker"),
+        "Expected TypeUnpacker function: {}",
+        output
+    );
+    assert!(
+        output.contains("TypeUnpacker.prototype.unpackArrayValue") && output.contains("TypeUnpacker.prototype.wrapInArray"),
+        "Expected unpackArrayValue and wrapInArray methods: {}",
+        output
+    );
+    assert!(
+        output.contains("TypeUnpacker.prototype.wrapInPromise") && output.contains("TypeUnpacker.prototype.identity"),
+        "Expected wrapInPromise and identity methods: {}",
+        output
+    );
+    assert!(
+        output.contains("function DeepProcessor"),
+        "Expected DeepProcessor function: {}",
+        output
+    );
+    assert!(
+        output.contains("DeepProcessor.prototype.processArray") && output.contains("DeepProcessor.prototype.processPromise"),
+        "Expected processArray and processPromise methods: {}",
+        output
+    );
+    assert!(
+        output.contains("DeepProcessor.prototype.flatten") && output.contains("DeepProcessor.prototype.createPair"),
+        "Expected flatten and createPair methods: {}",
+        output
+    );
+}
