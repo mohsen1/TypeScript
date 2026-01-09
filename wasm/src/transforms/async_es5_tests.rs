@@ -12763,3 +12763,104 @@ fn test_async_state_ignores_nested_async() {
     );
     assert!(!result, "Should not detect await inside nested async state handler");
 }
+
+// ============================================================================
+// ASYNC PUB/SUB PATTERN TESTS
+// Tests for pub/sub patterns: subscribe, publish, unsubscribe, filter
+// ============================================================================
+
+#[test]
+fn test_async_pubsub_subscribe() {
+    let result = async_error_propagation_contains_await(
+        "async function subscribe(topic) { await channel.subscribe(topic); }",
+    );
+    assert!(result, "Should detect await in subscribe");
+}
+
+#[test]
+fn test_async_pubsub_publish() {
+    let result = async_error_propagation_contains_await(
+        "async function publish(topic, message) { await channel.publish(topic, message); }",
+    );
+    assert!(result, "Should detect await in publish");
+}
+
+#[test]
+fn test_async_pubsub_unsubscribe() {
+    let result = async_error_propagation_contains_await(
+        "async function unsubscribe(topic) { await channel.unsubscribe(topic); }",
+    );
+    assert!(result, "Should detect await in unsubscribe");
+}
+
+#[test]
+fn test_async_pubsub_filter() {
+    let result = async_error_propagation_contains_await(
+        "async function filter(predicate) { return await channel.filter(predicate); }",
+    );
+    assert!(result, "Should detect await in filter");
+}
+
+#[test]
+fn test_async_pubsub_broadcast() {
+    let result = async_error_propagation_contains_await(
+        "async function broadcast(message) { await channel.broadcast(message); }",
+    );
+    assert!(result, "Should detect await in broadcast");
+}
+
+#[test]
+fn test_async_pubsub_receive() {
+    let result = async_error_propagation_contains_await(
+        "async function receive() { return await channel.receive(); }",
+    );
+    assert!(result, "Should detect await in receive");
+}
+
+#[test]
+fn test_async_pubsub_acknowledge() {
+    let result = async_error_propagation_contains_await(
+        "async function ack(messageId) { await channel.acknowledge(messageId); }",
+    );
+    assert!(result, "Should detect await in acknowledge");
+}
+
+#[test]
+fn test_async_pubsub_replay() {
+    let result = async_error_propagation_contains_await(
+        "async function replay(from) { return await channel.replay(from); }",
+    );
+    assert!(result, "Should detect await in replay");
+}
+
+#[test]
+fn test_async_pubsub_partition() {
+    let result = async_error_propagation_contains_await(
+        "async function partition(key) { return await channel.partition(key); }",
+    );
+    assert!(result, "Should detect await in partition");
+}
+
+#[test]
+fn test_async_pubsub_fanout() {
+    let result = async_error_propagation_contains_await(
+        "async function fanout(message) { await Promise.all(subscribers.map(s => s.send(message))); }",
+    );
+    assert!(result, "Should detect await in fanout");
+}
+
+#[test]
+fn test_async_pubsub_no_await() {
+    let result = async_error_propagation_contains_await(
+        "async function syncPubsub(topic) { subscribers.push(topic); return subscribers.length; }",
+    );
+    assert!(!result, "Should not detect await when pub/sub is sync");
+}
+
+#[test]
+fn test_async_pubsub_ignores_nested_async() {
+    let result = async_error_propagation_contains_await(
+        "async function outer() { const handler = async (msg) => await process(msg); }",
+    );
+    assert!(!result, "Should not detect await inside nested async pub/sub handler");
+}
