@@ -7,30 +7,14 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-Add async ES5 tests for async transaction patterns: begin, commit, rollback, savepoint
-
-Steps:
-1. Add 12 async transaction pattern tests to `wasm/src/transforms/async_es5_tests.rs`:
-   - begin transaction
-   - commit transaction
-   - rollback transaction
-   - savepoint
-   - nested transactions
-   - transaction timeout
-   - body_contains_await tests
-   - try/catch patterns
-   - conditional transactions
-   - Combined transaction patterns
-2. Run `./wasm/test.sh async_es5_tests` to verify all tests pass
-3. Commit with message: `[wasm] async_es5: add async transaction pattern tests`
-4. Push to `origin/worker/anvil-5`
-5. Update this plan file and push
+None - awaiting new task (final task completed)
 
 ## Task Queue
-(empty - this is Worker 5's final assigned task)
+(empty)
 
 
 ## Completed
+- [x] Added 12 async transaction pattern tests (begin, commit, rollback, savepoint, nested, timeout, try_catch, conditional, isolation, execute, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (964 tests PASS).
 - [x] Added 12 async resource pool pattern tests (acquire, release, drain, resize, create, destroy, validate, evict, warmup, health_check, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (952 tests PASS).
 - [x] Added 12 async pub/sub pattern tests (subscribe, publish, unsubscribe, filter, broadcast, receive, acknowledge, replay, partition, fanout, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (940 tests PASS).
 - [x] Added 12 async state machine pattern tests (transition, guard, action, enter, exit, effect, dispatch, subscribe, history, restore, no await, ignores nested async) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (928 tests PASS).
