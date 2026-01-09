@@ -7,7 +7,7 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- (awaiting assignment)
+- [ ] Add interface/type alias ES5 source map tests (type erasure, complex types, generic types) in `wasm/src/source_map_tests.rs`. Run `./wasm/test.sh source_map`.
 
 ## Task Queue
 - [ ] (empty)
