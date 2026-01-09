@@ -12157,3 +12157,104 @@ fn test_async_error_ignores_nested_async() {
     );
     assert!(!result, "Should not detect await inside nested async in error handler");
 }
+
+// ============================================================================
+// ASYNC CANCELLATION PATTERN TESTS
+// Tests for cancellation patterns: AbortController, signal, cancel token
+// ============================================================================
+
+#[test]
+fn test_async_cancel_abort_controller() {
+    let result = async_error_propagation_contains_await(
+        "async function withAbort() { const controller = new AbortController(); await fetch(url, { signal: controller.signal }); }",
+    );
+    assert!(result, "Should detect await with AbortController");
+}
+
+#[test]
+fn test_async_cancel_signal() {
+    let result = async_error_propagation_contains_await(
+        "async function withSignal(signal) { await operation({ signal }); if (signal.aborted) throw new Error('cancelled'); }",
+    );
+    assert!(result, "Should detect await with signal parameter");
+}
+
+#[test]
+fn test_async_cancel_token() {
+    let result = async_error_propagation_contains_await(
+        "async function withToken(token) { token.throwIfCancelled(); await longOperation(); token.throwIfCancelled(); }",
+    );
+    assert!(result, "Should detect await with cancel token pattern");
+}
+
+#[test]
+fn test_async_cancel_check() {
+    let result = async_error_propagation_contains_await(
+        "async function checkCancel(signal) { while (!signal.aborted) { await processChunk(); } }",
+    );
+    assert!(result, "Should detect await in cancellation check loop");
+}
+
+#[test]
+fn test_async_cancel_throw() {
+    let result = async_error_propagation_contains_await(
+        "async function throwOnCancel(signal) { signal.addEventListener('abort', () => { }); await task(); }",
+    );
+    assert!(result, "Should detect await with cancel throw handler");
+}
+
+#[test]
+fn test_async_cancel_cleanup() {
+    let result = async_error_propagation_contains_await(
+        "async function cancelCleanup(signal) { try { await operation(signal); } finally { await cleanup(); } }",
+    );
+    assert!(result, "Should detect await in cancellation cleanup");
+}
+
+#[test]
+fn test_async_cancel_propagate() {
+    let result = async_error_propagation_contains_await(
+        "async function propagateCancel(signal) { const child = AbortSignal.any([signal]); await childTask(child); }",
+    );
+    assert!(result, "Should detect await in cancel propagation");
+}
+
+#[test]
+fn test_async_cancel_timeout() {
+    let result = async_error_propagation_contains_await(
+        "async function cancelTimeout() { const signal = AbortSignal.timeout(5000); await fetch(url, { signal }); }",
+    );
+    assert!(result, "Should detect await with timeout signal");
+}
+
+#[test]
+fn test_async_cancel_race() {
+    let result = async_error_propagation_contains_await(
+        "async function cancelRace(signal) { await Promise.race([operation(), abortPromise(signal)]); }",
+    );
+    assert!(result, "Should detect await in cancel race pattern");
+}
+
+#[test]
+fn test_async_cancel_listener() {
+    let result = async_error_propagation_contains_await(
+        "async function cancelListener(signal) { signal.onabort = handler; await task(); }",
+    );
+    assert!(result, "Should detect await with cancel event listener");
+}
+
+#[test]
+fn test_async_cancel_no_await() {
+    let result = async_error_propagation_contains_await(
+        "async function syncCancel(signal) { if (signal.aborted) { return null; } return syncOp(); }",
+    );
+    assert!(!result, "Should not detect await when cancellation is sync");
+}
+
+#[test]
+fn test_async_cancel_ignores_nested_async() {
+    let result = async_error_propagation_contains_await(
+        "async function outer() { const onCancel = async () => await cleanup(); }",
+    );
+    assert!(!result, "Should not detect await inside nested async cancel handler");
+}
