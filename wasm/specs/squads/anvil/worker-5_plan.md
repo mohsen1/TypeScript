@@ -7,9 +7,10 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-None - awaiting next task assignment.
+- [ ] Add async ES5 tests for async observable patterns: subscription, unsubscribe, next/error/complete, operators. Tests: `./wasm/test.sh async_es5_tests`
 
 ## Task Queue
+- [ ] Add async ES5 tests for async channel patterns: send, receive, buffered, unbuffered
 
 
 ## Completed
