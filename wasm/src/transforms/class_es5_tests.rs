@@ -25579,3 +25579,412 @@ class DataPipeline<T> {
         output
     );
 }
+
+// ============================================================================
+// DECORATOR FACTORY PATTERN TESTS
+// ============================================================================
+
+/// Test ES5 class with decorator factory with parameters
+#[test]
+fn test_class_es5_decorator_factory_with_params() {
+    let source = r#"
+// Decorator factory with parameters
+function Log(prefix: string) {
+    return function(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+        const original = descriptor.value;
+        descriptor.value = function(...args: any[]) {
+            console.log(`${prefix}: ${propertyKey} called with`, args);
+            const result = original.apply(this, args);
+            console.log(`${prefix}: ${propertyKey} returned`, result);
+            return result;
+        };
+        return descriptor;
+    };
+}
+
+function Throttle(ms: number) {
+    return function(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+        const original = descriptor.value;
+        let lastCall = 0;
+        descriptor.value = function(...args: any[]) {
+            const now = Date.now();
+            if (now - lastCall >= ms) {
+                lastCall = now;
+                return original.apply(this, args);
+            }
+        };
+        return descriptor;
+    };
+}
+
+function Retry(attempts: number, delay: number) {
+    return function(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+        const original = descriptor.value;
+        descriptor.value = async function(...args: any[]) {
+            for (let i = 0; i < attempts; i++) {
+                try {
+                    return await original.apply(this, args);
+                } catch (e) {
+                    if (i === attempts - 1) throw e;
+                    await new Promise(r => setTimeout(r, delay));
+                }
+            }
+        };
+        return descriptor;
+    };
+}
+
+class ApiService {
+    @Log("API")
+    fetchData(endpoint: string): Promise<any> {
+        return fetch(endpoint).then(r => r.json());
+    }
+
+    @Throttle(1000)
+    handleClick(): void {
+        console.log("Click handled");
+    }
+
+    @Retry(3, 500)
+    async submitForm(data: any): Promise<void> {
+        const response = await fetch("/submit", {
+            method: "POST",
+            body: JSON.stringify(data)
+        });
+        if (!response.ok) throw new Error("Submit failed");
+    }
+}
+
+class CacheService {
+    @Log("Cache")
+    @Throttle(100)
+    get(key: string): any {
+        return localStorage.getItem(key);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Decorator factory functions should be present
+    assert!(
+        output.contains("Log") && output.contains("Throttle") && output.contains("Retry"),
+        "Expected decorator factory functions: {}",
+        output
+    );
+
+    // Classes should be converted
+    assert!(
+        output.contains("ApiService") && output.contains("CacheService"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Decorator invocations should be present (decorators are applied)
+    assert!(
+        output.contains("__decorate") || output.contains("Log(") || output.contains("Throttle("),
+        "Expected decorator application pattern: {}",
+        output
+    );
+}
+
+/// Test ES5 class with composed decorators
+#[test]
+fn test_class_es5_decorator_composed() {
+    let source = r#"
+// Composed decorators pattern
+function Enumerable(value: boolean) {
+    return function(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+        descriptor.enumerable = value;
+        return descriptor;
+    };
+}
+
+function Configurable(value: boolean) {
+    return function(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+        descriptor.configurable = value;
+        return descriptor;
+    };
+}
+
+function Writable(value: boolean) {
+    return function(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+        descriptor.writable = value;
+        return descriptor;
+    };
+}
+
+// Composed decorator factory
+function Sealed() {
+    return function(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+        descriptor.configurable = false;
+        descriptor.writable = false;
+        return descriptor;
+    };
+}
+
+function Validate(validator: (value: any) => boolean) {
+    return function(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+        const original = descriptor.set;
+        if (original) {
+            descriptor.set = function(value: any) {
+                if (!validator(value)) {
+                    throw new Error(`Invalid value for ${propertyKey}`);
+                }
+                original.call(this, value);
+            };
+        }
+        return descriptor;
+    };
+}
+
+function Memoize() {
+    return function(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+        const cache = new Map<string, any>();
+        const original = descriptor.value;
+        descriptor.value = function(...args: any[]) {
+            const key = JSON.stringify(args);
+            if (cache.has(key)) {
+                return cache.get(key);
+            }
+            const result = original.apply(this, args);
+            cache.set(key, result);
+            return result;
+        };
+        return descriptor;
+    };
+}
+
+class Configuration {
+    @Enumerable(false)
+    @Configurable(false)
+    get secret(): string {
+        return "hidden";
+    }
+
+    @Sealed()
+    getApiKey(): string {
+        return "api-key-123";
+    }
+
+    @Memoize()
+    @Enumerable(true)
+    computeExpensive(input: number): number {
+        let result = 0;
+        for (let i = 0; i < input * 1000000; i++) {
+            result += i;
+        }
+        return result;
+    }
+}
+
+class UserSettings {
+    private _age: number = 0;
+
+    @Validate((v: number) => v >= 0 && v <= 150)
+    set age(value: number) {
+        this._age = value;
+    }
+
+    get age(): number {
+        return this._age;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Decorator factory functions should be present
+    assert!(
+        output.contains("Enumerable") && output.contains("Configurable") && output.contains("Sealed"),
+        "Expected decorator factory functions: {}",
+        output
+    );
+
+    // Additional decorators
+    assert!(
+        output.contains("Validate") && output.contains("Memoize"),
+        "Expected additional decorator factories: {}",
+        output
+    );
+
+    // Classes should be converted
+    assert!(
+        output.contains("Configuration") && output.contains("UserSettings"),
+        "Expected classes: {}",
+        output
+    );
+}
+
+/// Test ES5 class with metadata decorators
+#[test]
+fn test_class_es5_decorator_metadata() {
+    let source = r#"
+// Metadata decorators pattern
+const METADATA_KEY = Symbol("metadata");
+
+interface FieldMetadata {
+    type: string;
+    required: boolean;
+    validation?: RegExp;
+}
+
+function Field(metadata: FieldMetadata) {
+    return function(target: any, propertyKey: string) {
+        const existing = Reflect.getMetadata(METADATA_KEY, target) || {};
+        existing[propertyKey] = metadata;
+        Reflect.defineMetadata(METADATA_KEY, existing, target);
+    };
+}
+
+function Required() {
+    return Field({ type: "any", required: true });
+}
+
+function TypedField(type: string) {
+    return Field({ type, required: false });
+}
+
+function Pattern(regex: RegExp) {
+    return function(target: any, propertyKey: string) {
+        const existing = Reflect.getMetadata(METADATA_KEY, target) || {};
+        existing[propertyKey] = { ...existing[propertyKey], validation: regex };
+        Reflect.defineMetadata(METADATA_KEY, existing, target);
+    };
+}
+
+function Entity(tableName: string) {
+    return function<T extends { new(...args: any[]): {} }>(constructor: T) {
+        return class extends constructor {
+            static tableName = tableName;
+            static getMetadata() {
+                return Reflect.getMetadata(METADATA_KEY, constructor.prototype);
+            }
+        };
+    };
+}
+
+@Entity("users")
+class User {
+    @Required()
+    @TypedField("string")
+    id!: string;
+
+    @Required()
+    @Pattern(/^[a-zA-Z0-9_]+$/)
+    username!: string;
+
+    @TypedField("string")
+    @Pattern(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)
+    email!: string;
+
+    @TypedField("number")
+    age?: number;
+}
+
+@Entity("products")
+class Product {
+    @Required()
+    @TypedField("string")
+    sku!: string;
+
+    @Required()
+    @TypedField("string")
+    name!: string;
+
+    @TypedField("number")
+    price!: number;
+
+    @TypedField("number")
+    quantity?: number;
+}
+
+class MetadataReader {
+    static getFieldsFor<T>(EntityClass: new () => T): FieldMetadata[] {
+        const metadata = Reflect.getMetadata(METADATA_KEY, EntityClass.prototype);
+        return Object.values(metadata || {});
+    }
+
+    static validateEntity<T extends object>(entity: T): boolean {
+        const metadata = Reflect.getMetadata(METADATA_KEY, Object.getPrototypeOf(entity));
+        for (const [key, meta] of Object.entries(metadata || {})) {
+            const fieldMeta = meta as FieldMetadata;
+            const value = (entity as any)[key];
+            if (fieldMeta.required && value === undefined) {
+                return false;
+            }
+            if (fieldMeta.validation && value && !fieldMeta.validation.test(String(value))) {
+                return false;
+            }
+        }
+        return true;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Decorator factory functions should be present
+    assert!(
+        output.contains("Field") && output.contains("Required") && output.contains("Entity"),
+        "Expected metadata decorator factories: {}",
+        output
+    );
+
+    // Additional decorators
+    assert!(
+        output.contains("TypedField") && output.contains("Pattern"),
+        "Expected additional metadata decorators: {}",
+        output
+    );
+
+    // Classes should be converted
+    assert!(
+        output.contains("User") && output.contains("Product") && output.contains("MetadataReader"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Interface should be stripped
+    assert!(
+        !output.contains("interface FieldMetadata"),
+        "Expected interface to be stripped: {}",
+        output
+    );
+}
