@@ -8785,3 +8785,356 @@ const UserRepo = createRepository<{ id: number; name: string }>();
         output
     );
 }
+
+// =============================================================================
+// Symbol.species Tests
+// =============================================================================
+
+#[test]
+fn test_class_es5_symbol_species_basic() {
+    // Basic Symbol.species static getter
+    let source = r#"
+class MyArray<T> {
+    items: T[] = [];
+
+    static get [Symbol.species](): typeof MyArray {
+        return MyArray;
+    }
+
+    push(item: T): void {
+        this.items.push(item);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit
+    assert!(
+        output.contains("function MyArray"),
+        "Expected MyArray class: {}",
+        output
+    );
+
+    // Method should be present
+    assert!(
+        output.contains("push"),
+        "Expected push method: {}",
+        output
+    );
+
+    // Symbol.species should be handled (either as computed property or defineProperty)
+    assert!(
+        output.contains("Symbol.species") || output.contains("species") || output.contains("defineProperty"),
+        "Expected Symbol.species handling: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_species_derived() {
+    // Symbol.species in derived class returning different constructor
+    let source = r#"
+class BaseCollection<T> {
+    items: T[] = [];
+
+    static get [Symbol.species](): typeof BaseCollection {
+        return BaseCollection;
+    }
+}
+
+class SpecialCollection<T> extends BaseCollection<T> {
+    static get [Symbol.species](): typeof SpecialCollection {
+        return SpecialCollection;
+    }
+
+    addSpecial(item: T): void {
+        this.items.push(item);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Second statement is the SpecialCollection class
+    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
+
+    // Class should emit
+    assert!(
+        output.contains("function SpecialCollection"),
+        "Expected SpecialCollection class: {}",
+        output
+    );
+
+    // Should have inheritance
+    assert!(
+        output.contains("__extends") || output.contains("_super"),
+        "Expected inheritance pattern: {}",
+        output
+    );
+
+    // Method should be present
+    assert!(
+        output.contains("addSpecial"),
+        "Expected addSpecial method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_species_with_methods() {
+    // Symbol.species with map-like method that uses it
+    let source = r#"
+class CustomList<T> {
+    private data: T[] = [];
+
+    static get [Symbol.species](): typeof CustomList {
+        return CustomList;
+    }
+
+    add(item: T): this {
+        this.data.push(item);
+        return this;
+    }
+
+    map<U>(fn: (item: T) => U): CustomList<U> {
+        const ctor = (this.constructor as any)[Symbol.species] || CustomList;
+        const result = new ctor();
+        for (const item of this.data) {
+            result.add(fn(item));
+        }
+        return result;
+    }
+
+    get length(): number {
+        return this.data.length;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit
+    assert!(
+        output.contains("function CustomList"),
+        "Expected CustomList class: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("add") && output.contains("map"),
+        "Expected add and map methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_species_returning_base() {
+    // Symbol.species in subclass returning base class
+    let source = r#"
+class Observable<T> {
+    value: T;
+
+    constructor(value: T) {
+        this.value = value;
+    }
+
+    static get [Symbol.species](): typeof Observable {
+        return Observable;
+    }
+}
+
+class BehaviorSubject<T> extends Observable<T> {
+    // Returns base class instead of derived
+    static get [Symbol.species](): typeof Observable {
+        return Observable;
+    }
+
+    next(value: T): void {
+        this.value = value;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    // Second statement is the BehaviorSubject class
+    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(*class_idx);
+
+    // Class should emit
+    assert!(
+        output.contains("function BehaviorSubject"),
+        "Expected BehaviorSubject class: {}",
+        output
+    );
+
+    // Should have inheritance
+    assert!(
+        output.contains("__extends") || output.contains("_super"),
+        "Expected inheritance pattern: {}",
+        output
+    );
+
+    // Method should be present
+    assert!(
+        output.contains("next"),
+        "Expected next method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_species_with_static_members() {
+    // Symbol.species alongside other static members
+    let source = r#"
+class Factory<T> {
+    static defaultName: string = "Factory";
+    static count: number = 0;
+
+    static get [Symbol.species](): typeof Factory {
+        return Factory;
+    }
+
+    static create<U>(value: U): Factory<U> {
+        Factory.count++;
+        return new Factory<U>();
+    }
+
+    produce(): T | null {
+        return null;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit
+    assert!(
+        output.contains("function Factory") || output.contains("Factory"),
+        "Expected Factory class: {}",
+        output
+    );
+
+    // Static members should be present
+    assert!(
+        output.contains("defaultName") || output.contains("count") || output.contains("create"),
+        "Expected static members: {}",
+        output
+    );
+
+    // Instance method should be present
+    assert!(
+        output.contains("produce"),
+        "Expected produce method: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_symbol_species_null() {
+    // Symbol.species returning null to prevent subclass creation
+    let source = r#"
+class ImmutableList<T> {
+    private readonly items: readonly T[];
+
+    constructor(items: T[]) {
+        this.items = Object.freeze([...items]);
+    }
+
+    // Returning null prevents derived instances
+    static get [Symbol.species](): null {
+        return null;
+    }
+
+    get(index: number): T | undefined {
+        return this.items[index];
+    }
+
+    get length(): number {
+        return this.items.length;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Class should emit
+    assert!(
+        output.contains("function ImmutableList"),
+        "Expected ImmutableList class: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("get"),
+        "Expected get method: {}",
+        output
+    );
+
+    // Constructor should handle items
+    assert!(
+        output.contains("items"),
+        "Expected items handling: {}",
+        output
+    );
+}
