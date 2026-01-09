@@ -23053,3 +23053,972 @@ fn test_overload_contextual_from_target() {
     ctx.add_lower_bound(var_t, TypeId::STRING);
     ctx.add_upper_bound(var_t, TypeId::STRING);
     let result = ctx.resolve_with_constraints(var_t).unwrap();
+
+// =============================================================================
+// Tuple Type Tests (labeled elements, rest, optional, spreads)
+// =============================================================================
+
+#[test]
+fn test_tuple_basic_fixed_length() {
+    // [string, number, boolean] - basic fixed-length tuple
+    let interner = TypeInterner::new();
+
+    let tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    if let Some(TypeKey::Tuple(elements)) = interner.lookup(tuple) {
+        assert_eq!(elements.len(), 3);
+        assert_eq!(elements[0].type_id, TypeId::STRING);
+        assert_eq!(elements[1].type_id, TypeId::NUMBER);
+        assert_eq!(elements[2].type_id, TypeId::BOOLEAN);
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_tuple_labeled_elements() {
+    // [name: string, age: number] - labeled tuple elements
+    let interner = TypeInterner::new();
+
+    let name_label = interner.intern_string("name");
+    let age_label = interner.intern_string("age");
+
+    let tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: Some(name_label),
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: Some(age_label),
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    if let Some(TypeKey::Tuple(elements)) = interner.lookup(tuple) {
+        assert_eq!(elements.len(), 2);
+        assert_eq!(elements[0].name, Some(name_label));
+        assert_eq!(elements[1].name, Some(age_label));
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_tuple_optional_elements() {
+    // [string, number?, boolean?] - optional tuple elements
+    let interner = TypeInterner::new();
+
+    let tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: true,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            name: None,
+            optional: true,
+            rest: false,
+        },
+    ]);
+
+    if let Some(TypeKey::Tuple(elements)) = interner.lookup(tuple) {
+        assert_eq!(elements.len(), 3);
+        assert!(!elements[0].optional);
+        assert!(elements[1].optional);
+        assert!(elements[2].optional);
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_tuple_rest_element_at_end() {
+    // [string, ...number[]] - rest element at end
+    let interner = TypeInterner::new();
+
+    let number_array = interner.array(TypeId::NUMBER);
+
+    let tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: number_array,
+            name: None,
+            optional: false,
+            rest: true,
+        },
+    ]);
+
+    if let Some(TypeKey::Tuple(elements)) = interner.lookup(tuple) {
+        assert_eq!(elements.len(), 2);
+        assert!(!elements[0].rest);
+        assert!(elements[1].rest);
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_tuple_rest_element_at_start() {
+    // [...string[], number] - rest element at start
+    let interner = TypeInterner::new();
+
+    let string_array = interner.array(TypeId::STRING);
+
+    let tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: string_array,
+            name: None,
+            optional: false,
+            rest: true,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    if let Some(TypeKey::Tuple(elements)) = interner.lookup(tuple) {
+        assert_eq!(elements.len(), 2);
+        assert!(elements[0].rest);
+        assert!(!elements[1].rest);
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_tuple_rest_element_in_middle() {
+    // [string, ...boolean[], number] - rest element in middle
+    let interner = TypeInterner::new();
+
+    let boolean_array = interner.array(TypeId::BOOLEAN);
+
+    let tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: boolean_array,
+            name: None,
+            optional: false,
+            rest: true,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    if let Some(TypeKey::Tuple(elements)) = interner.lookup(tuple) {
+        assert_eq!(elements.len(), 3);
+        assert!(!elements[0].rest);
+        assert!(elements[1].rest);
+        assert!(!elements[2].rest);
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_tuple_labeled_with_optional() {
+    // [name: string, age?: number] - labeled and optional
+    let interner = TypeInterner::new();
+
+    let name_label = interner.intern_string("name");
+    let age_label = interner.intern_string("age");
+
+    let tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: Some(name_label),
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: Some(age_label),
+            optional: true,
+            rest: false,
+        },
+    ]);
+
+    if let Some(TypeKey::Tuple(elements)) = interner.lookup(tuple) {
+        assert_eq!(elements[0].name, Some(name_label));
+        assert!(!elements[0].optional);
+        assert_eq!(elements[1].name, Some(age_label));
+        assert!(elements[1].optional);
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_tuple_labeled_rest() {
+    // [first: string, ...rest: number[]] - labeled rest element
+    let interner = TypeInterner::new();
+
+    let first_label = interner.intern_string("first");
+    let rest_label = interner.intern_string("rest");
+    let number_array = interner.array(TypeId::NUMBER);
+
+    let tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: Some(first_label),
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: number_array,
+            name: Some(rest_label),
+            optional: false,
+            rest: true,
+        },
+    ]);
+
+    if let Some(TypeKey::Tuple(elements)) = interner.lookup(tuple) {
+        assert_eq!(elements[0].name, Some(first_label));
+        assert_eq!(elements[1].name, Some(rest_label));
+        assert!(elements[1].rest);
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_tuple_empty() {
+    // [] - empty tuple
+    let interner = TypeInterner::new();
+
+    let empty_tuple = interner.tuple(vec![]);
+
+    if let Some(TypeKey::Tuple(elements)) = interner.lookup(empty_tuple) {
+        assert!(elements.is_empty());
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_tuple_single_element() {
+    // [string] - single element tuple
+    let interner = TypeInterner::new();
+
+    let single_tuple = interner.tuple(vec![TupleElement {
+        type_id: TypeId::STRING,
+        name: None,
+        optional: false,
+        rest: false,
+    }]);
+
+    if let Some(TypeKey::Tuple(elements)) = interner.lookup(single_tuple) {
+        assert_eq!(elements.len(), 1);
+        assert_eq!(elements[0].type_id, TypeId::STRING);
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_tuple_nested() {
+    // [[string, number], boolean] - nested tuple
+    let interner = TypeInterner::new();
+
+    let inner_tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    let outer_tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: inner_tuple,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    if let Some(TypeKey::Tuple(elements)) = interner.lookup(outer_tuple) {
+        assert_eq!(elements.len(), 2);
+        assert!(matches!(interner.lookup(elements[0].type_id), Some(TypeKey::Tuple(_))));
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_tuple_with_union_element() {
+    // [string | number, boolean] - union in tuple element
+    let interner = TypeInterner::new();
+
+    let string_or_number = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    let tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: string_or_number,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    if let Some(TypeKey::Tuple(elements)) = interner.lookup(tuple) {
+        assert_eq!(elements.len(), 2);
+        assert!(matches!(interner.lookup(elements[0].type_id), Some(TypeKey::Union(_))));
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_tuple_with_object_element() {
+    // [{ x: number }, string] - object in tuple
+    let interner = TypeInterner::new();
+
+    let x_name = interner.intern_string("x");
+    let obj = interner.object(vec![PropertyInfo {
+        name: x_name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: obj,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    if let Some(TypeKey::Tuple(elements)) = interner.lookup(tuple) {
+        assert_eq!(elements.len(), 2);
+        assert!(matches!(interner.lookup(elements[0].type_id), Some(TypeKey::Object(_))));
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_tuple_with_function_element() {
+    // [() => void, string] - function in tuple
+    let interner = TypeInterner::new();
+
+    let fn_type = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: fn_type,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    if let Some(TypeKey::Tuple(elements)) = interner.lookup(tuple) {
+        assert_eq!(elements.len(), 2);
+        assert!(matches!(interner.lookup(elements[0].type_id), Some(TypeKey::Function(_))));
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_tuple_with_literal_elements() {
+    // ["hello", 42, true] - literal types in tuple
+    let interner = TypeInterner::new();
+
+    let lit_hello = interner.literal_string("hello");
+    let lit_42 = interner.literal_number(42.0);
+    let lit_true = interner.literal_boolean(true);
+
+    let tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: lit_hello,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: lit_42,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: lit_true,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    if let Some(TypeKey::Tuple(elements)) = interner.lookup(tuple) {
+        assert_eq!(elements.len(), 3);
+        assert_eq!(elements[0].type_id, lit_hello);
+        assert_eq!(elements[1].type_id, lit_42);
+        assert_eq!(elements[2].type_id, lit_true);
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_tuple_inference_from_elements() {
+    // Infer T from [T, T] when both elements are string
+    let interner = TypeInterner::new();
+    let ctx = InferenceContext::new(&interner);
+
+    let var_t = ctx.fresh_type_param(None, None);
+
+    // Both elements inferred as string
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_tuple_spread_tuple() {
+    // [...[string, number], boolean] - spread another tuple
+    let interner = TypeInterner::new();
+
+    let inner_tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    // When spreading a tuple, it becomes a rest element
+    let outer_tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: inner_tuple,
+            name: None,
+            optional: false,
+            rest: true, // Spread
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    if let Some(TypeKey::Tuple(elements)) = interner.lookup(outer_tuple) {
+        assert_eq!(elements.len(), 2);
+        assert!(elements[0].rest);
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_tuple_multiple_optional_at_end() {
+    // [string, number?, boolean?, any?] - multiple optional at end
+    let interner = TypeInterner::new();
+
+    let tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: true,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            name: None,
+            optional: true,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::ANY,
+            name: None,
+            optional: true,
+            rest: false,
+        },
+    ]);
+
+    if let Some(TypeKey::Tuple(elements)) = interner.lookup(tuple) {
+        assert_eq!(elements.len(), 4);
+        assert!(!elements[0].optional);
+        assert!(elements[1].optional);
+        assert!(elements[2].optional);
+        assert!(elements[3].optional);
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_tuple_optional_before_rest() {
+    // [string, number?, ...boolean[]] - optional before rest
+    let interner = TypeInterner::new();
+
+    let boolean_array = interner.array(TypeId::BOOLEAN);
+
+    let tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: true,
+            rest: false,
+        },
+        TupleElement {
+            type_id: boolean_array,
+            name: None,
+            optional: false,
+            rest: true,
+        },
+    ]);
+
+    if let Some(TypeKey::Tuple(elements)) = interner.lookup(tuple) {
+        assert_eq!(elements.len(), 3);
+        assert!(elements[1].optional);
+        assert!(elements[2].rest);
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_tuple_with_never_element() {
+    // [string, never, number] - never in tuple
+    let interner = TypeInterner::new();
+
+    let tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NEVER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    if let Some(TypeKey::Tuple(elements)) = interner.lookup(tuple) {
+        assert_eq!(elements.len(), 3);
+        assert_eq!(elements[1].type_id, TypeId::NEVER);
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_tuple_with_any_element() {
+    // [string, any, number] - any in tuple
+    let interner = TypeInterner::new();
+
+    let tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::ANY,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    if let Some(TypeKey::Tuple(elements)) = interner.lookup(tuple) {
+        assert_eq!(elements.len(), 3);
+        assert_eq!(elements[1].type_id, TypeId::ANY);
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_tuple_with_unknown_element() {
+    // [string, unknown, number] - unknown in tuple
+    let interner = TypeInterner::new();
+
+    let tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::UNKNOWN,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    if let Some(TypeKey::Tuple(elements)) = interner.lookup(tuple) {
+        assert_eq!(elements.len(), 3);
+        assert_eq!(elements[1].type_id, TypeId::UNKNOWN);
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_tuple_all_same_type() {
+    // [string, string, string] - all same type
+    let interner = TypeInterner::new();
+
+    let tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    if let Some(TypeKey::Tuple(elements)) = interner.lookup(tuple) {
+        assert_eq!(elements.len(), 3);
+        assert!(elements.iter().all(|e| e.type_id == TypeId::STRING));
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_tuple_with_readonly_array_spread() {
+    // [...readonly string[]] - spread readonly array
+    let interner = TypeInterner::new();
+
+    let readonly_string_array = interner.readonly_array(TypeId::STRING);
+
+    let tuple = interner.tuple(vec![TupleElement {
+        type_id: readonly_string_array,
+        name: None,
+        optional: false,
+        rest: true,
+    }]);
+
+    if let Some(TypeKey::Tuple(elements)) = interner.lookup(tuple) {
+        assert_eq!(elements.len(), 1);
+        assert!(elements[0].rest);
+        assert!(matches!(interner.lookup(elements[0].type_id), Some(TypeKey::ReadonlyArray(_))));
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_tuple_parameter_inference() {
+    // function f<T extends [string, ...number[]]>(x: T): T
+    let interner = TypeInterner::new();
+    let ctx = InferenceContext::new(&interner);
+
+    let number_array = interner.array(TypeId::NUMBER);
+    let constraint_tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: number_array,
+            name: None,
+            optional: false,
+            rest: true,
+        },
+    ]);
+
+    let var_t = ctx.fresh_type_param(None, Some(constraint_tuple));
+
+    // Called with ["hello", 1, 2, 3]
+    let lit_hello = interner.literal_string("hello");
+    let arg_tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: lit_hello,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: interner.literal_number(1.0),
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: interner.literal_number(2.0),
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    ctx.add_lower_bound(var_t, arg_tuple);
+
+    let result = ctx.resolve_with_constraints(var_t);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_tuple_with_promise_element() {
+    // [Promise<string>, Promise<number>] - promises in tuple
+    let interner = TypeInterner::new();
+
+    let promise_string = interner.promise(TypeId::STRING);
+    let promise_number = interner.promise(TypeId::NUMBER);
+
+    let tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: promise_string,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: promise_number,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    if let Some(TypeKey::Tuple(elements)) = interner.lookup(tuple) {
+        assert_eq!(elements.len(), 2);
+        assert!(matches!(interner.lookup(elements[0].type_id), Some(TypeKey::Promise(_))));
+        assert!(matches!(interner.lookup(elements[1].type_id), Some(TypeKey::Promise(_))));
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_tuple_vs_array_distinction() {
+    // [string, number] vs (string | number)[]
+    let interner = TypeInterner::new();
+
+    let tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    let string_or_number = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let array = interner.array(string_or_number);
+
+    // They should be different types
+    assert_ne!(tuple, array);
+    assert!(matches!(interner.lookup(tuple), Some(TypeKey::Tuple(_))));
+    assert!(matches!(interner.lookup(array), Some(TypeKey::Array(_))));
+}
+
+#[test]
+fn test_tuple_long() {
+    // [a, b, c, d, e, f, g, h, i, j] - 10 element tuple
+    let interner = TypeInterner::new();
+
+    let elements: Vec<TupleElement> = (0..10)
+        .map(|_| TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        })
+        .collect();
+
+    let tuple = interner.tuple(elements);
+
+    if let Some(TypeKey::Tuple(elems)) = interner.lookup(tuple) {
+        assert_eq!(elems.len(), 10);
+    } else {
+        panic!("Expected tuple type");
+    }
+}
+
+#[test]
+fn test_tuple_mixed_labels() {
+    // [a: string, number, c: boolean] - some labeled, some not
+    let interner = TypeInterner::new();
+
+    let a_label = interner.intern_string("a");
+    let c_label = interner.intern_string("c");
+
+    let tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: Some(a_label),
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None, // No label
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            name: Some(c_label),
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    if let Some(TypeKey::Tuple(elements)) = interner.lookup(tuple) {
+        assert_eq!(elements[0].name, Some(a_label));
+        assert_eq!(elements[1].name, None);
+        assert_eq!(elements[2].name, Some(c_label));
+    } else {
+        panic!("Expected tuple type");
+    }
+}
