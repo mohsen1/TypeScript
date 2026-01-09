@@ -16008,3 +16008,371 @@ class NumericAnalyzer {
         output
     );
 }
+
+#[test]
+fn test_class_es5_math_trunc_basic() {
+    // Basic Math.trunc usage
+    let source = r#"
+class TruncCalculator {
+    truncate(value: number): number {
+        return Math.trunc(value);
+    }
+
+    truncateAll(values: number[]): number[] {
+        return values.map(v => Math.trunc(v));
+    }
+
+    static toInteger(value: number): number {
+        return Math.trunc(value);
+    }
+
+    divideAndTrunc(a: number, b: number): number {
+        return Math.trunc(a / b);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("TruncCalculator"),
+        "Expected TruncCalculator class: {}",
+        output
+    );
+    assert!(
+        output.contains("Math.trunc"),
+        "Expected Math.trunc: {}",
+        output
+    );
+    assert!(
+        output.contains("truncate") && output.contains("truncateAll"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_math_sign_basic() {
+    // Basic Math.sign usage
+    let source = r#"
+class SignChecker {
+    getSign(value: number): number {
+        return Math.sign(value);
+    }
+
+    isPositive(value: number): boolean {
+        return Math.sign(value) === 1;
+    }
+
+    isNegative(value: number): boolean {
+        return Math.sign(value) === -1;
+    }
+
+    static categorizeBySign(values: number[]): { positive: number[]; negative: number[]; zero: number[] } {
+        return {
+            positive: values.filter(v => Math.sign(v) === 1),
+            negative: values.filter(v => Math.sign(v) === -1),
+            zero: values.filter(v => Math.sign(v) === 0)
+        };
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("SignChecker"),
+        "Expected SignChecker class: {}",
+        output
+    );
+    assert!(
+        output.contains("Math.sign"),
+        "Expected Math.sign: {}",
+        output
+    );
+    assert!(
+        output.contains("getSign") && output.contains("isPositive"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_math_cbrt_basic() {
+    // Basic Math.cbrt usage
+    let source = r#"
+class CubeRootCalculator {
+    cubeRoot(value: number): number {
+        return Math.cbrt(value);
+    }
+
+    static calculateVolumeSide(volume: number): number {
+        return Math.cbrt(volume);
+    }
+
+    inverseCube(value: number): number {
+        const root = Math.cbrt(value);
+        return root * root * root;
+    }
+
+    cubeRootSum(values: number[]): number {
+        return values.reduce((sum, v) => sum + Math.cbrt(v), 0);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("CubeRootCalculator"),
+        "Expected CubeRootCalculator class: {}",
+        output
+    );
+    assert!(
+        output.contains("Math.cbrt"),
+        "Expected Math.cbrt: {}",
+        output
+    );
+    assert!(
+        output.contains("cubeRoot") && output.contains("cubeRootSum"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_math_log2_log10_basic() {
+    // Basic Math.log2 and Math.log10 usage
+    let source = r#"
+class LogarithmCalculator {
+    log2(value: number): number {
+        return Math.log2(value);
+    }
+
+    log10(value: number): number {
+        return Math.log10(value);
+    }
+
+    static bitsNeeded(value: number): number {
+        return Math.ceil(Math.log2(value + 1));
+    }
+
+    static digitsNeeded(value: number): number {
+        return Math.floor(Math.log10(Math.abs(value))) + 1;
+    }
+
+    isPowerOf2(value: number): boolean {
+        return Number.isInteger(Math.log2(value));
+    }
+
+    isPowerOf10(value: number): boolean {
+        return Number.isInteger(Math.log10(value));
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("LogarithmCalculator"),
+        "Expected LogarithmCalculator class: {}",
+        output
+    );
+    assert!(
+        output.contains("Math.log2") && output.contains("Math.log10"),
+        "Expected Math.log2 and Math.log10: {}",
+        output
+    );
+    assert!(
+        output.contains("bitsNeeded") && output.contains("digitsNeeded"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_math_expm1_basic() {
+    // Basic Math.expm1 usage
+    let source = r#"
+class ExponentialCalculator {
+    expm1(value: number): number {
+        return Math.expm1(value);
+    }
+
+    static preciseExpMinusOne(x: number): number {
+        return Math.expm1(x);
+    }
+
+    compoundInterest(principal: number, rate: number, time: number): number {
+        return principal * Math.expm1(rate * time);
+    }
+
+    growthFactor(rate: number): number {
+        return Math.expm1(rate) + 1;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("ExponentialCalculator"),
+        "Expected ExponentialCalculator class: {}",
+        output
+    );
+    assert!(
+        output.contains("Math.expm1"),
+        "Expected Math.expm1: {}",
+        output
+    );
+    assert!(
+        output.contains("expm1") && output.contains("compoundInterest"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_math_es6_combined() {
+    // Combined ES6 Math methods
+    let source = r#"
+class MathUtilities {
+    static analyze(value: number): {
+        truncated: number;
+        sign: number;
+        cubeRoot: number;
+        log2: number;
+        log10: number;
+        expm1: number;
+    } {
+        return {
+            truncated: Math.trunc(value),
+            sign: Math.sign(value),
+            cubeRoot: Math.cbrt(value),
+            log2: Math.log2(Math.abs(value)),
+            log10: Math.log10(Math.abs(value)),
+            expm1: Math.expm1(value)
+        };
+    }
+
+    static normalize(values: number[]): number[] {
+        const signs = values.map(v => Math.sign(v));
+        const magnitudes = values.map(v => Math.abs(v));
+        const maxLog = Math.max(...magnitudes.map(m => Math.log10(m + 1)));
+        return values.map((v, i) => {
+            const normalized = Math.log10(Math.abs(v) + 1) / maxLog;
+            return Math.sign(v) * normalized;
+        });
+    }
+
+    processValue(value: number): number {
+        const truncated = Math.trunc(value);
+        const sign = Math.sign(truncated);
+        const magnitude = Math.cbrt(Math.abs(truncated));
+        return sign * magnitude;
+    }
+
+    calculateComplexity(n: number): number {
+        if (n <= 0) return 0;
+        const log2n = Math.log2(n);
+        const log10n = Math.log10(n);
+        return Math.trunc(log2n * log10n);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("MathUtilities"),
+        "Expected MathUtilities class: {}",
+        output
+    );
+    assert!(
+        output.contains("Math.trunc") && output.contains("Math.sign"),
+        "Expected Math.trunc and Math.sign: {}",
+        output
+    );
+    assert!(
+        output.contains("Math.cbrt") && output.contains("Math.log2"),
+        "Expected Math.cbrt and Math.log2: {}",
+        output
+    );
+    assert!(
+        output.contains("analyze") && output.contains("normalize"),
+        "Expected utility methods: {}",
+        output
+    );
+}
