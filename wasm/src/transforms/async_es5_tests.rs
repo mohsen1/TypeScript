@@ -12258,3 +12258,104 @@ fn test_async_cancel_ignores_nested_async() {
     );
     assert!(!result, "Should not detect await inside nested async cancel handler");
 }
+
+// ============================================================================
+// ASYNC CACHING PATTERN TESTS
+// Tests for caching patterns: memoize, cache, invalidate, ttl
+// ============================================================================
+
+#[test]
+fn test_async_cache_memoize() {
+    let result = async_error_propagation_contains_await(
+        "async function memoized(key) { return await compute(key); }",
+    );
+    assert!(result, "Should detect await in memoization pattern");
+}
+
+#[test]
+fn test_async_cache_get_or_set() {
+    let result = async_error_propagation_contains_await(
+        "async function getOrSet(key) { return cache.get(key) || await fetchAndCache(key); }",
+    );
+    assert!(result, "Should detect await in cache get or set pattern");
+}
+
+#[test]
+fn test_async_cache_invalidate() {
+    let result = async_error_propagation_contains_await(
+        "async function invalidate(key) { cache.delete(key); await refreshFromSource(key); }",
+    );
+    assert!(result, "Should detect await in cache invalidation");
+}
+
+#[test]
+fn test_async_cache_ttl() {
+    let result = async_error_propagation_contains_await(
+        "async function withTTL(key) { const entry = cache.get(key); if (entry && !isExpired(entry)) return entry.value; return await refresh(key); }",
+    );
+    assert!(result, "Should detect await in TTL cache pattern");
+}
+
+#[test]
+fn test_async_cache_refresh() {
+    let result = async_error_propagation_contains_await(
+        "async function refresh(key) { return await source.fetch(key); }",
+    );
+    assert!(result, "Should detect await in cache refresh");
+}
+
+#[test]
+fn test_async_cache_warmup() {
+    let result = async_error_propagation_contains_await(
+        "async function warmup(keys) { for (const key of keys) { await prefetch(key); } }",
+    );
+    assert!(result, "Should detect await in cache warmup");
+}
+
+#[test]
+fn test_async_cache_stale_while_revalidate() {
+    let result = async_error_propagation_contains_await(
+        "async function swr(key) { const stale = cache.get(key); revalidate(key); return stale || await fetch(key); }",
+    );
+    assert!(result, "Should detect await in stale-while-revalidate");
+}
+
+#[test]
+fn test_async_cache_write_through() {
+    let result = async_error_propagation_contains_await(
+        "async function writeThrough(key, value) { cache.set(key, value); await persist(key, value); }",
+    );
+    assert!(result, "Should detect await in write-through cache");
+}
+
+#[test]
+fn test_async_cache_evict() {
+    let result = async_error_propagation_contains_await(
+        "async function evict(predicate) { for (const key of cache.keys()) { if (predicate(key)) { await cleanup(key); cache.delete(key); } } }",
+    );
+    assert!(result, "Should detect await in cache eviction");
+}
+
+#[test]
+fn test_async_cache_distributed() {
+    let result = async_error_propagation_contains_await(
+        "async function distributed(key) { let value = localCache.get(key); if (!value) { value = await remoteCache.get(key); } return value; }",
+    );
+    assert!(result, "Should detect await in distributed cache lookup");
+}
+
+#[test]
+fn test_async_cache_no_await() {
+    let result = async_error_propagation_contains_await(
+        "async function syncCache(key) { if (cache.has(key)) return cache.get(key); return null; }",
+    );
+    assert!(!result, "Should not detect await when cache is sync");
+}
+
+#[test]
+fn test_async_cache_ignores_nested_async() {
+    let result = async_error_propagation_contains_await(
+        "async function outer() { const loader = async (key) => await fetchData(key); }",
+    );
+    assert!(!result, "Should not detect await inside nested async cache loader");
+}

@@ -6,12 +6,13 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-- [ ] Add ES5 class tests for module augmentation patterns: declare module, global augmentation. Tests: `./wasm/test.sh class_es5_tests`
+Add ES5 class tests for enum patterns: const enum, string enum, computed. Tests: `./wasm/test.sh class_es5_tests`
 
 ## Task Queue
-- [ ] Add ES5 class tests for enum patterns: const enum, string enum, computed
+- [ ] Add ES5 class tests for namespace patterns: merged, exported, nested
 
 ## Completed
+- [x] Added ES5 tests for module augmentation patterns (6 tests): basic declare module, interface augmentation, global augmentation, namespace augmentation, class augmentation, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 446 pass).
 - [x] Added ES5 tests for function overload patterns (6 tests): basic method, constructor, generic method, static method, return types, combined overload patterns. Ran `./wasm/test.sh class_es5_tests` (all 443 pass).
 - [x] Added ES5 tests for utility type patterns (6 tests): Awaited, NonNullable, ReturnType, Parameters, InstanceType, combined utility patterns. Ran `./wasm/test.sh class_es5_tests` (all 440 pass).
 - [x] Added ES5 tests for nominal type patterns (6 tests): basic branded, opaque types, branded type guards, branded numeric, branded string, combined nominal patterns. Ran `./wasm/test.sh class_es5_tests` (all 437 pass).
