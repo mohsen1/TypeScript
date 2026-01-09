@@ -2654,6 +2654,97 @@ const h: Handler = { cb: x => x.toUpperCase() };
 }
 
 #[test]
+fn test_ts2339_any_property_access_no_error() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let value: any;
+value.foo;
+value.bar();
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2339),
+        "Did not expect 2339 for property access on any, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_ts2339_unknown_property_access_after_narrowing() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let value: unknown = {};
+value.foo;
+const obj: object = value as object;
+obj.foo;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2339).count();
+    assert_eq!(
+        count, 1,
+        "Expected one 2339 after narrowing unknown to object, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_ts2339_union_optional_property_access() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type A = { foo?: string };
+type B = { foo: string };
+
+function read(value: A | B) {
+    return value.foo;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2339),
+        "Did not expect 2339 for optional property on union, got: {:?}",
+        codes
+    );
+}
+
+#[test]
 fn test_strict_null_checks_property_access() {
     use crate::solver::{PropertyAccessEvaluator, PropertyAccessResult, PropertyInfo};
     use std::sync::Arc;
