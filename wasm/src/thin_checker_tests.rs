@@ -11147,3 +11147,204 @@ const elem = <unknowntag />;
         eprintln!("[{}] {}", diag.start, diag.message_text);
     }
 }
+
+// =============================================================================
+// NAMESPACE TYPE MEMBER ACCESS PATTERN TESTS
+// =============================================================================
+
+/// Test that namespace interface members can be used as type annotations
+#[test]
+fn test_namespace_type_member_interface_annotation() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+namespace Models {
+    export interface User {
+        id: number;
+        name: string;
+    }
+    export interface Post {
+        title: string;
+        author: User;
+    }
+}
+
+const user: Models.User = { id: 1, name: "Alice" };
+const post: Models.Post = { title: "Hello", author: user };
+function getUser(): Models.User {
+    return { id: 0, name: "" };
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    assert!(
+        checker.ctx.diagnostics.is_empty(),
+        "Expected no errors for namespace interface type annotations, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// Test that namespace type alias members can be used as type annotations
+#[test]
+fn test_namespace_type_member_type_alias_annotation() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+namespace Types {
+    export type ID = number;
+    export type Name = string;
+    export type Pair<T> = [T, T];
+}
+
+const id: Types.ID = 42;
+const name: Types.Name = "Bob";
+const pair: Types.Pair<number> = [1, 2];
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    assert!(
+        checker.ctx.diagnostics.is_empty(),
+        "Expected no errors for namespace type alias annotations, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// Test that nested namespace type members can be used as type annotations
+#[test]
+fn test_namespace_type_member_nested_annotation() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+namespace Outer {
+    export namespace Inner {
+        export interface Config {
+            enabled: boolean;
+        }
+        export namespace Deep {
+            export type Value = string | number;
+        }
+    }
+}
+
+const config: Outer.Inner.Config = { enabled: true };
+const value: Outer.Inner.Deep.Value = "test";
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    assert!(
+        checker.ctx.diagnostics.is_empty(),
+        "Expected no errors for nested namespace type annotations, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// Test that namespace generic type members work correctly
+#[test]
+fn test_namespace_type_member_generic_usage() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+namespace Collections {
+    export interface Container<T> {
+        value: T;
+    }
+    export type Optional<T> = T | null;
+    export interface Map<K, V> {
+        get(key: K): V;
+    }
+}
+
+const strContainer: Collections.Container<string> = { value: "hello" };
+const numContainer: Collections.Container<number> = { value: 42 };
+const optString: Collections.Optional<string> = null;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    assert!(
+        checker.ctx.diagnostics.is_empty(),
+        "Expected no errors for namespace generic type usage, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// Test that namespace type members work in function signatures
+#[test]
+fn test_namespace_type_member_function_signature() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+namespace API {
+    export interface Request {
+        method: string;
+        url: string;
+    }
+    export interface Response {
+        status: number;
+        body: string;
+    }
+}
+
+function handleRequest(req: API.Request): API.Response {
+    return { status: 200, body: "" };
+}
+
+const makeRequest: (req: API.Request) => API.Response = handleRequest;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    assert!(
+        checker.ctx.diagnostics.is_empty(),
+        "Expected no errors for namespace types in function signatures, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
