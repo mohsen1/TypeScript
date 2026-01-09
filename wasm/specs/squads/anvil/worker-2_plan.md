@@ -7,12 +7,13 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- [ ] Add ES5 spread/rest patterns parity tests: array spread, object spread, rest params. Tests: `./wasm/test.sh emitter_parity`
+(awaiting assignment)
 
 ## Task Queue
 (empty)
 
 ## Completed
+- [x] Added ES5 spread/rest patterns parity tests (object-literal-methods, async-error-handling, custom-iterables, generic-signatures) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (351 tests).
 - [x] Added ES5 destructuring patterns parity tests (function-params-complex, mixed-patterns, computed-defaults, class-methods) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (347 tests).
 - [x] Added ES5 arrow function edge case parity tests (deeply-nested-this, class-field-context, rest-spread-complex, callback-chains) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (343 tests).
 - [x] Added ES5 class field patterns parity tests (public-initializers, decorated, computed-dynamic, inheritance-chain) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (339 tests).
