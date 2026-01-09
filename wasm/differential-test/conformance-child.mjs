@@ -15,6 +15,9 @@ const __dirname = dirname(__filename);
 // Read config from temp file passed as argument
 const configFile = process.argv[2];
 const { testFiles, wasmPkgPath, conformanceDir } = JSON.parse(readFileSync(configFile, 'utf-8'));
+const DEFAULT_LIB_PATH = join(__dirname, '../../tests/lib/lib.d.ts');
+const DEFAULT_LIB_SOURCE = readFileSync(DEFAULT_LIB_PATH, 'utf-8');
+const DEFAULT_LIB_NAME = 'lib.d.ts';
 
 function parseTestDirectives(code) {
   const lines = code.split('\n');
@@ -124,12 +127,15 @@ async function runTsc(code, fileName = 'test.ts', testOptions = {}) {
   };
 }
 
-async function runWasm(code, fileName = 'test.ts') {
+async function runWasm(code, fileName = 'test.ts', testOptions = {}) {
   let parser = null;
   try {
     const wasm = await import(join(wasmPkgPath, 'wasm.js'));
 
     parser = new wasm.ThinParser(fileName, code);
+    if (!testOptions.nolib) {
+      parser.addLibFile(DEFAULT_LIB_NAME, DEFAULT_LIB_SOURCE);
+    }
     parser.parseSourceFile();
 
     const parseDiagsJson = parser.getDiagnosticsJson();
@@ -193,7 +199,7 @@ async function processTest(filePath) {
 
     const [tscResult, wasmResult] = await Promise.all([
       runTsc(cleanCode, fileName, options),
-      runWasm(cleanCode, fileName),
+      runWasm(cleanCode, fileName, options),
     ]);
 
     if (wasmResult.crashed) {

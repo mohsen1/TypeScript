@@ -349,3 +349,7 @@ mod tests {
         assert_eq!(state.next_loop_function_name(), "_loop_3");
     }
 }
+
+#[cfg(test)]
+#[path = "block_scoping_es5_tests.rs"]
+mod block_scoping_es5_tests;

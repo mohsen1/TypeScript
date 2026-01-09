@@ -79,6 +79,8 @@ const OBJECT_METHODS_RETURN_BOOLEAN: &[&str] = &[
     "isPrototypeOf",
     "propertyIsEnumerable",
 ];
+const OBJECT_METHODS_RETURN_STRING: &[&str] = &["toString"];
+const OBJECT_METHODS_RETURN_ANY: &[&str] = &["valueOf"];
 
 fn is_member(name: &str, list: &[&str]) -> bool {
     list.iter().any(|&item| item == name)
@@ -88,8 +90,20 @@ fn object_member_kind(name: &str, include_to_locale: bool) -> Option<ApparentMem
     if name == "constructor" {
         return Some(ApparentMemberKind::Value(TypeId::ANY));
     }
+    if name == "toString" {
+        return Some(ApparentMemberKind::Method(TypeId::STRING));
+    }
+    if name == "valueOf" {
+        return Some(ApparentMemberKind::Method(TypeId::ANY));
+    }
     if is_member(name, OBJECT_METHODS_RETURN_BOOLEAN) {
         return Some(ApparentMemberKind::Method(TypeId::BOOLEAN));
+    }
+    if is_member(name, OBJECT_METHODS_RETURN_STRING) {
+        return Some(ApparentMemberKind::Method(TypeId::STRING));
+    }
+    if is_member(name, OBJECT_METHODS_RETURN_ANY) {
+        return Some(ApparentMemberKind::Method(TypeId::ANY));
     }
     if include_to_locale && name == "toLocaleString" {
         return Some(ApparentMemberKind::Method(TypeId::STRING));
@@ -102,10 +116,30 @@ fn push_object_members(members: &mut Vec<ApparentMember>, include_to_locale: boo
         name: "constructor",
         kind: ApparentMemberKind::Value(TypeId::ANY),
     });
+    members.push(ApparentMember {
+        name: "toString",
+        kind: ApparentMemberKind::Method(TypeId::STRING),
+    });
+    members.push(ApparentMember {
+        name: "valueOf",
+        kind: ApparentMemberKind::Method(TypeId::ANY),
+    });
     for &name in OBJECT_METHODS_RETURN_BOOLEAN {
         members.push(ApparentMember {
             name,
             kind: ApparentMemberKind::Method(TypeId::BOOLEAN),
+        });
+    }
+    for &name in OBJECT_METHODS_RETURN_STRING {
+        members.push(ApparentMember {
+            name,
+            kind: ApparentMemberKind::Method(TypeId::STRING),
+        });
+    }
+    for &name in OBJECT_METHODS_RETURN_ANY {
+        members.push(ApparentMember {
+            name,
+            kind: ApparentMemberKind::Method(TypeId::ANY),
         });
     }
     if include_to_locale {
@@ -114,6 +148,10 @@ fn push_object_members(members: &mut Vec<ApparentMember>, include_to_locale: boo
             kind: ApparentMemberKind::Method(TypeId::STRING),
         });
     }
+}
+
+pub fn apparent_object_member_kind(name: &str) -> Option<ApparentMemberKind> {
+    object_member_kind(name, true)
 }
 
 pub fn apparent_primitive_member_kind(
@@ -184,6 +222,7 @@ pub fn apparent_primitive_member_kind(
             }
             object_member_kind(name, true)
         }
+        IntrinsicKind::Object => object_member_kind(name, true),
         _ => None,
     }
 }
@@ -286,6 +325,9 @@ pub fn apparent_primitive_members(
                 name: "valueOf",
                 kind: ApparentMemberKind::Method(TypeId::SYMBOL),
             });
+            push_object_members(&mut members, true);
+        }
+        IntrinsicKind::Object => {
             push_object_members(&mut members, true);
         }
         _ => {}
