@@ -7,7 +7,22 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-(none - awaiting new task from EM)
+Add ES5 async tests for async IIFE patterns
+
+Per GOALS.md Objective 1: ES5 downleveling correctness
+
+Steps:
+1. Add 6 ES5 async tests for async IIFE patterns to `wasm/src/transforms/async_es5_tests.rs`:
+   - Basic async IIFE
+   - Async IIFE with parameters
+   - Async IIFE in module scope
+   - Async IIFE with try/catch
+   - Async IIFE with Promise.all
+   - Combined async IIFE patterns
+2. Run `./wasm/test.sh async_es5_tests` to verify all tests pass
+3. Commit with message: `[wasm] async_es5: add async IIFE pattern tests`
+4. Push to `origin/worker/anvil-5`
+5. Update this plan file and push
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)

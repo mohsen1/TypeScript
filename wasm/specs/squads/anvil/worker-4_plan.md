@@ -7,7 +7,22 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-(none - awaiting assignment from EM)
+Add ES5 class tests for WeakMap/WeakSet private field patterns
+
+Per GOALS.md Objective 1: ES5 downleveling correctness
+
+Steps:
+1. Add 6 ES5 class tests for WeakMap/WeakSet private field patterns to `wasm/src/transforms/class_es5_tests.rs`:
+   - Private field via WeakMap
+   - Static private via WeakMap
+   - Private method via WeakMap
+   - WeakSet membership check
+   - WeakRef cache pattern
+   - Combined WeakMap/WeakSet patterns
+2. Run `./wasm/test.sh class_es5_tests` to verify all tests pass
+3. Commit with message: `[wasm] transforms: add WeakMap/WeakSet private field ES5 tests`
+4. Push to `origin/worker/anvil-4`
+5. Update this plan file and push
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)

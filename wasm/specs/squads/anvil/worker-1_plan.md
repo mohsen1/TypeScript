@@ -6,7 +6,22 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-(awaiting assignment)
+Add ES5 class tests for Proxy/Reflect patterns
+
+Per GOALS.md Objective 1: ES5 downleveling correctness
+
+Steps:
+1. Add 6 ES5 class tests for Proxy/Reflect patterns to `wasm/src/transforms/class_es5_tests.rs`:
+   - Basic Proxy handler
+   - Proxy with Reflect.get/set
+   - Revocable Proxy
+   - Proxy class wrapper
+   - Reflect.construct pattern
+   - Combined Proxy/Reflect patterns
+2. Run `./wasm/test.sh class_es5_tests` to verify all tests pass
+3. Commit with message: `[wasm] transforms: add Proxy/Reflect ES5 class tests`
+4. Push to `origin/worker/anvil-1`
+5. Update this plan file and push
 
 ## Task Queue
 (empty)
