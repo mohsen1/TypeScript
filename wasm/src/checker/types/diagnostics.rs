@@ -127,7 +127,10 @@ pub mod diagnostic_messages {
     pub const ENUM_MEMBER_MUST_HAVE_INITIALIZER: &str = "Enum member must have initializer.";
     pub const CONST_ENUM_MEMBER_INITIALIZER: &str = "In 'const' enum declarations member initializer must be constant expression.";
 
-    // Switch exhaustiveness
+    // Variable errors
+    pub const VARIABLE_USED_BEFORE_ASSIGNED: &str = "Variable '{0}' is used before being assigned.";
+
+    // Switch exhaustiveness / control flow
     pub const NOT_EXHAUSTIVE: &str = "Not all code paths return a value.";
     pub const SWITCH_NOT_EXHAUSTIVE: &str = "Switch is not exhaustive. Did you forget to handle '{0}'?";
     pub const FUNCTION_LACKS_ENDING_RETURN_STATEMENT: &str =
@@ -228,6 +231,7 @@ pub mod diagnostic_codes {
 
     // Variable declaration errors
     pub const SUBSEQUENT_VARIABLE_DECLARATIONS_MUST_HAVE_SAME_TYPE: u32 = 2403;  // Subsequent variable declarations must have the same type
+    pub const VARIABLE_USED_BEFORE_ASSIGNED: u32 = 2454;  // Variable '{0}' is used before being assigned.
 
     // Null/undefined errors
     pub const OBJECT_IS_POSSIBLY_UNDEFINED: u32 = 2532;
