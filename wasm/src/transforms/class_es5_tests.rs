@@ -42244,3 +42244,837 @@ class Store<T> {
         output
     );
 }
+
+// =============================================================================
+// MIXIN PATTERN VARIATION TESTS
+// =============================================================================
+
+/// Test ES5 class with basic mixin function
+#[test]
+fn test_class_es5_basic_mixin_function() {
+    let source = r#"
+type Constructor<T = {}> = new (...args: any[]) => T;
+
+function Timestamped<TBase extends Constructor>(Base: TBase) {
+    return class extends Base {
+        timestamp = Date.now();
+
+        getTimestamp(): number {
+            return this.timestamp;
+        }
+    };
+}
+
+function Named<TBase extends Constructor>(Base: TBase) {
+    return class extends Base {
+        name: string = "";
+
+        setName(name: string): void {
+            this.name = name;
+        }
+
+        getName(): string {
+            return this.name;
+        }
+    };
+}
+
+class BaseEntity {
+    id: string;
+
+    constructor(id: string) {
+        this.id = id;
+    }
+
+    getId(): string {
+        return this.id;
+    }
+}
+
+const TimestampedEntity = Timestamped(BaseEntity);
+const NamedEntity = Named(BaseEntity);
+
+class User extends Timestamped(Named(BaseEntity)) {
+    email: string;
+
+    constructor(id: string, email: string) {
+        super(id);
+        this.email = email;
+    }
+
+    getEmail(): string {
+        return this.email;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("BaseEntity") && output.contains("User"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Mixin functions should exist
+    assert!(
+        output.contains("Timestamped") && output.contains("Named"),
+        "Expected mixin functions: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("getId") && output.contains("getEmail"),
+        "Expected methods: {}",
+        output
+    );
+
+    // Type alias should be stripped
+    assert!(
+        !output.contains("type Constructor"),
+        "Expected type alias to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with mixin with static members
+#[test]
+fn test_class_es5_mixin_static_members() {
+    let source = r#"
+type Constructor<T = {}> = new (...args: any[]) => T;
+
+function WithRegistry<TBase extends Constructor>(Base: TBase) {
+    return class extends Base {
+        static registry: Map<string, any> = new Map();
+        static instanceCount: number = 0;
+
+        static register(key: string, instance: any): void {
+            this.registry.set(key, instance);
+            this.instanceCount++;
+        }
+
+        static get(key: string): any {
+            return this.registry.get(key);
+        }
+
+        static getCount(): number {
+            return this.instanceCount;
+        }
+    };
+}
+
+function WithFactory<TBase extends Constructor>(Base: TBase) {
+    return class extends Base {
+        static instances: any[] = [];
+
+        static create(...args: any[]): any {
+            const instance = new this(...args);
+            this.instances.push(instance);
+            return instance;
+        }
+
+        static getAll(): any[] {
+            return [...this.instances];
+        }
+
+        static clear(): void {
+            this.instances = [];
+        }
+    };
+}
+
+class Service {
+    name: string;
+
+    constructor(name: string) {
+        this.name = name;
+    }
+
+    getName(): string {
+        return this.name;
+    }
+}
+
+class RegisteredService extends WithRegistry(Service) {
+    constructor(name: string) {
+        super(name);
+    }
+}
+
+class FactoryService extends WithFactory(WithRegistry(Service)) {
+    constructor(name: string) {
+        super(name);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("Service") && output.contains("RegisteredService") && output.contains("FactoryService"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Mixin functions should exist
+    assert!(
+        output.contains("WithRegistry") && output.contains("WithFactory"),
+        "Expected mixin functions: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("getName"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+/// Test ES5 class with multiple mixins composition
+#[test]
+fn test_class_es5_multiple_mixins_composition() {
+    let source = r#"
+type Constructor<T = {}> = new (...args: any[]) => T;
+
+function Serializable<TBase extends Constructor>(Base: TBase) {
+    return class extends Base {
+        serialize(): string {
+            return JSON.stringify(this);
+        }
+
+        static deserialize(json: string): any {
+            return JSON.parse(json);
+        }
+    };
+}
+
+function Validatable<TBase extends Constructor>(Base: TBase) {
+    return class extends Base {
+        errors: string[] = [];
+
+        validate(): boolean {
+            this.errors = [];
+            return this.errors.length === 0;
+        }
+
+        addError(error: string): void {
+            this.errors.push(error);
+        }
+
+        getErrors(): string[] {
+            return [...this.errors];
+        }
+    };
+}
+
+function Observable<TBase extends Constructor>(Base: TBase) {
+    return class extends Base {
+        observers: ((data: any) => void)[] = [];
+
+        subscribe(observer: (data: any) => void): () => void {
+            this.observers.push(observer);
+            return () => {
+                const index = this.observers.indexOf(observer);
+                if (index !== -1) {
+                    this.observers.splice(index, 1);
+                }
+            };
+        }
+
+        notify(data: any): void {
+            this.observers.forEach(obs => obs(data));
+        }
+    };
+}
+
+class DataModel {
+    data: Record<string, any> = {};
+
+    get(key: string): any {
+        return this.data[key];
+    }
+
+    set(key: string, value: any): void {
+        this.data[key] = value;
+    }
+}
+
+class EnhancedModel extends Observable(Validatable(Serializable(DataModel))) {
+    setAndNotify(key: string, value: any): void {
+        this.set(key, value);
+        this.notify({ key, value });
+    }
+}
+
+class FormModel extends Validatable(Observable(DataModel)) {
+    submit(): boolean {
+        if (this.validate()) {
+            this.notify({ type: "submit", data: this.data });
+            return true;
+        }
+        return false;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("DataModel") && output.contains("EnhancedModel") && output.contains("FormModel"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Mixin functions should exist
+    assert!(
+        output.contains("Serializable") && output.contains("Validatable") && output.contains("Observable"),
+        "Expected mixin functions: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("setAndNotify") && output.contains("submit"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+/// Test ES5 class with generic mixin constraints
+#[test]
+fn test_class_es5_generic_mixin_constraints() {
+    let source = r#"
+type Constructor<T = {}> = new (...args: any[]) => T;
+
+interface Identifiable {
+    id: string;
+}
+
+interface Nameable {
+    name: string;
+}
+
+function WithId<TBase extends Constructor<Identifiable>>(Base: TBase) {
+    return class extends Base {
+        getShortId(): string {
+            return this.id.substring(0, 8);
+        }
+
+        matchesId(otherId: string): boolean {
+            return this.id === otherId;
+        }
+    };
+}
+
+function WithDisplayName<TBase extends Constructor<Nameable>>(Base: TBase) {
+    return class extends Base {
+        getDisplayName(): string {
+            return this.name.toUpperCase();
+        }
+
+        hasName(): boolean {
+            return this.name.length > 0;
+        }
+    };
+}
+
+function WithFullInfo<TBase extends Constructor<Identifiable & Nameable>>(Base: TBase) {
+    return class extends Base {
+        getFullInfo(): string {
+            return this.id + ": " + this.name;
+        }
+
+        toJSON(): object {
+            return { id: this.id, name: this.name };
+        }
+    };
+}
+
+class Entity implements Identifiable, Nameable {
+    id: string;
+    name: string;
+
+    constructor(id: string, name: string) {
+        this.id = id;
+        this.name = name;
+    }
+}
+
+class EnhancedEntity extends WithFullInfo(WithDisplayName(WithId(Entity))) {
+    description: string = "";
+
+    setDescription(desc: string): void {
+        this.description = desc;
+    }
+
+    getDescription(): string {
+        return this.description;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("Entity") && output.contains("EnhancedEntity"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Mixin functions should exist
+    assert!(
+        output.contains("WithId") && output.contains("WithDisplayName") && output.contains("WithFullInfo"),
+        "Expected mixin functions: {}",
+        output
+    );
+
+    // Interfaces should be stripped
+    assert!(
+        !output.contains("interface Identifiable") && !output.contains("interface Nameable"),
+        "Expected interfaces to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with mixin with private fields
+#[test]
+fn test_class_es5_mixin_private_fields() {
+    let source = r#"
+type Constructor<T = {}> = new (...args: any[]) => T;
+
+function WithCache<TBase extends Constructor>(Base: TBase) {
+    return class extends Base {
+        private _cache: Map<string, any> = new Map();
+
+        protected getCached(key: string): any {
+            return this._cache.get(key);
+        }
+
+        protected setCached(key: string, value: any): void {
+            this._cache.set(key, value);
+        }
+
+        protected hasCached(key: string): boolean {
+            return this._cache.has(key);
+        }
+
+        clearCache(): void {
+            this._cache.clear();
+        }
+    };
+}
+
+function WithLogger<TBase extends Constructor>(Base: TBase) {
+    return class extends Base {
+        private _logs: string[] = [];
+        private _logLevel: string = "info";
+
+        protected log(message: string): void {
+            this._logs.push("[" + this._logLevel + "] " + message);
+        }
+
+        setLogLevel(level: string): void {
+            this._logLevel = level;
+        }
+
+        getLogs(): string[] {
+            return [...this._logs];
+        }
+
+        clearLogs(): void {
+            this._logs = [];
+        }
+    };
+}
+
+function WithState<TBase extends Constructor>(Base: TBase) {
+    return class extends Base {
+        private _state: Record<string, any> = {};
+        private _history: Record<string, any>[] = [];
+
+        protected getState(): Record<string, any> {
+            return { ...this._state };
+        }
+
+        protected setState(newState: Record<string, any>): void {
+            this._history.push({ ...this._state });
+            this._state = { ...this._state, ...newState };
+        }
+
+        undo(): boolean {
+            if (this._history.length > 0) {
+                this._state = this._history.pop()!;
+                return true;
+            }
+            return false;
+        }
+
+        getHistoryLength(): number {
+            return this._history.length;
+        }
+    };
+}
+
+class Component {
+    element: string;
+
+    constructor(element: string) {
+        this.element = element;
+    }
+
+    getElement(): string {
+        return this.element;
+    }
+}
+
+class StatefulComponent extends WithState(WithLogger(WithCache(Component))) {
+    render(): void {
+        const state = this.getState();
+        this.log("Rendering with state: " + JSON.stringify(state));
+    }
+
+    update(data: Record<string, any>): void {
+        if (!this.hasCached("lastUpdate")) {
+            this.setCached("lastUpdate", Date.now());
+        }
+        this.setState(data);
+        this.log("Updated state");
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("Component") && output.contains("StatefulComponent"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Mixin functions should exist
+    assert!(
+        output.contains("WithCache") && output.contains("WithLogger") && output.contains("WithState"),
+        "Expected mixin functions: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("render") && output.contains("update") && output.contains("undo"),
+        "Expected methods: {}",
+        output
+    );
+
+    // Private field declarations should be stripped
+    assert!(
+        !output.contains("private _cache:") && !output.contains("private _logs:"),
+        "Expected private field declarations to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with combined mixin patterns
+#[test]
+fn test_class_es5_combined_mixin_patterns() {
+    let source = r#"
+type Constructor<T = {}> = new (...args: any[]) => T;
+
+interface Disposable {
+    dispose(): void;
+}
+
+function Activatable<TBase extends Constructor>(Base: TBase) {
+    return class extends Base {
+        isActive: boolean = false;
+
+        activate(): void {
+            const process = () => {
+                this.isActive = true;
+            };
+            process();
+        }
+
+        deactivate(): void {
+            const process = () => {
+                this.isActive = false;
+            };
+            process();
+        }
+
+        toggle(): void {
+            this.isActive = !this.isActive;
+        }
+    };
+}
+
+function Lockable<TBase extends Constructor>(Base: TBase) {
+    return class extends Base {
+        private locked: boolean = false;
+
+        lock(): void {
+            this.locked = true;
+        }
+
+        unlock(): void {
+            this.locked = false;
+        }
+
+        isLocked(): boolean {
+            return this.locked;
+        }
+
+        withLock<T>(fn: () => T): T {
+            this.lock();
+            try {
+                return fn();
+            } finally {
+                this.unlock();
+            }
+        }
+    };
+}
+
+function Taggable<TBase extends Constructor>(Base: TBase) {
+    return class extends Base {
+        private tags: Set<string> = new Set();
+
+        addTag(tag: string): void {
+            this.tags.add(tag);
+        }
+
+        removeTag(tag: string): boolean {
+            return this.tags.delete(tag);
+        }
+
+        hasTag(tag: string): boolean {
+            return this.tags.has(tag);
+        }
+
+        getTags(): string[] {
+            return Array.from(this.tags);
+        }
+
+        clearTags(): void {
+            this.tags.clear();
+        }
+    };
+}
+
+function DisposableMixin<TBase extends Constructor>(Base: TBase) {
+    return class extends Base implements Disposable {
+        private disposed: boolean = false;
+        private disposables: (() => void)[] = [];
+
+        registerDisposable(fn: () => void): void {
+            this.disposables.push(fn);
+        }
+
+        dispose(): void {
+            if (!this.disposed) {
+                this.disposables.forEach(d => d());
+                this.disposables = [];
+                this.disposed = true;
+            }
+        }
+
+        isDisposed(): boolean {
+            return this.disposed;
+        }
+    };
+}
+
+class Resource {
+    name: string;
+    private data: any;
+
+    constructor(name: string) {
+        this.name = name;
+        this.data = {};
+    }
+
+    getName(): string {
+        return this.name;
+    }
+
+    getData(): any {
+        return this.data;
+    }
+
+    setData(data: any): void {
+        this.data = data;
+    }
+}
+
+class ManagedResource extends DisposableMixin(Taggable(Lockable(Activatable(Resource)))) {
+    private connections: any[] = [];
+
+    constructor(name: string) {
+        super(name);
+        this.registerDisposable(() => {
+            this.connections = [];
+            this.deactivate();
+        });
+    }
+
+    connect(target: any): void {
+        const process = () => {
+            if (!this.isLocked()) {
+                this.connections.push(target);
+                this.addTag("connected");
+            }
+        };
+        process();
+    }
+
+    disconnect(): void {
+        this.withLock(() => {
+            this.connections = [];
+            this.removeTag("connected");
+        });
+    }
+
+    getConnectionCount(): number {
+        return this.connections.length;
+    }
+}
+
+class SecureResource extends Lockable(DisposableMixin(Resource)) {
+    secureData: string = "";
+
+    setSecureData(data: string): void {
+        this.withLock(() => {
+            this.secureData = data;
+        });
+    }
+
+    getSecureData(): string {
+        if (this.isLocked()) {
+            return "";
+        }
+        return this.secureData;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("Resource") && output.contains("ManagedResource") && output.contains("SecureResource"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Mixin functions should exist
+    assert!(
+        output.contains("Activatable") && output.contains("Lockable") && output.contains("Taggable") && output.contains("DisposableMixin"),
+        "Expected mixin functions: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("connect") && output.contains("disconnect") && output.contains("dispose"),
+        "Expected methods: {}",
+        output
+    );
+
+    // Interface should be stripped
+    assert!(
+        !output.contains("interface Disposable"),
+        "Expected interface to be stripped: {}",
+        output
+    );
+
+    // Type alias should be stripped
+    assert!(
+        !output.contains("type Constructor"),
+        "Expected type alias to be stripped: {}",
+        output
+    );
+}

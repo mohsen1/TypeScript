@@ -7,27 +7,13 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-Add ES5 class tests for mixin pattern variations
-
-Per GOALS.md Objective 1: ES5 downleveling correctness
-
-Steps:
-1. Add 6 ES5 class tests for mixin pattern variations to `wasm/src/transforms/class_es5_tests.rs`:
-   - Basic mixin function
-   - Mixin with static members
-   - Multiple mixins composition
-   - Generic mixin constraints
-   - Mixin with private fields
-   - Combined mixin patterns
-2. Run `./wasm/test.sh class_es5_tests` to verify all tests pass
-3. Commit with message: `[wasm] transforms: add mixin pattern ES5 class tests`
-4. Push to `origin/worker/anvil-4`
-5. Update this plan file and push
+(none - awaiting new task from EM)
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)
 
 ## Completed
+- [x] Add ES5 class tests for mixin pattern variations: basic, static members, multiple composition, generic constraints, private fields, combined. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for constructor parameter property patterns: public, private, protected, readonly, default value, combined. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for method decorator this binding patterns: decorated method, multiple decorators, factory, async, static, combined. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for getter/setter this binding patterns: arrow returning this, nested arrow, computed, static, decorator, combined. Tests: `./wasm/test.sh class_es5_tests`
