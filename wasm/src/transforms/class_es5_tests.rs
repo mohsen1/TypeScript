@@ -29399,3 +29399,314 @@ class RecordManager {
         output
     );
 }
+
+/// Test ES5 class with const type parameter patterns
+#[test]
+fn test_class_es5_const_type_parameter_basic() {
+    let source = r#"
+// Basic const type parameter
+class Routes<const T extends readonly string[]> {
+    private routes: T;
+
+    constructor(routes: T) {
+        this.routes = routes;
+    }
+
+    getRoutes(): T {
+        return this.routes;
+    }
+
+    hasRoute(route: T[number]): boolean {
+        return this.routes.includes(route);
+    }
+}
+
+// Const type parameter with object
+class Config<const T extends Record<string, unknown>> {
+    private config: T;
+
+    constructor(config: T) {
+        this.config = config;
+    }
+
+    get<K extends keyof T>(key: K): T[K] {
+        return this.config[key];
+    }
+
+    getAll(): T {
+        return this.config;
+    }
+}
+
+// Multiple const type parameters
+class Mapping<const K extends readonly string[], const V extends readonly number[]> {
+    private keys: K;
+    private values: V;
+
+    constructor(keys: K, values: V) {
+        this.keys = keys;
+        this.values = values;
+    }
+
+    getKey(index: number): K[number] {
+        return this.keys[index];
+    }
+
+    getValue(index: number): V[number] {
+        return this.values[index];
+    }
+}
+
+// Usage
+const routes = new Routes(["home", "about", "contact"] as const);
+const config = new Config({ debug: true, port: 3000 } as const);
+const mapping = new Mapping(["a", "b", "c"] as const, [1, 2, 3] as const);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("Routes") && output.contains("Config") && output.contains("Mapping"),
+        "Expected const type parameter classes: {}",
+        output
+    );
+
+    // const keyword in type parameters should be stripped
+    assert!(
+        !output.contains("const T extends") && !output.contains("const K extends"),
+        "Expected const type parameters to be stripped: {}",
+        output
+    );
+
+    // Methods should be preserved
+    assert!(
+        output.contains("getRoutes") && output.contains("getAll") && output.contains("getKey"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+/// Test ES5 class with readonly inference patterns
+#[test]
+fn test_class_es5_const_type_parameter_readonly_inference() {
+    let source = r#"
+// Readonly tuple inference
+class TupleStore<const T extends readonly unknown[]> {
+    private tuple: T;
+
+    constructor(tuple: T) {
+        this.tuple = tuple;
+    }
+
+    first(): T[0] {
+        return this.tuple[0];
+    }
+
+    last(): T[number] {
+        return this.tuple[this.tuple.length - 1];
+    }
+
+    length(): T["length"] {
+        return this.tuple.length;
+    }
+}
+
+// Readonly object inference
+class ObjectStore<const T extends Readonly<Record<string, unknown>>> {
+    private data: T;
+
+    constructor(data: T) {
+        this.data = data;
+    }
+
+    keys(): (keyof T)[] {
+        return Object.keys(this.data) as (keyof T)[];
+    }
+
+    values(): T[keyof T][] {
+        return Object.values(this.data) as T[keyof T][];
+    }
+}
+
+// Nested readonly inference
+class NestedStore<const T extends readonly { readonly name: string; readonly value: number }[]> {
+    private items: T;
+
+    constructor(items: T) {
+        this.items = items;
+    }
+
+    findByName(name: string): T[number] | undefined {
+        return this.items.find(item => item.name === name);
+    }
+
+    getNames(): string[] {
+        return this.items.map(item => item.name);
+    }
+}
+
+// Usage with inferred readonly types
+const tupleStore = new TupleStore([1, "two", true] as const);
+const objectStore = new ObjectStore({ x: 1, y: 2, z: 3 } as const);
+const nestedStore = new NestedStore([
+    { name: "first", value: 1 },
+    { name: "second", value: 2 }
+] as const);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("TupleStore") && output.contains("ObjectStore") && output.contains("NestedStore"),
+        "Expected readonly inference classes: {}",
+        output
+    );
+
+    // const keyword should be stripped
+    assert!(
+        !output.contains("const T extends"),
+        "Expected const to be stripped: {}",
+        output
+    );
+
+    // Methods should be preserved
+    assert!(
+        output.contains("first") && output.contains("keys") && output.contains("findByName"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+/// Test ES5 class with immutable array patterns
+#[test]
+fn test_class_es5_const_type_parameter_immutable_arrays() {
+    let source = r#"
+// Immutable array builder
+class ImmutableArrayBuilder<const T extends readonly unknown[]> {
+    private items: T;
+
+    constructor(items: T) {
+        this.items = items;
+    }
+
+    toArray(): T {
+        return this.items;
+    }
+
+    getLength(): number {
+        return this.items.length;
+    }
+
+    getFirst(): T[0] {
+        return this.items[0];
+    }
+}
+
+// Immutable set-like collection
+class ImmutableSet<const T extends readonly unknown[]> {
+    private elements: T;
+
+    constructor(elements: T) {
+        this.elements = elements;
+    }
+
+    has(element: unknown): boolean {
+        return this.elements.includes(element as T[number]);
+    }
+
+    size(): number {
+        return this.elements.length;
+    }
+}
+
+// Immutable stack
+class ImmutableStack<const T extends readonly unknown[]> {
+    private stack: T;
+
+    constructor(stack: T) {
+        this.stack = stack;
+    }
+
+    peek(): unknown {
+        return this.stack[this.stack.length - 1];
+    }
+
+    isEmpty(): boolean {
+        return this.stack.length === 0;
+    }
+
+    getStack(): T {
+        return this.stack;
+    }
+}
+
+// Usage
+const builder = new ImmutableArrayBuilder([1, 2, 3] as const);
+const set = new ImmutableSet(["a", "b", "c"] as const);
+const stack = new ImmutableStack([] as const);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("ImmutableArrayBuilder") && output.contains("ImmutableSet") && output.contains("ImmutableStack"),
+        "Expected immutable array classes: {}",
+        output
+    );
+
+    // const type parameters should be stripped
+    assert!(
+        !output.contains("const T extends") && !output.contains("const U extends"),
+        "Expected const type parameters to be stripped: {}",
+        output
+    );
+
+    // Methods should be preserved
+    assert!(
+        output.contains("toArray") && output.contains("has") && output.contains("peek") && output.contains("isEmpty"),
+        "Expected methods: {}",
+        output
+    );
+}
