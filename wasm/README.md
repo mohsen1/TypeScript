@@ -62,14 +62,46 @@ We are coding faster than we can verify. Current velocity (~70 commits/day) is a
 *   Performance micro-optimizations (unless we regress significantly)
 
 
-## Executive Summary (Manager report)
-Last updated: 2026-01-08
+## Executive Summary (Director report)
+Last updated: 2026-01-09
 
-- Overall: Added numeric separator index-name regression (`1_0`), non-distributive template literal union input + non-string union branch (current behavior yields never), template literal apparent member + number index subtyping, async return arrow super computed-key no-args regression (current behavior drops body), and async compound-assignment subtract/modulo await source-map mappings, alongside optional-parameter conditional infer and non-function union infer (current behavior yields never), index signature consistency, and async return arrow super method no-args/this-capture regressions; main repo is synced to `origin/rust`; no CLI/LSP feature work in flight.
-- Direction: Conformance-driven integration; prioritize solver inference gaps and ES5 emitter fidelity over new features.
-- Director update: Squad goals refreshed to emphasize conformance-driven integration and solver/emitter correctness bottlenecks; no new code or test deltas in this cycle.
-- EM-Forge: Blocker is `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports`; FunctionId build error not reproducible post-sync; pending merge is a plan-only worker/forge-1 update.
-- Anvil update (worker-1): fixed const initializer parse-error recovery and pushed branch; now blocked on `emitter_parity_tests::test_parity_commonjs_export` (likely trailing newline mismatch); awaiting next assignment.
+### Conformance Metrics (Primary KPI)
+| Metric | Value | Target |
+|--------|-------|--------|
+| Exact Match | 17.7% (86/487) | 50%+ |
+| Missing Errors | 70.0% | <30% |
+| Extra Errors (False Positives) | 47.2% | <20% |
+| Build Status | Passing (4771/4789) | Green |
+
+### Current Squad Structure
+- **Squad Forge (5 workers)**: Missing error implementation (TS2454, TS2564, TS7006, TS2792, TS2339, TS2300)
+- **Squad Anvil (5 workers)**: False positive elimination (TS2304, TS2322, TS2339, TS2769, TS2355)
+
+### Top Missing Errors (Forge Focus)
+- TS2564: 64 occurrences (property initialization)
+- TS2454: 43 occurrences (definite assignment) - control flow analysis IMPLEMENTED
+- TS7006: 42 occurrences (implicit any)
+- TS2705: 37 occurrences
+- TS2322: 19 occurrences (type assignability)
+
+### Top False Positives (Anvil Focus)
+- TS2304: 136 occurrences (cannot find name)
+- TS2355: 82 occurrences (return analysis)
+- TS1005: 65 occurrences (parser) - parser fixes IMPLEMENTED
+- TS2339: 35 occurrences (property access)
+- TS1109: 25 occurrences (parser)
+
+### Recent Progress (Jan 9)
+- TS2454 control flow analysis (+315 lines in checker/control_flow.rs)
+- TS1005/TS1068 parser fixes (+2568 lines in thin_parser.rs)
+- Spread argument expansion fix (+263 lines)
+- Inherited property access fix
+- DI tests (+674 lines), template literal tests (+388 lines)
+
+### Direction
+Conformance-driven development. Both squads working in parallel on orthogonal error codes.
+- Forge: Implements missing error checks TSC catches that we don't
+- Anvil: Eliminates false positives we report that TSC doesn't
 - Director update: merged latest `origin/squad/forge` and `origin/squad/anvil` into `origin/rust`.
 - Cross-squad FYI: Forge reported async ES5 fixes in `worker/forge-3` (commit `60da72008ad`) and `worker/forge-5` (commit `ff4c28be4e6`) touching `wasm/src/transforms/async_es5.rs`; coordinate with Anvil if reimplementation or cherry-pick is needed.
 - Director update: merged latest Forge updates into `origin/rust` (solver evaluate + thin_checker + parallel tests).
