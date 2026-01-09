@@ -13915,3 +13915,53 @@ fn test_async_proxy_reflect_combined() {
     );
     assert!(result, "Should detect await in combined async Proxy/Reflect patterns");
 }
+
+// ASYNC MAP/SET PATTERN TESTS
+
+#[test]
+fn test_async_map_operations() {
+    let result = async_error_propagation_contains_await(
+        "async function mapOp() { map.set(key, await getValue()); return map.get(key); }",
+    );
+    assert!(result, "Should detect await in async Map operations");
+}
+
+#[test]
+fn test_async_set_operations() {
+    let result = async_error_propagation_contains_await(
+        "async function setOp() { set.add(await getItem()); return set.has(item); }",
+    );
+    assert!(result, "Should detect await in async Set operations");
+}
+
+#[test]
+fn test_async_map_iteration() {
+    let result = async_error_propagation_contains_await(
+        "async function iterate() { for (const [k, v] of map) { await process(k, v); } }",
+    );
+    assert!(result, "Should detect await in async Map iteration");
+}
+
+#[test]
+fn test_async_set_callbacks() {
+    let result = async_error_propagation_contains_await(
+        "async function forEach() { for (const item of set) { await handle(item); } }",
+    );
+    assert!(result, "Should detect await in async Set with async callbacks");
+}
+
+#[test]
+fn test_async_weakmap_patterns() {
+    let result = async_error_propagation_contains_await(
+        "async function weakOp() { return await weakMap.get(obj).process(); }",
+    );
+    assert!(result, "Should detect await in async WeakMap patterns");
+}
+
+#[test]
+fn test_async_mapset_combined() {
+    let result = async_error_propagation_contains_await(
+        "async function combined() { map.set(key, await fetch(key)); set.add(await getItem()); }",
+    );
+    assert!(result, "Should detect await in combined async Map/Set patterns");
+}
