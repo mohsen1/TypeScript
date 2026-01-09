@@ -4,13 +4,21 @@
 Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transforms, cli, lsp).
 
 Status: Active
-Priority: 2
+Priority: 1
 
 ## Current Assignment
-(Waiting for next assignment from EM-Anvil)
+Reduce TS2355 false positives (return analysis) in the WASM checker.
+
+Steps:
+1. Capture 5-10 TS2355 false-positive conformance samples (use `wasm/differential-test/run-conformance.sh --max=500 --sequential --verbose` or a small script).
+2. Audit return-path analysis in `wasm/src/thin_checker.rs` (return statements, implicit return, void/never).
+3. Implement minimal fix and add 1-2 regression tests in `wasm/src/thin_checker_tests.rs`.
+4. Run `./wasm/test.sh` for the new test(s) and a conformance slice; record deltas in this plan.
 
 ## Task Queue
-(empty - will receive new tasks from EM after completing current assignment)
+- Investigate TS2355 in async/arrow functions with conditional returns.
+- Check interactions with `never`/`void` return types and `@noImplicitReturns`.
+- Confirm no regression in existing TS2355 or return-path tests.
 
 ## Completed
 - [x] Added ES5 template literal type parity tests (basic, union, Uppercase/Lowercase, Capitalize/Uncapitalize, inference, combined) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` blocked by pre-existing errors in `solver/evaluate_tests.rs` (TemplateLiteralSpan not in scope).
