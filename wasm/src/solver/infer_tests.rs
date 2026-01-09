@@ -5768,3 +5768,192 @@ fn test_generic_multiple_params_with_defaults() {
     // U has lower bound, resolves to boolean
     assert_eq!(results[1], (u_name, TypeId::BOOLEAN));
 }
+
+// ============================================================================
+// Method Signature Inference Tests
+// ============================================================================
+
+#[test]
+fn test_method_return_type_inference_basic() {
+    // Test inferring return type from method call: obj.method() returns string
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // Method signature: () => T
+    let _method = interner.function(FunctionShape {
+        type_params: vec![TypeParamInfo {
+            name: t_name,
+            constraint: None,
+            default: None,
+        }],
+        params: vec![],
+        this_type: None,
+        return_type: t_type,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // Call returns string, so T should be inferred as string
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_method_parameter_type_inference() {
+    // Test inferring parameter type from method call: obj.method(value)
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // Method signature: (x: T) => void
+    let _method = interner.function(FunctionShape {
+        type_params: vec![TypeParamInfo {
+            name: t_name,
+            constraint: None,
+            default: None,
+        }],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: t_type,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // Called with number, so T should be inferred as number
+    ctx.add_lower_bound(var_t, TypeId::NUMBER);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
+fn test_method_this_type_inference() {
+    // Test this type in method: class method with this constraint
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let this_name = interner.intern_string("This");
+
+    let var_this = ctx.fresh_type_param(this_name);
+    let this_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: this_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // Method signature: (this: This) => This
+    let _method = interner.function(FunctionShape {
+        type_params: vec![TypeParamInfo {
+            name: this_name,
+            constraint: None,
+            default: None,
+        }],
+        params: vec![],
+        this_type: Some(this_type),
+        return_type: this_type,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // Create an object type to represent `this`
+    let obj_type = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("value"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Called on object, so This should be inferred as that object type
+    ctx.add_lower_bound(var_this, obj_type);
+
+    let result = ctx.resolve_with_constraints(var_this).unwrap();
+    assert_eq!(result, obj_type);
+}
+
+#[test]
+fn test_method_generic_parameter_inference() {
+    // Test: generic method <T>(x: T) => Array<T>
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var_t = ctx.fresh_type_param(t_name);
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // Method signature: <T>(x: T) => Array<T>
+    let return_array = interner.array(t_type);
+    let _method = interner.function(FunctionShape {
+        type_params: vec![TypeParamInfo {
+            name: t_name,
+            constraint: None,
+            default: None,
+        }],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: t_type,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: return_array,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // Called with boolean, so T should be inferred as boolean
+    ctx.add_lower_bound(var_t, TypeId::BOOLEAN);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, TypeId::BOOLEAN);
+}
+
+#[test]
+fn test_method_multiple_generic_params_inference() {
+    // Test: <K, V>(key: K, value: V) => Map<K, V>
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let k_name = interner.intern_string("K");
+    let v_name = interner.intern_string("V");
+
+    let var_k = ctx.fresh_type_param(k_name);
+    let var_v = ctx.fresh_type_param(v_name);
+
+    // Called with (string, number)
+    ctx.add_lower_bound(var_k, TypeId::STRING);
+    ctx.add_lower_bound(var_v, TypeId::NUMBER);
+
+    let results = ctx.resolve_all_with_constraints().unwrap();
+
+    assert_eq!(results.len(), 2);
+    // K inferred as string
+    assert_eq!(results[0], (k_name, TypeId::STRING));
+    // V inferred as number
+    assert_eq!(results[1], (v_name, TypeId::NUMBER));
+}
