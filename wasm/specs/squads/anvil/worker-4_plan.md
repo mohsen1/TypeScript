@@ -6,8 +6,27 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 4
 
+---
+## 📢 DIRECTIVE: CONFORMANCE HARNESS (Operation Crucible)
+
+**⛔ STOP writing manual parity tests.** Build the conformance harness instead.
+
+Your assignment: **Read `tests/cases/compiler/*.ts`, parse test directives**
+
+Test files contain directives like:
+```typescript
+// @target: ES5
+// @module: commonjs
+// @lib: es2015
+// @strict: true
+```
+
+Build a parser that extracts these directives and configures the compiler accordingly.
+
+---
+
 ## Current Assignment
-- [ ] Add ES5 class tests for private static methods in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
+- [ ] Build test directive parser in `wasm/src/conformance_harness.rs` to read `@target`, `@module`, `@lib`, etc. from test files. Run `./wasm/test.sh conformance_harness`.
 
 ## Task Queue
 - [ ] (empty)

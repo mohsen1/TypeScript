@@ -6,8 +6,33 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 5
 
+---
+## 📢 DIRECTIVE: CONFORMANCE HARNESS (Operation Crucible)
+
+**⛔ STOP writing manual parity tests.** Build the conformance harness instead.
+
+Your assignment: **Diff against `tests/baselines/reference/*.js`, report pass rate**
+
+Build the baseline comparison and reporting:
+```rust
+// Compare actual output against expected baseline
+fn compare_baseline(actual: &str, expected_path: &str) -> DiffResult {
+    // Load tests/baselines/reference/*.js
+    // Normalize whitespace, line endings
+    // Generate diff if mismatch
+}
+
+// Report aggregate pass rate
+fn report_pass_rate(results: &[TestResult]) {
+    // Current: ~40/76 JS tests passing
+    // Track progress as we fix issues
+}
+```
+
+---
+
 ## Current Assignment
-- [ ] Add async method with super property access tests in `wasm/src/transforms/async_es5_tests.rs`. Run `./wasm/test.sh async_es5_tests`.
+- [ ] Build baseline diff and pass rate reporting in `wasm/src/conformance_harness.rs`. Run `./wasm/test.sh conformance_harness`.
 
 ## Task Queue
 - [ ] (empty)

@@ -6,8 +6,30 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 3
 
+---
+## 📢 DIRECTIVE: CONFORMANCE HARNESS (Operation Crucible)
+
+**⛔ STOP writing manual parity tests.** Build the conformance harness instead.
+
+Your assignment: **Build `run_conformance_test()` function**
+
+```rust
+// wasm/src/conformance_harness.rs
+pub fn run_conformance_test(test_path: &str) -> TestResult {
+    // 1. Read test file from tests/cases/compiler/*.ts
+    // 2. Parse any @-directives (target, module, lib, etc.)
+    // 3. Compile through Rust pipeline
+    // 4. Compare output against tests/baselines/reference/*.js
+    // 5. Return pass/fail with diff
+}
+```
+
+This single function will give us 6,500+ tests instead of 124 hand-written ones.
+
+---
+
 ## Current Assignment
-- [ ] Add class expression source map tests in `wasm/src/source_map_tests.rs`. Run `./wasm/test.sh source_map`.
+- [ ] Build `run_conformance_test()` core function in `wasm/src/conformance_harness.rs`. Run `./wasm/test.sh conformance_harness`.
 
 ## Task Queue
 - [ ] (empty)
