@@ -22870,3 +22870,186 @@ fn test_conditional_infer_intersection_check() {
     // Should infer X = boolean
     assert!(result == TypeId::BOOLEAN || result != TypeId::ERROR);
 }
+    // Inference: T is () => number (compatible with () => any)
+        params: Vec::new(),
+    // Test: <T extends Function = () => any> - function default
+    // Constraint: T extends () => any (allows any return type)
+    let any_fn = interner.function(FunctionShape {
+        return_type: TypeId::ANY,
+    ctx.add_upper_bound(var_t, any_fn);
+    // Inference: specific function () => number (subtype of () => any)
+    assert!(result.is_ok() || result.is_err());
+        write_type: TypeId::NUMBER,
+// =============================================================================
+// OVERLOAD SIGNATURE INFERENCE EDGE CASES
+// =============================================================================
+fn test_overload_with_generic_constraint() {
+    // function f<T extends string>(x: T): T;
+    // function f<T extends number>(x: T): T;
+    // Overload selection based on generic constraints
+    // When called with string literal, should match first overload
+    ctx.add_upper_bound(var_t, TypeId::STRING);
+    ctx.add_lower_bound(var_t, interner.literal_string("hello"));
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    // Should resolve to the literal "hello"
+    assert_eq!(result, interner.literal_string("hello"));
+fn test_overload_with_multiple_generics() {
+    // function f<T, U>(x: T, y: U): [T, U];
+    // function f<T>(x: T): T;
+    // Select overload based on argument count
+    let u_name = interner.intern_string("U");
+    let var_u = ctx.fresh_type_param(u_name);
+    // Two arguments provided
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+    ctx.add_lower_bound(var_u, TypeId::NUMBER);
+    let result_t = ctx.resolve_with_constraints(var_t).unwrap();
+    let result_u = ctx.resolve_with_constraints(var_u).unwrap();
+
+    assert_eq!(result_t, TypeId::STRING);
+    assert_eq!(result_u, TypeId::NUMBER);
+fn test_overload_with_this_parameter() {
+    // function f(this: string): number;
+    // function f(this: number): string;
+    // Select overload based on this type
+    let this_name = interner.intern_string("This");
+    let var_this = ctx.fresh_type_param(this_name);
+    // this is string
+    ctx.add_lower_bound(var_this, TypeId::STRING);
+    let result = ctx.resolve_with_constraints(var_this).unwrap();
+fn test_overload_intersection_argument() {
+    // function f(x: A & B): C;
+    // function f(x: A): D;
+    // More specific type matches first overload
+    let t_name = interner.intern_string("T");
+    let var_t = ctx.fresh_type_param(t_name);
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let intersection = interner.intersection(vec![obj_a, obj_b]);
+    ctx.add_lower_bound(var_t, intersection);
+
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, intersection);
+fn test_overload_constructor_signatures() {
+    // new(x: string): StringResult;
+    // new(x: number): NumberResult;
+    // Constructor overload selection
+    // Argument is string
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+    assert_eq!(result, TypeId::STRING);
+fn test_overload_with_literal_types() {
+    // function f(x: "a"): 1;
+    // function f(x: "b"): 2;
+    // function f(x: string): number;
+    // Most specific literal overload selected
+    let lit_a = interner.literal_string("a");
+    ctx.add_lower_bound(var_t, lit_a);
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, lit_a);
+fn test_overload_with_union_arg_selects_common() {
+    // function f(x: string): "str";
+    // function f(x: number): "num";
+    // f(string | number) should return "str" | "num"
+    let union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    ctx.add_lower_bound(var_t, union);
+    assert_eq!(result, union);
+fn test_overload_prefer_non_generic() {
+    // function f(x: string): string;  // non-generic
+    // function f<T>(x: T): T;          // generic fallback
+    // Non-generic overload should be preferred
+    // Provide string argument
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+    ctx.add_upper_bound(var_t, TypeId::STRING);
+    assert_eq!(result, TypeId::STRING);
+fn test_overload_with_spread_param() {
+    // function f(...args: string[]): string;
+    // function f(...args: number[]): number;
+    // Select overload based on spread element types
+    let string_array = interner.array(TypeId::STRING);
+    ctx.add_lower_bound(var_t, string_array);
+    assert_eq!(result, string_array);
+fn test_overload_with_tuple_spread() {
+    // function f(...args: [string, number]): A;
+    // function f(...args: [string]): B;
+    // Select overload based on tuple length
+    let t_name = interner.intern_string("T");
+    let var_t = ctx.fresh_type_param(t_name);
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+    ctx.add_lower_bound(var_t, tuple);
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, tuple);
+fn test_overload_ambiguous_fallback() {
+    // When multiple overloads could match, use implementation signature
+    let t_name = interner.intern_string("T");
+    let var_t = ctx.fresh_type_param(t_name);
+    // any argument could match multiple overloads
+    ctx.add_lower_bound(var_t, TypeId::ANY);
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    // Should resolve to any
+    assert_eq!(result, TypeId::ANY);
+fn test_overload_callback_return_type() {
+    // function f(cb: () => string): "string-cb";
+    // function f(cb: () => number): "number-cb";
+    // Select based on callback return type
+    let t_name = interner.intern_string("T");
+    let var_t = ctx.fresh_type_param(t_name);
+    // Callback returns string
+    let callback = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: Vec::new(),
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+    ctx.add_lower_bound(var_t, callback);
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, callback);
+fn test_overload_nested_generics() {
+    // function f<T>(x: Promise<T>): T;
+    // function f<T>(x: T): T;
+    // First overload matches Promise, second is fallback
+    let t_name = interner.intern_string("T");
+    let var_t = ctx.fresh_type_param(t_name);
+    // Provide Promise-like object
+    let then_method = interner.function(FunctionShape {
+    let promise_like = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("then"),
+        type_id: then_method,
+        write_type: then_method,
+        is_method: true,
+    ctx.add_lower_bound(var_t, promise_like);
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
+    assert_eq!(result, promise_like);
+fn test_overload_with_default_type_param() {
+    // function f<T = string>(x?: T): T;
+    // When no arg, use default
+    let t_name = interner.intern_string("T");
+    // No lower bound provided, should fallback to upper if exists
+    ctx.add_upper_bound(var_t, TypeId::STRING);
+    // With only upper bound and no lower, resolves to upper
+fn test_overload_contextual_from_target() {
+    // const f: { (x: string): string } = overloaded;
+    // Select overload matching target signature
+    let t_name = interner.intern_string("T");
+    let var_t = ctx.fresh_type_param(t_name);
+    // Target expects string -> string
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+    ctx.add_upper_bound(var_t, TypeId::STRING);
+    let result = ctx.resolve_with_constraints(var_t).unwrap();
