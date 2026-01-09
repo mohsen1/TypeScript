@@ -31,6 +31,7 @@ Priority: 4
 - [x] Add object type tests - DONE (added 28 tests: optional properties, excess property checks, type widening)
 - [x] Add bigint type tests - DONE (added 30 tests: literal bigints, arithmetic operations)
 - [x] Add typeof type tests - DONE (added 30 tests: type queries on values, expressions)
+- [x] Add infer type tests - DONE (added 30 tests: conditional type inference)
 
 ## Completed
 - [x] Fixed method type parameter scope in check_method_declaration
@@ -62,9 +63,10 @@ Priority: 4
 - [x] Added 28 object type tests (optional properties, excess property checks, type widening)
 - [x] Added 30 bigint type tests (literal bigints, arithmetic operations)
 - [x] Added 30 typeof type tests (type queries on values, expressions)
+- [x] Added 30 infer type tests (conditional type inference)
 
 ## Ready for Merge
-Yes - 461+ solver tests added (circular constraints, inference from usage, context-sensitive typing, advanced generic inference, distributive conditional types, circular edge cases, mapped types, index signatures, generic constraints, recursive types, readonly/optional modifiers, unknown type narrowing, class types, interface types, type aliases, literal types, object types, bigint types, typeof types)
+Yes - 491+ solver tests added (circular constraints, inference from usage, context-sensitive typing, advanced generic inference, distributive conditional types, circular edge cases, mapped types, index signatures, generic constraints, recursive types, readonly/optional modifiers, unknown type narrowing, class types, interface types, type aliases, literal types, object types, bigint types, typeof types, infer types)
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize solver correctness
