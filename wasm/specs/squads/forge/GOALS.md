@@ -1,118 +1,135 @@
 # Squad Forge Goals
 
-Updated: 2026-01-09
+Updated: 2026-01-09 (14:00)
 
 Priority: 1
 
 ---
-## 🛑 GRACEFUL EXIT - WRAP UP NOW
+## Current Conformance Baseline (5655 tests)
 
-**Director has called for graceful exit. Wrap up all worker tasks NOW.**
-
-1. Let workers finish their current atomic task (commit what's done)
-2. Do NOT assign new tasks
-3. Ensure all work is committed and pushed to worker branches
-4. Mark workers as complete when done
-5. Final merge to squad branch
-
-**Session is ending. No new work assignments.**
-
----
-## ⚠️ TMUX REMINDER - CHECK FOR HANGING PROMPTS
-
-**NEVER forget to pause 1 second before pressing Enter in tmux!**
-
-1. After sending any message, wait 1 second, THEN send Enter (C-m)
-2. Check all worker panes for prompts that may be hanging (message sent but no activity)
-3. If a prompt is hanging, send Enter again: `sleep 1 && tmux send-keys -t <pane> C-m`
-
-**Do this check NOW and periodically throughout your session.**
+| Metric | Value | Notes |
+|--------|-------|-------|
+| Exact Match | 23.3% (1148/4928) | Up from 18.1% |
+| Same Error Count | 26.2% (1293) | |
+| Tests with Missing Errors | 68.2% (3361) | WASM misses errors TSC catches |
+| Tests with Extra Errors | 35.8% (1766) | False positives |
+| Skipped (multi-file) | 727 | Need WasmProgram API fixes |
+| Crashed | 2 | Stack overflow, unreachable |
 
 ---
-## 📢 OPERATION CONFORMANCE - NEW DIRECTIVE
+## Top Missing Error Codes (PARALLELIZABLE WORK)
 
-**Conformance test results show 18.1% exact match rate. This is unacceptable.**
+These are errors TSC produces that WASM doesn't. Each worker can own one error code independently.
 
-The WASM checker has infrastructure but is MISSING critical checking passes. All workers are now reassigned to implement missing checks.
-
-### Current State (from conformance runner)
-- Total Tests: 698
-- Exact Match: 126 (18.1%)
-- Missing Errors: 444 tests (63.6%) - WASM doesn't catch errors TSC catches
-- Extra Errors: 271 tests (38.8%) - WASM reports false positives
-
-### Root Causes Identified
-1. **Property Initialization** (TS2564) - 135 tests affected - NOT IMPLEMENTED
-2. **Definite Assignment** (TS2454) - 104 tests affected - NOT IMPLEMENTED
-3. **Access Modifiers** (TS2341/TS2445) - 63 tests affected - NOT ENFORCED
-4. **Function Return Checking** (TS7010/TS7006) - 80 tests affected - NOT IMPLEMENTED
-5. **Namespace Scoping Bug** (TS2304) - 75 false positives - BROKEN
+| TS Code | Occurrences | Description | Difficulty | Worker |
+|---------|-------------|-------------|------------|--------|
+| **TS2454** | 573 | Variable used before assigned | Medium | W1 |
+| **TS2564** | 443 | Property not initialized in constructor | Medium | W2 |
+| **TS7006** | 357 | Parameter implicitly has 'any' type | Easy | W3 |
+| **TS2322** | 310 | Type not assignable | Hard | - |
+| **TS2792** | 204 | Cannot find module | Easy | W4 |
+| **TS7010** | 179 | Function must return a value | Medium | W5 |
+| **TS7008** | 169 | Member implicitly has 'any' type | Easy | W3 |
+| **TS2339** | 142 | Property does not exist | Hard | - |
+| **TS2304** | 138 | Cannot find name | Hard | - |
+| **TS2300** | 105 | Duplicate identifier | Easy | - |
 
 ---
+## Phase 10: Conformance Sprint
 
-## Current Milestone
-**Phase 9 - Conformance Parity**: Implement missing checker passes to reach 50%+ conformance.
+### Worker 1: Definite Assignment (TS2454) - 573 tests
+**Error:** "Variable 'x' is used before being assigned"
 
-## Focus Areas
-- `wasm/src/thin_checker.rs` - Main checker (add missing passes)
-- `wasm/src/checker/` - Modular checker components
-- `wasm/src/thin_binder.rs` - Fix namespace scoping bug
+Implementation:
+1. Add control flow analysis to track variable assignments
+2. Before each variable read, check if definitely assigned
+3. Handle conditional branches (if/else must both assign)
 
-## Objectives (Ranked by Test Impact)
+Files: `thin_checker.rs`, `checker/control_flow.rs`
 
-### 1. **Property Initialization Checking** (TS2564) - 135 tests
-   - Error: "Property has no initializer and is not definitely assigned in constructor"
-   - Implementation: Track property assignments in constructor, emit error for uninitialized
-   - Key Files: `thin_checker.rs`, `checker/control_flow.rs`
-   - Assigned: **Workers 1-2**
+### Worker 2: Property Initialization (TS2564) - 443 tests
+**Error:** "Property 'x' has no initializer and is not definitely assigned in constructor"
 
-### 2. **Definite Assignment Analysis** (TS2454) - 104 tests
-   - Error: "Variable is used before being assigned"
-   - Implementation: Track variable initialization through control flow
-   - Key Files: `thin_checker.rs`, `checker/control_flow.rs`
-   - Assigned: **Worker 3**
+Implementation:
+1. Track which properties are assigned in constructor
+2. For each class property without initializer, check constructor assigns it
+3. Handle `strictPropertyInitialization` flag
 
-### 3. **Access Modifier Enforcement** (TS2341/TS2445) - 63 tests
-   - Errors: "Property is private/protected and only accessible within class"
-   - Implementation: Check visibility on every property/method access
-   - Key Files: `thin_checker.rs` (functions exist but don't emit errors)
-   - Assigned: **Worker 4**
+Files: `thin_checker.rs`, `checker/class_checker.rs`
 
-### 4. **Function Return Type Checking** (TS7010/TS7006) - 80 tests
-   - Errors: "Function must return a value", "Parameter implicitly has 'any' type"
-   - Implementation: Validate all code paths return, check implicit any
-   - Key Files: `thin_checker.rs`, `checker/statements.rs`
-   - Assigned: **Worker 5**
+### Worker 3: Implicit Any (TS7006/TS7008) - 526 tests combined
+**Error:** "Parameter/Member implicitly has 'any' type"
 
+Implementation:
+1. Check function parameters have explicit types or can be inferred
+2. Check class members have types when `noImplicitAny` is set
+3. Emit error when type falls back to `any`
+
+Files: `thin_checker.rs` - add `check_implicit_any()` pass
+
+### Worker 4: Module Resolution (TS2792) - 204 tests
+**Error:** "Cannot find module 'x' or its corresponding type declarations"
+
+Implementation:
+1. Track which imports couldn't be resolved
+2. Emit proper error code (2792 vs 2307)
+3. Handle relative vs package imports
+
+Files: `thin_checker.rs`, `thin_binder.rs`
+
+### Worker 5: Return Type Checking (TS7010) - 179 tests
+**Error:** "Function lacks ending return statement and return type does not include 'undefined'"
+
+Implementation:
+1. Analyze all code paths in function body
+2. Check if all paths return a value
+3. If return type is non-void/undefined, emit error
+
+Files: `thin_checker.rs`, `checker/statements.rs`
+
+---
+## Category Breakdown (from conformance tests)
+
+| Category | Total | Exact Match | Priority |
+|----------|-------|-------------|----------|
+| es6 | 991 | 36% (360) | Medium |
+| types | 826 | 14% (117) | **HIGH** |
+| parser | 768 | 28% (215) | Medium |
+| classes | 456 | 25% (116) | **HIGH** |
+| expressions | 372 | 14% (53) | HIGH |
+| statements | 202 | 18% (37) | Medium |
+| externalModules | 190 | 19% (36) | Medium |
+| async | 179 | 7% (12) | LOW |
+| jsdoc | 148 | 28% (42) | LOW |
+| interfaces | 66 | 9% (6) | **HIGH** |
+
+**Focus on: types, classes, expressions, interfaces** - lowest match rates, core type system
+
+---
 ## Anti-Priorities
-- ⛔ Redux/Lodash blocker (handled separately)
-- ⛔ New solver features
-- ⛔ Template literal types
-- ⛔ Generic inference edge cases
+- Template literal types
+- JSDoc inference
+- Decorators (ES vs legacy)
+- Async/await edge cases
 
-## Cross-Squad Dependencies
-- Anvil workers fixing namespace scoping bug (affects 75 false positives)
-- Share conformance runner results: `wasm/differential-test/conformance-runner.mjs`
+---
+## Running Conformance Tests
 
-## Notes to EM
-- Run conformance tests: `cd wasm/differential-test && node conformance-runner.mjs --max=500`
-- Each worker should add tests for their error codes FIRST, then implement
-- Track progress by re-running conformance tests after each PR
-- Use Docker for tests: `./wasm/test.sh`
+```bash
+# Fast parallel run (14 workers)
+cd wasm/differential-test
+bash run-conformance.sh --all --workers=14
 
-## Management Strategy
-**Conformance-Driven Development**:
-- PRs must include before/after conformance numbers
-- Target: 50% exact match by end of sprint
+# Quick subset (500 tests)
+bash run-conformance.sh --max=500 --workers=8
 
+# Sequential (for debugging)
+bash run-conformance.sh --sequential --max=100
+```
+
+---
 ## Squad Status
-- Last EM Report: 2026-01-09 - Operation Conformance initiated
-- Conformance Baseline: **18.1% exact match**
-- Workers Active: 5/5
-- Current Focus: Missing checker passes
-- Worker Assignments:
-  - W1: Property initialization (TS2564) - constructor tracking
-  - W2: Property initialization (TS2564) - class field analysis
-  - W3: Definite assignment (TS2454) - variable tracking
-  - W4: Access modifiers (TS2341/TS2445) - visibility enforcement
-  - W5: Function returns (TS7010/TS7006) - return validation
+- Last Update: 2026-01-09 14:00
+- Conformance: **23.3% exact match** (up from 18.1%)
+- Workers: 5 available
+- Strategy: Each worker owns one error code, implement independently

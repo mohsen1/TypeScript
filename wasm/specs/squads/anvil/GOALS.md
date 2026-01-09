@@ -1,114 +1,143 @@
 # Squad Anvil Goals
 
-Updated: 2026-01-09
+Updated: 2026-01-09 (14:00)
 
 Priority: 1
 
 ---
-## 🛑 GRACEFUL EXIT - WRAP UP NOW
+## Current Conformance Baseline (5655 tests)
 
-**Director has called for graceful exit. Wrap up all worker tasks NOW.**
-
-1. Let workers finish their current atomic task (commit what's done)
-2. Do NOT assign new tasks
-3. Ensure all work is committed and pushed to worker branches
-4. Mark workers as complete when done
-5. Final merge to squad branch
-
-**Session is ending. No new work assignments.**
+| Metric | Value | Notes |
+|--------|-------|-------|
+| Exact Match | 23.3% (1148/4928) | Up from 18.1% |
+| Tests with Extra Errors | 35.8% (1766) | False positives - WASM says error, TSC doesn't |
+| Skipped (multi-file) | 727 | Need WasmProgram API fixes |
+| Crashed | 2 | Stack overflow, unreachable |
 
 ---
-## ⚠️ TMUX REMINDER - CHECK FOR HANGING PROMPTS
+## Top Extra Error Codes (PARALLELIZABLE WORK - FALSE POSITIVES)
 
-**NEVER forget to pause 1 second before pressing Enter in tmux!**
+These are errors WASM reports that TSC doesn't. Each worker can own one error code independently.
 
-1. After sending any message, wait 1 second, THEN send Enter (C-m)
-2. Check all worker panes for prompts that may be hanging (message sent but no activity)
-3. If a prompt is hanging, send Enter again: `sleep 1 && tmux send-keys -t <pane> C-m`
-
-**Do this check NOW and periodically throughout your session.**
-
----
-## 📢 OPERATION CONFORMANCE - NEW DIRECTIVE
-
-**Conformance test results show 18.1% exact match rate. Squad Anvil is reassigned to fix false positives and parser issues.**
-
-### Current State (from conformance runner)
-- Extra Errors: 271 tests (38.8%) - WASM reports errors TSC doesn't
-- Main culprits: TS2304 (75), TS2339 (68), TS1005 (44), TS2769 (30)
-
-### Root Causes Identified (Anvil Scope)
-1. **Namespace Scoping Bug** (TS2304) - 75 false positives - Identifiers can't resolve siblings
-2. **Property Resolution** (TS2339) - 68 false positives - "Property does not exist" incorrectly
-3. **Parser Issues** (TS1005/TS1068) - 60 false positives - Unexpected token errors
-4. **Overload Resolution** (TS2769) - 30 false positives - "No overload matches" incorrectly
-5. **Index Signature** (TS7053) - 28 false positives - Implicit any index access
+| TS Code | Occurrences | Description | Difficulty | Worker |
+|---------|-------------|-------------|------------|--------|
+| **TS2304** | 759 | Cannot find name (false positive) | Hard | W1 |
+| **TS1005** | 548 | Expected X (parser bug) | Medium | W2 |
+| **TS2339** | 292 | Property does not exist (false positive) | Hard | W3 |
+| **TS1109** | 273 | Expression expected (parser bug) | Medium | W2 |
+| **TS1068** | 200 | Unexpected token (parser bug) | Medium | W2 |
+| **TS2769** | 125 | No overload matches (false positive) | Hard | W4 |
+| **TS2355** | 116 | Function must return (false positive) | Medium | W5 |
+| **TS1128** | 101 | Declaration expected (parser bug) | Medium | W2 |
+| **TS2322** | 101 | Type not assignable (false positive) | Hard | - |
+| **TS2403** | 96 | Subsequent variable declarations (false positive) | Medium | - |
 
 ---
+## Phase 10: False Positive Elimination
 
-## Current Milestone
-**Phase 9 - Conformance Parity**: Fix false positives to reach 50%+ conformance.
+### Worker 1: Scope Resolution (TS2304) - 759 false positives
+**Problem:** "Cannot find name 'X'" when X is clearly defined
 
-## Focus Areas
-- `wasm/src/thin_binder.rs` - Fix namespace scoping (TS2304)
-- `wasm/src/thin_checker.rs` - Fix property resolution (TS2339)
-- `wasm/src/parser/` - Fix parser edge cases (TS1005/TS1068)
+Root Causes:
+1. Namespace members not finding sibling exports
+2. Module augmentation not merging correctly
+3. Global ambient declarations not registered
 
-## Objectives (Ranked by Test Impact)
+Files: `thin_binder.rs`, `thin_checker.rs`
 
-### 1. **Namespace Scoping Bug** (TS2304) - 75 false positives
-   - Problem: Identifiers inside `export namespace {}` can't resolve siblings
-   - Root Cause: Binder scope chain not properly linking namespace members
-   - Key Files: `thin_binder.rs` - scope resolution
-   - Assigned: **Workers 1-2**
+### Worker 2: Parser Bugs (TS1005/TS1109/TS1068/TS1128) - 1122 combined
+**Problem:** Valid TypeScript syntax rejected by parser
 
-### 2. **Property Resolution** (TS2339) - 68 false positives
-   - Problem: "Property 'X' does not exist on type 'Y'" when it does exist
-   - Root Cause: Type resolution not finding inherited/merged properties
-   - Key Files: `thin_checker.rs` - property access checking
-   - Assigned: **Worker 3**
+Common patterns failing:
+1. Type assertions in certain positions
+2. Generic type parameters with defaults
+3. JSX-like syntax in .ts files
+4. Computed property names
 
-### 3. **Parser Edge Cases** (TS1005/TS1068) - 60 false positives
-   - Problem: "Expected X" / "Unexpected token" for valid TypeScript
-   - Root Cause: Parser not handling certain syntax patterns
-   - Key Files: `parser/` - parse functions
-   - Assigned: **Worker 4**
+Files: `parser/` - all parse functions
 
-### 4. **Overload Resolution** (TS2769) - 30 false positives
-   - Problem: "No overload matches this call" when one should match
-   - Root Cause: Overload matching too strict or not checking all overloads
-   - Key Files: `thin_checker.rs`, `solver/` - call resolution
-   - Assigned: **Worker 5**
+### Worker 3: Property Access (TS2339) - 292 false positives
+**Problem:** "Property 'X' does not exist on type 'Y'" when it does
 
+Root Causes:
+1. Type narrowing not applied correctly
+2. Index signatures not considered
+3. Interface merging incomplete
+4. Prototype chain not followed
+
+Files: `thin_checker.rs` - property access checking
+
+### Worker 4: Overload Matching (TS2769) - 125 false positives
+**Problem:** "No overload matches this call" when one should
+
+Root Causes:
+1. Generic inference in overloads too strict
+2. Rest parameter matching incorrect
+3. Optional parameter handling wrong
+
+Files: `thin_checker.rs`, `solver/` - call resolution
+
+### Worker 5: Return Analysis (TS2355) - 116 false positives
+**Problem:** "A function whose declared type is neither 'void' nor 'any' must return a value"
+
+Root Causes:
+1. Throw statements not counted as exits
+2. Never-returning calls not recognized
+3. Unreachable code after return still analyzed
+
+Files: `thin_checker.rs`, `checker/control_flow.rs`
+
+---
+## Category Performance (Priority: Fix worst categories)
+
+| Category | Exact Match | False Positive Rate | Focus |
+|----------|-------------|---------------------|-------|
+| interfaces | 9% (6/66) | HIGH | **CRITICAL** |
+| async | 7% (12/179) | HIGH | Medium |
+| types | 14% (117/826) | HIGH | **CRITICAL** |
+| expressions | 14% (53/372) | Medium | HIGH |
+| decorators | 8% (6/76) | Medium | LOW |
+| internalModules | 17% (11/63) | Medium | Medium |
+
+---
+## Crashed Files (Fix Required)
+
+These 2 files crash the WASM checker:
+
+1. `es6/templates/TemplateExpression1.ts` - **unreachable**
+   - Likely missing case in template literal handling
+
+2. `types/mapped/recursiveMappedTypes.ts` - **Maximum call stack size exceeded**
+   - Infinite recursion in recursive mapped type
+
+---
 ## Anti-Priorities
-- ⛔ New emitter transforms
-- ⛔ New ES5 downleveling
-- ⛔ Source map enhancements
-- ⛔ LSP features
+- New emitter features
+- Source map improvements
+- LSP features
+- CLI enhancements
 
-## Cross-Squad Dependencies
-- Forge workers implementing missing checks (affects missing errors)
-- Share conformance runner: `wasm/differential-test/conformance-runner.mjs`
+---
+## Running Conformance Tests
 
-## Notes to EM
-- Run conformance tests: `cd wasm/differential-test && node conformance-runner.mjs --max=500`
-- Focus on REDUCING false positives (extra errors)
-- Each fix should show reduction in "extra errors" count
-- Use Docker for tests: `./wasm/test.sh`
+```bash
+# Fast parallel run (14 workers)
+cd wasm/differential-test
+bash run-conformance.sh --all --workers=14
 
-## Management Strategy
-**Conformance-Driven Development**:
-- PRs must include before/after conformance numbers
-- Target: Reduce extra errors from 271 to <100
+# Quick subset (500 tests)
+bash run-conformance.sh --max=500 --workers=8
 
+# Sequential (for debugging)
+bash run-conformance.sh --sequential --max=100
+
+# Single category
+node conformance-runner.mjs expressions --max=500
+```
+
+---
 ## Squad Status
-- Last EM Report: 2026-01-09 - Operation Conformance initiated
-- Conformance Baseline: **271 tests with extra errors (38.8%)**
-- Workers Active: 5/5
-- Current Focus: Fixing false positives
-- Worker Assignments:
-  - W1: Namespace scoping (TS2304) - binder scope chain
-  - W2: Namespace scoping (TS2304) - symbol resolution
-  - W3: Property resolution (TS2339) - inherited properties
-  - W4: Parser edge cases (TS1005/TS1068) - syntax patterns
-  - W5: Overload resolution (TS2769) - call matching
+- Last Update: 2026-01-09 14:00
+- False Positives: **1766 tests (35.8%)** - target: <500
+- Workers: 5 available
+- Strategy: Each worker owns one error code category, reduce false positives independently

@@ -60,21 +60,33 @@ function getTestFiles(dir, maxFiles = 500) {
 
 /**
  * Parse test directives from source code.
- * Returns { options: Object, isMultiFile: boolean, cleanCode: string }
+ * Returns { options: Object, isMultiFile: boolean, cleanCode: string, files: Array<{name, content}> }
  */
 function parseTestDirectives(code) {
   const lines = code.split('\n');
   const options = {};
   let isMultiFile = false;
   const cleanLines = [];
+  const files = []; // For multi-file tests: [{name: "a.ts", content: "..."}, ...]
+
+  // First pass: extract options and detect multi-file
+  let currentFileName = null;
+  let currentFileLines = [];
 
   for (const line of lines) {
     const trimmed = line.trim();
 
     // Check for @filename directive (multi-file test)
-    if (trimmed.startsWith('// @filename:')) {
+    const filenameMatch = trimmed.match(/^\/\/\s*@filename:\s*(.+)$/);
+    if (filenameMatch) {
       isMultiFile = true;
-      break;
+      // Save previous file if any
+      if (currentFileName) {
+        files.push({ name: currentFileName, content: currentFileLines.join('\n') });
+      }
+      currentFileName = filenameMatch[1].trim();
+      currentFileLines = [];
+      continue;
     }
 
     // Parse compiler options like // @strict: true
@@ -89,16 +101,29 @@ function parseTestDirectives(code) {
       continue; // Don't include directive in clean code
     }
 
-    cleanLines.push(line);
+    if (isMultiFile && currentFileName) {
+      currentFileLines.push(line);
+    } else {
+      cleanLines.push(line);
+    }
+  }
+
+  // Save the last file for multi-file tests
+  if (isMultiFile && currentFileName) {
+    files.push({ name: currentFileName, content: currentFileLines.join('\n') });
   }
 
   return {
     options,
     isMultiFile,
     cleanCode: cleanLines.join('\n'),
+    files,
   };
 }
 
+/**
+ * Run tsc on a single file
+ */
 async function runTsc(code, fileName = 'test.ts', testOptions = {}) {
   const ts = require('typescript');
 
@@ -168,6 +193,91 @@ async function runTsc(code, fileName = 'test.ts', testOptions = {}) {
   };
 }
 
+/**
+ * Run tsc on multiple files (for multi-file tests)
+ */
+async function runTscMultiFile(files, testOptions = {}) {
+  const ts = require('typescript');
+
+  // Build compiler options from test directives
+  const compilerOptions = {
+    strict: testOptions.strict !== false,
+    target: ts.ScriptTarget.ES2020,
+    module: ts.ModuleKind.ESNext,
+    noEmit: true,
+    skipLibCheck: true,
+  };
+
+  // Apply test-specific options
+  if (testOptions.target) {
+    const targetMap = {
+      'es5': ts.ScriptTarget.ES5,
+      'es6': ts.ScriptTarget.ES2015,
+      'es2015': ts.ScriptTarget.ES2015,
+      'es2016': ts.ScriptTarget.ES2016,
+      'es2017': ts.ScriptTarget.ES2017,
+      'es2018': ts.ScriptTarget.ES2018,
+      'es2019': ts.ScriptTarget.ES2019,
+      'es2020': ts.ScriptTarget.ES2020,
+      'es2021': ts.ScriptTarget.ES2021,
+      'es2022': ts.ScriptTarget.ES2022,
+      'esnext': ts.ScriptTarget.ESNext,
+    };
+    compilerOptions.target = targetMap[testOptions.target.toLowerCase()] || ts.ScriptTarget.ES2020;
+  }
+
+  if (testOptions.noimplicitany !== undefined) {
+    compilerOptions.noImplicitAny = testOptions.noimplicitany;
+  }
+  if (testOptions.strictnullchecks !== undefined) {
+    compilerOptions.strictNullChecks = testOptions.strictnullchecks;
+  }
+
+  // Create source files for all files
+  const sourceFiles = new Map();
+  const fileNames = [];
+  for (const file of files) {
+    const sf = ts.createSourceFile(file.name, file.content, ts.ScriptTarget.ES2020, true);
+    sourceFiles.set(file.name, sf);
+    fileNames.push(file.name);
+  }
+
+  const host = ts.createCompilerHost(compilerOptions);
+  const originalGetSourceFile = host.getSourceFile;
+  host.getSourceFile = (name, languageVersion, onError) => {
+    if (sourceFiles.has(name)) {
+      return sourceFiles.get(name);
+    }
+    return originalGetSourceFile.call(host, name, languageVersion, onError);
+  };
+
+  host.fileExists = (name) => {
+    return sourceFiles.has(name) || ts.sys.fileExists(name);
+  };
+
+  host.readFile = (name) => {
+    const file = files.find(f => f.name === name);
+    if (file) return file.content;
+    return ts.sys.readFile(name);
+  };
+
+  const program = ts.createProgram(fileNames, compilerOptions, host);
+
+  const allDiagnostics = [];
+  for (const sf of sourceFiles.values()) {
+    allDiagnostics.push(...program.getSyntacticDiagnostics(sf));
+    allDiagnostics.push(...program.getSemanticDiagnostics(sf));
+  }
+
+  return {
+    diagnostics: allDiagnostics.map(d => ({
+      code: d.code,
+      message: ts.flattenDiagnosticMessageText(d.messageText, '\n'),
+      category: ts.DiagnosticCategory[d.category],
+    })),
+  };
+}
+
 async function runWasm(code, fileName = 'test.ts') {
   try {
     const wasm = await import(join(CONFIG.wasmPkgPath, 'wasm.js'));
@@ -197,6 +307,46 @@ async function runWasm(code, fileName = 'test.ts') {
     ];
 
     parser.free();
+
+    return {
+      diagnostics: allDiagnostics,
+      crashed: false,
+    };
+  } catch (e) {
+    return {
+      diagnostics: [],
+      crashed: true,
+      error: e.message,
+    };
+  }
+}
+
+/**
+ * Run WASM on multiple files (for multi-file tests)
+ * Uses the new WasmProgram API for cross-file type checking
+ */
+async function runWasmMultiFile(files) {
+  try {
+    const wasm = await import(join(CONFIG.wasmPkgPath, 'wasm.js'));
+
+    // Use the new WasmProgram API for multi-file support
+    const program = new wasm.WasmProgram();
+
+    // Add all files to the program
+    for (const file of files) {
+      program.addFile(file.name, file.content);
+    }
+
+    // Get all diagnostic codes from the program
+    const codes = program.getAllDiagnosticCodes();
+
+    // Convert to diagnostic format
+    const allDiagnostics = Array.from(codes).map(code => ({
+      code,
+      message: '', // We don't have messages in this API
+      category: 'Error',
+      source: 'program',
+    }));
 
     return {
       diagnostics: allDiagnostics,
@@ -255,7 +405,7 @@ async function main() {
 
   const stats = {
     total: 0,
-    skippedMultiFile: 0,
+    multiFile: 0,      // Multi-file tests (using WasmProgram API)
     exactMatch: 0,
     sameCount: 0,
     crashed: 0,
@@ -284,18 +434,24 @@ async function main() {
       const rawCode = readFileSync(filePath, 'utf-8');
 
       // Parse test directives
-      const { options, isMultiFile, cleanCode } = parseTestDirectives(rawCode);
+      const { options, isMultiFile, cleanCode, files } = parseTestDirectives(rawCode);
 
-      // Skip multi-file tests (need special handling we don't support yet)
-      if (isMultiFile) {
-        stats.skippedMultiFile++;
-        continue;
+      let tscResult, wasmResult;
+
+      if (isMultiFile && files.length > 0) {
+        // Multi-file test - use the new APIs
+        stats.multiFile++;
+        [tscResult, wasmResult] = await Promise.all([
+          runTscMultiFile(files, options),
+          runWasmMultiFile(files),
+        ]);
+      } else {
+        // Single-file test
+        [tscResult, wasmResult] = await Promise.all([
+          runTsc(cleanCode, fileName, options),
+          runWasm(cleanCode, fileName),
+        ]);
       }
-
-      const [tscResult, wasmResult] = await Promise.all([
-        runTsc(cleanCode, fileName, options),
-        runWasm(cleanCode, fileName),
-      ]);
 
       stats.total++;
       stats.byCategory[cat] = stats.byCategory[cat] || { total: 0, exact: 0, same: 0 };
@@ -360,7 +516,7 @@ async function main() {
 
   log(`\n  Summary:`, colors.cyan);
   log(`    Files Found:      ${testFiles.length}`);
-  log(`    Multi-File Skipped: ${stats.skippedMultiFile}`, colors.dim);
+  log(`    Multi-File Tests:   ${stats.multiFile}`, colors.cyan);
   log(`    Tests Run:        ${stats.total}`);
   log(`    Exact Match:      ${stats.exactMatch} (${(stats.exactMatch / stats.total * 100).toFixed(1)}%)`, colors.green);
   log(`    Same Error Count: ${stats.sameCount} (${(stats.sameCount / stats.total * 100).toFixed(1)}%)`, colors.blue);
