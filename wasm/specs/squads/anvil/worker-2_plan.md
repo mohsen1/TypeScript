@@ -7,12 +7,13 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- [ ] Add ES5 generator function parity tests in `wasm/src/emitter_parity_tests.rs`. Run `./wasm/test.sh emitter_parity`.
+- [ ] (none)
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added ES5 generator function parity tests (return-value, multiple-yields, try-catch, expression) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (156 tests).
 - [x] Added ES5 class expression parity tests (anonymous, named, static, accessor) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (152 tests).
 - [x] Added ES5 import/export parity tests (alias, default-function, interface, type-alias) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (148 tests).
 - [x] Added ES5 enum parity tests (explicit-values, const, computed, heterogeneous) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (144 tests).
