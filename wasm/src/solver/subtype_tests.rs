@@ -9479,3 +9479,1077 @@ fn test_intersection_optional_property_access() {
     // Intersection should be subtype of required (a is required in intersection)
     assert!(checker.is_subtype_of(intersection, obj_a_required));
 }
+
+// =============================================================================
+// Function Type Subtype Tests
+// =============================================================================
+
+// -----------------------------------------------------------------------------
+// Parameter Contravariance
+// -----------------------------------------------------------------------------
+
+#[test]
+fn test_fn_param_contravariance_wider_param_is_subtype() {
+    // (x: string | number) => void <: (x: string) => void
+    // A function that accepts more types can be used where a function accepting fewer is expected
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let param_union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    let fn_string_param = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn_union_param = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: param_union,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // Function with wider param type is subtype (contravariance)
+    assert!(checker.is_subtype_of(fn_union_param, fn_string_param));
+    // Function with narrower param type is NOT subtype
+    assert!(!checker.is_subtype_of(fn_string_param, fn_union_param));
+}
+
+#[test]
+fn test_fn_param_contravariance_unknown_accepts_all() {
+    // (x: unknown) => void <: (x: string) => void
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let fn_string_param = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn_unknown_param = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::UNKNOWN,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // unknown param accepts any input, so it's a subtype
+    assert!(checker.is_subtype_of(fn_unknown_param, fn_string_param));
+}
+
+#[test]
+fn test_fn_param_contravariance_multiple_params() {
+    // (a: unknown, b: unknown) => void <: (a: string, b: number) => void
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let fn_specific = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo {
+                name: Some(interner.intern_string("a")),
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("b")),
+                type_id: TypeId::NUMBER,
+                optional: false,
+                rest: false,
+            },
+        ],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn_wide = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo {
+                name: Some(interner.intern_string("a")),
+                type_id: TypeId::UNKNOWN,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("b")),
+                type_id: TypeId::UNKNOWN,
+                optional: false,
+                rest: false,
+            },
+        ],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // Wide params is subtype due to contravariance
+    assert!(checker.is_subtype_of(fn_wide, fn_specific));
+}
+
+#[test]
+fn test_fn_param_contravariance_object_type() {
+    // (x: { a: string }) => void is NOT subtype of (x: { a: string, b: number }) => void
+    // Because { a: string, b: number } is narrower than { a: string }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a_name = interner.intern_string("a");
+    let b_name = interner.intern_string("b");
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: a_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_ab = interner.object(vec![
+        PropertyInfo {
+            name: a_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: b_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let fn_obj_a = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: obj_a,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn_obj_ab = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: obj_ab,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // fn_obj_a has wider param (accepts more objects), so it's subtype
+    assert!(checker.is_subtype_of(fn_obj_a, fn_obj_ab));
+    // fn_obj_ab has narrower param, so it's NOT subtype
+    assert!(!checker.is_subtype_of(fn_obj_ab, fn_obj_a));
+}
+
+#[test]
+fn test_fn_param_contravariance_never_param() {
+    // (x: never) => void - can't be called with any value
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let fn_string_param = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn_never_param = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::NEVER,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // never is the narrowest type, so fn_string is subtype of fn_never (contravariance)
+    assert!(checker.is_subtype_of(fn_string_param, fn_never_param));
+}
+
+#[test]
+fn test_fn_param_contravariance_literal_type() {
+    // (x: string) => void <: (x: "hello") => void
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let hello = interner.literal_string("hello");
+
+    let fn_string_param = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn_literal_param = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: hello,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // string is wider than "hello", so fn_string is subtype
+    assert!(checker.is_subtype_of(fn_string_param, fn_literal_param));
+    // "hello" is narrower, so fn_literal is NOT subtype
+    assert!(!checker.is_subtype_of(fn_literal_param, fn_string_param));
+}
+
+// -----------------------------------------------------------------------------
+// Return Type Covariance
+// -----------------------------------------------------------------------------
+
+#[test]
+fn test_fn_return_covariance_narrower_return_is_subtype() {
+    // () => string <: () => string | number
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let return_union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    let fn_return_string = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn_return_union = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: return_union,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // Narrower return type is subtype (covariance)
+    assert!(checker.is_subtype_of(fn_return_string, fn_return_union));
+    // Wider return type is NOT subtype
+    assert!(!checker.is_subtype_of(fn_return_union, fn_return_string));
+}
+
+#[test]
+fn test_fn_return_covariance_literal_return() {
+    // () => "hello" <: () => string
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let hello = interner.literal_string("hello");
+
+    let fn_return_literal = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: hello,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn_return_string = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // "hello" is subtype of string, so fn_return_literal is subtype
+    assert!(checker.is_subtype_of(fn_return_literal, fn_return_string));
+}
+
+#[test]
+fn test_fn_return_covariance_never_return() {
+    // () => never <: () => T for any T
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let fn_return_never = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::NEVER,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn_return_string = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn_return_number = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::NUMBER,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // never is subtype of everything
+    assert!(checker.is_subtype_of(fn_return_never, fn_return_string));
+    assert!(checker.is_subtype_of(fn_return_never, fn_return_number));
+}
+
+#[test]
+fn test_fn_return_covariance_object_return() {
+    // () => { a: string, b: number } <: () => { a: string }
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let a_name = interner.intern_string("a");
+    let b_name = interner.intern_string("b");
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: a_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let obj_ab = interner.object(vec![
+        PropertyInfo {
+            name: a_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: b_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let fn_return_a = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: obj_a,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn_return_ab = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: obj_ab,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // { a, b } is subtype of { a }, so fn_return_ab is subtype
+    assert!(checker.is_subtype_of(fn_return_ab, fn_return_a));
+    // { a } is NOT subtype of { a, b }
+    assert!(!checker.is_subtype_of(fn_return_a, fn_return_ab));
+}
+
+#[test]
+fn test_fn_return_covariance_void_return() {
+    // () => undefined <: () => void
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let fn_return_undefined = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::UNDEFINED,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn_return_void = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // undefined is subtype of void
+    assert!(checker.is_subtype_of(fn_return_undefined, fn_return_void));
+}
+
+#[test]
+fn test_fn_return_covariance_unknown_return() {
+    // () => string is NOT subtype of () => unknown in strict sense
+    // But () => unknown accepts any return
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let fn_return_string = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn_return_unknown = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::UNKNOWN,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // string is subtype of unknown, so fn_return_string is subtype
+    assert!(checker.is_subtype_of(fn_return_string, fn_return_unknown));
+}
+
+// -----------------------------------------------------------------------------
+// Optional Parameter Handling
+// -----------------------------------------------------------------------------
+
+#[test]
+fn test_fn_optional_param_fewer_params_is_subtype() {
+    // () => void <: (x?: string) => void
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let fn_no_params = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn_optional_param = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: true,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // Function with no params can be used where optional param is expected
+    assert!(checker.is_subtype_of(fn_no_params, fn_optional_param));
+}
+
+#[test]
+fn test_fn_optional_param_required_to_optional() {
+    // (x: string) => void <: (x?: string) => void
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let fn_required = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn_optional = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: true,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // Required param function can substitute for optional param function
+    assert!(checker.is_subtype_of(fn_required, fn_optional));
+}
+
+#[test]
+fn test_fn_optional_param_optional_to_required_not_subtype() {
+    // (x?: string) => void is NOT subtype of (x: string) => void
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let fn_required = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn_optional = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: true,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // Optional cannot substitute where required is expected
+    assert!(!checker.is_subtype_of(fn_optional, fn_required));
+}
+
+#[test]
+fn test_fn_optional_param_multiple_optional() {
+    // (a: string) => void <: (a?: string, b?: number) => void
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let fn_one_required = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("a")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn_two_optional = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo {
+                name: Some(interner.intern_string("a")),
+                type_id: TypeId::STRING,
+                optional: true,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("b")),
+                type_id: TypeId::NUMBER,
+                optional: true,
+                rest: false,
+            },
+        ],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // One required can substitute for two optional
+    assert!(checker.is_subtype_of(fn_one_required, fn_two_optional));
+}
+
+#[test]
+fn test_fn_optional_param_mixed_required_optional() {
+    // (a: string, b: number) => void <: (a: string, b?: number) => void
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let fn_both_required = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo {
+                name: Some(interner.intern_string("a")),
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("b")),
+                type_id: TypeId::NUMBER,
+                optional: false,
+                rest: false,
+            },
+        ],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn_one_optional = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo {
+                name: Some(interner.intern_string("a")),
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("b")),
+                type_id: TypeId::NUMBER,
+                optional: true,
+                rest: false,
+            },
+        ],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // Both required can substitute for one optional
+    assert!(checker.is_subtype_of(fn_both_required, fn_one_optional));
+}
+
+#[test]
+fn test_fn_optional_param_with_undefined_union() {
+    // (x: string | undefined) => void vs (x?: string) => void
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let string_or_undefined = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
+
+    let fn_union_param = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: string_or_undefined,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn_optional_param = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: true,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // These should be related - exact relationship depends on implementation
+    // At minimum, check they don't crash
+    let _union_to_optional = checker.is_subtype_of(fn_union_param, fn_optional_param);
+    let _optional_to_union = checker.is_subtype_of(fn_optional_param, fn_union_param);
+}
+
+// -----------------------------------------------------------------------------
+// Rest Parameter Assignability
+// -----------------------------------------------------------------------------
+
+#[test]
+fn test_fn_rest_param_basic() {
+    // (...args: string[]) => void
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let string_array = interner.array(TypeId::STRING);
+
+    let fn_rest = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: string_array,
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn_no_params = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // No params should be subtype of rest (can be called with zero args)
+    assert!(checker.is_subtype_of(fn_no_params, fn_rest));
+}
+
+#[test]
+fn test_fn_rest_param_fixed_params_to_rest() {
+    // (a: string, b: string) => void <: (...args: string[]) => void
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let string_array = interner.array(TypeId::STRING);
+
+    let fn_two_strings = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo {
+                name: Some(interner.intern_string("a")),
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("b")),
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            },
+        ],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn_rest = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: string_array,
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // Fixed string params should be subtype of rest strings
+    assert!(checker.is_subtype_of(fn_two_strings, fn_rest));
+}
+
+#[test]
+fn test_fn_rest_param_wider_element_type() {
+    // (...args: unknown[]) => void <: (...args: string[]) => void
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let string_array = interner.array(TypeId::STRING);
+    let unknown_array = interner.array(TypeId::UNKNOWN);
+
+    let fn_rest_string = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: string_array,
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn_rest_unknown = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: unknown_array,
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // unknown[] accepts more, so it's subtype (contravariance)
+    assert!(checker.is_subtype_of(fn_rest_unknown, fn_rest_string));
+}
+
+#[test]
+fn test_fn_rest_param_with_leading_params() {
+    // (a: string, ...rest: number[]) => void
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let number_array = interner.array(TypeId::NUMBER);
+
+    let fn_with_rest = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo {
+                name: Some(interner.intern_string("a")),
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("rest")),
+                type_id: number_array,
+                optional: false,
+                rest: true,
+            },
+        ],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn_just_string = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("a")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // Just string param should be subtype (rest can be empty)
+    assert!(checker.is_subtype_of(fn_just_string, fn_with_rest));
+}
+
+#[test]
+fn test_fn_rest_param_union_element_type() {
+    // (...args: (string | number)[]) => void
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let string_array = interner.array(TypeId::STRING);
+    let union_type = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let union_array = interner.array(union_type);
+
+    let fn_rest_string = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: string_array,
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn_rest_union = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: union_array,
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // Union array accepts more types, so it's subtype
+    assert!(checker.is_subtype_of(fn_rest_union, fn_rest_string));
+}
+
+#[test]
+fn test_fn_rest_to_rest_same_type() {
+    // (...args: string[]) => void <: (...args: string[]) => void
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let string_array = interner.array(TypeId::STRING);
+
+    let fn_rest1 = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: string_array,
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn_rest2 = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: string_array,
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // Same rest type should be bidirectionally subtype
+    assert!(checker.is_subtype_of(fn_rest1, fn_rest2));
+    assert!(checker.is_subtype_of(fn_rest2, fn_rest1));
+}
+
+#[test]
+fn test_fn_rest_combined_with_optional() {
+    // (a?: string, ...rest: number[]) => void
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let number_array = interner.array(TypeId::NUMBER);
+
+    let fn_optional_and_rest = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo {
+                name: Some(interner.intern_string("a")),
+                type_id: TypeId::STRING,
+                optional: true,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("rest")),
+                type_id: number_array,
+                optional: false,
+                rest: true,
+            },
+        ],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let fn_no_params = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // No params should be subtype (both optional and rest can be empty)
+    assert!(checker.is_subtype_of(fn_no_params, fn_optional_and_rest));
+}
