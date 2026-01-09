@@ -13765,3 +13765,103 @@ fn test_async_methchain_combined() {
     );
     assert!(result, "Should detect await in combined async chain patterns");
 }
+
+// ASYNC DISPOSABLE PATTERN TESTS
+
+#[test]
+fn test_async_disposepat_basic() {
+    let result = async_error_propagation_contains_await(
+        "async function cleanup() { return await resource.dispose(); }",
+    );
+    assert!(result, "Should detect await in basic async dispose");
+}
+
+#[test]
+fn test_async_disposepat_using() {
+    let result = async_error_propagation_contains_await(
+        "async function use() { return await getResource(); }",
+    );
+    assert!(result, "Should detect await in async using declaration");
+}
+
+#[test]
+fn test_async_disposepat_stack() {
+    let result = async_error_propagation_contains_await(
+        "async function manage() { await stack.use(r1); await stack.use(r2); return await stack.dispose(); }",
+    );
+    assert!(result, "Should detect await in async disposable stack");
+}
+
+#[test]
+fn test_async_disposepat_error() {
+    let result = async_error_propagation_contains_await(
+        "async function cleanup() { try { return await resource.dispose(); } catch (e) { console.error(e); } }",
+    );
+    assert!(result, "Should detect await in async disposal with error");
+}
+
+#[test]
+fn test_async_disposepat_symbol() {
+    let result = async_error_propagation_contains_await(
+        "async function dispose() { return await obj[Symbol.asyncDispose](); }",
+    );
+    assert!(result, "Should detect await in async Symbol.asyncDispose");
+}
+
+#[test]
+fn test_async_disposepat_combined() {
+    let result = async_error_propagation_contains_await(
+        "async function manage() { try { await init(); return await cleanup(); } finally { await dispose(); } }",
+    );
+    assert!(result, "Should detect await in combined async disposable patterns");
+}
+
+// ASYNC WEAKREF PATTERN TESTS
+
+#[test]
+fn test_async_weakref_deref() {
+    let result = async_error_propagation_contains_await(
+        "async function get() { const obj = ref.deref(); return await process(obj); }",
+    );
+    assert!(result, "Should detect await in basic async WeakRef deref");
+}
+
+#[test]
+fn test_async_weakref_cache() {
+    let result = async_error_propagation_contains_await(
+        "async function cached() { const val = cache.get(key); if (!val) return await fetch(key); return val; }",
+    );
+    assert!(result, "Should detect await in async WeakRef cache pattern");
+}
+
+#[test]
+fn test_async_weakref_finalization() {
+    let result = async_error_propagation_contains_await(
+        "async function cleanup() { return await registry.cleanupSome(); }",
+    );
+    assert!(result, "Should detect await in async FinalizationRegistry callback");
+}
+
+#[test]
+fn test_async_weakref_retry() {
+    let result = async_error_propagation_contains_await(
+        "async function getWithRetry() { let obj = ref.deref(); if (!obj) obj = await recreate(); return obj; }",
+    );
+    assert!(result, "Should detect await in async WeakRef with retry");
+}
+
+#[test]
+fn test_async_weakref_cleanup() {
+    let result = async_error_propagation_contains_await(
+        "async function clean() { await finalize(); ref = null; }",
+    );
+    assert!(result, "Should detect await in async WeakRef cleanup");
+}
+
+#[test]
+fn test_async_weakref_combined() {
+    let result = async_error_propagation_contains_await(
+        "async function manage() { const obj = ref.deref(); if (obj) return await obj.process(); return await fallback(); }",
+    );
+    assert!(result, "Should detect await in combined async WeakRef patterns");
+}

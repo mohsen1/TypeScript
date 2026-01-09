@@ -20,12 +20,53 @@ Priority: 2
 - [x] Tuple type tests (labeled elements, rest, optional, spreads)
 - [x] Array type tests (readonly, generic, type inference)
 - [x] Union type tests (type narrowing, union distribution)
+- [x] Spread type tests (tuple spreads, object spreads)
+- [x] Awaited type tests (async/await type unwrapping)
 
 ## Task Queue
 - [ ] Implement TypeResolver for TypeEvaluator to resolve Refs inside Mapped/Conditional types
 - [ ] This would enable full evaluation of complex patterns like `{ [K in keyof R]: ExtractAction<R[K]> }[keyof R]`
 
 ## Completed
+- [x] Added 50 awaited type tests including:
+  - Basic Awaited: Promise<string>, Promise<number>, Promise<boolean>
+  - Non-promise passthrough: Awaited<string> = string
+  - Void, undefined, null in promises
+  - Nested promise unwrapping: Promise<Promise<T>>
+  - Triple nested promises
+  - Promise type structure verification
+  - Union with promises: Promise<A> | Promise<B>
+  - Promise or value: Promise<T> | T
+  - Special types: any, never, unknown in Awaited
+  - Async function return inference
+  - Multiple returns in async functions
+  - Await expression unwrapping
+  - Promise.all tuple inference
+  - Promise.race union inference
+  - Promise.allSettled result types
+  - Complex types: objects, arrays, tuples, functions in promises
+  - Literal types, intersection types in promises
+  - Generic async functions with constraints
+  - PromiseLike thenable pattern
+  - Edge cases: nullable, optional, conditional branches
+  - Symbol, bigint promise types
+- [x] Added 45 spread type tests including:
+  - Tuple spreads: basic, leading/trailing elements, multiple spreads
+  - Empty/single element tuple spreads
+  - Rest elements at start/end positions
+  - Optional elements, labeled elements
+  - Generic tuple spread inference
+  - Union/literal types in spread elements
+  - Nested tuples, readonly tuples
+  - Object spreads: basic, two/three-way merge
+  - Property override (later wins)
+  - Optional/readonly property handling
+  - Methods, union/intersection properties
+  - Nested objects, array/function/tuple properties
+  - Generic object spread inference
+  - Combined spread patterns
+  - Special types (never, any, unknown) in spreads
+  - Long tuples/objects (10 elements)
 - [x] Added 40 union type tests including:
   - Basic unions (string | number, 3+ types)
   - Nullable types (string | null, string | undefined)
@@ -221,6 +262,8 @@ Solution options:
 **YES** - Branch reset to squad/forge baseline and new tests added.
 
 Worker 2 branch now contains:
+- 50 awaited type tests (async/await type unwrapping)
+- 45 spread type tests (tuple spreads, object spreads)
 - 40 union type tests (type narrowing, union distribution)
 - 32 array type tests (readonly, generic, type inference)
 - 28 new utility type edge case tests (ReturnType, Parameters, InstanceType, etc.)

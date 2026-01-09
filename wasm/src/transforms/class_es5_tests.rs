@@ -44515,3 +44515,1377 @@ const cacheManager = new CacheManager();
         output
     );
 }
+
+/// Test BigInt class property
+#[test]
+fn test_class_es5_bigint_class_property() {
+    let source = r#"
+class LargeCounter {
+    private count: bigint;
+    private maxValue: bigint;
+
+    constructor(initialCount: bigint = 0n) {
+        this.count = initialCount;
+        this.maxValue = 9007199254740991n;
+    }
+
+    getCount(): bigint {
+        return this.count;
+    }
+
+    increment(): void {
+        if (this.count < this.maxValue) {
+            this.count = this.count + 1n;
+        }
+    }
+
+    decrement(): void {
+        if (this.count > 0n) {
+            this.count = this.count - 1n;
+        }
+    }
+
+    reset(): void {
+        this.count = 0n;
+    }
+}
+
+class TransactionId {
+    private id: bigint;
+    private timestamp: bigint;
+
+    constructor(id: bigint) {
+        this.id = id;
+        this.timestamp = BigInt(Date.now());
+    }
+
+    getId(): bigint {
+        return this.id;
+    }
+
+    getTimestamp(): bigint {
+        return this.timestamp;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+    let output = printer.get_output().to_string();
+
+    // Should have ES5 class structure
+    assert!(
+        output.contains("LargeCounter") && output.contains("TransactionId"),
+        "Expected class names: {}",
+        output
+    );
+
+    // Should have BigInt literals
+    assert!(
+        output.contains("0n") || output.contains("BigInt"),
+        "Expected BigInt usage: {}",
+        output
+    );
+}
+
+/// Test BigInt arithmetic in methods
+#[test]
+fn test_class_es5_bigint_arithmetic_methods() {
+    let source = r#"
+class BigIntCalculator {
+    private precision: bigint;
+
+    constructor(precision: bigint = 10n) {
+        this.precision = precision;
+    }
+
+    add(a: bigint, b: bigint): bigint {
+        return a + b;
+    }
+
+    subtract(a: bigint, b: bigint): bigint {
+        return a - b;
+    }
+
+    multiply(a: bigint, b: bigint): bigint {
+        return a * b;
+    }
+
+    divide(a: bigint, b: bigint): bigint {
+        if (b === 0n) {
+            throw new Error('Division by zero');
+        }
+        return a / b;
+    }
+
+    modulo(a: bigint, b: bigint): bigint {
+        return a % b;
+    }
+
+    power(base: bigint, exponent: bigint): bigint {
+        return base ** exponent;
+    }
+
+    factorial(n: bigint): bigint {
+        if (n <= 1n) {
+            return 1n;
+        }
+        return n * this.factorial(n - 1n);
+    }
+}
+
+class FibonacciBigInt {
+    private cache: Map<bigint, bigint>;
+
+    constructor() {
+        this.cache = new Map();
+        this.cache.set(0n, 0n);
+        this.cache.set(1n, 1n);
+    }
+
+    calculate(n: bigint): bigint {
+        if (this.cache.has(n)) {
+            return this.cache.get(n)!;
+        }
+        const result = this.calculate(n - 1n) + this.calculate(n - 2n);
+        this.cache.set(n, result);
+        return result;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+    let output = printer.get_output().to_string();
+
+    // Should have ES5 class structure
+    assert!(
+        output.contains("BigIntCalculator") && output.contains("FibonacciBigInt"),
+        "Expected class names: {}",
+        output
+    );
+
+    // Should have arithmetic methods
+    assert!(
+        output.contains("add") && output.contains("multiply") && output.contains("factorial"),
+        "Expected arithmetic methods: {}",
+        output
+    );
+}
+
+/// Test BigInt comparison operations
+#[test]
+fn test_class_es5_bigint_comparison_operations() {
+    let source = r#"
+class BigIntRange {
+    private min: bigint;
+    private max: bigint;
+
+    constructor(min: bigint, max: bigint) {
+        this.min = min;
+        this.max = max;
+    }
+
+    contains(value: bigint): boolean {
+        return value >= this.min && value <= this.max;
+    }
+
+    isBelow(value: bigint): boolean {
+        return value < this.min;
+    }
+
+    isAbove(value: bigint): boolean {
+        return value > this.max;
+    }
+
+    equals(other: BigIntRange): boolean {
+        return this.min === other.min && this.max === other.max;
+    }
+
+    notEquals(other: BigIntRange): boolean {
+        return this.min !== other.min || this.max !== other.max;
+    }
+}
+
+class BigIntComparator {
+    compare(a: bigint, b: bigint): number {
+        if (a < b) return -1;
+        if (a > b) return 1;
+        return 0;
+    }
+
+    max(...values: bigint[]): bigint {
+        return values.reduce((max, val) => val > max ? val : max);
+    }
+
+    min(...values: bigint[]): bigint {
+        return values.reduce((min, val) => val < min ? val : min);
+    }
+
+    clamp(value: bigint, min: bigint, max: bigint): bigint {
+        if (value < min) return min;
+        if (value > max) return max;
+        return value;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+    let output = printer.get_output().to_string();
+
+    // Should have ES5 class structure
+    assert!(
+        output.contains("BigIntRange") && output.contains("BigIntComparator"),
+        "Expected class names: {}",
+        output
+    );
+
+    // Should have comparison methods
+    assert!(
+        output.contains("contains") && output.contains("compare") && output.contains("clamp"),
+        "Expected comparison methods: {}",
+        output
+    );
+}
+
+/// Test BigInt constructor parameter
+#[test]
+fn test_class_es5_bigint_constructor_parameter() {
+    let source = r#"
+class Account {
+    private readonly id: bigint;
+    private balance: bigint;
+    private readonly createdAt: bigint;
+
+    constructor(id: bigint, initialBalance: bigint = 0n) {
+        this.id = id;
+        this.balance = initialBalance;
+        this.createdAt = BigInt(Date.now());
+    }
+
+    getId(): bigint {
+        return this.id;
+    }
+
+    getBalance(): bigint {
+        return this.balance;
+    }
+
+    deposit(amount: bigint): void {
+        if (amount > 0n) {
+            this.balance = this.balance + amount;
+        }
+    }
+
+    withdraw(amount: bigint): boolean {
+        if (amount > 0n && amount <= this.balance) {
+            this.balance = this.balance - amount;
+            return true;
+        }
+        return false;
+    }
+}
+
+class BlockchainAddress {
+    private readonly address: bigint;
+    private readonly checksum: bigint;
+
+    constructor(address: bigint, checksum: bigint) {
+        this.address = address;
+        this.checksum = checksum;
+    }
+
+    getAddress(): bigint {
+        return this.address;
+    }
+
+    verify(): boolean {
+        return this.computeChecksum() === this.checksum;
+    }
+
+    private computeChecksum(): bigint {
+        return this.address % 256n;
+    }
+
+    toHex(): string {
+        return '0x' + this.address.toString(16);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+    let output = printer.get_output().to_string();
+
+    // Should have ES5 class structure
+    assert!(
+        output.contains("Account") && output.contains("BlockchainAddress"),
+        "Expected class names: {}",
+        output
+    );
+
+    // Should have methods with BigInt operations
+    assert!(
+        output.contains("deposit") && output.contains("withdraw") && output.contains("toHex"),
+        "Expected methods: {}",
+        output
+    );
+}
+
+/// Test BigInt static field
+#[test]
+fn test_class_es5_bigint_static_field() {
+    let source = r#"
+class BigIntConstants {
+    static readonly MAX_SAFE_INTEGER: bigint = 9007199254740991n;
+    static readonly MIN_SAFE_INTEGER: bigint = -9007199254740991n;
+    static readonly ZERO: bigint = 0n;
+    static readonly ONE: bigint = 1n;
+    static readonly NEGATIVE_ONE: bigint = -1n;
+
+    static isPositive(value: bigint): boolean {
+        return value > BigIntConstants.ZERO;
+    }
+
+    static isNegative(value: bigint): boolean {
+        return value < BigIntConstants.ZERO;
+    }
+
+    static abs(value: bigint): bigint {
+        return value < BigIntConstants.ZERO ? -value : value;
+    }
+
+    static sign(value: bigint): bigint {
+        if (value > BigIntConstants.ZERO) return BigIntConstants.ONE;
+        if (value < BigIntConstants.ZERO) return BigIntConstants.NEGATIVE_ONE;
+        return BigIntConstants.ZERO;
+    }
+}
+
+class CryptoConstants {
+    static readonly MODULUS: bigint = 2n ** 256n - 1n;
+    static readonly GENERATOR: bigint = 2n;
+    static readonly ORDER: bigint = 2n ** 128n;
+
+    private value: bigint;
+
+    constructor(value: bigint) {
+        this.value = value % CryptoConstants.MODULUS;
+    }
+
+    getValue(): bigint {
+        return this.value;
+    }
+
+    modPow(exponent: bigint): bigint {
+        let result = 1n;
+        let base = this.value;
+        let exp = exponent;
+        while (exp > 0n) {
+            if (exp % 2n === 1n) {
+                result = (result * base) % CryptoConstants.MODULUS;
+            }
+            base = (base * base) % CryptoConstants.MODULUS;
+            exp = exp / 2n;
+        }
+        return result;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+    let output = printer.get_output().to_string();
+
+    // Should have ES5 class structure
+    assert!(
+        output.contains("BigIntConstants") && output.contains("CryptoConstants"),
+        "Expected class names: {}",
+        output
+    );
+
+    // Should have static methods
+    assert!(
+        output.contains("isPositive") && output.contains("abs") && output.contains("modPow"),
+        "Expected static methods: {}",
+        output
+    );
+}
+
+/// Test combined BigInt patterns
+#[test]
+fn test_class_es5_bigint_combined_patterns() {
+    let source = r#"
+interface Currency {
+    code: string;
+    decimals: number;
+}
+
+class Money {
+    private amount: bigint;
+    private currency: Currency;
+
+    constructor(amount: bigint, currency: Currency) {
+        this.amount = amount;
+        this.currency = currency;
+    }
+
+    static fromNumber(value: number, currency: Currency): Money {
+        const multiplier = 10n ** BigInt(currency.decimals);
+        const amount = BigInt(Math.round(value * Number(multiplier)));
+        return new Money(amount, currency);
+    }
+
+    getAmount(): bigint {
+        return this.amount;
+    }
+
+    getCurrency(): Currency {
+        return this.currency;
+    }
+
+    add(other: Money): Money {
+        this.ensureSameCurrency(other);
+        return new Money(this.amount + other.amount, this.currency);
+    }
+
+    subtract(other: Money): Money {
+        this.ensureSameCurrency(other);
+        return new Money(this.amount - other.amount, this.currency);
+    }
+
+    multiply(factor: bigint): Money {
+        return new Money(this.amount * factor, this.currency);
+    }
+
+    divide(divisor: bigint): Money {
+        return new Money(this.amount / divisor, this.currency);
+    }
+
+    isGreaterThan(other: Money): boolean {
+        this.ensureSameCurrency(other);
+        return this.amount > other.amount;
+    }
+
+    isLessThan(other: Money): boolean {
+        this.ensureSameCurrency(other);
+        return this.amount < other.amount;
+    }
+
+    equals(other: Money): boolean {
+        return this.amount === other.amount && this.currency.code === other.currency.code;
+    }
+
+    private ensureSameCurrency(other: Money): void {
+        if (this.currency.code !== other.currency.code) {
+            throw new Error('Currency mismatch');
+        }
+    }
+
+    toNumber(): number {
+        const multiplier = 10n ** BigInt(this.currency.decimals);
+        return Number(this.amount) / Number(multiplier);
+    }
+
+    toString(): string {
+        return `${this.toNumber().toFixed(this.currency.decimals)} ${this.currency.code}`;
+    }
+}
+
+class Ledger {
+    private entries: Map<bigint, Money>;
+    private nextId: bigint;
+
+    constructor() {
+        this.entries = new Map();
+        this.nextId = 1n;
+    }
+
+    addEntry(amount: Money): bigint {
+        const id = this.nextId++;
+        this.entries.set(id, amount);
+        return id;
+    }
+
+    getEntry(id: bigint): Money | undefined {
+        return this.entries.get(id);
+    }
+
+    getTotal(currency: Currency): Money {
+        let total = new Money(0n, currency);
+        for (const entry of this.entries.values()) {
+            if (entry.getCurrency().code === currency.code) {
+                total = total.add(entry);
+            }
+        }
+        return total;
+    }
+
+    getEntryCount(): bigint {
+        return BigInt(this.entries.size);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+    let output = printer.get_output().to_string();
+
+    // Should have ES5 class structure
+    assert!(
+        output.contains("Money") && output.contains("Ledger"),
+        "Expected class names: {}",
+        output
+    );
+
+    // Should have various methods
+    assert!(
+        output.contains("add") && output.contains("subtract") && output.contains("getTotal"),
+        "Expected methods: {}",
+        output
+    );
+
+    // Interface should be stripped
+    assert!(
+        !output.contains("interface Currency"),
+        "Expected interface to be stripped: {}",
+        output
+    );
+
+    // Should have BigInt usage
+    assert!(
+        output.contains("0n") || output.contains("1n") || output.contains("BigInt"),
+        "Expected BigInt usage: {}",
+        output
+    );
+}
+
+/// Test ES5 class with basic Symbol.iterator implementation pattern
+#[test]
+fn test_class_es5_symbol_iterator_basic_pattern() {
+    let source = r#"
+class NumberRange {
+    private start: number;
+    private end: number;
+    private step: number;
+
+    constructor(start: number, end: number, step: number = 1) {
+        this.start = start;
+        this.end = end;
+        this.step = step;
+    }
+
+    [Symbol.iterator](): Iterator<number> {
+        let current = this.start;
+        const end = this.end;
+        const step = this.step;
+
+        return {
+            next(): IteratorResult<number> {
+                if (current <= end) {
+                    const value = current;
+                    current += step;
+                    return { value, done: false };
+                }
+                return { value: undefined, done: true };
+            }
+        };
+    }
+
+    toArray(): number[] {
+        return [...this];
+    }
+}
+
+class StringCharIterator {
+    private str: string;
+
+    constructor(str: string) {
+        this.str = str;
+    }
+
+    [Symbol.iterator](): Iterator<string> {
+        let index = 0;
+        const str = this.str;
+
+        return {
+            next(): IteratorResult<string> {
+                if (index < str.length) {
+                    return { value: str[index++], done: false };
+                }
+                return { value: undefined, done: true };
+            }
+        };
+    }
+
+    getLength(): number {
+        return this.str.length;
+    }
+}
+
+const range = new NumberRange(1, 10, 2);
+const chars = new StringCharIterator("hello");
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("NumberRange") && output.contains("StringCharIterator"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("toArray") && output.contains("getLength"),
+        "Expected methods: {}",
+        output
+    );
+
+    // Symbol.iterator should be present
+    assert!(
+        output.contains("Symbol.iterator"),
+        "Expected Symbol.iterator: {}",
+        output
+    );
+
+    // Type annotations should be stripped
+    assert!(
+        !output.contains(": Iterator<") && !output.contains(": IteratorResult<"),
+        "Expected type annotations to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with Symbol.asyncIterator implementation pattern
+#[test]
+fn test_class_es5_symbol_async_iterator_pattern() {
+    let source = r#"
+class AsyncDataStream {
+    private data: string[];
+    private delay: number;
+
+    constructor(data: string[], delay: number = 100) {
+        this.data = data;
+        this.delay = delay;
+    }
+
+    [Symbol.asyncIterator](): AsyncIterator<string> {
+        let index = 0;
+        const data = this.data;
+        const delay = this.delay;
+
+        return {
+            async next(): Promise<IteratorResult<string>> {
+                await new Promise(resolve => setTimeout(resolve, delay));
+                if (index < data.length) {
+                    return { value: data[index++], done: false };
+                }
+                return { value: undefined, done: true };
+            }
+        };
+    }
+
+    getCount(): number {
+        return this.data.length;
+    }
+}
+
+class AsyncNumberGenerator {
+    private max: number;
+
+    constructor(max: number) {
+        this.max = max;
+    }
+
+    [Symbol.asyncIterator](): AsyncIterator<number> {
+        let current = 0;
+        const max = this.max;
+
+        return {
+            async next(): Promise<IteratorResult<number>> {
+                if (current < max) {
+                    return { value: current++, done: false };
+                }
+                return { value: undefined, done: true };
+            }
+        };
+    }
+
+    getMax(): number {
+        return this.max;
+    }
+}
+
+const stream = new AsyncDataStream(["a", "b", "c"]);
+const generator = new AsyncNumberGenerator(5);
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("AsyncDataStream") && output.contains("AsyncNumberGenerator"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("getCount") && output.contains("getMax"),
+        "Expected methods: {}",
+        output
+    );
+
+    // Symbol.asyncIterator should be present
+    assert!(
+        output.contains("Symbol.asyncIterator"),
+        "Expected Symbol.asyncIterator: {}",
+        output
+    );
+
+    // Type annotations should be stripped
+    assert!(
+        !output.contains(": AsyncIterator<") && !output.contains(": Promise<IteratorResult"),
+        "Expected type annotations to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with iterable class pattern
+#[test]
+fn test_class_es5_iterable_class_pattern() {
+    let source = r#"
+class Collection<T> implements Iterable<T> {
+    private items: T[] = [];
+
+    add(item: T): void {
+        this.items.push(item);
+    }
+
+    remove(item: T): boolean {
+        const index = this.items.indexOf(item);
+        if (index !== -1) {
+            this.items.splice(index, 1);
+            return true;
+        }
+        return false;
+    }
+
+    [Symbol.iterator](): Iterator<T> {
+        let index = 0;
+        const items = this.items;
+
+        return {
+            next(): IteratorResult<T> {
+                if (index < items.length) {
+                    return { value: items[index++], done: false };
+                }
+                return { value: undefined as any, done: true };
+            }
+        };
+    }
+
+    size(): number {
+        return this.items.length;
+    }
+
+    toArray(): T[] {
+        return [...this];
+    }
+}
+
+class Queue<T> implements Iterable<T> {
+    private elements: T[] = [];
+
+    enqueue(item: T): void {
+        this.elements.push(item);
+    }
+
+    dequeue(): T | undefined {
+        return this.elements.shift();
+    }
+
+    peek(): T | undefined {
+        return this.elements[0];
+    }
+
+    [Symbol.iterator](): Iterator<T> {
+        return this.elements[Symbol.iterator]();
+    }
+
+    isEmpty(): boolean {
+        return this.elements.length === 0;
+    }
+}
+
+const collection = new Collection<number>();
+const queue = new Queue<string>();
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("Collection") && output.contains("Queue"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("add") && output.contains("remove") && output.contains("size"),
+        "Expected Collection methods: {}",
+        output
+    );
+
+    assert!(
+        output.contains("enqueue") && output.contains("dequeue") && output.contains("peek"),
+        "Expected Queue methods: {}",
+        output
+    );
+
+    // Generic type parameter should be stripped
+    assert!(
+        !output.contains("Collection<T>") && !output.contains("Queue<T>"),
+        "Expected generic parameters to be stripped: {}",
+        output
+    );
+
+    // implements clause should be stripped
+    assert!(
+        !output.contains("implements Iterable"),
+        "Expected implements clause to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with generator-based iterator pattern
+#[test]
+fn test_class_es5_generator_iterator_pattern() {
+    let source = r#"
+class TreeNode<T> {
+    value: T;
+    left: TreeNode<T> | null = null;
+    right: TreeNode<T> | null = null;
+
+    constructor(value: T) {
+        this.value = value;
+    }
+
+    *inOrder(): Generator<T> {
+        if (this.left) {
+            yield* this.left.inOrder();
+        }
+        yield this.value;
+        if (this.right) {
+            yield* this.right.inOrder();
+        }
+    }
+
+    *preOrder(): Generator<T> {
+        yield this.value;
+        if (this.left) {
+            yield* this.left.preOrder();
+        }
+        if (this.right) {
+            yield* this.right.preOrder();
+        }
+    }
+
+    *postOrder(): Generator<T> {
+        if (this.left) {
+            yield* this.left.postOrder();
+        }
+        if (this.right) {
+            yield* this.right.postOrder();
+        }
+        yield this.value;
+    }
+
+    [Symbol.iterator](): Generator<T> {
+        return this.inOrder();
+    }
+}
+
+class Fibonacci {
+    private max: number;
+
+    constructor(max: number) {
+        this.max = max;
+    }
+
+    *[Symbol.iterator](): Generator<number> {
+        let a = 0, b = 1;
+        while (a <= this.max) {
+            yield a;
+            [a, b] = [b, a + b];
+        }
+    }
+
+    getMax(): number {
+        return this.max;
+    }
+}
+
+const tree = new TreeNode<number>(1);
+const fib = new Fibonacci(100);
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("TreeNode") && output.contains("Fibonacci"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Generator methods should exist
+    assert!(
+        output.contains("inOrder") && output.contains("preOrder") && output.contains("postOrder"),
+        "Expected TreeNode generator methods: {}",
+        output
+    );
+
+    assert!(
+        output.contains("getMax"),
+        "Expected Fibonacci methods: {}",
+        output
+    );
+
+    // Generic type parameter should be stripped
+    assert!(
+        !output.contains("TreeNode<T>") && !output.contains(": Generator<"),
+        "Expected generic/type parameters to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with async iterator for-await-of pattern
+#[test]
+fn test_class_es5_async_iterator_for_await_pattern() {
+    let source = r#"
+class AsyncFileReader {
+    private lines: string[];
+
+    constructor(lines: string[]) {
+        this.lines = lines;
+    }
+
+    async *readLines(): AsyncGenerator<string> {
+        for (const line of this.lines) {
+            await new Promise(resolve => setTimeout(resolve, 10));
+            yield line;
+        }
+    }
+
+    [Symbol.asyncIterator](): AsyncGenerator<string> {
+        return this.readLines();
+    }
+
+    getLineCount(): number {
+        return this.lines.length;
+    }
+}
+
+class AsyncBatchProcessor<T> {
+    private items: T[];
+    private batchSize: number;
+
+    constructor(items: T[], batchSize: number = 10) {
+        this.items = items;
+        this.batchSize = batchSize;
+    }
+
+    async *processBatches(): AsyncGenerator<T[]> {
+        for (let i = 0; i < this.items.length; i += this.batchSize) {
+            await new Promise(resolve => setTimeout(resolve, 5));
+            yield this.items.slice(i, i + this.batchSize);
+        }
+    }
+
+    [Symbol.asyncIterator](): AsyncGenerator<T[]> {
+        return this.processBatches();
+    }
+
+    getTotalItems(): number {
+        return this.items.length;
+    }
+
+    getBatchSize(): number {
+        return this.batchSize;
+    }
+}
+
+async function consumeReader(reader: AsyncFileReader): Promise<string[]> {
+    const results: string[] = [];
+    for await (const line of reader) {
+        results.push(line);
+    }
+    return results;
+}
+
+const reader = new AsyncFileReader(["line1", "line2", "line3"]);
+const processor = new AsyncBatchProcessor<number>([1, 2, 3, 4, 5], 2);
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("AsyncFileReader") && output.contains("AsyncBatchProcessor"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("readLines") && output.contains("getLineCount"),
+        "Expected AsyncFileReader methods: {}",
+        output
+    );
+
+    assert!(
+        output.contains("processBatches") && output.contains("getTotalItems") && output.contains("getBatchSize"),
+        "Expected AsyncBatchProcessor methods: {}",
+        output
+    );
+
+    // Function should exist
+    assert!(
+        output.contains("consumeReader"),
+        "Expected consumeReader function: {}",
+        output
+    );
+
+    // Type annotations should be stripped
+    assert!(
+        !output.contains(": AsyncGenerator<") && !output.contains(": Promise<string[]>"),
+        "Expected type annotations to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with combined iterator patterns
+#[test]
+fn test_class_es5_combined_iterator_patterns() {
+    let source = r#"
+class DataPipeline<T> implements Iterable<T>, AsyncIterable<T> {
+    private data: T[];
+    private transformers: ((item: T) => T)[] = [];
+
+    constructor(data: T[]) {
+        this.data = data;
+    }
+
+    addTransformer(fn: (item: T) => T): this {
+        this.transformers.push(fn);
+        return this;
+    }
+
+    private applyTransformers(item: T): T {
+        return this.transformers.reduce((acc, fn) => fn(acc), item);
+    }
+
+    [Symbol.iterator](): Iterator<T> {
+        let index = 0;
+        const data = this.data;
+        const apply = this.applyTransformers.bind(this);
+
+        return {
+            next(): IteratorResult<T> {
+                if (index < data.length) {
+                    return { value: apply(data[index++]), done: false };
+                }
+                return { value: undefined as any, done: true };
+            }
+        };
+    }
+
+    async *[Symbol.asyncIterator](): AsyncGenerator<T> {
+        for (const item of this.data) {
+            await new Promise(resolve => setTimeout(resolve, 1));
+            yield this.applyTransformers(item);
+        }
+    }
+
+    *reversed(): Generator<T> {
+        for (let i = this.data.length - 1; i >= 0; i--) {
+            yield this.applyTransformers(this.data[i]);
+        }
+    }
+
+    async *filteredAsync(predicate: (item: T) => boolean): AsyncGenerator<T> {
+        for await (const item of this) {
+            if (predicate(item)) {
+                yield item;
+            }
+        }
+    }
+
+    toArray(): T[] {
+        return [...this];
+    }
+
+    getLength(): number {
+        return this.data.length;
+    }
+}
+
+class BidirectionalIterator<T> {
+    private items: T[];
+    private currentIndex: number = 0;
+
+    constructor(items: T[]) {
+        this.items = items;
+    }
+
+    [Symbol.iterator](): Iterator<T> {
+        this.currentIndex = 0;
+        return this.forwardIterator();
+    }
+
+    private forwardIterator(): Iterator<T> {
+        const self = this;
+        return {
+            next(): IteratorResult<T> {
+                if (self.currentIndex < self.items.length) {
+                    return { value: self.items[self.currentIndex++], done: false };
+                }
+                return { value: undefined as any, done: true };
+            }
+        };
+    }
+
+    *reverseIterator(): Generator<T> {
+        for (let i = this.items.length - 1; i >= 0; i--) {
+            yield this.items[i];
+        }
+    }
+
+    *rangeIterator(start: number, end: number): Generator<T> {
+        const actualStart = Math.max(0, start);
+        const actualEnd = Math.min(this.items.length, end);
+        for (let i = actualStart; i < actualEnd; i++) {
+            yield this.items[i];
+        }
+    }
+
+    getCurrentIndex(): number {
+        return this.currentIndex;
+    }
+
+    reset(): void {
+        this.currentIndex = 0;
+    }
+}
+
+class EventStream<T> {
+    private events: T[] = [];
+    private listeners: Set<(event: T) => void> = new Set();
+
+    emit(event: T): void {
+        this.events.push(event);
+        for (const listener of this.listeners) {
+            listener(event);
+        }
+    }
+
+    subscribe(listener: (event: T) => void): () => void {
+        this.listeners.add(listener);
+        return () => this.listeners.delete(listener);
+    }
+
+    [Symbol.iterator](): Iterator<T> {
+        return this.events[Symbol.iterator]();
+    }
+
+    async *watch(): AsyncGenerator<T> {
+        let index = 0;
+        while (true) {
+            if (index < this.events.length) {
+                yield this.events[index++];
+            } else {
+                await new Promise(resolve => setTimeout(resolve, 10));
+            }
+        }
+    }
+
+    getEventCount(): number {
+        return this.events.length;
+    }
+}
+
+const pipeline = new DataPipeline<number>([1, 2, 3, 4, 5]);
+const biIterator = new BidirectionalIterator<string>(["a", "b", "c"]);
+const eventStream = new EventStream<string>();
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("DataPipeline") && output.contains("BidirectionalIterator") && output.contains("EventStream"),
+        "Expected classes: {}",
+        output
+    );
+
+    // DataPipeline methods
+    assert!(
+        output.contains("addTransformer") && output.contains("reversed") && output.contains("filteredAsync"),
+        "Expected DataPipeline methods: {}",
+        output
+    );
+
+    // BidirectionalIterator methods
+    assert!(
+        output.contains("reverseIterator") && output.contains("rangeIterator") && output.contains("reset"),
+        "Expected BidirectionalIterator methods: {}",
+        output
+    );
+
+    // EventStream methods
+    assert!(
+        output.contains("emit") && output.contains("subscribe") && output.contains("watch"),
+        "Expected EventStream methods: {}",
+        output
+    );
+
+    // Symbol methods should be present
+    assert!(
+        output.contains("Symbol.iterator") && output.contains("Symbol.asyncIterator"),
+        "Expected Symbol.iterator and Symbol.asyncIterator: {}",
+        output
+    );
+
+    // implements clause should be stripped
+    assert!(
+        !output.contains("implements Iterable") && !output.contains("implements AsyncIterable"),
+        "Expected implements clauses to be stripped: {}",
+        output
+    );
+
+    // Generic type parameters should be stripped
+    assert!(
+        !output.contains("DataPipeline<T>") && !output.contains("BidirectionalIterator<T>"),
+        "Expected generic parameters to be stripped: {}",
+        output
+    );
+}
