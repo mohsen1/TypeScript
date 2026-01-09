@@ -7,12 +7,13 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- [ ] Add async getter/setter tests in `wasm/src/transforms/async_es5_tests.rs`. Run `./wasm/test.sh async_es5_tests`.
+- [ ] Awaiting next task from EM-Anvil.
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added 12 async getter/setter tests (basic, with await, no await, both, body_contains_await, body_no_await, ignores nested async, static, try/catch, computed, private, conditional) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (412 tests PASS).
 - [x] Added 12 async class method tests (private, with this, multiple returns, body_contains_await, body_no_await, ignores nested async, with super, generic, with finally, static, while loop, conditional) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (400 tests PASS).
 - [x] Added 12 async method decorator tests (basic, with await, no await, chained, body_contains_await, body_no_await, ignores nested async, with params, try/catch, static, factory, conditional) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (388 tests PASS).
 - [x] Added 12 async function expression tests (basic, with await, no await, named, body_contains_await, body_no_await, ignores nested await, with params, try/catch, in callback, iife, conditional) in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (376 tests PASS).
