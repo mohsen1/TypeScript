@@ -7,12 +7,13 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-Add ES5 source map tests for class static block patterns: init order, private access. Tests: `./wasm/test.sh source_map_tests`
+(none)
 
 ## Task Queue
 - [ ] Add ES5 source map tests for decorator metadata patterns: reflect, design types
 
 ## Completed
+- [x] Added class static block ES5 source map tests (basic, init order, multiple, private field access, private method access, static field init, computed props, async patterns, error handling, comprehensive); 857 tests pass.
 - [x] Added logical assignment ES5 source map tests (&&=, ||=, ??=, object property, element access, chained, function context, class methods, side effects, comprehensive); 847 tests pass.
 - [x] Added nullish coalescing ES5 source map tests (basic, with null, with undefined, chained, function call, assignment, conditional, objects, with optional chaining, comprehensive); 837 tests pass.
 - [x] Added optional chaining ES5 source map tests (property access, method call, element access, nested, with nullish, function context, chained methods, delete, call expression, comprehensive); 827 tests pass.
