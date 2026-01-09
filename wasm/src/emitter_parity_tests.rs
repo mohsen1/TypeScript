@@ -18739,3 +18739,318 @@ class BatchProcessor<T, R> {
         output
     );
 }
+
+// =============================================================================
+// ES5 Async Function Patterns Parity Tests
+// =============================================================================
+
+/// Test: async arrow with destructuring params and array methods
+#[test]
+fn test_parity_es5_async_arrow_destructuring() {
+    let source = r#"
+interface User {
+    id: number;
+    name: string;
+}
+
+const processUsers = async ({ users, limit }: { users: User[], limit: number }): Promise<string[]> => {
+    const names = await Promise.all(
+        users.slice(0, limit).map(async ({ name }) => {
+            return name.toUpperCase();
+        })
+    );
+    return names;
+};
+
+const nestedAsync = async (items: number[]): Promise<number[]> => {
+    return await Promise.all(
+        items.map(async (item) => {
+            const doubled = await Promise.resolve(item * 2);
+            return doubled;
+        })
+    );
+};
+
+const asyncInReduce = async (values: number[]): Promise<number> => {
+    return await values.reduce(async (accPromise, curr) => {
+        const acc = await accPromise;
+        return acc + curr;
+    }, Promise.resolve(0));
+};
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions should be present
+    assert!(
+        output.contains("processUsers") && output.contains("nestedAsync") && output.contains("asyncInReduce"),
+        "Output should contain async arrow functions: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface User"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": User[]") && !output.contains(": Promise<"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Test: async method with computed property and this capture
+#[test]
+fn test_parity_es5_async_method_computed_this() {
+    let source = r#"
+const methodNames = {
+    fetch: "fetchData",
+    process: "processData"
+} as const;
+
+class DataService<T> {
+    private cache: Map<string, T> = new Map();
+
+    async [methodNames.fetch](id: string): Promise<T | undefined> {
+        const cached = this.cache.get(id);
+        if (cached) return cached;
+
+        const data = await this.loadFromServer(id);
+        this.cache.set(id, data);
+        return data;
+    }
+
+    private async loadFromServer(id: string): Promise<T> {
+        return {} as T;
+    }
+
+    async processWithCallback(items: T[], callback: (item: T) => Promise<T>): Promise<T[]> {
+        const self = this;
+        return await Promise.all(
+            items.map(async function(item) {
+                const result = await callback(item);
+                return result;
+            })
+        );
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Class should be present
+    assert!(
+        output.contains("DataService"),
+        "Output should contain class: {}",
+        output
+    );
+    // Methods should be present
+    assert!(
+        output.contains("loadFromServer") && output.contains("processWithCallback"),
+        "Output should contain methods: {}",
+        output
+    );
+    // Type parameters should be erased
+    assert!(
+        !output.contains("<T>") && !output.contains("Promise<T"),
+        "Type parameters should be erased: {}",
+        output
+    );
+}
+
+/// Test: async generator with Symbol.asyncIterator implementation
+#[test]
+fn test_parity_es5_async_generator_symbol_iterator() {
+    let source = r#"
+class AsyncStream<T> {
+    private items: T[];
+
+    constructor(items: T[]) {
+        this.items = items;
+    }
+
+    async *[Symbol.asyncIterator](): AsyncGenerator<T, void, unknown> {
+        for (const item of this.items) {
+            await new Promise(resolve => setTimeout(resolve, 10));
+            yield item;
+        }
+    }
+
+    async *filter(predicate: (item: T) => Promise<boolean>): AsyncGenerator<T, void, unknown> {
+        for await (const item of this) {
+            if (await predicate(item)) {
+                yield item;
+            }
+        }
+    }
+
+    static async *fromPromises<U>(promises: Promise<U>[]): AsyncGenerator<U, void, unknown> {
+        for (const promise of promises) {
+            yield await promise;
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Class should be present
+    assert!(
+        output.contains("AsyncStream"),
+        "Output should contain class: {}",
+        output
+    );
+    // Methods should be present
+    assert!(
+        output.contains("filter") && output.contains("fromPromises"),
+        "Output should contain methods: {}",
+        output
+    );
+    // Type parameters should be erased
+    assert!(
+        !output.contains("<T>") && !output.contains("<U>") && !output.contains("AsyncGenerator<"),
+        "Type parameters should be erased: {}",
+        output
+    );
+}
+
+/// Test: await expressions with advanced patterns
+#[test]
+fn test_parity_es5_await_advanced_patterns() {
+    let source = r#"
+interface Result<T> {
+    data?: T;
+    error?: Error;
+}
+
+async function fetchWithFallback<T>(
+    primary: () => Promise<T>,
+    fallback: () => Promise<T>
+): Promise<T> {
+    const result = await primary().catch(() => null);
+    return result ?? await fallback();
+}
+
+async function settledResults<T>(promises: Promise<T>[]): Promise<Result<T>[]> {
+    const settled = await Promise.allSettled(promises);
+    return settled.map(result =>
+        result.status === "fulfilled"
+            ? { data: result.value }
+            : { error: result.reason }
+    );
+}
+
+class ApiClient {
+    private baseUrl?: string;
+
+    async fetchOptional<T>(endpoint: string): Promise<T | null> {
+        const url = this.baseUrl ?? "https://api.example.com";
+        const response = await fetch(url + endpoint);
+        const data = await response?.json?.();
+        return data as T ?? null;
+    }
+
+    async fetchWithDestructure(): Promise<{ id: number; name: string }> {
+        const { data: { user: { id, name } } } = await this.fetchNested();
+        return { id, name };
+    }
+
+    private async fetchNested(): Promise<{ data: { user: { id: number; name: string } } }> {
+        return { data: { user: { id: 1, name: "test" } } };
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Functions should be present
+    assert!(
+        output.contains("fetchWithFallback") && output.contains("settledResults"),
+        "Output should contain functions: {}",
+        output
+    );
+    // Class should be present
+    assert!(
+        output.contains("ApiClient"),
+        "Output should contain class: {}",
+        output
+    );
+    // Interface should be erased
+    assert!(
+        !output.contains("interface Result"),
+        "Interface should be erased: {}",
+        output
+    );
+    // Type parameters should be erased
+    assert!(
+        !output.contains("<T>") && !output.contains("Promise<T>"),
+        "Type parameters should be erased: {}",
+        output
+    );
+}
