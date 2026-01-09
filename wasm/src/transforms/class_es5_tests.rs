@@ -17454,3 +17454,369 @@ class TransactionScope extends BaseResource {
         output
     );
 }
+
+// ============================================================================
+// WeakMap/WeakSet pattern tests
+// ============================================================================
+
+#[test]
+fn test_class_es5_weakmap_cache_pattern() {
+    // WeakMap for caching computed values
+    let source = r#"
+class ComputeCache<K extends object, V> {
+    private cache: WeakMap<K, V> = new WeakMap();
+
+    getOrCompute(key: K, compute: () => V): V {
+        if (this.cache.has(key)) {
+            return this.cache.get(key)!;
+        }
+        const value = compute();
+        this.cache.set(key, value);
+        return value;
+    }
+
+    invalidate(key: K): boolean {
+        return this.cache.delete(key);
+    }
+
+    has(key: K): boolean {
+        return this.cache.has(key);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function ComputeCache"),
+        "Expected ComputeCache function: {}",
+        output
+    );
+    assert!(
+        output.contains("WeakMap"),
+        "Expected WeakMap: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_weakset_membership_pattern() {
+    // WeakSet for tracking object membership
+    let source = r#"
+class ObjectTracker<T extends object> {
+    private tracked: WeakSet<T> = new WeakSet();
+
+    track(obj: T): void {
+        this.tracked.add(obj);
+    }
+
+    untrack(obj: T): boolean {
+        return this.tracked.delete(obj);
+    }
+
+    isTracked(obj: T): boolean {
+        return this.tracked.has(obj);
+    }
+
+    trackMultiple(objects: T[]): void {
+        for (const obj of objects) {
+            this.tracked.add(obj);
+        }
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function ObjectTracker"),
+        "Expected ObjectTracker function: {}",
+        output
+    );
+    assert!(
+        output.contains("WeakSet"),
+        "Expected WeakSet: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_weakmap_metadata_pattern() {
+    // WeakMap for storing metadata on objects
+    let source = r#"
+interface Metadata {
+    createdAt: Date;
+    tags: string[];
+    version: number;
+}
+
+class MetadataStore {
+    private metadata: WeakMap<object, Metadata> = new WeakMap();
+
+    attach(target: object, meta: Metadata): void {
+        this.metadata.set(target, meta);
+    }
+
+    get(target: object): Metadata | undefined {
+        return this.metadata.get(target);
+    }
+
+    update(target: object, partial: Partial<Metadata>): void {
+        const existing = this.metadata.get(target);
+        if (existing) {
+            this.metadata.set(target, { ...existing, ...partial });
+        }
+    }
+
+    detach(target: object): boolean {
+        return this.metadata.delete(target);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function MetadataStore"),
+        "Expected MetadataStore function: {}",
+        output
+    );
+    assert!(
+        output.contains("WeakMap"),
+        "Expected WeakMap: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_weakset_visited_pattern() {
+    // WeakSet for cycle detection in graph traversal
+    let source = r#"
+interface GraphNode {
+    id: string;
+    neighbors: GraphNode[];
+}
+
+class GraphTraversal {
+    private visited: WeakSet<GraphNode> = new WeakSet();
+
+    traverse(node: GraphNode, callback: (node: GraphNode) => void): void {
+        if (this.visited.has(node)) {
+            return;
+        }
+        this.visited.add(node);
+        callback(node);
+        for (const neighbor of node.neighbors) {
+            this.traverse(neighbor, callback);
+        }
+    }
+
+    reset(): void {
+        this.visited = new WeakSet();
+    }
+
+    hasVisited(node: GraphNode): boolean {
+        return this.visited.has(node);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function GraphTraversal"),
+        "Expected GraphTraversal function: {}",
+        output
+    );
+    assert!(
+        output.contains("WeakSet"),
+        "Expected WeakSet: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_weakmap_weakset_in_constructor() {
+    // WeakMap and WeakSet initialized in constructor
+    let source = r#"
+class EventManager<T extends object> {
+    private handlers: WeakMap<T, Set<Function>>;
+    private activeObjects: WeakSet<T>;
+
+    constructor() {
+        this.handlers = new WeakMap();
+        this.activeObjects = new WeakSet();
+    }
+
+    register(target: T, handler: Function): void {
+        this.activeObjects.add(target);
+        if (!this.handlers.has(target)) {
+            this.handlers.set(target, new Set());
+        }
+        this.handlers.get(target)!.add(handler);
+    }
+
+    unregister(target: T): void {
+        this.handlers.delete(target);
+        this.activeObjects.delete(target);
+    }
+
+    isActive(target: T): boolean {
+        return this.activeObjects.has(target);
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function EventManager"),
+        "Expected EventManager function: {}",
+        output
+    );
+    assert!(
+        output.contains("WeakMap") && output.contains("WeakSet"),
+        "Expected WeakMap and WeakSet: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_weakmap_weakset_combined() {
+    // Combined WeakMap/WeakSet for object lifecycle management
+    let source = r#"
+class ObjectLifecycleManager<T extends object> {
+    private instances: WeakSet<T> = new WeakSet();
+    private metadata: WeakMap<T, { createdAt: number; state: string }> = new WeakMap();
+    private dependencies: WeakMap<T, Set<T>> = new WeakMap();
+
+    create(instance: T): void {
+        this.instances.add(instance);
+        this.metadata.set(instance, { createdAt: Date.now(), state: "active" });
+        this.dependencies.set(instance, new Set());
+    }
+
+    addDependency(instance: T, dependency: T): void {
+        if (this.instances.has(instance) && this.instances.has(dependency)) {
+            this.dependencies.get(instance)?.add(dependency);
+        }
+    }
+
+    getState(instance: T): string | undefined {
+        return this.metadata.get(instance)?.state;
+    }
+
+    setState(instance: T, state: string): void {
+        const meta = this.metadata.get(instance);
+        if (meta) {
+            this.metadata.set(instance, { ...meta, state });
+        }
+    }
+
+    destroy(instance: T): void {
+        this.instances.delete(instance);
+        this.metadata.delete(instance);
+        this.dependencies.delete(instance);
+    }
+
+    static createManager<U extends object>(): ObjectLifecycleManager<U> {
+        return new ObjectLifecycleManager<U>();
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    assert!(
+        output.contains("function ObjectLifecycleManager"),
+        "Expected ObjectLifecycleManager function: {}",
+        output
+    );
+    assert!(
+        output.contains("WeakSet"),
+        "Expected WeakSet: {}",
+        output
+    );
+    assert!(
+        output.contains("WeakMap"),
+        "Expected WeakMap: {}",
+        output
+    );
+    assert!(
+        output.contains("createManager"),
+        "Expected createManager static method: {}",
+        output
+    );
+}
