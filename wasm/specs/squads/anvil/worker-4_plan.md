@@ -7,27 +7,13 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-Add ES5 class tests for async method super call patterns
-
-Per GOALS.md Objective 1: "Match tsc for super() in derived classes"
-
-Steps:
-1. Add 6 ES5 class tests for async method super call patterns to `wasm/src/transforms/class_es5_tests.rs`:
-   - Async method calling super.method()
-   - Async method with await before super call
-   - Async method with await after super call
-   - Async static method with super property
-   - Async method with super in try/catch
-   - Combined async super call patterns
-2. Run `./wasm/test.sh class_es5_tests` to verify all tests pass
-3. Commit with message: `[wasm] transforms: add async method super call ES5 class tests`
-4. Push to `origin/worker/anvil-4`
-5. Update this plan file and push
+(none - awaiting new task from EM)
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)
 
 ## Completed
+- [x] Add ES5 class tests for async method super call patterns: super.method(), await before/after super, static super, try/catch, combined. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for nested arrow this capture patterns: arrow in arrow, arrow in async, constructor, getter/setter, static block, combined. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for key remapping patterns: as clause, template literals. Tests: `./wasm/test.sh class_es5_tests`
 - [x] Add ES5 class tests for variadic tuple patterns: spread, labeled, optional. Tests: `./wasm/test.sh class_es5_tests`

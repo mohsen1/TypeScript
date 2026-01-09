@@ -39098,3 +39098,680 @@ class EventBus<T> {
         output
     );
 }
+
+// =============================================================================
+// ASYNC METHOD SUPER CALL PATTERN TESTS
+// =============================================================================
+
+/// Test ES5 class with async method calling super.method()
+#[test]
+fn test_class_es5_async_method_calling_super_method() {
+    let source = r#"
+class BaseService {
+    protected async fetchData(): Promise<string> {
+        return "base data";
+    }
+
+    protected async processItem(item: string): Promise<string> {
+        return item.toUpperCase();
+    }
+
+    protected getData(): string {
+        return "sync data";
+    }
+}
+
+class DerivedService extends BaseService {
+    async fetchData(): Promise<string> {
+        const baseResult = await super.fetchData();
+        return baseResult + " extended";
+    }
+
+    async processItem(item: string): Promise<string> {
+        const processed = await super.processItem(item);
+        return "derived: " + processed;
+    }
+
+    async combinedOperation(): Promise<string> {
+        const data = await super.fetchData();
+        const processed = await super.processItem(data);
+        return processed;
+    }
+}
+
+class GrandchildService extends DerivedService {
+    async fetchData(): Promise<string> {
+        const parentResult = await super.fetchData();
+        return parentResult + " grandchild";
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("BaseService") && output.contains("DerivedService") && output.contains("GrandchildService"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("fetchData") && output.contains("processItem") && output.contains("combinedOperation"),
+        "Expected methods: {}",
+        output
+    );
+
+    // Type annotations should be stripped
+    assert!(
+        !output.contains("Promise<string>") && !output.contains("protected async"),
+        "Expected type annotations to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with async method with await before super call
+#[test]
+fn test_class_es5_async_method_await_before_super() {
+    let source = r#"
+class BaseProcessor {
+    process(data: string): string {
+        return data.trim();
+    }
+
+    validate(input: string): boolean {
+        return input.length > 0;
+    }
+}
+
+class AsyncProcessor extends BaseProcessor {
+    private config: any;
+
+    async processAsync(data: string): Promise<string> {
+        const config = await this.loadConfig();
+        this.config = config;
+        return super.process(data);
+    }
+
+    async validateAsync(input: string): Promise<boolean> {
+        await this.initialize();
+        const trimmed = input.trim();
+        return super.validate(trimmed);
+    }
+
+    async complexFlow(data: string): Promise<string> {
+        const step1 = await Promise.resolve(data);
+        const step2 = await this.transform(step1);
+        await this.log("before super");
+        return super.process(step2);
+    }
+
+    private async loadConfig(): Promise<any> {
+        return { enabled: true };
+    }
+
+    private async initialize(): Promise<void> {
+        await Promise.resolve();
+    }
+
+    private async transform(data: string): Promise<string> {
+        return data.toLowerCase();
+    }
+
+    private async log(message: string): Promise<void> {
+        console.log(message);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("BaseProcessor") && output.contains("AsyncProcessor"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("processAsync") && output.contains("validateAsync") && output.contains("complexFlow"),
+        "Expected methods: {}",
+        output
+    );
+
+    // Type annotations should be stripped
+    assert!(
+        !output.contains("private config: any") && !output.contains("Promise<string>"),
+        "Expected type annotations to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with async method with await after super call
+#[test]
+fn test_class_es5_async_method_await_after_super() {
+    let source = r#"
+class BaseLogger {
+    log(message: string): string {
+        return "[LOG] " + message;
+    }
+
+    format(data: any): string {
+        return JSON.stringify(data);
+    }
+}
+
+class AsyncLogger extends BaseLogger {
+    async logAndNotify(message: string): Promise<void> {
+        const formatted = super.log(message);
+        await this.sendNotification(formatted);
+    }
+
+    async formatAndStore(data: any): Promise<string> {
+        const formatted = super.format(data);
+        await this.storeInDatabase(formatted);
+        await this.updateCache(formatted);
+        return formatted;
+    }
+
+    async logWithRetry(message: string): Promise<string> {
+        const result = super.log(message);
+        for (let i = 0; i < 3; i++) {
+            try {
+                await this.sendToServer(result);
+                break;
+            } catch {
+                await this.delay(1000);
+            }
+        }
+        return result;
+    }
+
+    private async sendNotification(msg: string): Promise<void> {
+        await fetch("/notify", { method: "POST", body: msg });
+    }
+
+    private async storeInDatabase(data: string): Promise<void> {
+        await Promise.resolve();
+    }
+
+    private async updateCache(data: string): Promise<void> {
+        await Promise.resolve();
+    }
+
+    private async sendToServer(data: string): Promise<void> {
+        await fetch("/log", { method: "POST", body: data });
+    }
+
+    private async delay(ms: number): Promise<void> {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("BaseLogger") && output.contains("AsyncLogger"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("logAndNotify") && output.contains("formatAndStore") && output.contains("logWithRetry"),
+        "Expected methods: {}",
+        output
+    );
+
+    // Type annotations should be stripped
+    assert!(
+        !output.contains("Promise<void>") && !output.contains("Promise<string>"),
+        "Expected type annotations to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with async static method with super property
+#[test]
+fn test_class_es5_async_static_method_super_property() {
+    let source = r#"
+class BaseFactory {
+    static defaultConfig = { timeout: 5000 };
+
+    static create(): BaseFactory {
+        return new BaseFactory();
+    }
+
+    static getVersion(): string {
+        return "1.0.0";
+    }
+}
+
+class AsyncFactory extends BaseFactory {
+    static async createAsync(): Promise<AsyncFactory> {
+        await this.initialize();
+        const instance = super.create() as AsyncFactory;
+        return instance;
+    }
+
+    static async getVersionAsync(): Promise<string> {
+        await Promise.resolve();
+        const baseVersion = super.getVersion();
+        return baseVersion + "-async";
+    }
+
+    static async createWithConfig(config: any): Promise<AsyncFactory> {
+        const merged = { ...super.defaultConfig, ...config };
+        await this.applyConfig(merged);
+        return new AsyncFactory();
+    }
+
+    private static async initialize(): Promise<void> {
+        await Promise.resolve();
+    }
+
+    private static async applyConfig(config: any): Promise<void> {
+        await Promise.resolve();
+    }
+}
+
+class ExtendedFactory extends AsyncFactory {
+    static async createAsync(): Promise<ExtendedFactory> {
+        await Promise.resolve();
+        const base = await super.createAsync();
+        return base as ExtendedFactory;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("BaseFactory") && output.contains("AsyncFactory") && output.contains("ExtendedFactory"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("createAsync") && output.contains("getVersionAsync") && output.contains("createWithConfig"),
+        "Expected methods: {}",
+        output
+    );
+
+    // Type annotations should be stripped
+    assert!(
+        !output.contains("Promise<AsyncFactory>") && !output.contains("Promise<string>"),
+        "Expected type annotations to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with async method with super in try/catch
+#[test]
+fn test_class_es5_async_method_super_in_try_catch() {
+    let source = r#"
+class BaseHandler {
+    handle(request: any): any {
+        return { success: true, data: request };
+    }
+
+    handleError(error: Error): any {
+        return { success: false, error: error.message };
+    }
+
+    cleanup(): void {
+        console.log("cleanup");
+    }
+}
+
+class SafeHandler extends BaseHandler {
+    async safeHandle(request: any): Promise<any> {
+        try {
+            const result = super.handle(request);
+            await this.logSuccess(result);
+            return result;
+        } catch (error) {
+            return super.handleError(error as Error);
+        }
+    }
+
+    async handleWithFinally(request: any): Promise<any> {
+        try {
+            await this.preProcess(request);
+            return super.handle(request);
+        } catch (error) {
+            const errorResult = super.handleError(error as Error);
+            await this.logError(error);
+            return errorResult;
+        } finally {
+            super.cleanup();
+            await this.postProcess();
+        }
+    }
+
+    async nestedTryCatch(request: any): Promise<any> {
+        try {
+            try {
+                await this.validate(request);
+                return super.handle(request);
+            } catch (validationError) {
+                await this.handleValidationError(validationError);
+                throw validationError;
+            }
+        } catch (error) {
+            return super.handleError(error as Error);
+        }
+    }
+
+    private async logSuccess(result: any): Promise<void> {
+        await Promise.resolve();
+    }
+
+    private async logError(error: any): Promise<void> {
+        await Promise.resolve();
+    }
+
+    private async preProcess(request: any): Promise<void> {
+        await Promise.resolve();
+    }
+
+    private async postProcess(): Promise<void> {
+        await Promise.resolve();
+    }
+
+    private async validate(request: any): Promise<void> {
+        if (!request) throw new Error("Invalid request");
+    }
+
+    private async handleValidationError(error: any): Promise<void> {
+        await Promise.resolve();
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("BaseHandler") && output.contains("SafeHandler"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("safeHandle") && output.contains("handleWithFinally") && output.contains("nestedTryCatch"),
+        "Expected methods: {}",
+        output
+    );
+
+    // Type annotations should be stripped
+    assert!(
+        !output.contains("Promise<any>") && !output.contains("request: any"),
+        "Expected type annotations to be stripped: {}",
+        output
+    );
+}
+
+/// Test ES5 class with combined async super call patterns
+#[test]
+fn test_class_es5_combined_async_super_patterns() {
+    let source = r#"
+class BaseRepository<T> {
+    protected items: T[] = [];
+
+    save(item: T): T {
+        this.items.push(item);
+        return item;
+    }
+
+    findAll(): T[] {
+        return [...this.items];
+    }
+
+    delete(index: number): boolean {
+        if (index >= 0 && index < this.items.length) {
+            this.items.splice(index, 1);
+            return true;
+        }
+        return false;
+    }
+
+    static getRepositoryName(): string {
+        return "BaseRepository";
+    }
+}
+
+class AsyncRepository<T> extends BaseRepository<T> {
+    private eventHandlers: ((event: string, data: any) => void)[] = [];
+
+    async saveAsync(item: T): Promise<T> {
+        await this.beforeSave(item);
+        try {
+            const saved = super.save(item);
+            await this.afterSave(saved);
+            await this.notifyHandlers("save", saved);
+            return saved;
+        } catch (error) {
+            await this.handleError("save", error);
+            throw error;
+        }
+    }
+
+    async findAllAsync(): Promise<T[]> {
+        await this.ensureConnection();
+        const items = super.findAll();
+        await this.logAccess("findAll", items.length);
+        return items;
+    }
+
+    async deleteAsync(index: number): Promise<boolean> {
+        const item = this.items[index];
+        await this.beforeDelete(item);
+        try {
+            const result = super.delete(index);
+            if (result) {
+                await this.afterDelete(item);
+                await this.notifyHandlers("delete", { index, item });
+            }
+            return result;
+        } finally {
+            await this.cleanup();
+        }
+    }
+
+    static async getRepositoryNameAsync(): Promise<string> {
+        await Promise.resolve();
+        const baseName = super.getRepositoryName();
+        return baseName + "Async";
+    }
+
+    async batchSave(items: T[]): Promise<T[]> {
+        const results: T[] = [];
+        for (const item of items) {
+            await this.delay(10);
+            const saved = super.save(item);
+            results.push(saved);
+        }
+        await this.notifyHandlers("batchSave", results);
+        return results;
+    }
+
+    private async beforeSave(item: T): Promise<void> {
+        await Promise.resolve();
+    }
+
+    private async afterSave(item: T): Promise<void> {
+        await Promise.resolve();
+    }
+
+    private async beforeDelete(item: T): Promise<void> {
+        await Promise.resolve();
+    }
+
+    private async afterDelete(item: T): Promise<void> {
+        await Promise.resolve();
+    }
+
+    private async ensureConnection(): Promise<void> {
+        await Promise.resolve();
+    }
+
+    private async logAccess(operation: string, count: number): Promise<void> {
+        await Promise.resolve();
+    }
+
+    private async handleError(operation: string, error: any): Promise<void> {
+        await Promise.resolve();
+    }
+
+    private async cleanup(): Promise<void> {
+        await Promise.resolve();
+    }
+
+    private async delay(ms: number): Promise<void> {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    private async notifyHandlers(event: string, data: any): Promise<void> {
+        for (const handler of this.eventHandlers) {
+            await Promise.resolve();
+            handler(event, data);
+        }
+    }
+}
+
+class CachedRepository<T> extends AsyncRepository<T> {
+    private cache: Map<string, T[]> = new Map();
+
+    async findAllAsync(): Promise<T[]> {
+        const cached = this.cache.get("all");
+        if (cached) {
+            return cached;
+        }
+        const items = await super.findAllAsync();
+        this.cache.set("all", items);
+        return items;
+    }
+
+    async saveAsync(item: T): Promise<T> {
+        this.cache.delete("all");
+        return super.saveAsync(item);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("BaseRepository") && output.contains("AsyncRepository") && output.contains("CachedRepository"),
+        "Expected classes: {}",
+        output
+    );
+
+    // Methods should exist
+    assert!(
+        output.contains("saveAsync") && output.contains("findAllAsync") && output.contains("deleteAsync") && output.contains("batchSave"),
+        "Expected methods: {}",
+        output
+    );
+
+    // Type annotations should be stripped
+    assert!(
+        !output.contains("protected items: T[]") && !output.contains("private cache: Map"),
+        "Expected type annotations to be stripped: {}",
+        output
+    );
+
+    // Generic parameters should be stripped
+    assert!(
+        !output.contains("BaseRepository<T>") && !output.contains("AsyncRepository<T>"),
+        "Expected generic parameters to be stripped: {}",
+        output
+    );
+}
