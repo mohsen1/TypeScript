@@ -11046,3 +11046,104 @@ fn test_async_channel_ignores_nested_async() {
     );
     assert!(!result, "Should not detect await inside nested async in channel function");
 }
+
+// ============================================================================
+// ASYNC SEMAPHORE PATTERN TESTS
+// Tests for semaphore patterns: acquire, release, concurrent limit, wait queue
+// ============================================================================
+
+#[test]
+fn test_async_semaphore_acquire() {
+    let result = async_error_propagation_contains_await(
+        "async function acquire() { await semaphore.acquire(); }",
+    );
+    assert!(result, "Should detect await in semaphore acquire");
+}
+
+#[test]
+fn test_async_semaphore_release() {
+    let result = async_error_propagation_contains_await(
+        "async function release() { await semaphore.release(); }",
+    );
+    assert!(result, "Should detect await in semaphore release");
+}
+
+#[test]
+fn test_async_semaphore_concurrent_limit() {
+    let result = async_error_propagation_contains_await(
+        "async function limitedConcurrency() { return await limiter.run(task); }",
+    );
+    assert!(result, "Should detect await in concurrent limit");
+}
+
+#[test]
+fn test_async_semaphore_wait_queue() {
+    let result = async_error_propagation_contains_await(
+        "async function waitInQueue() { return await semaphore.waitForPermit(); }",
+    );
+    assert!(result, "Should detect await in wait queue");
+}
+
+#[test]
+fn test_async_semaphore_try_acquire() {
+    let result = async_error_propagation_contains_await(
+        "async function tryAcquire() { return await semaphore.tryAcquire(timeout); }",
+    );
+    assert!(result, "Should detect await in try acquire");
+}
+
+#[test]
+fn test_async_semaphore_with_timeout() {
+    let result = async_error_propagation_contains_await(
+        "async function acquireTimeout() { return await semaphore.acquireWithTimeout(5000); }",
+    );
+    assert!(result, "Should detect await in acquire with timeout");
+}
+
+#[test]
+fn test_async_semaphore_permits() {
+    let result = async_error_propagation_contains_await(
+        "async function multiPermit() { await semaphore.acquire(3); }",
+    );
+    assert!(result, "Should detect await in multiple permits acquire");
+}
+
+#[test]
+fn test_async_semaphore_drain() {
+    let result = async_error_propagation_contains_await(
+        "async function drain() { await semaphore.drainPermits(); }",
+    );
+    assert!(result, "Should detect await in drain permits");
+}
+
+#[test]
+fn test_async_semaphore_available() {
+    let result = async_error_propagation_contains_await(
+        "async function checkAvailable() { return await semaphore.availablePermits(); }",
+    );
+    assert!(result, "Should detect await in check available permits");
+}
+
+#[test]
+fn test_async_semaphore_guard() {
+    let result = async_error_propagation_contains_await(
+        "async function withGuard() { return await semaphore.withPermit(operation); }",
+    );
+    assert!(result, "Should detect await in semaphore guard pattern");
+}
+
+#[test]
+fn test_async_semaphore_no_await() {
+    let result = async_error_propagation_contains_await(
+        "async function syncSemaphore() { return semaphore.getPermitCount(); }",
+    );
+    assert!(!result, "Should not detect await when semaphore access is sync");
+}
+
+#[test]
+fn test_async_semaphore_ignores_nested_async() {
+    let result = async_error_propagation_contains_await(
+        "async function outer() { const worker = async () => await semaphore.acquire(); }",
+    );
+    assert!(!result, "Should not detect await inside nested async in semaphore function");
+}
