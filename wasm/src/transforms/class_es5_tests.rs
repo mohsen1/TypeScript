@@ -32327,135 +32327,82 @@ class UserService extends Service<User> {
 }
 
 // ============================================================================
-// NOMINAL TYPE PATTERN TESTS
+// INTERFACE IMPLEMENTATION PATTERN TESTS
 // ============================================================================
 
-/// Test nominal type patterns: basic branded types
+/// Test ES5 class downleveling with implements clause patterns
 #[test]
-fn test_class_es5_branded_types_basic() {
+fn test_class_es5_interface_implements_clause() {
     let source = r#"
-declare const BrandSymbol: unique symbol;
+interface Serializable {
+    serialize(): string;
+    deserialize(data: string): void;
+}
 
-type Brand<T, B> = T & { readonly [BrandSymbol]: B };
+interface Identifiable {
+    readonly id: string;
+    getId(): string;
+}
 
-type UserId = Brand<number, "UserId">;
-type OrderId = Brand<number, "OrderId">;
+interface Timestamped {
+    createdAt: Date;
+    updatedAt: Date;
+    touch(): void;
+}
 
-class UserService {
-    private users: Map<UserId, string> = new Map();
+class Document implements Serializable, Identifiable, Timestamped {
+    readonly id: string;
+    createdAt: Date;
+    updatedAt: Date;
+    private content: string;
 
-    createUserId(id: number): UserId {
-        return id as UserId;
+    constructor(id: string, content: string) {
+        this.id = id;
+        this.content = content;
+        this.createdAt = new Date();
+        this.updatedAt = new Date();
     }
 
-    addUser(id: UserId, name: string): void {
-        this.users.set(id, name);
+    serialize(): string {
+        return JSON.stringify({
+            id: this.id,
+            content: this.content,
+            createdAt: this.createdAt.toISOString(),
+            updatedAt: this.updatedAt.toISOString()
+        });
     }
 
-    getUser(id: UserId): string | undefined {
-        return this.users.get(id);
+    deserialize(data: string): void {
+        const parsed = JSON.parse(data);
+        this.content = parsed.content;
+    }
+
+    getId(): string {
+        return this.id;
+    }
+
+    touch(): void {
+        this.updatedAt = new Date();
+    }
+
+    getContent(): string {
+        return this.content;
     }
 }
 
-class OrderService {
-    private orders: Map<OrderId, UserId> = new Map();
+class User implements Identifiable {
+    readonly id: string;
+    name: string;
+    email: string;
 
-    createOrderId(id: number): OrderId {
-        return id as OrderId;
+    constructor(id: string, name: string, email: string) {
+        this.id = id;
+        this.name = name;
+        this.email = email;
     }
 
-    placeOrder(orderId: OrderId, userId: UserId): void {
-        this.orders.set(orderId, userId);
-    }
-
-    getOrderOwner(orderId: OrderId): UserId | undefined {
-        return this.orders.get(orderId);
-    }
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut options = PrinterOptions::default();
-    options.target = ScriptTarget::ES5;
-    let ctx = EmitContext::with_options(options.clone());
-    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
-    printer.set_target_es5(ctx.target_es5);
-    printer.emit(root);
-
-    let output = printer.get_output().to_string();
-
-    // Classes should be converted to ES5
-    assert!(
-        output.contains("function UserService") && output.contains("function OrderService"),
-        "Expected ES5 class constructors: {}",
-        output
-    );
-
-    // Methods should be on prototype
-    assert!(
-        output.contains("UserService.prototype.createUserId") &&
-        output.contains("OrderService.prototype.createOrderId"),
-        "Expected methods on prototype: {}",
-        output
-    );
-
-    // Map operations preserved
-    assert!(
-        output.contains(".set(") && output.contains(".get("),
-        "Expected Map operations: {}",
-        output
-    );
-}
-
-/// Test nominal type patterns: opaque types
-#[test]
-fn test_class_es5_opaque_types() {
-    let source = r#"
-declare const OpaqueTag: unique symbol;
-
-type Opaque<T, K> = T & { readonly [OpaqueTag]: K };
-
-type Email = Opaque<string, "Email">;
-type Password = Opaque<string, "Password">;
-type HashedPassword = Opaque<string, "HashedPassword">;
-
-class EmailValidator {
-    private emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-    validate(input: string): Email | null {
-        if (this.emailRegex.test(input)) {
-            return input as Email;
-        }
-        return null;
-    }
-
-    toString(email: Email): string {
-        return email;
-    }
-}
-
-class PasswordService {
-    private minLength = 8;
-
-    createPassword(input: string): Password | null {
-        if (input.length >= this.minLength) {
-            return input as Password;
-        }
-        return null;
-    }
-
-    hash(password: Password): HashedPassword {
-        const hashed = "hashed_" + password;
-        return hashed as HashedPassword;
-    }
-
-    verify(password: Password, hashed: HashedPassword): boolean {
-        return ("hashed_" + password) === hashed;
+    getId(): string {
+        return this.id;
     }
 }
 "#;
@@ -32477,80 +32424,483 @@ class PasswordService {
 
     // Classes should be converted
     assert!(
-        output.contains("function EmailValidator") && output.contains("function PasswordService"),
-        "Expected ES5 class constructors: {}",
+        output.contains("Document") && output.contains("User"),
+        "Expected implements clause classes: {}",
         output
     );
 
-    // Methods preserved
+    // Document methods should be preserved
     assert!(
-        output.contains("validate") && output.contains("hash") && output.contains("verify"),
+        output.contains("serialize") && output.contains("deserialize") && output.contains("getId"),
+        "Expected Document methods: {}",
+        output
+    );
+
+    // Touch method should be present
+    assert!(
+        output.contains("touch") && output.contains("getContent"),
+        "Expected additional methods: {}",
+        output
+    );
+}
+
+/// Test ES5 class downleveling with multiple interface implementations
+#[test]
+fn test_class_es5_interface_multiple_implements() {
+    let source = r#"
+interface Disposable {
+    dispose(): void;
+    isDisposed: boolean;
+}
+
+interface Cloneable<T> {
+    clone(): T;
+}
+
+interface Comparable<T> {
+    compareTo(other: T): number;
+    equals(other: T): boolean;
+}
+
+interface Hashable {
+    hashCode(): number;
+}
+
+class Entity implements Disposable, Cloneable<Entity>, Comparable<Entity>, Hashable {
+    private _isDisposed: boolean = false;
+    readonly value: number;
+
+    constructor(value: number) {
+        this.value = value;
+    }
+
+    get isDisposed(): boolean {
+        return this._isDisposed;
+    }
+
+    set isDisposed(value: boolean) {
+        this._isDisposed = value;
+    }
+
+    dispose(): void {
+        this._isDisposed = true;
+    }
+
+    clone(): Entity {
+        return new Entity(this.value);
+    }
+
+    compareTo(other: Entity): number {
+        return this.value - other.value;
+    }
+
+    equals(other: Entity): boolean {
+        return this.value === other.value;
+    }
+
+    hashCode(): number {
+        return this.value * 31;
+    }
+}
+
+interface EventEmitter {
+    on(event: string, handler: Function): void;
+    off(event: string, handler: Function): void;
+    emit(event: string, data?: any): void;
+}
+
+interface Logger {
+    log(message: string): void;
+    error(message: string): void;
+    warn(message: string): void;
+}
+
+class ServiceBase implements EventEmitter, Logger {
+    private handlers: Map<string, Function[]> = new Map();
+
+    on(event: string, handler: Function): void {
+        const list = this.handlers.get(event) || [];
+        list.push(handler);
+        this.handlers.set(event, list);
+    }
+
+    off(event: string, handler: Function): void {
+        const list = this.handlers.get(event) || [];
+        const index = list.indexOf(handler);
+        if (index >= 0) list.splice(index, 1);
+    }
+
+    emit(event: string, data?: any): void {
+        const list = this.handlers.get(event) || [];
+        list.forEach(h => h(data));
+    }
+
+    log(message: string): void {
+        console.log("[LOG]", message);
+    }
+
+    error(message: string): void {
+        console.error("[ERROR]", message);
+    }
+
+    warn(message: string): void {
+        console.warn("[WARN]", message);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("Entity") && output.contains("ServiceBase"),
+        "Expected multiple interface classes: {}",
+        output
+    );
+
+    // Entity methods
+    assert!(
+        output.contains("dispose") && output.contains("clone") && output.contains("compareTo"),
+        "Expected Entity methods: {}",
+        output
+    );
+
+    // ServiceBase methods
+    assert!(
+        output.contains("emit") && output.contains("log") && output.contains("error"),
+        "Expected ServiceBase methods: {}",
+        output
+    );
+}
+
+/// Test ES5 class downleveling with generic interface implementations
+#[test]
+fn test_class_es5_interface_generic_implements() {
+    let source = r#"
+interface Collection<T> {
+    add(item: T): void;
+    remove(item: T): boolean;
+    contains(item: T): boolean;
+    size(): number;
+    toArray(): T[];
+}
+
+interface Iterator<T> {
+    next(): { value: T; done: boolean };
+    hasNext(): boolean;
+    reset(): void;
+}
+
+class ArrayList<T> implements Collection<T>, Iterator<T> {
+    private items: T[] = [];
+    private index: number = 0;
+
+    add(item: T): void {
+        this.items.push(item);
+    }
+
+    remove(item: T): boolean {
+        const idx = this.items.indexOf(item);
+        if (idx >= 0) {
+            this.items.splice(idx, 1);
+            return true;
+        }
+        return false;
+    }
+
+    contains(item: T): boolean {
+        return this.items.indexOf(item) >= 0;
+    }
+
+    size(): number {
+        return this.items.length;
+    }
+
+    toArray(): T[] {
+        return [...this.items];
+    }
+
+    next(): { value: T; done: boolean } {
+        if (this.index < this.items.length) {
+            return { value: this.items[this.index++], done: false };
+        }
+        return { value: undefined as any, done: true };
+    }
+
+    hasNext(): boolean {
+        return this.index < this.items.length;
+    }
+
+    reset(): void {
+        this.index = 0;
+    }
+}
+
+interface KeyValueStore<K, V> {
+    get(key: K): V | undefined;
+    set(key: K, value: V): void;
+    delete(key: K): boolean;
+    has(key: K): boolean;
+    clear(): void;
+}
+
+class HashMap<K, V> implements KeyValueStore<K, V> {
+    private storage: Map<K, V> = new Map();
+
+    get(key: K): V | undefined {
+        return this.storage.get(key);
+    }
+
+    set(key: K, value: V): void {
+        this.storage.set(key, value);
+    }
+
+    delete(key: K): boolean {
+        return this.storage.delete(key);
+    }
+
+    has(key: K): boolean {
+        return this.storage.has(key);
+    }
+
+    clear(): void {
+        this.storage.clear();
+    }
+
+    keys(): K[] {
+        return Array.from(this.storage.keys());
+    }
+
+    values(): V[] {
+        return Array.from(this.storage.values());
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("ArrayList") && output.contains("HashMap"),
+        "Expected generic interface classes: {}",
+        output
+    );
+
+    // ArrayList/Collection methods
+    assert!(
+        output.contains("add") && output.contains("remove") && output.contains("contains"),
+        "Expected Collection methods: {}",
+        output
+    );
+
+    // Iterator methods
+    assert!(
+        output.contains("next") && output.contains("hasNext") && output.contains("reset"),
+        "Expected Iterator methods: {}",
+        output
+    );
+
+    // HashMap methods
+    assert!(
+        output.contains("keys") && output.contains("values") && output.contains("clear"),
+        "Expected HashMap methods: {}",
+        output
+    );
+}
+
+// ============================================================================
+// CONSTRUCTOR SIGNATURE PATTERN TESTS
+// ============================================================================
+
+/// Test ES5 class downleveling with constructor optional parameter patterns
+#[test]
+fn test_class_es5_constructor_signature_optional_params() {
+    let source = r#"
+class HttpClient {
+    private baseUrl: string;
+    private timeout: number;
+    private headers: Record<string, string>;
+    private retries: number;
+
+    constructor(
+        baseUrl: string,
+        timeout?: number,
+        headers?: Record<string, string>,
+        retries?: number
+    ) {
+        this.baseUrl = baseUrl;
+        this.timeout = timeout ?? 5000;
+        this.headers = headers ?? {};
+        this.retries = retries ?? 3;
+    }
+
+    get(path: string): Promise<any> {
+        return fetch(this.baseUrl + path, {
+            headers: this.headers
+        }).then(r => r.json());
+    }
+}
+
+class Logger {
+    private level: string;
+    private prefix: string;
+    private timestamps: boolean;
+
+    constructor(
+        level: string = "info",
+        prefix: string = "",
+        timestamps: boolean = true
+    ) {
+        this.level = level;
+        this.prefix = prefix;
+        this.timestamps = timestamps;
+    }
+
+    log(message: string): void {
+        const ts = this.timestamps ? new Date().toISOString() + " " : "";
+        console.log(ts + this.prefix + message);
+    }
+}
+
+class EventBus {
+    private name: string;
+    private maxListeners: number;
+    private debug: boolean;
+
+    constructor(name?: string, maxListeners?: number, debug?: boolean) {
+        this.name = name || "default";
+        this.maxListeners = maxListeners || 10;
+        this.debug = debug || false;
+    }
+
+    emit(event: string, data?: any): void {
+        if (this.debug) {
+            console.log("[" + this.name + "] Emitting:", event);
+        }
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("HttpClient") && output.contains("Logger") && output.contains("EventBus"),
+        "Expected constructor optional param classes: {}",
+        output
+    );
+
+    // Methods should be preserved
+    assert!(
+        output.contains("get") && output.contains("log") && output.contains("emit"),
         "Expected methods: {}",
         output
     );
 
-    // Regex preserved
+    // Properties should be referenced
     assert!(
-        output.contains("emailRegex"),
-        "Expected regex field: {}",
+        output.contains("baseUrl") && output.contains("timeout") && output.contains("headers"),
+        "Expected HttpClient properties: {}",
         output
     );
 }
 
-/// Test nominal type patterns: type guards for branded types
+/// Test ES5 class downleveling with constructor rest parameter patterns
 #[test]
-fn test_class_es5_branded_type_guards() {
+fn test_class_es5_constructor_signature_rest_params() {
     let source = r#"
-declare const TypeBrand: unique symbol;
+class Command {
+    private name: string;
+    private args: string[];
 
-type Branded<T, B extends string> = T & { readonly [TypeBrand]: B };
+    constructor(name: string, ...args: string[]) {
+        this.name = name;
+        this.args = args;
+    }
 
-type PositiveNumber = Branded<number, "PositiveNumber">;
-type NonEmptyString = Branded<string, "NonEmptyString">;
-type ValidUrl = Branded<string, "ValidUrl">;
+    execute(): string {
+        return this.name + " " + this.args.join(" ");
+    }
 
-function isPositive(value: number): value is PositiveNumber {
-    return value > 0;
+    getArgs(): string[] {
+        return [...this.args];
+    }
 }
 
-function isNonEmpty(value: string): value is NonEmptyString {
-    return value.length > 0;
+class Pipeline {
+    private stages: Function[];
+
+    constructor(...stages: Function[]) {
+        this.stages = stages;
+    }
+
+    run(input: any): any {
+        return this.stages.reduce((acc, stage) => stage(acc), input);
+    }
+
+    addStage(stage: Function): void {
+        this.stages.push(stage);
+    }
 }
 
-function isValidUrl(value: string): value is ValidUrl {
-    return value.startsWith("http://") || value.startsWith("https://");
-}
+class CompositeValidator {
+    private validators: ((value: any) => boolean)[];
+    private mode: string;
 
-class NumberValidator {
-    assertPositive(value: number): PositiveNumber {
-        if (!isPositive(value)) {
-            throw new Error("Value must be positive");
+    constructor(mode: string, ...validators: ((value: any) => boolean)[]) {
+        this.mode = mode;
+        this.validators = validators;
+    }
+
+    validate(value: any): boolean {
+        if (this.mode === "all") {
+            return this.validators.every(v => v(value));
+        } else {
+            return this.validators.some(v => v(value));
         }
-        return value;
     }
 
-    double(value: PositiveNumber): PositiveNumber {
-        return (value * 2) as PositiveNumber;
-    }
-}
-
-class StringValidator {
-    assertNonEmpty(value: string): NonEmptyString {
-        if (!isNonEmpty(value)) {
-            throw new Error("String must not be empty");
-        }
-        return value;
-    }
-
-    assertValidUrl(value: string): ValidUrl {
-        if (!isValidUrl(value)) {
-            throw new Error("Invalid URL format");
-        }
-        return value;
-    }
-
-    concatenate(a: NonEmptyString, b: NonEmptyString): NonEmptyString {
-        return (a + b) as NonEmptyString;
+    addValidator(validator: (value: any) => boolean): void {
+        this.validators.push(validator);
     }
 }
 "#;
@@ -32572,96 +32922,108 @@ class StringValidator {
 
     // Classes should be converted
     assert!(
-        output.contains("function NumberValidator") && output.contains("function StringValidator"),
-        "Expected ES5 class constructors: {}",
+        output.contains("Command") && output.contains("Pipeline") && output.contains("CompositeValidator"),
+        "Expected constructor rest param classes: {}",
         output
     );
 
-    // Type guard functions preserved
+    // Methods should be preserved
     assert!(
-        output.contains("isPositive") && output.contains("isNonEmpty") && output.contains("isValidUrl"),
-        "Expected type guard functions: {}",
+        output.contains("execute") && output.contains("run") && output.contains("validate"),
+        "Expected methods: {}",
         output
     );
 
-    // Methods on prototype
+    // Additional methods
     assert!(
-        output.contains("assertPositive") && output.contains("assertNonEmpty"),
-        "Expected assertion methods: {}",
+        output.contains("getArgs") && output.contains("addStage") && output.contains("addValidator"),
+        "Expected additional methods: {}",
         output
     );
 }
 
-/// Test nominal type patterns: branded numeric types
+/// Test ES5 class downleveling with constructor overload signature patterns
 #[test]
-fn test_class_es5_branded_numeric_types() {
+fn test_class_es5_constructor_signature_overloads() {
     let source = r#"
-declare const NumericBrand: unique symbol;
+class Point {
+    x: number;
+    y: number;
 
-type NumericBrand<B extends string> = number & { readonly [NumericBrand]: B };
-
-type Cents = NumericBrand<"Cents">;
-type Dollars = NumericBrand<"Dollars">;
-type Percentage = NumericBrand<"Percentage">;
-
-class MoneyConverter {
-    toCents(dollars: Dollars): Cents {
-        return (dollars * 100) as Cents;
+    constructor();
+    constructor(x: number);
+    constructor(x: number, y: number);
+    constructor(x?: number, y?: number) {
+        this.x = x ?? 0;
+        this.y = y ?? x ?? 0;
     }
 
-    toDollars(cents: Cents): Dollars {
-        return (cents / 100) as Dollars;
+    distanceTo(other: Point): number {
+        const dx = this.x - other.x;
+        const dy = this.y - other.y;
+        return Math.sqrt(dx * dx + dy * dy);
     }
 
-    addCents(a: Cents, b: Cents): Cents {
-        return (a + b) as Cents;
-    }
-
-    addDollars(a: Dollars, b: Dollars): Dollars {
-        return (a + b) as Dollars;
+    static fromArray(arr: [number, number]): Point {
+        return new Point(arr[0], arr[1]);
     }
 }
 
-class PercentageCalculator {
-    fromDecimal(value: number): Percentage {
-        return (value * 100) as Percentage;
+class Rectangle {
+    width: number;
+    height: number;
+    x: number;
+    y: number;
+
+    constructor(width: number, height: number);
+    constructor(width: number, height: number, x: number, y: number);
+    constructor(width: number, height: number, x?: number, y?: number) {
+        this.width = width;
+        this.height = height;
+        this.x = x ?? 0;
+        this.y = y ?? 0;
     }
 
-    toDecimal(percentage: Percentage): number {
-        return percentage / 100;
+    area(): number {
+        return this.width * this.height;
     }
 
-    apply(value: Dollars, percentage: Percentage): Dollars {
-        return (value * (percentage / 100)) as Dollars;
-    }
-
-    combine(a: Percentage, b: Percentage): Percentage {
-        return (a + b) as Percentage;
+    contains(point: Point): boolean {
+        return point.x >= this.x && point.x <= this.x + this.width &&
+               point.y >= this.y && point.y <= this.y + this.height;
     }
 }
 
-class PriceCalculator {
-    private converter: MoneyConverter;
-    private percentCalc: PercentageCalculator;
+class Color {
+    r: number;
+    g: number;
+    b: number;
+    a: number;
 
-    constructor() {
-        this.converter = new MoneyConverter();
-        this.percentCalc = new PercentageCalculator();
+    constructor(hex: string);
+    constructor(r: number, g: number, b: number);
+    constructor(r: number, g: number, b: number, a: number);
+    constructor(rOrHex: number | string, g?: number, b?: number, a?: number) {
+        if (typeof rOrHex === "string") {
+            // Parse hex
+            this.r = 0;
+            this.g = 0;
+            this.b = 0;
+            this.a = 1;
+        } else {
+            this.r = rOrHex;
+            this.g = g ?? 0;
+            this.b = b ?? 0;
+            this.a = a ?? 1;
+        }
     }
 
-    applyDiscount(price: Dollars, discount: Percentage): Dollars {
-        const discountAmount = this.percentCalc.apply(price, discount);
-        return (price - discountAmount) as Dollars;
+    toHex(): string {
+        return this.r.toString(16) + this.g.toString(16) + this.b.toString(16);
     }
 
-    addTax(price: Dollars, taxRate: Percentage): Dollars {
-        const taxAmount = this.percentCalc.apply(price, taxRate);
-        return this.converter.toDollars(
-            this.converter.addCents(
-                this.converter.toCents(price),
-                this.converter.toCents(taxAmount)
-            )
-        );
+    withAlpha(alpha: number): Color {
+        return new Color(this.r, this.g, this.b, alpha);
     }
 }
 "#;
@@ -32681,109 +33043,106 @@ class PriceCalculator {
 
     let output = printer.get_output().to_string();
 
-    // All classes converted
+    // Classes should be converted
     assert!(
-        output.contains("function MoneyConverter") &&
-        output.contains("function PercentageCalculator") &&
-        output.contains("function PriceCalculator"),
-        "Expected ES5 class constructors: {}",
+        output.contains("Point") && output.contains("Rectangle") && output.contains("Color"),
+        "Expected constructor overload classes: {}",
         output
     );
 
-    // Money conversion methods
+    // Point methods
     assert!(
-        output.contains("toCents") && output.contains("toDollars"),
-        "Expected money conversion methods: {}",
+        output.contains("distanceTo") && output.contains("fromArray"),
+        "Expected Point methods: {}",
         output
     );
 
-    // Percentage methods
+    // Rectangle methods
     assert!(
-        output.contains("fromDecimal") && output.contains("toDecimal"),
-        "Expected percentage methods: {}",
+        output.contains("area") && output.contains("contains"),
+        "Expected Rectangle methods: {}",
+        output
+    );
+
+    // Color methods
+    assert!(
+        output.contains("toHex") && output.contains("withAlpha"),
+        "Expected Color methods: {}",
         output
     );
 }
 
-/// Test nominal type patterns: branded string types
+// ============================================================================
+// GENERIC CONSTRAINT PATTERN TESTS
+// ============================================================================
+
+/// Test ES5 class downleveling with generic extends constraint patterns
 #[test]
-fn test_class_es5_branded_string_types() {
+fn test_class_es5_generic_constraint_extends() {
     let source = r#"
-declare const StringBrand: unique symbol;
+interface Entity {
+    id: string;
+    createdAt: Date;
+}
 
-type StringBrand<B extends string> = string & { readonly [StringBrand]: B };
+interface Nameable {
+    name: string;
+}
 
-type UUID = StringBrand<"UUID">;
-type Slug = StringBrand<"Slug">;
-type JWT = StringBrand<"JWT">;
+class Repository<T extends Entity> {
+    private items: Map<string, T> = new Map();
 
-class UUIDGenerator {
-    private counter = 0;
-
-    generate(): UUID {
-        this.counter++;
-        const uuid = "uuid-" + Date.now() + "-" + this.counter;
-        return uuid as UUID;
+    save(item: T): T {
+        this.items.set(item.id, item);
+        return item;
     }
 
-    validate(input: string): UUID | null {
-        if (input.startsWith("uuid-")) {
-            return input as UUID;
-        }
-        return null;
+    findById(id: string): T | undefined {
+        return this.items.get(id);
     }
 
-    compare(a: UUID, b: UUID): boolean {
-        return a === b;
+    findAll(): T[] {
+        return Array.from(this.items.values());
+    }
+
+    deleteById(id: string): boolean {
+        return this.items.delete(id);
     }
 }
 
-class SlugGenerator {
-    fromTitle(title: string): Slug {
-        const slug = title
-            .toLowerCase()
-            .replace(/\s+/g, "-")
-            .replace(/[^a-z0-9-]/g, "");
-        return slug as Slug;
+class NamedRepository<T extends Entity & Nameable> extends Repository<T> {
+    findByName(name: string): T | undefined {
+        for (const item of this.findAll()) {
+            if (item.name === name) return item;
+        }
+        return undefined;
     }
 
-    toUrl(baseUrl: string, slug: Slug): string {
-        return baseUrl + "/" + slug;
-    }
-
-    isValid(input: string): input is Slug {
-        return /^[a-z0-9-]+$/.test(input);
+    findAllByNamePrefix(prefix: string): T[] {
+        return this.findAll().filter(item => item.name.startsWith(prefix));
     }
 }
 
-class JWTService {
-    private secret: string;
+class ComparableCollection<T extends { compareTo(other: T): number }> {
+    private items: T[] = [];
 
-    constructor(secret: string) {
-        this.secret = secret;
+    add(item: T): void {
+        this.items.push(item);
     }
 
-    create(payload: object): JWT {
-        const header = btoa(JSON.stringify({ alg: "HS256", typ: "JWT" }));
-        const body = btoa(JSON.stringify(payload));
-        const signature = btoa(this.secret + header + body);
-        return (header + "." + body + "." + signature) as JWT;
+    sort(): T[] {
+        return [...this.items].sort((a, b) => a.compareTo(b));
     }
 
-    decode(token: JWT): object | null {
-        try {
-            const parts = token.split(".");
-            return JSON.parse(atob(parts[1]));
-        } catch {
-            return null;
-        }
+    min(): T | undefined {
+        if (this.items.length === 0) return undefined;
+        return this.sort()[0];
     }
 
-    validate(token: JWT): boolean {
-        const parts = token.split(".");
-        if (parts.length !== 3) return false;
-        const expectedSig = btoa(this.secret + parts[0] + parts[1]);
-        return parts[2] === expectedSig;
+    max(): T | undefined {
+        if (this.items.length === 0) return undefined;
+        const sorted = this.sort();
+        return sorted[sorted.length - 1];
     }
 }
 "#;
@@ -32803,136 +33162,107 @@ class JWTService {
 
     let output = printer.get_output().to_string();
 
-    // All classes converted
+    // Classes should be converted
     assert!(
-        output.contains("function UUIDGenerator") &&
-        output.contains("function SlugGenerator") &&
-        output.contains("function JWTService"),
-        "Expected ES5 class constructors: {}",
+        output.contains("Repository") && output.contains("NamedRepository") && output.contains("ComparableCollection"),
+        "Expected generic extends constraint classes: {}",
         output
     );
 
-    // UUID methods
+    // Repository methods
     assert!(
-        output.contains("generate") && output.contains("validate"),
-        "Expected UUID methods: {}",
+        output.contains("save") && output.contains("findById") && output.contains("findAll"),
+        "Expected Repository methods: {}",
         output
     );
 
-    // Slug methods
+    // NamedRepository methods
     assert!(
-        output.contains("fromTitle") && output.contains("toUrl"),
-        "Expected Slug methods: {}",
+        output.contains("findByName") && output.contains("findAllByNamePrefix"),
+        "Expected NamedRepository methods: {}",
         output
     );
 
-    // JWT methods
+    // ComparableCollection methods
     assert!(
-        output.contains("create") && output.contains("decode"),
-        "Expected JWT methods: {}",
+        output.contains("sort") && output.contains("min") && output.contains("max"),
+        "Expected ComparableCollection methods: {}",
         output
     );
 }
 
-/// Test nominal type patterns: combined nominal patterns
+/// Test ES5 class downleveling with generic keyof constraint patterns
 #[test]
-fn test_class_es5_nominal_combined_patterns() {
+fn test_class_es5_generic_constraint_keyof() {
     let source = r#"
-declare const NominalBrand: unique symbol;
+class PropertyAccessor<T, K extends keyof T> {
+    private obj: T;
+    private key: K;
 
-type Nominal<T, K extends string> = T & { readonly [NominalBrand]: K };
-
-type EntityId<E extends string> = Nominal<string, E>;
-type CustomerId = EntityId<"Customer">;
-type ProductId = EntityId<"Product">;
-type InvoiceId = EntityId<"Invoice">;
-
-type Currency = Nominal<number, "Currency">;
-type Quantity = Nominal<number, "Quantity">;
-
-interface LineItem {
-    productId: ProductId;
-    quantity: Quantity;
-    unitPrice: Currency;
-}
-
-class IdFactory {
-    private counters: Map<string, number> = new Map();
-
-    createId<E extends string>(prefix: E): EntityId<E> {
-        const count = (this.counters.get(prefix) || 0) + 1;
-        this.counters.set(prefix, count);
-        return (prefix + "-" + count) as EntityId<E>;
+    constructor(obj: T, key: K) {
+        this.obj = obj;
+        this.key = key;
     }
 
-    createCustomerId(): CustomerId {
-        return this.createId("Customer");
+    get(): T[K] {
+        return this.obj[this.key];
     }
 
-    createProductId(): ProductId {
-        return this.createId("Product");
-    }
-
-    createInvoiceId(): InvoiceId {
-        return this.createId("Invoice");
+    set(value: T[K]): void {
+        this.obj[this.key] = value;
     }
 }
 
-class InvoiceBuilder {
-    private idFactory: IdFactory;
-    private customerId: CustomerId | null = null;
-    private items: LineItem[] = [];
+class ObjectMapper<T extends object> {
+    private source: T;
 
-    constructor(idFactory: IdFactory) {
-        this.idFactory = idFactory;
+    constructor(source: T) {
+        this.source = source;
     }
 
-    setCustomer(customerId: CustomerId): this {
-        this.customerId = customerId;
-        return this;
-    }
-
-    addItem(productId: ProductId, quantity: Quantity, unitPrice: Currency): this {
-        this.items.push({ productId, quantity, unitPrice });
-        return this;
-    }
-
-    calculateTotal(): Currency {
-        let total = 0;
-        for (const item of this.items) {
-            total += item.quantity * item.unitPrice;
+    pick<K extends keyof T>(...keys: K[]): Pick<T, K> {
+        const result = {} as Pick<T, K>;
+        for (const key of keys) {
+            result[key] = this.source[key];
         }
-        return total as Currency;
+        return result;
     }
 
-    build(): { invoiceId: InvoiceId; customerId: CustomerId; items: LineItem[]; total: Currency } | null {
-        if (!this.customerId) return null;
-        return {
-            invoiceId: this.idFactory.createInvoiceId(),
-            customerId: this.customerId,
-            items: this.items,
-            total: this.calculateTotal()
-        };
+    omit<K extends keyof T>(...keys: K[]): Omit<T, K> {
+        const result = { ...this.source } as any;
+        for (const key of keys) {
+            delete result[key];
+        }
+        return result;
+    }
+
+    getProperty<K extends keyof T>(key: K): T[K] {
+        return this.source[key];
     }
 }
 
-class InventoryService {
-    private stock: Map<ProductId, Quantity> = new Map();
+class FormBuilder<T extends Record<string, any>> {
+    private values: Partial<T> = {};
+    private errors: Partial<Record<keyof T, string>> = {};
 
-    addStock(productId: ProductId, quantity: Quantity): void {
-        const current = this.stock.get(productId) || (0 as Quantity);
-        this.stock.set(productId, (current + quantity) as Quantity);
+    setValue<K extends keyof T>(key: K, value: T[K]): void {
+        this.values[key] = value;
     }
 
-    removeStock(productId: ProductId, quantity: Quantity): boolean {
-        const current = this.stock.get(productId) || (0 as Quantity);
-        if (current < quantity) return false;
-        this.stock.set(productId, (current - quantity) as Quantity);
-        return true;
+    getValue<K extends keyof T>(key: K): T[K] | undefined {
+        return this.values[key];
     }
 
-    getStock(productId: ProductId): Quantity {
-        return this.stock.get(productId) || (0 as Quantity);
+    setError<K extends keyof T>(key: K, error: string): void {
+        this.errors[key] = error;
+    }
+
+    getError<K extends keyof T>(key: K): string | undefined {
+        return this.errors[key];
+    }
+
+    getValues(): Partial<T> {
+        return { ...this.values };
     }
 }
 "#;
@@ -32952,40 +33282,148 @@ class InventoryService {
 
     let output = printer.get_output().to_string();
 
-    // All classes converted
+    // Classes should be converted
     assert!(
-        output.contains("function IdFactory") &&
-        output.contains("function InvoiceBuilder") &&
-        output.contains("function InventoryService"),
-        "Expected ES5 class constructors: {}",
+        output.contains("PropertyAccessor") && output.contains("ObjectMapper") && output.contains("FormBuilder"),
+        "Expected generic keyof constraint classes: {}",
         output
     );
 
-    // IdFactory methods
+    // PropertyAccessor methods
     assert!(
-        output.contains("createId") && output.contains("createCustomerId"),
-        "Expected IdFactory methods: {}",
+        output.contains("get") && output.contains("set"),
+        "Expected PropertyAccessor methods: {}",
         output
     );
 
-    // InvoiceBuilder methods
+    // ObjectMapper methods
     assert!(
-        output.contains("setCustomer") && output.contains("addItem") && output.contains("calculateTotal"),
-        "Expected InvoiceBuilder methods: {}",
+        output.contains("pick") && output.contains("omit") && output.contains("getProperty"),
+        "Expected ObjectMapper methods: {}",
         output
     );
 
-    // InventoryService methods
+    // FormBuilder methods
     assert!(
-        output.contains("addStock") && output.contains("removeStock") && output.contains("getStock"),
-        "Expected InventoryService methods: {}",
+        output.contains("setValue") && output.contains("getValue") && output.contains("getValues"),
+        "Expected FormBuilder methods: {}",
+        output
+    );
+}
+
+/// Test ES5 class downleveling with generic conditional type constraint patterns
+#[test]
+fn test_class_es5_generic_constraint_conditional() {
+    let source = r#"
+type IsArray<T> = T extends any[] ? true : false;
+type UnwrapPromise<T> = T extends Promise<infer U> ? U : T;
+type ElementType<T> = T extends (infer E)[] ? E : never;
+
+class TypeChecker<T> {
+    private value: T;
+
+    constructor(value: T) {
+        this.value = value;
+    }
+
+    isArray(): boolean {
+        return Array.isArray(this.value);
+    }
+
+    getValue(): T {
+        return this.value;
+    }
+
+    map<U>(fn: (value: T) => U): TypeChecker<U> {
+        return new TypeChecker(fn(this.value));
+    }
+}
+
+class AsyncHandler<T> {
+    private promise: Promise<T>;
+
+    constructor(promise: Promise<T>) {
+        this.promise = promise;
+    }
+
+    async unwrap(): Promise<T> {
+        return this.promise;
+    }
+
+    map<U>(fn: (value: T) => U): AsyncHandler<U> {
+        return new AsyncHandler(this.promise.then(fn));
+    }
+
+    flatMap<U>(fn: (value: T) => Promise<U>): AsyncHandler<U> {
+        return new AsyncHandler(this.promise.then(fn));
+    }
+}
+
+class ArrayProcessor<T extends any[]> {
+    private array: T;
+
+    constructor(array: T) {
+        this.array = array;
+    }
+
+    first(): T[number] | undefined {
+        return this.array[0];
+    }
+
+    last(): T[number] | undefined {
+        return this.array[this.array.length - 1];
+    }
+
+    map<U>(fn: (item: T[number]) => U): U[] {
+        return this.array.map(fn);
+    }
+
+    filter(predicate: (item: T[number]) => boolean): T[number][] {
+        return this.array.filter(predicate);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Classes should be converted
+    assert!(
+        output.contains("TypeChecker") && output.contains("AsyncHandler") && output.contains("ArrayProcessor"),
+        "Expected generic conditional constraint classes: {}",
         output
     );
 
-    // Map operations
+    // TypeChecker methods
     assert!(
-        output.contains(".get(") && output.contains(".set("),
-        "Expected Map operations: {}",
+        output.contains("isArray") && output.contains("getValue"),
+        "Expected TypeChecker methods: {}",
+        output
+    );
+
+    // AsyncHandler methods
+    assert!(
+        output.contains("unwrap") && output.contains("flatMap"),
+        "Expected AsyncHandler methods: {}",
+        output
+    );
+
+    // ArrayProcessor methods
+    assert!(
+        output.contains("first") && output.contains("last") && output.contains("filter"),
+        "Expected ArrayProcessor methods: {}",
         output
     );
 }
