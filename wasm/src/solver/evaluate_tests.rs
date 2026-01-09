@@ -41961,3 +41961,1122 @@ fn test_template_literal_getter_extraction() {
     let expected = interner.literal_string("Name");
     assert!(result == expected || result != TypeId::ERROR);
 }
+
+// =============================================================================
+// Recursive Type Tests (Self-Referential Types)
+// =============================================================================
+
+#[test]
+fn test_recursive_type_nested_array() {
+    // Test: type NestedArray<T> = T | NestedArray<T>[]
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    // Create Ref(1) for NestedArray type alias
+    let nested_ref = interner.reference(SymbolRef(1));
+
+    // NestedArray<number> = number | NestedArray<number>[]
+    let nested_array = interner.array(nested_ref);
+    let nested_body = interner.union(vec![TypeId::NUMBER, nested_array]);
+
+    let mut env = TypeEnvironment::new();
+    env.insert(SymbolRef(1), nested_body);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(nested_ref);
+
+    // Should resolve to union type
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_recursive_type_with_optional_chain() {
+    // Test: type Chain = { value: number, next?: Chain }
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    let chain_ref = interner.reference(SymbolRef(1));
+
+    let value_name = interner.intern_string("value");
+    let next_name = interner.intern_string("next");
+
+    let chain_body = interner.object(vec![
+        PropertyInfo {
+            name: value_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: next_name,
+            type_id: chain_ref,
+            write_type: chain_ref,
+            optional: true,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let mut env = TypeEnvironment::new();
+    env.insert(SymbolRef(1), chain_body);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(chain_ref);
+
+    match interner.lookup(result).unwrap() {
+        TypeKey::Object(shape_id) => {
+            let shape = interner.object_shape(shape_id);
+            assert_eq!(shape.properties.len(), 2);
+            let optional_count = shape.properties.iter().filter(|p| p.optional).count();
+            assert_eq!(optional_count, 1);
+        }
+        _ => panic!("Expected Object type"),
+    }
+}
+
+#[test]
+fn test_recursive_type_graph_node() {
+    // Test: type GraphNode = { id: string, edges: GraphNode[] }
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    let node_ref = interner.reference(SymbolRef(1));
+
+    let id_name = interner.intern_string("id");
+    let edges_name = interner.intern_string("edges");
+
+    let node_array = interner.array(node_ref);
+    let node_body = interner.object(vec![
+        PropertyInfo {
+            name: id_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: edges_name,
+            type_id: node_array,
+            write_type: node_array,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let mut env = TypeEnvironment::new();
+    env.insert(SymbolRef(1), node_body);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(node_ref);
+
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_recursive_type_with_readonly() {
+    // Test: type ImmutableTree = { readonly value: number, readonly children: readonly ImmutableTree[] }
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    let tree_ref = interner.reference(SymbolRef(1));
+
+    let value_name = interner.intern_string("value");
+    let children_name = interner.intern_string("children");
+
+    let children_array = interner.array(tree_ref);
+    let tree_body = interner.object(vec![
+        PropertyInfo {
+            name: value_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: true,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: children_name,
+            type_id: children_array,
+            write_type: children_array,
+            optional: false,
+            readonly: true,
+            is_method: false,
+        },
+    ]);
+
+    let mut env = TypeEnvironment::new();
+    env.insert(SymbolRef(1), tree_body);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(tree_ref);
+
+    match interner.lookup(result).unwrap() {
+        TypeKey::Object(shape_id) => {
+            let shape = interner.object_shape(shape_id);
+            let readonly_count = shape.properties.iter().filter(|p| p.readonly).count();
+            assert_eq!(readonly_count, 2);
+        }
+        _ => panic!("Expected Object type"),
+    }
+}
+
+#[test]
+fn test_recursive_type_nullable_reference() {
+    // Test: type Node = { data: string, parent: Node | null }
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    let node_ref = interner.reference(SymbolRef(1));
+
+    let data_name = interner.intern_string("data");
+    let parent_name = interner.intern_string("parent");
+
+    let parent_type = interner.union(vec![node_ref, TypeId::NULL]);
+    let node_body = interner.object(vec![
+        PropertyInfo {
+            name: data_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: parent_name,
+            type_id: parent_type,
+            write_type: parent_type,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let mut env = TypeEnvironment::new();
+    env.insert(SymbolRef(1), node_body);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(node_ref);
+
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_recursive_type_with_methods() {
+    // Test: type Builder = { value: string, chain(): Builder }
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    let builder_ref = interner.reference(SymbolRef(1));
+
+    let value_name = interner.intern_string("value");
+    let chain_name = interner.intern_string("chain");
+
+    let chain_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: builder_ref,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let builder_body = interner.object(vec![
+        PropertyInfo {
+            name: value_name,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: chain_name,
+            type_id: chain_fn,
+            write_type: chain_fn,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+    ]);
+
+    let mut env = TypeEnvironment::new();
+    env.insert(SymbolRef(1), builder_body);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(builder_ref);
+
+    match interner.lookup(result).unwrap() {
+        TypeKey::Object(shape_id) => {
+            let shape = interner.object_shape(shape_id);
+            let method_count = shape.properties.iter().filter(|p| p.is_method).count();
+            assert_eq!(method_count, 1);
+        }
+        _ => panic!("Expected Object type"),
+    }
+}
+
+#[test]
+fn test_recursive_type_tuple_tree() {
+    // Test: type TupleTree = [number, TupleTree | null, TupleTree | null]
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    let tree_ref = interner.reference(SymbolRef(1));
+    let nullable_tree = interner.union(vec![tree_ref, TypeId::NULL]);
+
+    let tree_body = interner.tuple_with_info(vec![
+        TupleElementInfo {
+            type_id: TypeId::NUMBER,
+            optional: false,
+            label: None,
+        },
+        TupleElementInfo {
+            type_id: nullable_tree,
+            optional: false,
+            label: None,
+        },
+        TupleElementInfo {
+            type_id: nullable_tree,
+            optional: false,
+            label: None,
+        },
+    ]);
+
+    let mut env = TypeEnvironment::new();
+    env.insert(SymbolRef(1), tree_body);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(tree_ref);
+
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_recursive_type_function_callback() {
+    // Test: type Continuation<T> = (value: T, next: Continuation<T>) => void
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    let cont_ref = interner.reference(SymbolRef(1));
+
+    let value_name = interner.intern_string("value");
+    let next_name = interner.intern_string("next");
+
+    let cont_body = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo {
+                name: Some(value_name),
+                type_id: TypeId::NUMBER,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(next_name),
+                type_id: cont_ref,
+                optional: false,
+                rest: false,
+            },
+        ],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let mut env = TypeEnvironment::new();
+    env.insert(SymbolRef(1), cont_body);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(cont_ref);
+
+    match interner.lookup(result).unwrap() {
+        TypeKey::Function(shape) => {
+            assert_eq!(shape.params.len(), 2);
+            assert_eq!(shape.return_type, TypeId::VOID);
+        }
+        _ => panic!("Expected Function type"),
+    }
+}
+
+#[test]
+fn test_recursive_type_union_discriminant() {
+    // Test: type Expr = { kind: "lit", value: number } | { kind: "add", left: Expr, right: Expr }
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    let expr_ref = interner.reference(SymbolRef(1));
+
+    let kind_name = interner.intern_string("kind");
+    let value_name = interner.intern_string("value");
+    let left_name = interner.intern_string("left");
+    let right_name = interner.intern_string("right");
+
+    let lit_kind = interner.literal_string("lit");
+    let add_kind = interner.literal_string("add");
+
+    let lit_case = interner.object(vec![
+        PropertyInfo {
+            name: kind_name,
+            type_id: lit_kind,
+            write_type: lit_kind,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: value_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let add_case = interner.object(vec![
+        PropertyInfo {
+            name: kind_name,
+            type_id: add_kind,
+            write_type: add_kind,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: left_name,
+            type_id: expr_ref,
+            write_type: expr_ref,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: right_name,
+            type_id: expr_ref,
+            write_type: expr_ref,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let expr_body = interner.union(vec![lit_case, add_case]);
+
+    let mut env = TypeEnvironment::new();
+    env.insert(SymbolRef(1), expr_body);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(expr_ref);
+
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_recursive_type_deeply_nested() {
+    // Test: type Deep = { level: number, child: { nested: Deep } | null }
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    let deep_ref = interner.reference(SymbolRef(1));
+
+    let level_name = interner.intern_string("level");
+    let child_name = interner.intern_string("child");
+    let nested_name = interner.intern_string("nested");
+
+    let inner = interner.object(vec![PropertyInfo {
+        name: nested_name,
+        type_id: deep_ref,
+        write_type: deep_ref,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let child_type = interner.union(vec![inner, TypeId::NULL]);
+
+    let deep_body = interner.object(vec![
+        PropertyInfo {
+            name: level_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: child_name,
+            type_id: child_type,
+            write_type: child_type,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let mut env = TypeEnvironment::new();
+    env.insert(SymbolRef(1), deep_body);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(deep_ref);
+
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_recursive_type_with_index_signature() {
+    // Test: type RecursiveRecord = { [key: string]: RecursiveRecord | string }
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    let rec_ref = interner.reference(SymbolRef(1));
+
+    let value_type = interner.union(vec![rec_ref, TypeId::STRING]);
+
+    let rec_body = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    let mut env = TypeEnvironment::new();
+    env.insert(SymbolRef(1), rec_body);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(rec_ref);
+
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_recursive_type_intersection_mixin() {
+    // Test: type Mixin = { base: string } & { extra: Mixin | null }
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    let mixin_ref = interner.reference(SymbolRef(1));
+
+    let base_name = interner.intern_string("base");
+    let extra_name = interner.intern_string("extra");
+
+    let base_part = interner.object(vec![PropertyInfo {
+        name: base_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let extra_type = interner.union(vec![mixin_ref, TypeId::NULL]);
+    let extra_part = interner.object(vec![PropertyInfo {
+        name: extra_name,
+        type_id: extra_type,
+        write_type: extra_type,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let mixin_body = interner.intersection(vec![base_part, extra_part]);
+
+    let mut env = TypeEnvironment::new();
+    env.insert(SymbolRef(1), mixin_body);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(mixin_ref);
+
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_recursive_type_event_emitter() {
+    // Test: type EventEmitter = { on(event: string, handler: (emitter: EventEmitter) => void): EventEmitter }
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    let emitter_ref = interner.reference(SymbolRef(1));
+
+    let on_name = interner.intern_string("on");
+    let event_name = interner.intern_string("event");
+    let handler_name = interner.intern_string("handler");
+    let emitter_param_name = interner.intern_string("emitter");
+
+    // Handler: (emitter: EventEmitter) => void
+    let handler_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(emitter_param_name),
+            type_id: emitter_ref,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // on(event: string, handler: Handler): EventEmitter
+    let on_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo {
+                name: Some(event_name),
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(handler_name),
+                type_id: handler_fn,
+                optional: false,
+                rest: false,
+            },
+        ],
+        this_type: None,
+        return_type: emitter_ref,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let emitter_body = interner.object(vec![PropertyInfo {
+        name: on_name,
+        type_id: on_fn,
+        write_type: on_fn,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let mut env = TypeEnvironment::new();
+    env.insert(SymbolRef(1), emitter_body);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(emitter_ref);
+
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_recursive_type_promise_chain() {
+    // Test: type PromiseChain<T> = { then<U>(fn: (value: T) => PromiseChain<U>): PromiseChain<U> }
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    let chain_ref = interner.reference(SymbolRef(1));
+
+    let then_name = interner.intern_string("then");
+    let fn_name = interner.intern_string("fn");
+    let value_name = interner.intern_string("value");
+
+    // For simplicity, use number as T
+    let callback_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(value_name),
+            type_id: TypeId::NUMBER,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: chain_ref,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let then_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(fn_name),
+            type_id: callback_fn,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: chain_ref,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let chain_body = interner.object(vec![PropertyInfo {
+        name: then_name,
+        type_id: then_fn,
+        write_type: then_fn,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let mut env = TypeEnvironment::new();
+    env.insert(SymbolRef(1), chain_body);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(chain_ref);
+
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_recursive_type_binary_tree_with_data() {
+    // Test: type BinaryTree<T> = { data: T, left: BinaryTree<T> | undefined, right: BinaryTree<T> | undefined }
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    let tree_ref = interner.reference(SymbolRef(1));
+
+    let data_name = interner.intern_string("data");
+    let left_name = interner.intern_string("left");
+    let right_name = interner.intern_string("right");
+
+    let optional_tree = interner.union(vec![tree_ref, TypeId::UNDEFINED]);
+
+    let tree_body = interner.object(vec![
+        PropertyInfo {
+            name: data_name,
+            type_id: TypeId::STRING, // T = string
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: left_name,
+            type_id: optional_tree,
+            write_type: optional_tree,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: right_name,
+            type_id: optional_tree,
+            write_type: optional_tree,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let mut env = TypeEnvironment::new();
+    env.insert(SymbolRef(1), tree_body);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(tree_ref);
+
+    match interner.lookup(result).unwrap() {
+        TypeKey::Object(shape_id) => {
+            let shape = interner.object_shape(shape_id);
+            assert_eq!(shape.properties.len(), 3);
+        }
+        _ => panic!("Expected Object type"),
+    }
+}
+
+#[test]
+fn test_recursive_type_stream() {
+    // Test: type Stream<T> = { head: T, tail: () => Stream<T> }
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    let stream_ref = interner.reference(SymbolRef(1));
+
+    let head_name = interner.intern_string("head");
+    let tail_name = interner.intern_string("tail");
+
+    let tail_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: stream_ref,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let stream_body = interner.object(vec![
+        PropertyInfo {
+            name: head_name,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: tail_name,
+            type_id: tail_fn,
+            write_type: tail_fn,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+    ]);
+
+    let mut env = TypeEnvironment::new();
+    env.insert(SymbolRef(1), stream_body);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(stream_ref);
+
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_recursive_type_trie_node() {
+    // Test: type TrieNode = { children: { [char: string]: TrieNode }, isEnd: boolean }
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    let trie_ref = interner.reference(SymbolRef(1));
+
+    let children_name = interner.intern_string("children");
+    let is_end_name = interner.intern_string("isEnd");
+
+    let children_obj = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: trie_ref,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    let trie_body = interner.object(vec![
+        PropertyInfo {
+            name: children_name,
+            type_id: children_obj,
+            write_type: children_obj,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: is_end_name,
+            type_id: TypeId::BOOLEAN,
+            write_type: TypeId::BOOLEAN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let mut env = TypeEnvironment::new();
+    env.insert(SymbolRef(1), trie_body);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(trie_ref);
+
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_recursive_type_middleware() {
+    // Test: type Middleware = (ctx: Context, next: Middleware) => Promise<void>
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    let mw_ref = interner.reference(SymbolRef(1));
+
+    let ctx_name = interner.intern_string("ctx");
+    let next_name = interner.intern_string("next");
+
+    // Context is a simple object
+    let context = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("request"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Promise<void> as simple object with then
+    let promise_void = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("then"),
+        type_id: TypeId::FUNCTION,
+        write_type: TypeId::FUNCTION,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let mw_body = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo {
+                name: Some(ctx_name),
+                type_id: context,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(next_name),
+                type_id: mw_ref,
+                optional: false,
+                rest: false,
+            },
+        ],
+        this_type: None,
+        return_type: promise_void,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let mut env = TypeEnvironment::new();
+    env.insert(SymbolRef(1), mw_body);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(mw_ref);
+
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_recursive_type_reducer() {
+    // Test: type Reducer<S, A> = (state: S, action: A) => S | ((state: S, action: A, dispatch: (action: A) => void) => S)
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    let reducer_ref = interner.reference(SymbolRef(1));
+
+    let state_name = interner.intern_string("state");
+    let action_name = interner.intern_string("action");
+    let dispatch_name = interner.intern_string("dispatch");
+
+    // dispatch: (action: A) => void
+    let dispatch_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(action_name),
+            type_id: TypeId::STRING, // Action = string
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // Simple reducer: (state: S, action: A) => S
+    let simple_reducer = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo {
+                name: Some(state_name),
+                type_id: TypeId::NUMBER, // State = number
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(action_name),
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            },
+        ],
+        this_type: None,
+        return_type: TypeId::NUMBER,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // Complex reducer with dispatch
+    let complex_reducer = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo {
+                name: Some(state_name),
+                type_id: TypeId::NUMBER,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(action_name),
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(dispatch_name),
+                type_id: dispatch_fn,
+                optional: false,
+                rest: false,
+            },
+        ],
+        this_type: None,
+        return_type: TypeId::NUMBER,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let reducer_body = interner.union(vec![simple_reducer, complex_reducer]);
+
+    let mut env = TypeEnvironment::new();
+    env.insert(SymbolRef(1), reducer_body);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(reducer_ref);
+
+    assert!(result != TypeId::ERROR);
+}
+
+#[test]
+fn test_recursive_type_observable() {
+    // Test: type Observable<T> = { subscribe(observer: { next: (value: T) => void, complete: () => void }): { unsubscribe: () => void } }
+    use crate::solver::subtype::TypeEnvironment;
+    use crate::solver::evaluate::TypeEvaluator;
+
+    let interner = TypeInterner::new();
+
+    let obs_ref = interner.reference(SymbolRef(1));
+
+    let subscribe_name = interner.intern_string("subscribe");
+    let observer_name = interner.intern_string("observer");
+    let next_name = interner.intern_string("next");
+    let complete_name = interner.intern_string("complete");
+    let unsubscribe_name = interner.intern_string("unsubscribe");
+    let value_name = interner.intern_string("value");
+
+    // next: (value: T) => void
+    let next_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(value_name),
+            type_id: TypeId::NUMBER,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // complete: () => void
+    let complete_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // Observer type
+    let observer = interner.object(vec![
+        PropertyInfo {
+            name: next_name,
+            type_id: next_fn,
+            write_type: next_fn,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+        PropertyInfo {
+            name: complete_name,
+            type_id: complete_fn,
+            write_type: complete_fn,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+    ]);
+
+    // Subscription type
+    let unsubscribe_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let subscription = interner.object(vec![PropertyInfo {
+        name: unsubscribe_name,
+        type_id: unsubscribe_fn,
+        write_type: unsubscribe_fn,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    // subscribe method
+    let subscribe_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(observer_name),
+            type_id: observer,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: subscription,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let obs_body = interner.object(vec![PropertyInfo {
+        name: subscribe_name,
+        type_id: subscribe_fn,
+        write_type: subscribe_fn,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let mut env = TypeEnvironment::new();
+    env.insert(SymbolRef(1), obs_body);
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate(obs_ref);
+
+    assert!(result != TypeId::ERROR);
+}
