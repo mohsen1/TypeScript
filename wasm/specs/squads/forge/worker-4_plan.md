@@ -99,9 +99,8 @@ The WASM checker has `has_private_modifier()` and `has_protected_modifier()` fun
 No
 
 ## Notes
-- Functions exist but don't emit errors - wire them up
-- Be careful with `#private` fields (different mechanism)
-- Run `./wasm/test.sh` before pushing
-- Commit format: `[wasm] checker: implement TS2341/TS2445 access modifier enforcement`
-- Push to: `origin/worker/forge-4`
+- Implemented access modifier enforcement + tests.
+- `./wasm/test.sh` failed due to existing repo errors (BindResult import, TemplateLiteralSpan, object_with_index signature).
+- `git push origin worker/forge-4` failed: `Permission denied (publickey)`.
+- Be careful with `#private` fields (different mechanism).
 - **NEVER edit**: `STRUCTURE.md`, `GOALS.md`, other workers' plan files, or anything in `orchestrator/`
