@@ -7,10 +7,31 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-None - awaiting new task (final task completed)
+Add async ES5 integration tests for derived class edge cases: super() with async field initializers
+
+Per GOALS.md Objective 1: "Match tsc for super() in derived classes with field initializers, nested arrow/async this capture"
+
+Steps:
+1. Add 12 async/class integration edge case tests to `wasm/src/transforms/async_es5_tests.rs`:
+   - Derived class with async field initializer calling super()
+   - Async arrow in derived constructor before super()
+   - Async arrow in derived constructor after super()
+   - Async method calling super.method()
+   - Async static method with this capture
+   - Async field with nested arrow this binding
+   - Derived async constructor with parameter properties
+   - Async generator in derived class
+   - Multiple async fields with super dependency
+   - Computed async field with super access
+   - body_contains_await tests for derived patterns
+   - Combined derived async patterns
+2. Run `./wasm/test.sh async_es5_tests` to verify all tests pass
+3. Commit with message: `[wasm] async_es5: add derived class edge case integration tests`
+4. Push to `origin/worker/anvil-5`
+5. Update this plan file and push
 
 ## Task Queue
-(empty)
+(empty - will receive new tasks from EM after completing current assignment)
 
 
 ## Completed
