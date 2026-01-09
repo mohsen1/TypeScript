@@ -41387,3 +41387,860 @@ class EventEmitter {
         output
     );
 }
+
+// =============================================================================
+// AUTO-ACCESSOR DECORATOR PATTERNS
+// =============================================================================
+
+/// Test basic auto-accessor with decorator
+#[test]
+fn test_class_es5_auto_accessor_basic_decorator() {
+    let source = r#"
+function logged(target: any, context: ClassAccessorDecoratorContext) {
+    return {
+        get() {
+            console.log("Getting value");
+            return target.get.call(this);
+        },
+        set(value: any) {
+            console.log("Setting value:", value);
+            target.set.call(this, value);
+        }
+    };
+}
+
+class Counter {
+    @logged
+    accessor count: number = 0;
+
+    increment(): void {
+        this.count++;
+    }
+
+    decrement(): void {
+        this.count--;
+    }
+
+    getCount(): number {
+        return this.count;
+    }
+}
+
+class Temperature {
+    @logged
+    accessor celsius: number = 0;
+
+    setFahrenheit(f: number): void {
+        this.celsius = (f - 32) * 5 / 9;
+    }
+
+    getFahrenheit(): number {
+        return this.celsius * 9 / 5 + 32;
+    }
+
+    getKelvin(): number {
+        return this.celsius + 273.15;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Counter class should be ES5 constructor
+    assert!(
+        output.contains("function Counter") || output.contains("Counter"),
+        "Expected Counter class: {}",
+        output
+    );
+
+    // Temperature class should be ES5 constructor
+    assert!(
+        output.contains("function Temperature") || output.contains("Temperature"),
+        "Expected Temperature class: {}",
+        output
+    );
+
+    // Decorator function should be present
+    assert!(
+        output.contains("function logged") || output.contains("logged"),
+        "Expected logged decorator: {}",
+        output
+    );
+
+    // Methods should be present
+    assert!(
+        output.contains("increment") && output.contains("decrement") && output.contains("getCount"),
+        "Expected Counter methods: {}",
+        output
+    );
+
+    // Temperature methods
+    assert!(
+        output.contains("setFahrenheit") && output.contains("getFahrenheit") && output.contains("getKelvin"),
+        "Expected Temperature methods: {}",
+        output
+    );
+}
+
+/// Test static auto-accessor with decorator
+#[test]
+fn test_class_es5_auto_accessor_static_decorator() {
+    let source = r#"
+function cached(target: any, context: ClassAccessorDecoratorContext) {
+    let cachedValue: any = undefined;
+    return {
+        get() {
+            if (cachedValue === undefined) {
+                cachedValue = target.get.call(this);
+            }
+            return cachedValue;
+        },
+        set(value: any) {
+            cachedValue = value;
+            target.set.call(this, value);
+        }
+    };
+}
+
+class Configuration {
+    @cached
+    static accessor apiUrl: string = "https://api.example.com";
+
+    @cached
+    static accessor timeout: number = 5000;
+
+    static getApiUrl(): string {
+        return Configuration.apiUrl;
+    }
+
+    static getTimeout(): number {
+        return Configuration.timeout;
+    }
+
+    static setApiUrl(url: string): void {
+        Configuration.apiUrl = url;
+    }
+
+    static setTimeout(ms: number): void {
+        Configuration.timeout = ms;
+    }
+}
+
+class AppState {
+    @cached
+    static accessor initialized: boolean = false;
+
+    @cached
+    static accessor version: string = "1.0.0";
+
+    static initialize(): void {
+        AppState.initialized = true;
+    }
+
+    static isInitialized(): boolean {
+        return AppState.initialized;
+    }
+
+    static getVersion(): string {
+        return AppState.version;
+    }
+
+    static setVersion(v: string): void {
+        AppState.version = v;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Configuration class
+    assert!(
+        output.contains("Configuration"),
+        "Expected Configuration class: {}",
+        output
+    );
+
+    // AppState class
+    assert!(
+        output.contains("AppState"),
+        "Expected AppState class: {}",
+        output
+    );
+
+    // Cached decorator function
+    assert!(
+        output.contains("function cached") || output.contains("cached"),
+        "Expected cached decorator: {}",
+        output
+    );
+
+    // Static methods should be present
+    assert!(
+        output.contains("getApiUrl") && output.contains("getTimeout") && output.contains("setApiUrl"),
+        "Expected Configuration static methods: {}",
+        output
+    );
+
+    // AppState methods
+    assert!(
+        output.contains("initialize") && output.contains("isInitialized") && output.contains("getVersion"),
+        "Expected AppState static methods: {}",
+        output
+    );
+}
+
+/// Test auto-accessor with multiple decorators
+#[test]
+fn test_class_es5_auto_accessor_multiple_decorators() {
+    let source = r#"
+function validate(min: number, max: number) {
+    return function(target: any, context: ClassAccessorDecoratorContext) {
+        return {
+            get() {
+                return target.get.call(this);
+            },
+            set(value: number) {
+                if (value < min || value > max) {
+                    throw new Error("Value out of range");
+                }
+                target.set.call(this, value);
+            }
+        };
+    };
+}
+
+function round(target: any, context: ClassAccessorDecoratorContext) {
+    return {
+        get() {
+            return Math.round(target.get.call(this));
+        },
+        set(value: number) {
+            target.set.call(this, value);
+        }
+    };
+}
+
+function clamp(min: number, max: number) {
+    return function(target: any, context: ClassAccessorDecoratorContext) {
+        return {
+            get() {
+                return target.get.call(this);
+            },
+            set(value: number) {
+                target.set.call(this, Math.max(min, Math.min(max, value)));
+            }
+        };
+    };
+}
+
+class NumberBox {
+    @validate(0, 100)
+    @round
+    accessor value: number = 0;
+
+    getValue(): number {
+        return this.value;
+    }
+
+    setValue(v: number): void {
+        this.value = v;
+    }
+}
+
+class Slider {
+    @clamp(0, 100)
+    @round
+    accessor position: number = 50;
+
+    getPosition(): number {
+        return this.position;
+    }
+
+    setPosition(p: number): void {
+        this.position = p;
+    }
+
+    increment(step: number = 1): void {
+        this.position += step;
+    }
+
+    decrement(step: number = 1): void {
+        this.position -= step;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // NumberBox class
+    assert!(
+        output.contains("NumberBox"),
+        "Expected NumberBox class: {}",
+        output
+    );
+
+    // Slider class
+    assert!(
+        output.contains("Slider"),
+        "Expected Slider class: {}",
+        output
+    );
+
+    // Decorator functions
+    assert!(
+        output.contains("validate") && output.contains("round") && output.contains("clamp"),
+        "Expected decorator functions: {}",
+        output
+    );
+
+    // NumberBox methods
+    assert!(
+        output.contains("getValue") && output.contains("setValue"),
+        "Expected NumberBox methods: {}",
+        output
+    );
+
+    // Slider methods
+    assert!(
+        output.contains("getPosition") && output.contains("setPosition") && output.contains("increment"),
+        "Expected Slider methods: {}",
+        output
+    );
+}
+
+/// Test auto-accessor in derived class
+#[test]
+fn test_class_es5_auto_accessor_derived_class() {
+    let source = r#"
+function observable(target: any, context: ClassAccessorDecoratorContext) {
+    const listeners: Array<(value: any) => void> = [];
+    return {
+        get() {
+            return target.get.call(this);
+        },
+        set(value: any) {
+            target.set.call(this, value);
+            listeners.forEach(fn => fn(value));
+        }
+    };
+}
+
+class BaseEntity {
+    protected id: string;
+
+    constructor(id: string) {
+        this.id = id;
+    }
+
+    getId(): string {
+        return this.id;
+    }
+}
+
+class User extends BaseEntity {
+    @observable
+    accessor name: string = "";
+
+    @observable
+    accessor email: string = "";
+
+    constructor(id: string, name: string, email: string) {
+        super(id);
+        this.name = name;
+        this.email = email;
+    }
+
+    getName(): string {
+        return this.name;
+    }
+
+    getEmail(): string {
+        return this.email;
+    }
+
+    setName(name: string): void {
+        this.name = name;
+    }
+
+    setEmail(email: string): void {
+        this.email = email;
+    }
+}
+
+class Admin extends User {
+    @observable
+    accessor role: string = "admin";
+
+    @observable
+    accessor permissions: string[] = [];
+
+    constructor(id: string, name: string, email: string) {
+        super(id, name, email);
+    }
+
+    getRole(): string {
+        return this.role;
+    }
+
+    getPermissions(): string[] {
+        return this.permissions;
+    }
+
+    addPermission(perm: string): void {
+        this.permissions = [...this.permissions, perm];
+    }
+
+    setRole(role: string): void {
+        this.role = role;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // BaseEntity should be ES5 constructor
+    assert!(
+        output.contains("function BaseEntity"),
+        "Expected ES5 BaseEntity class: {}",
+        output
+    );
+
+    // User class
+    assert!(
+        output.contains("User"),
+        "Expected User class: {}",
+        output
+    );
+
+    // Admin class
+    assert!(
+        output.contains("Admin"),
+        "Expected Admin class: {}",
+        output
+    );
+
+    // Observable decorator
+    assert!(
+        output.contains("function observable") || output.contains("observable"),
+        "Expected observable decorator: {}",
+        output
+    );
+
+    // Should have __extends pattern
+    assert!(
+        output.contains("__extends") || output.contains("extendStatics"),
+        "Expected __extends helper: {}",
+        output
+    );
+
+    // User methods
+    assert!(
+        output.contains("getName") && output.contains("getEmail") && output.contains("setName"),
+        "Expected User methods: {}",
+        output
+    );
+
+    // Admin methods
+    assert!(
+        output.contains("getRole") && output.contains("getPermissions") && output.contains("addPermission"),
+        "Expected Admin methods: {}",
+        output
+    );
+}
+
+/// Test auto-accessor with initializer
+#[test]
+fn test_class_es5_auto_accessor_with_initializer() {
+    let source = r#"
+function lazy(target: any, context: ClassAccessorDecoratorContext) {
+    let initialized = false;
+    let value: any;
+    return {
+        get() {
+            if (!initialized) {
+                value = target.get.call(this);
+                initialized = true;
+            }
+            return value;
+        },
+        set(newValue: any) {
+            value = newValue;
+            initialized = true;
+            target.set.call(this, newValue);
+        }
+    };
+}
+
+class Settings {
+    @lazy
+    accessor theme: string = "light";
+
+    @lazy
+    accessor fontSize: number = 14;
+
+    @lazy
+    accessor notifications: boolean = true;
+
+    getTheme(): string {
+        return this.theme;
+    }
+
+    getFontSize(): number {
+        return this.fontSize;
+    }
+
+    areNotificationsEnabled(): boolean {
+        return this.notifications;
+    }
+
+    setTheme(theme: string): void {
+        this.theme = theme;
+    }
+
+    setFontSize(size: number): void {
+        this.fontSize = size;
+    }
+
+    toggleNotifications(): void {
+        this.notifications = !this.notifications;
+    }
+}
+
+class Cache {
+    @lazy
+    accessor data: Map<string, any> = new Map();
+
+    @lazy
+    accessor maxSize: number = 1000;
+
+    @lazy
+    accessor ttl: number = 60000;
+
+    get(key: string): any {
+        return this.data.get(key);
+    }
+
+    set(key: string, value: any): void {
+        this.data.set(key, value);
+    }
+
+    has(key: string): boolean {
+        return this.data.has(key);
+    }
+
+    clear(): void {
+        this.data.clear();
+    }
+
+    getMaxSize(): number {
+        return this.maxSize;
+    }
+
+    getTtl(): number {
+        return this.ttl;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Settings class
+    assert!(
+        output.contains("Settings"),
+        "Expected Settings class: {}",
+        output
+    );
+
+    // Cache class
+    assert!(
+        output.contains("Cache"),
+        "Expected Cache class: {}",
+        output
+    );
+
+    // Lazy decorator
+    assert!(
+        output.contains("function lazy") || output.contains("lazy"),
+        "Expected lazy decorator: {}",
+        output
+    );
+
+    // Settings methods
+    assert!(
+        output.contains("getTheme") && output.contains("getFontSize") && output.contains("toggleNotifications"),
+        "Expected Settings methods: {}",
+        output
+    );
+
+    // Cache methods
+    assert!(
+        output.contains("get") && output.contains("set") && output.contains("has") && output.contains("clear"),
+        "Expected Cache methods: {}",
+        output
+    );
+
+    // Initializer values should be present
+    assert!(
+        output.contains("\"light\"") || output.contains("14") || output.contains("1000"),
+        "Expected initializer values: {}",
+        output
+    );
+}
+
+/// Test combined auto-accessor patterns
+#[test]
+fn test_class_es5_auto_accessor_combined_patterns() {
+    let source = r#"
+function track(name: string) {
+    return function(target: any, context: ClassAccessorDecoratorContext) {
+        return {
+            get() {
+                console.log("Read:", name);
+                return target.get.call(this);
+            },
+            set(value: any) {
+                console.log("Write:", name, value);
+                target.set.call(this, value);
+            }
+        };
+    };
+}
+
+function readonly(target: any, context: ClassAccessorDecoratorContext) {
+    let value: any;
+    let initialized = false;
+    return {
+        get() {
+            return value ?? target.get.call(this);
+        },
+        set(newValue: any) {
+            if (!initialized) {
+                value = newValue;
+                initialized = true;
+            }
+        }
+    };
+}
+
+function memoize(target: any, context: ClassAccessorDecoratorContext) {
+    const cache = new WeakMap();
+    return {
+        get() {
+            if (!cache.has(this)) {
+                cache.set(this, target.get.call(this));
+            }
+            return cache.get(this);
+        },
+        set(value: any) {
+            cache.set(this, value);
+            target.set.call(this, value);
+        }
+    };
+}
+
+class Document {
+    @readonly
+    accessor id: string = "";
+
+    @track("title")
+    accessor title: string = "Untitled";
+
+    @track("content")
+    @memoize
+    accessor content: string = "";
+
+    @track("version")
+    static accessor version: string = "1.0";
+
+    constructor(id: string) {
+        this.id = id;
+    }
+
+    getId(): string {
+        return this.id;
+    }
+
+    getTitle(): string {
+        return this.title;
+    }
+
+    getContent(): string {
+        return this.content;
+    }
+
+    setTitle(title: string): void {
+        this.title = title;
+    }
+
+    setContent(content: string): void {
+        this.content = content;
+    }
+
+    static getVersion(): string {
+        return Document.version;
+    }
+}
+
+class Store<T> {
+    @track("state")
+    accessor state: T;
+
+    @track("subscribers")
+    accessor subscribers: Array<(state: T) => void> = [];
+
+    constructor(initialState: T) {
+        this.state = initialState;
+    }
+
+    getState(): T {
+        return this.state;
+    }
+
+    setState(newState: T): void {
+        this.state = newState;
+        this.notify();
+    }
+
+    subscribe(fn: (state: T) => void): void {
+        this.subscribers = [...this.subscribers, fn];
+    }
+
+    private notify(): void {
+        this.subscribers.forEach(fn => fn(this.state));
+    }
+
+    getSubscriberCount(): number {
+        return this.subscribers.length;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Document class
+    assert!(
+        output.contains("Document"),
+        "Expected Document class: {}",
+        output
+    );
+
+    // Store class
+    assert!(
+        output.contains("Store"),
+        "Expected Store class: {}",
+        output
+    );
+
+    // Decorator functions
+    assert!(
+        output.contains("track") && output.contains("readonly") && output.contains("memoize"),
+        "Expected decorator functions: {}",
+        output
+    );
+
+    // Document methods
+    assert!(
+        output.contains("getId") && output.contains("getTitle") && output.contains("getContent") && output.contains("setTitle"),
+        "Expected Document methods: {}",
+        output
+    );
+
+    // Store methods
+    assert!(
+        output.contains("getState") && output.contains("setState") && output.contains("subscribe") && output.contains("getSubscriberCount"),
+        "Expected Store methods: {}",
+        output
+    );
+
+    // Static method
+    assert!(
+        output.contains("getVersion"),
+        "Expected Document.getVersion static method: {}",
+        output
+    );
+
+    // Initializer strings
+    assert!(
+        output.contains("\"Untitled\"") || output.contains("\"1.0\""),
+        "Expected initializer strings: {}",
+        output
+    );
+}
