@@ -137,3 +137,5 @@ Ready for Merge: No (partial TS2456 implementation; needs investigation of pre-e
 - Implemented variadic tuple rest tail handling in call evaluator and spread type resolution for spreads.
 - Tests: `./wasm/test.sh test_call_spread_tuple_type_param`, `./wasm/test.sh test_call_tuple_rest_with_fixed_tail` (PASS).
 - Avoid committing `.role/AGENTS.md` change (expected local modification).
+
+Ready for Merge: Yes
