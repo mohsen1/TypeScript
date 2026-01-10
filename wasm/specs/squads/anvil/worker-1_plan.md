@@ -6,8 +6,9 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-- Idle; last completed task: fix await/async TS2304 false positives (TS2552 for await type refs, TS1042 for async class/enum) and add regressions (merged 2026-01-10).
-- Awaiting next task from EM-Anvil.
+- Reduce TS2322 false positives ("Type 'X' is not assignable to type 'Y'").
+- Collect 3-5 failing samples via conformance or a targeted scan; trace assignability in `wasm/src/thin_checker.rs` and `wasm/src/solver/subtype.rs`.
+- Implement fix + regression test and report delta from a targeted conformance run.
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)

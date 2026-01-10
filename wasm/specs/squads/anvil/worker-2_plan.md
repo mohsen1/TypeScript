@@ -7,11 +7,9 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-**COMPLETED**: Fixed parser extra errors TS1005/TS1109/TS1068/TS1128.
-
-Handled `static static` member names, static blocks with modifiers (emit TS1184), and async function expression keyword names; added `thin_parser_tests` regressions tied to conformance samples `ambient/ambientDeclarations.ts`, `async/es2017/functionDeclarations/asyncFunctionDeclaration12_es2017.ts`, and `classes/classStaticBlock/classStaticBlock20.ts`. `./wasm/test.sh thin_parser` passed.
-
-(Awaiting next assignment from EM-Anvil)
+- Fix crash in `es6/templates/TemplateExpression1.ts` ("unreachable").
+- Reproduce via conformance runner or direct harness; trace template literal handling in `wasm/src/thin_checker.rs` and related template/type evaluation paths.
+- Add regression test and confirm crash is eliminated.
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)

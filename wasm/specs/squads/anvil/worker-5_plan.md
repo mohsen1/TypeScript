@@ -7,7 +7,9 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-(Completed - TS2355 async Promise<void> false positives)
+- Fix crash in `types/mapped/recursiveMappedTypes.ts` (stack overflow).
+- Reproduce with conformance runner; locate recursion in mapped type evaluation (`wasm/src/thin_checker.rs`, `wasm/src/solver/evaluate.rs`).
+- Add guard/fix + regression test; report conformance delta.
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)
