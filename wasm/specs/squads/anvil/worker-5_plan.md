@@ -17,6 +17,7 @@ Priority: 5
 - [x] Fixed merge conflicts from origin/rust sync: binder.rs can_merge_flags and CallableShape missing fields in thin_checker.rs. Added test documenting never-returning call limitation. Commit: `bb137e9631d`.
 - [x] Fixed TS2355 false positives for throw-only functions. Added `falls_through` check to TS2355 condition for functions, methods, and getters. Functions that only throw no longer incorrectly trigger "must return a value". Added tests `test_throw_only_function_no_2355` and `test_infinite_loop_no_2355`. Commit: `3eea80b3d93`.
 - [x] Fixed TS2355 false positives for async `Promise<void>`/alias returns by unwrapping async return types before checking `requires_return_value`. Added `test_async_promise_void_no_2355`. Commit: `031b7f1ffe`.
+- [x] Expanded TS2355 async `Promise<void>` regression coverage to include `PromiseLike<void>` and aliases in `test_async_promise_void_no_2355`. Ran `./wasm/test.sh test_async_promise_void_no_2355` (PASS). Commit: `9a40689eb0`.
 - [x] Added block scoping tests for loop var collection and closure capture in `wasm/src/transforms/block_scoping_es5_tests.rs`; wired test module in `wasm/src/transforms/block_scoping_es5.rs`; `./wasm/test.sh block_scoping_es5_tests` failed (Docker socket EOF).
 - [x] Added await detection for array/object literal elements (computed names, spreads) in `wasm/src/transforms/async_es5.rs`; added computed object literal await test in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (PASS).
 - [x] Added computed-name async method expression test in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (PASS).
@@ -188,14 +189,15 @@ Yes
 
 ## Resume Notes
 - Branch: `worker/anvil-5`
-- Last commit: `031b7f1ffe` (`[wasm] checker: handle async Promise<void> returns`)
+- Last commit: `9a40689eb0` (`[wasm] checker: cover async PromiseLike<void> TS2355`)
 - Docker: working
-- Tests: `./wasm/test.sh thin_checker_tests` (fails: `test_abstract_class_through_type_alias_2511`, `test_abstract_class_union_type_2511` expecting 2511 vs 2564)
+- Tests: `./wasm/test.sh test_async_promise_void_no_2355` (PASS). Known failures when running `./wasm/test.sh thin_checker_tests`: `test_abstract_class_through_type_alias_2511`, `test_abstract_class_union_type_2511` expecting 2511 vs 2564.
 - Stashed work: `enum_es5_tests.rs` was stashed (incomplete) when new assignment arrived
 - TS2355 status:
   - Fixed: throw-only functions (commit `3eea80b3d93`)
   - Fixed: infinite loops without break (commit `3eea80b3d93`)
   - Fixed: async Promise<void>/alias returns (commit `031b7f1ffe`)
+  - Covered: async PromiseLike<void>/alias returns (commit `9a40689eb0`)
   - Documented: never-returning calls limitation (test added, needs type integration for fix)
 - Merge work: Fixed binder.rs conflict and CallableShape missing fields from origin/rust merge
 - Next step: awaiting new assignment from EM
