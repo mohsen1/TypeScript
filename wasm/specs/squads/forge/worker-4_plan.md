@@ -77,16 +77,16 @@ Improve TS2322 assignability by tightening return-type compatibility and void/un
 - [x] Applied check_parameter_initializers to constructors, methods, accessors, functions
 
 ## Ready for Merge
-No
+Yes
 
 ## Notes
-- Progress: fixed mapped type param scope in missing-name checks; relaxed recursive generic type alias resolution to avoid TS2456 for DeepReadonly/DeepPartial; added mapped type param scope regression test; added TS2322 tests for union mismatch and intersection literal assignment; added TS2322 compound assignment checks (+=, &&=, ??=) to use assigned type for diagnostics.
-- Tests: `./wasm/test.sh compile_generic_utility_library_type_utilities`, `./wasm/test.sh mapped_type_parameter_scope_in_template`, `./wasm/test.sh contextual_typing_for_union_object_assignment_mismatch`, `./wasm/test.sh intersection_object_literal_assignment`, `./wasm/test.sh compound_assignment_plus_equals_assignability`, `./wasm/test.sh compound_assignment_logical_nullish_assignability`.
-- Commit format: `[wasm] checker: improve TS2322 assignability diagnostics`
+- Progress: fixed mapped type param scope in missing-name checks; relaxed recursive generic type alias resolution to avoid TS2456 for DeepReadonly/DeepPartial; added mapped type param scope regression test; added TS2322 tests for union mismatch and intersection literal assignment; added TS2322 compound assignment checks (+=, &&=, ??=) to use assigned type for diagnostics; added binding element default value TS2322 checks for destructuring patterns; fixed pre-existing compilation error in cli/driver.rs.
+- Tests: `./wasm/test.sh compile_generic_utility_library_type_utilities`, `./wasm/test.sh mapped_type_parameter_scope_in_template`, `./wasm/test.sh contextual_typing_for_union_object_assignment_mismatch`, `./wasm/test.sh intersection_object_literal_assignment`, `./wasm/test.sh compound_assignment_plus_equals_assignability`, `./wasm/test.sh compound_assignment_logical_nullish_assignability`, `./wasm/test.sh test_object_destructuring_assignability`, `./wasm/test.sh test_array_destructuring_assignability`, `./wasm/test.sh test_destructuring_with_default_values_assignability`, `./wasm/test.sh test_nested_destructuring_assignability`, `./wasm/test.sh test_destructuring_binding_element_default_value_mismatch`, `./wasm/test.sh test_binding_element_default_value_isolated_check`.
+- Commit format: `[wasm] checker: add TS2322 checks for destructuring binding element default values`
 - Push to: `origin/worker/forge-4`
 - **NEVER edit**: `STRUCTURE.md`, `GOALS.md`, other workers' plan files, or anything in `orchestrator/`
 
 ## Resume
-- Branch/state: `worker/forge-4`, local changes pending commit.
-- Session work: added TS2322 tests for union mismatch and intersection assignments; added TS2322 compound assignment coverage (+=, &&=, ??=) and adjusted diagnostics to use assigned type; audit ongoing.
+- Branch/state: `worker/forge-4`, changes ready for commit.
+- Session work: completed destructuring assignment TS2322 audit; found and fixed gap in binding element default value type checking; added 6 new tests; all tests passing; fixed cli/driver.rs compilation error.
 - Unit tests: `./wasm/test.sh compile_generic_utility_library_type_utilities`, `./wasm/test.sh mapped_type_parameter_scope_in_template`, `./wasm/test.sh contextual_typing_for_union_object_assignment_mismatch`, `./wasm/test.sh intersection_object_literal_assignment`, `./wasm/test.sh compound_assignment_plus_equals_assignability`, `./wasm/test.sh compound_assignment_logical_nullish_assignability`.

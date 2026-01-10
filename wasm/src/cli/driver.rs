@@ -2266,7 +2266,7 @@ fn collect_diagnostics(
             )
         };
         let mut resolved_modules = HashSet::new();
-        for specifier in collect_module_specifiers(&file.arena, file.source_file) {
+        for (specifier, _specifier_node) in collect_module_specifiers(&file.arena, file.source_file) {
             if let Some(resolved) = resolve_module_specifier(
                 Path::new(&file.file_name),
                 &specifier,
