@@ -30,9 +30,9 @@ Reduce remaining TS2339 false positives (non-control-flow cases).
 
 ## Resume Notes
 - Branch: `worker/forge-2`.
-- Latest commit: `[wasm] checker: support optional call chaining`
-- Recent changes: Re-applied static index signature collection after squad/forge merge; narrowed flow types on direct assignments to use assigned expression types; added TS2339 test covering assignment-based narrowing on unions; tracked resolved module specifiers in multi-file CLI diagnostics to avoid TS2792 for in-program imports; marked optional call expressions and stripped nullish callee types for optional chaining calls.
-- Last tests: `./wasm/test.sh compile_optional_chaining_with_call` (pass)
+- Latest commit: `[wasm] driver: adapt to collect_module_specifiers tuple return`
+- Recent changes: Merged origin/rust and origin/squad/forge; fixed driver.rs to handle collect_module_specifiers returning (String, NodeIndex) tuples; re-applied static index signature collection after squad/forge merge; narrowed flow types on direct assignments to use assigned expression types; added TS2339 test covering assignment-based narrowing on unions; tracked resolved module specifiers in multi-file CLI diagnostics to avoid TS2792 for in-program imports; marked optional call expressions and stripped nullish callee types for optional chaining calls.
+- Last tests: `./wasm/test.sh compile_optional_chaining_with_call` (pass), `./wasm/test.sh compile_object_spread` (pass)
 - **Latest TS2339 conformance scan results (1000 files):**
   - Extra (false positives): 0 files (was 3)
 - Conformance scan command: `cd wasm/differential-test && node find-ts2339.mjs --max=1000 --samples=20`
@@ -77,8 +77,8 @@ Reduce remaining TS2339 false positives (non-control-flow cases).
 No
 
 ## Notes
-- Full test run: failing in `cli::driver_tests::compile_object_spread` (TS2741).
-- Last run: `./wasm/test.sh compile_optional_chaining_with_call` (pass)
+- Full test run: all tests passing (compile_object_spread fixed by squad/forge merge).
+- Last run: `./wasm/test.sh compile_optional_chaining_with_call` (pass), `./wasm/test.sh compile_object_spread` (pass)
 - Last run: `cd wasm/differential-test && node find-ts2339.mjs --max=1000 --samples=20`
 - Commit format: `[wasm] checker: improve TS2339 property access diagnostics`
 - Push to: `origin/worker/forge-2`
