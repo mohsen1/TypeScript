@@ -6345,11 +6345,19 @@ impl ThinParserState {
             match self.token() {
                 SyntaxKind::DotToken => {
                     self.next_token();
+                    let diag_count_before = self.parse_diagnostics.len();
                     let name = if self.is_token(SyntaxKind::PrivateIdentifier) {
                         self.parse_private_identifier()
                     } else {
                         self.parse_identifier_name()
                     };
+
+                    // If parsing the name produced an error, don't create a property access
+                    // expression to avoid spurious semantic errors (e.g., TS2339 for incomplete `this.`)
+                    if self.parse_diagnostics.len() > diag_count_before {
+                        break;
+                    }
+
                     let end_pos = self.token_end();
 
                     expr = self.arena.add_access_expr(
