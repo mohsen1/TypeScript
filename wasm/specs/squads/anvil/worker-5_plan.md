@@ -7,7 +7,7 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-(Completed - TS2355 async Promise<void> false positives)
+(In progress - TS2769 overload matching)
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)
@@ -18,6 +18,7 @@ Priority: 5
 - [x] Fixed TS2355 false positives for throw-only functions. Added `falls_through` check to TS2355 condition for functions, methods, and getters. Functions that only throw no longer incorrectly trigger "must return a value". Added tests `test_throw_only_function_no_2355` and `test_infinite_loop_no_2355`. Commit: `3eea80b3d93`.
 - [x] Fixed TS2355 false positives for async `Promise<void>`/alias returns by unwrapping async return types before checking `requires_return_value`. Added `test_async_promise_void_no_2355`. Commit: `031b7f1ffe`.
 - [x] Expanded TS2355 async `Promise<void>` regression coverage to include `PromiseLike<void>` and aliases in `test_async_promise_void_no_2355`. Ran `./wasm/test.sh test_async_promise_void_no_2355` (PASS). Commit: `9a40689eb0`.
+- [x] Fixed tuple spread overload calls by reading spread expressions from unary-expr nodes and wiring parent links for spread/await/yield nodes. Added `test_overload_call_handles_tuple_spread_params`. Ran `./wasm/test.sh test_overload_call_handles_tuple_spread_params` (PASS). Commit: `c7d86a60c5`.
 - [x] Added block scoping tests for loop var collection and closure capture in `wasm/src/transforms/block_scoping_es5_tests.rs`; wired test module in `wasm/src/transforms/block_scoping_es5.rs`; `./wasm/test.sh block_scoping_es5_tests` failed (Docker socket EOF).
 - [x] Added await detection for array/object literal elements (computed names, spreads) in `wasm/src/transforms/async_es5.rs`; added computed object literal await test in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (PASS).
 - [x] Added computed-name async method expression test in `wasm/src/transforms/async_es5_tests.rs`; ran `./wasm/test.sh async_es5_tests` (PASS).
@@ -189,9 +190,9 @@ Yes
 
 ## Resume Notes
 - Branch: `worker/anvil-5`
-- Last commit: `9a40689eb0` (`[wasm] checker: cover async PromiseLike<void> TS2355`)
+- Last commit: `c7d86a60c5` (`[wasm] checker: fix spread tuple arg expansion`)
 - Docker: working
-- Tests: `./wasm/test.sh test_async_promise_void_no_2355` (PASS). Known failures when running `./wasm/test.sh thin_checker_tests`: `test_abstract_class_through_type_alias_2511`, `test_abstract_class_union_type_2511` expecting 2511 vs 2564.
+- Tests: `./wasm/test.sh test_overload_call_handles_tuple_spread_params` (PASS). Known failures when running `./wasm/test.sh thin_checker_tests`: `test_abstract_class_through_type_alias_2511`, `test_abstract_class_union_type_2511` expecting 2511 vs 2564.
 - Stashed work: `enum_es5_tests.rs` was stashed (incomplete) when new assignment arrived
 - TS2355 status:
   - Fixed: throw-only functions (commit `3eea80b3d93`)
@@ -199,16 +200,18 @@ Yes
   - Fixed: async Promise<void>/alias returns (commit `031b7f1ffe`)
   - Covered: async PromiseLike<void>/alias returns (commit `9a40689eb0`)
   - Documented: never-returning calls limitation (test added, needs type integration for fix)
+- TS2769 status:
+  - Fixed: spread tuple args now resolve in overload calls (commit `c7d86a60c5`)
+  - Conformance (`types/tuple --max=200 -v`): no delta in summary; extra TS2769 still reported in `contextualTypeTupleEnd.ts`, `partiallyNamedTuples.ts`, `restTupleElements1.ts`, `typeInferenceWithTupleType.ts`, `variadicTuples1.ts`, `variadicTuples2.ts`.
 - Merge work: Fixed binder.rs conflict and CallableShape missing fields from origin/rust merge
 - Next step: awaiting new assignment from EM
 
 ## TS2769 Overload Resolution Work (Latest)
 
 ### Progress
-- TS2769 false positives: 11 -> 10 occurrences
-- Implemented spread argument expansion for tuple types in `collect_call_argument_types_with_context`
-- Works for: `declare const t1: [number, string]; foo(...t1, true);`
-- Not yet working for: function parameters `function test(t1: [number, string]) { foo(...t1, true); }`
+- Implemented spread argument expansion for tuple types and corrected spread-element data access; added parent links for unary-expr nodes so spread identifiers resolve in scope.
+- Added regression `test_overload_call_handles_tuple_spread_params` to cover tuple spreads from parameters in overload calls.
+- Conformance (`types/tuple --max=200 -v`) summary unchanged after rebuild; extra TS2769 still present in variadic tuple and named tuple samples.
 
 ### Findings
 - Main issue: variadicTuples1.ts accounts for 10 of the TS2769 false positives
@@ -217,9 +220,9 @@ Yes
 - Further investigation needed on type resolution order for parameters
 
 ### Files Modified
-- `wasm/src/thin_checker.rs`: Added spread expansion in `collect_call_argument_types_with_context`
-- `wasm/src/solver/subtype.rs`: Fixed duplicate Application match arms
-- `wasm/src/lib.rs`: Fixed duplicate BindResult import
+- `wasm/src/thin_checker.rs`: Use unary-expr spread data for argument expansion and shared spread-expression helper; parameter cache now falls back to identifier node symbols.
+- `wasm/src/parser/thin_node.rs`: Set parent links for unary-expr nodes (spread/await/yield) so identifier scope resolution works.
+- `wasm/src/thin_checker_tests.rs`: Added tuple spread overload regression test.
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize emitter fidelity (ES5 downleveling/source maps) before new features.
