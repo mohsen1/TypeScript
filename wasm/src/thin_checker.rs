@@ -15,7 +15,7 @@
 //! Phase 7.5 integration - using solver type system for type checking.
 
 use crate::parser::NodeIndex;
-use crate::parser::thin_node::ThinNodeArena;
+use crate::parser::thin_node::{ThinNode, ThinNodeArena};
 use crate::parser::syntax_kind_ext;
 use crate::scanner::SyntaxKind;
 use crate::binder::{ContainerKind, ScopeId, SymbolId, symbol_flags};
@@ -193,7 +193,12 @@ impl<'a> ThinCheckerState<'a> {
                 continue;
             };
 
-            let Some(sym_id) = self.ctx.binder.get_node_symbol(param_idx) else {
+            let Some(sym_id) = self
+                .ctx
+                .binder
+                .get_node_symbol(param_idx)
+                .or_else(|| self.ctx.binder.get_node_symbol(param.name))
+            else {
                 continue;
             };
             self.push_symbol_dependency(sym_id, true);
@@ -4036,6 +4041,14 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    fn spread_element_expression(&self, node: &ThinNode) -> Option<NodeIndex> {
+        self.ctx
+            .arena
+            .get_spread(node)
+            .map(|spread| spread.expression)
+            .or_else(|| self.ctx.arena.get_unary_expr_ex(node).map(|unary| unary.expression))
+    }
+
     /// Get type of a symbol.
     pub fn get_type_of_symbol(&mut self, sym_id: SymbolId) -> TypeId {
         use crate::solver::SymbolRef;
@@ -4778,8 +4791,8 @@ impl<'a> ThinCheckerState<'a> {
         for &arg_idx in args.iter() {
             if let Some(arg_node) = self.ctx.arena.get(arg_idx) {
                 if arg_node.kind == syntax_kind_ext::SPREAD_ELEMENT {
-                    if let Some(spread_data) = self.ctx.arena.get_spread(arg_node) {
-                        let spread_type = self.get_type_of_node(spread_data.expression);
+                    if let Some(spread_expr) = self.spread_element_expression(arg_node) {
+                        let spread_type = self.get_type_of_node(spread_expr);
                         if let Some(TypeKey::Tuple(elems_id)) = self.ctx.types.lookup(spread_type) {
                             let elems = self.ctx.types.tuple_list(elems_id);
                             expanded_count += elems.len();
@@ -4798,8 +4811,8 @@ impl<'a> ThinCheckerState<'a> {
             if let Some(arg_node) = self.ctx.arena.get(arg_idx) {
                 // Handle spread elements specially - expand tuple types
                 if arg_node.kind == syntax_kind_ext::SPREAD_ELEMENT {
-                    if let Some(spread_data) = self.ctx.arena.get_spread(arg_node) {
-                        let spread_type = self.get_type_of_node(spread_data.expression);
+                    if let Some(spread_expr) = self.spread_element_expression(arg_node) {
+                        let spread_type = self.get_type_of_node(spread_expr);
 
                         // If it's a tuple type, expand its elements
                         if let Some(TypeKey::Tuple(elems_id)) = self.ctx.types.lookup(spread_type) {
@@ -11321,8 +11334,8 @@ impl<'a> ThinCheckerState<'a> {
                 k if k == syntax_kind_ext::SPREAD_ELEMENT
                     || k == syntax_kind_ext::SPREAD_ASSIGNMENT =>
                 {
-                    if let Some(spread) = self.ctx.arena.get_spread(node) {
-                        stack.push(spread.expression);
+                    if let Some(spread_expr) = self.spread_element_expression(node) {
+                        stack.push(spread_expr);
                     }
                 }
                 k if k == syntax_kind_ext::AS_EXPRESSION
