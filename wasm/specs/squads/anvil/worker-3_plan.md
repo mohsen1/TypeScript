@@ -215,9 +215,19 @@ Active
 - Resolved `import = require('module')` against ambient module exports
 - Added default `tests/lib/lib.d.ts` loading in conformance harness scripts
 
-Ready for Merge: No (merged 2026-01-09)
+Ready for Merge: Yes (2026-01-09)
 
 ## Current Task: TS2339 property access fixes (new assignment)
+
+### Update (2026-01-09)
+- Implemented mixin base instance extraction for heritage expressions and merged base properties (handles call-expression bases and type-parameter constructors).
+- Preserved callable index signatures in type literal/interface lowering and interface merge logic.
+- Added `test_mixin_inheritance_property_access` in `wasm/src/thin_checker_tests.rs`.
+- Build: `./wasm/build-wasm.sh` (warnings only).
+- Conformance `--max=200`: 2 Missing TS2339 lines:
+  - `ambient/ambientDeclarationsPatterns_merging3.ts`
+  - `async/es6/asyncWithVarShadowing_es6.ts` (Missing TS7031, TS2339)
+  - Prior pre-change scan showed 0 TS2339 lines (delta +2 missing; no extra TS2339 in first 200).
 
 ### Failing Samples (extra TS2339)
 Collected from `node wasm/differential-test/conformance-runner.mjs --max=1000 -v ... | awk ...`:
