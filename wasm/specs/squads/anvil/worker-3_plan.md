@@ -280,4 +280,8 @@ Ready for Merge: No (merged)
 - Conformance: `node wasm/differential-test/conformance-runner.mjs es6/templates --max=200 -v` (TS1160 no longer missing; extra TS1160 in `templateStringInPropertyName2` and `templateStringInPropertyNameES6_2`).
 - Test: `./wasm/test.sh test_thin_parser_unterminated_template_literal_reports_ts1160`.
 
+### Update (2026-01-10)
+- Larger crash sweep: `node wasm/differential-test/conformance-runner.mjs --max=1000` (993 tests run, 120 multi-file; WASM Crashed: 1).
+- Crashed file: `classes/members/privateNames/privateNamesInterfaceExtendingClass.ts` with `Maximum call stack size exceeded`.
+
 Ready for Merge: Yes (2026-01-10)
