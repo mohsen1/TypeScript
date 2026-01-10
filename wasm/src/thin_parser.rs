@@ -17,7 +17,7 @@
 use crate::scanner::SyntaxKind;
 use crate::scanner_impl::{ScannerState, TokenFlags};
 use crate::parser::{
-    NodeIndex, NodeList,
+    node_flags, NodeIndex, NodeList,
     thin_node::{
         ThinNodeArena, IdentifierData, LiteralData, BinaryExprData, CallExprData,
         AccessExprData, ConditionalExprData, LiteralExprData, ParenthesizedData,
@@ -5038,12 +5038,16 @@ impl ThinParserState {
                     );
                 }
                 SyntaxKind::OpenParenToken => {
+                    let callee_expr = expr;
                     self.next_token();
                     let arguments = self.parse_argument_list();
                     let end_pos = self.token_end();
                     self.parse_expected(SyntaxKind::CloseParenToken);
 
-                    expr = self.arena.add_call_expr(
+                    let is_optional_chain = self.arena.get(callee_expr)
+                        .and_then(|callee_node| self.arena.get_access_expr(callee_node))
+                        .is_some_and(|access| access.question_dot_token);
+                    let call_expr = self.arena.add_call_expr(
                         syntax_kind_ext::CALL_EXPRESSION,
                         start_pos,
                         end_pos,
@@ -5053,6 +5057,12 @@ impl ThinParserState {
                             arguments: Some(arguments),
                         },
                     );
+                    if is_optional_chain {
+                        if let Some(call_node) = self.arena.get_mut(call_expr) {
+                            call_node.flags |= node_flags::OPTIONAL_CHAIN as u16;
+                        }
+                    }
+                    expr = call_expr;
                 }
                 // Tagged template literals: tag`template` or tag`head${expr}tail`
                 SyntaxKind::NoSubstitutionTemplateLiteral | SyntaxKind::TemplateHead => {
@@ -5082,7 +5092,7 @@ impl ThinParserState {
                                 let end_pos = self.token_end();
                                 self.parse_expected(SyntaxKind::CloseParenToken);
 
-                                expr = self.arena.add_call_expr(
+                                let call_expr = self.arena.add_call_expr(
                                     syntax_kind_ext::CALL_EXPRESSION,
                                     start_pos,
                                     end_pos,
@@ -5092,6 +5102,10 @@ impl ThinParserState {
                                         arguments: Some(arguments),
                                     },
                                 );
+                                if let Some(call_node) = self.arena.get_mut(call_expr) {
+                                    call_node.flags |= node_flags::OPTIONAL_CHAIN as u16;
+                                }
+                                expr = call_expr;
                                 continue;
                             } else if self.is_token(SyntaxKind::NoSubstitutionTemplateLiteral)
                                 || self.is_token(SyntaxKind::TemplateHead)
@@ -5137,7 +5151,7 @@ impl ThinParserState {
                         let end_pos = self.token_end();
                         self.parse_expected(SyntaxKind::CloseParenToken);
 
-                        expr = self.arena.add_call_expr(
+                        let call_expr = self.arena.add_call_expr(
                             syntax_kind_ext::CALL_EXPRESSION,
                             start_pos,
                             end_pos,
@@ -5147,6 +5161,10 @@ impl ThinParserState {
                                 arguments: Some(arguments),
                             },
                         );
+                        if let Some(call_node) = self.arena.get_mut(call_expr) {
+                            call_node.flags |= node_flags::OPTIONAL_CHAIN as u16;
+                        }
+                        expr = call_expr;
                     } else {
                         // expr?.prop
                         let name = if self.is_token(SyntaxKind::PrivateIdentifier) {

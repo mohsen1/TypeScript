@@ -4778,6 +4778,7 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Get type of call expression.
     fn get_type_of_call_expression(&mut self, idx: NodeIndex) -> TypeId {
+        use crate::parser::node_flags;
         use crate::solver::{CallEvaluator, CallResult, CompatChecker, TypeKey};
 
         let Some(node) = self.ctx.arena.get(idx) else {
@@ -4789,11 +4790,24 @@ impl<'a> ThinCheckerState<'a> {
         };
 
         // Get the type of the callee
-        let callee_type = self.get_type_of_node(call.expression);
+        let mut callee_type = self.get_type_of_node(call.expression);
 
         // Check if callee is any/error (don't report for those)
         if callee_type == TypeId::ANY || callee_type == TypeId::ERROR {
             return TypeId::ANY;
+        }
+
+        let mut nullish_cause = None;
+        if (node.flags as u32) & node_flags::OPTIONAL_CHAIN != 0 {
+            let (non_nullish, cause) = self.split_nullish_type(callee_type);
+            nullish_cause = cause;
+            let Some(non_nullish) = non_nullish else {
+                return TypeId::UNDEFINED;
+            };
+            callee_type = non_nullish;
+            if callee_type == TypeId::ANY || callee_type == TypeId::ERROR {
+                return TypeId::ANY;
+            }
         }
 
         // Get arguments list (may be None for calls without arguments)
@@ -4814,7 +4828,13 @@ impl<'a> ThinCheckerState<'a> {
         // Overload candidates need signature-specific contextual typing.
         if let Some(signatures) = overload_signatures.as_deref() {
             if let Some(return_type) = self.resolve_overloaded_call_with_signatures(args, signatures) {
-                return self.apply_this_substitution_to_call_return(return_type, call.expression);
+                let return_type =
+                    self.apply_this_substitution_to_call_return(return_type, call.expression);
+                return if nullish_cause.is_some() {
+                    self.ctx.types.union(vec![return_type, TypeId::UNDEFINED])
+                } else {
+                    return_type
+                };
             }
         }
 
@@ -4835,7 +4855,13 @@ impl<'a> ThinCheckerState<'a> {
             CallResult::Success(return_type) => {
                 let return_type =
                     self.apply_this_substitution_to_call_return(return_type, call.expression);
-                self.refine_mixin_call_return_type(call.expression, &arg_types, return_type)
+                let return_type =
+                    self.refine_mixin_call_return_type(call.expression, &arg_types, return_type);
+                if nullish_cause.is_some() {
+                    self.ctx.types.union(vec![return_type, TypeId::UNDEFINED])
+                } else {
+                    return_type
+                }
             }
 
             CallResult::NotCallable { .. } => {
