@@ -13563,3 +13563,82 @@ class Derived extends Base {
         checker.ctx.diagnostics
     );
 }
+
+#[test]
+fn test_class_extends_constructor_expression_includes_base_props() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+interface Base {
+    x: number;
+    y: number;
+}
+
+interface BaseCtor {
+    new (value: number): Base;
+}
+
+declare function getBase(): BaseCtor;
+
+class Derived extends getBase() {
+    constructor() {
+        super(1);
+        this.x = 1;
+        this.y = 2;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2339),
+        "Should not emit TS2339 for base constructor properties, got errors: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_incomplete_property_access_no_ts2339() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Foo {
+    method() {
+        this.
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(
+        parser.get_diagnostics().iter().any(|d| d.code == 1003),
+        "Expected parse error TS1003 for missing identifier, got: {:?}",
+        parser.get_diagnostics()
+    );
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2339),
+        "Should not emit TS2339 after parse errors, got errors: {:?}",
+        checker.ctx.diagnostics
+    );
+}
