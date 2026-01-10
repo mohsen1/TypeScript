@@ -122,6 +122,7 @@ This requires control flow analysis to track variable state through branches.
 - [x] Fix `intersectionWithIndexSignatures` TS2339 — no longer extra TS2339 errors
 - [x] Flow assignment narrowing uses RHS node types (added control flow test)
 - [x] Private identifier property access falls back to class owner type (static private members)
+- [x] Assignment narrowing falls back to RHS literal/nullish types without node cache; updated flow tests
 
 ### Remaining TS2339 False Positives (pending re-run)
 - Mixin classes: mixin type inference issues (intersection handling added in new expressions, unit tests pass, conformance tests need more investigation)
@@ -143,3 +144,4 @@ Yes
 - TS2339 no longer in top 10 extra errors (was reduced from 35 to 20)
 - Remaining TS2339 issues pending re-run; likely mixins + assertion predicates
 - `get_type_from_type_operator` added for proper keyof/readonly/unique handling
+- Tests: `./wasm/test.sh control_flow_tests`, `./wasm/test.sh test_ts2339_`
