@@ -1262,6 +1262,16 @@ impl ScannerState {
     ///   false if this is a continuation after a `}` (middle or tail).
     fn scan_template_and_set_token_value(&mut self, started_with_backtick: bool) -> SyntaxKind {
         // Move past the opening character (backtick for head, } for middle/tail)
+        // Safety check: ensure we don't move past the end
+        if self.pos >= self.end {
+            self.token_flags |= TokenFlags::Unterminated as u32;
+            self.token_value = String::new();
+            return if started_with_backtick {
+                SyntaxKind::NoSubstitutionTemplateLiteral
+            } else {
+                SyntaxKind::TemplateTail
+            };
+        }
         self.pos += 1;
         let mut start = self.pos;
         let mut contents = String::new();
