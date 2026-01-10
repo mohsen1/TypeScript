@@ -390,58 +390,91 @@ impl<'a> FlowAnalyzer<'a> {
     }
 
     fn get_assigned_type(&self, assignment_node: NodeIndex, target: NodeIndex) -> Option<TypeId> {
-        let node_types = self.node_types?;
         let Some(node) = self.arena.get(assignment_node) else {
             return None;
         };
 
-        match node.kind {
-            k if k == syntax_kind_ext::BINARY_EXPRESSION => {
-                let bin = self.arena.get_binary_expr(node)?;
-                if !self.is_assignment_operator(bin.operator_token) {
-                    return None;
+        if let Some(rhs) = self.assignment_rhs_for_reference(assignment_node, target) {
+            if let Some(node_types) = self.node_types {
+                if let Some(&rhs_type) = node_types.get(&rhs.0) {
+                    return Some(rhs_type);
                 }
-                if !self.is_matching_reference(bin.left, target) {
-                    return None;
-                }
-                if bin.operator_token == SyntaxKind::EqualsToken as u16 {
-                    return node_types.get(&bin.right.0).copied();
-                }
-                None
             }
-            k if k == syntax_kind_ext::VARIABLE_DECLARATION => {
-                let decl = self.arena.get_variable_declaration(node)?;
-                if !self.is_matching_reference(decl.name, target) {
-                    return None;
-                }
-                if decl.initializer.is_none() {
-                    return None;
-                }
-                node_types.get(&decl.initializer.0).copied()
+            if let Some(literal_type) = self.literal_type_from_node(rhs) {
+                return Some(literal_type);
             }
-            k if k == syntax_kind_ext::VARIABLE_DECLARATION_LIST => {
-                let list = self.arena.get_variable(node)?;
+            if let Some(nullish_type) = self.nullish_literal_type(rhs) {
+                return Some(nullish_type);
+            }
+            return None;
+        }
+
+        if node.kind == syntax_kind_ext::PREFIX_UNARY_EXPRESSION
+            || node.kind == syntax_kind_ext::POSTFIX_UNARY_EXPRESSION
+        {
+            let unary = self.arena.get_unary_expr(node)?;
+            if (unary.operator == SyntaxKind::PlusPlusToken as u16
+                || unary.operator == SyntaxKind::MinusMinusToken as u16)
+                && self.is_matching_reference(unary.operand, target)
+            {
+                return Some(TypeId::NUMBER);
+            }
+        }
+
+        None
+    }
+
+    fn assignment_rhs_for_reference(
+        &self,
+        assignment_node: NodeIndex,
+        reference: NodeIndex,
+    ) -> Option<NodeIndex> {
+        let Some(node) = self.arena.get(assignment_node) else {
+            return None;
+        };
+
+        if node.kind == syntax_kind_ext::BINARY_EXPRESSION {
+            let bin = self.arena.get_binary_expr(node)?;
+            if bin.operator_token == SyntaxKind::EqualsToken as u16
+                && self.is_matching_reference(bin.left, reference)
+            {
+                return Some(bin.right);
+            }
+            return None;
+        }
+
+        if node.kind == syntax_kind_ext::VARIABLE_DECLARATION {
+            let decl = self.arena.get_variable_declaration(node)?;
+            if self.is_matching_reference(decl.name, reference) && !decl.initializer.is_none() {
+                return Some(decl.initializer);
+            }
+            return None;
+        }
+
+        if node.kind == syntax_kind_ext::VARIABLE_DECLARATION_LIST
+            || node.kind == syntax_kind_ext::VARIABLE_STATEMENT
+        {
+            if let Some(list) = self.arena.get_variable(node) {
                 for &decl_idx in &list.declarations.nodes {
-                    if let Some(assigned) = self.get_assigned_type(decl_idx, target) {
-                        return Some(assigned);
+                    let Some(decl_node) = self.arena.get(decl_idx) else {
+                        continue;
+                    };
+                    if decl_node.kind != syntax_kind_ext::VARIABLE_DECLARATION {
+                        continue;
+                    }
+                    let Some(decl) = self.arena.get_variable_declaration(decl_node) else {
+                        continue;
+                    };
+                    if self.is_matching_reference(decl.name, reference)
+                        && !decl.initializer.is_none()
+                    {
+                        return Some(decl.initializer);
                     }
                 }
-                None
             }
-            k if k == syntax_kind_ext::PREFIX_UNARY_EXPRESSION
-                || k == syntax_kind_ext::POSTFIX_UNARY_EXPRESSION =>
-            {
-                let unary = self.arena.get_unary_expr(node)?;
-                if (unary.operator == SyntaxKind::PlusPlusToken as u16
-                    || unary.operator == SyntaxKind::MinusMinusToken as u16)
-                    && self.is_matching_reference(unary.operand, target)
-                {
-                    return Some(TypeId::NUMBER);
-                }
-                None
-            }
-            _ => None,
         }
+
+        None
     }
 
     fn assignment_affects_reference_node(
@@ -1918,6 +1951,22 @@ impl<'a> FlowAnalyzer<'a> {
 
     /// Check if two references point to the same symbol or property access chain.
     fn is_matching_reference(&self, a: NodeIndex, b: NodeIndex) -> bool {
+        let a = self.skip_parenthesized(a);
+        let b = self.skip_parenthesized(b);
+
+        if let (Some(node_a), Some(node_b)) = (self.arena.get(a), self.arena.get(b)) {
+            if node_a.kind == SyntaxKind::ThisKeyword as u16
+                && node_b.kind == SyntaxKind::ThisKeyword as u16
+            {
+                return true;
+            }
+            if node_a.kind == SyntaxKind::SuperKeyword as u16
+                && node_b.kind == SyntaxKind::SuperKeyword as u16
+            {
+                return true;
+            }
+        }
+
         let sym_a = self.reference_symbol(a);
         let sym_b = self.reference_symbol(b);
         if sym_a.is_some() && sym_a == sym_b {
