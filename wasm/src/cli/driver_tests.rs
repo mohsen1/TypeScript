@@ -3502,6 +3502,15 @@ declare const Object: {
     keys(o: object): string[];
 };
 
+// Declare built-in utility types
+type Readonly<T> = {
+    readonly [P in keyof T]: T[P];
+};
+
+type Partial<T> = {
+    [P in keyof T]?: T[P];
+};
+
 // Type-level utilities (erased at runtime)
 export type DeepReadonly<T> = {
     readonly [P in keyof T]: T[P] extends object ? Readonly<T[P]> : T[P];
@@ -3538,6 +3547,15 @@ export function isNonNull<T>(value: T | null | undefined): value is T {
 
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
+
+    // Debug: print any diagnostics found
+    if !result.diagnostics.is_empty() {
+        eprintln!("\n=== DIAGNOSTICS FOUND ===");
+        for diag in &result.diagnostics {
+            eprintln!("  TS{}: {} (at {}:{})", diag.code, diag.message_text, diag.file, diag.start);
+        }
+        eprintln!("=========================\n");
+    }
 
     assert!(result.diagnostics.is_empty(), "Should compile without errors");
     assert!(base.join("dist/src/types.js").is_file(), "JS output should exist");

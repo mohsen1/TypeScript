@@ -48,7 +48,7 @@ export interface ConfigInput {
 const DEFAULT_SESSION = 'zang-org';
 
 const DEFAULT_IDLE_THRESHOLDS: IdleThresholds = {
-  director: 600,  // 10 minutes - Director is hands-off
+  director: 60,   // 1 minute - Director should stay active monitoring squad branches
   em: 120,        // 2 minutes - EMs should be responsive but not spammed
   worker: 600,    // 10 minutes - Workers can be deep in debugging for 30-60+ min
                   // Note: Smart detection will avoid poking workers showing active work
