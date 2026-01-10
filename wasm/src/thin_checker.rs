@@ -2364,7 +2364,16 @@ impl<'a> ThinCheckerState<'a> {
                             let (params, updates) = self.push_type_parameters(&base_class.type_parameters);
                             base_type_params = params;
                             base_param_updates = updates;
-                            base_type = Some(self.get_class_instance_type(base_decl_idx, base_class));
+
+                            // Guard against recursion when interface extends class
+                            if !self.ctx.class_instance_resolution_set.insert(base_sym_id) {
+                                // Recursion detected; use a type reference fallback
+                                use crate::solver::{TypeKey, SymbolRef};
+                                base_type = Some(self.ctx.types.intern(TypeKey::Ref(SymbolRef(base_sym_id.0))));
+                            } else {
+                                base_type = Some(self.get_class_instance_type(base_decl_idx, base_class));
+                                self.ctx.class_instance_resolution_set.remove(&base_sym_id);
+                            }
                             break;
                         }
                     }
@@ -2386,7 +2395,16 @@ impl<'a> ThinCheckerState<'a> {
                                 let (params, updates) = self.push_type_parameters(&base_class.type_parameters);
                                 base_type_params = params;
                                 base_param_updates = updates;
-                                base_type = Some(self.get_class_instance_type(base_decl_idx, base_class));
+
+                                // Guard against recursion when interface extends class
+                                if !self.ctx.class_instance_resolution_set.insert(base_sym_id) {
+                                    // Recursion detected; use a type reference fallback
+                                    use crate::solver::{TypeKey, SymbolRef};
+                                    base_type = Some(self.ctx.types.intern(TypeKey::Ref(SymbolRef(base_sym_id.0))));
+                                } else {
+                                    base_type = Some(self.get_class_instance_type(base_decl_idx, base_class));
+                                    self.ctx.class_instance_resolution_set.remove(&base_sym_id);
+                                }
                             }
                         }
                     }
