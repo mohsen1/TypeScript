@@ -6860,6 +6860,15 @@ impl<'a> ThinCheckerState<'a> {
             if elem_idx.is_none() {
                 continue;
             }
+            let Some(elem_node) = self.ctx.arena.get(elem_idx) else {
+                continue;
+            };
+            let is_spread = elem_node.kind == syntax_kind_ext::SPREAD_ELEMENT;
+            let elem_type_idx = if tuple_context.is_some() && is_spread {
+                self.spread_element_expression(elem_node).unwrap_or(elem_idx)
+            } else {
+                elem_idx
+            };
 
             let prev_context = self.ctx.contextual_type;
             if let Some(ref helper) = ctx_helper {
@@ -6870,12 +6879,12 @@ impl<'a> ThinCheckerState<'a> {
                 }
             }
 
-            let elem_type = self.get_type_of_node(elem_idx);
+            let elem_type = self.get_type_of_node(elem_type_idx);
 
             self.ctx.contextual_type = prev_context;
 
             if let Some(ref expected) = tuple_context {
-                let (name, optional, rest) = match expected.get(index) {
+                let (name, optional, _rest) = match expected.get(index) {
                     Some(el) => (el.name, el.optional, el.rest),
                     None => {
                         if let Some(last) = expected.last() {
@@ -6893,7 +6902,7 @@ impl<'a> ThinCheckerState<'a> {
                     type_id: elem_type,
                     name,
                     optional,
-                    rest,
+                    rest: is_spread,
                 });
             } else {
                 element_types.push(elem_type);
