@@ -6207,6 +6207,33 @@ impl ThinParserState {
             return self.parse_object_method(start_pos, false, true);
         }
 
+        if self.is_token(SyntaxKind::NoSubstitutionTemplateLiteral)
+            || self.is_token(SyntaxKind::TemplateHead)
+        {
+            use crate::checker::types::diagnostics::diagnostic_codes;
+            self.parse_error_at_current_token(
+                "Property assignment expected.",
+                diagnostic_codes::PROPERTY_ASSIGNMENT_EXPECTED,
+            );
+            let name = self.parse_template_literal();
+            let initializer = if self.parse_optional(SyntaxKind::ColonToken) {
+                self.parse_assignment_expression()
+            } else {
+                name
+            };
+            let end_pos = self.token_end();
+            return self.arena.add_property_assignment(
+                syntax_kind_ext::PROPERTY_ASSIGNMENT,
+                start_pos,
+                end_pos,
+                crate::parser::thin_node::PropertyAssignmentData {
+                    modifiers: None,
+                    name,
+                    initializer,
+                },
+            );
+        }
+
         let name = self.parse_property_name();
 
         // Handle method: foo() { } or foo<T>() { }

@@ -284,4 +284,12 @@ Ready for Merge: No (merged)
 - Larger crash sweep: `node wasm/differential-test/conformance-runner.mjs --max=1000` (993 tests run, 120 multi-file; WASM Crashed: 1).
 - Crashed file: `classes/members/privateNames/privateNamesInterfaceExtendingClass.ts` with `Maximum call stack size exceeded`.
 
+### Update (2026-01-10)
+- Root cause: template literal property names were parsed as identifiers, leaving the closing backtick to be scanned as a new unterminated template literal (extra TS1160).
+- Fix: in object literal property assignment, emit TS1136 and consume template literals as property names to keep the scanner in sync.
+- Added `test_thin_parser_template_literal_property_name_no_ts1160` in `wasm/src/thin_parser_tests.rs`.
+- Build: `./wasm/build-wasm.sh` (warnings only).
+- Conformance: `node wasm/differential-test/conformance-runner.mjs es6/templates --max=200 -v` (extra TS1160 removed; extra errors down to 13).
+- Test: `./wasm/test.sh test_thin_parser_template_literal_property_name_no_ts1160`.
+
 Ready for Merge: Yes (2026-01-10)
