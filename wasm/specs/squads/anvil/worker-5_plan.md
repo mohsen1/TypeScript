@@ -202,7 +202,7 @@ Yes
   - Documented: never-returning calls limitation (test added, needs type integration for fix)
 - TS2769 status:
   - Fixed: spread tuple args now resolve in overload calls (commit `c7d86a60c5`)
-  - Conformance (`types/tuple --max=200 -v`): no delta in summary; extra TS2769 still reported in `contextualTypeTupleEnd.ts`, `partiallyNamedTuples.ts`, `restTupleElements1.ts`, `typeInferenceWithTupleType.ts`, `variadicTuples1.ts`, `variadicTuples2.ts`.
+  - Conformance (`types/tuple --max=200 -v`): Files Found 34; Exact Match 8 (23.5%); Same Error Count 8 (23.5%); Missing errors 23 (67.6%); Extra errors 13 (38.2%). Extra TS2769 in `contextualTypeTupleEnd.ts`, `partiallyNamedTuples.ts`, `restTupleElements1.ts`, `typeInferenceWithTupleType.ts`, `variadicTuples1.ts`, `variadicTuples2.ts` (no delta vs previous run).
 - Merge work: Fixed binder.rs conflict and CallableShape missing fields from origin/rust merge
 - Next step: awaiting new assignment from EM
 
@@ -211,13 +211,12 @@ Yes
 ### Progress
 - Implemented spread argument expansion for tuple types and corrected spread-element data access; added parent links for unary-expr nodes so spread identifiers resolve in scope.
 - Added regression `test_overload_call_handles_tuple_spread_params` to cover tuple spreads from parameters in overload calls.
-- Conformance (`types/tuple --max=200 -v`) summary unchanged after rebuild; extra TS2769 still present in variadic tuple and named tuple samples.
+- Conformance audit (`types/tuple --max=200 -v`): Files Found 34; Exact Match 8 (23.5%); Same Error Count 8 (23.5%); Missing errors 23 (67.6%); Extra errors 13 (38.2%); TS2769 extras in `contextualTypeTupleEnd.ts`, `partiallyNamedTuples.ts`, `restTupleElements1.ts`, `typeInferenceWithTupleType.ts`, `variadicTuples1.ts`, `variadicTuples2.ts`.
 
 ### Findings
-- Main issue: variadicTuples1.ts accounts for 10 of the TS2769 false positives
-- Root cause for function params: parameter types may not be cached as direct Tuple types when checked
-- The `cache_parameter_types` function should cache param types before body checking
-- Further investigation needed on type resolution order for parameters
+- Extra TS2769 tends to co-occur with parser-level extras (TS1005/TS1109/TS2304) in tuple/named tuple suites, suggesting cascade from unsupported syntax.
+- Variadic tuple samples (`variadicTuples1.ts`, `variadicTuples2.ts`) still produce extra TS2769; likely tied to overload resolution with rest/variadic tuple inference.
+- Parameter tuple handling may still be brittle in overload matching; review `cache_parameter_types` and argument inference ordering.
 
 ### Files Modified
 - `wasm/src/thin_checker.rs`: Use unary-expr spread data for argument expansion and shared spread-expression helper; parameter cache now falls back to identifier node symbols.
