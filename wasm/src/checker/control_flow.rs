@@ -21,7 +21,7 @@
 use crate::binder::{FlowNode, FlowNodeId, flow_flags, symbol_flags, SymbolId};
 use crate::interner::Atom;
 use crate::parser::thin_node::{BinaryExprData, CallExprData, ThinNodeArena};
-use crate::parser::{NodeIndex, syntax_kind_ext};
+use crate::parser::{NodeIndex, node_flags, syntax_kind_ext};
 use crate::scanner::SyntaxKind;
 use crate::solver::{LiteralValue, ParamInfo, TypeId, TypeInterner, TypeKey, TypePredicate, TypePredicateTarget, NarrowingContext};
 use crate::thin_binder::ThinBinderState;
@@ -695,6 +695,24 @@ impl<'a> FlowAnalyzer<'a> {
         target: NodeIndex,
         is_true_branch: bool,
     ) -> TypeId {
+        let mut visited_aliases = Vec::new();
+        self.narrow_type_by_condition_inner(
+            type_id,
+            condition_idx,
+            target,
+            is_true_branch,
+            &mut visited_aliases,
+        )
+    }
+
+    fn narrow_type_by_condition_inner(
+        &self,
+        type_id: TypeId,
+        condition_idx: NodeIndex,
+        target: NodeIndex,
+        is_true_branch: bool,
+        visited_aliases: &mut Vec<SymbolId>,
+    ) -> TypeId {
         let condition_idx = self.skip_parenthesized(condition_idx);
         let Some(cond_node) = self.arena.get(condition_idx) else {
             return type_id;
@@ -702,11 +720,34 @@ impl<'a> FlowAnalyzer<'a> {
 
         let narrowing = NarrowingContext::new(self.interner);
 
+        if cond_node.kind == SyntaxKind::Identifier as u16 {
+            if let Some((sym_id, initializer)) = self.const_condition_initializer(condition_idx) {
+                if !visited_aliases.contains(&sym_id) {
+                    visited_aliases.push(sym_id);
+                    let narrowed = self.narrow_type_by_condition_inner(
+                        type_id,
+                        initializer,
+                        target,
+                        is_true_branch,
+                        visited_aliases,
+                    );
+                    visited_aliases.pop();
+                    return narrowed;
+                }
+            }
+        }
+
         match cond_node.kind {
             // typeof x === "string"
             k if k == syntax_kind_ext::BINARY_EXPRESSION => {
                 if let Some(bin) = self.arena.get_binary_expr(cond_node) {
-                    if let Some(narrowed) = self.narrow_by_logical_expr(type_id, bin, target, is_true_branch) {
+                    if let Some(narrowed) = self.narrow_by_logical_expr(
+                        type_id,
+                        bin,
+                        target,
+                        is_true_branch,
+                        visited_aliases,
+                    ) {
                         return narrowed;
                     }
                     return self.narrow_by_binary_expr(type_id, bin, target, is_true_branch, &narrowing);
@@ -718,7 +759,13 @@ impl<'a> FlowAnalyzer<'a> {
                 if let Some(unary) = self.arena.get_unary_expr(cond_node) {
                     // !x inverts the narrowing
                     if unary.operator == SyntaxKind::ExclamationToken as u16 {
-                        return self.narrow_type_by_condition(type_id, unary.operand, target, !is_true_branch);
+                        return self.narrow_type_by_condition_inner(
+                            type_id,
+                            unary.operand,
+                            target,
+                            !is_true_branch,
+                            visited_aliases,
+                        );
                     }
                 }
             }
@@ -746,6 +793,55 @@ impl<'a> FlowAnalyzer<'a> {
         }
 
         type_id
+    }
+
+    fn const_condition_initializer(&self, ident_idx: NodeIndex) -> Option<(SymbolId, NodeIndex)> {
+        let sym_id = self.binder.resolve_identifier(self.arena, ident_idx)?;
+        let symbol = self.binder.get_symbol(sym_id)?;
+        if (symbol.flags & symbol_flags::BLOCK_SCOPED_VARIABLE) == 0 {
+            return None;
+        }
+        let decl_idx = if !symbol.value_declaration.is_none() {
+            symbol.value_declaration
+        } else {
+            *symbol.declarations.first()?
+        };
+        let decl_node = self.arena.get(decl_idx)?;
+        if decl_node.kind != syntax_kind_ext::VARIABLE_DECLARATION {
+            return None;
+        }
+        if !self.is_const_variable_declaration(decl_idx) {
+            return None;
+        }
+        let decl = self.arena.get_variable_declaration(decl_node)?;
+        if decl.initializer.is_none() {
+            return None;
+        }
+        Some((sym_id, decl.initializer))
+    }
+
+    fn is_const_variable_declaration(&self, decl_idx: NodeIndex) -> bool {
+        let Some(decl_node) = self.arena.get(decl_idx) else {
+            return false;
+        };
+        let mut flags = decl_node.flags as u32;
+        if (flags & (node_flags::LET | node_flags::CONST)) == 0 {
+            let Some(ext) = self.arena.get_extended(decl_idx) else {
+                return false;
+            };
+            let parent_idx = ext.parent;
+            if parent_idx.is_none() {
+                return false;
+            }
+            let Some(parent_node) = self.arena.get(parent_idx) else {
+                return false;
+            };
+            if parent_node.kind != syntax_kind_ext::VARIABLE_DECLARATION_LIST {
+                return false;
+            }
+            flags |= parent_node.flags as u32;
+        }
+        (flags & node_flags::CONST) != 0
     }
 
     /// Narrow type based on a binary expression (===, !==, typeof checks, etc.)
@@ -833,32 +929,93 @@ impl<'a> FlowAnalyzer<'a> {
         bin: &crate::parser::thin_node::BinaryExprData,
         target: NodeIndex,
         is_true_branch: bool,
+        visited_aliases: &mut Vec<SymbolId>,
     ) -> Option<TypeId> {
         let operator = bin.operator_token;
 
         if operator == SyntaxKind::AmpersandAmpersandToken as u16 {
             if is_true_branch {
-                let left_true = self.narrow_type_by_condition(type_id, bin.left, target, true);
-                let right_true = self.narrow_type_by_condition(left_true, bin.right, target, true);
+                let left_true = self.narrow_type_by_condition_inner(
+                    type_id,
+                    bin.left,
+                    target,
+                    true,
+                    visited_aliases,
+                );
+                let right_true = self.narrow_type_by_condition_inner(
+                    left_true,
+                    bin.right,
+                    target,
+                    true,
+                    visited_aliases,
+                );
                 return Some(right_true);
             }
 
-            let left_false = self.narrow_type_by_condition(type_id, bin.left, target, false);
-            let left_true = self.narrow_type_by_condition(type_id, bin.left, target, true);
-            let right_false = self.narrow_type_by_condition(left_true, bin.right, target, false);
+            let left_false = self.narrow_type_by_condition_inner(
+                type_id,
+                bin.left,
+                target,
+                false,
+                visited_aliases,
+            );
+            let left_true = self.narrow_type_by_condition_inner(
+                type_id,
+                bin.left,
+                target,
+                true,
+                visited_aliases,
+            );
+            let right_false = self.narrow_type_by_condition_inner(
+                left_true,
+                bin.right,
+                target,
+                false,
+                visited_aliases,
+            );
             return Some(self.union_types(left_false, right_false));
         }
 
         if operator == SyntaxKind::BarBarToken as u16 {
             if is_true_branch {
-                let left_true = self.narrow_type_by_condition(type_id, bin.left, target, true);
-                let left_false = self.narrow_type_by_condition(type_id, bin.left, target, false);
-                let right_true = self.narrow_type_by_condition(left_false, bin.right, target, true);
+                let left_true = self.narrow_type_by_condition_inner(
+                    type_id,
+                    bin.left,
+                    target,
+                    true,
+                    visited_aliases,
+                );
+                let left_false = self.narrow_type_by_condition_inner(
+                    type_id,
+                    bin.left,
+                    target,
+                    false,
+                    visited_aliases,
+                );
+                let right_true = self.narrow_type_by_condition_inner(
+                    left_false,
+                    bin.right,
+                    target,
+                    true,
+                    visited_aliases,
+                );
                 return Some(self.union_types(left_true, right_true));
             }
 
-            let left_false = self.narrow_type_by_condition(type_id, bin.left, target, false);
-            let right_false = self.narrow_type_by_condition(left_false, bin.right, target, false);
+            let left_false = self.narrow_type_by_condition_inner(
+                type_id,
+                bin.left,
+                target,
+                false,
+                visited_aliases,
+            );
+            let right_false = self.narrow_type_by_condition_inner(
+                left_false,
+                bin.right,
+                target,
+                false,
+                visited_aliases,
+            );
             return Some(right_false);
         }
 
