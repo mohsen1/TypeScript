@@ -1,32 +1,31 @@
 # Worker 1 Plan - Squad Forge
 
 ## Mission
-Implement TS2454 variable used before assigned diagnostics.
+Implement TS2792 module resolution diagnostics.
 
 Status: Active
 Priority: 1
 
 ## Current Assignment
-Enhance TS2564 "Property X has no initializer and is not definitely assigned in constructor" error coverage.
+TS2792 module resolution: missing relative vs package imports.
 
-**Error Code:** TS2564 - "Property has no initializer and is not definitely assigned in constructor"
-
-**Impact:** 443 conformance tests affected
+**Error Code:** TS2792 - "Cannot find module '{0}' or its corresponding type declarations."
 
 ### Steps
-1. **Review existing implementation** - check_property_initialization in thin_checker.rs
-2. **Identify missing edge cases** from conformance test failures
-3. **Handle additional cases** (parameter properties, nested assignments, etc.)
-4. **Run conformance tests** and report delta.
+1. **Review existing implementation** - check_import_declaration in thin_checker.rs
+2. **Track ambient module declarations** in thin_binder.rs
+3. **Emit 2307 vs 2792** based on relative vs package specifiers
+4. **Add tests** for missing relative/package imports and run `./wasm/test.sh`.
 
 ### Key Files
+- `wasm/src/thin_binder.rs`
 - `wasm/src/thin_checker.rs`
 - `wasm/src/thin_checker_tests.rs`
 
 ### Success Criteria
-- TS2564 emitted correctly for all uninitialized properties
-- Constructor assignment tracking handles all control flow patterns
-- No false positives for properly initialized properties
+- Missing relative imports emit TS2307
+- Missing package imports emit TS2792
+- Ambient module declarations skip module-not-found errors
 
 ## Task Queue
 (empty - single focused task)
@@ -49,6 +48,7 @@ Enhance TS2564 "Property X has no initializer and is not definitely assigned in 
 - **TS2454 implementation complete**: Fixed `get_type_of_call_expression` to process arguments even when callee is `any`. Added 7 tests covering basic cases and conditional branches (all passing).
 - **TS2564 implementation enhanced**: Added 4 more edge case tests (parameter properties, conditional constructor assignments, derived classes with super). Total 11 tests passing.
 - Added TS2564 tracking for string/numeric literal property names and element-access assignments; added 3 tests.
+- Implemented TS2792 module resolution split (2307 for relative, 2792 for package) and ambient module tracking; added missing import tests. `./wasm/test.sh` failed at `cli::driver_tests::compile_generic_utility_library_type_utilities`.
 
 ## Ready for Merge
 Yes
@@ -70,4 +70,5 @@ Yes
   - Handles: optional, initializers, definite assertion (!), static, parameter properties
   - Constructor assignment tracking with control flow (if/else, derived class super)
 - TS2564 literal property coverage: element access + string/numeric literal property names; `./wasm/test.sh ts2564` passing.
+- TS2792 module resolution: ambient module tracking + missing import tests; `./wasm/test.sh` fails at `cli::driver_tests::compile_generic_utility_library_type_utilities`.
 - Conformance tests: Docker runner has path issue (lib.d.ts not copied), skipped for now.

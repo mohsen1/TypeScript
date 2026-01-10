@@ -6661,6 +6661,74 @@ Foo;
 }
 
 #[test]
+fn test_missing_relative_import_emits_2307() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+import { Foo } from "./missing";
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let missing_count = codes.iter().filter(|&&code| code == diagnostic_codes::MODULE_NOT_FOUND).count();
+    assert_eq!(
+        missing_count,
+        1,
+        "Expected TS2307 for missing relative import, got: {:?}",
+        codes
+    );
+    assert!(
+        !codes.contains(&diagnostic_codes::CANNOT_FIND_MODULE),
+        "Expected no TS2792 for missing relative import, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_missing_package_import_emits_2792() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+import { Foo } from "missing-package";
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let missing_count = codes.iter().filter(|&&code| code == diagnostic_codes::CANNOT_FIND_MODULE).count();
+    assert_eq!(
+        missing_count,
+        1,
+        "Expected TS2792 for missing package import, got: {:?}",
+        codes
+    );
+    assert!(
+        !codes.contains(&diagnostic_codes::MODULE_NOT_FOUND),
+        "Expected no TS2307 for missing package import, got: {:?}",
+        codes
+    );
+}
+
+#[test]
 fn test_numeric_enum_open_and_nominal_assignability() {
     use crate::thin_parser::ThinParserState;
 

@@ -10410,18 +10410,23 @@ impl<'a> ThinCheckerState<'a> {
 
         let module_name = &literal.text;
 
+        if self.ctx.binder.declared_modules.contains(module_name) {
+            return;
+        }
+
         // In single-file mode, any external import is considered unresolved.
         // This is correct because WASM checker operates on individual files
-        // without access to the module graph or ambient module declarations.
+        // without access to the module graph (aside from ambient module declarations).
         let message = format_message(
             diagnostic_messages::CANNOT_FIND_MODULE,
             &[module_name],
         );
-        self.error_at_node(
-            import.module_specifier,
-            &message,
-            diagnostic_codes::CANNOT_FIND_MODULE,
-        );
+        let code = if module_name.starts_with('.') || module_name.starts_with('/') {
+            diagnostic_codes::MODULE_NOT_FOUND
+        } else {
+            diagnostic_codes::CANNOT_FIND_MODULE
+        };
+        self.error_at_node(import.module_specifier, &message, code);
     }
 
     /// Check heritage clauses (extends/implements) for unresolved names.
