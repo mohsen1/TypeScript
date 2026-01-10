@@ -328,6 +328,7 @@ impl ScannerState {
         self.token_flags = 0;
         self.token_invalid_separator_pos = None;
         self.token_invalid_separator_is_consecutive = false;
+        self.token_value.clear();
         self.token_atom = Atom::NONE; // Reset atom for non-identifier tokens
 
         loop {
