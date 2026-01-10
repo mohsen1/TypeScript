@@ -1454,6 +1454,7 @@ impl ThinNodeArena {
         self.set_parent(when_false, parent);
         parent
     }
+
     /// Add an object/array literal expression node
     pub fn add_literal_expr(&mut self, kind: u16, pos: u32, end: u32, data: LiteralExprData) -> NodeIndex {
         let elements = data.elements.clone();
