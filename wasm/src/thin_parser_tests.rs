@@ -341,6 +341,20 @@ fn test_thin_parser_template_expression_spans() {
 }
 
 #[test]
+fn test_thin_parser_unterminated_template_expression_no_crash() {
+    let source = "var v = `foo ${ a";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    assert!(!root.is_none());
+    assert!(
+        parser.get_diagnostics().iter().any(|diag| diag.code == diagnostic_codes::TOKEN_EXPECTED),
+        "Expected a token expected diagnostic, got: {:?}",
+        parser.get_diagnostics()
+    );
+}
+
+#[test]
 fn test_thin_parser_call_expression() {
     let mut parser = ThinParserState::new(
         "test.ts".to_string(),

@@ -1939,6 +1939,10 @@ impl ThinParserState {
         let mut expr = if self.is_token(SyntaxKind::ClassKeyword) {
             // Inline class expression in extends clause: class extends class Expr {} {...}
             self.parse_class_expression()
+        } else if self.is_token(SyntaxKind::OpenParenToken) {
+            self.parse_parenthesized_expression()
+        } else if self.is_token(SyntaxKind::NewKeyword) {
+            self.parse_new_expression()
         } else if self.is_identifier_or_keyword() {
             self.parse_identifier_name()
         } else {
@@ -5150,8 +5154,11 @@ impl ThinParserState {
                     // Handle both regular identifiers and private identifiers (#name)
                     let name = if self.is_token(SyntaxKind::PrivateIdentifier) {
                         self.parse_private_identifier()
-                    } else {
+                    } else if self.is_identifier_or_keyword() {
                         self.parse_identifier_name()
+                    } else {
+                        self.error_identifier_expected();
+                        NodeIndex::NONE
                     };
                     let end_pos = self.token_end();
 
@@ -5947,6 +5954,28 @@ impl ThinParserState {
             // Parse expression in ${ }
             let expression = self.parse_expression();
 
+            if !self.is_token(SyntaxKind::CloseBraceToken) {
+                // Unterminated template expression - report and synthesize tail to avoid looping.
+                self.error_token_expected("}");
+                let literal_start = self.token_pos();
+                let literal_end = self.token_end();
+                let literal = self.arena.add_literal(
+                    SyntaxKind::TemplateTail as u16,
+                    literal_start,
+                    literal_end,
+                    LiteralData { text: String::new(), raw_text: None, value: None },
+                );
+                let span_start = self.arena.get(expression).map(|node| node.pos).unwrap_or(literal_start);
+                let span = self.arena.add_template_span(
+                    syntax_kind_ext::TEMPLATE_SPAN,
+                    span_start,
+                    literal_end,
+                    TemplateSpanData { expression, literal },
+                );
+                spans.push(span);
+                break literal_end;
+            }
+
             // Now we need to rescan the } as a template continuation
             // The scanner needs to be told to rescan as template
             self.scanner.re_scan_template_token(false);
@@ -5954,13 +5983,31 @@ impl ThinParserState {
 
             // Parse template middle or tail
             let literal_start = self.token_pos();
-            let literal_text = self.scanner.get_token_value_ref().to_string();
             let is_tail = self.is_token(SyntaxKind::TemplateTail);
-            let literal_kind = if is_tail {
-                SyntaxKind::TemplateTail
-            } else {
-                SyntaxKind::TemplateMiddle
-            };
+            let is_middle = self.is_token(SyntaxKind::TemplateMiddle);
+            if !is_tail && !is_middle {
+                // Unexpected token after template span - report and finish.
+                self.error_token_expected("`");
+                let literal_end = self.token_end();
+                let literal = self.arena.add_literal(
+                    SyntaxKind::TemplateTail as u16,
+                    literal_start,
+                    literal_end,
+                    LiteralData { text: String::new(), raw_text: None, value: None },
+                );
+                let span_start = self.arena.get(expression).map(|node| node.pos).unwrap_or(literal_start);
+                let span = self.arena.add_template_span(
+                    syntax_kind_ext::TEMPLATE_SPAN,
+                    span_start,
+                    literal_end,
+                    TemplateSpanData { expression, literal },
+                );
+                spans.push(span);
+                break literal_end;
+            }
+
+            let literal_text = self.scanner.get_token_value_ref().to_string();
+            let literal_kind = if is_tail { SyntaxKind::TemplateTail } else { SyntaxKind::TemplateMiddle };
 
             let literal_end = self.token_end();
             self.next_token();
@@ -6474,8 +6521,11 @@ impl ThinParserState {
                     self.next_token();
                     let name = if self.is_token(SyntaxKind::PrivateIdentifier) {
                         self.parse_private_identifier()
-                    } else {
+                    } else if self.is_identifier_or_keyword() {
                         self.parse_identifier_name()
+                    } else {
+                        self.error_identifier_expected();
+                        NodeIndex::NONE
                     };
                     let end_pos = self.token_end();
 

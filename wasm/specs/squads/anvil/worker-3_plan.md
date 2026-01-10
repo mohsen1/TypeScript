@@ -238,12 +238,7 @@ Ready for Merge: No (merged 2026-01-10)
   - Prior pre-change scan showed 0 TS2339 lines (delta +2 missing; no extra TS2339 in first 200).
 
 ### Failing Samples (extra TS2339)
-Collected from `node wasm/differential-test/conformance-runner.mjs --max=1000 -v ... | awk ...`:
-- `tests/cases/conformance/classes/members/privateNames/privateNameStaticAccessorsAccess.ts`
-- `tests/cases/conformance/classes/members/privateNames/privateNameStaticsAndStaticMethods.ts`
-- `tests/cases/conformance/classes/members/privateNames/privateNamesAndStaticMethods.ts`
-- `tests/cases/conformance/classes/mixinAbstractClasses.ts`
-- `tests/cases/conformance/classes/mixinClassesAnonymous.ts`
+- Latest scan (`node wasm/differential-test/find-ts2339.mjs --max=300 --samples=5`): none in first 300 tests.
 
 ### Emit Sites (thin_checker.rs)
 - Property access miss → TS2339: `wasm/src/thin_checker.rs:4901` / `wasm/src/thin_checker.rs:4902`
@@ -254,3 +249,20 @@ Collected from `node wasm/differential-test/conformance-runner.mjs --max=1000 -v
 1. Re-run conformance with higher `--max` if needed to confirm failing set.
 2. Inspect private name / mixin samples for property lookup path (likely class static/private handling in property access).
 3. Trace property access in `get_type_of_property_access_expression` and related type resolution helpers for static/private members.
+
+### Update (2026-01-10)
+- Typed class expressions as constructor values so return-type inference and property access see base members.
+- Extended heritage parsing to accept parenthesized/new expressions like `extends (new B2<number>().anon)`.
+- Avoided emitting property access nodes when `.` is followed by a non-identifier token (prevents TS2339 on `this.`).
+- Build: `./wasm/build-wasm.sh` (warnings only).
+- Conformance: `node wasm/differential-test/conformance-runner.mjs classes/classExpressions --max=200 -v`.
+- Scan: `node wasm/differential-test/find-ts2339.mjs --max=300 --samples=5` (0 extra TS2339 in first 300).
+
+### Update (2026-01-10)
+- Fixed TemplateExpression1 crash by guarding missing `}` in template spans and synthesizing a tail literal to avoid infinite loops.
+- Added `test_thin_parser_unterminated_template_expression_no_crash` in `wasm/src/thin_parser_tests.rs`.
+- Build: `./wasm/build-wasm.sh` (warnings only).
+- Conformance: `node wasm/differential-test/conformance-runner.mjs es6/templates --max=200 -v` (no crashes).
+- Test: `./wasm/test.sh test_thin_parser_unterminated_template_expression_no_crash`.
+
+Ready for Merge: Yes (2026-01-10)
