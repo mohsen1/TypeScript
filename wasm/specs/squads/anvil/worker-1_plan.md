@@ -6,9 +6,8 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-- Reduce TS2304 false positives (scope resolution).
-- Collect 3-5 failing samples via conformance or `find-ts2304`, then trace namespace/module augmentation and global ambient registration.
-- Focus on `wasm/src/thin_binder.rs` and `wasm/src/thin_checker.rs`, propose fix + regression test, and report delta from a targeted conformance run.
+- Idle; last completed task: fix await/async TS2304 false positives (TS2552 for await type refs, TS1042 for async class/enum) and add regressions (committed/pushed; Ready for Merge: Yes).
+- Awaiting next task from EM-Anvil.
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)
@@ -22,6 +21,8 @@ Priority: 1
 - Notify manager on status: `.notify/notify.sh ready|merge|blocked|task "..."` (after any significant work)
 
 ## Completed
+- [x] Fixed TS2304 scope-resolution false positives from missing parent links in ThinNodeArena (export decl/assignment, object/array literal elements, conditional expressions, binding patterns, property/shorthand assignments, spreads, type predicates, named tuple members, import attributes). Added thin_checker_tests for object-literal locals and ambient export default. Ran `./wasm/test.sh thin_checker_tests::test_object_literal_properties_resolve_locals` and `./wasm/test.sh thin_checker_tests::test_export_default_in_ambient_module_resolves_local`.
+- [x] Fixed await/async TS2304 false positives: emit TS2552 with Awaited suggestion for unresolved `await` type references, parse `async` class/enum as declarations with TS1042. Added thin_checker_tests for `await` type context and async class/enum parse errors. Ran `./wasm/test.sh thin_checker_tests::test_await_type_context_suggests_awaited` and `./wasm/test.sh thin_checker_tests::test_async_modifier_rejected_for_class_and_enum`.
 - [x] Added ES5 tests for dependency injection patterns (6 tests): basic constructor injection, property injection, factory pattern, singleton pattern, scoped injection, combined DI patterns. Ran `./wasm/test.sh class_es5_tests` (all 548 pass).
 - [x] Added ES5 tests for observable/event emitter patterns (6 tests): basic event emitter, subscribe/unsubscribe, event delegation, typed event emitter, async event handling, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 536 pass).
 - [x] Added ES5 tests for error boundary patterns (6 tests): try/catch, componentDidCatch, getDerivedStateFromError, nested boundaries, async error handling, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 530 pass).

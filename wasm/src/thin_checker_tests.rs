@@ -93,6 +93,71 @@ fn test_thin_checker_union_normalization() {
 }
 
 #[test]
+fn test_await_type_context_suggests_awaited() {
+    use crate::thin_parser::ThinParserState;
+    use crate::checker::types::diagnostics::diagnostic_codes;
+
+    let source = r#"
+async function foo() {
+  var v: await;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let did_you_mean_count = codes
+        .iter()
+        .filter(|&&code| code == diagnostic_codes::CANNOT_FIND_NAME_DID_YOU_MEAN)
+        .count();
+    assert_eq!(
+        did_you_mean_count,
+        1,
+        "Expected TS2552 for 'await' in type position, got: {:?}",
+        codes
+    );
+    assert!(
+        !codes.iter().any(|&code| code == diagnostic_codes::CANNOT_FIND_NAME),
+        "Unexpected TS2304 for 'await' in type position: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_async_modifier_rejected_for_class_and_enum() {
+    use crate::thin_parser::ThinParserState;
+    use crate::checker::types::diagnostics::diagnostic_codes;
+
+    let source = r#"
+async class C {}
+async enum E { Value }
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let _root = parser.parse_source_file();
+    let codes: Vec<u32> = parser.get_diagnostics().iter().map(|d| d.code).collect();
+    let async_modifier_count = codes
+        .iter()
+        .filter(|&&code| code == diagnostic_codes::ASYNC_MODIFIER_CANNOT_BE_USED_HERE)
+        .count();
+    assert_eq!(
+        async_modifier_count,
+        2,
+        "Expected two TS1042 errors for async class/enum, got: {:?}",
+        codes
+    );
+}
+
+#[test]
 fn test_excess_property_in_variable_declaration() {
     use crate::thin_parser::ThinParserState;
 
@@ -1515,6 +1580,65 @@ fn test_for_loop_variable_scope() {
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
     assert!(!codes.contains(&2304),
         "Should not have 'Cannot find name' error for loop variable, got: {:?}", codes);
+}
+
+#[test]
+fn test_object_literal_properties_resolve_locals() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+function test() {
+    const foo = 1;
+    const bar = 2;
+    const obj = { foo, baz: bar };
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2304),
+        "Should not have 'Cannot find name' error for object literal locals, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_export_default_in_ambient_module_resolves_local() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+declare module "foo" {
+    const x: string;
+    export default x;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2304),
+        "Should not have 'Cannot find name' error in ambient export default, got: {:?}",
+        codes
+    );
 }
 
 #[test]

@@ -1435,22 +1435,34 @@ impl ThinNodeArena {
 
     /// Add a conditional expression node (a ? b : c)
     pub fn add_conditional_expr(&mut self, kind: u16, pos: u32, end: u32, data: ConditionalExprData) -> NodeIndex {
+        let condition = data.condition;
+        let when_true = data.when_true;
+        let when_false = data.when_false;
+
         let data_index = self.conditional_exprs.len() as u32;
         self.conditional_exprs.push(data);
         let index = self.nodes.len() as u32;
         self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
-        NodeIndex(index)
+        let parent = NodeIndex(index);
+        self.set_parent(condition, parent);
+        self.set_parent(when_true, parent);
+        self.set_parent(when_false, parent);
+        parent
     }
 
     /// Add an object/array literal expression node
     pub fn add_literal_expr(&mut self, kind: u16, pos: u32, end: u32, data: LiteralExprData) -> NodeIndex {
+        let elements = data.elements.clone();
+
         let data_index = self.literal_exprs.len() as u32;
         self.literal_exprs.push(data);
         let index = self.nodes.len() as u32;
         self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
-        NodeIndex(index)
+        let parent = NodeIndex(index);
+        self.set_parent_list(&elements, parent);
+        parent
     }
 
     /// Add a parenthesized expression node
@@ -2210,22 +2222,34 @@ impl ThinNodeArena {
 
     /// Add a named tuple member node
     pub fn add_named_tuple_member(&mut self, kind: u16, pos: u32, end: u32, data: NamedTupleMemberData) -> NodeIndex {
+        let name = data.name;
+        let type_node = data.type_node;
+
         let data_index = self.named_tuple_members.len() as u32;
         self.named_tuple_members.push(data);
         let index = self.nodes.len() as u32;
         self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
-        NodeIndex(index)
+        let parent = NodeIndex(index);
+        self.set_parent(name, parent);
+        self.set_parent(type_node, parent);
+        parent
     }
 
     /// Add a type predicate node
     pub fn add_type_predicate(&mut self, kind: u16, pos: u32, end: u32, data: TypePredicateData) -> NodeIndex {
+        let parameter_name = data.parameter_name;
+        let type_node = data.type_node;
+
         let data_index = self.type_predicates.len() as u32;
         self.type_predicates.push(data);
         let index = self.nodes.len() as u32;
         self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
-        NodeIndex(index)
+        let parent = NodeIndex(index);
+        self.set_parent(parameter_name, parent);
+        self.set_parent(type_node, parent);
+        parent
     }
 
     /// Add an import declaration node
@@ -2298,92 +2322,150 @@ impl ThinNodeArena {
 
     /// Add an export declaration node
     pub fn add_export_decl(&mut self, kind: u16, pos: u32, end: u32, data: ExportDeclData) -> NodeIndex {
+        let modifiers = data.modifiers.clone();
+        let export_clause = data.export_clause;
+        let module_specifier = data.module_specifier;
+        let attributes = data.attributes;
+
         let data_index = self.export_decls.len() as u32;
         self.export_decls.push(data);
         let index = self.nodes.len() as u32;
         self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
-        NodeIndex(index)
+        let parent = NodeIndex(index);
+        self.set_parent_opt_list(&modifiers, parent);
+        self.set_parent(export_clause, parent);
+        self.set_parent(module_specifier, parent);
+        self.set_parent(attributes, parent);
+        parent
     }
 
     /// Add an export assignment node
     pub fn add_export_assignment(&mut self, kind: u16, pos: u32, end: u32, data: ExportAssignmentData) -> NodeIndex {
+        let modifiers = data.modifiers.clone();
+        let expression = data.expression;
+
         let data_index = self.export_assignments.len() as u32;
         self.export_assignments.push(data);
         let index = self.nodes.len() as u32;
         self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
-        NodeIndex(index)
+        let parent = NodeIndex(index);
+        self.set_parent_opt_list(&modifiers, parent);
+        self.set_parent(expression, parent);
+        parent
     }
 
     /// Add an import attributes node
     pub fn add_import_attributes(&mut self, kind: u16, pos: u32, end: u32, data: ImportAttributesData) -> NodeIndex {
+        let elements = data.elements.clone();
+
         let data_index = self.import_attributes.len() as u32;
         self.import_attributes.push(data);
         let index = self.nodes.len() as u32;
         self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
-        NodeIndex(index)
+        let parent = NodeIndex(index);
+        self.set_parent_list(&elements, parent);
+        parent
     }
 
     /// Add an import attribute node
     pub fn add_import_attribute(&mut self, kind: u16, pos: u32, end: u32, data: ImportAttributeData) -> NodeIndex {
+        let name = data.name;
+        let value = data.value;
+
         let data_index = self.import_attribute.len() as u32;
         self.import_attribute.push(data);
         let index = self.nodes.len() as u32;
         self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
-        NodeIndex(index)
+        let parent = NodeIndex(index);
+        self.set_parent(name, parent);
+        self.set_parent(value, parent);
+        parent
     }
 
     /// Add a binding pattern node
     pub fn add_binding_pattern(&mut self, kind: u16, pos: u32, end: u32, data: BindingPatternData) -> NodeIndex {
+        let elements = data.elements.clone();
+
         let data_index = self.binding_patterns.len() as u32;
         self.binding_patterns.push(data);
         let index = self.nodes.len() as u32;
         self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
-        NodeIndex(index)
+        let parent = NodeIndex(index);
+        self.set_parent_list(&elements, parent);
+        parent
     }
 
     /// Add a binding element node
     pub fn add_binding_element(&mut self, kind: u16, pos: u32, end: u32, data: BindingElementData) -> NodeIndex {
+        let property_name = data.property_name;
+        let name = data.name;
+        let initializer = data.initializer;
+
         let data_index = self.binding_elements.len() as u32;
         self.binding_elements.push(data);
         let index = self.nodes.len() as u32;
         self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
-        NodeIndex(index)
+        let parent = NodeIndex(index);
+        self.set_parent(property_name, parent);
+        self.set_parent(name, parent);
+        self.set_parent(initializer, parent);
+        parent
     }
 
     /// Add a property assignment node
     pub fn add_property_assignment(&mut self, kind: u16, pos: u32, end: u32, data: PropertyAssignmentData) -> NodeIndex {
+        let modifiers = data.modifiers.clone();
+        let name = data.name;
+        let initializer = data.initializer;
+
         let data_index = self.property_assignments.len() as u32;
         self.property_assignments.push(data);
         let index = self.nodes.len() as u32;
         self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
-        NodeIndex(index)
+        let parent = NodeIndex(index);
+        self.set_parent_opt_list(&modifiers, parent);
+        self.set_parent(name, parent);
+        self.set_parent(initializer, parent);
+        parent
     }
 
     /// Add a shorthand property assignment node
     pub fn add_shorthand_property(&mut self, kind: u16, pos: u32, end: u32, data: ShorthandPropertyData) -> NodeIndex {
+        let modifiers = data.modifiers.clone();
+        let name = data.name;
+        let object_assignment_initializer = data.object_assignment_initializer;
+
         let data_index = self.shorthand_properties.len() as u32;
         self.shorthand_properties.push(data);
         let index = self.nodes.len() as u32;
         self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
-        NodeIndex(index)
+        let parent = NodeIndex(index);
+        self.set_parent_opt_list(&modifiers, parent);
+        self.set_parent(name, parent);
+        self.set_parent(object_assignment_initializer, parent);
+        parent
     }
 
     /// Add a spread assignment node
     pub fn add_spread(&mut self, kind: u16, pos: u32, end: u32, data: SpreadData) -> NodeIndex {
+        let expression = data.expression;
+
         let data_index = self.spread_data.len() as u32;
         self.spread_data.push(data);
         let index = self.nodes.len() as u32;
         self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
-        NodeIndex(index)
+        let parent = NodeIndex(index);
+        self.set_parent(expression, parent);
+        parent
     }
 
     /// Add a JSX element node
