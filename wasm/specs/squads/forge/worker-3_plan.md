@@ -80,7 +80,7 @@ Extend control-flow narrowing for property access after `in`/`typeof`/`instanceo
 - Re-run conformance to confirm private names/control-flow narrowing improvements
 
 ## Ready for Merge
-No
+No (merged)
 
 ## Notes
 - Similar infrastructure to TS2564 (property init) - share patterns with Workers 1-2
