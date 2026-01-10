@@ -2265,18 +2265,19 @@ fn collect_diagnostics(
                 file.file_name.clone(),
             )
         };
+        let module_specifiers = collect_module_specifiers(&file.arena, file.source_file);
         let mut resolved_modules = HashSet::new();
-        for specifier in collect_module_specifiers(&file.arena, file.source_file) {
+        for (specifier, _) in &module_specifiers {
             if let Some(resolved) = resolve_module_specifier(
                 Path::new(&file.file_name),
-                &specifier,
+                specifier,
                 options,
                 base_dir,
                 &mut resolution_cache,
             ) {
                 let canonical = canonicalize_or_owned(&resolved);
                 if program_paths.contains(&canonical) {
-                    resolved_modules.insert(specifier);
+                    resolved_modules.insert(specifier.clone());
                 }
             }
         }
@@ -2289,7 +2290,7 @@ fn collect_diagnostics(
             ));
         }
         let file_path_for_resolve = Path::new(&file.file_name);
-        for (specifier, specifier_node) in collect_module_specifiers(&file.arena, file.source_file) {
+        for (specifier, specifier_node) in module_specifiers {
             if specifier.is_empty() {
                 continue;
             }
