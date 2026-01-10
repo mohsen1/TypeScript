@@ -11426,9 +11426,7 @@ impl<'a> ThinCheckerState<'a> {
                 || k == syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION =>
             {
                 if let Some(key) = self.property_key_from_access(target_idx) {
-                    if tracked.contains(&key) {
-                        assigned.insert(key);
-                    }
+                    self.record_property_assignment(key, assigned, tracked);
                 }
             }
             k if k == syntax_kind_ext::PARENTHESIZED_EXPRESSION => {
@@ -11453,7 +11451,36 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    fn record_property_assignment(
+        &self,
+        key: PropertyKey,
+        assigned: &mut FxHashSet<PropertyKey>,
+        tracked: &FxHashSet<PropertyKey>,
+    ) {
+        if tracked.contains(&key) {
+            assigned.insert(key.clone());
+        }
+
+        match key {
+            PropertyKey::Ident(name) => {
+                let computed = PropertyKey::Computed(ComputedKey::String(name));
+                if tracked.contains(&computed) {
+                    assigned.insert(computed);
+                }
+            }
+            PropertyKey::Computed(ComputedKey::String(name)) => {
+                let ident = PropertyKey::Ident(name);
+                if tracked.contains(&ident) {
+                    assigned.insert(ident);
+                }
+            }
+            _ => {}
+        }
+    }
+
     fn property_key_from_name(&self, name_idx: NodeIndex) -> Option<PropertyKey> {
+        use crate::scanner::SyntaxKind;
+
         let Some(name_node) = self.ctx.arena.get(name_idx) else {
             return None;
         };
@@ -11463,6 +11490,24 @@ impl<'a> ThinCheckerState<'a> {
                 return Some(PropertyKey::Private(ident.escaped_text.clone()));
             }
             return Some(PropertyKey::Ident(ident.escaped_text.clone()));
+        }
+
+        if matches!(
+            name_node.kind,
+            k if k == SyntaxKind::StringLiteral as u16
+                || k == SyntaxKind::NoSubstitutionTemplateLiteral as u16
+                || k == SyntaxKind::NumericLiteral as u16
+        ) {
+            if let Some(lit) = self.ctx.arena.get_literal(name_node) {
+                if !lit.text.is_empty() {
+                    let key = if name_node.kind == SyntaxKind::NumericLiteral as u16 {
+                        PropertyKey::Computed(ComputedKey::Number(lit.text.clone()))
+                    } else {
+                        PropertyKey::Computed(ComputedKey::String(lit.text.clone()))
+                    };
+                    return Some(key);
+                }
+            }
         }
 
         if name_node.kind == syntax_kind_ext::COMPUTED_PROPERTY_NAME {

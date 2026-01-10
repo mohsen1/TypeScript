@@ -49,6 +49,7 @@ Implement TS2792 "Cannot find module 'x' or its corresponding type declarations"
 - Added built-in utility type handling to reduce false TS2304 errors (Partial, Required, Pick, Omit, Record, Exclude, Extract, NonNullable, ReturnType, Parameters, etc.).
 - **TS2454 implementation complete**: Fixed `get_type_of_call_expression` to process arguments even when callee is `any`. Added 7 tests covering basic cases and conditional branches (all passing).
 - **TS2564 implementation enhanced**: Added 4 more edge case tests (parameter properties, conditional constructor assignments, derived classes with super). Total 11 tests passing.
+- Added TS2564 tracking for string/numeric literal property names and element-access assignments; added 3 tests.
 
 ## Ready for Merge
 No
@@ -66,7 +67,8 @@ No
 - TS2304 work complete: added utility type handling to reduce false positives.
 - TS2454 implementation complete: 7 tests passing.
 - TS2564 implementation complete:
-  - 11 tests passing
+  - 14 tests passing
   - Handles: optional, initializers, definite assertion (!), static, parameter properties
   - Constructor assignment tracking with control flow (if/else, derived class super)
+- TS2564 literal property coverage: element access + string/numeric literal property names; `./wasm/test.sh ts2564` passing.
 - Conformance tests: Docker runner has path issue (lib.d.ts not copied), skipped for now.
