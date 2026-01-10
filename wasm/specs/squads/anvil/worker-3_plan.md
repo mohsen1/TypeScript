@@ -1,5 +1,15 @@
 # Anvil Worker 3 - TS2339 Property Resolution (Inherited Properties)
 
+Ready for Merge: No (merged)
+
+## Current Assignment (Crash triage: privateNamesInterfaceExtendingClass)
+
+- Fix crash in `classes/members/privateNames/privateNamesInterfaceExtendingClass.ts` (Maximum call stack size exceeded).
+- Repro: `node wasm/differential-test/conformance-runner.mjs classes/members/privateNames --max=200 -v` -> crash in that file.
+- Suspected root cause: recursion `get_class_instance_type` -> type ref `I` -> `type_reference_symbol_type` -> `merge_interface_heritage_types` -> `get_class_instance_type` for base class `C`; interface type references bypass `symbol_resolution_set`, and base class resolution uses `get_class_instance_type` without `class_instance_resolution_set`.
+- Next steps: add guard (route interface references through `get_type_of_symbol` or use `class_instance_type_from_symbol` in `merge_interface_heritage_types`), add regression test, re-run conformance to confirm crash removed.
+- Deliverables: repro stack path, regression test, conformance delta.
+
 ## Operation Conformance Assignment
 
 **Mission**: Fix false positive TS2339 errors for inherited and prototype chain properties.
@@ -7,7 +17,7 @@
 **Target Error**: TS2339 "Property 'X' does not exist on type 'Y'" - 68 false positives
 **Root Cause**: Property lookup doesn't traverse class inheritance or interface extension chains
 
-## Current Assignment (2026-01-10)
+## Previous Assignment (2026-01-10)
 
 - Reduce TS2339 false positives (mixin/private/static/property lookup cases).
 - Collect 3-5 failing samples from conformance output; record the failing expression + expected property resolution.
