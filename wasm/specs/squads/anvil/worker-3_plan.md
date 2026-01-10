@@ -2,13 +2,18 @@
 
 Ready for Merge: No (merged)
 
-## Current Assignment (Crash triage: privateNamesInterfaceExtendingClass)
+## Current Assignment (Crash triage: privateNamesInterfaceExtendingClass) - COMPLETED
 
-- Fix crash in `classes/members/privateNames/privateNamesInterfaceExtendingClass.ts` (Maximum call stack size exceeded).
-- Repro: `node wasm/differential-test/conformance-runner.mjs classes/members/privateNames --max=200 -v` -> crash in that file.
-- Suspected root cause: recursion `get_class_instance_type` -> type ref `I` -> `type_reference_symbol_type` -> `merge_interface_heritage_types` -> `get_class_instance_type` for base class `C`; interface type references bypass `symbol_resolution_set`, and base class resolution uses `get_class_instance_type` without `class_instance_resolution_set`.
-- Next steps: add guard (route interface references through `get_type_of_symbol` or use `class_instance_type_from_symbol` in `merge_interface_heritage_types`), add regression test, re-run conformance to confirm crash removed.
-- Deliverables: repro stack path, regression test, conformance delta.
+- **Status**: Fixed and committed (399e930edc)
+- **Issue**: Stack overflow crash in `classes/members/privateNames/privateNamesInterfaceExtendingClass.ts`
+- **Root cause**: Unbounded recursion when interface extends class with private fields:
+  - `get_class_instance_type(C)` → type ref `I` → `type_reference_symbol_type` → `merge_interface_heritage_types` → `get_class_instance_type(C)` again
+  - Interface type references bypassed `symbol_resolution_set`, and base class resolution used `get_class_instance_type` without `class_instance_resolution_set`
+- **Fix**: Added `class_instance_resolution_set` guard in `merge_interface_heritage_types` around two `get_class_instance_type` calls (wasm/src/thin_checker.rs:2243-2250, 2274-2281)
+  - On recursion detection, returns `TypeKey::Ref(SymbolRef)` fallback instead of crashing
+- **Regression test**: Added `test_interface_extends_class_no_recursion_crash` in wasm/src/thin_checker_tests.rs
+- **Verification**: Conformance test `classes/members/privateNames` slice completes with 0 crashes (124 tests run, previously crashed on privateNamesInterfaceExtendingClass.ts)
+- **Time**: ~2.5 hours (investigation, fix, test, verification)
 
 ## Operation Conformance Assignment
 
