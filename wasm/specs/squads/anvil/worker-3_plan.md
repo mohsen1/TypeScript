@@ -270,4 +270,7 @@ Ready for Merge: No (merged)
 - Repro: `tests/cases/conformance/es6/templates/TemplateExpression1.ts` (unterminated template expression).
 - Crash path: `parse_template_expression` in `wasm/src/thin_parser.rs` during template span rescan; now guarded to emit TS1005 and synthesize a tail.
 
+### Update (2026-01-10)
+- Broader sweep: `node wasm/differential-test/conformance-runner.mjs --max=500` (497 tests run, 13 multi-file; WASM Crashed: 0).
+
 Ready for Merge: No (merged)
