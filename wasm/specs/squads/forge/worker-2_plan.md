@@ -38,9 +38,9 @@ Reduce false positives for property access errors by aligning TS2339 behavior wi
 
 ## Resume Notes
 - Branch: `worker/forge-2`.
-- Latest commit: `[wasm] checker: resolve imports in multi-file mode`
-- Recent changes: Re-applied static index signature collection after squad/forge merge; narrowed flow types on direct assignments to use assigned expression types; added TS2339 test covering assignment-based narrowing on unions; tracked resolved module specifiers in multi-file CLI diagnostics to avoid TS2792 for in-program imports.
-- Last tests: `./wasm/test.sh compile_multi_file_project_with_` (pass: compile_multi_file_project_with_imports, compile_multi_file_project_with_default_and_named_imports, compile_multi_file_project_with_type_imports)
+- Latest commit: `[wasm] checker: support optional call chaining`
+- Recent changes: Re-applied static index signature collection after squad/forge merge; narrowed flow types on direct assignments to use assigned expression types; added TS2339 test covering assignment-based narrowing on unions; tracked resolved module specifiers in multi-file CLI diagnostics to avoid TS2792 for in-program imports; marked optional call expressions and stripped nullish callee types for optional chaining calls.
+- Last tests: `./wasm/test.sh compile_optional_chaining_with_call` (pass)
 - **Latest TS2339 conformance scan results (1000 files):**
   - Extra (false positives): 0 files (was 3)
 - Conformance scan command: `cd wasm/differential-test && node find-ts2339.mjs --max=1000 --samples=20`
@@ -79,13 +79,14 @@ Reduce false positives for property access errors by aligning TS2339 behavior wi
 - Conformance scan after heritage/parse fixes: 0 extra (from 1000 files).
 - Scoped type parameters for type-alias/mapped-type missing-name checks (fixes TS2304 in mapped types).
 - Resolved TS2792 import diagnostics in multi-file CLI mode by tracking resolved module specifiers.
+- Fixed optional call chaining to avoid TS2349 on `?.()` when the callee is optional.
 
 ## Ready for Merge
 Yes
 
 ## Notes
-- Full test run: not run (last run was targeted import tests).
-- Last run: `./wasm/test.sh compile_multi_file_project_with_` (pass: compile_multi_file_project_with_imports, compile_multi_file_project_with_default_and_named_imports, compile_multi_file_project_with_type_imports)
+- Full test run: failing in `cli::driver_tests::compile_object_spread` (TS2741).
+- Last run: `./wasm/test.sh compile_optional_chaining_with_call` (pass)
 - Last run: `cd wasm/differential-test && node find-ts2339.mjs --max=1000 --samples=20`
 - Commit format: `[wasm] checker: improve TS2339 property access diagnostics`
 - Push to: `origin/worker/forge-2`
