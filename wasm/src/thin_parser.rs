@@ -1852,6 +1852,8 @@ impl ThinParserState {
         let mut expr = if self.is_token(SyntaxKind::ClassKeyword) {
             // Inline class expression in extends clause: class extends class Expr {} {...}
             self.parse_class_expression()
+        } else if self.is_token(SyntaxKind::OpenParenToken) || self.is_token(SyntaxKind::NewKeyword) {
+            self.parse_left_hand_side_expression()
         } else if self.is_identifier_or_keyword() {
             self.parse_identifier_name()
         } else {
@@ -5365,13 +5367,14 @@ impl ThinParserState {
         let start_pos = self.token_pos();
         // Capture end position BEFORE consuming the token
         let end_pos = self.token_end();
-        let text = self.scanner.get_token_value_ref().to_string();
-
-        if self.is_identifier_or_keyword() {
+        let text = if self.is_identifier_or_keyword() {
+            let text = self.scanner.get_token_value_ref().to_string();
             self.next_token();
+            text
         } else {
             self.error_identifier_expected();
-        }
+            String::new()
+        };
 
         self.arena.add_identifier(
             SyntaxKind::Identifier as u16,

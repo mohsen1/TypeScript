@@ -3076,6 +3076,14 @@ impl<'a> ThinCheckerState<'a> {
                     }
                 }
                 let Some(base_class_idx) = base_class_idx else {
+                    if let Some(base_instance_type) = self.base_instance_type_from_expression(expr_idx) {
+                        self.merge_base_instance_properties(
+                            base_instance_type,
+                            &mut properties,
+                            &mut string_index,
+                            &mut number_index,
+                        );
+                    }
                     break;
                 };
                 let Some(base_node) = self.ctx.arena.get(base_class_idx) else {
@@ -3614,6 +3622,18 @@ impl<'a> ThinCheckerState<'a> {
                     }
                 }
                 let Some(base_class_idx) = base_class_idx else {
+                    if let Some(base_constructor_type) =
+                        self.base_constructor_type_from_expression(expr_idx)
+                    {
+                        if let Some(TypeKey::Callable(base_shape_id)) =
+                            self.ctx.types.lookup(base_constructor_type)
+                        {
+                            let base_shape = self.ctx.types.callable_shape(base_shape_id);
+                            for base_prop in base_shape.properties.iter() {
+                                properties.entry(base_prop.name).or_insert_with(|| base_prop.clone());
+                            }
+                        }
+                    }
                     break;
                 };
                 let Some(base_node) = self.ctx.arena.get(base_class_idx) else {
@@ -5642,6 +5662,11 @@ impl<'a> ThinCheckerState<'a> {
         let Some(name_node) = self.ctx.arena.get(access.name_or_argument) else {
             return TypeId::ANY;
         };
+        if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
+            if ident.escaped_text.is_empty() {
+                return TypeId::ANY;
+            }
+        }
 
         // Check for abstract property access in constructor BEFORE evaluating types (error 2715)
         // This must happen even when `this` has type ANY
