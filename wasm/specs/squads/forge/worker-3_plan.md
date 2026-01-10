@@ -29,7 +29,7 @@ Extend control-flow narrowing for property access after `in`/`typeof`/`instanceo
 - No regressions in existing TS2339 tests
 
 ## Task Queue
-- [ ] Investigate assertion type predicate narrowing for remaining TS2339 false positive
+- (empty)
 
 ## Completed
 - [x] TS2454 error code and message added to diagnostics
@@ -72,15 +72,15 @@ Extend control-flow narrowing for property access after `in`/`typeof`/`instanceo
 - [x] Match `this`/`super` reference bases in control flow for property assignment narrowing; added test
 - [x] Loop label flow unions entry/back-edge types; added regression test
 - [x] Const-aliased condition narrowing uses initializer for flow analysis; added test
+- [x] Assertion predicate calls create flow nodes and narrow asserted targets; added test
 
 ### Remaining TS2339 False Positives (pending re-run)
 - Mixin classes: mixin type inference issues (intersection handling added in new expressions, unit tests pass, conformance tests need more investigation)
 - Static index signatures: would require adding index signatures to CallableShape
-- Assertion type predicates: 1 test
 - Re-run conformance to confirm private names/control-flow narrowing improvements
 
 ## Ready for Merge
-No (merged)
+Yes
 
 ## Notes
 - Similar infrastructure to TS2564 (property init) - share patterns with Workers 1-2
