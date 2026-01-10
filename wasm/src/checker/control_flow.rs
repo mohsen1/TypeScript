@@ -379,6 +379,12 @@ impl<'a> FlowAnalyzer<'a> {
                             return rhs_type;
                         }
                     }
+                    if let Some(literal_type) = self.literal_type_from_node(rhs) {
+                        return literal_type;
+                    }
+                    if let Some(nullish_type) = self.nullish_literal_type(rhs) {
+                        return nullish_type;
+                    }
                 }
             }
             return type_id;
@@ -402,7 +408,7 @@ impl<'a> FlowAnalyzer<'a> {
 
         if node.kind == syntax_kind_ext::BINARY_EXPRESSION {
             let bin = self.arena.get_binary_expr(node)?;
-            if self.is_assignment_operator(bin.operator_token)
+            if bin.operator_token == SyntaxKind::EqualsToken as u16
                 && self.is_matching_reference(bin.left, reference)
             {
                 return Some(bin.right);

@@ -519,7 +519,7 @@ if (assertString(x)) {
 }
 
 #[test]
-fn test_assignment_clears_narrowing_in_branch() {
+fn test_assignment_narrows_to_rhs_in_branch() {
     let source = r#"
 let x: string | number;
 if (typeof x === "string") {
@@ -557,7 +557,7 @@ if (typeof x === "string") {
 
     let flow_after = binder.get_node_flow(ident_after).expect("flow after");
     let narrowed_after = analyzer.get_flow_type(ident_after, union, flow_after);
-    assert_eq!(narrowed_after, union);
+    assert_eq!(narrowed_after, types.literal_number(1.0));
 }
 
 #[test]
@@ -602,6 +602,70 @@ x;
     let flow_after = binder.get_node_flow(ident_after).expect("flow after");
     let narrowed_after = analyzer.get_flow_type(ident_after, union, flow_after);
     assert_eq!(narrowed_after, TypeId::STRING);
+}
+
+#[test]
+fn test_assignment_narrows_to_rhs_literal_without_cache() {
+    let source = r#"
+let x: string | number;
+x;
+x = "hi";
+x;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let arena = parser.get_arena();
+    let types = TypeInterner::new();
+    let analyzer = FlowAnalyzer::new(arena, &binder, &types);
+
+    let root_node = arena.get(root).expect("root node");
+    let source_file = arena.get_source_file(root_node).expect("source file");
+    let ident_after = extract_expression_from_statement(
+        arena,
+        *source_file.statements.nodes.get(3).expect("x after"),
+    );
+
+    let union = types.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let flow_after = binder.get_node_flow(ident_after).expect("flow after");
+    let narrowed_after = analyzer.get_flow_type(ident_after, union, flow_after);
+    assert_eq!(narrowed_after, types.literal_string("hi"));
+}
+
+#[test]
+fn test_assignment_narrows_to_null_without_cache() {
+    let source = r#"
+let x: string | null;
+x;
+x = null;
+x;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let arena = parser.get_arena();
+    let types = TypeInterner::new();
+    let analyzer = FlowAnalyzer::new(arena, &binder, &types);
+
+    let root_node = arena.get(root).expect("root node");
+    let source_file = arena.get_source_file(root_node).expect("source file");
+    let ident_after = extract_expression_from_statement(
+        arena,
+        *source_file.statements.nodes.get(3).expect("x after"),
+    );
+
+    let union = types.union(vec![TypeId::STRING, TypeId::NULL]);
+    let flow_after = binder.get_node_flow(ident_after).expect("flow after");
+    let narrowed_after = analyzer.get_flow_type(ident_after, union, flow_after);
+    assert_eq!(narrowed_after, TypeId::NULL);
 }
 
 #[test]
