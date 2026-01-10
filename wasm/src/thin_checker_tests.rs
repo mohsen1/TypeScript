@@ -1518,6 +1518,65 @@ fn test_for_loop_variable_scope() {
 }
 
 #[test]
+fn test_object_literal_properties_resolve_locals() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+function test() {
+    const foo = 1;
+    const bar = 2;
+    const obj = { foo, baz: bar };
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2304),
+        "Should not have 'Cannot find name' error for object literal locals, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_export_default_in_ambient_module_resolves_local() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+declare module "foo" {
+    const x: string;
+    export default x;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2304),
+        "Should not have 'Cannot find name' error in ambient export default, got: {:?}",
+        codes
+    );
+}
+
+#[test]
 fn test_missing_identifier_emits_2304() {
     use crate::thin_parser::ThinParserState;
 
