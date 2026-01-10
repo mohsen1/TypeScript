@@ -15956,7 +15956,10 @@ impl<'a> ThinCheckerState<'a> {
     }
 
     fn should_report_implicit_any_return(&self, return_type: TypeId) -> bool {
-        self.type_contains_any(return_type) || self.is_null_or_undefined_only(return_type)
+        // Only report when return type is exactly 'any', not when it contains 'any' somewhere.
+        // For example, Promise<void> should not trigger TS7010 even if Promise's definition
+        // contains 'any' in its type structure.
+        return_type == TypeId::ANY || self.is_null_or_undefined_only(return_type)
     }
 
     fn maybe_report_implicit_any_return(

@@ -4928,6 +4928,145 @@ const obj = { baz() { return undefined; } };
     assert_eq!(count(7010), 4, "Expected four 7010 errors, got codes: {:?}", codes);
 }
 
+#[test]
+fn test_ts7010_async_function_no_false_positive() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// @noImplicitAny: true
+// Async functions without return type should NOT trigger TS7010
+// because they infer Promise<void>, not 'any'
+async function asyncNoReturn() {
+}
+
+async function asyncExplicitReturn() {
+    return;
+}
+
+class C {
+    async get foo() {
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let ts7010_errors: Vec<_> = checker.ctx.diagnostics.iter().filter(|d| d.code == 7010).collect();
+
+    assert!(ts7010_errors.is_empty(),
+        "Expected no TS7010 errors for async functions returning Promise<void>, got: {:?}",
+        codes);
+}
+
+#[test]
+fn test_ts7010_exactly_any_return() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// @noImplicitAny: true
+declare var anyValue: any;
+
+// Should trigger TS7010 - return type is exactly 'any'
+function returnsAny() {
+    return anyValue;
+}
+
+// Should trigger TS7010 - return type is exactly 'any'
+const arrowReturnsAny = () => anyValue;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let count = |code| codes.iter().filter(|&&c| c == code).count();
+
+    assert_eq!(count(7010), 2, "Expected two TS7010 errors for functions returning 'any', got codes: {:?}", codes);
+}
+
+#[test]
+fn test_ts7010_null_undefined_return() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// @noImplicitAny: true
+// Should trigger TS7010 - return type is null | undefined (treated as 'any')
+function returnsNullOrUndefined(flag: boolean) {
+    if (flag) return null;
+    return undefined;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let count = |code| codes.iter().filter(|&&c| c == code).count();
+
+    assert_eq!(count(7010), 1, "Expected one TS7010 error for null | undefined return, got codes: {:?}", codes);
+}
+
+#[test]
+fn test_ts7010_class_expression_no_false_positive() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// @noImplicitAny: true
+// Functions returning class expressions should NOT trigger TS7010
+// even if the class contains 'any' in its structure somewhere
+class A<T> {
+    value: T;
+}
+
+function createClass() {
+    return class extends A<string> { };
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts7010_errors: Vec<_> = checker.ctx.diagnostics.iter().filter(|d| d.code == 7010).collect();
+
+    assert!(ts7010_errors.is_empty(),
+        "Expected no TS7010 errors for functions returning class expressions, got: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| d.code).collect::<Vec<_>>());
+}
+
 /// Test that functions that only throw don't trigger TS2355.
 /// TS2355: "A function whose declared type is neither 'void' nor 'any' must return a value"
 /// This should NOT fire for functions that only throw since throwing is a valid exit.

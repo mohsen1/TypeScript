@@ -33,6 +33,25 @@ Implement TS2695 for comma operator expressions in statement position.
 - Missing TS7010: 151 occurrences
 - Extra TS7010: 292 occurrences
 
+### TS7010 Fix - Reduce False Positives
+- [x] Created `find-ts7010.mjs` script to isolate TS7010 patterns
+- [x] Analyzed patterns: identified `type_contains_any()` as too broad
+- [x] Fixed `should_report_implicit_any_return()` to check `return_type == TypeId::ANY` instead
+- [x] Added regression tests: async functions, class expressions, exact any, null|undefined
+- [x] Built WASM and validated: Extra TS7010 reduced from 40→27 (32.5% improvement) in sample run
+
+**Issue:** `should_report_implicit_any_return` used `type_contains_any()` which checked if `any` appeared anywhere in type structure (e.g., Promise<void> with `any` in Promise definition).
+
+**Fix:** Changed to `return_type == TypeId::ANY` to only report when return type is exactly `any`.
+
+**Results (500-test sample):**
+- Before: Extra 40, Missing 14
+- After: Extra 27 (-32.5%), Missing 9
+- Remaining false positives: async functions (likely Promise<any> cases)
+- Remaining missing: abstract methods without return types (separate issue)
+
+**Files:** `thin_checker.rs:15958`, `thin_checker_tests.rs:4931-5068`, `find-ts7010.mjs`
+
 ### Notes
 - Initial conformance run failed due to missing `wasm/pkg`; rebuilt via `./wasm/build-wasm.sh`.
 - Docker run with `--workers=14` failed (CPU limit); reran with `--workers=10`.
