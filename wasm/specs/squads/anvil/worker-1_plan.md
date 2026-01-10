@@ -6,8 +6,10 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-- Idle; last completed task: TS2304 false positives fix (committed/pushed; Ready for Merge: Yes).
-- Awaiting next task from EM-Anvil.
+- Reduce TS2304 false positives (Cannot find name).
+- Collect 3-5 failing samples via conformance or `node wasm/differential-test/find-ts2304.mjs`; trace scope resolution in `wasm/src/thin_binder.rs` and `wasm/src/thin_checker.rs`.
+- Implement fix + regression tests, then report delta from a targeted conformance run.
+- Deliverables: sample list + root cause notes, regression test(s), and a before/after conformance delta.
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)
@@ -21,6 +23,8 @@ Priority: 1
 - Notify manager on status: `.notify/notify.sh ready|merge|blocked|task "..."` (after any significant work)
 
 ## Completed
+- [x] Fixed TS2304 scope-resolution false positives from missing parent links in ThinNodeArena (export decl/assignment, object/array literal elements, conditional expressions, binding patterns, property/shorthand assignments, spreads, type predicates, named tuple members, import attributes). Added thin_checker_tests for object-literal locals and ambient export default. Ran `./wasm/test.sh thin_checker_tests::test_object_literal_properties_resolve_locals` and `./wasm/test.sh thin_checker_tests::test_export_default_in_ambient_module_resolves_local`.
+- [x] Fixed await/async TS2304 false positives: emit TS2552 with Awaited suggestion for unresolved `await` type references, parse `async` class/enum as declarations with TS1042. Added thin_checker_tests for `await` type context and async class/enum parse errors. Ran `./wasm/test.sh thin_checker_tests::test_await_type_context_suggests_awaited` and `./wasm/test.sh thin_checker_tests::test_async_modifier_rejected_for_class_and_enum`.
 - [x] Added ES5 tests for dependency injection patterns (6 tests): basic constructor injection, property injection, factory pattern, singleton pattern, scoped injection, combined DI patterns. Ran `./wasm/test.sh class_es5_tests` (all 548 pass).
 - [x] Added ES5 tests for observable/event emitter patterns (6 tests): basic event emitter, subscribe/unsubscribe, event delegation, typed event emitter, async event handling, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 536 pass).
 - [x] Added ES5 tests for error boundary patterns (6 tests): try/catch, componentDidCatch, getDerivedStateFromError, nested boundaries, async error handling, combined patterns. Ran `./wasm/test.sh class_es5_tests` (all 530 pass).
@@ -166,7 +170,7 @@ Priority: 1
 - [x] Fixed TS2304 false positives (Cannot find name): Added builtin global type handling for Promise, PromiseLike, Map, Set, Iterator, Generator, and 30+ other global types. Fixed type alias type parameter scoping, heritage clause resolution, type queries. Added find-ts2304.mjs differential test script. Added regression test. Key files: thin_checker.rs.
 
 ## Ready for Merge
-Yes
+No (merged 2026-01-10)
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize emitter fidelity (ES5 downleveling/source maps) before new features.
@@ -183,3 +187,4 @@ Yes
 - Conformance before (max=500, process-pool): exact 88/487 (18.1%), same 104 (21.4%), missing 309, extra 255, missing TS2322 19, crashed 3, duration 11.9s, throughput 41.9 tests/sec.
 - Conformance after (max=500, process-pool): exact 86/487 (17.7%), same 103 (21.1%), missing 311, extra 255, missing TS2322 21, crashed 3, duration 42.6s, throughput 11.7 tests/sec (perf variance likely cache/noise).
 - TS2322 scan tool: `wasm/differential-test/find-ts2322.mjs` (exits immediately to avoid wasm finalizer crash).
+- TS2304 samples (post-fix, find-ts2304 --max=5000 --samples=10): tests/cases/conformance/async/es5/asyncInterface_es5.ts (async keyword), tests/cases/conformance/async/es5/asyncModule_es5.ts (async keyword), tests/cases/conformance/async/es6/asyncArrowFunction/asyncArrowFunctionCapturesArguments_es6.ts (arguments), tests/cases/conformance/async/es6/asyncInterface_es6.ts (async keyword), tests/cases/conformance/async/es6/asyncModule_es6.ts (async keyword), tests/cases/conformance/classes/classDeclarations/classAbstractKeyword/classAbstractManyKeywords.ts (default keyword), tests/cases/conformance/classes/classDeclarations/classAbstractKeyword/classAbstractWithInterface.ts (abstract keyword), tests/cases/conformance/classes/classDeclarations/classExtendingClassLikeType.ts (type params), tests/cases/conformance/classes/classDeclarations/classExtendingNonConstructor.ts (undefined/true/false/number), tests/cases/conformance/classes/classDeclarations/classExtendingNull.ts (null). Re-run confirmed same list (runtime ~1m).

@@ -198,6 +198,57 @@ fn test_thin_parser_array_binding_pattern_span() {
 }
 
 #[test]
+fn test_thin_parser_static_keyword_member_name() {
+    let source = "declare class C { static static(p): number; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    parser.parse_source_file();
+
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Unexpected diagnostics: {:?}",
+        parser.get_diagnostics()
+    );
+}
+
+#[test]
+fn test_thin_parser_async_function_expression_keyword_name() {
+    let source = "var v = async function await(): Promise<void> { }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    parser.parse_source_file();
+
+    let codes: Vec<u32> = parser.get_diagnostics().iter().map(|diag| diag.code).collect();
+    assert!(
+        !codes.contains(&diagnostic_codes::TOKEN_EXPECTED),
+        "Unexpected TS1005 diagnostics: {:?}",
+        parser.get_diagnostics()
+    );
+    assert!(
+        !codes.contains(&diagnostic_codes::EXPRESSION_EXPECTED),
+        "Unexpected TS1109 diagnostics: {:?}",
+        parser.get_diagnostics()
+    );
+}
+
+#[test]
+fn test_thin_parser_static_block_with_modifiers() {
+    let source = "class C { async static { } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    parser.parse_source_file();
+
+    let codes: Vec<u32> = parser.get_diagnostics().iter().map(|diag| diag.code).collect();
+    assert!(
+        !codes.contains(&diagnostic_codes::DECLARATION_OR_STATEMENT_EXPECTED),
+        "Unexpected TS1128 diagnostics: {:?}",
+        parser.get_diagnostics()
+    );
+    assert!(
+        codes.contains(&diagnostic_codes::MODIFIERS_NOT_ALLOWED_HERE),
+        "Expected TS1184 diagnostics: {:?}",
+        parser.get_diagnostics()
+    );
+}
+
+#[test]
 fn test_thin_parser_object_binding_pattern_span() {
     let source = "const { foo } = bar;";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -286,6 +337,58 @@ fn test_thin_parser_template_expression_spans() {
         &source[expr.pos as usize..expr.end as usize],
         expr.pos,
         expr.end
+    );
+}
+
+#[test]
+fn test_thin_parser_unterminated_template_expression_no_crash() {
+    let source = "var v = `foo ${ a";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    assert!(!root.is_none());
+    assert!(
+        parser.get_diagnostics().iter().any(|diag| diag.code == diagnostic_codes::TOKEN_EXPECTED),
+        "Expected a token expected diagnostic, got: {:?}",
+        parser.get_diagnostics()
+    );
+}
+
+#[test]
+fn test_thin_parser_unterminated_template_literal_reports_ts1160() {
+    let source = "`";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    assert!(!root.is_none());
+    assert!(
+        parser.get_diagnostics().iter().any(|diag| diag.code == diagnostic_codes::UNTERMINATED_TEMPLATE_LITERAL),
+        "Expected unterminated template literal diagnostic, got: {:?}",
+        parser.get_diagnostics()
+    );
+}
+
+#[test]
+fn test_thin_parser_template_literal_property_name_no_ts1160() {
+    let source = "var x = { `abc${ 123 }def${ 456 }ghi`: 321 };";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    assert!(!root.is_none());
+    let diagnostics = parser.get_diagnostics();
+    assert!(
+        diagnostics
+            .iter()
+            .any(|diag| diag.code == diagnostic_codes::PROPERTY_ASSIGNMENT_EXPECTED),
+        "Expected property assignment expected diagnostic, got: {:?}",
+        diagnostics
+    );
+    assert!(
+        diagnostics
+            .iter()
+            .all(|diag| diag.code != diagnostic_codes::UNTERMINATED_TEMPLATE_LITERAL),
+        "Did not expect unterminated template literal diagnostic, got: {:?}",
+        diagnostics
     );
 }
 

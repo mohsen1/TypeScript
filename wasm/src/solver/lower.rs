@@ -821,7 +821,9 @@ impl<'a> TypeLowering<'a> {
                     call_signatures,
                     construct_signatures,
                     properties,
-                ..Default::default() });
+                    string_index,
+                    number_index,
+                });
             }
 
             if string_index.is_some() || number_index.is_some() {
@@ -964,7 +966,9 @@ impl<'a> TypeLowering<'a> {
                 call_signatures: parts.call_signatures,
                 construct_signatures: parts.construct_signatures,
                 properties,
-            ..Default::default() });
+                string_index: parts.string_index,
+                number_index: parts.number_index,
+            });
         }
 
         if parts.string_index.is_some() || parts.number_index.is_some() {

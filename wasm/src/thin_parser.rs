@@ -325,6 +325,13 @@ impl ThinParserState {
         self.parse_error_at_current_token(&format!("'{}' expected", token), diagnostic_codes::TOKEN_EXPECTED);
     }
 
+    /// Error: Unterminated template literal (TS1160)
+    fn error_unterminated_template_literal_at(&mut self, start: u32, end: u32) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+        let length = end.saturating_sub(start).max(1);
+        self.parse_error_at(start, length, "Unterminated template literal.", diagnostic_codes::UNTERMINATED_TEMPLATE_LITERAL);
+    }
+
     /// Error: Declaration expected (TS1146)
     fn error_declaration_expected(&mut self) {
         use crate::checker::types::diagnostics::diagnostic_codes;
@@ -341,6 +348,15 @@ impl ThinParserState {
     fn error_unexpected_token(&mut self) {
         use crate::checker::types::diagnostics::diagnostic_codes;
         self.parse_error_at_current_token("Unexpected token", diagnostic_codes::UNEXPECTED_TOKEN);
+    }
+
+    /// Error: 'async' modifier cannot be used here. (TS1042)
+    fn error_async_modifier_cannot_be_used_here(&mut self) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+        self.parse_error_at_current_token(
+            "'async' modifier cannot be used here.",
+            diagnostic_codes::ASYNC_MODIFIER_CANNOT_BE_USED_HERE,
+        );
     }
 
     /// Parse semicolon (or recover from missing)
@@ -624,6 +640,31 @@ impl ThinParserState {
                 // Look ahead to see if it's "async function"
                 if self.look_ahead_is_async_function() {
                     self.parse_async_function_declaration()
+                } else if self.look_ahead_is_async_declaration() {
+                    let start_pos = self.token_pos();
+                    self.error_async_modifier_cannot_be_used_here();
+                    let async_start = self.token_pos();
+                    self.parse_expected(SyntaxKind::AsyncKeyword);
+                    let async_end = self.token_end();
+                    let async_modifier = self.arena.add_token(
+                        SyntaxKind::AsyncKeyword as u16,
+                        async_start,
+                        async_end,
+                    );
+                    let modifiers = Some(self.make_node_list(vec![async_modifier]));
+                    match self.token() {
+                        SyntaxKind::ClassKeyword => self.parse_class_declaration_with_modifiers(start_pos, modifiers),
+                        SyntaxKind::EnumKeyword => self.parse_enum_declaration_with_modifiers(start_pos, modifiers),
+                        SyntaxKind::InterfaceKeyword => self.parse_interface_declaration(),
+                        SyntaxKind::NamespaceKeyword | SyntaxKind::ModuleKeyword => {
+                            if self.look_ahead_is_module_declaration() {
+                                self.parse_module_declaration()
+                            } else {
+                                self.parse_expression_statement()
+                            }
+                        }
+                        _ => self.parse_expression_statement(),
+                    }
                 } else {
                     // It's an async arrow function as expression statement
                     self.parse_expression_statement()
@@ -638,9 +679,46 @@ impl ThinParserState {
                 // abstract class declaration
                 if self.look_ahead_is_abstract_class() {
                     self.parse_abstract_class_declaration()
+                } else if self.look_ahead_is_abstract_declaration() {
+                    use crate::checker::types::diagnostics::diagnostic_codes;
+                    self.parse_error_at_current_token(
+                        "Modifiers cannot appear here.",
+                        diagnostic_codes::MODIFIERS_NOT_ALLOWED_HERE,
+                    );
+                    self.next_token();
+                    match self.token() {
+                        SyntaxKind::InterfaceKeyword => self.parse_interface_declaration(),
+                        SyntaxKind::EnumKeyword => self.parse_enum_declaration(),
+                        SyntaxKind::NamespaceKeyword | SyntaxKind::ModuleKeyword => {
+                            if self.look_ahead_is_module_declaration() {
+                                self.parse_module_declaration()
+                            } else {
+                                self.parse_expression_statement()
+                            }
+                        }
+                        _ => self.parse_expression_statement(),
+                    }
                 } else {
                     self.parse_expression_statement()
                 }
+            }
+            SyntaxKind::AccessorKeyword => {
+                if self.look_ahead_is_accessor_declaration() {
+                    use crate::checker::types::diagnostics::diagnostic_codes;
+                    self.parse_error_at_current_token(
+                        "Modifiers cannot appear here.",
+                        diagnostic_codes::MODIFIERS_NOT_ALLOWED_HERE,
+                    );
+                    self.next_token();
+                    self.parse_statement()
+                } else {
+                    self.parse_expression_statement()
+                }
+            }
+            SyntaxKind::DefaultKeyword => {
+                self.error_unexpected_token();
+                self.next_token();
+                self.parse_statement()
             }
             SyntaxKind::InterfaceKeyword => self.parse_interface_declaration(),
             SyntaxKind::TypeKeyword => {
@@ -710,6 +788,27 @@ impl ThinParserState {
         is_function
     }
 
+    /// Look ahead to see if "async" is followed by a declaration keyword.
+    fn look_ahead_is_async_declaration(&mut self) -> bool {
+        let snapshot = self.scanner.save_state();
+        let current = self.current_token;
+
+        // Skip 'async'
+        self.next_token();
+        let is_decl = matches!(
+            self.token(),
+            SyntaxKind::ClassKeyword
+                | SyntaxKind::InterfaceKeyword
+                | SyntaxKind::EnumKeyword
+                | SyntaxKind::NamespaceKeyword
+                | SyntaxKind::ModuleKeyword
+        );
+
+        self.scanner.restore_state(snapshot);
+        self.current_token = current;
+        is_decl
+    }
+
     /// Look ahead to see if we have "abstract class"
     fn look_ahead_is_abstract_class(&mut self) -> bool {
         let snapshot = self.scanner.save_state();
@@ -722,6 +821,53 @@ impl ThinParserState {
         self.scanner.restore_state(snapshot);
         self.current_token = current;
         is_class
+    }
+
+    /// Look ahead to see if "abstract" is followed by another declaration keyword.
+    fn look_ahead_is_abstract_declaration(&mut self) -> bool {
+        let snapshot = self.scanner.save_state();
+        let current = self.current_token;
+
+        self.next_token(); // skip 'abstract'
+        let is_decl = matches!(
+            self.token(),
+            SyntaxKind::InterfaceKeyword
+                | SyntaxKind::EnumKeyword
+                | SyntaxKind::NamespaceKeyword
+                | SyntaxKind::ModuleKeyword
+        );
+
+        self.scanner.restore_state(snapshot);
+        self.current_token = current;
+        is_decl
+    }
+
+    /// Look ahead to see if "accessor" is followed by a declaration keyword.
+    fn look_ahead_is_accessor_declaration(&mut self) -> bool {
+        let snapshot = self.scanner.save_state();
+        let current = self.current_token;
+
+        self.next_token(); // skip 'accessor'
+        let is_decl = matches!(
+            self.token(),
+            SyntaxKind::ClassKeyword
+                | SyntaxKind::InterfaceKeyword
+                | SyntaxKind::EnumKeyword
+                | SyntaxKind::NamespaceKeyword
+                | SyntaxKind::ModuleKeyword
+                | SyntaxKind::DeclareKeyword
+                | SyntaxKind::VarKeyword
+                | SyntaxKind::LetKeyword
+                | SyntaxKind::ConstKeyword
+                | SyntaxKind::TypeKeyword
+                | SyntaxKind::FunctionKeyword
+                | SyntaxKind::ImportKeyword
+                | SyntaxKind::ExportKeyword
+        );
+
+        self.scanner.restore_state(snapshot);
+        self.current_token = current;
+        is_decl
     }
 
     /// Look ahead to see if we have "import identifier ="
@@ -1223,8 +1369,8 @@ impl ThinParserState {
         let asterisk_token = self.parse_optional(SyntaxKind::AsteriskToken);
 
         // Parse optional name (function expressions can be anonymous)
-        let name = if self.is_token(SyntaxKind::Identifier) {
-            self.parse_identifier()
+        let name = if self.is_identifier_or_keyword() {
+            self.parse_identifier_name()
         } else {
             NodeIndex::NONE
         };
@@ -1459,6 +1605,51 @@ impl ThinParserState {
             end_pos,
             ClassData {
                 modifiers: None,
+                name,
+                type_parameters,
+                heritage_clauses,
+                members,
+            },
+        )
+    }
+
+    /// Parse class declaration with explicit modifiers.
+    fn parse_class_declaration_with_modifiers(
+        &mut self,
+        start_pos: u32,
+        modifiers: Option<NodeList>,
+    ) -> NodeIndex {
+        self.parse_expected(SyntaxKind::ClassKeyword);
+
+        // Parse class name - keywords like 'any', 'string' can be used as class names
+        let name = if self.is_identifier_or_keyword() {
+            self.parse_identifier_name()
+        } else {
+            NodeIndex::NONE
+        };
+
+        // Parse type parameters: class Foo<T, U> {}
+        let type_parameters = if self.is_token(SyntaxKind::LessThanToken) {
+            Some(self.parse_type_parameters())
+        } else {
+            None
+        };
+
+        // Parse heritage clauses (extends, implements)
+        let heritage_clauses = self.parse_heritage_clauses();
+
+        // Parse class body
+        self.parse_expected(SyntaxKind::OpenBraceToken);
+        let members = self.parse_class_members();
+        self.parse_expected(SyntaxKind::CloseBraceToken);
+
+        let end_pos = self.token_end();
+        self.arena.add_class(
+            syntax_kind_ext::CLASS_DECLARATION,
+            start_pos,
+            end_pos,
+            ClassData {
+                modifiers,
                 name,
                 type_parameters,
                 heritage_clauses,
@@ -1852,10 +2043,12 @@ impl ThinParserState {
         let mut expr = if self.is_token(SyntaxKind::ClassKeyword) {
             // Inline class expression in extends clause: class extends class Expr {} {...}
             self.parse_class_expression()
+        } else if self.is_token(SyntaxKind::ThisKeyword) {
+            self.parse_this_expression()
         } else if self.is_identifier_or_keyword() {
             self.parse_identifier_name()
         } else {
-            self.parse_identifier()
+            self.parse_primary_expression()
         };
 
         // Handle property access chain and call expressions: Foo.Bar.Baz or Mixin(Parent)
@@ -1972,6 +2165,9 @@ impl ThinParserState {
         let mut modifiers = Vec::new();
 
         loop {
+            if self.should_stop_class_member_modifier() {
+                break;
+            }
             let start_pos = self.token_pos();
             let modifier = match self.token() {
                 SyntaxKind::StaticKeyword => {
@@ -2044,6 +2240,34 @@ impl ThinParserState {
         } else {
             Some(self.make_node_list(modifiers))
         }
+    }
+
+    fn should_stop_class_member_modifier(&mut self) -> bool {
+        if !self.is_token(SyntaxKind::StaticKeyword) {
+            return false;
+        }
+
+        if self.look_ahead_is_static_block() {
+            return true;
+        }
+
+        let snapshot = self.scanner.save_state();
+        let current = self.current_token;
+        self.next_token();
+        let next = self.current_token;
+        self.scanner.restore_state(snapshot);
+        self.current_token = current;
+
+        matches!(
+            next,
+            SyntaxKind::OpenParenToken
+                | SyntaxKind::LessThanToken
+                | SyntaxKind::QuestionToken
+                | SyntaxKind::ExclamationToken
+                | SyntaxKind::ColonToken
+                | SyntaxKind::EqualsToken
+                | SyntaxKind::SemicolonToken
+        )
     }
 
     /// Parse constructor with modifiers
@@ -2187,6 +2411,17 @@ impl ThinParserState {
 
         // Parse modifiers (static, public, private, protected, readonly, abstract, override)
         let modifiers = self.parse_class_member_modifiers();
+
+        // Handle static block after modifiers: { ... }
+        if self.is_token(SyntaxKind::StaticKeyword) && self.look_ahead_is_static_block() {
+            if modifiers.is_some() {
+                self.parse_error_at_current_token(
+                    "Modifiers cannot appear on a static block.",
+                    diagnostic_codes::MODIFIERS_NOT_ALLOWED_HERE,
+                );
+            }
+            return self.parse_static_block();
+        }
 
         // Handle constructor
         if self.is_token(SyntaxKind::ConstructorKeyword) {
@@ -2367,11 +2602,7 @@ impl ThinParserState {
         self.next_token();
 
         // Check for property name (identifier, private identifier, string, number, or computed)
-        let has_name = self.is_token(SyntaxKind::Identifier) ||
-                       self.is_token(SyntaxKind::PrivateIdentifier) ||
-                       self.is_token(SyntaxKind::StringLiteral) ||
-                       self.is_token(SyntaxKind::NumericLiteral) ||
-                       self.is_token(SyntaxKind::OpenBracketToken);
+        let has_name = self.is_property_name();
 
         self.scanner.restore_state(snapshot);
         self.current_token = current;
@@ -2611,6 +2842,25 @@ impl ThinParserState {
     /// Parse a single type member (property signature, method signature, call signature, construct signature)
     fn parse_type_member(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
+
+        // Handle invalid access modifiers (private/protected/public) on type members.
+        if matches!(
+            self.token(),
+            SyntaxKind::PrivateKeyword
+                | SyntaxKind::ProtectedKeyword
+                | SyntaxKind::PublicKeyword
+                | SyntaxKind::AccessorKeyword
+        ) {
+            use crate::checker::types::diagnostics::diagnostic_codes;
+            self.parse_error_at_current_token(
+                "Modifiers cannot appear here.",
+                diagnostic_codes::MODIFIERS_NOT_ALLOWED_HERE,
+            );
+            self.next_token();
+            if self.is_token(SyntaxKind::OpenBracketToken) && self.look_ahead_is_index_signature() {
+                return self.parse_index_signature_with_modifiers(None, start_pos);
+            }
+        }
 
         // Handle generic call signature: <T>(): returnType
         if self.is_token(SyntaxKind::LessThanToken) {
@@ -3037,8 +3287,10 @@ impl ThinParserState {
             // Enum member names can be identifiers or string literals
             let name = if self.is_token(SyntaxKind::StringLiteral) {
                 self.parse_string_literal()
+            } else if self.is_token(SyntaxKind::PrivateIdentifier) {
+                self.parse_private_identifier()
             } else {
-                self.parse_identifier()
+                self.parse_identifier_name()
             };
 
             let initializer = if self.parse_optional(SyntaxKind::EqualsToken) {
@@ -3566,6 +3818,7 @@ impl ThinParserState {
         let expression = match self.token() {
             SyntaxKind::FunctionKeyword => self.parse_function_declaration(),
             SyntaxKind::ClassKeyword => self.parse_class_declaration(),
+            SyntaxKind::AbstractKeyword => self.parse_abstract_class_declaration(),
             _ => {
                 let expr = self.parse_assignment_expression();
                 self.parse_semicolon();
@@ -3727,6 +3980,31 @@ impl ThinParserState {
             SyntaxKind::AsyncKeyword => {
                 if self.look_ahead_is_async_function() {
                     self.parse_async_function_declaration()
+                } else if self.look_ahead_is_async_declaration() {
+                    let start_pos = self.token_pos();
+                    self.error_async_modifier_cannot_be_used_here();
+                    let async_start = self.token_pos();
+                    self.parse_expected(SyntaxKind::AsyncKeyword);
+                    let async_end = self.token_end();
+                    let async_modifier = self.arena.add_token(
+                        SyntaxKind::AsyncKeyword as u16,
+                        async_start,
+                        async_end,
+                    );
+                    let modifiers = Some(self.make_node_list(vec![async_modifier]));
+                    match self.token() {
+                        SyntaxKind::ClassKeyword => self.parse_class_declaration_with_modifiers(start_pos, modifiers),
+                        SyntaxKind::EnumKeyword => self.parse_enum_declaration_with_modifiers(start_pos, modifiers),
+                        SyntaxKind::InterfaceKeyword => self.parse_interface_declaration(),
+                        SyntaxKind::NamespaceKeyword | SyntaxKind::ModuleKeyword => {
+                            if self.look_ahead_is_module_declaration() {
+                                self.parse_module_declaration()
+                            } else {
+                                self.parse_expression_statement()
+                            }
+                        }
+                        _ => self.parse_expression_statement(),
+                    }
                 } else {
                     self.parse_expression_statement()
                 }
@@ -5002,8 +5280,11 @@ impl ThinParserState {
                     // Handle both regular identifiers and private identifiers (#name)
                     let name = if self.is_token(SyntaxKind::PrivateIdentifier) {
                         self.parse_private_identifier()
-                    } else {
+                    } else if self.is_identifier_or_keyword() {
                         self.parse_identifier_name()
+                    } else {
+                        self.error_identifier_expected();
+                        NodeIndex::NONE
                     };
                     let end_pos = self.token_end();
 
@@ -5276,6 +5557,7 @@ impl ThinParserState {
     fn parse_primary_expression(&mut self) -> NodeIndex {
         match self.token() {
             SyntaxKind::Identifier => self.parse_identifier(),
+            SyntaxKind::PrivateIdentifier => self.parse_private_identifier(),
             SyntaxKind::NumericLiteral => self.parse_numeric_literal(),
             SyntaxKind::BigIntLiteral => self.parse_bigint_literal(),
             SyntaxKind::StringLiteral => self.parse_string_literal(),
@@ -5764,9 +6046,13 @@ impl ThinParserState {
     /// Parse no-substitution template literal: `hello`
     fn parse_no_substitution_template_literal(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
+        let is_unterminated = self.scanner.is_unterminated();
         let text = self.scanner.get_token_value_ref().to_string();
         let end_pos = self.token_end();
         self.parse_expected(SyntaxKind::NoSubstitutionTemplateLiteral);
+        if is_unterminated {
+            self.error_unterminated_template_literal_at(start_pos, end_pos);
+        }
 
         self.arena.add_literal(
             SyntaxKind::NoSubstitutionTemplateLiteral as u16,
@@ -5799,6 +6085,28 @@ impl ThinParserState {
             // Parse expression in ${ }
             let expression = self.parse_expression();
 
+            if !self.is_token(SyntaxKind::CloseBraceToken) {
+                // Unterminated template expression - report and synthesize tail to avoid looping.
+                self.error_token_expected("}");
+                let literal_start = self.token_pos();
+                let literal_end = self.token_end();
+                let literal = self.arena.add_literal(
+                    SyntaxKind::TemplateTail as u16,
+                    literal_start,
+                    literal_end,
+                    LiteralData { text: String::new(), raw_text: None, value: None },
+                );
+                let span_start = self.arena.get(expression).map(|node| node.pos).unwrap_or(literal_start);
+                let span = self.arena.add_template_span(
+                    syntax_kind_ext::TEMPLATE_SPAN,
+                    span_start,
+                    literal_end,
+                    TemplateSpanData { expression, literal },
+                );
+                spans.push(span);
+                break literal_end;
+            }
+
             // Now we need to rescan the } as a template continuation
             // The scanner needs to be told to rescan as template
             self.scanner.re_scan_template_token(false);
@@ -5806,13 +6114,32 @@ impl ThinParserState {
 
             // Parse template middle or tail
             let literal_start = self.token_pos();
-            let literal_text = self.scanner.get_token_value_ref().to_string();
             let is_tail = self.is_token(SyntaxKind::TemplateTail);
-            let literal_kind = if is_tail {
-                SyntaxKind::TemplateTail
-            } else {
-                SyntaxKind::TemplateMiddle
-            };
+            let is_middle = self.is_token(SyntaxKind::TemplateMiddle);
+            if !is_tail && !is_middle {
+                // Unexpected token after template span - report and finish.
+                self.error_token_expected("`");
+                let literal_end = self.token_end();
+                let literal = self.arena.add_literal(
+                    SyntaxKind::TemplateTail as u16,
+                    literal_start,
+                    literal_end,
+                    LiteralData { text: String::new(), raw_text: None, value: None },
+                );
+                let span_start = self.arena.get(expression).map(|node| node.pos).unwrap_or(literal_start);
+                let span = self.arena.add_template_span(
+                    syntax_kind_ext::TEMPLATE_SPAN,
+                    span_start,
+                    literal_end,
+                    TemplateSpanData { expression, literal },
+                );
+                spans.push(span);
+                break literal_end;
+            }
+
+            let is_unterminated = self.scanner.is_unterminated();
+            let literal_text = self.scanner.get_token_value_ref().to_string();
+            let literal_kind = if is_tail { SyntaxKind::TemplateTail } else { SyntaxKind::TemplateMiddle };
 
             let literal_end = self.token_end();
             self.next_token();
@@ -5823,6 +6150,9 @@ impl ThinParserState {
                 literal_end,
                 LiteralData { text: literal_text, raw_text: None, value: None },
             );
+            if is_unterminated {
+                self.error_unterminated_template_literal_at(literal_start, literal_end);
+            }
 
             let span_start = if let Some(node) = self.arena.get(expression) { node.pos } else { literal_start };
             let span = self.arena.add_template_span(
@@ -5935,7 +6265,9 @@ impl ThinParserState {
         let mut properties = Vec::new();
         while !self.is_token(SyntaxKind::CloseBraceToken) {
             let prop = self.parse_property_assignment();
-            properties.push(prop);
+            if !prop.is_none() {
+                properties.push(prop);
+            }
 
             if !self.parse_optional(SyntaxKind::CommaToken) {
                 break;
@@ -5976,6 +6308,23 @@ impl ThinParserState {
             );
         }
 
+        // Handle invalid modifiers before index signatures in object literals.
+        if matches!(
+            self.token(),
+            SyntaxKind::PrivateKeyword | SyntaxKind::ProtectedKeyword | SyntaxKind::PublicKeyword
+        ) {
+            use crate::checker::types::diagnostics::diagnostic_codes;
+            self.parse_error_at_current_token(
+                "Modifiers cannot appear here.",
+                diagnostic_codes::MODIFIERS_NOT_ALLOWED_HERE,
+            );
+            self.next_token();
+            if self.is_token(SyntaxKind::OpenBracketToken) && self.look_ahead_is_index_signature() {
+                let _ = self.parse_index_signature_with_modifiers(None, start_pos);
+                return NodeIndex::NONE;
+            }
+        }
+
         // Handle get accessor: get foo() { }
         if self.is_token(SyntaxKind::GetKeyword) && self.look_ahead_is_object_method() {
             return self.parse_object_get_accessor(start_pos);
@@ -5995,6 +6344,33 @@ impl ThinParserState {
         if self.is_token(SyntaxKind::AsteriskToken) {
             self.next_token(); // consume '*'
             return self.parse_object_method(start_pos, false, true);
+        }
+
+        if self.is_token(SyntaxKind::NoSubstitutionTemplateLiteral)
+            || self.is_token(SyntaxKind::TemplateHead)
+        {
+            use crate::checker::types::diagnostics::diagnostic_codes;
+            self.parse_error_at_current_token(
+                "Property assignment expected.",
+                diagnostic_codes::PROPERTY_ASSIGNMENT_EXPECTED,
+            );
+            let name = self.parse_template_literal();
+            let initializer = if self.parse_optional(SyntaxKind::ColonToken) {
+                self.parse_assignment_expression()
+            } else {
+                name
+            };
+            let end_pos = self.token_end();
+            return self.arena.add_property_assignment(
+                syntax_kind_ext::PROPERTY_ASSIGNMENT,
+                start_pos,
+                end_pos,
+                crate::parser::thin_node::PropertyAssignmentData {
+                    modifiers: None,
+                    name,
+                    initializer,
+                },
+            );
         }
 
         let name = self.parse_property_name();
@@ -6326,8 +6702,11 @@ impl ThinParserState {
                     self.next_token();
                     let name = if self.is_token(SyntaxKind::PrivateIdentifier) {
                         self.parse_private_identifier()
-                    } else {
+                    } else if self.is_identifier_or_keyword() {
                         self.parse_identifier_name()
+                    } else {
+                        self.error_identifier_expected();
+                        NodeIndex::NONE
                     };
                     let end_pos = self.token_end();
 
@@ -6728,6 +7107,7 @@ impl ThinParserState {
                 // Parse keyword as identifier for type reference
                 self.parse_keyword_as_identifier()
             }
+            SyntaxKind::PrivateIdentifier => self.parse_private_identifier(),
             _ => {
                 // Regular identifier
                 self.parse_identifier()
@@ -7155,10 +7535,15 @@ impl ThinParserState {
     /// Parse template literal head (NoSubstitutionTemplateLiteral or TemplateHead)
     fn parse_template_literal_head(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
+        let is_unterminated = self.scanner.is_unterminated();
         let kind = self.token() as u16;
         let text = self.scanner.get_token_value_ref().to_string();
+        let literal_end = self.token_end();
         self.next_token();
         let end_pos = self.token_end();
+        if is_unterminated {
+            self.error_unterminated_template_literal_at(start_pos, literal_end);
+        }
         self.arena.add_literal(
             kind,
             start_pos,
@@ -7170,10 +7555,15 @@ impl ThinParserState {
     /// Parse template literal span (TemplateMiddle or TemplateTail)
     fn parse_template_literal_span(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
+        let is_unterminated = self.scanner.is_unterminated();
         let kind = self.token() as u16;
         let text = self.scanner.get_token_value_ref().to_string();
+        let literal_end = self.token_end();
         self.next_token();
         let end_pos = self.token_end();
+        if is_unterminated {
+            self.error_unterminated_template_literal_at(start_pos, literal_end);
+        }
         self.arena.add_literal(
             kind,
             start_pos,

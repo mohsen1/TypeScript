@@ -154,6 +154,8 @@ pub mod diagnostic_messages {
         "'{0}', which lacks return-type annotation, implicitly has an '{1}' return type.";
     pub const IMPLICIT_ANY_RETURN_FUNCTION_EXPRESSION: &str =
         "Function expression, which lacks return-type annotation, implicitly has an '{0}' return type.";
+    pub const CANNOT_FIND_NAME_DID_YOU_MEAN: &str =
+        "Cannot find name '{0}'. Did you mean '{1}'?";
 
     // Scanner/parser errors
     pub const NUMERIC_SEPARATORS_NOT_ALLOWED_HERE: &str = "Numeric separators are not allowed here.";
@@ -168,12 +170,14 @@ pub mod diagnostic_codes {
     // Scanner/Parser errors (1xxx)
     // =========================================================================
     pub const UNTERMINATED_STRING_LITERAL: u32 = 1002;
+    pub const UNTERMINATED_TEMPLATE_LITERAL: u32 = 1160;
     pub const IDENTIFIER_EXPECTED: u32 = 1003;
     pub const TOKEN_EXPECTED: u32 = 1005;  // '{0}' expected.
     pub const TRAILING_COMMA_NOT_ALLOWED: u32 = 1009;
     pub const UNEXPECTED_TOKEN: u32 = 1012;
     pub const REST_PARAMETER_MUST_BE_LAST: u32 = 1014;
     pub const PARAMETER_CANNOT_HAVE_INITIALIZER: u32 = 1015;
+    pub const ASYNC_MODIFIER_CANNOT_BE_USED_HERE: u32 = 1042;  // 'async' modifier cannot be used here.
     pub const SETTER_MUST_HAVE_EXACTLY_ONE_PARAMETER: u32 = 1049;
     pub const SETTER_PARAMETER_CANNOT_HAVE_INITIALIZER: u32 = 1052;  // A 'set' accessor parameter cannot have an initializer.
     pub const SETTER_CANNOT_HAVE_REST_PARAMETER: u32 = 1053;  // A 'set' accessor cannot have rest parameter.
@@ -221,6 +225,7 @@ pub mod diagnostic_codes {
     pub const ARGUMENT_NOT_ASSIGNABLE_TO_PARAMETER: u32 = 2345;
     pub const CANNOT_INVOKE_NON_FUNCTION: u32 = 2349;
     pub const CANNOT_INVOKE_POSSIBLY_UNDEFINED: u32 = 2722;
+    pub const CANNOT_FIND_NAME_DID_YOU_MEAN: u32 = 2552;  // Cannot find name '{0}'. Did you mean '{1}'?
     pub const EXPECTED_ARGUMENTS: u32 = 2554;  // Expected {0} arguments, but got {1}
     pub const EXPECTED_AT_LEAST_ARGUMENTS: u32 = 2555;
     pub const NO_OVERLOAD_MATCHES_CALL: u32 = 2769;
