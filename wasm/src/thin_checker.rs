@@ -6077,14 +6077,39 @@ impl<'a> ThinCheckerState<'a> {
             return TypeId::ANY;
         };
 
-        let Some(func) = self.ctx.arena.get_function(node) else {
-            return TypeId::ANY;
-        };
+        let (type_parameters, parameters, type_annotation, body, name_node, name_for_error) =
+            if let Some(func) = self.ctx.arena.get_function(node) {
+                let name_node = if func.name.is_none() { None } else { Some(func.name) };
+                let name_for_error = if func.name.is_none() {
+                    None
+                } else {
+                    self.get_function_name_from_node(idx)
+                };
+                (
+                    &func.type_parameters,
+                    &func.parameters,
+                    func.type_annotation,
+                    func.body,
+                    name_node,
+                    name_for_error,
+                )
+            } else if let Some(method) = self.ctx.arena.get_method_decl(node) {
+                (
+                    &method.type_parameters,
+                    &method.parameters,
+                    method.type_annotation,
+                    method.body,
+                    Some(method.name),
+                    self.property_name_for_error(method.name),
+                )
+            } else {
+                return TypeId::ANY;
+            };
 
         // Function declarations don't report implicit any for parameters (handled by check_statement)
         let is_function_declaration = node.kind == syntax_kind_ext::FUNCTION_DECLARATION;
 
-        let (type_params, type_param_updates) = self.push_type_parameters(&func.type_parameters);
+        let (type_params, type_param_updates) = self.push_type_parameters(type_parameters);
 
         // Collect parameter info using solver's ParamInfo struct
         let mut params = Vec::new();
@@ -6100,7 +6125,7 @@ impl<'a> ThinCheckerState<'a> {
         };
 
         let mut contextual_index = 0;
-        for &param_idx in func.parameters.nodes.iter() {
+        for &param_idx in parameters.nodes.iter() {
             if let Some(param_node) = self.ctx.arena.get(param_idx) {
                 if let Some(param) = self.ctx.arena.get_parameter(param_node) {
                     // Get parameter name
@@ -6169,14 +6194,14 @@ impl<'a> ThinCheckerState<'a> {
 
         // Check for parameter properties (error 2369)
         // Parameter properties are only allowed in constructors, not in regular functions
-        self.check_parameter_properties(&func.parameters.nodes);
+        self.check_parameter_properties(&parameters.nodes);
 
         // Get return type from annotation or infer
-        let has_type_annotation = !func.type_annotation.is_none();
+        let has_type_annotation = !type_annotation.is_none();
         let (mut return_type, type_predicate) = if has_type_annotation {
             // Check return type for parameter properties in function types
-            self.check_type_for_parameter_properties(func.type_annotation);
-            self.return_type_and_predicate(func.type_annotation)
+            self.check_type_for_parameter_properties(type_annotation);
+            self.return_type_and_predicate(type_annotation)
         } else {
             (TypeId::ANY, None)
         };
@@ -6186,28 +6211,22 @@ impl<'a> ThinCheckerState<'a> {
         return_type = self.evaluate_application_type(return_type);
 
         // Check the function body (for type errors within the body)
-        if !func.body.is_none() {
-            self.cache_parameter_types(&func.parameters.nodes, Some(&param_types));
+        if !body.is_none() {
+            self.cache_parameter_types(&parameters.nodes, Some(&param_types));
 
             // Check that parameter default values are assignable to declared types (TS2322)
-            self.check_parameter_initializers(&func.parameters.nodes);
+            self.check_parameter_initializers(&parameters.nodes);
 
             let mut has_contextual_return = false;
             if !has_type_annotation {
                 let return_context = ctx_helper.as_ref().and_then(|helper| helper.get_return_type());
                 has_contextual_return = return_context.is_some();
-                return_type = self.infer_return_type_from_body(func.body, return_context);
+                return_type = self.infer_return_type_from_body(body, return_context);
             }
 
             if !is_function_declaration {
-                let func_name = if !func.name.is_none() {
-                    self.get_function_name_from_node(idx)
-                } else {
-                    None
-                };
-                let name_node = if !func.name.is_none() { Some(func.name) } else { None };
                 self.maybe_report_implicit_any_return(
-                    func_name,
+                    name_for_error,
                     name_node,
                     return_type,
                     has_type_annotation,
@@ -6217,7 +6236,7 @@ impl<'a> ThinCheckerState<'a> {
             }
 
             self.push_return_type(return_type);
-            self.check_statement(func.body);
+            self.check_statement(body);
             self.pop_return_type();
         }
 
@@ -9510,8 +9529,8 @@ impl<'a> ThinCheckerState<'a> {
                     }
 
                     // Check function body if present
+                    let has_type_annotation = !func.type_annotation.is_none();
                     if !func.body.is_none() {
-                        let has_type_annotation = !func.type_annotation.is_none();
                         let mut return_type = if has_type_annotation {
                             self.get_type_of_node(func.type_annotation)
                         } else {
@@ -9566,6 +9585,24 @@ impl<'a> ThinCheckerState<'a> {
                         }
 
                         self.pop_return_type();
+                    } else if self.ctx.no_implicit_any && !has_type_annotation {
+                        let is_ambient = self.has_declare_modifier(&func.modifiers)
+                            || self.ctx.file_name.ends_with(".d.ts");
+                        if is_ambient {
+                            if let Some(func_name) = self.get_function_name_from_node(stmt_idx) {
+                                use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages, format_message};
+                                let message = format_message(
+                                    diagnostic_messages::IMPLICIT_ANY_RETURN,
+                                    &[&func_name, "any"],
+                                );
+                                let name_node = if !func.name.is_none() { Some(func.name) } else { None };
+                                self.error_at_node(
+                                    name_node.unwrap_or(stmt_idx),
+                                    &message,
+                                    diagnostic_codes::IMPLICIT_ANY_RETURN,
+                                );
+                            }
+                        }
                     }
 
                     self.pop_type_parameters(type_param_updates);
@@ -12413,6 +12450,13 @@ impl<'a> ThinCheckerState<'a> {
                     }
                 }
                 self.check_type_for_parameter_properties(sig.type_annotation);
+                if self.ctx.no_implicit_any && sig.type_annotation.is_none() {
+                    if let Some(name) = self.property_name_for_error(sig.name) {
+                        use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages, format_message};
+                        let message = format_message(diagnostic_messages::IMPLICIT_ANY_RETURN, &[&name, "any"]);
+                        self.error_at_node(sig.name, &message, diagnostic_codes::IMPLICIT_ANY_RETURN);
+                    }
+                }
             }
         }
         // Check property signatures for implicit any (error 7008)
@@ -13891,6 +13935,14 @@ impl<'a> ThinCheckerState<'a> {
             .unwrap_or_else(|| "parameter".to_string())
     }
 
+    fn property_name_for_error(&self, name_idx: NodeIndex) -> Option<String> {
+        self.get_property_name(name_idx).or_else(|| {
+            self.node_text(name_idx)
+                .map(|text| text.trim().to_string())
+                .filter(|text| !text.is_empty())
+        })
+    }
+
     fn is_this_parameter_name(&self, name_idx: NodeIndex) -> bool {
         if let Some(name_node) = self.ctx.arena.get(name_idx) {
             if name_node.kind == SyntaxKind::ThisKeyword as u16 {
@@ -14408,6 +14460,17 @@ impl<'a> ThinCheckerState<'a> {
             }
 
             self.pop_return_type();
+        } else if self.ctx.no_implicit_any && !has_type_annotation {
+            if let Some(class_info) = self.ctx.enclosing_class.as_ref() {
+                if class_info.is_declared && !self.has_private_modifier(&method.modifiers) {
+                    if let Some(name) = self.property_name_for_error(method.name) {
+                        use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages, format_message};
+                        let message =
+                            format_message(diagnostic_messages::IMPLICIT_ANY_RETURN, &[&name, "any"]);
+                        self.error_at_node(method.name, &message, diagnostic_codes::IMPLICIT_ANY_RETURN);
+                    }
+                }
+            }
         }
 
         self.pop_type_parameters(type_param_updates);

@@ -4505,6 +4505,42 @@ const anon = () => { return null; };
     assert_eq!(count(7011), 1, "Expected one 7011 error, got codes: {:?}", codes);
 }
 
+#[test]
+fn test_implicit_any_return_in_signatures() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// @noImplicitAny: true
+interface I {
+    foo();
+}
+
+declare function bar();
+
+declare class C {
+    publicMethod();
+}
+
+const obj = { baz() { return undefined; } };
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let count = |code| codes.iter().filter(|&&c| c == code).count();
+
+    assert_eq!(count(7010), 4, "Expected four 7010 errors, got codes: {:?}", codes);
+}
+
 /// Test that functions that only throw don't trigger TS2355.
 /// TS2355: "A function whose declared type is neither 'void' nor 'any' must return a value"
 /// This should NOT fire for functions that only throw since throwing is a valid exit.

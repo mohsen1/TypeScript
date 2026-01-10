@@ -1,31 +1,30 @@
 # Worker 1 Plan - Squad Forge
 
 ## Mission
-Implement TS2792 module resolution diagnostics.
+Implement TS7010 implicit-any return diagnostics.
 
 Status: Active
 Priority: 1
 
 ## Current Assignment
-TS2792 module resolution: missing relative vs package imports.
+TS7010 implicit-any return: signature-only declarations and object literal methods.
 
-**Error Code:** TS2792 - "Cannot find module '{0}' or its corresponding type declarations."
+**Error Code:** TS7010 - "'{0}', which lacks return-type annotation, implicitly has an '{1}' return type."
 
 ### Steps
-1. **Review existing implementation** - check_import_declaration in thin_checker.rs
-2. **Track ambient module declarations** in thin_binder.rs
-3. **Emit 2307 vs 2792** based on relative vs package specifiers
-4. **Add tests** for missing relative/package imports and run `./wasm/test.sh`.
+1. **Find missing contexts** - interface/type literal method signatures, `declare` functions/classes, object literal methods
+2. **Emit TS7010** for signature-only declarations with no return type annotation
+3. **Cover object literal methods** returning `null`/`undefined`/`any`
+4. **Add tests** and run `./wasm/test.sh`.
 
 ### Key Files
-- `wasm/src/thin_binder.rs`
 - `wasm/src/thin_checker.rs`
 - `wasm/src/thin_checker_tests.rs`
 
 ### Success Criteria
-- Missing relative imports emit TS2307
-- Missing package imports emit TS2792
-- Ambient module declarations skip module-not-found errors
+- Interface/type literal method signatures with missing return types emit TS7010
+- `declare` function/class signatures with missing return types emit TS7010
+- Object literal methods returning implicit-any emit TS7010
 
 ## Task Queue
 (empty - single focused task)
@@ -55,8 +54,9 @@ Yes
 
 ## Notes
 - Run `./wasm/test.sh` before pushing
-- Commit format: `[wasm] checker: implement TS2304 missing name diagnostics`
+- Commit format: `[wasm] checker: implement TS7010 implicit any return diagnostics`
 - Push to: `origin/worker/forge-1`
+- TS2792 changes already pushed to `origin/worker/forge-1` if you want to merge before TS7010 work
 - **NEVER edit**: `STRUCTURE.md`, `GOALS.md`, other workers' plan files, or anything in `orchestrator/`
 
 ## Resume Notes
@@ -73,3 +73,5 @@ Yes
 - TS2792 module resolution: ambient module tracking + missing import tests; `./wasm/test.sh` fails at `cli::driver_tests::compile_generic_utility_library_type_utilities`.
 - Conformance tests: Docker runner has path issue (lib.d.ts not copied), skipped for now.
 - Fixed cli driver utility-type test by scoping mapped type parameters during missing-name checks; made DeepReadonly/DeepPartial non-recursive and stubbed Object; `./wasm/test.sh compile_generic_utility_library_type_utilities` passing.
+- Ran `./wasm/test.sh implicit_any_return_in_signatures` (passed).
+- Ran full `./wasm/test.sh` - failing at `cli::driver_tests::compile_multi_file_project_with_default_and_named_imports` and `cli::driver_tests::compile_multi_file_project_with_imports` (module resolution 2307).
