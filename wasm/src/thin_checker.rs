@@ -609,10 +609,12 @@ impl<'a> ThinCheckerState<'a> {
                         self.error_value_only_type_at(&name, type_name_idx);
                         return TypeId::ERROR;
                     }
-                    // Ensure the base type symbol is resolved first so its type params
-                    // are available in the type_env for Application expansion
-                    let _ = self.get_type_of_symbol(sym_id);
                     if let Some(args) = &type_ref.type_arguments {
+                        if self.should_resolve_recursive_type_alias(sym_id, args) {
+                            // Ensure the base type symbol is resolved first so its type params
+                            // are available in the type_env for Application expansion
+                            let _ = self.get_type_of_symbol(sym_id);
+                        }
                         for &arg_idx in &args.nodes {
                             let _ = self.get_type_from_type_node(arg_idx);
                         }
@@ -652,9 +654,13 @@ impl<'a> ThinCheckerState<'a> {
                                 self.error_value_only_type_at(name, type_name_idx);
                                 return TypeId::ERROR;
                             }
-                            // Ensure the base type symbol is resolved first so its type params
-                            // are available in the type_env for Application expansion
-                            let _ = self.get_type_of_symbol(sym_id);
+                            if let Some(args) = &type_ref.type_arguments {
+                                if self.should_resolve_recursive_type_alias(sym_id, args) {
+                                    // Ensure the base type symbol is resolved first so its type params
+                                    // are available in the type_env for Application expansion
+                                    let _ = self.get_type_of_symbol(sym_id);
+                                }
+                            }
                         }
                     }
                     // Also ensure type arguments are resolved and in type_env
@@ -736,6 +742,110 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         TypeId::ANY
+    }
+
+    fn should_resolve_recursive_type_alias(
+        &self,
+        sym_id: SymbolId,
+        type_args: &crate::parser::NodeList,
+    ) -> bool {
+        if !self.ctx.symbol_resolution_set.contains(&sym_id) {
+            return true;
+        }
+        if self.ctx.symbol_resolution_stack.last().copied() != Some(sym_id) {
+            return true;
+        }
+        let Some(symbol) = self.ctx.binder.get_symbol(sym_id) else {
+            return true;
+        };
+        if symbol.flags & symbol_flags::TYPE_ALIAS == 0 {
+            return true;
+        }
+        self.type_args_match_alias_params(sym_id, type_args)
+    }
+
+    fn type_args_match_alias_params(
+        &self,
+        sym_id: SymbolId,
+        type_args: &crate::parser::NodeList,
+    ) -> bool {
+        let Some(symbol) = self.ctx.binder.get_symbol(sym_id) else {
+            return false;
+        };
+        if symbol.flags & symbol_flags::TYPE_ALIAS == 0 {
+            return false;
+        }
+
+        let decl_idx = if !symbol.value_declaration.is_none() {
+            symbol.value_declaration
+        } else {
+            symbol.declarations.first().copied().unwrap_or(NodeIndex::NONE)
+        };
+        if decl_idx.is_none() {
+            return false;
+        }
+        let Some(node) = self.ctx.arena.get(decl_idx) else {
+            return false;
+        };
+        let Some(type_alias) = self.ctx.arena.get_type_alias(node) else {
+            return false;
+        };
+        let Some(type_params) = &type_alias.type_parameters else {
+            return false;
+        };
+        if type_params.nodes.len() != type_args.nodes.len() {
+            return false;
+        }
+
+        for (&param_idx, &arg_idx) in type_params.nodes.iter().zip(type_args.nodes.iter()) {
+            let Some(param_node) = self.ctx.arena.get(param_idx) else {
+                return false;
+            };
+            let Some(param) = self.ctx.arena.get_type_parameter(param_node) else {
+                return false;
+            };
+            let Some(param_name) = self
+                .ctx
+                .arena
+                .get(param.name)
+                .and_then(|node| self.ctx.arena.get_identifier(node))
+                .map(|ident| ident.escaped_text.as_str())
+            else {
+                return false;
+            };
+
+            let Some(arg_node) = self.ctx.arena.get(arg_idx) else {
+                return false;
+            };
+            if arg_node.kind == syntax_kind_ext::TYPE_REFERENCE {
+                let Some(arg_ref) = self.ctx.arena.get_type_ref(arg_node) else {
+                    return false;
+                };
+                if arg_ref.type_arguments.as_ref().map_or(false, |list| !list.nodes.is_empty()) {
+                    return false;
+                }
+                let Some(arg_name_node) = self.ctx.arena.get(arg_ref.type_name) else {
+                    return false;
+                };
+                let Some(arg_ident) = self.ctx.arena.get_identifier(arg_name_node) else {
+                    return false;
+                };
+                if arg_ident.escaped_text != param_name {
+                    return false;
+                }
+            } else if arg_node.kind == SyntaxKind::Identifier as u16 {
+                let Some(arg_ident) = self.ctx.arena.get_identifier(arg_node) else {
+                    return false;
+                };
+                if arg_ident.escaped_text != param_name {
+                    return false;
+                }
+            } else {
+                return false;
+            }
+        }
+
+        true
     }
 
     fn class_instance_type_from_symbol(&mut self, sym_id: SymbolId) -> Option<TypeId> {
@@ -2320,8 +2430,8 @@ impl<'a> ThinCheckerState<'a> {
                     call_signatures,
                     construct_signatures,
                     properties,
-                    string_index: derived_shape.string_index.clone().or_else(|| base_shape.string_index.clone()),
-                    number_index: derived_shape.number_index.clone().or_else(|| base_shape.number_index.clone()),
+                    string_index: derived_shape.string_index.clone().or(base_shape.string_index.clone()),
+                    number_index: derived_shape.number_index.clone().or(base_shape.number_index.clone()),
                 })
             }
             (Some(TypeKey::Callable(derived_shape_id)), Some(TypeKey::Object(base_shape_id))) => {
@@ -2344,8 +2454,8 @@ impl<'a> ThinCheckerState<'a> {
                     call_signatures: derived_shape.call_signatures.clone(),
                     construct_signatures: derived_shape.construct_signatures.clone(),
                     properties,
-                    string_index: derived_shape.string_index.clone().or_else(|| base_shape.string_index.clone()),
-                    number_index: derived_shape.number_index.clone().or_else(|| base_shape.number_index.clone()),
+                    string_index: derived_shape.string_index.clone().or(base_shape.string_index.clone()),
+                    number_index: derived_shape.number_index.clone().or(base_shape.number_index.clone()),
                 })
             }
             (Some(TypeKey::Object(derived_shape_id)), Some(TypeKey::Callable(base_shape_id))) => {
@@ -2368,8 +2478,8 @@ impl<'a> ThinCheckerState<'a> {
                     call_signatures: base_shape.call_signatures.clone(),
                     construct_signatures: base_shape.construct_signatures.clone(),
                     properties,
-                    string_index: derived_shape.string_index.clone().or_else(|| base_shape.string_index.clone()),
-                    number_index: derived_shape.number_index.clone().or_else(|| base_shape.number_index.clone()),
+                    string_index: derived_shape.string_index.clone().or(base_shape.string_index.clone()),
+                    number_index: derived_shape.number_index.clone().or(base_shape.number_index.clone()),
                 })
             }
             (Some(TypeKey::Object(derived_shape_id)), Some(TypeKey::Object(base_shape_id))) => {
@@ -4620,6 +4730,58 @@ impl<'a> ThinCheckerState<'a> {
         self.get_type_of_node(idx)
     }
 
+    /// Check an assignment expression, applying contextual typing to the RHS.
+    fn check_assignment_expression(
+        &mut self,
+        left_idx: NodeIndex,
+        right_idx: NodeIndex,
+        expr_idx: NodeIndex,
+    ) -> TypeId {
+        let left_target = self.get_type_of_assignment_target(left_idx);
+        let left_type = self.resolve_type_query_type(left_target);
+
+        let prev_context = self.ctx.contextual_type;
+        if left_type != TypeId::ANY && !self.type_contains_error(left_type) {
+            self.ctx.contextual_type = Some(left_type);
+        }
+
+        let right_raw = self.get_type_of_node(right_idx);
+        let right_type = self.resolve_type_query_type(right_raw);
+
+        self.ctx.contextual_type = prev_context;
+
+        self.ensure_application_symbols_resolved(right_type);
+        self.ensure_application_symbols_resolved(left_type);
+
+        self.check_readonly_assignment(left_idx, expr_idx);
+
+        if left_type != TypeId::ANY {
+            if let Some((source_level, target_level)) =
+                self.constructor_accessibility_mismatch_for_assignment(left_idx, right_idx)
+            {
+                self.error_constructor_accessibility_not_assignable(
+                    right_type,
+                    left_type,
+                    source_level,
+                    target_level,
+                    right_idx,
+                );
+            } else if !self.is_assignable_to(right_type, left_type) {
+                self.error_type_not_assignable_with_reason_at(right_type, left_type, right_idx);
+            }
+
+            if left_type != TypeId::UNKNOWN {
+                if let Some(right_node) = self.ctx.arena.get(right_idx) {
+                    if right_node.kind == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION {
+                        self.check_object_literal_excess_properties(right_type, left_type, right_idx);
+                    }
+                }
+            }
+        }
+
+        right_type
+    }
+
     /// Get type of binary expression.
     fn get_type_of_binary_expression(&mut self, idx: NodeIndex) -> TypeId {
         use crate::solver::{BinaryOpEvaluator, BinaryOpResult};
@@ -4647,46 +4809,16 @@ impl<'a> ThinCheckerState<'a> {
             let op_kind = binary.operator_token;
 
             if !visited {
-                stack.push((node_idx, true));
                 if op_kind == SyntaxKind::EqualsToken as u16 {
-                    stack.push((binary.right, false));
-                } else {
-                    stack.push((binary.right, false));
-                    stack.push((binary.left, false));
+                    let assign_type =
+                        self.check_assignment_expression(binary.left, binary.right, node_idx);
+                    type_stack.push(assign_type);
+                    continue;
                 }
-                continue;
-            }
 
-            if op_kind == SyntaxKind::EqualsToken as u16 {
-                let right_type = self.resolve_type_query_type(type_stack.pop().unwrap_or(TypeId::ANY));
-                let left_target = self.get_type_of_assignment_target(binary.left);
-                let left_type = self.resolve_type_query_type(left_target);
-                self.ensure_application_symbols_resolved(right_type);
-                self.ensure_application_symbols_resolved(left_type);
-                self.check_readonly_assignment(binary.left, node_idx);
-                if left_type != TypeId::ANY {
-                    if let Some((source_level, target_level)) =
-                        self.constructor_accessibility_mismatch_for_assignment(
-                            binary.left,
-                            binary.right,
-                        )
-                    {
-                        self.error_constructor_accessibility_not_assignable(
-                            right_type,
-                            left_type,
-                            source_level,
-                            target_level,
-                            binary.right,
-                        );
-                    } else if !self.is_assignable_to(right_type, left_type) {
-                        self.error_type_not_assignable_with_reason_at(
-                            right_type,
-                            left_type,
-                            binary.right,
-                        );
-                    }
-                }
-                type_stack.push(right_type);
+                stack.push((node_idx, true));
+                stack.push((binary.right, false));
+                stack.push((binary.left, false));
                 continue;
             }
 
@@ -10813,7 +10945,13 @@ impl<'a> ThinCheckerState<'a> {
 
         // Get the type of the return expression (if any)
         let return_type = if !return_data.expression.is_none() {
-            self.get_type_of_node(return_data.expression)
+            let prev_context = self.ctx.contextual_type;
+            if expected_type != TypeId::ANY && !self.type_contains_error(expected_type) {
+                self.ctx.contextual_type = Some(expected_type);
+            }
+            let return_type = self.get_type_of_node(return_data.expression);
+            self.ctx.contextual_type = prev_context;
+            return_type
         } else {
             // `return;` without expression returns undefined
             TypeId::UNDEFINED
@@ -12714,7 +12852,10 @@ impl<'a> ThinCheckerState<'a> {
                             if let Some(name_node) = self.ctx.arena.get(param.name) {
                                 if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
                                     let name = ident.escaped_text.clone();
-                                    let previous = self.ctx.type_parameter_scope.insert(name.clone(), TypeId::ANY);
+                                    let previous = self
+                                        .ctx
+                                        .type_parameter_scope
+                                        .insert(name.clone(), TypeId::UNKNOWN);
                                     updates.push((name, previous));
                                 }
                             }
@@ -14316,10 +14457,15 @@ impl<'a> ThinCheckerState<'a> {
             let declared_type = self.get_type_from_type_node(param.type_annotation);
 
             // Get the type of the initializer
+            let prev_context = self.ctx.contextual_type;
+            if declared_type != TypeId::ANY && !self.type_contains_error(declared_type) {
+                self.ctx.contextual_type = Some(declared_type);
+            }
             let init_type = self.get_type_of_node(param.initializer);
+            self.ctx.contextual_type = prev_context;
 
             // Check if the initializer type is assignable to the declared type
-            if !self.is_assignable_to(init_type, declared_type) {
+            if declared_type != TypeId::ANY && !self.is_assignable_to(init_type, declared_type) {
                 self.error_type_not_assignable_with_reason_at(
                     init_type,
                     declared_type,
@@ -14736,7 +14882,12 @@ impl<'a> ThinCheckerState<'a> {
         // If property has type annotation and initializer, check type compatibility
         if !prop.type_annotation.is_none() && !prop.initializer.is_none() {
             let declared_type = self.get_type_from_type_node(prop.type_annotation);
+            let prev_context = self.ctx.contextual_type;
+            if declared_type != TypeId::ANY && !self.type_contains_error(declared_type) {
+                self.ctx.contextual_type = Some(declared_type);
+            }
             let init_type = self.get_type_of_node(prop.initializer);
+            self.ctx.contextual_type = prev_context;
 
             if declared_type != TypeId::ANY && !self.is_assignable_to(init_type, declared_type) {
                 self.error_type_not_assignable_with_reason_at(init_type, declared_type, prop.initializer);

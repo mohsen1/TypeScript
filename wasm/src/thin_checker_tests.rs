@@ -2710,6 +2710,130 @@ const handler: (x: string) => void = (x) => {
 }
 
 #[test]
+fn test_contextual_typing_for_assignment_expression() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let handler: (x: string) => void;
+handler = (x) => {
+    let y: number = x;
+};
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(codes.contains(&2322),
+        "Expected error 2322 from contextual typing on assignment, got: {:?}",
+        codes);
+}
+
+#[test]
+fn test_contextual_typing_for_union_object_assignment() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type A = { kind: "a"; value: number };
+type B = { kind: "b"; value: number };
+let v: A | B;
+v = { kind: "a", value: 1 };
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(!codes.contains(&2322),
+        "Did not expect error 2322 for contextual union object assignment, got: {:?}",
+        codes);
+}
+
+#[test]
+fn test_object_literal_optional_vs_required_assignment() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type Opt = { a: number; b?: string };
+type Req = { a: number; b: string };
+let opt: Opt;
+opt = { a: 1 };
+let req: Req;
+req = { a: 1 };
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let missing_prop_count = codes
+        .iter()
+        .filter(|&&code| code == 2322 || code == 2741)
+        .count();
+    assert_eq!(
+        missing_prop_count,
+        1,
+        "Expected 1 assignability error for missing required property, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_any_unknown_assignability_in_assignment() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let anyValue: any = "ok";
+let unknownValue: unknown = 42;
+let num: number = 0;
+
+num = anyValue;
+unknownValue = num;
+num = unknownValue;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let count_2322 = codes.iter().filter(|&&code| code == 2322).count();
+    assert_eq!(
+        count_2322,
+        1,
+        "Expected one TS2322 for unknown assignment, got: {:?}",
+        codes
+    );
+}
+
+#[test]
 fn test_contextual_typing_overload_by_arity() {
     use crate::thin_parser::ThinParserState;
 
@@ -9568,6 +9692,41 @@ const m: string = state.message;
     assert!(
         checker.ctx.diagnostics.is_empty(),
         "StateFromReducers mapped type should work: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// Ensure mapped type parameters are in scope for template type checking.
+#[test]
+fn test_mapped_type_parameter_scope_in_template() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type M<T> = { [P in keyof T]: P };
+type Example = M<{ a: 1; b: 2 }>;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    if !checker.ctx.diagnostics.is_empty() {
+        eprintln!("=== Mapped Type Param Scope Diagnostics ===");
+        for diag in &checker.ctx.diagnostics {
+            eprintln!("[{}] {}", diag.start, diag.message_text);
+        }
+    }
+
+    assert!(
+        checker.ctx.diagnostics.is_empty(),
+        "Mapped type parameter scope should be available: {:?}",
         checker.ctx.diagnostics
     );
 }
