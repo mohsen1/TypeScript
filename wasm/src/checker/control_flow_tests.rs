@@ -519,6 +519,43 @@ if (assertString(x)) {
 }
 
 #[test]
+fn test_asserts_call_statement_narrows() {
+    let source = r#"
+function assertString(x: string | number): asserts x is string {
+  if (typeof x !== "string") throw new Error("nope");
+}
+let x: string | number;
+assertString(x);
+x;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let arena = parser.get_arena();
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let analyzer = FlowAnalyzer::with_node_types(arena, &binder, &types, &checker.ctx.node_types);
+
+    let root_node = arena.get(root).expect("root node");
+    let source_file = arena.get_source_file(root_node).expect("source file");
+    let ident_after = extract_expression_from_statement(
+        arena,
+        *source_file.statements.nodes.get(3).expect("x after"),
+    );
+
+    let union = types.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let flow_after = binder.get_node_flow(ident_after).expect("flow after");
+    let narrowed_after = analyzer.get_flow_type(ident_after, union, flow_after);
+    assert_eq!(narrowed_after, TypeId::STRING);
+}
+
+#[test]
 fn test_assignment_narrows_to_rhs_in_branch() {
     let source = r#"
 let x: string | number;

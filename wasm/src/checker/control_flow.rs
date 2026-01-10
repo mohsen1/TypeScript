@@ -143,6 +143,10 @@ impl<'a> FlowAnalyzer<'a> {
             return self.handle_array_mutation(reference, type_id, flow, visited);
         }
 
+        if flow.has_any_flags(flow_flags::CALL) {
+            return self.handle_call(reference, type_id, flow, visited);
+        }
+
         if flow.has_any_flags(flow_flags::START) {
             // Reached start of flow - return initial type
             return type_id;
@@ -630,6 +634,56 @@ impl<'a> FlowAnalyzer<'a> {
         } else {
             type_id
         }
+    }
+
+    fn handle_call(
+        &self,
+        reference: NodeIndex,
+        type_id: TypeId,
+        flow: &FlowNode,
+        visited: &mut Vec<FlowNodeId>,
+    ) -> TypeId {
+        let pre_type = if let Some(&ant) = flow.antecedent.first() {
+            self.check_flow(reference, type_id, ant, visited)
+        } else {
+            type_id
+        };
+
+        let Some(node) = self.arena.get(flow.node) else {
+            return pre_type;
+        };
+        if node.kind != syntax_kind_ext::CALL_EXPRESSION {
+            return pre_type;
+        }
+        let Some(call) = self.arena.get_call_expr(node) else {
+            return pre_type;
+        };
+
+        let Some(node_types) = self.node_types else {
+            return pre_type;
+        };
+        let Some(&callee_type) = node_types.get(&call.expression.0) else {
+            return pre_type;
+        };
+        let Some(signature) = self.predicate_signature_for_type(callee_type) else {
+            return pre_type;
+        };
+        if !signature.predicate.asserts {
+            return pre_type;
+        }
+
+        let Some(predicate_target) = self.predicate_target_expression(
+            call,
+            &signature.predicate,
+            &signature.params,
+        ) else {
+            return pre_type;
+        };
+        if !self.is_matching_reference(predicate_target, reference) {
+            return pre_type;
+        }
+
+        self.apply_type_predicate_narrowing(pre_type, &signature.predicate, true)
     }
 
     fn narrow_by_switch_clause(

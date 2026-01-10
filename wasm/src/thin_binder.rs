@@ -1060,6 +1060,8 @@ impl ThinBinderState {
                             self.bind_node(arena, arg);
                         }
                     }
+                    let flow = self.create_flow_call(idx);
+                    self.current_flow = flow;
                     if self.is_array_mutation_call(arena, idx) {
                         let flow = self.create_flow_array_mutation(idx);
                         self.current_flow = flow;
@@ -2672,6 +2674,18 @@ impl ThinBinderState {
         let id = self.flow_nodes.alloc(flow_flags::ASSIGNMENT);
         if let Some(node) = self.flow_nodes.get_mut(id) {
             node.node = assignment;
+            if !self.current_flow.is_none() {
+                node.antecedent.push(self.current_flow);
+            }
+        }
+        id
+    }
+
+    /// Create a flow node for a call expression.
+    fn create_flow_call(&mut self, call: NodeIndex) -> FlowNodeId {
+        let id = self.flow_nodes.alloc(flow_flags::CALL);
+        if let Some(node) = self.flow_nodes.get_mut(id) {
+            node.node = call;
             if !self.current_flow.is_none() {
                 node.antecedent.push(self.current_flow);
             }
