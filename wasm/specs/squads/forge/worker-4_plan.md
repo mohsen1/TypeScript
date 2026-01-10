@@ -82,16 +82,16 @@ Improve assignability diagnostics and reduce false positives/negatives for TS232
 - [x] Applied check_parameter_initializers to constructors, methods, accessors, functions
 
 ## Ready for Merge
-Yes
+No
 
 ## Notes
-- Progress: fixed mapped type param scope in missing-name checks; relaxed recursive generic type alias resolution to avoid TS2456 for DeepReadonly/DeepPartial; added mapped type param scope regression test.
-- Tests: `./wasm/test.sh compile_generic_utility_library_type_utilities`, `./wasm/test.sh mapped_type_parameter_scope_in_template`.
+- Progress: fixed mapped type param scope in missing-name checks; relaxed recursive generic type alias resolution to avoid TS2456 for DeepReadonly/DeepPartial; added mapped type param scope regression test; added TS2322 tests for union mismatch and intersection literal assignment; added TS2322 compound assignment checks (+=, &&=, ??=) to use assigned type for diagnostics.
+- Tests: `./wasm/test.sh compile_generic_utility_library_type_utilities`, `./wasm/test.sh mapped_type_parameter_scope_in_template`, `./wasm/test.sh contextual_typing_for_union_object_assignment_mismatch`, `./wasm/test.sh intersection_object_literal_assignment`, `./wasm/test.sh compound_assignment_plus_equals_assignability`, `./wasm/test.sh compound_assignment_logical_nullish_assignability`.
 - Commit format: `[wasm] checker: improve TS2322 assignability diagnostics`
 - Push to: `origin/worker/forge-4`
 - **NEVER edit**: `STRUCTURE.md`, `GOALS.md`, other workers' plan files, or anything in `orchestrator/`
 
 ## Resume
 - Branch/state: `worker/forge-4`, local changes pending commit.
-- Session work: fixed recursive generic type alias resolution and mapped type param scoping; added mapped type param scope regression test.
-- Unit tests: `./wasm/test.sh compile_generic_utility_library_type_utilities`, `./wasm/test.sh mapped_type_parameter_scope_in_template`.
+- Session work: added TS2322 tests for union mismatch and intersection assignments; added TS2322 compound assignment coverage (+=, &&=, ??=) and adjusted diagnostics to use assigned type; audit ongoing.
+- Unit tests: `./wasm/test.sh compile_generic_utility_library_type_utilities`, `./wasm/test.sh mapped_type_parameter_scope_in_template`, `./wasm/test.sh contextual_typing_for_union_object_assignment_mismatch`, `./wasm/test.sh intersection_object_literal_assignment`, `./wasm/test.sh compound_assignment_plus_equals_assignability`, `./wasm/test.sh compound_assignment_logical_nullish_assignability`.
