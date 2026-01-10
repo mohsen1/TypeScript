@@ -265,4 +265,9 @@ Ready for Merge: No (merged)
 - Conformance: `node wasm/differential-test/conformance-runner.mjs es6/templates --max=200 -v` (no crashes).
 - Test: `./wasm/test.sh test_thin_parser_unterminated_template_expression_no_crash`.
 
+### Update (2026-01-10)
+- Larger sweep: `node wasm/differential-test/conformance-runner.mjs es6/templates --max=1000 -v` (178 tests, WASM Crashed: 0).
+- Repro: `tests/cases/conformance/es6/templates/TemplateExpression1.ts` (unterminated template expression).
+- Crash path: `parse_template_expression` in `wasm/src/thin_parser.rs` during template span rescan; now guarded to emit TS1005 and synthesize a tail.
+
 Ready for Merge: No (merged)
