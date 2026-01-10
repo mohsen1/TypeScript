@@ -17,7 +17,7 @@
 use crate::scanner::SyntaxKind;
 use crate::scanner_impl::{ScannerState, TokenFlags};
 use crate::parser::{
-    NodeIndex, NodeList,
+    node_flags, NodeIndex, NodeList,
     thin_node::{
         ThinNodeArena, IdentifierData, LiteralData, BinaryExprData, CallExprData,
         AccessExprData, ConditionalExprData, LiteralExprData, ParenthesizedData,
@@ -1852,6 +1852,8 @@ impl ThinParserState {
         let mut expr = if self.is_token(SyntaxKind::ClassKeyword) {
             // Inline class expression in extends clause: class extends class Expr {} {...}
             self.parse_class_expression()
+        } else if self.is_token(SyntaxKind::OpenParenToken) || self.is_token(SyntaxKind::NewKeyword) {
+            self.parse_left_hand_side_expression()
         } else if self.is_identifier_or_keyword() {
             self.parse_identifier_name()
         } else {
@@ -5036,12 +5038,16 @@ impl ThinParserState {
                     );
                 }
                 SyntaxKind::OpenParenToken => {
+                    let callee_expr = expr;
                     self.next_token();
                     let arguments = self.parse_argument_list();
                     let end_pos = self.token_end();
                     self.parse_expected(SyntaxKind::CloseParenToken);
 
-                    expr = self.arena.add_call_expr(
+                    let is_optional_chain = self.arena.get(callee_expr)
+                        .and_then(|callee_node| self.arena.get_access_expr(callee_node))
+                        .is_some_and(|access| access.question_dot_token);
+                    let call_expr = self.arena.add_call_expr(
                         syntax_kind_ext::CALL_EXPRESSION,
                         start_pos,
                         end_pos,
@@ -5051,6 +5057,12 @@ impl ThinParserState {
                             arguments: Some(arguments),
                         },
                     );
+                    if is_optional_chain {
+                        if let Some(call_node) = self.arena.get_mut(call_expr) {
+                            call_node.flags |= node_flags::OPTIONAL_CHAIN as u16;
+                        }
+                    }
+                    expr = call_expr;
                 }
                 // Tagged template literals: tag`template` or tag`head${expr}tail`
                 SyntaxKind::NoSubstitutionTemplateLiteral | SyntaxKind::TemplateHead => {
@@ -5080,7 +5092,7 @@ impl ThinParserState {
                                 let end_pos = self.token_end();
                                 self.parse_expected(SyntaxKind::CloseParenToken);
 
-                                expr = self.arena.add_call_expr(
+                                let call_expr = self.arena.add_call_expr(
                                     syntax_kind_ext::CALL_EXPRESSION,
                                     start_pos,
                                     end_pos,
@@ -5090,6 +5102,10 @@ impl ThinParserState {
                                         arguments: Some(arguments),
                                     },
                                 );
+                                if let Some(call_node) = self.arena.get_mut(call_expr) {
+                                    call_node.flags |= node_flags::OPTIONAL_CHAIN as u16;
+                                }
+                                expr = call_expr;
                                 continue;
                             } else if self.is_token(SyntaxKind::NoSubstitutionTemplateLiteral)
                                 || self.is_token(SyntaxKind::TemplateHead)
@@ -5135,7 +5151,7 @@ impl ThinParserState {
                         let end_pos = self.token_end();
                         self.parse_expected(SyntaxKind::CloseParenToken);
 
-                        expr = self.arena.add_call_expr(
+                        let call_expr = self.arena.add_call_expr(
                             syntax_kind_ext::CALL_EXPRESSION,
                             start_pos,
                             end_pos,
@@ -5145,6 +5161,10 @@ impl ThinParserState {
                                 arguments: Some(arguments),
                             },
                         );
+                        if let Some(call_node) = self.arena.get_mut(call_expr) {
+                            call_node.flags |= node_flags::OPTIONAL_CHAIN as u16;
+                        }
+                        expr = call_expr;
                     } else {
                         // expr?.prop
                         let name = if self.is_token(SyntaxKind::PrivateIdentifier) {
@@ -5365,13 +5385,14 @@ impl ThinParserState {
         let start_pos = self.token_pos();
         // Capture end position BEFORE consuming the token
         let end_pos = self.token_end();
-        let text = self.scanner.get_token_value_ref().to_string();
-
-        if self.is_identifier_or_keyword() {
+        let text = if self.is_identifier_or_keyword() {
+            let text = self.scanner.get_token_value_ref().to_string();
             self.next_token();
+            text
         } else {
             self.error_identifier_expected();
-        }
+            String::new()
+        };
 
         self.arena.add_identifier(
             SyntaxKind::Identifier as u16,

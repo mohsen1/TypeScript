@@ -2764,6 +2764,135 @@ v = { kind: "a", value: 1 };
 }
 
 #[test]
+fn test_contextual_typing_for_union_object_assignment_mismatch() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type A = { kind: "a"; value: number };
+type B = { kind: "b"; value: string };
+let v: A | B;
+v = { kind: "a", value: "nope" };
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let count_2322 = codes.iter().filter(|&&code| code == 2322).count();
+    assert_eq!(
+        count_2322,
+        1,
+        "Expected one TS2322 for union assignment mismatch, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_intersection_object_literal_assignment() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type I = { a: number } & { b: string };
+let ok: I = { a: 1, b: "ok" };
+let bad: I = { a: 1 };
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let missing_prop_count = codes
+        .iter()
+        .filter(|&&code| code == 2322 || code == 2741)
+        .count();
+    assert_eq!(
+        missing_prop_count,
+        1,
+        "Expected 1 assignability error for missing intersection property, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_compound_assignment_plus_equals_assignability() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let n: number = 0;
+n += 1;
+n += "nope";
+let s: string = "hi";
+s += 1;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let count_2322 = codes.iter().filter(|&&code| code == 2322).count();
+    assert_eq!(
+        count_2322,
+        1,
+        "Expected one TS2322 for n += \"nope\", got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_compound_assignment_logical_nullish_assignability() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let v: number | undefined = 0;
+v &&= 1;
+v &&= "bad";
+
+let w: number | undefined;
+w ??= "bad";
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let count_2322 = codes.iter().filter(|&&code| code == 2322).count();
+    assert_eq!(
+        count_2322,
+        2,
+        "Expected two TS2322 errors for logical/nullish assignments, got: {:?}",
+        codes
+    );
+}
+
+#[test]
 fn test_object_literal_optional_vs_required_assignment() {
     use crate::thin_parser::ThinParserState;
 
@@ -4761,6 +4890,42 @@ const anon = () => { return null; };
     assert_eq!(count(7006), 1, "Expected one 7006 error, got codes: {:?}", codes);
     assert_eq!(count(7010), 1, "Expected one 7010 error, got codes: {:?}", codes);
     assert_eq!(count(7011), 1, "Expected one 7011 error, got codes: {:?}", codes);
+}
+
+#[test]
+fn test_implicit_any_return_in_signatures() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// @noImplicitAny: true
+interface I {
+    foo();
+}
+
+declare function bar();
+
+declare class C {
+    publicMethod();
+}
+
+const obj = { baz() { return undefined; } };
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let count = |code| codes.iter().filter(|&&c| c == code).count();
+
+    assert_eq!(count(7010), 4, "Expected four 7010 errors, got codes: {:?}", codes);
 }
 
 /// Test that functions that only throw don't trigger TS2355.
