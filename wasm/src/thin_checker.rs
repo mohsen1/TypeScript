@@ -314,7 +314,9 @@ impl<'a> ThinCheckerState<'a> {
                     let parent_id = scope.parent;
                     if scope.kind == ContainerKind::Module {
                         if let Some(parent_scope) = self.ctx.binder.scopes.get(parent_id.0 as usize) {
-                            require_export = parent_scope.kind == ContainerKind::Module;
+                            require_export =
+                                parent_scope.kind == ContainerKind::Module
+                                    && self.is_external_module_scope(parent_scope);
                         } else {
                             require_export = false;
                         }
@@ -382,6 +384,9 @@ impl<'a> ThinCheckerState<'a> {
             // Identifiers
             k if k == SyntaxKind::Identifier as u16 => {
                 self.get_type_of_identifier(idx)
+            }
+            k if k == SyntaxKind::PrivateIdentifier as u16 => {
+                TypeId::ANY
             }
             k if k == SyntaxKind::ThisKeyword as u16 => {
                 self.current_this_type().unwrap_or(TypeId::ANY)
@@ -644,6 +649,9 @@ impl<'a> ThinCheckerState<'a> {
 
         // Get the identifier for the type name
         if let Some(name_node) = self.ctx.arena.get(type_name_idx) {
+            if name_node.kind == SyntaxKind::PrivateIdentifier as u16 {
+                return TypeId::UNKNOWN;
+            }
             if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
                 let name = ident.escaped_text.as_str();
 
@@ -742,7 +750,11 @@ impl<'a> ThinCheckerState<'a> {
                     // Global interfaces from lib.d.ts - these accept primitives via boxing
                     // Object/String/Number/Boolean are wide types that accept their primitive counterparts
                     // We use UNKNOWN as a permissive stand-in when lib.d.ts is not loaded
-                    "Object" | "String" | "Number" | "Boolean" | "Symbol" | "Function" => {
+                    "Object" | "String" | "Number" | "Boolean" | "Symbol" | "Function"
+                    | "Element" | "HTMLElement" | "Document" | "Window" | "Event"
+                    | "EventTarget" | "Node" | "NodeList" | "HTMLInputElement"
+                    | "HTMLSelectElement" | "HTMLDivElement" | "HTMLCanvasElement"
+                    | "SVGElement" => {
                         return TypeId::UNKNOWN
                     }
                     // Global generic types from lib.d.ts - return UNKNOWN when not loaded
@@ -1197,6 +1209,15 @@ impl<'a> ThinCheckerState<'a> {
         None
     }
 
+    fn is_non_type_heritage_name(&self, name: &str) -> bool {
+        let starts_with_digit = name.as_bytes().first().map(|b| b.is_ascii_digit()).unwrap_or(false);
+        starts_with_digit
+            || matches!(
+                name,
+                "undefined" | "null" | "true" | "false" | "NaN" | "Infinity" | "void"
+            )
+    }
+
     fn resolve_type_symbol_for_lowering(&self, idx: NodeIndex) -> Option<u32> {
         let sym_id = self.resolve_qualified_symbol(idx)?;
         let symbol = self.ctx.binder.get_symbol(sym_id)?;
@@ -1375,7 +1396,7 @@ impl<'a> ThinCheckerState<'a> {
         } else if let Some(name) = name_text {
             if is_identifier {
                 // Don't emit error for builtin global constructors like Promise, Array, Map, etc.
-                let is_builtin_value = matches!(name.as_str(), "Promise" | "Array" | "Map" | "Set" | "WeakMap" | "WeakSet" | "Object" | "String" | "Number" | "Boolean" | "Symbol" | "Function" | "RegExp" | "Error" | "Date" | "JSON" | "Math" | "console" | "Proxy" | "Reflect" | "BigInt" | "Intl" | "ArrayBuffer" | "DataView" | "Float32Array" | "Float64Array" | "Int8Array" | "Int16Array" | "Int32Array" | "Uint8Array" | "Uint8ClampedArray" | "Uint16Array" | "Uint32Array" | "BigInt64Array" | "BigUint64Array" | "SharedArrayBuffer" | "Atomics" | "Iterator" | "Generator" | "AsyncGenerator" | "FinalizationRegistry" | "WeakRef");
+                let is_builtin_value = matches!(name.as_str(), "Promise" | "Array" | "Map" | "Set" | "WeakMap" | "WeakSet" | "Object" | "String" | "Number" | "Boolean" | "Symbol" | "Function" | "RegExp" | "Error" | "Date" | "JSON" | "Math" | "console" | "Proxy" | "Reflect" | "BigInt" | "Intl" | "ArrayBuffer" | "DataView" | "Float32Array" | "Float64Array" | "Int8Array" | "Int16Array" | "Int32Array" | "Uint8Array" | "Uint8ClampedArray" | "Uint16Array" | "Uint32Array" | "BigInt64Array" | "BigUint64Array" | "SharedArrayBuffer" | "Atomics" | "Iterator" | "Generator" | "AsyncGenerator" | "FinalizationRegistry" | "WeakRef" | "Element" | "HTMLElement" | "Document" | "Window" | "Event" | "EventTarget" | "Node" | "NodeList" | "HTMLInputElement" | "HTMLSelectElement" | "HTMLDivElement" | "HTMLCanvasElement" | "SVGElement");
                 if is_builtin_value {
                     return TypeId::UNKNOWN;
                 }
@@ -1523,6 +1544,9 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         if let Some(name_node) = self.ctx.arena.get(type_name_idx) {
+            if name_node.kind == SyntaxKind::PrivateIdentifier as u16 {
+                return TypeId::UNKNOWN;
+            }
             if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
                 let name = ident.escaped_text.as_str();
 
@@ -1617,6 +1641,25 @@ impl<'a> ThinCheckerState<'a> {
                     "object" => return TypeId::OBJECT,
                     "bigint" => return TypeId::BIGINT,
                     "symbol" => return TypeId::SYMBOL,
+                    // Global interfaces from lib.d.ts - return UNKNOWN when lib isn't loaded.
+                    "Object" | "String" | "Number" | "Boolean" | "Symbol" | "Function"
+                    | "Element" | "HTMLElement" | "Document" | "Window" | "Event"
+                    | "EventTarget" | "Node" | "NodeList" | "HTMLInputElement"
+                    | "HTMLSelectElement" | "HTMLDivElement" | "HTMLCanvasElement"
+                    | "SVGElement" | "RegExp" | "Error" | "Date" | "JSON"
+                    | "Math" | "Console" => {
+                        return TypeId::UNKNOWN
+                    }
+                    // Global generics from lib.d.ts - return UNKNOWN when lib isn't loaded.
+                    "Partial" | "Required" | "Readonly" | "Pick" | "Omit" | "Record"
+                    | "Exclude" | "Extract" | "NonNullable" | "Parameters" | "ReturnType"
+                    | "ConstructorParameters" | "InstanceType" | "ThisParameterType"
+                    | "OmitThisParameter" | "ThisType" | "Awaited" | "Map" | "Set"
+                    | "WeakMap" | "WeakSet" | "Iterator" | "IterableIterator"
+                    | "AsyncIterator" | "AsyncIterableIterator" | "Generator" | "AsyncGenerator"
+                    | "Iterable" | "AsyncIterable" | "ArrayLike" | "PropertyKey" => {
+                        return TypeId::UNKNOWN
+                    }
                     _ => {}
                 }
 
@@ -4144,7 +4187,10 @@ impl<'a> ThinCheckerState<'a> {
             "console" | "Math" | "JSON" | "Object" | "Array" | "String"
             | "Number" | "Boolean" | "Date" | "RegExp" | "Error" | "Promise"
             | "Map" | "Set" | "WeakMap" | "WeakSet" | "WeakRef" | "Proxy"
-            | "Reflect" | "globalThis" | "window" | "document"
+            | "Reflect" | "globalThis" | "window" | "document" | "Element"
+            | "HTMLElement" | "Document" | "Window" | "Event" | "EventTarget"
+            | "Node" | "NodeList" | "HTMLInputElement" | "HTMLSelectElement"
+            | "HTMLDivElement" | "HTMLCanvasElement" | "SVGElement"
             | "FinalizationRegistry" | "BigInt" | "ArrayBuffer" | "SharedArrayBuffer"
             | "DataView" | "Int8Array" | "Uint8Array" | "Uint8ClampedArray"
             | "Int16Array" | "Uint16Array" | "Int32Array" | "Uint32Array"
@@ -4156,7 +4202,8 @@ impl<'a> ThinCheckerState<'a> {
             | "TextEncoder" | "TextDecoder" | "AbortController" | "AbortSignal"
             | "fetch" | "setTimeout" | "setInterval" | "clearTimeout" | "clearInterval"
             | "queueMicrotask" | "structuredClone" | "atob" | "btoa"
-            | "performance" | "crypto" | "navigator" | "location" | "history" => TypeId::ANY,
+            | "performance" | "crypto" | "navigator" | "location" | "history"
+            | "require" | "exports" | "module" => TypeId::ANY,
             _ => {
                 // Check if we're inside a class and the name matches a static member (error 2662)
                 // Clone values to avoid borrow issues
@@ -11034,8 +11081,11 @@ impl<'a> ThinCheckerState<'a> {
                 if self.resolve_heritage_symbol(expr_idx).is_none() {
                     // Get the name for the error message
                     if let Some(name) = self.heritage_name_text(expr_idx) {
+                        if self.is_non_type_heritage_name(&name) {
+                            continue;
+                        }
                         // Don't emit error for builtin global types
-                        let is_builtin = matches!(name.as_str(), "Promise" | "PromiseLike" | "Array" | "ReadonlyArray" | "Error" | "Map" | "Set" | "WeakMap" | "WeakSet" | "Iterator" | "Iterable" | "AsyncIterator" | "AsyncIterable" | "Generator" | "AsyncGenerator" | "IterableIterator" | "AsyncIterableIterator" | "ArrayLike" | "PromiseConstructor" | "Object" | "String" | "Number" | "Boolean" | "Symbol" | "Function" | "RegExp" | "Date");
+                        let is_builtin = matches!(name.as_str(), "Promise" | "PromiseLike" | "Array" | "ReadonlyArray" | "Error" | "Map" | "Set" | "WeakMap" | "WeakSet" | "Iterator" | "Iterable" | "AsyncIterator" | "AsyncIterable" | "Generator" | "AsyncGenerator" | "IterableIterator" | "AsyncIterableIterator" | "ArrayLike" | "PromiseConstructor" | "Object" | "String" | "Number" | "Boolean" | "Symbol" | "Function" | "RegExp" | "Date" | "Element" | "HTMLElement" | "Document" | "Window" | "Event" | "EventTarget" | "Node" | "NodeList" | "HTMLInputElement" | "HTMLSelectElement" | "HTMLDivElement" | "HTMLCanvasElement" | "SVGElement");
                         if !is_builtin {
                             self.error_cannot_find_name_at(&name, expr_idx);
                         }
@@ -12200,6 +12250,33 @@ impl<'a> ThinCheckerState<'a> {
         false
     }
 
+    fn is_external_module_scope(&self, scope: &crate::binder::Scope) -> bool {
+        use crate::scanner::SyntaxKind;
+
+        if scope.kind != ContainerKind::Module {
+            return false;
+        }
+
+        let Some(node) = self.ctx.arena.get(scope.container_node) else {
+            return false;
+        };
+        let Some(module) = self.ctx.arena.get_module(node) else {
+            return false;
+        };
+
+        let is_external_name = self
+            .ctx
+            .arena
+            .get(module.name)
+            .map(|name_node| {
+                name_node.kind == SyntaxKind::StringLiteral as u16
+                    || name_node.kind == SyntaxKind::NoSubstitutionTemplateLiteral as u16
+            })
+            .unwrap_or(false);
+
+        is_external_name || self.has_declare_modifier(&module.modifiers)
+    }
+
     /// Check if a node has the `abstract` modifier.
     fn has_abstract_modifier(&self, modifiers: &Option<crate::parser::NodeList>) -> bool {
         use crate::scanner::SyntaxKind;
@@ -12776,6 +12853,10 @@ impl<'a> ThinCheckerState<'a> {
             k if k == syntax_kind_ext::MAPPED_TYPE => {
                 if let Some(mapped) = self.ctx.arena.get_mapped_type(node) {
                     self.check_type_parameter_node_for_missing_names(mapped.type_parameter);
+                    let mut mapped_params = crate::parser::NodeList::new();
+                    mapped_params.push(mapped.type_parameter);
+                    let (_type_params, type_param_updates) =
+                        self.push_type_parameters(&Some(mapped_params));
                     if !mapped.name_type.is_none() {
                         self.check_type_for_missing_names(mapped.name_type);
                     }
@@ -12787,6 +12868,7 @@ impl<'a> ThinCheckerState<'a> {
                             self.check_type_member_for_missing_names(member_idx);
                         }
                     }
+                    self.pop_type_parameters(type_param_updates);
                 }
             }
             k if k == syntax_kind_ext::TYPE_PREDICATE => {
@@ -12868,6 +12950,7 @@ impl<'a> ThinCheckerState<'a> {
         };
 
         if let Some(sig) = self.ctx.arena.get_signature(member_node) {
+            let (_type_params, type_param_updates) = self.push_type_parameters(&sig.type_parameters);
             self.check_type_parameters_for_missing_names(&sig.type_parameters);
             if let Some(ref params) = sig.parameters {
                 for &param_idx in &params.nodes {
@@ -12877,6 +12960,7 @@ impl<'a> ThinCheckerState<'a> {
             if !sig.type_annotation.is_none() {
                 self.check_type_for_missing_names(sig.type_annotation);
             }
+            self.pop_type_parameters(type_param_updates);
             return;
         }
 

@@ -1391,12 +1391,16 @@ impl ThinNodeArena {
 
     /// Add a computed property name node
     pub fn add_computed_property(&mut self, kind: u16, pos: u32, end: u32, data: ComputedPropertyData) -> NodeIndex {
+        let expression = data.expression;
+
         let data_index = self.computed_properties.len() as u32;
         self.computed_properties.push(data);
         let index = self.nodes.len() as u32;
         self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
-        NodeIndex(index)
+        let parent = NodeIndex(index);
+        self.set_parent(expression, parent);
+        parent
     }
 
     /// Add a unary expression node
@@ -1450,7 +1454,6 @@ impl ThinNodeArena {
         self.set_parent(when_false, parent);
         parent
     }
-
     /// Add an object/array literal expression node
     pub fn add_literal_expr(&mut self, kind: u16, pos: u32, end: u32, data: LiteralExprData) -> NodeIndex {
         let elements = data.elements.clone();
@@ -2342,7 +2345,6 @@ impl ThinNodeArena {
         self.set_parent(attributes, parent);
         parent
     }
-
     /// Add an export assignment node
     pub fn add_export_assignment(&mut self, kind: u16, pos: u32, end: u32, data: ExportAssignmentData) -> NodeIndex {
         let modifiers = data.modifiers.clone();

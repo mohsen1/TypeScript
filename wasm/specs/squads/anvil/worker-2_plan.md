@@ -16,6 +16,7 @@ Priority: 2
 (empty - will receive new tasks from EM after completing current assignment)
 
 ## Completed
+- [x] Reduced TS2304 false positives: scoped mapped type parameters during missing-name checks, added DOM globals (HTMLElement/Element/Document/etc.) to builtin type/value allowlists, and recovered from invalid `accessor` modifiers in statement/type-member parsing. Added thin_checker regressions, rebuilt wasm, `find-ts2304.mjs --max=200 --samples=5` (0 false positives), conformance run `run-conformance.sh --max=200 --workers=10` (TS2304 missing: 6). `./wasm/test.sh thin_checker_tests` failed at pre-existing abstract class tests (TS2564 vs expected TS2511).
 - [x] Reduced TS2322 false positives: apply contextual typing for class property initializers, resolve Ref/index access types before assignability in var/property declarations, add thin_checker regressions for literal property init and class indexed access. `find-ts2322.mjs --max=500 --samples=5` now reports 0 false positives (previously hit derivedTypeDoesNotRequireExtendsClause + typeOfThisInStaticMembers12/13 + privateNamesAndIndexedAccess).
 - [x] Fixed parser extra errors TS1005/TS1109/TS1068/TS1128 (static name parsing, static blocks with modifiers, async function expression keyword names). Added regression tests in `thin_parser_tests.rs`; `./wasm/test.sh thin_parser` passed.
 - [x] Added ES5 template literal type parity tests (basic, union, Uppercase/Lowercase, Capitalize/Uncapitalize, inference, combined) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` blocked by pre-existing errors in `solver/evaluate_tests.rs` (TemplateLiteralSpan not in scope).
@@ -210,5 +211,5 @@ No (merged 2026-01-10)
 - Push to: `origin/worker/anvil-2`
 - **NEVER edit**: `DIRECTOR_AGENT.md`, `SQUAD_LEAD_AGENT.md`, `MANAGER_AGENT.md`, `AGENTS.md`, `start_*.sh`
 ## Resume
-- Parser extra errors (TS1005/TS1109/TS1068/TS1128) reduced with static member name handling, static block modifier parsing, and async function expression keyword names.
+- TS2304 false positive audit complete (mapped type params, DOM globals, accessor modifier recovery).
 - Awaiting next assignment from EM-Anvil.
