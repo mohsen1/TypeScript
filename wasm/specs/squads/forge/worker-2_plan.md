@@ -76,6 +76,9 @@ Reduce false positives for property access errors by aligning TS2339 behavior wi
 - Added TS2339 test for assignment-based union narrowing.
 - Re-applied static index signature collection after squad/forge merge.
 - Conformance scan after re-apply: 22 extra (from 1000 files).
+- Fixed mixin class inheritance to merge intersection base properties.
+- Allowed constructor callables to satisfy constructor function constraints.
+- Added TS2339 tests for mixins, globalThis property access, and private identifiers.
 
 ## Ready for Merge
 Yes
@@ -84,6 +87,7 @@ Yes
 - Full test run failing in `cli::driver_tests::compile_multi_file_project_with_imports`
   and `cli::driver_tests::compile_multi_file_project_with_default_and_named_imports` (TS2792).
 - Run `./wasm/test.sh` before pushing
+- Last run: `./wasm/test.sh test_ts2339_mixin_class_property_access`
 - Commit format: `[wasm] checker: improve TS2339 property access diagnostics`
 - Push to: `origin/worker/forge-2`
 - **NEVER edit**: `STRUCTURE.md`, `GOALS.md`, other workers' plan files, or anything in `orchestrator/`
