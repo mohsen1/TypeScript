@@ -142,3 +142,47 @@ Ready for Merge: No (partial TS2456 implementation; needs investigation of pre-e
 - Avoid committing `.role/AGENTS.md` change (expected local modification).
 
 Ready for Merge: Yes (current fix pushed; conformance still shows extra TS2769 in variadicTuples1)
+
+## Follow-up (2026-01-09) - TS2339 False Positives (Class-Like Extends)
+
+**Mission**: Remove extra TS2339 errors for class inheritance through constructor-returning expressions.
+
+**Status**: COMPLETED
+
+### Checklist
+
+- [x] Reproduced TS2339 extras via `node wasm/differential-test/find-ts2339.mjs --max=400 --samples=10`
+- [x] Traced root causes in `thin_checker` (constructor return types, union base shapes, class expressions) and scanner
+- [x] Implemented fixes for constructor-returning base types and class expressions
+- [x] Added regression tests for constructor expressions + parse-error property access
+- [x] Rebuilt wasm + reran TS2339 scan (0 extras in first 400 files)
+
+### Root Causes
+
+1. `get_class_instance_type_inner` merged base properties only for direct class symbols; constructor-returning expressions (e.g., `getBase()`) returned `Ref`/`TypeParameter`/`TypeQuery` types that were ignored, and unions from overloaded constructors were dropped.
+2. `get_type_of_node` lacked class expression typing, so factory-returned classes were inferred as `any`.
+3. Scanner retained `token_value` for punctuation tokens, causing `this.` parse errors to produce bogus `this` property names and TS2339.
+
+### Fixes
+
+- Resolve constructor-returning base types through `Ref`/`TypeQuery`/type parameter constraints and meta-types, then collect construct-signature return types.
+- Merge base instance properties for unions/intersections of constructor return types.
+- Type class expressions as constructor types so factory-returned classes preserve base instance properties.
+- Clear scanner `token_value` per token and guard against empty property names in property access.
+
+### Tests
+
+- `./wasm/test.sh test_class_extends_constructor_expression_includes_base_props` (PASS)
+- `./wasm/test.sh test_incomplete_property_access_no_ts2339` (PASS)
+
+### Conformance Delta (TS2339)
+
+**Before** (`find-ts2339.mjs --max=400 --samples=10`):
+- `classes/classDeclarations/classAbstractKeyword/classAbstractCrashedOnce.ts` (1 extra)
+- `classes/classDeclarations/classExtendingClassLikeType.ts` (6 extra)
+- `classes/classExpressions/genericClassExpressionInFunction.ts` (3 extra)
+
+**After** (`find-ts2339.mjs --max=400 --samples=10`):
+- 0 extra TS2339 in first 400 files
+
+Ready for Merge: Yes
