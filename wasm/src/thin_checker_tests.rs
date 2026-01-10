@@ -4749,6 +4749,48 @@ function loopWithBreak(): number {
     assert_eq!(count(2355), 1, "Expected exactly one 2355 error for loopWithBreak(), got: {:?}", codes);
 }
 
+#[test]
+fn test_async_promise_void_no_2355() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+interface Promise<T> {}
+interface PromiseLike<T> {}
+type PromiseAlias<T> = Promise<T>;
+type PromiseLikeAlias<T> = PromiseLike<T>;
+
+async function f1(): Promise<void> { }
+async function f2(): PromiseAlias<void> { }
+async function f3(): PromiseLike<void> { }
+async function f4(): PromiseLikeAlias<void> { }
+
+class C {
+    async m1(): Promise<void> { }
+    async m2(): PromiseAlias<void> { }
+    async m3(): PromiseLike<void> { }
+    async m4(): PromiseLikeAlias<void> { }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2355),
+        "Did not expect TS2355 for async Promise<void> return types, got: {:?}",
+        codes
+    );
+}
+
 /// Test that calling a never-returning function doesn't trigger TS2355
 /// This is a known limitation - calls to functions returning `never` should
 /// terminate control flow but aren't currently detected.
