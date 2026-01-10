@@ -2703,7 +2703,7 @@ impl<'a> ThinCheckerState<'a> {
                 if shape.construct_signatures.is_empty() {
                     return None;
                 }
-                let mut returns: Vec<TypeId> = shape
+                let returns: Vec<TypeId> = shape
                     .construct_signatures
                     .iter()
                     .map(|sig| sig.return_type)
