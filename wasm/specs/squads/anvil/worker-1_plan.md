@@ -6,9 +6,10 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-- Reduce TS2322 false positives ("Type 'X' is not assignable to type 'Y'").
-- Collect 3-5 failing samples via conformance or a targeted scan; trace assignability in `wasm/src/thin_checker.rs` and `wasm/src/solver/subtype.rs`.
-- Implement fix + regression test and report delta from a targeted conformance run.
+- Reduce TS2304 false positives (Cannot find name).
+- Collect 3-5 failing samples via conformance or `node wasm/differential-test/find-ts2304.mjs`; trace scope resolution in `wasm/src/thin_binder.rs` and `wasm/src/thin_checker.rs`.
+- Implement fix + regression tests, then report delta from a targeted conformance run.
+- Deliverables: sample list + root cause notes, regression test(s), and a before/after conformance delta.
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)

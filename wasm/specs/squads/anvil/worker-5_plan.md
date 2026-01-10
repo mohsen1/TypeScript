@@ -10,6 +10,7 @@ Priority: 5
 - Fix crash in `types/mapped/recursiveMappedTypes.ts` (stack overflow).
 - Reproduce with conformance runner; locate recursion in mapped type evaluation (`wasm/src/thin_checker.rs`, `wasm/src/solver/evaluate.rs`).
 - Add guard/fix + regression test; report conformance delta.
+- Deliverables: crash repro notes + failing stack path, regression test(s), and conformance delta showing crash removed.
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)

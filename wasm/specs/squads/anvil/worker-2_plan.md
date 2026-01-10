@@ -10,6 +10,7 @@ Priority: 2
 - Fix crash in `es6/templates/TemplateExpression1.ts` ("unreachable").
 - Reproduce via conformance runner or direct harness; trace template literal handling in `wasm/src/thin_checker.rs` and related template/type evaluation paths.
 - Add regression test and confirm crash is eliminated.
+- Deliverables: crash repro notes + failing stack path, regression test, and conformance delta showing crash removed.
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)
