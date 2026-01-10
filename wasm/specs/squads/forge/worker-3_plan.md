@@ -83,7 +83,7 @@ This requires control flow analysis to track variable state through branches.
 - No false positives for properly assigned variables
 
 ## Task Queue
-(empty - single focused task)
+- [ ] Investigate const-aliased condition narrowing in FlowAnalyzer to preserve TS2339 property access guards
 
 ## Completed
 - [x] TS2454 error code and message added to diagnostics
@@ -133,7 +133,7 @@ This requires control flow analysis to track variable state through branches.
 - Re-run conformance to confirm private names/control-flow narrowing improvements
 
 ## Ready for Merge
-Yes
+No (merged)
 
 ## Notes
 - Similar infrastructure to TS2564 (property init) - share patterns with Workers 1-2
