@@ -7,34 +7,26 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-Reduce false positives for property access errors by aligning TS2339 behavior with TypeScript.
+Reduce remaining TS2339 false positives (non-control-flow cases).
 
 **Error Code:** TS2339 - "Property 'X' does not exist on type 'Y'"
 
 **Impact:** 142 conformance tests affected
 
 ### Steps
-1. **Audit TS2339 emit points** in `thin_checker.rs` to ensure we skip diagnostics for:
-   - `any` and `unknown` flows
-   - `error` type (suppress cascades)
-   - Union members where at least one contains the property
-2. **Add tests first** in `wasm/src/thin_checker_tests.rs`:
-   - `any` access should not error
-   - `unknown` access should error only when narrowed
-   - Optional properties on unions should not error when present in some members
-3. **Implement fixes** and ensure existing TS2339 tests still pass.
-4. **Run conformance tests** and record delta.
+1. **Run a scan**: `cd wasm/differential-test && node find-ts2339.mjs --max=1000 --samples=30`.
+2. **Pick top non-control-flow pattern** (e.g., enum/namespace merging or static/instance property access).
+3. **Implement the fix** in `thin_checker.rs`/`binder.rs` and add a focused regression test.
+4. **Run focused tests** with `./wasm/test.sh` and report delta.
 
 ### Key Files
 - `wasm/src/thin_checker.rs`
-- `wasm/src/solver/operations.rs`
-- `wasm/src/checker/context.rs`
-- `wasm/src/checker/types/diagnostics.rs`
+- `wasm/src/binder.rs`
 - `wasm/src/thin_checker_tests.rs`
 
 ### Success Criteria
-- TS2339 missing errors reduced
-- Extra errors do not increase (no regressions)
+- TS2339 false positives reduced for the selected pattern
+- No new regressions in existing TS2339 tests
 
 ## Resume Notes
 - Branch: `worker/forge-2`.
@@ -82,7 +74,7 @@ Reduce false positives for property access errors by aligning TS2339 behavior wi
 - Fixed optional call chaining to avoid TS2349 on `?.()` when the callee is optional.
 
 ## Ready for Merge
-Yes
+No
 
 ## Notes
 - Full test run: failing in `cli::driver_tests::compile_object_spread` (TS2741).

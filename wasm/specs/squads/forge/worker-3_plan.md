@@ -1,89 +1,35 @@
 # Worker 3 Plan - Squad Forge
 
 ## Mission
-Implement TS2454 definite assignment analysis for variables.
+Reduce TS2339 false positives via control flow narrowing.
 
 Status: Active
 Priority: 1
 
 ## Current Assignment
-Fix TS2339 false positives in property access checking.
+Extend control-flow narrowing for property access after `in`/`typeof`/`instanceof` guards.
 
 **Error Code:** TS2339 - "Property 'X' does not exist on type 'Y'"
 
-**Impact:** 142 conformance tests affected (was 35 extra errors, now 14)
-
-### Background
-TypeScript tracks whether variables are definitely assigned before use:
-```typescript
-let x: number;
-console.log(x);  // TS2454: Variable 'x' is used before being assigned
-
-let y: number;
-y = 5;
-console.log(y);  // OK
-```
-
-This requires control flow analysis to track variable state through branches.
+**Impact:** 142 conformance tests affected (control-flow narrowing cases)
 
 ### Steps
-1. **Add test cases first**:
-   ```typescript
-   // Should error: TS2454
-   function foo() {
-     let x: number;
-     return x;  // used before assigned
-   }
-
-   // Should error: TS2454 - not all paths assign
-   function bar(flag: boolean) {
-     let x: number;
-     if (flag) { x = 1; }
-     return x;  // might not be assigned
-   }
-
-   // Should NOT error: assigned in all paths
-   function baz(flag: boolean) {
-     let x: number;
-     if (flag) { x = 1; } else { x = 2; }
-     return x;  // definitely assigned
-   }
-
-   // Should NOT error: assigned before use
-   function qux() {
-     let x: number;
-     x = 5;
-     return x;
-   }
-   ```
-
-2. **Implement variable tracking**:
-   - Create a `DefiniteAssignmentChecker` or extend existing flow analysis
-   - Track declared variables and their assignment state
-   - At each variable reference, check if definitely assigned
-
-3. **Handle control flow**:
-   - If/else branches: both must assign for "definitely assigned"
-   - Loops: conservative (assume loop might not execute)
-   - Try/catch: handle exception paths
-   - Switch: all cases must assign
-
-4. **Emit TS2454** when variable is used but not definitely assigned.
-
-5. **Run conformance tests** and report numbers.
+1. **Guard narrowing:** confirm `in`/`typeof`/`instanceof` paths update flow types in `control_flow.rs`.
+2. **Reference matching:** ensure property chains (including `this`/`super`) are matched for narrowing.
+3. **Add tests** in `wasm/src/checker/control_flow_tests.rs` for `in`/`typeof` guards and property access.
+4. **Run focused tests** (`./wasm/test.sh control_flow_tests`) and report delta.
 
 ### Key Files
-- `wasm/src/thin_checker.rs` - main checker
-- `wasm/src/checker/control_flow.rs` - flow analysis infrastructure
-- `wasm/src/checker/statements.rs` - statement checking
+- `wasm/src/checker/control_flow.rs`
+- `wasm/src/thin_checker.rs`
+- `wasm/src/thin_checker_tests.rs`
 
 ### Success Criteria
-- TS2454 emitted for use-before-assignment
-- Correct handling of control flow branches
-- No false positives for properly assigned variables
+- TS2339 extra errors reduced for control-flow narrowing cases
+- No regressions in existing TS2339 tests
 
 ## Task Queue
-(empty - single focused task)
+- [ ] Investigate assertion type predicate narrowing for remaining TS2339 false positive
 
 ## Completed
 - [x] TS2454 error code and message added to diagnostics
@@ -120,13 +66,18 @@ This requires control flow analysis to track variable state through branches.
 - TS2339 extra errors reduced from 35 to 14
 - [x] Implement TYPE_OPERATOR handling in `get_type_from_type_node` (keyof/etc) — `get_type_from_type_operator` added
 - [x] Fix `intersectionWithIndexSignatures` TS2339 — no longer extra TS2339 errors
+- [x] Flow assignment narrowing uses RHS node types (added control flow test)
+- [x] Private identifier property access falls back to class owner type (static private members)
+- [x] Assignment narrowing falls back to RHS literal/nullish types without node cache; updated flow tests
+- [x] Match `this`/`super` reference bases in control flow for property assignment narrowing; added test
+- [x] Loop label flow unions entry/back-edge types; added regression test
+- [x] Const-aliased condition narrowing uses initializer for flow analysis; added test
 
-### Remaining TS2339 False Positives (20 tests)
-- Private names (#foo): 6 tests — static private accessors/properties not found on class type
-- Mixin classes: 4 tests — mixin type inference issues (intersection handling added in new expressions, unit tests pass, conformance tests need more investigation)
-- Control flow narrowing: 8 tests — assignment narrowing not tracked
-- Static index signatures: 1 test — would require adding index signatures to CallableShape
+### Remaining TS2339 False Positives (pending re-run)
+- Mixin classes: mixin type inference issues (intersection handling added in new expressions, unit tests pass, conformance tests need more investigation)
+- Static index signatures: would require adding index signatures to CallableShape
 - Assertion type predicates: 1 test
+- Re-run conformance to confirm private names/control-flow narrowing improvements
 
 ## Ready for Merge
 No
@@ -140,5 +91,6 @@ No
 - **NEVER edit**: `STRUCTURE.md`, `GOALS.md`, other workers' plan files, or anything in `orchestrator/`
 - Conformance (500 tests, latest): Exact 105 (21.6%), Same count 126 (25.9%), 0 crashes
 - TS2339 no longer in top 10 extra errors (was reduced from 35 to 20)
-- Remaining TS2339 issues are primarily: private names, mixins, control flow narrowing
+- Remaining TS2339 issues pending re-run; likely mixins + assertion predicates
 - `get_type_from_type_operator` added for proper keyof/readonly/unique handling
+- Tests: `./wasm/test.sh control_flow_tests`, `./wasm/test.sh test_ts2339_`

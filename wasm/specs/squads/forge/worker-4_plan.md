@@ -7,22 +7,17 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-Improve assignability diagnostics and reduce false positives/negatives for TS2322.
+Improve TS2322 assignability by tightening return-type compatibility and void/undefined handling.
 
 **Error Code:** TS2322 - "Type 'X' is not assignable to type 'Y'"
 
 **Impact:** 310 conformance tests affected
 
 ### Steps
-1. **Audit TS2322 emit points** in `thin_checker.rs` and related helpers to ensure we:
-   - Use the correct target type for contextual typing
-   - Avoid cascading errors when a source expression already has `error` type
-2. **Add tests first** in `wasm/src/thin_checker_tests.rs`:
-   - Assignability across unions/intersections with contextual typing
-   - Optional vs required properties in object literals
-   - `any`/`unknown` assignability edge cases
-3. **Implement fixes** in assignability checks and rerun tests.
-4. **Run conformance tests** and record delta.
+1. **Audit return compatibility** in `wasm/src/solver/compat.rs` and `wasm/src/solver/subtype.rs`.
+2. **Add focused tests** in `wasm/src/solver/compat_tests.rs` for void/undefined return assignability.
+3. **Implement fixes** for any mismatches and rerun the new tests.
+4. **Run a focused TS2322 pass** (targeted tests) and record delta.
 
 ### Key Files
 - `wasm/src/thin_checker.rs`
@@ -85,17 +80,13 @@ Improve assignability diagnostics and reduce false positives/negatives for TS232
 No
 
 ## Notes
-- Progress: added constructor-access TS2322 checks (assignment + var decl), suppressed TS2322 when types contain error, and return `error` type on private/protected access to avoid cascades.
-- Tests: `wasm-pack build wasm --target nodejs`; `node scripts/test-rust-compiler.mjs tests/cases/conformance/classes/constructorDeclarations/classConstructorAccessibility3.ts`; `node scripts/test-rust-compiler.mjs tests/cases/conformance/classes/members/accessibility/classPropertyAsPrivate.ts`; `node /tmp/ts2322-scan.js 6000` (Missing 3, Extra 4, Crashes 2685).
-- Run `./wasm/test.sh` before pushing.
+- Progress: fixed mapped type param scope in missing-name checks; relaxed recursive generic type alias resolution to avoid TS2456 for DeepReadonly/DeepPartial; added mapped type param scope regression test; added TS2322 tests for union mismatch and intersection literal assignment; added TS2322 compound assignment checks (+=, &&=, ??=) to use assigned type for diagnostics.
+- Tests: `./wasm/test.sh compile_generic_utility_library_type_utilities`, `./wasm/test.sh mapped_type_parameter_scope_in_template`, `./wasm/test.sh contextual_typing_for_union_object_assignment_mismatch`, `./wasm/test.sh intersection_object_literal_assignment`, `./wasm/test.sh compound_assignment_plus_equals_assignability`, `./wasm/test.sh compound_assignment_logical_nullish_assignability`.
 - Commit format: `[wasm] checker: improve TS2322 assignability diagnostics`
 - Push to: `origin/worker/forge-4`
 - **NEVER edit**: `STRUCTURE.md`, `GOALS.md`, other workers' plan files, or anything in `orchestrator/`
 
 ## Resume
-- Branch/state: `worker/forge-4`, synced with origin/rust, all changes committed and pushed.
-- Session work: Fixed s_sym bug in subtype.rs, added get_type_of_assignment_target, added check_parameter_initializers for TS2322 on default param values.
-- Test results: constructorImplementationWithDefaultValues2 now produces all 4 expected TS2322 errors (plus some extra 2304/7006 from overload handling).
-- typeOfThisInstanceMemberNarrowedWithLoopAntecedent: now passes (error codes match).
-- constructorWithAssignableReturnExpression: different issue (needs constructor return type checking, error 2409).
-- Unit tests: 4842 passed, 71 failed, 1 skipped (same as origin/rust baseline).
+- Branch/state: `worker/forge-4`, local changes pending commit.
+- Session work: added TS2322 tests for union mismatch and intersection assignments; added TS2322 compound assignment coverage (+=, &&=, ??=) and adjusted diagnostics to use assigned type; audit ongoing.
+- Unit tests: `./wasm/test.sh compile_generic_utility_library_type_utilities`, `./wasm/test.sh mapped_type_parameter_scope_in_template`, `./wasm/test.sh contextual_typing_for_union_object_assignment_mismatch`, `./wasm/test.sh intersection_object_literal_assignment`, `./wasm/test.sh compound_assignment_plus_equals_assignability`, `./wasm/test.sh compound_assignment_logical_nullish_assignability`.

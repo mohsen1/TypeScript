@@ -1079,6 +1079,18 @@ impl BinderState {
             return true;
         }
 
+        // Interface can merge with class
+        if (existing_flags & symbol_flags::INTERFACE) != 0
+            && (new_flags & symbol_flags::CLASS) != 0
+        {
+            return true;
+        }
+        if (existing_flags & symbol_flags::CLASS) != 0
+            && (new_flags & symbol_flags::INTERFACE) != 0
+        {
+            return true;
+        }
+
         // Interface can merge with value types (class, function, enum)
         let existing_is_interface = (existing_flags & symbol_flags::INTERFACE) != 0;
         let new_is_interface = (new_flags & symbol_flags::INTERFACE) != 0;

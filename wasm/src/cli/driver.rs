@@ -7,7 +7,9 @@ use std::path::{Path, PathBuf};
 
 use crate::binder::{symbol_flags, SymbolId, SymbolTable};
 use crate::checker::TypeCache;
-use crate::checker::types::diagnostics::{Diagnostic, DiagnosticCategory};
+use crate::checker::types::diagnostics::{
+    diagnostic_codes, diagnostic_messages, format_message, Diagnostic, DiagnosticCategory,
+};
 use crate::cli::args::CliArgs;
 use crate::cli::config::{
     load_tsconfig, resolve_compiler_options, JsxEmit, ModuleResolutionKind, PathMapping,
@@ -353,7 +355,7 @@ fn compile_inner(
         update_import_symbol_ids(&program, &resolved, &base_dir, cache);
     }
 
-    let mut diagnostics = collect_diagnostics(&program, cache, &resolved, &base_dir);
+    let mut diagnostics = collect_diagnostics(&program, &resolved, &base_dir, cache);
     diagnostics.sort_by(|left, right| {
         left.file
             .cmp(&right.file)
@@ -953,9 +955,12 @@ fn collect_module_specifiers_from_text(path: &Path, text: &str) -> Vec<String> {
     let source_file = parser.parse_source_file();
     let (arena, _diagnostics) = parser.into_parts();
     collect_module_specifiers(&arena, source_file)
+        .into_iter()
+        .map(|(specifier, _)| specifier)
+        .collect()
 }
 
-fn collect_module_specifiers(arena: &ThinNodeArena, source_file: NodeIndex) -> Vec<String> {
+fn collect_module_specifiers(arena: &ThinNodeArena, source_file: NodeIndex) -> Vec<(String, NodeIndex)> {
     let mut specifiers = Vec::new();
 
     let Some(node) = arena.get(source_file) else {
@@ -974,17 +979,17 @@ fn collect_module_specifiers(arena: &ThinNodeArena, source_file: NodeIndex) -> V
         };
         if let Some(import_decl) = arena.get_import_decl(stmt) {
             if let Some(text) = arena.get_literal_text(import_decl.module_specifier) {
-                specifiers.push(text.to_string());
+                specifiers.push((text.to_string(), import_decl.module_specifier));
             }
         }
         if let Some(export_decl) = arena.get_export_decl(stmt) {
             if let Some(text) = arena.get_literal_text(export_decl.module_specifier) {
-                specifiers.push(text.to_string());
+                specifiers.push((text.to_string(), export_decl.module_specifier));
             } else if !export_decl.export_clause.is_none() {
                 if let Some(clause_node) = arena.get(export_decl.export_clause) {
                     if let Some(import_decl) = arena.get_import_decl(clause_node) {
                         if let Some(text) = arena.get_literal_text(import_decl.module_specifier) {
-                            specifiers.push(text.to_string());
+                            specifiers.push((text.to_string(), import_decl.module_specifier));
                         }
                     }
                 }
@@ -2214,9 +2219,9 @@ fn apply_exports_subpath(target: &str, wildcard: &str) -> String {
 
 fn collect_diagnostics(
     program: &MergedProgram,
-    cache: Option<&mut CompilationCache>,
     options: &ResolvedCompilerOptions,
     base_dir: &Path,
+    cache: Option<&mut CompilationCache>,
 ) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
     let mut used_paths = HashSet::new();
@@ -2281,6 +2286,49 @@ fn collect_diagnostics(
             file_diagnostics.push(parse_diagnostic_to_checker(
                 &file.file_name,
                 parse_diagnostic,
+            ));
+        }
+        let file_path_for_resolve = Path::new(&file.file_name);
+        for (specifier, specifier_node) in collect_module_specifiers(&file.arena, file.source_file) {
+            if specifier.is_empty() {
+                continue;
+            }
+            if program.declared_modules.contains(specifier.as_str()) {
+                continue;
+            }
+            let resolved = resolve_module_specifier(
+                file_path_for_resolve,
+                &specifier,
+                options,
+                base_dir,
+                &mut resolution_cache,
+            );
+            if resolved.is_some() {
+                continue;
+            }
+            if specifier_node.is_none() {
+                continue;
+            }
+            let Some(spec_node) = file.arena.get(specifier_node) else {
+                continue;
+            };
+            let start = spec_node.pos;
+            let length = spec_node.end.saturating_sub(spec_node.pos);
+            let message = format_message(
+                diagnostic_messages::CANNOT_FIND_MODULE,
+                &[specifier.as_str()],
+            );
+            let code = if specifier.starts_with('.') || specifier.starts_with('/') {
+                diagnostic_codes::MODULE_NOT_FOUND
+            } else {
+                diagnostic_codes::CANNOT_FIND_MODULE
+            };
+            file_diagnostics.push(Diagnostic::error(
+                file.file_name.clone(),
+                start,
+                length,
+                message,
+                code,
             ));
         }
         checker.check_source_file(file.source_file);
@@ -2872,13 +2920,16 @@ fn create_binder_from_bound_file(
         }
     }
 
-    ThinBinderState::from_bound_state_with_scopes(
+    let mut binder = ThinBinderState::from_bound_state_with_scopes(
         program.symbols.clone(),
         file_locals,
         file.node_symbols.clone(),
         file.scopes.clone(),
         file.node_scope_ids.clone(),
-    )
+    );
+
+    binder.declared_modules = program.declared_modules.clone();
+    binder
 }
 
 fn emit_outputs(

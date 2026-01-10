@@ -4,7 +4,55 @@
 Execute tasks assigned by EM-Forge for the Forge squad (type system).
 
 Status: Active
-Priority: 5
+Priority: 1
+
+## Current Assignment (TS2695 - Comma Operator Side Effects)
+Implement TS2695 for comma operator expressions in statement position.
+
+**Error Code:** TS2695 - "Left side of comma operator is unused and has no side effects."
+
+**Impact:** 46 conformance tests affected (top missing).
+
+### Steps
+1. **Find expression-statement handling** in `wasm/src/thin_checker.rs` and detect comma operator expressions.
+2. **Add TS2695 emission** when the left operand is side-effect free.
+3. **Add tests** in `wasm/src/thin_checker_tests.rs` for `a, b;` and `1, b;` (error) vs `a(), b;` (no error).
+4. **Run focused tests** with `./wasm/test.sh` and report delta.
+
+## Current Assignment (TS7010 - Implicit Any Return)
+- [x] Consulted Gemini to confirm TS7010 = implicit any return (not TS2366)
+- [x] Built WASM package (`./wasm/build-wasm.sh`)
+- [x] Ran conformance baseline (`bash run-conformance.sh --all --workers=10`)
+
+### Baseline (workers=10 due to 10 CPU limit)
+- Exact Match: 1289 (26.2%)
+- Same Error Count: 1464 (29.7%)
+- Missing Errors: 2872 (58.3%)
+- Extra Errors: 1910 (38.8%)
+- Crashed: 143
+- Missing TS7010: 151 occurrences
+- Extra TS7010: 292 occurrences
+
+### Notes
+- Initial conformance run failed due to missing `wasm/pkg`; rebuilt via `./wasm/build-wasm.sh`.
+- Docker run with `--workers=14` failed (CPU limit); reran with `--workers=10`.
+
+## Current Assignment (Class `this`/Generic Constructor Typing)
+- [x] Use current class type parameters for instance `this` during member checking
+- [x] Run `./wasm/test.sh compile_class_with_generic_constructor`
+
+### Implementation Notes
+- `class_member_this_type()` now uses `get_class_instance_type()` with the enclosing class to avoid fresh type params.
+
+### Test Status
+- `./wasm/test.sh compile_class_with_generic_constructor` (PASS; warnings about unused imports elsewhere)
+
+## Current Assignment (Call Signature Void-Return Assignability)
+- [x] Add call signature void-return assignability test in `wasm/src/solver/compat_tests.rs`
+- [x] Run `./wasm/test.sh test_call_signature_void_return_assignability`
+
+### Test Status
+- `./wasm/test.sh test_call_signature_void_return_assignability` (PASS; warnings about unused imports elsewhere)
 
 ## Current Assignment (TS7006 - Parameter Implicit Any)
 - [x] Gather failing samples (call/construct/method signatures + function type aliases)
@@ -30,7 +78,7 @@ Priority: 5
 - Property signatures now recurse into their type annotations for signature checks
 
 ### Test Status
-- `./wasm/test.sh` failed: `cli::driver_tests::compile_class_with_generic_constructor` (pre-existing)
+- `./wasm/test.sh` previously failed: `cli::driver_tests::compile_class_with_generic_constructor` (now fixed)
 
 ## Previous Assignment (TS7008 - Member Implicit Any) - COMPLETED
 - [x] Implement member implicit any checking (TS7008) in `thin_checker.rs`
@@ -177,13 +225,22 @@ Added 40 comprehensive stress tests in `evaluate_tests.rs` covering:
 - [x] Add TS7030 diagnostic code and message
 - [x] Parse @noImplicitReturns compiler option from source comments
 - [x] Implement TS7030 check in function/method/accessor declarations
-- [x] Add regression tests: `test_no_implicit_returns_ts7030`, `test_no_implicit_returns_disabled`
+- [x] Add regression tests: `test_no_implicit_returns_ts7030`, `test_no_implicit_returns_disabled`, `test_no_implicit_returns_ts7030_getter`
 
 ### TS7030 Implementation Details
 - Error: "Not all code paths return a value."
 - Emits when: `noImplicitReturns && has_return && falls_through`
 - Checks: function declarations, method declarations, getter accessors
 - Unlike TS2366 (requires explicit return type), TS7030 fires even for inferred return types
+
+## Current Assignment (compile_class_with_generic_constructor)
+- [x] Ensure Application symbols insert type params in `type_env` during assignability checks
+- [x] Add regression test `test_generic_class_return_this_and_constructor` in `thin_checker_tests.rs`
+- [x] Run `./wasm/test.sh`
+
+### Result
+- Fixes `cli::driver_tests::compile_class_with_generic_constructor`
+- `./wasm/test.sh` now fails at `cli::driver_tests::compile_generic_utility_library_type_utilities` (pre-existing)
 
 ## Completed
 - [x] **TS7030 noImplicitReturns**: Implemented check for functions with implicit return paths
@@ -332,7 +389,7 @@ type Guard = (x: any) => x is Guard;  // Guard references itself in predicate
 - [x] Updated non-distributive union object inference expectation (tests not run).
 
 ## Ready for Merge
-Yes
+No
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize solver correctness (inference/conditional/subtype) before new features.

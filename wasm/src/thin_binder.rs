@@ -28,6 +28,8 @@ pub struct ThinBinderState {
     scope_stack: Vec<SymbolTable>,
     /// File-level locals (for module resolution)
     pub file_locals: SymbolTable,
+    /// Ambient module declarations by specifier (e.g. "pkg", "./types")
+    pub declared_modules: FxHashSet<String>,
     /// Flow nodes for control flow analysis
     pub flow_nodes: FlowNodeArena,
     /// Current flow node
@@ -73,6 +75,7 @@ impl ThinBinderState {
             current_scope: SymbolTable::new(),
             scope_stack: Vec::new(),
             file_locals: SymbolTable::new(),
+            declared_modules: FxHashSet::default(),
             flow_nodes,
             current_flow: FlowNodeId::NONE,
             unreachable_flow,
@@ -96,6 +99,7 @@ impl ThinBinderState {
         self.current_scope.clear();
         self.scope_stack.clear();
         self.file_locals.clear();
+        self.declared_modules.clear();
         self.flow_nodes.clear();
         self.unreachable_flow = self.flow_nodes.alloc(flow_flags::UNREACHABLE);
         self.current_flow = FlowNodeId::NONE;
@@ -130,6 +134,7 @@ impl ThinBinderState {
             current_scope: SymbolTable::new(),
             scope_stack: Vec::new(),
             file_locals,
+            declared_modules: FxHashSet::default(),
             flow_nodes,
             current_flow: FlowNodeId::NONE,
             unreachable_flow,
@@ -164,6 +169,7 @@ impl ThinBinderState {
             current_scope: SymbolTable::new(),
             scope_stack: Vec::new(),
             file_locals,
+            declared_modules: FxHashSet::default(),
             flow_nodes,
             current_flow: FlowNodeId::NONE,
             unreachable_flow,
@@ -2510,6 +2516,18 @@ impl ThinBinderState {
 
     fn bind_module_declaration(&mut self, arena: &ThinNodeArena, node: &ThinNode, idx: NodeIndex) {
         if let Some(module) = arena.get_module(node) {
+            if let Some(name_node) = arena.get(module.name) {
+                if name_node.kind == SyntaxKind::StringLiteral as u16
+                    || name_node.kind == SyntaxKind::NoSubstitutionTemplateLiteral as u16
+                {
+                    if let Some(lit) = arena.get_literal(name_node) {
+                        if !lit.text.is_empty() {
+                            self.declared_modules.insert(lit.text.clone());
+                        }
+                    }
+                }
+            }
+
             let name = self.get_identifier_name(arena, module.name)
                 .map(str::to_string)
                 .or_else(|| {

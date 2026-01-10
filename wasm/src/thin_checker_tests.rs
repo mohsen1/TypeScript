@@ -2710,6 +2710,259 @@ const handler: (x: string) => void = (x) => {
 }
 
 #[test]
+fn test_contextual_typing_for_assignment_expression() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let handler: (x: string) => void;
+handler = (x) => {
+    let y: number = x;
+};
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(codes.contains(&2322),
+        "Expected error 2322 from contextual typing on assignment, got: {:?}",
+        codes);
+}
+
+#[test]
+fn test_contextual_typing_for_union_object_assignment() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type A = { kind: "a"; value: number };
+type B = { kind: "b"; value: number };
+let v: A | B;
+v = { kind: "a", value: 1 };
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(!codes.contains(&2322),
+        "Did not expect error 2322 for contextual union object assignment, got: {:?}",
+        codes);
+}
+
+#[test]
+fn test_contextual_typing_for_union_object_assignment_mismatch() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type A = { kind: "a"; value: number };
+type B = { kind: "b"; value: string };
+let v: A | B;
+v = { kind: "a", value: "nope" };
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let count_2322 = codes.iter().filter(|&&code| code == 2322).count();
+    assert_eq!(
+        count_2322,
+        1,
+        "Expected one TS2322 for union assignment mismatch, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_intersection_object_literal_assignment() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type I = { a: number } & { b: string };
+let ok: I = { a: 1, b: "ok" };
+let bad: I = { a: 1 };
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let missing_prop_count = codes
+        .iter()
+        .filter(|&&code| code == 2322 || code == 2741)
+        .count();
+    assert_eq!(
+        missing_prop_count,
+        1,
+        "Expected 1 assignability error for missing intersection property, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_compound_assignment_plus_equals_assignability() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let n: number = 0;
+n += 1;
+n += "nope";
+let s: string = "hi";
+s += 1;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let count_2322 = codes.iter().filter(|&&code| code == 2322).count();
+    assert_eq!(
+        count_2322,
+        1,
+        "Expected one TS2322 for n += \"nope\", got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_compound_assignment_logical_nullish_assignability() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let v: number | undefined = 0;
+v &&= 1;
+v &&= "bad";
+
+let w: number | undefined;
+w ??= "bad";
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let count_2322 = codes.iter().filter(|&&code| code == 2322).count();
+    assert_eq!(
+        count_2322,
+        2,
+        "Expected two TS2322 errors for logical/nullish assignments, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_object_literal_optional_vs_required_assignment() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type Opt = { a: number; b?: string };
+type Req = { a: number; b: string };
+let opt: Opt;
+opt = { a: 1 };
+let req: Req;
+req = { a: 1 };
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let missing_prop_count = codes
+        .iter()
+        .filter(|&&code| code == 2322 || code == 2741)
+        .count();
+    assert_eq!(
+        missing_prop_count,
+        1,
+        "Expected 1 assignability error for missing required property, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_any_unknown_assignability_in_assignment() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let anyValue: any = "ok";
+let unknownValue: unknown = 42;
+let num: number = 0;
+
+num = anyValue;
+unknownValue = num;
+num = unknownValue;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let count_2322 = codes.iter().filter(|&&code| code == 2322).count();
+    assert_eq!(
+        count_2322,
+        1,
+        "Expected one TS2322 for unknown assignment, got: {:?}",
+        codes
+    );
+}
+
+#[test]
 fn test_contextual_typing_overload_by_arity() {
     use crate::thin_parser::ThinParserState;
 
@@ -4637,6 +4890,42 @@ const anon = () => { return null; };
     assert_eq!(count(7006), 1, "Expected one 7006 error, got codes: {:?}", codes);
     assert_eq!(count(7010), 1, "Expected one 7010 error, got codes: {:?}", codes);
     assert_eq!(count(7011), 1, "Expected one 7011 error, got codes: {:?}", codes);
+}
+
+#[test]
+fn test_implicit_any_return_in_signatures() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// @noImplicitAny: true
+interface I {
+    foo();
+}
+
+declare function bar();
+
+declare class C {
+    publicMethod();
+}
+
+const obj = { baz() { return undefined; } };
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let count = |code| codes.iter().filter(|&&c| c == code).count();
+
+    assert_eq!(count(7010), 4, "Expected four 7010 errors, got codes: {:?}", codes);
 }
 
 /// Test that functions that only throw don't trigger TS2355.
@@ -6830,6 +7119,74 @@ Foo;
         type_only_count,
         1,
         "Expected error 2693 for using import type as value, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_missing_relative_import_emits_2307() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+import { Foo } from "./missing";
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let missing_count = codes.iter().filter(|&&code| code == diagnostic_codes::MODULE_NOT_FOUND).count();
+    assert_eq!(
+        missing_count,
+        1,
+        "Expected TS2307 for missing relative import, got: {:?}",
+        codes
+    );
+    assert!(
+        !codes.contains(&diagnostic_codes::CANNOT_FIND_MODULE),
+        "Expected no TS2792 for missing relative import, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_missing_package_import_emits_2792() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+import { Foo } from "missing-package";
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let missing_count = codes.iter().filter(|&&code| code == diagnostic_codes::CANNOT_FIND_MODULE).count();
+    assert_eq!(
+        missing_count,
+        1,
+        "Expected TS2792 for missing package import, got: {:?}",
+        codes
+    );
+    assert!(
+        !codes.contains(&diagnostic_codes::MODULE_NOT_FOUND),
+        "Expected no TS2307 for missing package import, got: {:?}",
         codes
     );
 }
@@ -9504,6 +9861,41 @@ const m: string = state.message;
     );
 }
 
+/// Ensure mapped type parameters are in scope for template type checking.
+#[test]
+fn test_mapped_type_parameter_scope_in_template() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type M<T> = { [P in keyof T]: P };
+type Example = M<{ a: 1; b: 2 }>;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    if !checker.ctx.diagnostics.is_empty() {
+        eprintln!("=== Mapped Type Param Scope Diagnostics ===");
+        for diag in &checker.ctx.diagnostics {
+            eprintln!("[{}] {}", diag.start, diag.message_text);
+        }
+    }
+
+    assert!(
+        checker.ctx.diagnostics.is_empty(),
+        "Mapped type parameter scope should be available: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
 /// Minimal repro: DeepPartial recursive mapped type
 /// Pattern: `{ [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K] }`
 #[test]
@@ -11974,6 +12366,51 @@ const result = new AdvancedBuilder()
     );
 }
 
+#[test]
+fn test_generic_class_return_this_and_constructor() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Builder<T> {
+    private value: T;
+
+    constructor(initial: T) {
+        this.value = initial;
+    }
+
+    set(value: T): Builder<T> {
+        this.value = value;
+        return this;
+    }
+
+    transform<U>(fn: (value: T) => U): Builder<U> {
+        return new Builder(fn(this.value));
+    }
+
+    build(): T {
+        return this.value;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    assert!(
+        checker.ctx.diagnostics.is_empty(),
+        "Expected no diagnostics, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
 /// TS Unsoundness #19: Covariant `this` Types - Interface with this
 ///
 /// Interfaces can also use `this` type for fluent patterns.
@@ -13328,6 +13765,250 @@ class Foo {
     );
 }
 
+/// Test that element access assignment counts for identifier properties
+#[test]
+fn test_ts2564_element_access_assigns_identifier_property() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Foo {
+    name: string;
+    constructor() {
+        this["name"] = "assigned";
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let has_2564 = checker.ctx.diagnostics.iter().any(|d| d.code == 2564);
+    assert!(
+        !has_2564,
+        "Expected no TS2564 errors for element access assignment, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// Test that string-literal properties count assignments via dot access
+#[test]
+fn test_ts2564_string_literal_property_assigned_by_dot_access() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Foo {
+    "name": string;
+    constructor() {
+        this.name = "assigned";
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let has_2564 = checker.ctx.diagnostics.iter().any(|d| d.code == 2564);
+    assert!(
+        !has_2564,
+        "Expected no TS2564 errors for string literal property via dot access, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// Test that numeric literal properties can be assigned via element access
+#[test]
+fn test_ts2564_numeric_literal_property_assigned_by_element_access() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Foo {
+    0: string;
+    constructor() {
+        this[0] = "assigned";
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let has_2564 = checker.ctx.diagnostics.iter().any(|d| d.code == 2564);
+    assert!(
+        !has_2564,
+        "Expected no TS2564 errors for numeric literal property, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// Test that parameter properties don't emit TS2564 (they're auto-initialized)
+#[test]
+fn test_ts2564_parameter_property_skips_check() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Test {
+    constructor(public name: string, private age: number, readonly id: number) {
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Parameter properties should not have TS2564 errors
+    let has_2564 = checker.ctx.diagnostics.iter().any(|d| d.code == 2564);
+    assert!(
+        !has_2564,
+        "Expected no TS2564 errors for parameter properties, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// Test that properties assigned in if/else branches both need assignment
+#[test]
+fn test_ts2564_conditional_constructor_assignment() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Test {
+    name: string;
+    constructor(condition: boolean) {
+        if (condition) {
+            this.name = "a";
+        } else {
+            this.name = "b";
+        }
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Property assigned in both branches should not have TS2564 errors
+    let has_2564 = checker.ctx.diagnostics.iter().any(|d| d.code == 2564);
+    assert!(
+        !has_2564,
+        "Expected no TS2564 for conditional assignment in both branches, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// Test that properties assigned in only if branch DO emit TS2564
+#[test]
+fn test_ts2564_partial_conditional_assignment_error() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Test {
+    name: string;
+    constructor(condition: boolean) {
+        if (condition) {
+            this.name = "a";
+        }
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Property assigned in only if branch SHOULD have TS2564 error
+    let count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2564).count();
+    assert_eq!(
+        count,
+        1,
+        "Expected TS2564 for partial conditional assignment, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// Test that properties assigned in derived class with super call work
+#[test]
+fn test_ts2564_derived_class_with_super() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Base {
+    constructor(public id: number) {}
+}
+class Derived extends Base {
+    name: string;
+    constructor() {
+        super(1);
+        this.name = "test";
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Property assigned after super call should not have TS2564 errors
+    let has_2564 = checker.ctx.diagnostics.iter().any(|d| d.code == 2564);
+    assert!(
+        !has_2564,
+        "Expected no TS2564 for property assigned after super, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
 #[test]
 fn test_recursive_mapped_type_stack_guard() {
     use crate::thin_parser::ThinParserState;
@@ -13707,4 +14388,140 @@ class Derived extends Base {
         "Should not emit TS2339 for inherited method call, got errors: {:?}",
         checker.ctx.diagnostics
     );
+}
+
+#[test]
+fn test_no_implicit_returns_ts7030_function() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// @noImplicitReturns: true
+function maybeReturn(x: boolean) {
+    if (x) {
+        return 42;
+    }
+    // Missing return when x is false - should trigger TS7030
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts7030_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 7030)
+        .collect();
+
+    assert_eq!(ts7030_errors.len(), 1, "Expected one TS7030 error, got: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| d.code).collect::<Vec<_>>());
+}
+
+#[test]
+fn test_no_implicit_returns_disabled() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// @noImplicitReturns: false
+function maybeReturn(x: boolean) {
+    if (x) {
+        return 42;
+    }
+    // Should not trigger TS7030 since noImplicitReturns is false
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts7030_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 7030)
+        .collect();
+
+    assert!(ts7030_errors.is_empty(), "Expected no TS7030 errors, got: {:?}", ts7030_errors);
+}
+
+#[test]
+fn test_no_implicit_returns_ts7030_method() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// @noImplicitReturns: true
+class Example {
+    maybeReturn(x: boolean) {
+        if (x) {
+            return "hello";
+        }
+        // Missing return when x is false - should trigger TS7030
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts7030_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 7030)
+        .collect();
+
+    assert_eq!(ts7030_errors.len(), 1, "Expected one TS7030 error for method, got: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| d.code).collect::<Vec<_>>());
+}
+
+#[test]
+fn test_no_implicit_returns_ts7030_getter() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// @noImplicitReturns: true
+class Example {
+    private _value = 0;
+    get value() {
+        if (this._value > 0) {
+            return this._value;
+        }
+        // Missing return when _value <= 0 - should trigger TS7030
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts7030_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 7030)
+        .collect();
+
+    assert_eq!(ts7030_errors.len(), 1, "Expected one TS7030 error for getter, got: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| d.code).collect::<Vec<_>>());
 }

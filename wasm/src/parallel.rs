@@ -33,7 +33,7 @@ use crate::thin_binder::ThinBinderState;
 use crate::binder::{Scope, ScopeId, SymbolArena, SymbolId, SymbolTable};
 use crate::parser::NodeIndex;
 use crate::parser::thin_node::ThinNodeArena;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 /// Result of parsing a single file
 pub struct ParseResult {
@@ -122,6 +122,8 @@ pub struct BindResult {
     pub symbols: SymbolArena,
     /// File-level symbol table (exports, declarations)
     pub file_locals: SymbolTable,
+    /// Ambient module declarations by specifier
+    pub declared_modules: FxHashSet<String>,
     /// Node-to-symbol mapping
     pub node_symbols: FxHashMap<u32, SymbolId>,
     /// Persistent scopes for stateless checking
@@ -162,6 +164,7 @@ pub fn parse_and_bind_parallel(files: Vec<(String, String)>) -> Vec<BindResult> 
                 arena: Arc::new(arena),
                 symbols: binder.symbols,
                 file_locals: binder.file_locals,
+                declared_modules: binder.declared_modules,
                 node_symbols: binder.node_symbols,
                 scopes: binder.scopes,
                 node_scope_ids: binder.node_scope_ids,
@@ -187,6 +190,7 @@ pub fn parse_and_bind_single(file_name: String, source_text: String) -> BindResu
         arena: Arc::new(arena),
         symbols: binder.symbols,
         file_locals: binder.file_locals,
+        declared_modules: binder.declared_modules,
         node_symbols: binder.node_symbols,
         scopes: binder.scopes,
         node_scope_ids: binder.node_scope_ids,
@@ -262,6 +266,8 @@ pub struct MergedProgram {
     pub globals: SymbolTable,
     /// Per-file symbol tables (file-local symbols, symbol IDs remapped)
     pub file_locals: Vec<SymbolTable>,
+    /// Ambient module declarations across all files
+    pub declared_modules: FxHashSet<String>,
     /// Global type interner - shared across all threads for type deduplication
     pub type_interner: TypeInterner,
 }
@@ -293,8 +299,10 @@ pub fn merge_bind_results_ref(results: &[&BindResult]) -> MergedProgram {
     let mut globals = SymbolTable::new();
     let mut files = Vec::with_capacity(results.len());
     let mut file_locals_list = Vec::with_capacity(results.len());
+    let mut declared_modules = FxHashSet::default();
 
     for result in results {
+        declared_modules.extend(result.declared_modules.iter().cloned());
         // Copy symbols from this file to global arena, getting new IDs
         let mut id_remap: FxHashMap<SymbolId, SymbolId> = FxHashMap::default();
         for i in 0..result.symbols.len() {
@@ -392,6 +400,7 @@ pub fn merge_bind_results_ref(results: &[&BindResult]) -> MergedProgram {
         symbol_arenas,
         globals,
         file_locals: file_locals_list,
+        declared_modules,
         type_interner: TypeInterner::new(),
     }
 }
@@ -653,6 +662,7 @@ fn create_binder_from_bound_file(file: &BoundFile, program: &MergedProgram, file
         file.node_scope_ids.clone(),
     );
 
+    binder.declared_modules = program.declared_modules.clone();
     binder.symbol_arenas = program.symbol_arenas.clone();
     binder
 }
