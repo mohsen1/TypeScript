@@ -886,13 +886,15 @@ rest("a", "b");
 }
 
 #[test]
-fn test_call_spread_tuple_type_param() {
+fn test_overload_call_handles_tuple_spread_params() {
     use crate::thin_parser::ThinParserState;
 
     let source = r#"
 declare function foo1(a: number, b: string, c: boolean, ...d: number[]): void;
 
 function foo2<T extends [number, string]>(t1: T, t2: [boolean], a1: number[]) {
+    foo1(...t1, true, 42, 43, 44);
+    foo1(...t1, ...t2, 42, 43, 44);
     foo1(...t1, ...t2, ...a1);
 }
 "#;
