@@ -11800,6 +11800,51 @@ const result = new AdvancedBuilder()
     );
 }
 
+#[test]
+fn test_generic_class_return_this_and_constructor() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Builder<T> {
+    private value: T;
+
+    constructor(initial: T) {
+        this.value = initial;
+    }
+
+    set(value: T): Builder<T> {
+        this.value = value;
+        return this;
+    }
+
+    transform<U>(fn: (value: T) => U): Builder<U> {
+        return new Builder(fn(this.value));
+    }
+
+    build(): T {
+        return this.value;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    assert!(
+        checker.ctx.diagnostics.is_empty(),
+        "Expected no diagnostics, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
 /// TS Unsoundness #19: Covariant `this` Types - Interface with this
 ///
 /// Interfaces can also use `this` type for fluent patterns.

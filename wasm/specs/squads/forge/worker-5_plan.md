@@ -30,7 +30,7 @@ Priority: 5
 - Property signatures now recurse into their type annotations for signature checks
 
 ### Test Status
-- `./wasm/test.sh` failed: `cli::driver_tests::compile_class_with_generic_constructor` (pre-existing)
+- `./wasm/test.sh` previously failed: `cli::driver_tests::compile_class_with_generic_constructor` (now fixed)
 
 ## Previous Assignment (TS7008 - Member Implicit Any) - COMPLETED
 - [x] Implement member implicit any checking (TS7008) in `thin_checker.rs`
@@ -184,6 +184,15 @@ Added 40 comprehensive stress tests in `evaluate_tests.rs` covering:
 - Emits when: `noImplicitReturns && has_return && falls_through`
 - Checks: function declarations, method declarations, getter accessors
 - Unlike TS2366 (requires explicit return type), TS7030 fires even for inferred return types
+
+## Current Assignment (compile_class_with_generic_constructor)
+- [x] Ensure Application symbols insert type params in `type_env` during assignability checks
+- [x] Add regression test `test_generic_class_return_this_and_constructor` in `thin_checker_tests.rs`
+- [x] Run `./wasm/test.sh`
+
+### Result
+- Fixes `cli::driver_tests::compile_class_with_generic_constructor`
+- `./wasm/test.sh` now fails at `cli::driver_tests::compile_generic_utility_library_type_utilities` (pre-existing)
 
 ## Completed
 - [x] **TS7030 noImplicitReturns**: Implemented check for functions with implicit return paths
