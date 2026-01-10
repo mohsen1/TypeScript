@@ -13950,6 +13950,15 @@ impl<'a> ThinCheckerState<'a> {
         let class_idx = class_info.class_idx;
         let is_static = self.class_member_is_static(member_idx);
 
+        if !is_static {
+            // Use the current class type parameters in scope for instance `this`.
+            if let Some(node) = self.ctx.arena.get(class_idx) {
+                if let Some(class) = self.ctx.arena.get_class(node) {
+                    return Some(self.get_class_instance_type(class_idx, class));
+                }
+            }
+        }
+
         if let Some(sym_id) = self.ctx.binder.get_node_symbol(class_idx) {
             if is_static {
                 return Some(self.get_type_of_symbol(sym_id));

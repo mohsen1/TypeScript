@@ -6,6 +6,16 @@ Execute tasks assigned by EM-Forge for the Forge squad (type system).
 Status: Active
 Priority: 5
 
+## Current Assignment (Class `this`/Generic Constructor Typing)
+- [x] Use current class type parameters for instance `this` during member checking
+- [x] Run `./wasm/test.sh compile_class_with_generic_constructor`
+
+### Implementation Notes
+- `class_member_this_type()` now uses `get_class_instance_type()` with the enclosing class to avoid fresh type params.
+
+### Test Status
+- `./wasm/test.sh compile_class_with_generic_constructor` (PASS; warnings about unused imports elsewhere)
+
 ## Current Assignment (Call Signature Void-Return Assignability)
 - [x] Add call signature void-return assignability test in `wasm/src/solver/compat_tests.rs`
 - [x] Run `./wasm/test.sh test_call_signature_void_return_assignability`
