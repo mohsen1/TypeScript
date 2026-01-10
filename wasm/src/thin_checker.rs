@@ -426,6 +426,11 @@ impl<'a> ThinCheckerState<'a> {
                 self.get_type_of_new_expression(idx)
             }
 
+            // Class expression
+            k if k == syntax_kind_ext::CLASS_EXPRESSION => {
+                self.get_type_of_class_expression(idx)
+            }
+
             // Property access
             k if k == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION => {
                 self.get_type_of_property_access(idx)
@@ -5356,6 +5361,16 @@ impl<'a> ThinCheckerState<'a> {
                 TypeId::ERROR
             }
         }
+    }
+
+    fn get_type_of_class_expression(&mut self, idx: NodeIndex) -> TypeId {
+        let Some(node) = self.ctx.arena.get(idx) else {
+            return TypeId::ANY;
+        };
+        let Some(class) = self.ctx.arena.get_class(node) else {
+            return TypeId::ANY;
+        };
+        self.get_class_constructor_type(idx, class)
     }
 
     /// Check if a type contains any abstract class constructors.

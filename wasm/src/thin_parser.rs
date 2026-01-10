@@ -1852,6 +1852,10 @@ impl ThinParserState {
         let mut expr = if self.is_token(SyntaxKind::ClassKeyword) {
             // Inline class expression in extends clause: class extends class Expr {} {...}
             self.parse_class_expression()
+        } else if self.is_token(SyntaxKind::OpenParenToken) {
+            self.parse_parenthesized_expression()
+        } else if self.is_token(SyntaxKind::NewKeyword) {
+            self.parse_new_expression()
         } else if self.is_identifier_or_keyword() {
             self.parse_identifier_name()
         } else {
@@ -5002,8 +5006,11 @@ impl ThinParserState {
                     // Handle both regular identifiers and private identifiers (#name)
                     let name = if self.is_token(SyntaxKind::PrivateIdentifier) {
                         self.parse_private_identifier()
-                    } else {
+                    } else if self.is_identifier_or_keyword() {
                         self.parse_identifier_name()
+                    } else {
+                        self.error_identifier_expected();
+                        NodeIndex::NONE
                     };
                     let end_pos = self.token_end();
 
@@ -6326,8 +6333,11 @@ impl ThinParserState {
                     self.next_token();
                     let name = if self.is_token(SyntaxKind::PrivateIdentifier) {
                         self.parse_private_identifier()
-                    } else {
+                    } else if self.is_identifier_or_keyword() {
                         self.parse_identifier_name()
+                    } else {
+                        self.error_identifier_expected();
+                        NodeIndex::NONE
                     };
                     let end_pos = self.token_end();
 
