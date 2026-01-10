@@ -754,6 +754,10 @@ impl<'a> ThinCheckerState<'a> {
                 if let Some(type_id) = self.resolve_named_type_reference(name, type_name_idx) {
                     return type_id;
                 }
+                if name == "await" {
+                    self.error_cannot_find_name_did_you_mean_at(name, "Awaited", type_name_idx);
+                    return TypeId::ERROR;
+                }
                 self.error_cannot_find_name_at(name, type_name_idx);
                 return TypeId::ERROR;
             }
@@ -8935,6 +8939,32 @@ impl<'a> ThinCheckerState<'a> {
             );
             self.ctx.diagnostics.push(Diagnostic {
                 code: diagnostic_codes::CANNOT_FIND_NAME_DID_YOU_MEAN_STATIC,
+                category: DiagnosticCategory::Error,
+                message_text: message,
+                file: self.ctx.file_name.clone(),
+                start: loc.start,
+                length: loc.length(),
+                related_information: Vec::new(),
+            });
+        }
+    }
+
+    /// Report error 2552: Cannot find name 'X'. Did you mean 'Y'?
+    pub fn error_cannot_find_name_did_you_mean_at(
+        &mut self,
+        name: &str,
+        suggestion: &str,
+        idx: NodeIndex,
+    ) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+
+        if let Some(loc) = self.get_source_location(idx) {
+            let message = format!(
+                "Cannot find name '{}'. Did you mean '{}'?",
+                name, suggestion
+            );
+            self.ctx.diagnostics.push(Diagnostic {
+                code: diagnostic_codes::CANNOT_FIND_NAME_DID_YOU_MEAN,
                 category: DiagnosticCategory::Error,
                 message_text: message,
                 file: self.ctx.file_name.clone(),
