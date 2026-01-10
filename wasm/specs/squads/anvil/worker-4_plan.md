@@ -150,6 +150,50 @@ Ready for Merge: No (partial TS2456 implementation; needs investigation of pre-e
 
 Ready for Merge: Yes (current fix pushed; conformance still shows extra TS2769 in variadicTuples1)
 
+## Follow-up (2026-01-10) - TS2769 Variadic Tuple Rest Parameters
+
+**Mission**: Fix TS2769 false positives for variadic tuple rest parameters with trailing fixed elements.
+
+**Status**: COMPLETED
+
+### Checklist
+
+- [x] Analyze TS2769 errors in `variadicTuples1.ts` (15 false positives identified)
+- [x] Create minimal test case reproducing the issue
+- [x] Trace root cause in `wasm/src/solver/operations.rs::rest_tuple_inference_target`
+- [x] Implement fix to account for trailing fixed elements
+- [x] Add regression test: `test_variadic_tuple_rest_param_no_ts2769`
+- [x] Run conformance on types/tuple to measure impact
+
+### Root Cause
+
+For signature `foo<T extends unknown[]>(x: number, ...args: [...T, number]): T`:
+- Call `foo(1, 2)` should infer T = [] (rest args [2] match [...[], number])
+- Bug: `rest_tuple_inference_target` was inferring T from ALL remaining arguments
+- It didn't account for trailing fixed elements after the variadic part
+- Result: tried to infer T = [2] instead of T = [], causing type mismatch
+
+### Fix
+
+Modified `rest_tuple_inference_target` in `wasm/src/solver/operations.rs:515-573`:
+1. Count trailing fixed elements after the variadic type parameter
+2. Calculate `infer_count = rest_arg_count - trailing_count`
+3. Build inference tuple from `arg_types[start_index..start_index+infer_count]`
+
+### Test Results
+
+- Minimal test: 3 TS2769 errors eliminated (3 → 0)
+- variadicTuples1.ts: 5 TS2769 errors eliminated (15 → 10)
+- Conformance (types/tuple, max 200): TS2769 extras reduced (6 → 5 occurrences)
+- Regression test: `cargo test test_variadic_tuple_rest_param_no_ts2769` (PASS)
+
+### Files Modified
+
+- `wasm/src/solver/operations.rs` - Fixed variadic tuple rest parameter type inference
+- `wasm/src/thin_checker_tests.rs` - Added regression test
+
+Ready for Merge: Yes
+
 ## Follow-up (2026-01-09) - TS2339 False Positives (Class-Like Extends)
 
 **Mission**: Remove extra TS2339 errors for class inheritance through constructor-returning expressions.
@@ -192,4 +236,4 @@ Ready for Merge: Yes (current fix pushed; conformance still shows extra TS2769 i
 **After** (`find-ts2339.mjs --max=400 --samples=10`):
 - 0 extra TS2339 in first 400 files
 
-Ready for Merge: Yes
+Ready for Merge: No (merged)
