@@ -126,6 +126,10 @@ pub struct CheckerContext<'a> {
     /// Whether noImplicitReturns checks are enabled.
     pub no_implicit_returns: bool,
 
+    /// Whether unresolved import diagnostics should be emitted by the checker.
+    /// The CLI driver handles module resolution in multi-file mode.
+    pub report_unresolved_imports: bool,
+
     // --- Caches ---
 
     /// Cached types for symbols.
@@ -251,6 +255,7 @@ impl<'a> CheckerContext<'a> {
             file_name,
             no_implicit_any: true,
             no_implicit_returns: false,
+            report_unresolved_imports: true,
             symbol_types: FxHashMap::default(),
             var_decl_types: FxHashMap::default(),
             node_types: FxHashMap::default(),
@@ -301,6 +306,7 @@ impl<'a> CheckerContext<'a> {
             file_name,
             no_implicit_any: true,
             no_implicit_returns: false,
+            report_unresolved_imports: true,
             symbol_types: cache.symbol_types,
             var_decl_types: FxHashMap::default(),
             node_types: cache.node_types,
