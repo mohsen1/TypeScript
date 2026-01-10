@@ -600,10 +600,12 @@ impl<'a> ThinCheckerState<'a> {
                         self.error_value_only_type_at(&name, type_name_idx);
                         return TypeId::ERROR;
                     }
-                    // Ensure the base type symbol is resolved first so its type params
-                    // are available in the type_env for Application expansion
-                    let _ = self.get_type_of_symbol(sym_id);
                     if let Some(args) = &type_ref.type_arguments {
+                        if self.should_resolve_recursive_type_alias(sym_id, args) {
+                            // Ensure the base type symbol is resolved first so its type params
+                            // are available in the type_env for Application expansion
+                            let _ = self.get_type_of_symbol(sym_id);
+                        }
                         for &arg_idx in &args.nodes {
                             let _ = self.get_type_from_type_node(arg_idx);
                         }
@@ -654,9 +656,13 @@ impl<'a> ThinCheckerState<'a> {
                                 self.error_value_only_type_at(name, type_name_idx);
                                 return TypeId::ERROR;
                             }
-                            // Ensure the base type symbol is resolved first so its type params
-                            // are available in the type_env for Application expansion
-                            let _ = self.get_type_of_symbol(sym_id);
+                            if let Some(args) = &type_ref.type_arguments {
+                                if self.should_resolve_recursive_type_alias(sym_id, args) {
+                                    // Ensure the base type symbol is resolved first so its type params
+                                    // are available in the type_env for Application expansion
+                                    let _ = self.get_type_of_symbol(sym_id);
+                                }
+                            }
                         }
                     }
                     // Also ensure type arguments are resolved and in type_env
@@ -760,6 +766,110 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         TypeId::ANY
+    }
+
+    fn should_resolve_recursive_type_alias(
+        &self,
+        sym_id: SymbolId,
+        type_args: &crate::parser::NodeList,
+    ) -> bool {
+        if !self.ctx.symbol_resolution_set.contains(&sym_id) {
+            return true;
+        }
+        if self.ctx.symbol_resolution_stack.last().copied() != Some(sym_id) {
+            return true;
+        }
+        let Some(symbol) = self.ctx.binder.get_symbol(sym_id) else {
+            return true;
+        };
+        if symbol.flags & symbol_flags::TYPE_ALIAS == 0 {
+            return true;
+        }
+        self.type_args_match_alias_params(sym_id, type_args)
+    }
+
+    fn type_args_match_alias_params(
+        &self,
+        sym_id: SymbolId,
+        type_args: &crate::parser::NodeList,
+    ) -> bool {
+        let Some(symbol) = self.ctx.binder.get_symbol(sym_id) else {
+            return false;
+        };
+        if symbol.flags & symbol_flags::TYPE_ALIAS == 0 {
+            return false;
+        }
+
+        let decl_idx = if !symbol.value_declaration.is_none() {
+            symbol.value_declaration
+        } else {
+            symbol.declarations.first().copied().unwrap_or(NodeIndex::NONE)
+        };
+        if decl_idx.is_none() {
+            return false;
+        }
+        let Some(node) = self.ctx.arena.get(decl_idx) else {
+            return false;
+        };
+        let Some(type_alias) = self.ctx.arena.get_type_alias(node) else {
+            return false;
+        };
+        let Some(type_params) = &type_alias.type_parameters else {
+            return false;
+        };
+        if type_params.nodes.len() != type_args.nodes.len() {
+            return false;
+        }
+
+        for (&param_idx, &arg_idx) in type_params.nodes.iter().zip(type_args.nodes.iter()) {
+            let Some(param_node) = self.ctx.arena.get(param_idx) else {
+                return false;
+            };
+            let Some(param) = self.ctx.arena.get_type_parameter(param_node) else {
+                return false;
+            };
+            let Some(param_name) = self
+                .ctx
+                .arena
+                .get(param.name)
+                .and_then(|node| self.ctx.arena.get_identifier(node))
+                .map(|ident| ident.escaped_text.as_str())
+            else {
+                return false;
+            };
+
+            let Some(arg_node) = self.ctx.arena.get(arg_idx) else {
+                return false;
+            };
+            if arg_node.kind == syntax_kind_ext::TYPE_REFERENCE {
+                let Some(arg_ref) = self.ctx.arena.get_type_ref(arg_node) else {
+                    return false;
+                };
+                if arg_ref.type_arguments.as_ref().map_or(false, |list| !list.nodes.is_empty()) {
+                    return false;
+                }
+                let Some(arg_name_node) = self.ctx.arena.get(arg_ref.type_name) else {
+                    return false;
+                };
+                let Some(arg_ident) = self.ctx.arena.get_identifier(arg_name_node) else {
+                    return false;
+                };
+                if arg_ident.escaped_text != param_name {
+                    return false;
+                }
+            } else if arg_node.kind == SyntaxKind::Identifier as u16 {
+                let Some(arg_ident) = self.ctx.arena.get_identifier(arg_node) else {
+                    return false;
+                };
+                if arg_ident.escaped_text != param_name {
+                    return false;
+                }
+            } else {
+                return false;
+            }
+        }
+
+        true
     }
 
     fn class_instance_type_from_symbol(&mut self, sym_id: SymbolId) -> Option<TypeId> {
@@ -12218,6 +12328,21 @@ impl<'a> ThinCheckerState<'a> {
             k if k == syntax_kind_ext::MAPPED_TYPE => {
                 if let Some(mapped) = self.ctx.arena.get_mapped_type(node) {
                     self.check_type_parameter_node_for_missing_names(mapped.type_parameter);
+                    let mut mapped_param_scope: Option<(String, Option<TypeId>)> = None;
+                    if let Some(param_node) = self.ctx.arena.get(mapped.type_parameter) {
+                        if let Some(param) = self.ctx.arena.get_type_parameter(param_node) {
+                            if let Some(name_node) = self.ctx.arena.get(param.name) {
+                                if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
+                                    let name = ident.escaped_text.clone();
+                                    let previous = self
+                                        .ctx
+                                        .type_parameter_scope
+                                        .insert(name.clone(), TypeId::UNKNOWN);
+                                    mapped_param_scope = Some((name, previous));
+                                }
+                            }
+                        }
+                    }
                     if !mapped.name_type.is_none() {
                         self.check_type_for_missing_names(mapped.name_type);
                     }
@@ -12227,6 +12352,13 @@ impl<'a> ThinCheckerState<'a> {
                     if let Some(ref members) = mapped.members {
                         for &member_idx in &members.nodes {
                             self.check_type_member_for_missing_names(member_idx);
+                        }
+                    }
+                    if let Some((name, previous)) = mapped_param_scope {
+                        if let Some(prev_type) = previous {
+                            self.ctx.type_parameter_scope.insert(name, prev_type);
+                        } else {
+                            self.ctx.type_parameter_scope.remove(&name);
                         }
                     }
                 }

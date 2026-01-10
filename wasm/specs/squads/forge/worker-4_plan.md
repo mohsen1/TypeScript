@@ -85,13 +85,13 @@ Improve assignability diagnostics and reduce false positives/negatives for TS232
 Yes
 
 ## Notes
-- Progress: added contextual typing for assignment expressions, return expressions, parameter defaults, and class property initializers; added TS2322 regression tests for assignment/contextual typing/optional-vs-required/any-unknown.
-- Tests: `./wasm/test.sh` (fails at `cli::driver_tests::compile_generic_utility_library_type_utilities` with TS2456/TS2304 on mapped type params `P`).
+- Progress: fixed mapped type param scope in missing-name checks; relaxed recursive generic type alias resolution to avoid TS2456 for DeepReadonly/DeepPartial; added mapped type param scope regression test.
+- Tests: `./wasm/test.sh compile_generic_utility_library_type_utilities`, `./wasm/test.sh mapped_type_parameter_scope_in_template`.
 - Commit format: `[wasm] checker: improve TS2322 assignability diagnostics`
 - Push to: `origin/worker/forge-4`
 - **NEVER edit**: `STRUCTURE.md`, `GOALS.md`, other workers' plan files, or anything in `orchestrator/`
 
 ## Resume
-- Branch/state: `worker/forge-4`, changes committed and pushed.
-- Session work: Added contextual typing on assignment/returns/initializers; added TS2322 regression tests for assignment union/object optionality/any-unknown cases.
-- Unit tests: `./wasm/test.sh` fails early at `compile_generic_utility_library_type_utilities` (TS2456 + TS2304 for mapped type param `P`).
+- Branch/state: `worker/forge-4`, local changes pending commit.
+- Session work: fixed recursive generic type alias resolution and mapped type param scoping; added mapped type param scope regression test.
+- Unit tests: `./wasm/test.sh compile_generic_utility_library_type_utilities`, `./wasm/test.sh mapped_type_parameter_scope_in_template`.

@@ -9454,6 +9454,41 @@ const m: string = state.message;
     );
 }
 
+/// Ensure mapped type parameters are in scope for template type checking.
+#[test]
+fn test_mapped_type_parameter_scope_in_template() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type M<T> = { [P in keyof T]: P };
+type Example = M<{ a: 1; b: 2 }>;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    if !checker.ctx.diagnostics.is_empty() {
+        eprintln!("=== Mapped Type Param Scope Diagnostics ===");
+        for diag in &checker.ctx.diagnostics {
+            eprintln!("[{}] {}", diag.start, diag.message_text);
+        }
+    }
+
+    assert!(
+        checker.ctx.diagnostics.is_empty(),
+        "Mapped type parameter scope should be available: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
 /// Minimal repro: DeepPartial recursive mapped type
 /// Pattern: `{ [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K] }`
 #[test]
