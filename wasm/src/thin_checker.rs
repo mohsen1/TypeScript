@@ -10850,6 +10850,12 @@ impl<'a> ThinCheckerState<'a> {
 
         let module_name = &literal.text;
 
+        if let Some(ref resolved) = self.ctx.resolved_modules {
+            if resolved.contains(module_name) {
+                return;
+            }
+        }
+
         // In single-file mode, any external import is considered unresolved.
         // This is correct because WASM checker operates on individual files
         // without access to the module graph or ambient module declarations.

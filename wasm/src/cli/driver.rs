@@ -353,7 +353,7 @@ fn compile_inner(
         update_import_symbol_ids(&program, &resolved, &base_dir, cache);
     }
 
-    let mut diagnostics = collect_diagnostics(&program, cache);
+    let mut diagnostics = collect_diagnostics(&program, cache, &resolved, &base_dir);
     diagnostics.sort_by(|left, right| {
         left.file
             .cmp(&right.file)
@@ -2215,10 +2215,19 @@ fn apply_exports_subpath(target: &str, wildcard: &str) -> String {
 fn collect_diagnostics(
     program: &MergedProgram,
     cache: Option<&mut CompilationCache>,
+    options: &ResolvedCompilerOptions,
+    base_dir: &Path,
 ) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
     let mut used_paths = HashSet::new();
     let mut cache = cache;
+    let mut resolution_cache = ModuleResolutionCache::default();
+    let mut program_paths = HashSet::new();
+
+    for file in &program.files {
+        let canonical = canonicalize_or_owned(Path::new(&file.file_name));
+        program_paths.insert(canonical);
+    }
 
     for (file_idx, file) in program.files.iter().enumerate() {
         let file_path = PathBuf::from(&file.file_name);
@@ -2251,6 +2260,22 @@ fn collect_diagnostics(
                 file.file_name.clone(),
             )
         };
+        let mut resolved_modules = HashSet::new();
+        for specifier in collect_module_specifiers(&file.arena, file.source_file) {
+            if let Some(resolved) = resolve_module_specifier(
+                Path::new(&file.file_name),
+                &specifier,
+                options,
+                base_dir,
+                &mut resolution_cache,
+            ) {
+                let canonical = canonicalize_or_owned(&resolved);
+                if program_paths.contains(&canonical) {
+                    resolved_modules.insert(specifier);
+                }
+            }
+        }
+        checker.ctx.resolved_modules = Some(resolved_modules);
         let mut file_diagnostics = Vec::new();
         for parse_diagnostic in &file.parse_diagnostics {
             file_diagnostics.push(parse_diagnostic_to_checker(
