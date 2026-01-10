@@ -1,21 +1,22 @@
 # Worker 2 Plan - Squad Forge
 
 ## Mission
-Implement TS2339 property access checking improvements (property does not exist).
+Improve missing-name diagnostics (TS2304) in the checker/binder.
 
 Status: Active
 Priority: 1
 
 ## Current Assignment
-Reduce remaining TS2339 false positives (non-control-flow cases).
+Improve TS2304 "Cannot find name" diagnostics for unresolved type positions (heritage clauses, type queries, and type literals).
 
-**Error Code:** TS2339 - "Property 'X' does not exist on type 'Y'"
+**Error Code:** TS2304 - "Cannot find name '{0}'."
 
-**Impact:** 142 conformance tests affected
+**Impact:** 138 conformance tests affected
 
 ### Steps
-1. **Run a scan**: `cd wasm/differential-test && node find-ts2339.mjs --max=1000 --samples=30`.
-2. **Pick top non-control-flow pattern** (e.g., enum/namespace merging or static/instance property access).
+1. **Run a scan** for missing TS2304s: `cd wasm/differential-test && node find-ts2304.mjs --max=1000 --samples=30`.
+   - If the script doesn't exist, clone `find-ts2339.mjs` into `find-ts2304.mjs` and invert the comparison to report missing (TSC-only) TS2304s.
+2. **Pick top missing pattern** (e.g., `extends`/`implements` type references, `typeof` type queries, or type literal members).
 3. **Implement the fix** in `thin_checker.rs`/`binder.rs` and add a focused regression test.
 4. **Run focused tests** with `./wasm/test.sh` and report delta.
 
@@ -23,10 +24,11 @@ Reduce remaining TS2339 false positives (non-control-flow cases).
 - `wasm/src/thin_checker.rs`
 - `wasm/src/binder.rs`
 - `wasm/src/thin_checker_tests.rs`
+- `wasm/differential-test/find-ts2304.mjs` (new if needed)
 
 ### Success Criteria
-- TS2339 false positives reduced for the selected pattern
-- No new regressions in existing TS2339 tests
+- TS2304 missing errors reduced for the selected pattern
+- Extra TS2304s do not increase
 
 ## Resume Notes
 - Branch: `worker/forge-2`.
