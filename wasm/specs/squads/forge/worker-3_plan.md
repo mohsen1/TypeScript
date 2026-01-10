@@ -1,86 +1,32 @@
 # Worker 3 Plan - Squad Forge
 
 ## Mission
-Implement TS2454 definite assignment analysis for variables.
+Reduce TS2339 false positives via control flow narrowing.
 
 Status: Active
 Priority: 1
 
 ## Current Assignment
-Fix TS2339 false positives in property access checking.
+Fix control-flow narrowing for property access after assignments/type guards.
 
 **Error Code:** TS2339 - "Property 'X' does not exist on type 'Y'"
 
-**Impact:** 142 conformance tests affected (was 35 extra errors, now 14)
-
-### Background
-TypeScript tracks whether variables are definitely assigned before use:
-```typescript
-let x: number;
-console.log(x);  // TS2454: Variable 'x' is used before being assigned
-
-let y: number;
-y = 5;
-console.log(y);  // OK
-```
-
-This requires control flow analysis to track variable state through branches.
+**Impact:** 142 conformance tests affected (control-flow narrowing cases)
 
 ### Steps
-1. **Add test cases first**:
-   ```typescript
-   // Should error: TS2454
-   function foo() {
-     let x: number;
-     return x;  // used before assigned
-   }
-
-   // Should error: TS2454 - not all paths assign
-   function bar(flag: boolean) {
-     let x: number;
-     if (flag) { x = 1; }
-     return x;  // might not be assigned
-   }
-
-   // Should NOT error: assigned in all paths
-   function baz(flag: boolean) {
-     let x: number;
-     if (flag) { x = 1; } else { x = 2; }
-     return x;  // definitely assigned
-   }
-
-   // Should NOT error: assigned before use
-   function qux() {
-     let x: number;
-     x = 5;
-     return x;
-   }
-   ```
-
-2. **Implement variable tracking**:
-   - Create a `DefiniteAssignmentChecker` or extend existing flow analysis
-   - Track declared variables and their assignment state
-   - At each variable reference, check if definitely assigned
-
-3. **Handle control flow**:
-   - If/else branches: both must assign for "definitely assigned"
-   - Loops: conservative (assume loop might not execute)
-   - Try/catch: handle exception paths
-   - Switch: all cases must assign
-
-4. **Emit TS2454** when variable is used but not definitely assigned.
-
-5. **Run conformance tests** and report numbers.
+1. **Assignment narrowing:** update `handle_assignment` / flow tracking to carry RHS type for matching references.
+2. **Reference matching:** only narrow for direct identifier/property matches (skip destructuring).
+3. **Add tests** in `wasm/src/thin_checker_tests.rs` for assignment-based narrowing and property access.
+4. **Run focused TS2339 tests** and report delta.
 
 ### Key Files
-- `wasm/src/thin_checker.rs` - main checker
-- `wasm/src/checker/control_flow.rs` - flow analysis infrastructure
-- `wasm/src/checker/statements.rs` - statement checking
+- `wasm/src/checker/control_flow.rs`
+- `wasm/src/thin_checker.rs`
+- `wasm/src/thin_checker_tests.rs`
 
 ### Success Criteria
-- TS2454 emitted for use-before-assignment
-- Correct handling of control flow branches
-- No false positives for properly assigned variables
+- TS2339 extra errors reduced for control-flow narrowing cases
+- No regressions in existing TS2339 tests
 
 ## Task Queue
 (empty - single focused task)

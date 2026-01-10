@@ -7,34 +7,26 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-Reduce false positives for property access errors by aligning TS2339 behavior with TypeScript.
+Reduce TS2339 false positives for **private names** and **mixin classes**, plus missing errors on `globalThis`.
 
 **Error Code:** TS2339 - "Property 'X' does not exist on type 'Y'"
 
 **Impact:** 142 conformance tests affected
 
 ### Steps
-1. **Audit TS2339 emit points** in `thin_checker.rs` to ensure we skip diagnostics for:
-   - `any` and `unknown` flows
-   - `error` type (suppress cascades)
-   - Union members where at least one contains the property
-2. **Add tests first** in `wasm/src/thin_checker_tests.rs`:
-   - `any` access should not error
-   - `unknown` access should error only when narrowed
-   - Optional properties on unions should not error when present in some members
-3. **Implement fixes** and ensure existing TS2339 tests still pass.
-4. **Run conformance tests** and record delta.
+1. **Private names:** ensure `#prop` lookups on class types resolve correctly (static and instance).
+2. **Mixin classes:** fix property resolution for mixin-generated types (avoid TS2339 on valid props).
+3. **globalThis:** add missing property checks for `globalThis` access.
+4. **Add tests** in `wasm/src/thin_checker_tests.rs` and re-run focused TS2339 tests.
 
 ### Key Files
 - `wasm/src/thin_checker.rs`
 - `wasm/src/solver/operations.rs`
-- `wasm/src/checker/context.rs`
-- `wasm/src/checker/types/diagnostics.rs`
 - `wasm/src/thin_checker_tests.rs`
 
 ### Success Criteria
-- TS2339 missing errors reduced
-- Extra errors do not increase (no regressions)
+- TS2339 extra errors reduced in private name + mixin cases
+- Missing `globalThis` errors emitted correctly
 
 ## Resume Notes
 - Branch: `worker/forge-2` (ahead of `origin/rust`).
@@ -79,7 +71,7 @@ Reduce false positives for property access errors by aligning TS2339 behavior wi
 - Conformance scan after re-apply: 22 extra (from 1000 files).
 
 ## Ready for Merge
-Yes
+No
 
 ## Notes
 - Full test run failing in `cli::driver_tests::compile_multi_file_project_with_imports`

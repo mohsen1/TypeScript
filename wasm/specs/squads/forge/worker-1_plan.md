@@ -1,37 +1,38 @@
 # Worker 1 Plan - Squad Forge
 
 ## Mission
-Implement TS2454 variable used before assigned diagnostics.
+Implement TS2792 module resolution diagnostics.
 
 Status: Active
 Priority: 1
 
 ## Current Assignment
-Enhance TS2564 "Property X has no initializer and is not definitely assigned in constructor" error coverage.
+Implement TS2792 "Cannot find module 'x' or its corresponding type declarations".
 
-**Error Code:** TS2564 - "Property has no initializer and is not definitely assigned in constructor"
+**Error Code:** TS2792
 
-**Impact:** 443 conformance tests affected
+**Impact:** 204 conformance tests affected
 
 ### Steps
-1. **Review existing implementation** - check_property_initialization in thin_checker.rs
-2. **Identify missing edge cases** from conformance test failures
-3. **Handle additional cases** (parameter properties, nested assignments, etc.)
-4. **Run conformance tests** and report delta.
+1. **Track unresolved imports** in `thin_binder.rs` and `thin_checker.rs`.
+2. **Emit TS2792** for unresolved module specifiers (pick TS2792 vs TS2307 correctly).
+3. **Add unit tests** in `wasm/src/thin_checker_tests.rs` for relative + package imports.
+4. **Run `./wasm/test.sh`** (or focused tests) and report delta.
 
 ### Key Files
 - `wasm/src/thin_checker.rs`
+- `wasm/src/thin_binder.rs`
 - `wasm/src/thin_checker_tests.rs`
 
 ### Success Criteria
-- TS2564 emitted correctly for all uninitialized properties
-- Constructor assignment tracking handles all control flow patterns
-- No false positives for properly initialized properties
+- TS2792 emitted for missing modules
+- No new false positives for resolved modules
 
 ## Task Queue
 (empty - single focused task)
 
 ## Completed
+- TS2454 implementation merged into squad/forge.
 - TS2564 property initialization tracking and tests (merged).
 - Implemented TS2564 property initialization check using type annotations when symbol types are `any`/`unknown`.
 - Added TS2564 tests for required property errors and `undefined` union exemption.
@@ -50,7 +51,7 @@ Enhance TS2564 "Property X has no initializer and is not definitely assigned in 
 - **TS2564 implementation enhanced**: Added 4 more edge case tests (parameter properties, conditional constructor assignments, derived classes with super). Total 11 tests passing.
 
 ## Ready for Merge
-Yes
+No
 
 ## Notes
 - Run `./wasm/test.sh` before pushing

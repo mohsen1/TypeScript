@@ -6,7 +6,27 @@ Execute tasks assigned by EM-Forge for the Forge squad (type system).
 Status: Active
 Priority: 5
 
-## Current Assignment (TS7006 - Parameter Implicit Any)
+## Current Assignment
+Fix `compile_class_with_generic_constructor` by aligning class `this`/constructor return typing with nominal class identity.
+
+**Focus:** Reduce TS2322 false positives on `return this` and generic constructor returns.
+
+### Steps
+1. Reproduce failure in `cli::driver_tests::compile_class_with_generic_constructor`.
+2. Track where class instance types are built and where assignability compares `this`/constructor returns.
+3. Ensure same-class instance types compare as identical (private brand should not cause mismatch).
+4. Add regression tests in `wasm/src/thin_checker_tests.rs`.
+
+### Key Files
+- `wasm/src/thin_checker.rs`
+- `wasm/src/checker/types/assignability.rs` (if present)
+- `wasm/src/thin_checker_tests.rs`
+
+### Success Criteria
+- `compile_class_with_generic_constructor` passes
+- No new TS2322 regressions
+
+## Previous Assignment (TS7006 - Parameter Implicit Any) - COMPLETED
 - [x] Gather failing samples (call/construct/method signatures + function type aliases)
 - [x] Add implicit-any checks for signature parameters and function type nodes
 - [x] Add regression tests in `thin_checker_tests.rs`
@@ -332,7 +352,7 @@ type Guard = (x: any) => x is Guard;  // Guard references itself in predicate
 - [x] Updated non-distributive union object inference expectation (tests not run).
 
 ## Ready for Merge
-Yes
+No
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize solver correctness (inference/conditional/subtype) before new features.
