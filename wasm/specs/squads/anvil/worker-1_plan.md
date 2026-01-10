@@ -6,7 +6,7 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-- Idle; last completed task: fix await/async TS2304 false positives (TS2552 for await type refs, TS1042 for async class/enum) and add regressions (committed/pushed; Ready for Merge: Yes).
+- Idle; last completed task: fix await/async TS2304 false positives (TS2552 for await type refs, TS1042 for async class/enum) and add regressions (merged 2026-01-10).
 - Awaiting next task from EM-Anvil.
 
 ## Task Queue

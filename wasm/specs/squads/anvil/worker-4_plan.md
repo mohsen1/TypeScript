@@ -147,4 +147,4 @@ Ready for Merge: No (partial TS2456 implementation; needs investigation of pre-e
 - Built WASM package for conformance: `./wasm/build-wasm.sh` (warnings only).
 - Avoid committing `.role/AGENTS.md` change (expected local modification).
 
-Ready for Merge: Yes (current fix pushed; conformance still shows extra TS2769 in variadicTuples1)
+Ready for Merge: No (merged 2026-01-10; conformance still shows extra TS2769 in variadicTuples1)
