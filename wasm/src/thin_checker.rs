@@ -8845,11 +8845,26 @@ impl<'a> ThinCheckerState<'a> {
     /// This walks the type structure and calls get_type_of_symbol for any Application base symbols.
     fn ensure_application_symbols_resolved(&mut self, type_id: TypeId) {
         use crate::solver::TypeKey;
-        use crate::binder::SymbolId;
         use std::collections::HashSet;
 
         let mut visited: HashSet<TypeId> = HashSet::new();
         self.ensure_application_symbols_resolved_inner(type_id, &mut visited);
+    }
+
+    fn insert_type_env_symbol(&mut self, sym_id: crate::binder::SymbolId, resolved: TypeId) {
+        use crate::solver::SymbolRef;
+
+        if resolved == TypeId::ANY || resolved == TypeId::ERROR {
+            return;
+        }
+
+        let type_params = self.get_type_params_for_symbol(sym_id);
+        let mut env = self.ctx.type_env.borrow_mut();
+        if type_params.is_empty() {
+            env.insert(SymbolRef(sym_id.0), resolved);
+        } else {
+            env.insert_with_params(SymbolRef(sym_id.0), resolved, type_params);
+        }
     }
 
     fn ensure_application_symbols_resolved_inner(&mut self, type_id: TypeId, visited: &mut std::collections::HashSet<TypeId>) {
@@ -8870,10 +8885,9 @@ impl<'a> ThinCheckerState<'a> {
 
                 // If the base is a Ref, resolve the symbol
                 if let Some(TypeKey::Ref(SymbolRef(sym_id))) = self.ctx.types.lookup(app.base) {
-                    let resolved = self.type_reference_symbol_type(SymbolId(sym_id));
-                    if resolved != TypeId::ANY && resolved != TypeId::ERROR {
-                        self.ctx.type_env.borrow_mut().insert(SymbolRef(sym_id), resolved);
-                    }
+                    let sym_id = SymbolId(sym_id);
+                    let resolved = self.type_reference_symbol_type(sym_id);
+                    self.insert_type_env_symbol(sym_id, resolved);
                 }
 
                 // Recursively process base and args
@@ -8883,10 +8897,9 @@ impl<'a> ThinCheckerState<'a> {
                 }
             }
             TypeKey::Ref(SymbolRef(sym_id)) => {
-                let resolved = self.type_reference_symbol_type(SymbolId(sym_id));
-                if resolved != TypeId::ANY && resolved != TypeId::ERROR {
-                    self.ctx.type_env.borrow_mut().insert(SymbolRef(sym_id), resolved);
-                }
+                let sym_id = SymbolId(sym_id);
+                let resolved = self.type_reference_symbol_type(sym_id);
+                self.insert_type_env_symbol(sym_id, resolved);
             }
             TypeKey::Union(members_id) => {
                 let members = self.ctx.types.type_list(members_id);
@@ -14597,6 +14610,15 @@ impl<'a> ThinCheckerState<'a> {
         let class_info = self.ctx.enclosing_class.as_ref()?;
         let class_idx = class_info.class_idx;
         let is_static = self.class_member_is_static(member_idx);
+
+        if !is_static {
+            // Use the current class type parameters in scope for instance `this`.
+            if let Some(node) = self.ctx.arena.get(class_idx) {
+                if let Some(class) = self.ctx.arena.get_class(node) {
+                    return Some(self.get_class_instance_type(class_idx, class));
+                }
+            }
+        }
 
         if let Some(sym_id) = self.ctx.binder.get_node_symbol(class_idx) {
             if is_static {

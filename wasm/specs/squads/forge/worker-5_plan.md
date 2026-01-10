@@ -6,27 +6,24 @@ Execute tasks assigned by EM-Forge for the Forge squad (type system).
 Status: Active
 Priority: 5
 
-## Current Assignment
-Fix `compile_class_with_generic_constructor` by aligning class `this`/constructor return typing with nominal class identity.
+## Current Assignment (Class `this`/Generic Constructor Typing)
+- [x] Use current class type parameters for instance `this` during member checking
+- [x] Run `./wasm/test.sh compile_class_with_generic_constructor`
 
-**Focus:** Reduce TS2322 false positives on `return this` and generic constructor returns.
+### Implementation Notes
+- `class_member_this_type()` now uses `get_class_instance_type()` with the enclosing class to avoid fresh type params.
 
-### Steps
-1. Reproduce failure in `cli::driver_tests::compile_class_with_generic_constructor`.
-2. Track where class instance types are built and where assignability compares `this`/constructor returns.
-3. Ensure same-class instance types compare as identical (private brand should not cause mismatch).
-4. Add regression tests in `wasm/src/thin_checker_tests.rs`.
+### Test Status
+- `./wasm/test.sh compile_class_with_generic_constructor` (PASS; warnings about unused imports elsewhere)
 
-### Key Files
-- `wasm/src/thin_checker.rs`
-- `wasm/src/checker/types/assignability.rs` (if present)
-- `wasm/src/thin_checker_tests.rs`
+## Current Assignment (Call Signature Void-Return Assignability)
+- [x] Add call signature void-return assignability test in `wasm/src/solver/compat_tests.rs`
+- [x] Run `./wasm/test.sh test_call_signature_void_return_assignability`
 
-### Success Criteria
-- `compile_class_with_generic_constructor` passes
-- No new TS2322 regressions
+### Test Status
+- `./wasm/test.sh test_call_signature_void_return_assignability` (PASS; warnings about unused imports elsewhere)
 
-## Previous Assignment (TS7006 - Parameter Implicit Any) - COMPLETED
+## Current Assignment (TS7006 - Parameter Implicit Any)
 - [x] Gather failing samples (call/construct/method signatures + function type aliases)
 - [x] Add implicit-any checks for signature parameters and function type nodes
 - [x] Add regression tests in `thin_checker_tests.rs`
@@ -50,7 +47,7 @@ Fix `compile_class_with_generic_constructor` by aligning class `this`/constructo
 - Property signatures now recurse into their type annotations for signature checks
 
 ### Test Status
-- `./wasm/test.sh` failed: `cli::driver_tests::compile_class_with_generic_constructor` (pre-existing)
+- `./wasm/test.sh` previously failed: `cli::driver_tests::compile_class_with_generic_constructor` (now fixed)
 
 ## Previous Assignment (TS7008 - Member Implicit Any) - COMPLETED
 - [x] Implement member implicit any checking (TS7008) in `thin_checker.rs`
@@ -204,6 +201,15 @@ Added 40 comprehensive stress tests in `evaluate_tests.rs` covering:
 - Emits when: `noImplicitReturns && has_return && falls_through`
 - Checks: function declarations, method declarations, getter accessors
 - Unlike TS2366 (requires explicit return type), TS7030 fires even for inferred return types
+
+## Current Assignment (compile_class_with_generic_constructor)
+- [x] Ensure Application symbols insert type params in `type_env` during assignability checks
+- [x] Add regression test `test_generic_class_return_this_and_constructor` in `thin_checker_tests.rs`
+- [x] Run `./wasm/test.sh`
+
+### Result
+- Fixes `cli::driver_tests::compile_class_with_generic_constructor`
+- `./wasm/test.sh` now fails at `cli::driver_tests::compile_generic_utility_library_type_utilities` (pre-existing)
 
 ## Completed
 - [x] **TS7030 noImplicitReturns**: Implemented check for functions with implicit return paths
