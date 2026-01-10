@@ -10330,6 +10330,8 @@ impl<'a> ThinCheckerState<'a> {
 
                     // Check assignability (skip for 'any' since anything is assignable to any)
                     if declared_type != TypeId::ANY {
+                        checker.ensure_application_symbols_resolved(init_type);
+                        checker.ensure_application_symbols_resolved(declared_type);
                         if let Some((source_level, target_level)) =
                             checker.constructor_accessibility_mismatch_for_var_decl(var_decl)
                         {
@@ -14790,7 +14792,15 @@ impl<'a> ThinCheckerState<'a> {
         // If property has type annotation and initializer, check type compatibility
         if !prop.type_annotation.is_none() && !prop.initializer.is_none() {
             let declared_type = self.get_type_from_type_node(prop.type_annotation);
+            let prev_context = self.ctx.contextual_type;
+            if declared_type != TypeId::ANY {
+                self.ctx.contextual_type = Some(declared_type);
+            }
             let init_type = self.get_type_of_node(prop.initializer);
+            self.ctx.contextual_type = prev_context;
+
+            self.ensure_application_symbols_resolved(init_type);
+            self.ensure_application_symbols_resolved(declared_type);
 
             // Resolve TypeQuery types (typeof) before checking assignability
             if declared_type != TypeId::ANY && !self.is_assignable_to_resolving_type_queries(init_type, declared_type) {

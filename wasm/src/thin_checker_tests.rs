@@ -235,6 +235,57 @@ let bad: object = "hi";
 }
 
 #[test]
+fn test_property_initializer_contextual_literal_type() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class C {
+    static readonly c: "foo" = "foo";
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+}
+
+#[test]
+fn test_indexed_access_class_property_type() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class C {
+    foo = 3;
+    constructor() {
+        const ok: C["foo"] = 3;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+}
+
+#[test]
 fn test_tuple_array_assignability_in_checker() {
     use crate::thin_parser::ThinParserState;
 

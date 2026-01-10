@@ -16,6 +16,7 @@ Priority: 2
 (empty - will receive new tasks from EM after completing current assignment)
 
 ## Completed
+- [x] Reduced TS2322 false positives: apply contextual typing for class property initializers, resolve Ref/index access types before assignability in var/property declarations, add thin_checker regressions for literal property init and class indexed access. `find-ts2322.mjs --max=500 --samples=5` now reports 0 false positives (previously hit derivedTypeDoesNotRequireExtendsClause + typeOfThisInStaticMembers12/13 + privateNamesAndIndexedAccess).
 - [x] Fixed parser extra errors TS1005/TS1109/TS1068/TS1128 (static name parsing, static blocks with modifiers, async function expression keyword names). Added regression tests in `thin_parser_tests.rs`; `./wasm/test.sh thin_parser` passed.
 - [x] Added ES5 template literal type parity tests (basic, union, Uppercase/Lowercase, Capitalize/Uncapitalize, inference, combined) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` blocked by pre-existing errors in `solver/evaluate_tests.rs` (TemplateLiteralSpan not in scope).
 - [x] Fixed TS2304 method type parameter resolution: push type params to scope before checking return type and parameter types in `check_method_declaration`; fixes "Cannot find name 'U'" for generic methods like `static fn<U>(id: U)`.
