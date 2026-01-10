@@ -198,7 +198,7 @@ Scoped mapped type parameters during TS2304 walks, treated core DOM globals as b
 - [x] Further fixed TS2403 false positives: changed from TypeId equality to bi-directional assignability check. TypeScript's "same type" semantics requires mutual assignability, not identical TypeIds. Fixes patterns like `var e = E1; var e: typeof E1;` (enum/typeof) and `var n = 42; var n: number;` (inferred vs annotated). Also fixed compilation error in solver/subtype.rs (s_sym referenced but undefined). Added regression tests for enum typeof and inferred vs annotated patterns. Quick conformance (200 files): TS2403 removed from top 10 extra errors list; appears only as 7 missing errors (legitimate cases where TSC emits but we don't).
 
 ## Ready for Merge
-Yes (2026-01-09)
+Yes (2026-01-10)
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize emitter fidelity (ES5 downleveling/source maps) before new features.
@@ -210,5 +210,5 @@ Yes (2026-01-09)
 - Push to: `origin/worker/anvil-2`
 - **NEVER edit**: `DIRECTOR_AGENT.md`, `SQUAD_LEAD_AGENT.md`, `MANAGER_AGENT.md`, `AGENTS.md`, `start_*.sh`
 ## Resume
-- Parser extra errors (TS1005/TS1109/TS1068/TS1128) reduced with static member name handling, static block modifier parsing, and async function expression keyword names.
+- TS2304 false positive audit complete (mapped type params, DOM globals, accessor modifier recovery).
 - Awaiting next assignment from EM-Anvil.
