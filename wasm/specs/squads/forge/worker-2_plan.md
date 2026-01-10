@@ -37,10 +37,10 @@ Reduce false positives for property access errors by aligning TS2339 behavior wi
 - Extra errors do not increase (no regressions)
 
 ## Resume Notes
-- Branch: `worker/forge-2` (ahead of `origin/rust`).
-- Latest commit: `[wasm] checker: add static index signature support to CallableShape`
-- Recent changes: Added static index signature support to CallableShape for class constructors, fixed merge conflict in solver/subtype.rs, created find-ts2339.mjs conformance scan script.
-- Last tests: `./wasm/test.sh test_ts2339_` (9 tests pass).
+- Branch: `worker/forge-2`.
+- Latest commit: `[wasm] checker: narrow assignment flow types for TS2339`
+- Recent changes: Narrowed flow types on direct assignments to use assigned expression types; added TS2339 test covering assignment-based narrowing on unions.
+- Last tests: `./wasm/test.sh ts2339_assignment_narrows_union_property_access`
 - **Latest TS2339 conformance scan results (1000 files):**
   - Extra (false positives): 27 files (was 28, fixed staticIndexSignature4.ts)
   - Missing: 29 files
@@ -57,9 +57,6 @@ Reduce false positives for property access errors by aligning TS2339 behavior wi
 - Remember: do not touch `.role/AGENTS.md`.
 
 ## Task Queue
-- Fix control flow narrowing for property access after type guards (highest priority - affects 10 files)
-  - **Root cause identified:** In `handle_assignment` in control_flow.rs, when an assignment affects a reference, we return the declared type instead of the assigned expression's type. For example, after `x = ""` where `x: string | number`, we should narrow `x` to `string`, but we return `string | number`.
-  - **Fix needed:** Track assigned types in flow nodes and use them for narrowing.
 - Investigate private name (#prop) handling - both extra and missing errors
 - Fix mixin class property resolution
 - Add globalThis property checking
@@ -80,6 +77,8 @@ Reduce false positives for property access errors by aligning TS2339 behavior wi
 - Fixed parser to preserve static modifier on index signatures (was dropping static keyword).
 - Fixed static index signature property access - staticIndexSignature4.ts now passes.
 - Conformance scan after fix: 27 extra, 29 missing (from 1000 files).
+- Narrowed flow assignment handling to use assigned expression types for TS2339.
+- Added TS2339 test for assignment-based union narrowing.
 
 ## Ready for Merge
 Yes

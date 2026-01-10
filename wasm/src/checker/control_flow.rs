@@ -369,9 +369,16 @@ impl<'a> FlowAnalyzer<'a> {
         flow: &FlowNode,
         visited: &mut Vec<FlowNodeId>,
     ) -> TypeId {
-        let affects_reference = self.assignment_affects_reference_node(flow.node, reference);
+        let targets_reference = self.assignment_targets_reference_node(flow.node, reference);
 
-        if affects_reference {
+        if targets_reference {
+            if let Some(assigned_type) = self.get_assigned_type(flow.node, reference) {
+                return assigned_type;
+            }
+            return type_id;
+        }
+
+        if self.assignment_affects_reference_node(flow.node, reference) {
             return type_id;
         }
 
@@ -379,6 +386,61 @@ impl<'a> FlowAnalyzer<'a> {
             self.check_flow(reference, type_id, ant, visited)
         } else {
             type_id
+        }
+    }
+
+    fn get_assigned_type(&self, assignment_node: NodeIndex, target: NodeIndex) -> Option<TypeId> {
+        let node_types = self.node_types?;
+        let Some(node) = self.arena.get(assignment_node) else {
+            return None;
+        };
+
+        match node.kind {
+            k if k == syntax_kind_ext::BINARY_EXPRESSION => {
+                let bin = self.arena.get_binary_expr(node)?;
+                if !self.is_assignment_operator(bin.operator_token) {
+                    return None;
+                }
+                if !self.is_matching_reference(bin.left, target) {
+                    return None;
+                }
+                if bin.operator_token == SyntaxKind::EqualsToken as u16 {
+                    return node_types.get(&bin.right.0).copied();
+                }
+                None
+            }
+            k if k == syntax_kind_ext::VARIABLE_DECLARATION => {
+                let decl = self.arena.get_variable_declaration(node)?;
+                if !self.is_matching_reference(decl.name, target) {
+                    return None;
+                }
+                if decl.initializer.is_none() {
+                    return None;
+                }
+                node_types.get(&decl.initializer.0).copied()
+            }
+            k if k == syntax_kind_ext::VARIABLE_DECLARATION_LIST => {
+                let list = self.arena.get_variable(node)?;
+                for &decl_idx in &list.declarations.nodes {
+                    if let Some(assigned) = self.get_assigned_type(decl_idx, target) {
+                        return Some(assigned);
+                    }
+                }
+                None
+            }
+            k if k == syntax_kind_ext::PREFIX_UNARY_EXPRESSION
+                || k == syntax_kind_ext::POSTFIX_UNARY_EXPRESSION =>
+            {
+                let unary = self.arena.get_unary_expr(node)?;
+                if (unary.operator == SyntaxKind::PlusPlusToken as u16
+                    || unary.operator == SyntaxKind::MinusMinusToken as u16)
+                    && self.is_matching_reference(unary.operand, target)
+                {
+                    return Some(TypeId::NUMBER);
+                }
+                None
+            }
+            _ => None,
         }
     }
 

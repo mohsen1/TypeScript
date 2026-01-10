@@ -2882,6 +2882,38 @@ function read(value: A | B) {
 }
 
 #[test]
+fn test_ts2339_assignment_narrows_union_property_access() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type A = { foo: string };
+type B = { bar: string };
+
+let value: A | B;
+value = { foo: "ok" };
+value.foo;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2339),
+        "Did not expect 2339 after assignment narrowing, got: {:?}",
+        codes
+    );
+}
+
+#[test]
 fn test_ts2339_class_static_inheritance() {
     use crate::thin_parser::ThinParserState;
 
