@@ -14234,3 +14234,43 @@ class Foo {
         checker.ctx.diagnostics
     );
 }
+
+#[test]
+fn test_variadic_tuple_rest_param_no_ts2769() {
+    use crate::thin_parser::ThinParserState;
+
+    // Regression test for TS2769 false positives with variadic tuple rest parameters
+    // https://github.com/microsoft/TypeScript/issues/...
+    // For signature: foo<T extends unknown[]>(x: number, ...args: [...T, number]): T
+    // Call foo(1, 2) should infer T = [], not emit TS2769
+    let source = r#"
+        declare function foo3<T extends unknown[]>(x: number, ...args: [...T, number]): T;
+
+        // These should all be valid calls (no TS2769)
+        foo3(1, 2);  // T = [], args = [2]
+        foo3(1, 'hello', true, 2);  // T = ['hello', true], args = ['hello', true, 2]
+
+        function test<U extends unknown[]>(u: U) {
+            foo3(1, ...u, 'hi', 2);  // Should work with spread
+        }
+    "#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2769_errors: Vec<_> = checker.ctx.diagnostics.iter().filter(|d| d.code == 2769).collect();
+    assert!(
+        ts2769_errors.is_empty(),
+        "Should not emit TS2769 for variadic tuple rest parameters, got {} TS2769 errors: {:?}",
+        ts2769_errors.len(),
+        ts2769_errors
+    );
+}

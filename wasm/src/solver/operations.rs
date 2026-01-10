@@ -523,16 +523,18 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
 
         let target = match self.interner.lookup(rest_param.type_id) {
             Some(TypeKey::TypeParameter(_)) if var_map.contains_key(&rest_param.type_id) => {
-                Some((rest_start, rest_param.type_id))
+                Some((rest_start, rest_param.type_id, 0))
             }
             Some(TypeKey::Tuple(elements)) => {
                 let elements = self.interner.tuple_list(elements);
                 let mut prefix_len = 0usize;
                 let mut target = None;
-                for elem in elements.iter() {
+                for (i, elem) in elements.iter().enumerate() {
                     if elem.rest {
                         if var_map.contains_key(&elem.type_id) {
-                            target = Some((rest_start + prefix_len, elem.type_id));
+                            // Count trailing fixed elements after the variadic part
+                            let trailing_count = elements.len() - i - 1;
+                            target = Some((rest_start + prefix_len, elem.type_id, trailing_count));
                         }
                         break;
                     }
@@ -543,12 +545,22 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
             _ => None,
         }?;
 
-        let (start_index, target_type) = target;
+        let (start_index, target_type, trailing_count) = target;
         if start_index >= arg_types.len() {
             return None;
         }
 
-        let tuple_elements = arg_types[start_index..]
+        // Extract the arguments that should be inferred for the variadic type parameter,
+        // excluding trailing fixed elements.
+        // For example, for `...args: [...T, number]` with call `foo(1, 'a', 'b', 2)`:
+        //   - rest arguments are ['a', 'b', 2] (args after first param)
+        //   - trailing_count is 1 (the `number` element)
+        //   - we should infer T from ['a', 'b'], not ['a', 'b', 2]
+        let rest_arg_count = arg_types.len() - rest_start;
+        let infer_count = rest_arg_count.saturating_sub(trailing_count);
+        let end_index = start_index + infer_count;
+
+        let tuple_elements = arg_types[start_index..end_index]
             .iter()
             .map(|&ty| TupleElement {
                 type_id: ty,
