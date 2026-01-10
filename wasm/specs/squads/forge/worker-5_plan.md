@@ -177,7 +177,7 @@ Added 40 comprehensive stress tests in `evaluate_tests.rs` covering:
 - [x] Add TS7030 diagnostic code and message
 - [x] Parse @noImplicitReturns compiler option from source comments
 - [x] Implement TS7030 check in function/method/accessor declarations
-- [x] Add regression tests: `test_no_implicit_returns_ts7030`, `test_no_implicit_returns_disabled`
+- [x] Add regression tests: `test_no_implicit_returns_ts7030`, `test_no_implicit_returns_disabled`, `test_no_implicit_returns_ts7030_getter`
 
 ### TS7030 Implementation Details
 - Error: "Not all code paths return a value."
