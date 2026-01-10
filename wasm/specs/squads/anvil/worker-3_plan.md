@@ -215,7 +215,7 @@ Active
 - Resolved `import = require('module')` against ambient module exports
 - Added default `tests/lib/lib.d.ts` loading in conformance harness scripts
 
-Ready for Merge: Yes (2026-01-09)
+Ready for Merge: No (merged)
 
 ## Current Task: TS2339 property access fixes (new assignment)
 
@@ -257,4 +257,4 @@ Ready for Merge: Yes (2026-01-09)
 - Conformance: `node wasm/differential-test/conformance-runner.mjs es6/templates --max=200 -v` (no crashes).
 - Test: `./wasm/test.sh test_thin_parser_unterminated_template_expression_no_crash`.
 
-Ready for Merge: Yes (2026-01-10)
+Ready for Merge: No (merged)
