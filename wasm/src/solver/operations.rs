@@ -231,7 +231,7 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
             if rest_tuple_start.is_some_and(|start| i >= start) {
                 continue;
             }
-            let Some(target_type) = self.param_type_for_arg_index(&instantiated_params, i) else {
+            let Some(target_type) = self.param_type_for_arg_index(&instantiated_params, i, arg_types.len()) else {
                 break;
             };
 
@@ -328,8 +328,9 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
         arg_types: &[TypeId],
         strict: bool,
     ) -> Option<CallResult> {
+        let arg_count = arg_types.len();
         for (i, arg_type) in arg_types.iter().enumerate() {
-            let Some(param_type) = self.param_type_for_arg_index(params, i) else {
+            let Some(param_type) = self.param_type_for_arg_index(params, i, arg_count) else {
                 break;
             };
 
@@ -360,31 +361,21 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
         match self.interner.lookup(rest_param.type_id) {
             Some(TypeKey::Tuple(elements)) => {
                 let elements = self.interner.tuple_list(elements);
-                let mut min = required;
-                let mut max = required;
-                for elem in elements.iter() {
-                    if elem.rest {
-                        let expansion = self.expand_tuple_rest(elem.type_id);
-                        for fixed in expansion.fixed {
-                            max += 1;
-                            if !fixed.optional {
-                                min += 1;
-                            }
-                        }
-                        return (min, if expansion.variadic.is_some() { None } else { Some(max) });
-                    }
-                    max += 1;
-                    if !elem.optional {
-                        min += 1;
-                    }
-                }
-                (min, Some(max))
+                let (rest_min, rest_max) = self.tuple_length_bounds(&elements);
+                let min = required + rest_min;
+                let max = rest_max.map(|max| required + max);
+                (min, max)
             }
             _ => (required, None),
         }
     }
 
-    fn param_type_for_arg_index(&self, params: &[ParamInfo], arg_index: usize) -> Option<TypeId> {
+    fn param_type_for_arg_index(
+        &self,
+        params: &[ParamInfo],
+        arg_index: usize,
+        arg_count: usize,
+    ) -> Option<TypeId> {
         let rest_param = params.last().filter(|param| param.rest);
         let rest_start = if rest_param.is_some() { params.len().saturating_sub(1) } else { params.len() };
 
@@ -394,30 +385,92 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
 
         let rest_param = rest_param?;
         let offset = arg_index - rest_start;
+        let rest_arg_count = arg_count.saturating_sub(rest_start);
 
         match self.interner.lookup(rest_param.type_id) {
             Some(TypeKey::Array(elem)) => Some(elem),
             Some(TypeKey::Tuple(elements)) => {
                 let elements = self.interner.tuple_list(elements);
-                let mut fixed_count = 0usize;
-                for elem in elements.iter() {
-                    if elem.rest {
-                        let expansion = self.expand_tuple_rest(elem.type_id);
-                        let inner_offset = offset.saturating_sub(fixed_count);
-                        if inner_offset < expansion.fixed.len() {
-                            return Some(expansion.fixed[inner_offset].type_id);
-                        }
-                        return expansion.variadic;
-                    }
-                    if fixed_count == offset {
-                        return Some(elem.type_id);
-                    }
-                    fixed_count += 1;
-                }
-                None
+                self.tuple_rest_element_type(&elements, offset, rest_arg_count)
             }
             _ => Some(rest_param.type_id),
         }
+    }
+
+    fn tuple_length_bounds(&self, elements: &[TupleElement]) -> (usize, Option<usize>) {
+        let mut min = 0usize;
+        let mut max = 0usize;
+        let mut variadic = false;
+
+        for elem in elements.iter() {
+            if elem.rest {
+                let expansion = self.expand_tuple_rest(elem.type_id);
+                for fixed in expansion.fixed {
+                    max += 1;
+                    if !fixed.optional {
+                        min += 1;
+                    }
+                }
+                if expansion.variadic.is_some() {
+                    variadic = true;
+                }
+                continue;
+            }
+            max += 1;
+            if !elem.optional {
+                min += 1;
+            }
+        }
+
+        (min, if variadic { None } else { Some(max) })
+    }
+
+    fn tuple_rest_element_type(
+        &self,
+        elements: &[TupleElement],
+        offset: usize,
+        rest_arg_count: usize,
+    ) -> Option<TypeId> {
+        let rest_index = elements.iter().position(|elem| elem.rest);
+        let Some(rest_index) = rest_index else {
+            return elements.get(offset).map(|elem| elem.type_id);
+        };
+
+        let (prefix, rest_and_tail) = elements.split_at(rest_index);
+        let rest_elem = &rest_and_tail[0];
+        let tail = &rest_and_tail[1..];
+
+        let expansion = self.expand_tuple_rest(rest_elem.type_id);
+        let prefix_len = prefix.len();
+        let rest_fixed_len = expansion.fixed.len();
+        let tail_len = tail.len();
+
+        if let Some(variadic) = expansion.variadic {
+            let suffix_start = rest_arg_count.saturating_sub(tail_len);
+            if offset >= suffix_start {
+                let tail_index = offset - suffix_start;
+                return tail.get(tail_index).map(|elem| elem.type_id);
+            }
+            if offset < prefix_len {
+                return Some(prefix[offset].type_id);
+            }
+            let fixed_end = prefix_len + rest_fixed_len;
+            if offset < fixed_end {
+                return Some(expansion.fixed[offset - prefix_len].type_id);
+            }
+            return Some(variadic);
+        }
+
+        let mut index = offset;
+        if index < prefix_len {
+            return Some(prefix[index].type_id);
+        }
+        index -= prefix_len;
+        if index < rest_fixed_len {
+            return Some(expansion.fixed[index].type_id);
+        }
+        index -= rest_fixed_len;
+        tail.get(index).map(|elem| elem.type_id)
     }
 
     fn rest_element_type(&self, type_id: TypeId) -> TypeId {

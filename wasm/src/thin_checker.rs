@@ -5061,6 +5061,49 @@ impl<'a> ThinCheckerState<'a> {
         F: FnMut(usize, usize) -> Option<TypeId>,
     {
         use crate::solver::TypeKey;
+        use crate::solver::SymbolRef;
+        use crate::binder::SymbolId;
+        use rustc_hash::FxHashSet;
+
+        fn resolve_spread_type(
+            checker: &mut ThinCheckerState,
+            type_id: TypeId,
+        ) -> TypeId {
+            let mut current = type_id;
+            let mut visited = FxHashSet::default();
+
+            loop {
+                if !visited.insert(current) {
+                    return current;
+                }
+                let Some(key) = checker.ctx.types.lookup(current) else {
+                    return current;
+                };
+                match key {
+                    TypeKey::ReadonlyType(inner) => {
+                        current = inner;
+                    }
+                    TypeKey::TypeParameter(info) => {
+                        if let Some(constraint) = info.constraint {
+                            current = constraint;
+                        } else {
+                            return current;
+                        }
+                    }
+                    TypeKey::Ref(SymbolRef(sym_id)) => {
+                        current = checker.type_reference_symbol_type(SymbolId(sym_id));
+                    }
+                    TypeKey::Application(_) => {
+                        let evaluated = checker.evaluate_application_type(current);
+                        if evaluated == current {
+                            return current;
+                        }
+                        current = evaluated;
+                    }
+                    _ => return current,
+                }
+            }
+        }
 
         // First pass: count expanded arguments (spreads of tuple types expand to multiple args)
         let mut expanded_count = 0usize;
@@ -5069,9 +5112,14 @@ impl<'a> ThinCheckerState<'a> {
                 if arg_node.kind == syntax_kind_ext::SPREAD_ELEMENT {
                     if let Some(spread_data) = self.ctx.arena.get_spread(arg_node) {
                         let spread_type = self.get_type_of_node(spread_data.expression);
-                        if let Some(TypeKey::Tuple(elems_id)) = self.ctx.types.lookup(spread_type) {
+                        let resolved_spread_type = resolve_spread_type(self, spread_type);
+                        if let Some(TypeKey::Tuple(elems_id)) = self.ctx.types.lookup(resolved_spread_type) {
                             let elems = self.ctx.types.tuple_list(elems_id);
                             expanded_count += elems.len();
+                            continue;
+                        }
+                        if let Some(TypeKey::Array(_)) = self.ctx.types.lookup(resolved_spread_type) {
+                            expanded_count += 1;
                             continue;
                         }
                     }
@@ -5089,9 +5137,10 @@ impl<'a> ThinCheckerState<'a> {
                 if arg_node.kind == syntax_kind_ext::SPREAD_ELEMENT {
                     if let Some(spread_data) = self.ctx.arena.get_spread(arg_node) {
                         let spread_type = self.get_type_of_node(spread_data.expression);
+                        let resolved_spread_type = resolve_spread_type(self, spread_type);
 
                         // If it's a tuple type, expand its elements
-                        if let Some(TypeKey::Tuple(elems_id)) = self.ctx.types.lookup(spread_type) {
+                        if let Some(TypeKey::Tuple(elems_id)) = self.ctx.types.lookup(resolved_spread_type) {
                             let elems = self.ctx.types.tuple_list(elems_id);
                             for elem in elems.iter() {
                                 arg_types.push(elem.type_id);
@@ -5101,14 +5150,14 @@ impl<'a> ThinCheckerState<'a> {
                         }
 
                         // If it's an array type, push the element type (variadic handling)
-                        if let Some(TypeKey::Array(elem_type)) = self.ctx.types.lookup(spread_type) {
+                        if let Some(TypeKey::Array(elem_type)) = self.ctx.types.lookup(resolved_spread_type) {
                             arg_types.push(elem_type);
                             effective_index += 1;
                             continue;
                         }
 
                         // Otherwise just push the spread type as-is
-                        arg_types.push(spread_type);
+                        arg_types.push(resolved_spread_type);
                         effective_index += 1;
                         continue;
                     }

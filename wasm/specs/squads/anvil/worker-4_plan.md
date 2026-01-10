@@ -122,3 +122,29 @@
   - Conformance tests `mappedTypes2.ts` and `recursiveMappedTypes.ts` crash with "unreachable" (from upstream merge)
 
 Ready for Merge: No (partial TS2456 implementation; needs investigation of pre-existing crashes)
+
+## Follow-up (2026-01-09) - TS2769 Overload Matching False Positives
+
+**Mission**: Fix TS2769 overload mismatch false positives involving variadic tuples.
+
+**Status**: IN PROGRESS
+
+### Checklist
+
+- [x] Reproduce in `variadicTuples1.ts` and other samples
+- [x] Trace `collect_call_argument_types_with_context` and overload resolution in `thin_checker.rs` / `solver`
+- [x] Implement fix for spread/tuple expansion or overload matching
+- [x] Add regression test for TS2769 case
+- [x] Run `./wasm/test.sh` for new test
+- [ ] Investigate remaining TS2769 extras in `variadicTuples1.ts` (23 occurrences after tuple conformance run)
+
+### Notes
+
+- Gemini suggests expanding tuple elements for spread arguments, including type parameter constraints and type refs.
+- Implemented variadic tuple rest tail handling in call evaluator and spread type resolution for spreads.
+- Tests: `./wasm/test.sh test_call_spread_tuple_type_param`, `./wasm/test.sh test_call_tuple_rest_with_fixed_tail` (PASS).
+- Conformance: `node wasm/differential-test/conformance-runner.mjs types/tuple --verbose` (variadicTuples1 still has extra TS2769).
+- Built WASM package for conformance: `./wasm/build-wasm.sh` (warnings only).
+- Avoid committing `.role/AGENTS.md` change (expected local modification).
+
+Ready for Merge: Yes (current fix pushed; conformance still shows extra TS2769 in variadicTuples1)
