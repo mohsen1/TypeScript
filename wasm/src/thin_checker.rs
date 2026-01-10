@@ -10092,9 +10092,11 @@ impl<'a> ThinCheckerState<'a> {
             // Type alias declarations - check the type for accessor body and parameter property errors
             syntax_kind_ext::TYPE_ALIAS_DECLARATION => {
                 if let Some(type_alias) = self.ctx.arena.get_type_alias(node) {
+                    let (_params, updates) = self.push_type_parameters(&type_alias.type_parameters);
                     // Check the type for accessor bodies in ambient context and parameter properties
                     self.check_type_for_missing_names(type_alias.type_node);
                     self.check_type_for_parameter_properties(type_alias.type_node);
+                    self.pop_type_parameters(updates);
                 }
             }
             // Other type declarations - just register them, no expression checking needed
@@ -12639,6 +12641,26 @@ impl<'a> ThinCheckerState<'a> {
             k if k == syntax_kind_ext::MAPPED_TYPE => {
                 if let Some(mapped) = self.ctx.arena.get_mapped_type(node) {
                     self.check_type_parameter_node_for_missing_names(mapped.type_parameter);
+                    let mut param_binding: Option<(String, Option<TypeId>)> = None;
+                    if let Some(param_node) = self.ctx.arena.get(mapped.type_parameter) {
+                        if let Some(param) = self.ctx.arena.get_type_parameter(param_node) {
+                            if let Some(name_node) = self.ctx.arena.get(param.name) {
+                                if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
+                                    let name = ident.escaped_text.clone();
+                                    let atom = self.ctx.types.intern_string(&name);
+                                    let type_id = self.ctx.types.intern(crate::solver::TypeKey::TypeParameter(
+                                        crate::solver::TypeParamInfo {
+                                            name: atom,
+                                            constraint: None,
+                                            default: None,
+                                        },
+                                    ));
+                                    let previous = self.ctx.type_parameter_scope.insert(name.clone(), type_id);
+                                    param_binding = Some((name, previous));
+                                }
+                            }
+                        }
+                    }
                     if !mapped.name_type.is_none() {
                         self.check_type_for_missing_names(mapped.name_type);
                     }
@@ -12648,6 +12670,13 @@ impl<'a> ThinCheckerState<'a> {
                     if let Some(ref members) = mapped.members {
                         for &member_idx in &members.nodes {
                             self.check_type_member_for_missing_names(member_idx);
+                        }
+                    }
+                    if let Some((name, previous)) = param_binding {
+                        if let Some(prev_type) = previous {
+                            self.ctx.type_parameter_scope.insert(name, prev_type);
+                        } else {
+                            self.ctx.type_parameter_scope.remove(&name);
                         }
                     }
                 }
