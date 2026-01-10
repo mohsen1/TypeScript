@@ -343,6 +343,15 @@ impl ThinParserState {
         self.parse_error_at_current_token("Unexpected token", diagnostic_codes::UNEXPECTED_TOKEN);
     }
 
+    /// Error: 'async' modifier cannot be used here. (TS1042)
+    fn error_async_modifier_cannot_be_used_here(&mut self) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+        self.parse_error_at_current_token(
+            "'async' modifier cannot be used here.",
+            diagnostic_codes::ASYNC_MODIFIER_CANNOT_BE_USED_HERE,
+        );
+    }
+
     /// Parse semicolon (or recover from missing)
     fn parse_semicolon(&mut self) {
         if self.is_token(SyntaxKind::SemicolonToken) {
@@ -624,6 +633,25 @@ impl ThinParserState {
                 // Look ahead to see if it's "async function"
                 if self.look_ahead_is_async_function() {
                     self.parse_async_function_declaration()
+                } else if self.look_ahead_is_async_class_or_enum() {
+                    let start_pos = self.token_pos();
+                    self.error_async_modifier_cannot_be_used_here();
+                    let async_start = self.token_pos();
+                    self.parse_expected(SyntaxKind::AsyncKeyword);
+                    let async_end = self.token_end();
+                    let async_modifier = self.arena.add_token(
+                        SyntaxKind::AsyncKeyword as u16,
+                        async_start,
+                        async_end,
+                    );
+                    let modifiers = Some(self.make_node_list(vec![async_modifier]));
+                    if self.is_token(SyntaxKind::ClassKeyword) {
+                        self.parse_class_declaration_with_modifiers(start_pos, modifiers)
+                    } else if self.is_token(SyntaxKind::EnumKeyword) {
+                        self.parse_enum_declaration_with_modifiers(start_pos, modifiers)
+                    } else {
+                        self.parse_expression_statement()
+                    }
                 } else {
                     // It's an async arrow function as expression statement
                     self.parse_expression_statement()
@@ -708,6 +736,20 @@ impl ThinParserState {
         self.scanner.restore_state(snapshot);
         self.current_token = current;
         is_function
+    }
+
+    fn look_ahead_is_async_class_or_enum(&mut self) -> bool {
+        let snapshot = self.scanner.save_state();
+        let current = self.current_token;
+
+        // Skip 'async'
+        self.next_token();
+        let is_class_or_enum = self.is_token(SyntaxKind::ClassKeyword)
+            || self.is_token(SyntaxKind::EnumKeyword);
+
+        self.scanner.restore_state(snapshot);
+        self.current_token = current;
+        is_class_or_enum
     }
 
     /// Look ahead to see if we have "abstract class"
@@ -1223,8 +1265,8 @@ impl ThinParserState {
         let asterisk_token = self.parse_optional(SyntaxKind::AsteriskToken);
 
         // Parse optional name (function expressions can be anonymous)
-        let name = if self.is_token(SyntaxKind::Identifier) {
-            self.parse_identifier()
+        let name = if self.is_identifier_or_keyword() {
+            self.parse_identifier_name()
         } else {
             NodeIndex::NONE
         };
@@ -1459,6 +1501,51 @@ impl ThinParserState {
             end_pos,
             ClassData {
                 modifiers: None,
+                name,
+                type_parameters,
+                heritage_clauses,
+                members,
+            },
+        )
+    }
+
+    /// Parse class declaration with explicit modifiers.
+    fn parse_class_declaration_with_modifiers(
+        &mut self,
+        start_pos: u32,
+        modifiers: Option<NodeList>,
+    ) -> NodeIndex {
+        self.parse_expected(SyntaxKind::ClassKeyword);
+
+        // Parse class name - keywords like 'any', 'string' can be used as class names
+        let name = if self.is_identifier_or_keyword() {
+            self.parse_identifier_name()
+        } else {
+            NodeIndex::NONE
+        };
+
+        // Parse type parameters: class Foo<T, U> {}
+        let type_parameters = if self.is_token(SyntaxKind::LessThanToken) {
+            Some(self.parse_type_parameters())
+        } else {
+            None
+        };
+
+        // Parse heritage clauses (extends, implements)
+        let heritage_clauses = self.parse_heritage_clauses();
+
+        // Parse class body
+        self.parse_expected(SyntaxKind::OpenBraceToken);
+        let members = self.parse_class_members();
+        self.parse_expected(SyntaxKind::CloseBraceToken);
+
+        let end_pos = self.token_end();
+        self.arena.add_class(
+            syntax_kind_ext::CLASS_DECLARATION,
+            start_pos,
+            end_pos,
+            ClassData {
+                modifiers,
                 name,
                 type_parameters,
                 heritage_clauses,
@@ -1976,6 +2063,9 @@ impl ThinParserState {
         let mut modifiers = Vec::new();
 
         loop {
+            if self.should_stop_class_member_modifier() {
+                break;
+            }
             let start_pos = self.token_pos();
             let modifier = match self.token() {
                 SyntaxKind::StaticKeyword => {
@@ -2048,6 +2138,34 @@ impl ThinParserState {
         } else {
             Some(self.make_node_list(modifiers))
         }
+    }
+
+    fn should_stop_class_member_modifier(&mut self) -> bool {
+        if !self.is_token(SyntaxKind::StaticKeyword) {
+            return false;
+        }
+
+        if self.look_ahead_is_static_block() {
+            return true;
+        }
+
+        let snapshot = self.scanner.save_state();
+        let current = self.current_token;
+        self.next_token();
+        let next = self.current_token;
+        self.scanner.restore_state(snapshot);
+        self.current_token = current;
+
+        matches!(
+            next,
+            SyntaxKind::OpenParenToken
+                | SyntaxKind::LessThanToken
+                | SyntaxKind::QuestionToken
+                | SyntaxKind::ExclamationToken
+                | SyntaxKind::ColonToken
+                | SyntaxKind::EqualsToken
+                | SyntaxKind::SemicolonToken
+        )
     }
 
     /// Parse constructor with modifiers
@@ -2191,6 +2309,17 @@ impl ThinParserState {
 
         // Parse modifiers (static, public, private, protected, readonly, abstract, override)
         let modifiers = self.parse_class_member_modifiers();
+
+        // Handle static block after modifiers: { ... }
+        if self.is_token(SyntaxKind::StaticKeyword) && self.look_ahead_is_static_block() {
+            if modifiers.is_some() {
+                self.parse_error_at_current_token(
+                    "Modifiers cannot appear on a static block.",
+                    diagnostic_codes::MODIFIERS_NOT_ALLOWED_HERE,
+                );
+            }
+            return self.parse_static_block();
+        }
 
         // Handle constructor
         if self.is_token(SyntaxKind::ConstructorKeyword) {
@@ -3731,6 +3860,25 @@ impl ThinParserState {
             SyntaxKind::AsyncKeyword => {
                 if self.look_ahead_is_async_function() {
                     self.parse_async_function_declaration()
+                } else if self.look_ahead_is_async_class_or_enum() {
+                    let start_pos = self.token_pos();
+                    self.error_async_modifier_cannot_be_used_here();
+                    let async_start = self.token_pos();
+                    self.parse_expected(SyntaxKind::AsyncKeyword);
+                    let async_end = self.token_end();
+                    let async_modifier = self.arena.add_token(
+                        SyntaxKind::AsyncKeyword as u16,
+                        async_start,
+                        async_end,
+                    );
+                    let modifiers = Some(self.make_node_list(vec![async_modifier]));
+                    if self.is_token(SyntaxKind::ClassKeyword) {
+                        self.parse_class_declaration_with_modifiers(start_pos, modifiers)
+                    } else if self.is_token(SyntaxKind::EnumKeyword) {
+                        self.parse_enum_declaration_with_modifiers(start_pos, modifiers)
+                    } else {
+                        self.parse_expression_statement()
+                    }
                 } else {
                     self.parse_expression_statement()
                 }

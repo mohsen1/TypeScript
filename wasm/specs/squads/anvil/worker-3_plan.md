@@ -7,6 +7,14 @@
 **Target Error**: TS2339 "Property 'X' does not exist on type 'Y'" - 68 false positives
 **Root Cause**: Property lookup doesn't traverse class inheritance or interface extension chains
 
+## Current Assignment (2026-01-10)
+
+- Reduce TS2339 false positives (mixin/private/static/property lookup cases).
+- Collect 3-5 failing samples from conformance output; record the failing expression + expected property resolution.
+- Trace property access in `wasm/src/thin_checker.rs` (property access/type resolution paths) and related mixin/base handling; verify index signatures and callable/index merges.
+- Implement fix + regression tests; run a targeted conformance check (TS2339 grep) and report the delta.
+- Deliverables: sample list + root cause notes, regression test(s), and conformance delta.
+
 ## Problem Analysis
 
 The WASM checker incorrectly reports TS2339 for valid code:

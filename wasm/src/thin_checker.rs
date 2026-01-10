@@ -15,7 +15,7 @@
 //! Phase 7.5 integration - using solver type system for type checking.
 
 use crate::parser::NodeIndex;
-use crate::parser::thin_node::ThinNodeArena;
+use crate::parser::thin_node::{ThinNode, ThinNodeArena};
 use crate::parser::syntax_kind_ext;
 use crate::scanner::SyntaxKind;
 use crate::binder::{ContainerKind, ScopeId, SymbolId, symbol_flags};
@@ -193,7 +193,12 @@ impl<'a> ThinCheckerState<'a> {
                 continue;
             };
 
-            let Some(sym_id) = self.ctx.binder.get_node_symbol(param_idx) else {
+            let Some(sym_id) = self
+                .ctx
+                .binder
+                .get_node_symbol(param_idx)
+                .or_else(|| self.ctx.binder.get_node_symbol(param.name))
+            else {
                 continue;
             };
             self.push_symbol_dependency(sym_id, true);
@@ -419,6 +424,15 @@ impl<'a> ThinCheckerState<'a> {
             // Call expressions
             k if k == syntax_kind_ext::CALL_EXPRESSION => {
                 self.get_type_of_call_expression(idx)
+            }
+
+            // Class expressions
+            k if k == syntax_kind_ext::CLASS_EXPRESSION => {
+                if let Some(class) = self.ctx.arena.get_class(node) {
+                    self.get_class_constructor_type(idx, class)
+                } else {
+                    TypeId::ANY
+                }
             }
 
             // New expressions
@@ -758,6 +772,10 @@ impl<'a> ThinCheckerState<'a> {
 
                 if let Some(type_id) = self.resolve_named_type_reference(name, type_name_idx) {
                     return type_id;
+                }
+                if name == "await" {
+                    self.error_cannot_find_name_did_you_mean_at(name, "Awaited", type_name_idx);
+                    return TypeId::ERROR;
                 }
                 self.error_cannot_find_name_at(name, type_name_idx);
                 return TypeId::ERROR;
@@ -2988,6 +3006,38 @@ impl<'a> ThinCheckerState<'a> {
             setter: Option<TypeId>,
         }
 
+        fn merge_base_shape(
+            checker: &mut ThinCheckerState<'_>,
+            type_id: TypeId,
+            properties: &mut FxHashMap<Atom, PropertyInfo>,
+            string_index: &mut Option<IndexSignature>,
+            number_index: &mut Option<IndexSignature>,
+        ) {
+            use crate::solver::TypeKey;
+
+            match checker.ctx.types.lookup(type_id) {
+                Some(TypeKey::Object(shape_id)) | Some(TypeKey::ObjectWithIndex(shape_id)) => {
+                    let shape = checker.ctx.types.object_shape(shape_id);
+                    for base_prop in shape.properties.iter() {
+                        properties.entry(base_prop.name).or_insert_with(|| base_prop.clone());
+                    }
+                    if let Some(ref idx) = shape.string_index {
+                        ThinCheckerState::merge_index_signature(string_index, idx.clone());
+                    }
+                    if let Some(ref idx) = shape.number_index {
+                        ThinCheckerState::merge_index_signature(number_index, idx.clone());
+                    }
+                }
+                Some(TypeKey::Union(members_id)) | Some(TypeKey::Intersection(members_id)) => {
+                    let members = checker.ctx.types.type_list(members_id);
+                    for &member in members.iter() {
+                        merge_base_shape(checker, member, properties, string_index, number_index);
+                    }
+                }
+                _ => {}
+            }
+        }
+
         let mut properties: FxHashMap<Atom, PropertyInfo> = FxHashMap::default();
         let mut methods: FxHashMap<Atom, MethodAggregate> = FxHashMap::default();
         let mut accessors: FxHashMap<Atom, AccessorAggregate> = FxHashMap::default();
@@ -3271,13 +3321,14 @@ impl<'a> ThinCheckerState<'a> {
                     break;
                 };
 
-                let (expr_idx, type_arguments) = if let Some(expr_type_args) = self.ctx.arena.get_expr_type_args(type_node) {
-                    (expr_type_args.expression, expr_type_args.type_arguments.as_ref())
-                } else {
-                    (type_idx, None)
-                };
+                let (expr_idx, type_arguments) =
+                    if let Some(expr_type_args) = self.ctx.arena.get_expr_type_args(type_node) {
+                        (expr_type_args.expression, expr_type_args.type_arguments.as_ref())
+                    } else {
+                        (type_idx, None)
+                    };
 
-                let mut base_instance_type: Option<TypeId> = None;
+                let mut base_instance_type = None;
 
                 if let Some(base_sym_id) = self.resolve_heritage_symbol(expr_idx) {
                     if visited.contains(&base_sym_id) {
@@ -3301,6 +3352,7 @@ impl<'a> ThinCheckerState<'a> {
                                 }
                             }
                         }
+
                         if let Some(base_class_idx) = base_class_idx {
                             if let Some(base_node) = self.ctx.arena.get(base_class_idx) {
                                 if let Some(base_class) = self.ctx.arena.get_class(base_node) {
@@ -3316,7 +3368,8 @@ impl<'a> ThinCheckerState<'a> {
 
                                     if type_args.len() < base_type_params.len() {
                                         for param in base_type_params.iter().skip(type_args.len()) {
-                                            let fallback = param.default.or(param.constraint).unwrap_or(TypeId::ANY);
+                                            let fallback =
+                                                param.default.or(param.constraint).unwrap_or(TypeId::ANY);
                                             type_args.push(fallback);
                                         }
                                     }
@@ -3324,11 +3377,8 @@ impl<'a> ThinCheckerState<'a> {
                                         type_args.truncate(base_type_params.len());
                                     }
 
-                                    let base_type = self.get_class_instance_type_inner(
-                                        base_class_idx,
-                                        base_class,
-                                        visited,
-                                    );
+                                    let base_type =
+                                        self.get_class_instance_type_inner(base_class_idx, base_class, visited);
                                     let substitution = TypeSubstitution::from_args(&base_type_params, &type_args);
                                     base_instance_type =
                                         Some(instantiate_type(self.ctx.types, base_type, &substitution));
@@ -3340,13 +3390,13 @@ impl<'a> ThinCheckerState<'a> {
                 }
 
                 if base_instance_type.is_none() {
-                    let base_expr_type = self.get_type_of_node(expr_idx);
-                    let base_expr_type = self.evaluate_application_type(base_expr_type);
-                    base_instance_type = self.instance_type_from_constructor_type(base_expr_type);
+                    base_instance_type = self.base_instance_type_from_expression(expr_idx, type_arguments);
                 }
 
                 if let Some(base_instance_type) = base_instance_type {
-                    self.merge_base_properties_from_type(
+                    let base_instance_type = self.resolve_type_for_property_access(base_instance_type);
+                    merge_base_shape(
+                        self,
                         base_instance_type,
                         &mut properties,
                         &mut string_index,
@@ -3560,6 +3610,129 @@ impl<'a> ThinCheckerState<'a> {
             visited.remove(&sym_id);
         }
         instance_type
+    }
+
+    fn base_instance_type_from_expression(
+        &mut self,
+        expr_idx: NodeIndex,
+        type_arguments: Option<&crate::parser::NodeList>,
+    ) -> Option<TypeId> {
+        use crate::solver::{SymbolRef, TypeKey, TypeSubstitution, instantiate_type};
+        use crate::binder::SymbolId;
+        use rustc_hash::FxHashSet;
+
+        let mut base_type = self.get_type_of_node(expr_idx);
+        if base_type == TypeId::ANY || base_type == TypeId::ERROR {
+            return None;
+        }
+        base_type = self.evaluate_application_type(base_type);
+
+        let mut type_args = Vec::new();
+        if let Some(args) = type_arguments {
+            for &arg_idx in &args.nodes {
+                type_args.push(self.get_type_from_type_node(arg_idx));
+            }
+        }
+
+        fn collect_constructor_returns(
+            checker: &mut ThinCheckerState<'_>,
+            type_id: TypeId,
+            type_args: &[TypeId],
+            return_types: &mut Vec<TypeId>,
+            visited: &mut FxHashSet<TypeId>,
+        ) {
+            if !visited.insert(type_id) {
+                return;
+            }
+
+            let Some(key) = checker.ctx.types.lookup(type_id) else {
+                return;
+            };
+
+            match key {
+                TypeKey::Callable(shape_id) => {
+                    let shape = checker.ctx.types.callable_shape(shape_id);
+                    for sig in &shape.construct_signatures {
+                        let mut return_type = sig.return_type;
+                        if !sig.type_params.is_empty() && !type_args.is_empty() {
+                            let mut sig_args = type_args.to_vec();
+                            if sig_args.len() < sig.type_params.len() {
+                                for param in sig.type_params.iter().skip(sig_args.len()) {
+                                    let fallback = param.default.or(param.constraint).unwrap_or(TypeId::ANY);
+                                    sig_args.push(fallback);
+                                }
+                            }
+                            if sig_args.len() > sig.type_params.len() {
+                                sig_args.truncate(sig.type_params.len());
+                            }
+                            let substitution = TypeSubstitution::from_args(&sig.type_params, &sig_args);
+                            return_type = instantiate_type(checker.ctx.types, return_type, &substitution);
+                        }
+                        return_types.push(return_type);
+                    }
+                }
+                TypeKey::Function(shape_id) => {
+                    let shape = checker.ctx.types.function_shape(shape_id);
+                    if shape.is_constructor {
+                        return_types.push(shape.return_type);
+                    }
+                }
+                TypeKey::Ref(SymbolRef(sym_id)) => {
+                    let resolved = checker.get_type_of_symbol(SymbolId(sym_id));
+                    if resolved != type_id {
+                        collect_constructor_returns(checker, resolved, type_args, return_types, visited);
+                    }
+                }
+                TypeKey::TypeQuery(SymbolRef(sym_id)) => {
+                    let resolved = checker.get_type_of_symbol(SymbolId(sym_id));
+                    if resolved != type_id {
+                        collect_constructor_returns(checker, resolved, type_args, return_types, visited);
+                    }
+                }
+                TypeKey::TypeParameter(info) | TypeKey::Infer(info) => {
+                    if let Some(constraint) = info.constraint {
+                        collect_constructor_returns(checker, constraint, type_args, return_types, visited);
+                    }
+                }
+                TypeKey::Conditional(_)
+                | TypeKey::Mapped(_)
+                | TypeKey::IndexAccess(_, _)
+                | TypeKey::KeyOf(_) => {
+                    let evaluated = checker.evaluate_type_with_env(type_id);
+                    if evaluated != type_id {
+                        collect_constructor_returns(checker, evaluated, type_args, return_types, visited);
+                    }
+                }
+                TypeKey::Application(_) => {
+                    let evaluated = checker.evaluate_application_type(type_id);
+                    if evaluated != type_id {
+                        collect_constructor_returns(checker, evaluated, type_args, return_types, visited);
+                    }
+                }
+                TypeKey::Union(members_id) | TypeKey::Intersection(members_id) => {
+                    let members = checker.ctx.types.type_list(members_id);
+                    for &member in members.iter() {
+                        collect_constructor_returns(checker, member, type_args, return_types, visited);
+                    }
+                }
+                TypeKey::ReadonlyType(inner) => {
+                    collect_constructor_returns(checker, inner, type_args, return_types, visited);
+                }
+                _ => {}
+            }
+        }
+
+        let mut return_types = Vec::new();
+        let mut visited = FxHashSet::default();
+        collect_constructor_returns(self, base_type, &type_args, &mut return_types, &mut visited);
+
+        if return_types.is_empty() {
+            None
+        } else if return_types.len() == 1 {
+            Some(return_types[0])
+        } else {
+            Some(self.ctx.types.union(return_types))
+        }
     }
 
     fn get_class_constructor_type(
@@ -4326,6 +4499,14 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    fn spread_element_expression(&self, node: &ThinNode) -> Option<NodeIndex> {
+        self.ctx
+            .arena
+            .get_spread(node)
+            .map(|spread| spread.expression)
+            .or_else(|| self.ctx.arena.get_unary_expr_ex(node).map(|unary| unary.expression))
+    }
+
     /// Get type of a symbol.
     pub fn get_type_of_symbol(&mut self, sym_id: SymbolId) -> TypeId {
         use crate::solver::SymbolRef;
@@ -5062,17 +5243,65 @@ impl<'a> ThinCheckerState<'a> {
         F: FnMut(usize, usize) -> Option<TypeId>,
     {
         use crate::solver::TypeKey;
+        use crate::solver::SymbolRef;
+        use crate::binder::SymbolId;
+        use rustc_hash::FxHashSet;
+
+        fn resolve_spread_type(
+            checker: &mut ThinCheckerState,
+            type_id: TypeId,
+        ) -> TypeId {
+            let mut current = type_id;
+            let mut visited = FxHashSet::default();
+
+            loop {
+                if !visited.insert(current) {
+                    return current;
+                }
+                let Some(key) = checker.ctx.types.lookup(current) else {
+                    return current;
+                };
+                match key {
+                    TypeKey::ReadonlyType(inner) => {
+                        current = inner;
+                    }
+                    TypeKey::TypeParameter(info) => {
+                        if let Some(constraint) = info.constraint {
+                            current = constraint;
+                        } else {
+                            return current;
+                        }
+                    }
+                    TypeKey::Ref(SymbolRef(sym_id)) => {
+                        current = checker.type_reference_symbol_type(SymbolId(sym_id));
+                    }
+                    TypeKey::Application(_) => {
+                        let evaluated = checker.evaluate_application_type(current);
+                        if evaluated == current {
+                            return current;
+                        }
+                        current = evaluated;
+                    }
+                    _ => return current,
+                }
+            }
+        }
 
         // First pass: count expanded arguments (spreads of tuple types expand to multiple args)
         let mut expanded_count = 0usize;
         for &arg_idx in args.iter() {
             if let Some(arg_node) = self.ctx.arena.get(arg_idx) {
                 if arg_node.kind == syntax_kind_ext::SPREAD_ELEMENT {
-                    if let Some(spread_data) = self.ctx.arena.get_spread(arg_node) {
-                        let spread_type = self.get_type_of_node(spread_data.expression);
-                        if let Some(TypeKey::Tuple(elems_id)) = self.ctx.types.lookup(spread_type) {
+                    if let Some(spread_expr) = self.spread_element_expression(arg_node) {
+                        let spread_type = self.get_type_of_node(spread_expr);
+                        let resolved_spread_type = resolve_spread_type(self, spread_type);
+                        if let Some(TypeKey::Tuple(elems_id)) = self.ctx.types.lookup(resolved_spread_type) {
                             let elems = self.ctx.types.tuple_list(elems_id);
                             expanded_count += elems.len();
+                            continue;
+                        }
+                        if let Some(TypeKey::Array(_)) = self.ctx.types.lookup(resolved_spread_type) {
+                            expanded_count += 1;
                             continue;
                         }
                     }
@@ -5088,11 +5317,12 @@ impl<'a> ThinCheckerState<'a> {
             if let Some(arg_node) = self.ctx.arena.get(arg_idx) {
                 // Handle spread elements specially - expand tuple types
                 if arg_node.kind == syntax_kind_ext::SPREAD_ELEMENT {
-                    if let Some(spread_data) = self.ctx.arena.get_spread(arg_node) {
-                        let spread_type = self.get_type_of_node(spread_data.expression);
+                    if let Some(spread_expr) = self.spread_element_expression(arg_node) {
+                        let spread_type = self.get_type_of_node(spread_expr);
+                        let resolved_spread_type = resolve_spread_type(self, spread_type);
 
                         // If it's a tuple type, expand its elements
-                        if let Some(TypeKey::Tuple(elems_id)) = self.ctx.types.lookup(spread_type) {
+                        if let Some(TypeKey::Tuple(elems_id)) = self.ctx.types.lookup(resolved_spread_type) {
                             let elems = self.ctx.types.tuple_list(elems_id);
                             for elem in elems.iter() {
                                 arg_types.push(elem.type_id);
@@ -5102,14 +5332,14 @@ impl<'a> ThinCheckerState<'a> {
                         }
 
                         // If it's an array type, push the element type (variadic handling)
-                        if let Some(TypeKey::Array(elem_type)) = self.ctx.types.lookup(spread_type) {
+                        if let Some(TypeKey::Array(elem_type)) = self.ctx.types.lookup(resolved_spread_type) {
                             arg_types.push(elem_type);
                             effective_index += 1;
                             continue;
                         }
 
                         // Otherwise just push the spread type as-is
-                        arg_types.push(spread_type);
+                        arg_types.push(resolved_spread_type);
                         effective_index += 1;
                         continue;
                     }
@@ -5624,6 +5854,9 @@ impl<'a> ThinCheckerState<'a> {
         // Enforce private/protected access modifiers when possible
         if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
             let property_name = &ident.escaped_text;
+            if property_name.is_empty() {
+                return TypeId::ANY;
+            }
             if !self.check_property_accessibility(
                 access.expression,
                 property_name,
@@ -7631,6 +7864,15 @@ impl<'a> ThinCheckerState<'a> {
         type1 == type2
     }
 
+    /// Check if source type is assignable to target type, resolving TypeQuery types first.
+    /// This is needed because `typeof x` (TypeQuery) needs to be resolved to its structural
+    /// type before checking assignability.
+    pub fn is_assignable_to_resolving_type_queries(&mut self, source: TypeId, target: TypeId) -> bool {
+        let resolved_source = self.resolve_type_query_to_structural(source);
+        let resolved_target = self.resolve_type_query_to_structural(target);
+        self.is_assignable_to(resolved_source, resolved_target)
+    }
+
     /// Check if a type is assignable to a union of types.
     /// Uses the context's TypeEnvironment for resolving type references and expanding Applications.
     pub fn is_assignable_to_union(&self, source: TypeId, targets: &[TypeId]) -> bool {
@@ -9245,6 +9487,32 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    /// Report error 2552: Cannot find name 'X'. Did you mean 'Y'?
+    pub fn error_cannot_find_name_did_you_mean_at(
+        &mut self,
+        name: &str,
+        suggestion: &str,
+        idx: NodeIndex,
+    ) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+
+        if let Some(loc) = self.get_source_location(idx) {
+            let message = format!(
+                "Cannot find name '{}'. Did you mean '{}'?",
+                name, suggestion
+            );
+            self.ctx.diagnostics.push(Diagnostic {
+                code: diagnostic_codes::CANNOT_FIND_NAME_DID_YOU_MEAN,
+                category: DiagnosticCategory::Error,
+                message_text: message,
+                file: self.ctx.file_name.clone(),
+                start: loc.start,
+                length: loc.length(),
+                related_information: Vec::new(),
+            });
+        }
+    }
+
     /// Report error 2403: Subsequent variable declarations must have the same type.
     pub fn error_subsequent_variable_declaration(
         &mut self,
@@ -9843,7 +10111,7 @@ impl<'a> ThinCheckerState<'a> {
 
                         // Check for error 2355: function with return type must return a value
                         // Only check if there's an explicit return type annotation
-                        let requires_return = self.requires_return_value(return_type);
+                        let requires_return = self.requires_return_value(return_type, func.is_async);
                         let has_return = self.body_has_return_with_value(func.body);
                         let falls_through = self.function_body_falls_through(func.body);
 
@@ -10062,6 +10330,8 @@ impl<'a> ThinCheckerState<'a> {
 
                     // Check assignability (skip for 'any' since anything is assignable to any)
                     if declared_type != TypeId::ANY {
+                        checker.ensure_application_symbols_resolved(init_type);
+                        checker.ensure_application_symbols_resolved(declared_type);
                         if let Some((source_level, target_level)) =
                             checker.constructor_accessibility_mismatch_for_var_decl(var_decl)
                         {
@@ -10667,7 +10937,8 @@ impl<'a> ThinCheckerState<'a> {
         self.ensure_application_symbols_resolved(expected_type);
 
         // Check if the return type is assignable to the expected type
-        if expected_type != TypeId::ANY && !self.is_assignable_to(return_type, expected_type) {
+        // Resolve TypeQuery types (typeof) before checking assignability
+        if expected_type != TypeId::ANY && !self.is_assignable_to_resolving_type_queries(return_type, expected_type) {
             // Report error at the return expression (or at return keyword if no expression)
             let error_node = if !return_data.expression.is_none() {
                 return_data.expression
@@ -11621,8 +11892,8 @@ impl<'a> ThinCheckerState<'a> {
                 k if k == syntax_kind_ext::SPREAD_ELEMENT
                     || k == syntax_kind_ext::SPREAD_ASSIGNMENT =>
                 {
-                    if let Some(spread) = self.ctx.arena.get_spread(node) {
-                        stack.push(spread.expression);
+                    if let Some(spread_expr) = self.spread_element_expression(node) {
+                        stack.push(spread_expr);
                     }
                 }
                 k if k == syntax_kind_ext::AS_EXPRESSION
@@ -11951,6 +12222,21 @@ impl<'a> ThinCheckerState<'a> {
             for &mod_idx in &mods.nodes {
                 if let Some(mod_node) = self.ctx.arena.get(mod_idx) {
                     if mod_node.kind == SyntaxKind::StaticKeyword as u16 {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    /// Check if modifiers include the 'async' keyword.
+    fn has_async_modifier(&self, modifiers: &Option<crate::parser::NodeList>) -> bool {
+        use crate::scanner::SyntaxKind;
+        if let Some(mods) = modifiers {
+            for &mod_idx in &mods.nodes {
+                if let Some(mod_node) = self.ctx.arena.get(mod_idx) {
+                    if mod_node.kind == SyntaxKind::AsyncKeyword as u16 {
                         return true;
                     }
                 }
@@ -12950,7 +13236,8 @@ impl<'a> ThinCheckerState<'a> {
                 }
 
                 // Check if getter return type is assignable to setter param type
-                if !self.is_assignable_to(getter_type, setter_type) {
+                // Resolve TypeQuery types (typeof) before checking assignability
+                if !self.is_assignable_to_resolving_type_queries(getter_type, setter_type) {
                     // Get type strings for error message
                     let getter_type_str = self.format_type(getter_type);
                     let setter_type_str = self.format_type(setter_type);
@@ -13493,7 +13780,8 @@ impl<'a> ThinCheckerState<'a> {
                             found = true;
                             let base_type = instantiate_type(self.ctx.types, base_type, &substitution);
 
-                            if !self.is_assignable_to(*member_type, base_type) {
+                            // Resolve TypeQuery types (typeof) before checking assignability
+                            if !self.is_assignable_to_resolving_type_queries(*member_type, base_type) {
                                 let member_type_str = self.format_type(*member_type);
                                 let base_type_str = self.format_type(base_type);
 
@@ -14086,7 +14374,8 @@ impl<'a> ThinCheckerState<'a> {
             let init_type = self.get_type_of_node(param.initializer);
 
             // Check if the initializer type is assignable to the declared type
-            if !self.is_assignable_to(init_type, declared_type) {
+            // Resolve TypeQuery types (typeof) before checking assignability
+            if !self.is_assignable_to_resolving_type_queries(init_type, declared_type) {
                 self.error_type_not_assignable_with_reason_at(
                     init_type,
                     declared_type,
@@ -14503,9 +14792,18 @@ impl<'a> ThinCheckerState<'a> {
         // If property has type annotation and initializer, check type compatibility
         if !prop.type_annotation.is_none() && !prop.initializer.is_none() {
             let declared_type = self.get_type_from_type_node(prop.type_annotation);
+            let prev_context = self.ctx.contextual_type;
+            if declared_type != TypeId::ANY {
+                self.ctx.contextual_type = Some(declared_type);
+            }
             let init_type = self.get_type_of_node(prop.initializer);
+            self.ctx.contextual_type = prev_context;
 
-            if declared_type != TypeId::ANY && !self.is_assignable_to(init_type, declared_type) {
+            self.ensure_application_symbols_resolved(init_type);
+            self.ensure_application_symbols_resolved(declared_type);
+
+            // Resolve TypeQuery types (typeof) before checking assignability
+            if declared_type != TypeId::ANY && !self.is_assignable_to_resolving_type_queries(init_type, declared_type) {
                 self.error_type_not_assignable_with_reason_at(init_type, declared_type, prop.initializer);
             }
         } else if !prop.initializer.is_none() {
@@ -14621,7 +14919,8 @@ impl<'a> ThinCheckerState<'a> {
             self.push_return_type(return_type);
             self.check_statement(method.body);
 
-            let requires_return = self.requires_return_value(return_type);
+            let is_async = self.has_async_modifier(&method.modifiers);
+            let requires_return = self.requires_return_value(return_type, is_async);
             let has_return = self.body_has_return_with_value(method.body);
             let falls_through = self.function_body_falls_through(method.body);
 
@@ -14796,7 +15095,7 @@ impl<'a> ThinCheckerState<'a> {
             self.push_return_type(return_type);
             self.check_statement(accessor.body);
             if is_getter {
-                let requires_return = self.requires_return_value(return_type);
+                let requires_return = self.requires_return_value(return_type, false);
                 let has_return = self.body_has_return_with_value(accessor.body);
                 let falls_through = self.function_body_falls_through(accessor.body);
                 // Only emit 2355 if getter falls through without returning.
@@ -14856,21 +15155,28 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Check if a return type requires a return value.
     /// Returns false for void, undefined, any, and never.
-    fn requires_return_value(&self, return_type: TypeId) -> bool {
+    fn requires_return_value(&mut self, return_type: TypeId, is_async: bool) -> bool {
         use crate::solver::TypeKey;
 
+        let mut effective_return = return_type;
+        if is_async {
+            if let Some(awaited) = self.async_return_value_type(return_type) {
+                effective_return = awaited;
+            }
+        }
+
         // void, undefined, any, never don't require a return value
-        if return_type == TypeId::VOID
-            || return_type == TypeId::UNDEFINED
-            || return_type == TypeId::ANY
-            || return_type == TypeId::NEVER
-            || return_type == TypeId::UNKNOWN
+        if effective_return == TypeId::VOID
+            || effective_return == TypeId::UNDEFINED
+            || effective_return == TypeId::ANY
+            || effective_return == TypeId::NEVER
+            || effective_return == TypeId::UNKNOWN
         {
             return false;
         }
 
         // Check for union types that include void/undefined
-        if let Some(TypeKey::Union(members)) = self.ctx.types.lookup(return_type) {
+        if let Some(TypeKey::Union(members)) = self.ctx.types.lookup(effective_return) {
             let members = self.ctx.types.type_list(members);
             for &member in members.iter() {
                 if member == TypeId::VOID || member == TypeId::UNDEFINED {
@@ -14880,6 +15186,97 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         true
+    }
+
+    fn async_return_value_type(&mut self, return_type: TypeId) -> Option<TypeId> {
+        self.promise_like_type_argument(return_type, 0)
+    }
+
+    fn promise_like_type_argument(&mut self, type_id: TypeId, depth: u8) -> Option<TypeId> {
+        use crate::binder::SymbolId;
+        use crate::solver::{instantiate_type, SymbolRef, TypeKey, TypeSubstitution};
+
+        if depth > 8 {
+            return None;
+        }
+
+        match self.ctx.types.lookup(type_id) {
+            Some(TypeKey::Application(app_id)) => {
+                let app = self.ctx.types.type_application(app_id);
+                if let Some(arg) = app.args.first().copied() {
+                    if self.is_promise_like_base(app.base) {
+                        return Some(arg);
+                    }
+                }
+
+                if let Some(TypeKey::Ref(SymbolRef(sym_id))) = self.ctx.types.lookup(app.base) {
+                    let sym_id = SymbolId(sym_id);
+                    if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
+                        if symbol.flags & symbol_flags::TYPE_ALIAS != 0 {
+                            let alias_type = self.type_reference_symbol_type(sym_id);
+                            if alias_type == TypeId::ANY || alias_type == TypeId::ERROR {
+                                return None;
+                            }
+                            let type_params = self.get_type_params_for_symbol(sym_id);
+                            if !type_params.is_empty() {
+                                let substitution = TypeSubstitution::from_args(&type_params, &app.args);
+                                let instantiated = instantiate_type(self.ctx.types, alias_type, &substitution);
+                                return self.promise_like_type_argument(instantiated, depth + 1);
+                            }
+                            return self.promise_like_type_argument(alias_type, depth + 1);
+                        }
+                    }
+                }
+
+                None
+            }
+            Some(TypeKey::Ref(SymbolRef(sym_id))) => {
+                let sym_id = SymbolId(sym_id);
+                if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
+                    if symbol.flags & symbol_flags::TYPE_ALIAS != 0 {
+                        let alias_type = self.type_reference_symbol_type(sym_id);
+                        if alias_type == TypeId::ANY || alias_type == TypeId::ERROR {
+                            return None;
+                        }
+                        return self.promise_like_type_argument(alias_type, depth + 1);
+                    }
+                }
+                None
+            }
+            Some(TypeKey::Union(list_id)) => {
+                let members = self.ctx.types.type_list(list_id);
+                let mut awaited_members = Vec::new();
+                for &member in members.iter() {
+                    let awaited = self.promise_like_type_argument(member, depth + 1)?;
+                    awaited_members.push(awaited);
+                }
+                if awaited_members.is_empty() {
+                    None
+                } else {
+                    Some(self.ctx.types.union(awaited_members))
+                }
+            }
+            _ => None,
+        }
+    }
+
+    fn is_promise_like_base(&self, base: TypeId) -> bool {
+        use crate::binder::SymbolId;
+        use crate::solver::{SymbolRef, TypeKey};
+
+        match self.ctx.types.lookup(base) {
+            Some(TypeKey::Ref(SymbolRef(sym_id))) => self.is_promise_like_symbol(SymbolId(sym_id)),
+            _ => false,
+        }
+    }
+
+    fn is_promise_like_symbol(&self, sym_id: SymbolId) -> bool {
+        self.ctx
+            .binder
+            .get_symbol(sym_id)
+            .map_or(false, |symbol| {
+                symbol.escaped_name == "Promise" || symbol.escaped_name == "PromiseLike"
+            })
     }
 
     fn is_null_or_undefined_only(&self, return_type: TypeId) -> bool {

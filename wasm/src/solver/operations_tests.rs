@@ -632,6 +632,55 @@ fn test_call_tuple_rest_argument_success() {
 }
 
 #[test]
+fn test_call_tuple_rest_with_fixed_tail() {
+    let interner = TypeInterner::new();
+    let mut subtype = CompatChecker::new(&interner);
+    let mut evaluator = CallEvaluator::new(&interner, &mut subtype);
+
+    let rest_array = interner.array(TypeId::STRING);
+    let tuple_rest = interner.tuple(vec![
+        TupleElement { type_id: rest_array, name: None, optional: false, rest: true },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+
+    let func = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: tuple_rest,
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let result = evaluator.resolve_call(func, &[TypeId::NUMBER]);
+    match result {
+        CallResult::Success(ret) => assert_eq!(ret, TypeId::VOID),
+        _ => panic!("Expected success, got {:?}", result),
+    }
+
+    let result = evaluator.resolve_call(func, &[TypeId::STRING, TypeId::STRING, TypeId::NUMBER]);
+    match result {
+        CallResult::Success(ret) => assert_eq!(ret, TypeId::VOID),
+        _ => panic!("Expected success, got {:?}", result),
+    }
+
+    let result = evaluator.resolve_call(func, &[TypeId::STRING, TypeId::NUMBER, TypeId::STRING]);
+    match result {
+        CallResult::ArgumentTypeMismatch { index, expected, actual } => {
+            assert_eq!(index, 1);
+            assert_eq!(expected, TypeId::STRING);
+            assert_eq!(actual, TypeId::NUMBER);
+        }
+        _ => panic!("Expected ArgumentTypeMismatch, got {:?}", result),
+    }
+}
+
+#[test]
 fn test_property_access_object() {
     let interner = TypeInterner::new();
     let evaluator = PropertyAccessEvaluator::new(&interner);
