@@ -1265,8 +1265,8 @@ impl ThinParserState {
         let asterisk_token = self.parse_optional(SyntaxKind::AsteriskToken);
 
         // Parse optional name (function expressions can be anonymous)
-        let name = if self.is_token(SyntaxKind::Identifier) {
-            self.parse_identifier()
+        let name = if self.is_identifier_or_keyword() {
+            self.parse_identifier_name()
         } else {
             NodeIndex::NONE
         };
@@ -2059,6 +2059,9 @@ impl ThinParserState {
         let mut modifiers = Vec::new();
 
         loop {
+            if self.should_stop_class_member_modifier() {
+                break;
+            }
             let start_pos = self.token_pos();
             let modifier = match self.token() {
                 SyntaxKind::StaticKeyword => {
@@ -2131,6 +2134,34 @@ impl ThinParserState {
         } else {
             Some(self.make_node_list(modifiers))
         }
+    }
+
+    fn should_stop_class_member_modifier(&mut self) -> bool {
+        if !self.is_token(SyntaxKind::StaticKeyword) {
+            return false;
+        }
+
+        if self.look_ahead_is_static_block() {
+            return true;
+        }
+
+        let snapshot = self.scanner.save_state();
+        let current = self.current_token;
+        self.next_token();
+        let next = self.current_token;
+        self.scanner.restore_state(snapshot);
+        self.current_token = current;
+
+        matches!(
+            next,
+            SyntaxKind::OpenParenToken
+                | SyntaxKind::LessThanToken
+                | SyntaxKind::QuestionToken
+                | SyntaxKind::ExclamationToken
+                | SyntaxKind::ColonToken
+                | SyntaxKind::EqualsToken
+                | SyntaxKind::SemicolonToken
+        )
     }
 
     /// Parse constructor with modifiers
@@ -2274,6 +2305,17 @@ impl ThinParserState {
 
         // Parse modifiers (static, public, private, protected, readonly, abstract, override)
         let modifiers = self.parse_class_member_modifiers();
+
+        // Handle static block after modifiers: { ... }
+        if self.is_token(SyntaxKind::StaticKeyword) && self.look_ahead_is_static_block() {
+            if modifiers.is_some() {
+                self.parse_error_at_current_token(
+                    "Modifiers cannot appear on a static block.",
+                    diagnostic_codes::MODIFIERS_NOT_ALLOWED_HERE,
+                );
+            }
+            return self.parse_static_block();
+        }
 
         // Handle constructor
         if self.is_token(SyntaxKind::ConstructorKeyword) {
