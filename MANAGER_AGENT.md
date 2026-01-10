@@ -168,6 +168,8 @@ Tmux key sending can fail if you don't pause. The message arrives but Enter does
 - If you see a message was sent but the prompt is still waiting (no response), send Enter again:
   - `sleep 1 && tmux send-keys -t <session>:<window>.<pane> C-m`
 - Common sign of hanging prompt: your message appears in the pane but there's no activity following it
+ - If prompts pile up, you can clear them with Ctrl-C (`tmux send-keys -t <session>:<window>.<pane> C-c`)
+ - Avoid sending `/login` instructions when sessions are already authenticated; let workers proceed
 
 If sessions need to be recreated:
 - `tmux new-session -d -s <worker> -c <path>`
