@@ -2914,6 +2914,76 @@ value.foo;
 }
 
 #[test]
+fn test_ts2339_mixin_class_property_access() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Base {
+    baseProp = 1;
+}
+
+function Mixin<TBase extends new (...args: any[]) => {}>(Base: TBase) {
+    return class extends Base {
+        mixinProp = "m";
+    };
+}
+
+class Derived extends Mixin(Base) {}
+
+const d = new Derived();
+d.baseProp;
+d.mixinProp;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2339),
+        "Did not expect 2339 for mixin class properties, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_ts2339_global_this_property_access() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+var globalValue = 42;
+globalThis.globalValue;
+globalThis.missingValue;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let error_2339_count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2339).count();
+    assert_eq!(
+        error_2339_count, 1,
+        "Expected one 2339 for missing globalThis property, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
 fn test_ts2339_class_static_inheritance() {
     use crate::thin_parser::ThinParserState;
 
@@ -6322,6 +6392,46 @@ class A {
 
     assert_eq!(error_2339_count, 0,
         "Expected no TS2339 error for private static method access, got errors: {:?}", codes);
+}
+
+#[test]
+fn test_private_identifier_access_outside_class_errors() {
+    use crate::thin_parser::ThinParserState;
+    use crate::checker::types::diagnostics::diagnostic_codes;
+
+    let source = r#"
+class C {
+    #value = 1;
+    getValue() {
+        return this.#value;
+    }
+}
+
+const c = new C();
+c.#value;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        codes.contains(&diagnostic_codes::PROPERTY_IS_PRIVATE),
+        "Expected private access error for #value, got: {:?}",
+        codes
+    );
+    assert!(
+        !codes.contains(&2339),
+        "Did not expect 2339 for private identifier access, got: {:?}",
+        codes
+    );
 }
 
 #[test]
