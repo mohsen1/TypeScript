@@ -21,6 +21,105 @@ We need to keep working on our project and while maintaining the architectural i
 
 Output of `wasm/differential-test/run-conformance.sh --max=10000` dictates where we are and where should we go from here
 
+
+#### Current focus 
+
+Based on the Conformance Report and the architectural constraints defined in `WASM_ARCHITECTURE.md`, here is a deep analysis of why conformance is low (23.4%) and where the fundamental architectural gaps lie.
+
+### Executive Summary: The "Permissive" Trap
+
+The most alarming statistic is **Missing Errors: 68.2%**.
+This means your compiler is **too permissive**. It accepts code that TypeScript rejects.
+In a compiler, "Extra Errors" (35%) means you are buggy (parsing/binding issues). "Missing Errors" (68%) means you are **unsound**.
+
+You are failing to catch:
+1.  **Uninitialized Variables** (TS2454: 573 hits)
+2.  **Uninitialized Properties** (TS2564: 443 hits)
+3.  **Implicit Anys** (TS7006: 357 hits)
+
+This suggests the architecture prioritizes *throughput* and *memory* (Data-Oriented Design) but lacks the **Control Flow Graph (CFG)** and **Inference strictness** required to match `tsc`.
+
+---
+
+### 1. Fundamental Issue: Data-Oriented Design vs. Control Flow Analysis (CFA)
+
+**The Problem:**
+You are using a `ThinNode` architecture (Struct-of-Arrays). This is excellent for parsing speed (500 MB/s), but it makes **Control Flow Analysis** (CFA) significantly harder.
+
+TS2454 ("Variable used before assigned") and TS2564 require a **Control Flow Graph**. In a pointer-based AST (like TSC), you can attach "Flow Nodes" to AST nodes easily. In your `ThinNode` array, you cannot mutate nodes to add flow data.
+
+**Evidence:**
+*   `src/checker/control_flow.rs` exists but seems to rely on a `FlowNodeArena`.
+*   The high missing count for TS2454 suggests that `check_identifier` in `thin_checker.rs` is **not** querying the Flow Graph effectively, or the Flow Graph construction is incomplete/disconnected from the linear parser pass.
+
+**Architectural Fix:**
+You need a dedicated **Side Table** for Flow Nodes that is computed *after* binding but *before* checking. The Checker must query `flow_graph[node_index]` for every identifier usage. Currently, it seems the checker defaults to "Assigned" if it can't prove otherwise. It must default to "Unassigned".
+
+### 2. Fundamental Issue: The "Any" Fallback
+
+**The Problem:**
+The high number of missing **TS7006 (Implicit Any)** and **TS2322 (Type Not Assignable)** suggests that when your Solver encounters a complex type (generics, conditional types), it "bails out" and returns `Any` (or `true` for subtyping) to avoid crashing.
+
+**Evidence:**
+*   `src/solver/` uses a `TypeKey` system.
+*   If `lower_type` fails to resolve a symbol (due to the TS2304 binding issues), it likely returns `Error` or `Any`.
+*   In `specs/SOLVER.md`, the "Error Poisoning" rule states `Error` is compatible with everything.
+*   Because you have 702 **TS2304 (Cannot find name)** errors, those unresolved names become `Any/Error`, which then silences all downstream errors (TS2322, TS7006).
+
+**Architectural Fix:**
+You cannot fix conformance until you fix **Binding (TS2304)**.
+If the Binder cannot find `Array`, `Promise`, or `console`, the Solver treats them as `Any`.
+1.  **Fix the Library Context:** Ensure `lib.d.ts` is actually loaded and bound in the test runner. The `WasmProgram` class seems to handle this, but the high TS2304 count implies global scope pollution is failing.
+2.  **Strict Error Types:** Change the default bailout from `Any` to `Unknown`. `Unknown` is safe (errors on usage), whereas `Any` suppresses errors.
+
+### 3. Fundamental Issue: The Parser is "Too Strict"
+
+**The Problem:**
+**TS1005 (Expected token)** and **TS1109 (Expression expected)** account for ~800 extra errors.
+Your `ThinParser` is a recursive descent parser written from scratch. TypeScript allows many grammar ambiguities (ASI, loose keywords) that a strict Rust parser might reject.
+
+**Impact:**
+When parsing fails, the AST is incomplete. An incomplete AST leads to:
+1.  Missing nodes -> Missing Symbols -> **TS2304 (Cannot find name)**.
+2.  Missing Symbols -> Inferred as Any -> **Missing TS2322**.
+
+**Architectural Fix:**
+The parser needs a robust **Error Recovery** strategy.
+*   Current: Seems to bail or produce error nodes that stop further analysis.
+*   Required: "Resynchronization". If a statement is malformed, skip tokens until the next semicolon/brace and *continue parsing*. The AST must be as complete as possible even with syntax errors.
+
+### 4. Fundamental Issue: The "Judge vs. Lawyer" Gap
+
+**The Problem:**
+Your `specs/SOLVER.md` describes a "Judge" (Sound Set Theory) and a "Lawyer" (Compat Layer).
+The data shows the **Lawyer is missing**.
+
+*   **TS2339 (Property does not exist):** 294 Extra Errors.
+    *   This happens when you check `obj.prop`.
+    *   A "Sound" solver checks if `prop` is in `obj`.
+    *   TypeScript checks: `prop` in `obj` OR `obj` is `any` OR `obj` has string index signature OR `obj` is a Union and *one* constituent has it (sometimes).
+*   **TS2322 (Type not assignable):** 310 Missing Errors.
+    *   Your solver is likely returning `true` for things TS rejects (e.g., `string | number` assignable to `string`? No, but maybe your union logic is loose).
+
+**Architectural Fix:**
+The `CompatChecker` in `src/solver/` needs to implement the "Unsoundness Catalog" explicitly.
+*   Implement **Apparent Members** for primitives (e.g., `string` has `.length`).
+*   Implement **Union Widening** correctly.
+
+### Summary of Recommendations
+
+1.  **Priority 1: Fix the Parser Recovery (TS1005/1109).**
+    *   You cannot trust semantic errors if the syntax tree is broken. 500+ parse errors are masking thousands of semantic issues.
+
+2.  **Priority 2: Fix Global Binding (TS2304).**
+    *   700+ "Cannot find name" errors mean your `lib.d.ts` or global scope handling is broken. This causes cascading `Any` types, hiding real errors.
+
+3.  **Priority 3: Invert Control Flow Default.**
+    *   Change `FlowAnalyzer` to assume variables are **Unassigned** by default. Currently, it seems to assume they are assigned (hence missing TS2454).
+
+4.  **Priority 4: Strict Solver Fallback.**
+    *   When a type cannot be resolved, return `Type::Unknown` instead of `Type::Any`. This will convert "Missing Errors" into "Extra Errors", which are easier to debug and fix.
+
 ### Anti-Priorities (Do Not Work On)
 *   **New Emitter transforms** (ES3, obscure module formats) - we have enough
 *   New LSP features (Semantic Tokens, Code Actions) unless they expose a Solver bug
