@@ -29,10 +29,10 @@ Reduce TS2339 false positives for **private names** and **mixin classes**, plus 
 - Missing `globalThis` errors emitted correctly
 
 ## Resume Notes
-- Branch: `worker/forge-2` (ahead of `origin/rust`).
-- Latest commit: `[wasm] checker: re-apply static index signature collection after merge`
-- Recent changes: Re-applied static index signature collection after squad/forge merge overwrote changes.
-- Last tests: `./wasm/test.sh test_ts2339_` (10 tests pass).
+- Branch: `worker/forge-2`.
+- Latest commit: `[wasm] checker: narrow assignment flow types for TS2339`
+- Recent changes: Re-applied static index signature collection after squad/forge merge; narrowed flow types on direct assignments to use assigned expression types; added TS2339 test covering assignment-based narrowing on unions.
+- Last tests: `./wasm/test.sh ts2339_assignment_narrows_union_property_access`
 - **Latest TS2339 conformance scan results (1000 files):**
   - Extra (false positives): 22 files (was 27)
   - Main categories of false positives:
@@ -44,9 +44,6 @@ Reduce TS2339 false positives for **private names** and **mixin classes**, plus 
 - Remember: do not touch `.role/AGENTS.md`.
 
 ## Task Queue
-- Fix control flow narrowing for property access after type guards (highest priority - affects 10 files)
-  - **Root cause identified:** In `handle_assignment` in control_flow.rs, when an assignment affects a reference, we return the declared type instead of the assigned expression's type. For example, after `x = ""` where `x: string | number`, we should narrow `x` to `string`, but we return `string | number`.
-  - **Fix needed:** Track assigned types in flow nodes and use them for narrowing.
 - Investigate private name (#prop) handling - both extra and missing errors
 - Fix mixin class property resolution
 - Add globalThis property checking
@@ -67,8 +64,13 @@ Reduce TS2339 false positives for **private names** and **mixin classes**, plus 
 - Fixed parser to preserve static modifier on index signatures (was dropping static keyword).
 - Fixed static index signature property access - staticIndexSignature4.ts now passes.
 - Conformance scan after fix: 27 extra, 29 missing (from 1000 files).
+- Narrowed flow assignment handling to use assigned expression types for TS2339.
+- Added TS2339 test for assignment-based union narrowing.
 - Re-applied static index signature collection after squad/forge merge.
 - Conformance scan after re-apply: 22 extra (from 1000 files).
+- Fixed mixin class inheritance to merge intersection base properties.
+- Allowed constructor callables to satisfy constructor function constraints.
+- Added TS2339 tests for mixins, globalThis property access, and private identifiers.
 
 ## Ready for Merge
 No
@@ -77,6 +79,7 @@ No
 - Full test run failing in `cli::driver_tests::compile_multi_file_project_with_imports`
   and `cli::driver_tests::compile_multi_file_project_with_default_and_named_imports` (TS2792).
 - Run `./wasm/test.sh` before pushing
+- Last run: `./wasm/test.sh test_ts2339_mixin_class_property_access`
 - Commit format: `[wasm] checker: improve TS2339 property access diagnostics`
 - Push to: `origin/worker/forge-2`
 - **NEVER edit**: `STRUCTURE.md`, `GOALS.md`, other workers' plan files, or anything in `orchestrator/`

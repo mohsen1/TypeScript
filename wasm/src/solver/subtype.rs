@@ -562,6 +562,15 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 // At least one source signature must match the target function
                 let s_callable = self.interner.callable_shape(*s_callable_id);
                 let t_fn = self.interner.function_shape(*t_fn_id);
+                if t_fn.is_constructor {
+                    for s_sig in &s_callable.construct_signatures {
+                        if self.check_call_signature_subtype_to_fn(s_sig, &t_fn).is_true() {
+                            return SubtypeResult::True;
+                        }
+                    }
+                    return SubtypeResult::False;
+                }
+
                 for s_sig in &s_callable.call_signatures {
                     if self.check_call_signature_subtype_to_fn(s_sig, &t_fn).is_true() {
                         return SubtypeResult::True;
