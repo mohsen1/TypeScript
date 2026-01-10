@@ -10428,6 +10428,10 @@ impl<'a> ThinCheckerState<'a> {
     fn check_import_declaration(&mut self, stmt_idx: NodeIndex) {
         use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages, format_message};
 
+        if !self.ctx.report_unresolved_imports {
+            return;
+        }
+
         let Some(node) = self.ctx.arena.get(stmt_idx) else {
             return;
         };
