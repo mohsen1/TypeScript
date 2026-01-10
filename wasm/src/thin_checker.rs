@@ -4518,6 +4518,57 @@ impl<'a> ThinCheckerState<'a> {
         self.get_type_of_node(idx)
     }
 
+    /// Check an assignment expression, applying contextual typing to the RHS.
+    fn check_assignment_expression(
+        &mut self,
+        left_idx: NodeIndex,
+        right_idx: NodeIndex,
+        expr_idx: NodeIndex,
+    ) -> TypeId {
+        let left_target = self.get_type_of_assignment_target(left_idx);
+        let left_type = self.resolve_type_query_type(left_target);
+
+        let prev_context = self.ctx.contextual_type;
+        if left_type != TypeId::ANY && !self.type_contains_error(left_type) {
+            self.ctx.contextual_type = Some(left_type);
+        }
+
+        let right_type = self.resolve_type_query_type(self.get_type_of_node(right_idx));
+
+        self.ctx.contextual_type = prev_context;
+
+        self.ensure_application_symbols_resolved(right_type);
+        self.ensure_application_symbols_resolved(left_type);
+
+        self.check_readonly_assignment(left_idx, expr_idx);
+
+        if left_type != TypeId::ANY {
+            if let Some((source_level, target_level)) =
+                self.constructor_accessibility_mismatch_for_assignment(left_idx, right_idx)
+            {
+                self.error_constructor_accessibility_not_assignable(
+                    right_type,
+                    left_type,
+                    source_level,
+                    target_level,
+                    right_idx,
+                );
+            } else if !self.is_assignable_to(right_type, left_type) {
+                self.error_type_not_assignable_with_reason_at(right_type, left_type, right_idx);
+            }
+
+            if left_type != TypeId::UNKNOWN {
+                if let Some(right_node) = self.ctx.arena.get(right_idx) {
+                    if right_node.kind == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION {
+                        self.check_object_literal_excess_properties(right_type, left_type, right_idx);
+                    }
+                }
+            }
+        }
+
+        right_type
+    }
+
     /// Get type of binary expression.
     fn get_type_of_binary_expression(&mut self, idx: NodeIndex) -> TypeId {
         use crate::solver::{BinaryOpEvaluator, BinaryOpResult};
@@ -4545,46 +4596,16 @@ impl<'a> ThinCheckerState<'a> {
             let op_kind = binary.operator_token;
 
             if !visited {
-                stack.push((node_idx, true));
                 if op_kind == SyntaxKind::EqualsToken as u16 {
-                    stack.push((binary.right, false));
-                } else {
-                    stack.push((binary.right, false));
-                    stack.push((binary.left, false));
+                    let assign_type =
+                        self.check_assignment_expression(binary.left, binary.right, node_idx);
+                    type_stack.push(assign_type);
+                    continue;
                 }
-                continue;
-            }
 
-            if op_kind == SyntaxKind::EqualsToken as u16 {
-                let right_type = self.resolve_type_query_type(type_stack.pop().unwrap_or(TypeId::ANY));
-                let left_target = self.get_type_of_assignment_target(binary.left);
-                let left_type = self.resolve_type_query_type(left_target);
-                self.ensure_application_symbols_resolved(right_type);
-                self.ensure_application_symbols_resolved(left_type);
-                self.check_readonly_assignment(binary.left, node_idx);
-                if left_type != TypeId::ANY {
-                    if let Some((source_level, target_level)) =
-                        self.constructor_accessibility_mismatch_for_assignment(
-                            binary.left,
-                            binary.right,
-                        )
-                    {
-                        self.error_constructor_accessibility_not_assignable(
-                            right_type,
-                            left_type,
-                            source_level,
-                            target_level,
-                            binary.right,
-                        );
-                    } else if !self.is_assignable_to(right_type, left_type) {
-                        self.error_type_not_assignable_with_reason_at(
-                            right_type,
-                            left_type,
-                            binary.right,
-                        );
-                    }
-                }
-                type_stack.push(right_type);
+                stack.push((node_idx, true));
+                stack.push((binary.right, false));
+                stack.push((binary.left, false));
                 continue;
             }
 
@@ -10356,7 +10377,13 @@ impl<'a> ThinCheckerState<'a> {
 
         // Get the type of the return expression (if any)
         let return_type = if !return_data.expression.is_none() {
-            self.get_type_of_node(return_data.expression)
+            let prev_context = self.ctx.contextual_type;
+            if expected_type != TypeId::ANY && !self.type_contains_error(expected_type) {
+                self.ctx.contextual_type = Some(expected_type);
+            }
+            let return_type = self.get_type_of_node(return_data.expression);
+            self.ctx.contextual_type = prev_context;
+            return_type
         } else {
             // `return;` without expression returns undefined
             TypeId::UNDEFINED
@@ -13783,10 +13810,15 @@ impl<'a> ThinCheckerState<'a> {
             let declared_type = self.get_type_from_type_node(param.type_annotation);
 
             // Get the type of the initializer
+            let prev_context = self.ctx.contextual_type;
+            if declared_type != TypeId::ANY && !self.type_contains_error(declared_type) {
+                self.ctx.contextual_type = Some(declared_type);
+            }
             let init_type = self.get_type_of_node(param.initializer);
+            self.ctx.contextual_type = prev_context;
 
             // Check if the initializer type is assignable to the declared type
-            if !self.is_assignable_to(init_type, declared_type) {
+            if declared_type != TypeId::ANY && !self.is_assignable_to(init_type, declared_type) {
                 self.error_type_not_assignable_with_reason_at(
                     init_type,
                     declared_type,
@@ -14203,7 +14235,12 @@ impl<'a> ThinCheckerState<'a> {
         // If property has type annotation and initializer, check type compatibility
         if !prop.type_annotation.is_none() && !prop.initializer.is_none() {
             let declared_type = self.get_type_from_type_node(prop.type_annotation);
+            let prev_context = self.ctx.contextual_type;
+            if declared_type != TypeId::ANY && !self.type_contains_error(declared_type) {
+                self.ctx.contextual_type = Some(declared_type);
+            }
             let init_type = self.get_type_of_node(prop.initializer);
+            self.ctx.contextual_type = prev_context;
 
             if declared_type != TypeId::ANY && !self.is_assignable_to(init_type, declared_type) {
                 self.error_type_not_assignable_with_reason_at(init_type, declared_type, prop.initializer);
