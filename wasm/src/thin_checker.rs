@@ -9543,7 +9543,7 @@ impl<'a> ThinCheckerState<'a> {
 
                         // Check for error 2355: function with return type must return a value
                         // Only check if there's an explicit return type annotation
-                        let requires_return = self.requires_return_value(return_type);
+                        let requires_return = self.requires_return_value(return_type, func.is_async);
                         let has_return = self.body_has_return_with_value(func.body);
                         let falls_through = self.function_body_falls_through(func.body);
 
@@ -11651,6 +11651,21 @@ impl<'a> ThinCheckerState<'a> {
             for &mod_idx in &mods.nodes {
                 if let Some(mod_node) = self.ctx.arena.get(mod_idx) {
                     if mod_node.kind == SyntaxKind::StaticKeyword as u16 {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    /// Check if modifiers include the 'async' keyword.
+    fn has_async_modifier(&self, modifiers: &Option<crate::parser::NodeList>) -> bool {
+        use crate::scanner::SyntaxKind;
+        if let Some(mods) = modifiers {
+            for &mod_idx in &mods.nodes {
+                if let Some(mod_node) = self.ctx.arena.get(mod_idx) {
+                    if mod_node.kind == SyntaxKind::AsyncKeyword as u16 {
                         return true;
                     }
                 }
@@ -14321,7 +14336,8 @@ impl<'a> ThinCheckerState<'a> {
             self.push_return_type(return_type);
             self.check_statement(method.body);
 
-            let requires_return = self.requires_return_value(return_type);
+            let is_async = self.has_async_modifier(&method.modifiers);
+            let requires_return = self.requires_return_value(return_type, is_async);
             let has_return = self.body_has_return_with_value(method.body);
             let falls_through = self.function_body_falls_through(method.body);
 
@@ -14496,7 +14512,7 @@ impl<'a> ThinCheckerState<'a> {
             self.push_return_type(return_type);
             self.check_statement(accessor.body);
             if is_getter {
-                let requires_return = self.requires_return_value(return_type);
+                let requires_return = self.requires_return_value(return_type, false);
                 let has_return = self.body_has_return_with_value(accessor.body);
                 let falls_through = self.function_body_falls_through(accessor.body);
                 // Only emit 2355 if getter falls through without returning.
@@ -14556,21 +14572,28 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Check if a return type requires a return value.
     /// Returns false for void, undefined, any, and never.
-    fn requires_return_value(&self, return_type: TypeId) -> bool {
+    fn requires_return_value(&mut self, return_type: TypeId, is_async: bool) -> bool {
         use crate::solver::TypeKey;
 
+        let mut effective_return = return_type;
+        if is_async {
+            if let Some(awaited) = self.async_return_value_type(return_type) {
+                effective_return = awaited;
+            }
+        }
+
         // void, undefined, any, never don't require a return value
-        if return_type == TypeId::VOID
-            || return_type == TypeId::UNDEFINED
-            || return_type == TypeId::ANY
-            || return_type == TypeId::NEVER
-            || return_type == TypeId::UNKNOWN
+        if effective_return == TypeId::VOID
+            || effective_return == TypeId::UNDEFINED
+            || effective_return == TypeId::ANY
+            || effective_return == TypeId::NEVER
+            || effective_return == TypeId::UNKNOWN
         {
             return false;
         }
 
         // Check for union types that include void/undefined
-        if let Some(TypeKey::Union(members)) = self.ctx.types.lookup(return_type) {
+        if let Some(TypeKey::Union(members)) = self.ctx.types.lookup(effective_return) {
             let members = self.ctx.types.type_list(members);
             for &member in members.iter() {
                 if member == TypeId::VOID || member == TypeId::UNDEFINED {
@@ -14580,6 +14603,97 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         true
+    }
+
+    fn async_return_value_type(&mut self, return_type: TypeId) -> Option<TypeId> {
+        self.promise_like_type_argument(return_type, 0)
+    }
+
+    fn promise_like_type_argument(&mut self, type_id: TypeId, depth: u8) -> Option<TypeId> {
+        use crate::binder::SymbolId;
+        use crate::solver::{instantiate_type, SymbolRef, TypeKey, TypeSubstitution};
+
+        if depth > 8 {
+            return None;
+        }
+
+        match self.ctx.types.lookup(type_id) {
+            Some(TypeKey::Application(app_id)) => {
+                let app = self.ctx.types.type_application(app_id);
+                if let Some(arg) = app.args.first().copied() {
+                    if self.is_promise_like_base(app.base) {
+                        return Some(arg);
+                    }
+                }
+
+                if let Some(TypeKey::Ref(SymbolRef(sym_id))) = self.ctx.types.lookup(app.base) {
+                    let sym_id = SymbolId(sym_id);
+                    if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
+                        if symbol.flags & symbol_flags::TYPE_ALIAS != 0 {
+                            let alias_type = self.type_reference_symbol_type(sym_id);
+                            if alias_type == TypeId::ANY || alias_type == TypeId::ERROR {
+                                return None;
+                            }
+                            let type_params = self.get_type_params_for_symbol(sym_id);
+                            if !type_params.is_empty() {
+                                let substitution = TypeSubstitution::from_args(&type_params, &app.args);
+                                let instantiated = instantiate_type(self.ctx.types, alias_type, &substitution);
+                                return self.promise_like_type_argument(instantiated, depth + 1);
+                            }
+                            return self.promise_like_type_argument(alias_type, depth + 1);
+                        }
+                    }
+                }
+
+                None
+            }
+            Some(TypeKey::Ref(SymbolRef(sym_id))) => {
+                let sym_id = SymbolId(sym_id);
+                if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
+                    if symbol.flags & symbol_flags::TYPE_ALIAS != 0 {
+                        let alias_type = self.type_reference_symbol_type(sym_id);
+                        if alias_type == TypeId::ANY || alias_type == TypeId::ERROR {
+                            return None;
+                        }
+                        return self.promise_like_type_argument(alias_type, depth + 1);
+                    }
+                }
+                None
+            }
+            Some(TypeKey::Union(list_id)) => {
+                let members = self.ctx.types.type_list(list_id);
+                let mut awaited_members = Vec::new();
+                for &member in members.iter() {
+                    let awaited = self.promise_like_type_argument(member, depth + 1)?;
+                    awaited_members.push(awaited);
+                }
+                if awaited_members.is_empty() {
+                    None
+                } else {
+                    Some(self.ctx.types.union(awaited_members))
+                }
+            }
+            _ => None,
+        }
+    }
+
+    fn is_promise_like_base(&self, base: TypeId) -> bool {
+        use crate::binder::SymbolId;
+        use crate::solver::{SymbolRef, TypeKey};
+
+        match self.ctx.types.lookup(base) {
+            Some(TypeKey::Ref(SymbolRef(sym_id))) => self.is_promise_like_symbol(SymbolId(sym_id)),
+            _ => false,
+        }
+    }
+
+    fn is_promise_like_symbol(&self, sym_id: SymbolId) -> bool {
+        self.ctx
+            .binder
+            .get_symbol(sym_id)
+            .map_or(false, |symbol| {
+                symbol.escaped_name == "Promise" || symbol.escaped_name == "PromiseLike"
+            })
     }
 
     fn is_null_or_undefined_only(&self, return_type: TypeId) -> bool {
