@@ -14234,3 +14234,40 @@ class Foo {
         checker.ctx.diagnostics
     );
 }
+
+#[test]
+fn test_interface_extends_class_no_recursion_crash() {
+    use crate::thin_parser::ThinParserState;
+
+    // Regression test for crash: interface extending a class with private fields
+    // should not cause infinite recursion during type checking
+    let source = r#"
+class C {
+    #prop;
+    func(x: I) {
+        x.#prop = 123;
+    }
+}
+interface I extends C {}
+
+function func(x: I) {
+    x.#prop = 123;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+
+    // This should not crash with stack overflow
+    checker.check_source_file(root);
+
+    // The test passes if we get here without crashing
+    // (private field access across interface boundaries should produce errors, but no crash)
+    assert!(true, "Interface extending class should not cause recursion crash");
+}
