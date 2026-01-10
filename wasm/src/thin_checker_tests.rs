@@ -13154,6 +13154,105 @@ class Foo {
     );
 }
 
+/// Test that element access assignment counts for identifier properties
+#[test]
+fn test_ts2564_element_access_assigns_identifier_property() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Foo {
+    name: string;
+    constructor() {
+        this["name"] = "assigned";
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let has_2564 = checker.ctx.diagnostics.iter().any(|d| d.code == 2564);
+    assert!(
+        !has_2564,
+        "Expected no TS2564 errors for element access assignment, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// Test that string-literal properties count assignments via dot access
+#[test]
+fn test_ts2564_string_literal_property_assigned_by_dot_access() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Foo {
+    "name": string;
+    constructor() {
+        this.name = "assigned";
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let has_2564 = checker.ctx.diagnostics.iter().any(|d| d.code == 2564);
+    assert!(
+        !has_2564,
+        "Expected no TS2564 errors for string literal property via dot access, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// Test that numeric literal properties can be assigned via element access
+#[test]
+fn test_ts2564_numeric_literal_property_assigned_by_element_access() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Foo {
+    0: string;
+    constructor() {
+        this[0] = "assigned";
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let has_2564 = checker.ctx.diagnostics.iter().any(|d| d.code == 2564);
+    assert!(
+        !has_2564,
+        "Expected no TS2564 errors for numeric literal property, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
 /// Test that parameter properties don't emit TS2564 (they're auto-initialized)
 #[test]
 fn test_ts2564_parameter_property_skips_check() {
