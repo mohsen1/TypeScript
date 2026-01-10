@@ -1924,6 +1924,22 @@ impl<'a> FlowAnalyzer<'a> {
 
     /// Check if two references point to the same symbol or property access chain.
     fn is_matching_reference(&self, a: NodeIndex, b: NodeIndex) -> bool {
+        let a = self.skip_parenthesized(a);
+        let b = self.skip_parenthesized(b);
+
+        if let (Some(node_a), Some(node_b)) = (self.arena.get(a), self.arena.get(b)) {
+            if node_a.kind == SyntaxKind::ThisKeyword as u16
+                && node_b.kind == SyntaxKind::ThisKeyword as u16
+            {
+                return true;
+            }
+            if node_a.kind == SyntaxKind::SuperKeyword as u16
+                && node_b.kind == SyntaxKind::SuperKeyword as u16
+            {
+                return true;
+            }
+        }
+
         let sym_a = self.reference_symbol(a);
         let sym_b = self.reference_symbol(b);
         if sym_a.is_some() && sym_a == sym_b {

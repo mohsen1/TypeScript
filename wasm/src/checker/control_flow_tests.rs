@@ -605,6 +605,60 @@ x;
 }
 
 #[test]
+fn test_this_property_assignment_narrows() {
+    let source = r#"
+class Foo {
+  x: string | number;
+  method() {
+    this.x;
+    this.x = "s";
+    this.x;
+  }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let arena = parser.get_arena();
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let analyzer = FlowAnalyzer::with_node_types(arena, &binder, &types, &checker.ctx.node_types);
+
+    let root_node = arena.get(root).expect("root node");
+    let source_file = arena.get_source_file(root_node).expect("source file");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("class decl");
+    let class_node = arena.get(class_idx).expect("class node");
+    let class_decl = arena.get_class(class_node).expect("class data");
+    let method_idx = *class_decl.members.nodes.get(1).expect("method decl");
+    let method_node = arena.get(method_idx).expect("method node");
+    let method_decl = arena.get_method_decl(method_node).expect("method data");
+    let body_idx = method_decl.body;
+
+    let ident_before = get_block_expression(arena, body_idx, 0);
+    let ident_after = get_block_expression(arena, body_idx, 2);
+
+    let union = types.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    let flow_before = binder.get_node_flow(ident_before).expect("flow before");
+    let narrowed_before = analyzer.get_flow_type(ident_before, union, flow_before);
+    assert_eq!(narrowed_before, union);
+
+    let flow_after = binder.get_node_flow(ident_after).expect("flow after");
+    let narrowed_after = analyzer.get_flow_type(ident_after, union, flow_after);
+    assert_eq!(narrowed_after, TypeId::STRING);
+}
+
+#[test]
 fn test_assignment_narrows_to_rhs_literal_without_cache() {
     let source = r#"
 let x: string | number;
