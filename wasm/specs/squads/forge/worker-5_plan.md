@@ -6,6 +6,13 @@ Execute tasks assigned by EM-Forge for the Forge squad (type system).
 Status: Active
 Priority: 5
 
+## Current Assignment (Call Signature Void-Return Assignability)
+- [x] Add call signature void-return assignability test in `wasm/src/solver/compat_tests.rs`
+- [x] Run `./wasm/test.sh test_call_signature_void_return_assignability`
+
+### Test Status
+- `./wasm/test.sh test_call_signature_void_return_assignability` (PASS; warnings about unused imports elsewhere)
+
 ## Current Assignment (TS7006 - Parameter Implicit Any)
 - [x] Gather failing samples (call/construct/method signatures + function type aliases)
 - [x] Add implicit-any checks for signature parameters and function type nodes
