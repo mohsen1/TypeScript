@@ -5326,8 +5326,24 @@ impl<'a> ThinCheckerState<'a> {
         self.symbol_is_value_only(target)
     }
 
+    fn private_member_owner_type(&mut self, name_idx: NodeIndex) -> Option<TypeId> {
+        let sym_id = self.ctx.binder.resolve_identifier(self.ctx.arena, name_idx)?;
+        let symbol = self.ctx.binder.get_symbol(sym_id)?;
+        let is_static = (symbol.flags & symbol_flags::STATIC) != 0;
+        let class_idx = self.ctx.enclosing_class.as_ref().map(|info| info.class_idx)?;
+        let class_node = self.ctx.arena.get(class_idx)?;
+        let class_data = self.ctx.arena.get_class(class_node)?;
+
+        Some(if is_static {
+            self.get_class_constructor_type(class_idx, class_data)
+        } else {
+            self.get_class_instance_type(class_idx, class_data)
+        })
+    }
+
     /// Get type of property access expression.
     fn get_type_of_property_access(&mut self, idx: NodeIndex) -> TypeId {
+        use crate::scanner::SyntaxKind;
         use crate::solver::{PropertyAccessResult, QueryDatabase};
 
         let Some(node) = self.ctx.arena.get(idx) else {
@@ -5403,7 +5419,16 @@ impl<'a> ThinCheckerState<'a> {
             }
 
             // Use solver QueryDatabase to resolve the property access
-            let result = self.ctx.types.property_access_type(object_type_for_access, property_name);
+            let mut result = self.ctx.types.property_access_type(object_type_for_access, property_name);
+
+            if name_node.kind == SyntaxKind::PrivateIdentifier as u16 {
+                if matches!(result, PropertyAccessResult::PropertyNotFound { .. }) {
+                    if let Some(owner_type) = self.private_member_owner_type(access.name_or_argument) {
+                        let owner_type = self.resolve_type_for_property_access(owner_type);
+                        result = self.ctx.types.property_access_type(owner_type, property_name);
+                    }
+                }
+            }
 
             match result {
                 PropertyAccessResult::Success { type_id: prop_type, from_index_signature } => {
