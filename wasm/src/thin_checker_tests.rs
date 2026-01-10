@@ -852,6 +852,35 @@ function foo2(t1: [number, string], t2: [boolean], a1: number[]) {
 }
 
 #[test]
+fn test_overload_call_handles_variadic_tuple_param() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+declare function ft3<T extends unknown[]>(t: [...T]): T;
+declare function ft4<T extends unknown[]>(t: [...T]): readonly [...T];
+
+ft3(["hello", 42]);
+ft4(["hello", 42]);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    assert!(
+        checker.ctx.diagnostics.is_empty(),
+        "Unexpected diagnostics: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
 fn test_overload_call_handles_generic_signatures() {
     use crate::thin_parser::ThinParserState;
 
