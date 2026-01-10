@@ -10472,18 +10472,23 @@ impl<'a> ThinCheckerState<'a> {
 
         let module_name = &literal.text;
 
+        if self.ctx.binder.declared_modules.contains(module_name) {
+            return;
+        }
+
         // In single-file mode, any external import is considered unresolved.
         // This is correct because WASM checker operates on individual files
-        // without access to the module graph or ambient module declarations.
+        // without access to the module graph (aside from ambient module declarations).
         let message = format_message(
             diagnostic_messages::CANNOT_FIND_MODULE,
             &[module_name],
         );
-        self.error_at_node(
-            import.module_specifier,
-            &message,
-            diagnostic_codes::CANNOT_FIND_MODULE,
-        );
+        let code = if module_name.starts_with('.') || module_name.starts_with('/') {
+            diagnostic_codes::MODULE_NOT_FOUND
+        } else {
+            diagnostic_codes::CANNOT_FIND_MODULE
+        };
+        self.error_at_node(import.module_specifier, &message, code);
     }
 
     /// Check heritage clauses (extends/implements) for unresolved names.
@@ -12297,6 +12302,18 @@ impl<'a> ThinCheckerState<'a> {
             k if k == syntax_kind_ext::MAPPED_TYPE => {
                 if let Some(mapped) = self.ctx.arena.get_mapped_type(node) {
                     self.check_type_parameter_node_for_missing_names(mapped.type_parameter);
+                    let mut updates = Vec::new();
+                    if let Some(param_node) = self.ctx.arena.get(mapped.type_parameter) {
+                        if let Some(param) = self.ctx.arena.get_type_parameter(param_node) {
+                            if let Some(name_node) = self.ctx.arena.get(param.name) {
+                                if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
+                                    let name = ident.escaped_text.clone();
+                                    let previous = self.ctx.type_parameter_scope.insert(name.clone(), TypeId::ANY);
+                                    updates.push((name, previous));
+                                }
+                            }
+                        }
+                    }
                     if !mapped.name_type.is_none() {
                         self.check_type_for_missing_names(mapped.name_type);
                     }
@@ -12307,6 +12324,9 @@ impl<'a> ThinCheckerState<'a> {
                         for &member_idx in &members.nodes {
                             self.check_type_member_for_missing_names(member_idx);
                         }
+                    }
+                    if !updates.is_empty() {
+                        self.pop_type_parameters(updates);
                     }
                 }
             }
