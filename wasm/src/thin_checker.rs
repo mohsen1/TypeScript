@@ -629,26 +629,15 @@ impl<'a> ThinCheckerState<'a> {
                 let name = ident.escaped_text.as_str();
 
                 if has_type_args {
-                    let is_builtin_generic = matches!(name, "Array" | "ReadonlyArray" | "Promise" | "PromiseLike" | "Partial" | "Required" | "Readonly" | "Pick" | "Omit" | "Record" | "Exclude" | "Extract" | "NonNullable" | "Parameters" | "ReturnType" | "ConstructorParameters" | "InstanceType" | "ThisParameterType" | "OmitThisParameter" | "ThisType" | "Awaited" | "Map" | "Set" | "WeakMap" | "WeakSet" | "Iterator" | "IterableIterator" | "AsyncIterator" | "AsyncIterableIterator" | "Generator" | "AsyncGenerator" | "Iterable" | "AsyncIterable" | "ArrayLike" | "PropertyKey");
-                    if !is_builtin_generic
+                    let is_builtin_array = name == "Array" || name == "ReadonlyArray";
+                    if !is_builtin_array
                         && self.lookup_type_parameter(name).is_none()
                         && self.resolve_identifier_symbol(type_name_idx).is_none()
                     {
                         self.error_cannot_find_name_at(name, type_name_idx);
                         return TypeId::ERROR;
                     }
-                    // For builtin generics that aren't defined in the file, return UNKNOWN
-                    // to avoid errors from the lowering process trying to resolve them
-                    if is_builtin_generic && self.resolve_identifier_symbol(type_name_idx).is_none() {
-                        // Still check the type arguments to ensure they're valid
-                        if let Some(args) = &type_ref.type_arguments {
-                            for &arg_idx in &args.nodes {
-                                let _ = self.get_type_from_type_node(arg_idx);
-                            }
-                        }
-                        return TypeId::UNKNOWN;
-                    }
-                    if !is_builtin_generic {
+                    if !is_builtin_array {
                         if let Some(sym_id) = self.resolve_identifier_symbol(type_name_idx) {
                             if self.alias_resolves_to_value_only(sym_id) || self.symbol_is_value_only(sym_id) {
                                 self.error_value_only_type_at(name, type_name_idx);
@@ -697,15 +686,6 @@ impl<'a> ThinCheckerState<'a> {
                     return array_type;
                 }
 
-                // Handle Promise<T> - return UNKNOWN when lib.d.ts isn't loaded
-                if name == "Promise" || name == "PromiseLike" {
-                    if let Some(type_id) = self.resolve_named_type_reference(name, type_name_idx) {
-                        return type_id;
-                    }
-                    // Just return UNKNOWN - Promise semantics aren't needed for type checking
-                    return TypeId::UNKNOWN;
-                }
-
                 // Check for built-in types (primitive keywords)
                 match name {
                     "number" => return TypeId::NUMBER,
@@ -720,29 +700,16 @@ impl<'a> ThinCheckerState<'a> {
                     "object" => return TypeId::OBJECT,
                     "bigint" => return TypeId::BIGINT,
                     "symbol" => return TypeId::SYMBOL,
-                    // Global interfaces from lib.d.ts - these accept primitives via boxing
+                    // Global interfaces from lib.es5.d.ts - these accept primitives via boxing
                     // Object/String/Number/Boolean are wide types that accept their primitive counterparts
                     // We use UNKNOWN as a permissive stand-in when lib.d.ts is not loaded
                     "Object" | "String" | "Number" | "Boolean" | "Symbol" | "Function" => {
                         return TypeId::UNKNOWN
                     }
-                    // Global generic types from lib.d.ts - return UNKNOWN when not loaded
-                    "Partial" | "Required" | "Readonly" | "Pick" | "Omit" | "Record" |
-                    "Exclude" | "Extract" | "NonNullable" | "Parameters" | "ReturnType" |
-                    "ConstructorParameters" | "InstanceType" | "ThisParameterType" |
-                    "OmitThisParameter" | "ThisType" | "Awaited" | "Map" | "Set" |
-                    "WeakMap" | "WeakSet" | "Iterator" | "IterableIterator" | "AsyncIterator" |
-                    "AsyncIterableIterator" | "Generator" | "AsyncGenerator" | "Iterable" |
-                    "AsyncIterable" | "ArrayLike" | "PropertyKey" | "RegExp" | "Error" |
-                    "Date" | "JSON" | "Math" | "Console" => {
-                        return TypeId::UNKNOWN
-                    }
                     _ => {}
                 }
 
-                // Don't emit errors for builtin generics
-                let is_builtin_generic = matches!(name, "Array" | "ReadonlyArray" | "Promise" | "PromiseLike" | "Partial" | "Required" | "Readonly" | "Pick" | "Omit" | "Record" | "Exclude" | "Extract" | "NonNullable" | "Parameters" | "ReturnType" | "ConstructorParameters" | "InstanceType" | "ThisParameterType" | "OmitThisParameter" | "ThisType" | "Awaited" | "Map" | "Set" | "WeakMap" | "WeakSet" | "Iterator" | "IterableIterator" | "AsyncIterator" | "AsyncIterableIterator" | "Generator" | "AsyncGenerator" | "Iterable" | "AsyncIterable" | "ArrayLike" | "PropertyKey");
-                if !is_builtin_generic {
+                if name != "Array" && name != "ReadonlyArray" {
                     if let Some(sym_id) = self.resolve_identifier_symbol(type_name_idx) {
                         if self.alias_resolves_to_value_only(sym_id) || self.symbol_is_value_only(sym_id) {
                             self.error_value_only_type_at(name, type_name_idx);
@@ -877,9 +844,7 @@ impl<'a> ThinCheckerState<'a> {
         self.ctx.types.callable(CallableShape {
             call_signatures: shape.call_signatures.clone(),
             construct_signatures: shape.construct_signatures.clone(),
-            properties,
-            string_index: None,
-            number_index: None,
+            properties, ..Default::default()
         })
     }
 
@@ -1351,11 +1316,6 @@ impl<'a> ThinCheckerState<'a> {
             return TypeId::ERROR;
         } else if let Some(name) = name_text {
             if is_identifier {
-                // Don't emit error for builtin global constructors like Promise, Array, Map, etc.
-                let is_builtin_value = matches!(name.as_str(), "Promise" | "Array" | "Map" | "Set" | "WeakMap" | "WeakSet" | "Object" | "String" | "Number" | "Boolean" | "Symbol" | "Function" | "RegExp" | "Error" | "Date" | "JSON" | "Math" | "console" | "Proxy" | "Reflect" | "BigInt" | "Intl" | "ArrayBuffer" | "DataView" | "Float32Array" | "Float64Array" | "Int8Array" | "Int16Array" | "Int32Array" | "Uint8Array" | "Uint8ClampedArray" | "Uint16Array" | "Uint32Array" | "BigInt64Array" | "BigUint64Array" | "SharedArrayBuffer" | "Atomics" | "Iterator" | "Generator" | "AsyncGenerator" | "FinalizationRegistry" | "WeakRef");
-                if is_builtin_value {
-                    return TypeId::UNKNOWN;
-                }
                 self.error_cannot_find_name_at(&name, type_query.expr_name);
                 return TypeId::ERROR;
             }
@@ -1504,12 +1464,11 @@ impl<'a> ThinCheckerState<'a> {
                 let name = ident.escaped_text.as_str();
 
                 if has_type_args {
-                    let is_builtin_generic = matches!(name, "Array" | "ReadonlyArray" | "Promise" | "PromiseLike" | "Partial" | "Required" | "Readonly" | "Pick" | "Omit" | "Record" | "Exclude" | "Extract" | "NonNullable" | "Parameters" | "ReturnType" | "ConstructorParameters" | "InstanceType" | "ThisParameterType" | "OmitThisParameter" | "ThisType" | "Awaited" | "Map" | "Set" | "WeakMap" | "WeakSet" | "Iterator" | "IterableIterator" | "AsyncIterator" | "AsyncIterableIterator" | "Generator" | "AsyncGenerator" | "Iterable" | "AsyncIterable" | "ArrayLike" | "PropertyKey");
+                    let is_builtin_array = name == "Array" || name == "ReadonlyArray";
                     let type_param = self.lookup_type_parameter(name);
                     let sym_id = self.resolve_identifier_symbol(type_name_idx);
 
-                    // Handle Array/ReadonlyArray specially - return proper array type
-                    if (name == "Array" || name == "ReadonlyArray") && type_param.is_none() && sym_id.is_none() {
+                    if is_builtin_array && type_param.is_none() && sym_id.is_none() {
                         let elem_type = type_ref.type_arguments
                             .as_ref()
                             .and_then(|args| args.nodes.first().copied())
@@ -1522,22 +1481,11 @@ impl<'a> ThinCheckerState<'a> {
                         return array_type;
                     }
 
-                    // For other builtin generics, return UNKNOWN if not defined locally
-                    if is_builtin_generic && type_param.is_none() && sym_id.is_none() {
-                        // Check type arguments for validity
-                        if let Some(args) = &type_ref.type_arguments {
-                            for &arg_idx in &args.nodes {
-                                let _ = self.get_type_from_type_node_in_type_literal(arg_idx);
-                            }
-                        }
-                        return TypeId::UNKNOWN;
-                    }
-
-                    if !is_builtin_generic && type_param.is_none() && sym_id.is_none() {
+                    if !is_builtin_array && type_param.is_none() && sym_id.is_none() {
                         self.error_cannot_find_name_at(name, type_name_idx);
                         return TypeId::ERROR;
                     }
-                    if !is_builtin_generic {
+                    if !is_builtin_array {
                         if let Some(sym_id) = sym_id {
                             if self.alias_resolves_to_value_only(sym_id) || self.symbol_is_value_only(sym_id) {
                                 self.error_value_only_type_at(name, type_name_idx);
@@ -1827,9 +1775,7 @@ impl<'a> ThinCheckerState<'a> {
             return self.ctx.types.callable(CallableShape {
                 call_signatures,
                 construct_signatures,
-                properties,
-                string_index: None,
-                number_index: None,
+                properties, ..Default::default()
             });
         }
 
@@ -2054,8 +2000,7 @@ impl<'a> ThinCheckerState<'a> {
                 call_signatures,
                 construct_signatures,
                 properties,
-                string_index: None,
-                number_index: None,
+                ..Default::default()
             };
             self.ctx.types.callable(shape)
         } else if string_index.is_some() || number_index.is_some() {
@@ -2252,9 +2197,7 @@ impl<'a> ThinCheckerState<'a> {
                 self.ctx.types.callable(CallableShape {
                     call_signatures,
                     construct_signatures,
-                    properties,
-                    string_index: None,
-                    number_index: None,
+                    properties, ..Default::default()
                 })
             }
             (Some(TypeKey::Callable(derived_shape_id)), Some(TypeKey::Object(base_shape_id))) => {
@@ -2264,9 +2207,7 @@ impl<'a> ThinCheckerState<'a> {
                 self.ctx.types.callable(CallableShape {
                     call_signatures: derived_shape.call_signatures.clone(),
                     construct_signatures: derived_shape.construct_signatures.clone(),
-                    properties,
-                    string_index: None,
-                    number_index: None,
+                    properties, ..Default::default()
                 })
             }
             (Some(TypeKey::Callable(derived_shape_id)), Some(TypeKey::ObjectWithIndex(base_shape_id))) => {
@@ -2276,9 +2217,7 @@ impl<'a> ThinCheckerState<'a> {
                 self.ctx.types.callable(CallableShape {
                     call_signatures: derived_shape.call_signatures.clone(),
                     construct_signatures: derived_shape.construct_signatures.clone(),
-                    properties,
-                    string_index: None,
-                    number_index: None,
+                    properties, ..Default::default()
                 })
             }
             (Some(TypeKey::Object(derived_shape_id)), Some(TypeKey::Callable(base_shape_id))) => {
@@ -2288,9 +2227,7 @@ impl<'a> ThinCheckerState<'a> {
                 self.ctx.types.callable(CallableShape {
                     call_signatures: base_shape.call_signatures.clone(),
                     construct_signatures: base_shape.construct_signatures.clone(),
-                    properties,
-                    string_index: None,
-                    number_index: None,
+                    properties, ..Default::default()
                 })
             }
             (Some(TypeKey::ObjectWithIndex(derived_shape_id)), Some(TypeKey::Callable(base_shape_id))) => {
@@ -2300,9 +2237,7 @@ impl<'a> ThinCheckerState<'a> {
                 self.ctx.types.callable(CallableShape {
                     call_signatures: base_shape.call_signatures.clone(),
                     construct_signatures: base_shape.construct_signatures.clone(),
-                    properties,
-                    string_index: None,
-                    number_index: None,
+                    properties, ..Default::default()
                 })
             }
             (Some(TypeKey::Object(derived_shape_id)), Some(TypeKey::Object(base_shape_id))) => {
@@ -2931,9 +2866,7 @@ impl<'a> ThinCheckerState<'a> {
             let type_id = self.ctx.types.callable(CallableShape {
                 call_signatures: signatures,
                 construct_signatures: Vec::new(),
-                properties: Vec::new(),
-                string_index: None,
-                number_index: None,
+                properties: Vec::new(), ..Default::default()
             });
             properties.insert(name, PropertyInfo {
                 name,
@@ -3300,6 +3233,8 @@ impl<'a> ThinCheckerState<'a> {
         let mut properties: FxHashMap<Atom, PropertyInfo> = FxHashMap::default();
         let mut methods: FxHashMap<Atom, MethodAggregate> = FxHashMap::default();
         let mut accessors: FxHashMap<Atom, AccessorAggregate> = FxHashMap::default();
+        let mut static_string_index: Option<crate::solver::IndexSignature> = None;
+        let mut static_number_index: Option<crate::solver::IndexSignature> = None;
 
         for &member_idx in &class.members.nodes {
             let Some(member_node) = self.ctx.arena.get(member_idx) else {
@@ -3399,6 +3334,48 @@ impl<'a> ThinCheckerState<'a> {
                         entry.setter = Some(setter_type);
                     }
                 }
+                k if k == syntax_kind_ext::INDEX_SIGNATURE => {
+                    let Some(index_sig) = self.ctx.arena.get_index_signature(member_node) else {
+                        continue;
+                    };
+                    if !self.has_static_modifier(&index_sig.modifiers) {
+                        continue;
+                    }
+                    // Determine key type from the parameter
+                    let key_type = index_sig.parameters.nodes.first()
+                        .and_then(|&param_idx| self.ctx.arena.get(param_idx))
+                        .and_then(|param_node| self.ctx.arena.get_parameter(param_node))
+                        .and_then(|param| {
+                            if !param.type_annotation.is_none() {
+                                Some(self.get_type_from_type_node(param.type_annotation))
+                            } else {
+                                None
+                            }
+                        })
+                        .unwrap_or(TypeId::STRING);
+
+                    let value_type = if !index_sig.type_annotation.is_none() {
+                        self.get_type_from_type_node(index_sig.type_annotation)
+                    } else {
+                        TypeId::ANY
+                    };
+
+                    let readonly = self.has_readonly_modifier(&index_sig.modifiers);
+
+                    let idx_sig = crate::solver::IndexSignature {
+                        key_type,
+                        value_type,
+                        readonly,
+                    };
+
+                    // Check if key is string or number type
+                    if key_type == TypeId::NUMBER {
+                        static_number_index = Some(idx_sig);
+                    } else {
+                        // Default to string index for string or symbol keys
+                        static_string_index = Some(idx_sig);
+                    }
+                }
                 _ => {}
             }
         }
@@ -3432,9 +3409,7 @@ impl<'a> ThinCheckerState<'a> {
             let type_id = self.ctx.types.callable(CallableShape {
                 call_signatures: signatures,
                 construct_signatures: Vec::new(),
-                properties: Vec::new(),
-                string_index: None,
-                number_index: None,
+                properties: Vec::new(), ..Default::default()
             });
             properties.insert(name, PropertyInfo {
                 name,
@@ -3611,8 +3586,8 @@ impl<'a> ThinCheckerState<'a> {
             call_signatures: Vec::new(),
             construct_signatures,
             properties,
-            string_index: None,
-            number_index: None,
+            string_index: static_string_index,
+            number_index: static_number_index,
         });
 
         if let Some(level) = constructor_access {
@@ -3773,9 +3748,7 @@ impl<'a> ThinCheckerState<'a> {
         self.ctx.types.callable(CallableShape {
             call_signatures: vec![call_signature],
             construct_signatures: Vec::new(),
-            properties,
-            string_index: None,
-            number_index: None,
+            properties, ..Default::default()
         })
     }
 
@@ -4049,25 +4022,6 @@ impl<'a> ThinCheckerState<'a> {
 
         // Check for circular reference
         if self.ctx.symbol_resolution_set.contains(&sym_id) {
-            // Emit TS2456 for type aliases with circular references
-            if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
-                if symbol.flags & symbol_flags::TYPE_ALIAS != 0 {
-                    let name = symbol.escaped_name.clone();
-                    let decl_idx = if !symbol.value_declaration.is_none() {
-                        symbol.value_declaration
-                    } else {
-                        symbol.declarations.first().copied().unwrap_or(NodeIndex::NONE)
-                    };
-                    if let Some(node) = self.ctx.arena.get(decl_idx) {
-                        self.error(
-                            node.pos,
-                            node.end - node.pos,
-                            format!("Type alias '{}' circularly references itself.", name),
-                            crate::checker::types::diagnostics::diagnostic_codes::TYPE_ALIAS_CIRCULARLY_REFERENCES_ITSELF,
-                        );
-                    }
-                }
-            }
             return TypeId::ANY;
         }
 
@@ -4194,8 +4148,7 @@ impl<'a> ThinCheckerState<'a> {
                     call_signatures: overloads,
                     construct_signatures: Vec::new(),
                     properties: Vec::new(),
-                    string_index: None,
-                    number_index: None,
+                    ..Default::default()
                 };
                 return (self.ctx.types.callable(shape), Vec::new());
             }
@@ -5004,9 +4957,7 @@ impl<'a> ThinCheckerState<'a> {
                     Some(self.ctx.types.callable(CallableShape {
                         call_signatures: shape.construct_signatures.clone(),
                         construct_signatures: Vec::new(),
-                        properties: Vec::new(),
-                        string_index: None,
-                        number_index: None,
+                        properties: Vec::new(), ..Default::default()
                     }))
                 }
             }
@@ -8060,9 +8011,7 @@ impl<'a> ThinCheckerState<'a> {
                     self.ctx.types.callable(CallableShape {
                         call_signatures,
                         construct_signatures,
-                        properties,
-                        string_index: None,
-                        number_index: None,
+                        properties, ..Default::default()
                     })
                 } else {
                     type_id
@@ -9547,9 +9496,7 @@ impl<'a> ThinCheckerState<'a> {
                         let has_return = self.body_has_return_with_value(func.body);
                         let falls_through = self.function_body_falls_through(func.body);
 
-                        // Only emit 2355 if function falls through without returning.
-                        // Functions that only throw (falls_through=false) shouldn't get this error.
-                        if has_type_annotation && requires_return && !has_return && falls_through {
+                        if has_type_annotation && requires_return && !has_return {
                             use crate::checker::types::diagnostics::diagnostic_codes;
                             self.error_at_node(
                                 func.type_annotation,
@@ -9643,13 +9590,9 @@ impl<'a> ThinCheckerState<'a> {
             // Type alias declarations - check the type for accessor body and parameter property errors
             syntax_kind_ext::TYPE_ALIAS_DECLARATION => {
                 if let Some(type_alias) = self.ctx.arena.get_type_alias(node) {
-                    // Push type parameters into scope before checking the type body
-                    let (_, updates) = self.push_type_parameters(&type_alias.type_parameters);
                     // Check the type for accessor bodies in ambient context and parameter properties
                     self.check_type_for_missing_names(type_alias.type_node);
                     self.check_type_for_parameter_properties(type_alias.type_node);
-                    // Pop type parameters
-                    self.pop_type_parameters(updates);
                 }
             }
             // Other type declarations - just register them, no expression checking needed
@@ -9817,16 +9760,9 @@ impl<'a> ThinCheckerState<'a> {
             // Check for variable redeclaration in the current scope (TS2403).
             // Note: This applies specifically to 'var' merging where types must match.
             // let/const duplicates are caught earlier by the binder (TS2451).
-            // TypeScript requires types to be "the same" - meaning bi-directionally assignable,
-            // not just identical TypeIds. For example, `typeof E1` and its structural form
-            // should be considered "the same type" even if they have different TypeIds.
             if let Some(prev_type) = self.ctx.var_decl_types.get(&sym_id).copied() {
                 if let Some(ref name) = var_name {
-                    // Types are "the same" if they are identical OR bi-directionally assignable
-                    let types_are_same = self.are_types_identical(final_type, prev_type)
-                        || (self.is_assignable_to(final_type, prev_type)
-                            && self.is_assignable_to(prev_type, final_type));
-                    if !types_are_same {
+                    if !self.are_types_identical(final_type, prev_type) {
                         self.error_subsequent_variable_declaration(name, prev_type, final_type, decl_idx);
                     }
                 }
@@ -10463,11 +10399,7 @@ impl<'a> ThinCheckerState<'a> {
                 if self.resolve_heritage_symbol(expr_idx).is_none() {
                     // Get the name for the error message
                     if let Some(name) = self.heritage_name_text(expr_idx) {
-                        // Don't emit error for builtin global types
-                        let is_builtin = matches!(name.as_str(), "Promise" | "PromiseLike" | "Array" | "ReadonlyArray" | "Error" | "Map" | "Set" | "WeakMap" | "WeakSet" | "Iterator" | "Iterable" | "AsyncIterator" | "AsyncIterable" | "Generator" | "AsyncGenerator" | "IterableIterator" | "AsyncIterableIterator" | "ArrayLike" | "PromiseConstructor" | "Object" | "String" | "Number" | "Boolean" | "Symbol" | "Function" | "RegExp" | "Date");
-                        if !is_builtin {
-                            self.error_cannot_find_name_at(&name, expr_idx);
-                        }
+                        self.error_cannot_find_name_at(&name, expr_idx);
                     }
                 }
             }
@@ -14325,9 +14257,7 @@ impl<'a> ThinCheckerState<'a> {
             let has_return = self.body_has_return_with_value(method.body);
             let falls_through = self.function_body_falls_through(method.body);
 
-            // Only emit 2355 if method falls through without returning.
-            // Methods that only throw (falls_through=false) shouldn't get this error.
-            if has_type_annotation && requires_return && !has_return && falls_through {
+            if has_type_annotation && requires_return && !has_return {
                 self.error_at_node(
                     method.type_annotation,
                     "A function whose declared type is neither 'undefined', 'void', nor 'any' must return a value.",
@@ -14499,9 +14429,7 @@ impl<'a> ThinCheckerState<'a> {
                 let requires_return = self.requires_return_value(return_type);
                 let has_return = self.body_has_return_with_value(accessor.body);
                 let falls_through = self.function_body_falls_through(accessor.body);
-                // Only emit 2355 if getter falls through without returning.
-                // Getters that only throw (falls_through=false) shouldn't get this error.
-                if has_type_annotation && requires_return && !has_return && falls_through {
+                if has_type_annotation && requires_return && !has_return {
                     self.error_at_node(
                         accessor.type_annotation,
                         "A function whose declared type is neither 'undefined', 'void', nor 'any' must return a value.",

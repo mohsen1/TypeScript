@@ -3112,6 +3112,38 @@ c.y;
 }
 
 #[test]
+fn test_ts2339_static_index_signature() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class B {
+    static readonly [s: string]: number;
+}
+
+// Accessing property via static index signature should not error
+B.anyProperty;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let diags: Vec<(u32, &str)> = checker.ctx.diagnostics.iter().map(|d| (d.code, d.message_text.as_str())).collect();
+    assert!(
+        !diags.iter().any(|(code, _)| *code == 2339),
+        "Did not expect 2339 for static index signature access, got: {:?}",
+        diags
+    );
+}
+
+#[test]
 fn test_strict_null_checks_property_access() {
     use crate::solver::{PropertyAccessEvaluator, PropertyAccessResult, PropertyInfo};
     use std::sync::Arc;

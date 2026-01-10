@@ -39,20 +39,15 @@ Reduce false positives for property access errors by aligning TS2339 behavior wi
 ## Resume Notes
 - Branch: `worker/forge-2`.
 - Latest commit: `[wasm] checker: narrow assignment flow types for TS2339`
-- Recent changes: Narrowed flow types on direct assignments to use assigned expression types; added TS2339 test covering assignment-based narrowing on unions.
+- Recent changes: Re-applied static index signature collection after squad/forge merge; narrowed flow types on direct assignments to use assigned expression types; added TS2339 test covering assignment-based narrowing on unions.
 - Last tests: `./wasm/test.sh ts2339_assignment_narrows_union_property_access`
 - **Latest TS2339 conformance scan results (1000 files):**
-  - Extra (false positives): 27 files (was 28, fixed staticIndexSignature4.ts)
-  - Missing: 29 files
+  - Extra (false positives): 22 files (was 27)
   - Main categories of false positives:
-    1. **Control flow narrowing** (10 files) - `length` property errors on narrowed unions (constLocalsInFunctionExpressions, controlFlowWhileStatement, etc.)
+    1. **Control flow narrowing** (11 files) - assertion predicates, const locals, various control flow tests
     2. **Private names** (6 files) - `#prop` access on class types
     3. **Mixin classes** (4 files) - Properties not found on mixin types
-    4. **Dynamic imports** (5 files) - importCallExpression tests
-  - Main categories of missing errors:
-    1. **Private names** (14 files) - Missing errors for invalid #prop access
-    2. **globalThis** (9 files) - Property access on globalThis
-    3. **Control flow aliasing** (1 file)
+    4. **Enum merging** (1 file) - enumMerging.ts
 - Conformance scan command: `cd wasm/differential-test && node find-ts2339.mjs --max=1000 --samples=30`
 - Remember: do not touch `.role/AGENTS.md`.
 
@@ -79,6 +74,8 @@ Reduce false positives for property access errors by aligning TS2339 behavior wi
 - Conformance scan after fix: 27 extra, 29 missing (from 1000 files).
 - Narrowed flow assignment handling to use assigned expression types for TS2339.
 - Added TS2339 test for assignment-based union narrowing.
+- Re-applied static index signature collection after squad/forge merge.
+- Conformance scan after re-apply: 22 extra (from 1000 files).
 
 ## Ready for Merge
 Yes
