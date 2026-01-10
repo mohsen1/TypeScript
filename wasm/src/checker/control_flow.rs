@@ -372,6 +372,15 @@ impl<'a> FlowAnalyzer<'a> {
         let affects_reference = self.assignment_affects_reference_node(flow.node, reference);
 
         if affects_reference {
+            if self.assignment_targets_reference_node(flow.node, reference) {
+                if let Some(rhs) = self.assignment_rhs_for_reference(flow.node, reference) {
+                    if let Some(node_types) = self.node_types {
+                        if let Some(&rhs_type) = node_types.get(&rhs.0) {
+                            return rhs_type;
+                        }
+                    }
+                }
+            }
             return type_id;
         }
 
@@ -380,6 +389,59 @@ impl<'a> FlowAnalyzer<'a> {
         } else {
             type_id
         }
+    }
+
+    fn assignment_rhs_for_reference(
+        &self,
+        assignment_node: NodeIndex,
+        reference: NodeIndex,
+    ) -> Option<NodeIndex> {
+        let Some(node) = self.arena.get(assignment_node) else {
+            return None;
+        };
+
+        if node.kind == syntax_kind_ext::BINARY_EXPRESSION {
+            let bin = self.arena.get_binary_expr(node)?;
+            if self.is_assignment_operator(bin.operator_token)
+                && self.is_matching_reference(bin.left, reference)
+            {
+                return Some(bin.right);
+            }
+            return None;
+        }
+
+        if node.kind == syntax_kind_ext::VARIABLE_DECLARATION {
+            let decl = self.arena.get_variable_declaration(node)?;
+            if self.is_matching_reference(decl.name, reference) && !decl.initializer.is_none() {
+                return Some(decl.initializer);
+            }
+            return None;
+        }
+
+        if node.kind == syntax_kind_ext::VARIABLE_DECLARATION_LIST
+            || node.kind == syntax_kind_ext::VARIABLE_STATEMENT
+        {
+            if let Some(list) = self.arena.get_variable(node) {
+                for &decl_idx in &list.declarations.nodes {
+                    let Some(decl_node) = self.arena.get(decl_idx) else {
+                        continue;
+                    };
+                    if decl_node.kind != syntax_kind_ext::VARIABLE_DECLARATION {
+                        continue;
+                    }
+                    let Some(decl) = self.arena.get_variable_declaration(decl_node) else {
+                        continue;
+                    };
+                    if self.is_matching_reference(decl.name, reference)
+                        && !decl.initializer.is_none()
+                    {
+                        return Some(decl.initializer);
+                    }
+                }
+            }
+        }
+
+        None
     }
 
     fn assignment_affects_reference_node(
