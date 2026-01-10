@@ -264,11 +264,23 @@ impl<'a> FlowAnalyzer<'a> {
         visited: &mut Vec<FlowNodeId>,
     ) -> TypeId {
         // For loops, we ideally compute a fixed point.
-        // For basic narrowing, we can just take the type from the entry antecedent.
-        if let Some(&ant) = flow.antecedent.first() {
-            self.check_flow(reference, type_id, ant, visited)
-        } else {
+        // Approximate by unioning entry and back-edge antecedents.
+        if flow.antecedent.is_empty() {
+            return type_id;
+        }
+
+        let loop_types: Vec<TypeId> = flow
+            .antecedent
+            .iter()
+            .map(|&ant| self.check_flow(reference, type_id, ant, &mut visited.clone()))
+            .collect();
+
+        if loop_types.is_empty() {
             type_id
+        } else if loop_types.len() == 1 {
+            loop_types[0]
+        } else {
+            self.interner.union(loop_types)
         }
     }
 

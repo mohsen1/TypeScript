@@ -124,6 +124,7 @@ This requires control flow analysis to track variable state through branches.
 - [x] Private identifier property access falls back to class owner type (static private members)
 - [x] Assignment narrowing falls back to RHS literal/nullish types without node cache; updated flow tests
 - [x] Match `this`/`super` reference bases in control flow for property assignment narrowing; added test
+- [x] Loop label flow unions entry/back-edge types; added regression test
 
 ### Remaining TS2339 False Positives (pending re-run)
 - Mixin classes: mixin type inference issues (intersection handling added in new expressions, unit tests pass, conformance tests need more investigation)
