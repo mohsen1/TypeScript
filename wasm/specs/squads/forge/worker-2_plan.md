@@ -77,9 +77,14 @@ Reduce remaining TS2339 false positives (non-control-flow cases).
 No
 
 ## Notes
-- Full test run: all tests passing (compile_object_spread fixed by squad/forge merge).
-- Last run: `./wasm/test.sh compile_optional_chaining_with_call` (pass), `./wasm/test.sh compile_object_spread` (pass)
-- Last run: `cd wasm/differential-test && node find-ts2339.mjs --max=1000 --samples=20`
+- **Post-merge test status:** 68 unit test failures after merging origin/rust + origin/squad/forge
+  - ~25 failures from new TS2564/TS7006/TS7010 error checks (other workers' features)
+  - ~15 failures from `infer` type parameter scoping issue (needs fix)
+  - ~10 failures from namespace merging regression (needs investigation)
+  - ~18 other type system failures (needs triage)
+  - See POST_MERGE_TEST_FAILURES.md for details
+- CLI tests: `./wasm/test.sh compile_optional_chaining_with_call` (pass), `./wasm/test.sh compile_object_spread` (pass)
+- Last conformance scan: `cd wasm/differential-test && node find-ts2339.mjs --max=1000 --samples=20` (0 false positives)
 - Commit format: `[wasm] checker: improve TS2339 property access diagnostics`
 - Push to: `origin/worker/forge-2`
 - **NEVER edit**: `STRUCTURE.md`, `GOALS.md`, other workers' plan files, or anything in `orchestrator/`
