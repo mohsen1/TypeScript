@@ -4533,7 +4533,8 @@ impl<'a> ThinCheckerState<'a> {
             self.ctx.contextual_type = Some(left_type);
         }
 
-        let right_type = self.resolve_type_query_type(self.get_type_of_node(right_idx));
+        let right_raw = self.get_type_of_node(right_idx);
+        let right_type = self.resolve_type_query_type(right_raw);
 
         self.ctx.contextual_type = prev_context;
 
