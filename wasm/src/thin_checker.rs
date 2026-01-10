@@ -10737,6 +10737,138 @@ impl<'a> ThinCheckerState<'a> {
         } else {
             compute_final_type(self);
         }
+
+        // If the variable name is a binding pattern, check binding element default values
+        if let Some(name_node) = self.ctx.arena.get(var_decl.name) {
+            if name_node.kind == syntax_kind_ext::OBJECT_BINDING_PATTERN
+                || name_node.kind == syntax_kind_ext::ARRAY_BINDING_PATTERN
+            {
+                let pattern_type = if !var_decl.type_annotation.is_none() {
+                    self.get_type_from_type_node(var_decl.type_annotation)
+                } else {
+                    TypeId::ANY
+                };
+                self.check_binding_pattern(var_decl.name, pattern_type);
+            }
+        }
+    }
+
+    /// Check binding pattern elements and their default values for type correctness.
+    ///
+    /// This function traverses a binding pattern (object or array destructuring) and verifies
+    /// that any default values provided in binding elements are assignable to their expected types.
+    fn check_binding_pattern(&mut self, pattern_idx: NodeIndex, pattern_type: TypeId) {
+        let Some(pattern_node) = self.ctx.arena.get(pattern_idx) else {
+            return;
+        };
+
+        let Some(pattern_data) = self.ctx.arena.get_binding_pattern(pattern_node) else {
+            return;
+        };
+
+        // Traverse binding elements
+        for &element_idx in &pattern_data.elements.nodes {
+            self.check_binding_element(element_idx, pattern_type);
+        }
+    }
+
+    /// Check a single binding element for default value assignability.
+    fn check_binding_element(&mut self, element_idx: NodeIndex, parent_type: TypeId) {
+        let Some(element_node) = self.ctx.arena.get(element_idx) else {
+            return;
+        };
+
+        let Some(element_data) = self.ctx.arena.get_binding_element(element_node) else {
+            return;
+        };
+
+        // Get the expected type for this binding element from the parent type
+        let element_type = if parent_type != TypeId::ANY {
+            // For object binding patterns, look up the property type
+            // For array binding patterns, look up the tuple element type
+            // For now, we'll use a simplified approach
+            self.get_binding_element_type(element_idx, parent_type, element_data)
+        } else {
+            TypeId::ANY
+        };
+
+        // Check if there's a default value (initializer)
+        if !element_data.initializer.is_none() {
+            if element_type != TypeId::ANY {
+                let default_value_type = self.get_type_of_node(element_data.initializer);
+
+                if !self.is_assignable_to(default_value_type, element_type) {
+                    self.error_type_not_assignable_with_reason_at(
+                        default_value_type,
+                        element_type,
+                        element_data.initializer,
+                    );
+                }
+            }
+        }
+
+        // If the name is a nested binding pattern, recursively check it
+        if let Some(name_node) = self.ctx.arena.get(element_data.name) {
+            if name_node.kind == syntax_kind_ext::OBJECT_BINDING_PATTERN
+                || name_node.kind == syntax_kind_ext::ARRAY_BINDING_PATTERN
+            {
+                self.check_binding_pattern(element_data.name, element_type);
+            }
+        }
+    }
+
+    /// Get the expected type for a binding element from its parent type.
+    fn get_binding_element_type(
+        &mut self,
+        _element_idx: NodeIndex,
+        parent_type: TypeId,
+        element_data: &crate::parser::thin_node::BindingElementData,
+    ) -> TypeId {
+        use crate::solver::TypeKey;
+
+        // Get the property name or index
+        let property_name = if !element_data.property_name.is_none() {
+            // { x: a } - property_name is "x"
+            if let Some(prop_node) = self.ctx.arena.get(element_data.property_name) {
+                if let Some(ident) = self.ctx.arena.get_identifier(prop_node) {
+                    Some(ident.escaped_text.clone())
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            // { x } - the name itself is the property name
+            if let Some(name_node) = self.ctx.arena.get(element_data.name) {
+                if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
+                    Some(ident.escaped_text.clone())
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        };
+
+        if let Some(prop_name_str) = property_name {
+            // Look up the property type in the parent type
+            match self.ctx.types.lookup(parent_type) {
+                Some(TypeKey::Object(shape_id)) => {
+                    let shape = self.ctx.types.object_shape(shape_id);
+                    // Find the property by comparing names
+                    for prop in shape.properties.as_slice() {
+                        if self.ctx.types.resolve_atom_ref(prop.name).as_ref() == prop_name_str {
+                            return prop.type_id;
+                        }
+                    }
+                    TypeId::ANY
+                }
+                _ => TypeId::ANY,
+            }
+        } else {
+            TypeId::ANY
+        }
     }
 
     /// Check object literal assignment for excess properties.

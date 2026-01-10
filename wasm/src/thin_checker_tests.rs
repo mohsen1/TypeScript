@@ -14528,3 +14528,201 @@ declare var x: Circular<tup>;
     // The recursion guard should prevent infinite loops
     assert!(checker.ctx.diagnostics.len() >= 0, "Checker should complete");
 }
+#[test]
+fn test_object_destructuring_assignability() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let obj: { x: number, y: string } = { x: 10, y: "hello" };
+
+// Should trigger TS2322: Type 'number' is not assignable to type 'string'
+let { x, y }: { x: string, y: string } = obj;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2322_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2322)
+        .collect();
+
+    eprintln!("All diagnostics: {:?}", checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>());
+    eprintln!("TS2322 count: {}", ts2322_errors.len());
+
+    assert!(!ts2322_errors.is_empty(), "Expected TS2322 error for object destructuring type mismatch, got: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| d.code).collect::<Vec<_>>());
+}
+
+#[test]
+fn test_array_destructuring_assignability() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let arr: [number, string] = [10, "hello"];
+
+// Should trigger TS2322: Type 'string' is not assignable to type 'number'
+let [a, b]: [number, number] = arr;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2322_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2322)
+        .collect();
+
+    eprintln!("[ARRAY] All diagnostics: {:?}", checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>());
+    eprintln!("[ARRAY] TS2322 count: {}", ts2322_errors.len());
+
+    assert!(!ts2322_errors.is_empty(), "Expected TS2322 error for array destructuring type mismatch, got: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| d.code).collect::<Vec<_>>());
+}
+
+#[test]
+fn test_destructuring_with_default_values_assignability() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let obj: { x?: number } = {};
+
+// Should trigger TS2322: Type 'number' is not assignable to type 'string'
+// (The default value type should be checked against the declared type)
+let { x = 42 }: { x: string } = obj;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2322_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2322)
+        .collect();
+
+    eprintln!("[DEFAULT] All diagnostics: {:?}", checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>());
+    eprintln!("[DEFAULT] TS2322 count: {}", ts2322_errors.len());
+
+    assert!(!ts2322_errors.is_empty(), "Expected TS2322 error for destructuring default value type mismatch, got: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| d.code).collect::<Vec<_>>());
+}
+
+#[test]
+fn test_nested_destructuring_assignability() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let obj: { a: { b: number } } = { a: { b: 10 } };
+
+// Should trigger TS2322 for nested property mismatch
+let { a: { b } }: { a: { b: string } } = obj;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2322_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2322)
+        .collect();
+
+    eprintln!("[NESTED] All diagnostics: {:?}", checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>());
+    eprintln!("[NESTED] TS2322 count: {}", ts2322_errors.len());
+
+    assert!(!ts2322_errors.is_empty(), "Expected TS2322 error for nested destructuring type mismatch, got: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| d.code).collect::<Vec<_>>());
+}
+
+#[test]
+fn test_destructuring_binding_element_default_value_mismatch() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// The default value 42 (number) should trigger TS2322: Type 'number' is not assignable to type 'string'
+let obj: { x?: string } = {};
+let { x = 42 }: { x: string } = obj;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    eprintln!("[BINDING_DEFAULT] All diagnostics: {:?}", checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>());
+
+    let ts2322_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2322)
+        .collect();
+
+    // This should find TS2322 for the default value 42 (number) not being assignable to string
+    assert!(!ts2322_errors.is_empty(), "Expected TS2322 error for binding element default value type mismatch, got: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| d.code).collect::<Vec<_>>());
+}
+
+#[test]
+fn test_binding_element_default_value_isolated_check() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// The initializer {} is valid for { x?: number } (x is optional)
+// But the default value "hello" (string) should NOT be assignable to number
+// This should give TS2322: Type 'string' is not assignable to type 'number'
+let { x = "hello" }: { x?: number } = {};
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    eprintln!("[ISOLATED_DEFAULT] All diagnostics: {:?}", checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>());
+
+    let ts2322_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2322)
+        .collect();
+
+    // EXPECTED: TS2322 for "hello" (string) not assignable to number
+    // This test may currently fail if default values in binding elements aren't being checked
+    assert!(!ts2322_errors.is_empty(), "Expected TS2322 error for binding element default value 'hello' (string) not assignable to number, got: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| d.code).collect::<Vec<_>>());
+}
