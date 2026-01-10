@@ -249,3 +249,12 @@ Ready for Merge: Yes (2026-01-09)
 - Build: `./wasm/build-wasm.sh` (warnings only).
 - Conformance: `node wasm/differential-test/conformance-runner.mjs classes/classExpressions --max=200 -v`.
 - Scan: `node wasm/differential-test/find-ts2339.mjs --max=300 --samples=5` (0 extra TS2339 in first 300).
+
+### Update (2026-01-10)
+- Fixed TemplateExpression1 crash by guarding missing `}` in template spans and synthesizing a tail literal to avoid infinite loops.
+- Added `test_thin_parser_unterminated_template_expression_no_crash` in `wasm/src/thin_parser_tests.rs`.
+- Build: `./wasm/build-wasm.sh` (warnings only).
+- Conformance: `node wasm/differential-test/conformance-runner.mjs es6/templates --max=200 -v` (no crashes).
+- Test: `./wasm/test.sh test_thin_parser_unterminated_template_expression_no_crash`.
+
+Ready for Merge: Yes (2026-01-10)
