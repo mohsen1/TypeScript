@@ -7,17 +7,17 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-Fix control-flow narrowing for property access after assignments/type guards.
+Extend control-flow narrowing for property access after `in`/`typeof`/`instanceof` guards.
 
 **Error Code:** TS2339 - "Property 'X' does not exist on type 'Y'"
 
 **Impact:** 142 conformance tests affected (control-flow narrowing cases)
 
 ### Steps
-1. **Assignment narrowing:** update `handle_assignment` / flow tracking to carry RHS type for matching references.
-2. **Reference matching:** only narrow for direct identifier/property matches (skip destructuring).
-3. **Add tests** in `wasm/src/thin_checker_tests.rs` for assignment-based narrowing and property access.
-4. **Run focused TS2339 tests** and report delta.
+1. **Guard narrowing:** confirm `in`/`typeof`/`instanceof` paths update flow types in `control_flow.rs`.
+2. **Reference matching:** ensure property chains (including `this`/`super`) are matched for narrowing.
+3. **Add tests** in `wasm/src/checker/control_flow_tests.rs` for `in`/`typeof` guards and property access.
+4. **Run focused tests** (`./wasm/test.sh control_flow_tests`) and report delta.
 
 ### Key Files
 - `wasm/src/checker/control_flow.rs`

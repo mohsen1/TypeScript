@@ -7,29 +7,26 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-TS2792 module resolution: missing relative vs package imports.
+Implement TS2300 "Duplicate identifier" diagnostics for basic redeclaration cases.
 
-**Error Code:** TS2792 - "Cannot find module '{0}' or its corresponding type declarations."
+**Error Code:** TS2300 - "Duplicate identifier '{0}'."
 
-**Impact:** 204 conformance tests affected
+**Impact:** 105 conformance tests affected
 
 ### Steps
-1. **Review existing implementation** - check_import_declaration in thin_checker.rs
-2. **Track ambient module declarations** in thin_binder.rs
-3. **Emit 2307 vs 2792** based on relative vs package specifiers
-4. **Add tests** for missing relative/package imports and run `./wasm/test.sh`.
+1. **Review redeclaration checks** in `wasm/src/binder.rs` (symbol flags + declaration rules).
+2. **Emit TS2300** when incompatible declarations share a scope (var/let/const/function/type alias).
+3. **Add tests** in `wasm/src/thin_checker_tests.rs` for duplicate var/function/type alias combos.
+4. **Run focused tests** with `./wasm/test.sh` and report delta.
 
 ### Key Files
-- `wasm/src/thin_binder.rs`
+- `wasm/src/binder.rs`
 - `wasm/src/thin_checker.rs`
-- `wasm/src/thin_binder.rs`
 - `wasm/src/thin_checker_tests.rs`
 
 ### Success Criteria
-- Missing relative imports emit TS2307
-- Missing package imports emit TS2792
-- Ambient module declarations skip module-not-found errors
-- No new false positives for resolved modules
+- TS2300 emitted for obvious duplicate declarations
+- Valid merges (interface/namespace) still allowed
 
 ## Task Queue
 (empty - single focused task)

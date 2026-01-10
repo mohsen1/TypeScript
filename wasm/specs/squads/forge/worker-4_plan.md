@@ -7,22 +7,17 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-Improve assignability diagnostics and reduce false positives/negatives for TS2322.
+Improve TS2322 assignability by tightening return-type compatibility and void/undefined handling.
 
 **Error Code:** TS2322 - "Type 'X' is not assignable to type 'Y'"
 
 **Impact:** 310 conformance tests affected
 
 ### Steps
-1. **Audit TS2322 emit points** in `thin_checker.rs` and related helpers to ensure we:
-   - Use the correct target type for contextual typing
-   - Avoid cascading errors when a source expression already has `error` type
-2. **Add tests first** in `wasm/src/thin_checker_tests.rs`:
-   - Assignability across unions/intersections with contextual typing
-   - Optional vs required properties in object literals
-   - `any`/`unknown` assignability edge cases
-3. **Implement fixes** in assignability checks and rerun tests.
-4. **Run conformance tests** and record delta.
+1. **Audit return compatibility** in `wasm/src/solver/compat.rs` and `wasm/src/solver/subtype.rs`.
+2. **Add focused tests** in `wasm/src/solver/compat_tests.rs` for void/undefined return assignability.
+3. **Implement fixes** for any mismatches and rerun the new tests.
+4. **Run a focused TS2322 pass** (targeted tests) and record delta.
 
 ### Key Files
 - `wasm/src/thin_checker.rs`

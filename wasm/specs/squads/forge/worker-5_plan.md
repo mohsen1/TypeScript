@@ -4,7 +4,20 @@
 Execute tasks assigned by EM-Forge for the Forge squad (type system).
 
 Status: Active
-Priority: 5
+Priority: 1
+
+## Current Assignment (TS2695 - Comma Operator Side Effects)
+Implement TS2695 for comma operator expressions in statement position.
+
+**Error Code:** TS2695 - "Left side of comma operator is unused and has no side effects."
+
+**Impact:** 46 conformance tests affected (top missing).
+
+### Steps
+1. **Find expression-statement handling** in `wasm/src/thin_checker.rs` and detect comma operator expressions.
+2. **Add TS2695 emission** when the left operand is side-effect free.
+3. **Add tests** in `wasm/src/thin_checker_tests.rs` for `a, b;` and `1, b;` (error) vs `a(), b;` (no error).
+4. **Run focused tests** with `./wasm/test.sh` and report delta.
 
 ## Current Assignment (Class `this`/Generic Constructor Typing)
 - [x] Use current class type parameters for instance `this` during member checking

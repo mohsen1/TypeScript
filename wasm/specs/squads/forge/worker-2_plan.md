@@ -7,26 +7,26 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-Reduce TS2339 false positives for **private names** and **mixin classes**, plus missing errors on `globalThis`.
+Reduce remaining TS2339 false positives (non-control-flow cases).
 
 **Error Code:** TS2339 - "Property 'X' does not exist on type 'Y'"
 
 **Impact:** 142 conformance tests affected
 
 ### Steps
-1. **Private names:** ensure `#prop` lookups on class types resolve correctly (static and instance).
-2. **Mixin classes:** fix property resolution for mixin-generated types (avoid TS2339 on valid props).
-3. **globalThis:** add missing property checks for `globalThis` access.
-4. **Add tests** in `wasm/src/thin_checker_tests.rs` and re-run focused TS2339 tests.
+1. **Run a scan**: `cd wasm/differential-test && node find-ts2339.mjs --max=1000 --samples=30`.
+2. **Pick top non-control-flow pattern** (e.g., enum/namespace merging or static/instance property access).
+3. **Implement the fix** in `thin_checker.rs`/`binder.rs` and add a focused regression test.
+4. **Run focused tests** with `./wasm/test.sh` and report delta.
 
 ### Key Files
 - `wasm/src/thin_checker.rs`
-- `wasm/src/solver/operations.rs`
+- `wasm/src/binder.rs`
 - `wasm/src/thin_checker_tests.rs`
 
 ### Success Criteria
-- TS2339 extra errors reduced in private name + mixin cases
-- Missing `globalThis` errors emitted correctly
+- TS2339 false positives reduced for the selected pattern
+- No new regressions in existing TS2339 tests
 
 ## Resume Notes
 - Branch: `worker/forge-2`.
