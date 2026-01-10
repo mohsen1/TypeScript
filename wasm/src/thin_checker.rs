@@ -3207,6 +3207,14 @@ impl<'a> ThinCheckerState<'a> {
                     }
                 }
                 let Some(base_class_idx) = base_class_idx else {
+                    if let Some(base_instance_type) = self.base_instance_type_from_expression(expr_idx) {
+                        self.merge_base_instance_properties(
+                            base_instance_type,
+                            &mut properties,
+                            &mut string_index,
+                            &mut number_index,
+                        );
+                    }
                     break;
                 };
                 let Some(base_node) = self.ctx.arena.get(base_class_idx) else {
@@ -3747,6 +3755,18 @@ impl<'a> ThinCheckerState<'a> {
                     }
                 }
                 let Some(base_class_idx) = base_class_idx else {
+                    if let Some(base_constructor_type) =
+                        self.base_constructor_type_from_expression(expr_idx)
+                    {
+                        if let Some(TypeKey::Callable(base_shape_id)) =
+                            self.ctx.types.lookup(base_constructor_type)
+                        {
+                            let base_shape = self.ctx.types.callable_shape(base_shape_id);
+                            for base_prop in base_shape.properties.iter() {
+                                properties.entry(base_prop.name).or_insert_with(|| base_prop.clone());
+                            }
+                        }
+                    }
                     break;
                 };
                 let Some(base_node) = self.ctx.arena.get(base_class_idx) else {
@@ -5038,6 +5058,7 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Get type of call expression.
     fn get_type_of_call_expression(&mut self, idx: NodeIndex) -> TypeId {
+        use crate::parser::node_flags;
         use crate::solver::{CallEvaluator, CallResult, CompatChecker, TypeKey};
 
         let Some(node) = self.ctx.arena.get(idx) else {
@@ -5049,11 +5070,24 @@ impl<'a> ThinCheckerState<'a> {
         };
 
         // Get the type of the callee
-        let callee_type = self.get_type_of_node(call.expression);
+        let mut callee_type = self.get_type_of_node(call.expression);
 
         // Check if callee is any/error (don't report for those)
         if callee_type == TypeId::ANY || callee_type == TypeId::ERROR {
             return TypeId::ANY;
+        }
+
+        let mut nullish_cause = None;
+        if (node.flags as u32) & node_flags::OPTIONAL_CHAIN != 0 {
+            let (non_nullish, cause) = self.split_nullish_type(callee_type);
+            nullish_cause = cause;
+            let Some(non_nullish) = non_nullish else {
+                return TypeId::UNDEFINED;
+            };
+            callee_type = non_nullish;
+            if callee_type == TypeId::ANY || callee_type == TypeId::ERROR {
+                return TypeId::ANY;
+            }
         }
 
         // Get arguments list (may be None for calls without arguments)
@@ -5074,7 +5108,13 @@ impl<'a> ThinCheckerState<'a> {
         // Overload candidates need signature-specific contextual typing.
         if let Some(signatures) = overload_signatures.as_deref() {
             if let Some(return_type) = self.resolve_overloaded_call_with_signatures(args, signatures) {
-                return self.apply_this_substitution_to_call_return(return_type, call.expression);
+                let return_type =
+                    self.apply_this_substitution_to_call_return(return_type, call.expression);
+                return if nullish_cause.is_some() {
+                    self.ctx.types.union(vec![return_type, TypeId::UNDEFINED])
+                } else {
+                    return_type
+                };
             }
         }
 
@@ -5095,7 +5135,13 @@ impl<'a> ThinCheckerState<'a> {
             CallResult::Success(return_type) => {
                 let return_type =
                     self.apply_this_substitution_to_call_return(return_type, call.expression);
-                self.refine_mixin_call_return_type(call.expression, &arg_types, return_type)
+                let return_type =
+                    self.refine_mixin_call_return_type(call.expression, &arg_types, return_type);
+                if nullish_cause.is_some() {
+                    self.ctx.types.union(vec![return_type, TypeId::UNDEFINED])
+                } else {
+                    return_type
+                }
             }
 
             CallResult::NotCallable { .. } => {
@@ -5924,6 +5970,11 @@ impl<'a> ThinCheckerState<'a> {
         let Some(name_node) = self.ctx.arena.get(access.name_or_argument) else {
             return TypeId::ANY;
         };
+        if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
+            if ident.escaped_text.is_empty() {
+                return TypeId::ANY;
+            }
+        }
 
         // Check for abstract property access in constructor BEFORE evaluating types (error 2715)
         // This must happen even when `this` has type ANY
@@ -10469,9 +10520,11 @@ impl<'a> ThinCheckerState<'a> {
             // Type alias declarations - check the type for accessor body and parameter property errors
             syntax_kind_ext::TYPE_ALIAS_DECLARATION => {
                 if let Some(type_alias) = self.ctx.arena.get_type_alias(node) {
+                    let (_params, updates) = self.push_type_parameters(&type_alias.type_parameters);
                     // Check the type for accessor bodies in ambient context and parameter properties
                     self.check_type_for_missing_names(type_alias.type_node);
                     self.check_type_for_parameter_properties(type_alias.type_node);
+                    self.pop_type_parameters(updates);
                 }
             }
             // Other type declarations - just register them, no expression checking needed
@@ -11237,6 +11290,11 @@ impl<'a> ThinCheckerState<'a> {
 
         if self.ctx.binder.declared_modules.contains(module_name) {
             return;
+        }
+        if let Some(ref resolved) = self.ctx.resolved_modules {
+            if resolved.contains(module_name) {
+                return;
+            }
         }
 
         // In single-file mode, any external import is considered unresolved.
@@ -13076,17 +13134,22 @@ impl<'a> ThinCheckerState<'a> {
             k if k == syntax_kind_ext::MAPPED_TYPE => {
                 if let Some(mapped) = self.ctx.arena.get_mapped_type(node) {
                     self.check_type_parameter_node_for_missing_names(mapped.type_parameter);
-                    let mut updates = Vec::new();
+                    let mut param_binding: Option<(String, Option<TypeId>)> = None;
                     if let Some(param_node) = self.ctx.arena.get(mapped.type_parameter) {
                         if let Some(param) = self.ctx.arena.get_type_parameter(param_node) {
                             if let Some(name_node) = self.ctx.arena.get(param.name) {
                                 if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
                                     let name = ident.escaped_text.clone();
-                                    let previous = self
-                                        .ctx
-                                        .type_parameter_scope
-                                        .insert(name.clone(), TypeId::UNKNOWN);
-                                    updates.push((name, previous));
+                                    let atom = self.ctx.types.intern_string(&name);
+                                    let type_id = self.ctx.types.intern(crate::solver::TypeKey::TypeParameter(
+                                        crate::solver::TypeParamInfo {
+                                            name: atom,
+                                            constraint: None,
+                                            default: None,
+                                        },
+                                    ));
+                                    let previous = self.ctx.type_parameter_scope.insert(name.clone(), type_id);
+                                    param_binding = Some((name, previous));
                                 }
                             }
                         }
@@ -13102,8 +13165,12 @@ impl<'a> ThinCheckerState<'a> {
                             self.check_type_member_for_missing_names(member_idx);
                         }
                     }
-                    if !updates.is_empty() {
-                        self.pop_type_parameters(updates);
+                    if let Some((name, previous)) = param_binding {
+                        if let Some(prev_type) = previous {
+                            self.ctx.type_parameter_scope.insert(name, prev_type);
+                        } else {
+                            self.ctx.type_parameter_scope.remove(&name);
+                        }
                     }
                 }
             }

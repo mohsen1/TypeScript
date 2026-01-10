@@ -30,23 +30,16 @@ Reduce remaining TS2339 false positives (non-control-flow cases).
 
 ## Resume Notes
 - Branch: `worker/forge-2`.
-- Latest commit: `[wasm] checker: narrow assignment flow types for TS2339`
-- Recent changes: Re-applied static index signature collection after squad/forge merge; narrowed flow types on direct assignments to use assigned expression types; added TS2339 test covering assignment-based narrowing on unions.
-- Last tests: `./wasm/test.sh ts2339_assignment_narrows_union_property_access`
+- Latest commit: `[wasm] checker: support optional call chaining`
+- Recent changes: Re-applied static index signature collection after squad/forge merge; narrowed flow types on direct assignments to use assigned expression types; added TS2339 test covering assignment-based narrowing on unions; tracked resolved module specifiers in multi-file CLI diagnostics to avoid TS2792 for in-program imports; marked optional call expressions and stripped nullish callee types for optional chaining calls.
+- Last tests: `./wasm/test.sh compile_optional_chaining_with_call` (pass)
 - **Latest TS2339 conformance scan results (1000 files):**
-  - Extra (false positives): 22 files (was 27)
-  - Main categories of false positives:
-    1. **Control flow narrowing** (11 files) - assertion predicates, const locals, various control flow tests
-    2. **Private names** (6 files) - `#prop` access on class types
-    3. **Mixin classes** (4 files) - Properties not found on mixin types
-    4. **Enum merging** (1 file) - enumMerging.ts
-- Conformance scan command: `cd wasm/differential-test && node find-ts2339.mjs --max=1000 --samples=30`
+  - Extra (false positives): 0 files (was 3)
+- Conformance scan command: `cd wasm/differential-test && node find-ts2339.mjs --max=1000 --samples=20`
 - Remember: do not touch `.role/AGENTS.md`.
 
 ## Task Queue
-- Investigate private name (#prop) handling - both extra and missing errors
-- Fix mixin class property resolution
-- Add globalThis property checking
+- None (1000-file TS2339 scan shows 0 extras; waiting on new assignment)
 
 ## Completed
 - Implemented property access on constrained type parameters in checker and solver.
@@ -71,15 +64,22 @@ Reduce remaining TS2339 false positives (non-control-flow cases).
 - Fixed mixin class inheritance to merge intersection base properties.
 - Allowed constructor callables to satisfy constructor function constraints.
 - Added TS2339 tests for mixins, globalThis property access, and private identifiers.
+- Conformance scan after mixin/private/globalThis fixes: 3 extra (from 1000 files).
+- Suppressed TS2339 for property access with missing identifiers from parse errors.
+- Allowed heritage parsing of parenthesized/new base expressions for extends.
+- Merged base instance/static properties when extends resolves to non-class symbol.
+- Conformance scan after heritage/parse fixes: 0 extra (from 1000 files).
+- Scoped type parameters for type-alias/mapped-type missing-name checks (fixes TS2304 in mapped types).
+- Resolved TS2792 import diagnostics in multi-file CLI mode by tracking resolved module specifiers.
+- Fixed optional call chaining to avoid TS2349 on `?.()` when the callee is optional.
 
 ## Ready for Merge
 No
 
 ## Notes
-- Full test run failing in `cli::driver_tests::compile_multi_file_project_with_imports`
-  and `cli::driver_tests::compile_multi_file_project_with_default_and_named_imports` (TS2792).
-- Run `./wasm/test.sh` before pushing
-- Last run: `./wasm/test.sh test_ts2339_mixin_class_property_access`
+- Full test run: failing in `cli::driver_tests::compile_object_spread` (TS2741).
+- Last run: `./wasm/test.sh compile_optional_chaining_with_call` (pass)
+- Last run: `cd wasm/differential-test && node find-ts2339.mjs --max=1000 --samples=20`
 - Commit format: `[wasm] checker: improve TS2339 property access diagnostics`
 - Push to: `origin/worker/forge-2`
 - **NEVER edit**: `STRUCTURE.md`, `GOALS.md`, other workers' plan files, or anything in `orchestrator/`
