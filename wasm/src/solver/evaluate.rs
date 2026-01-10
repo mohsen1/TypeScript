@@ -45,6 +45,7 @@ pub struct TypeEvaluator<'a, R: TypeResolver = NoopResolver> {
     no_unchecked_indexed_access: bool,
     cache: RefCell<FxHashMap<TypeId, TypeId>>,
     visiting: RefCell<FxHashSet<TypeId>>,
+    depth: RefCell<u32>,
 }
 
 struct MappedKeys {
@@ -158,6 +159,7 @@ impl<'a> TypeEvaluator<'a, NoopResolver> {
             no_unchecked_indexed_access: false,
             cache: RefCell::new(FxHashMap::default()),
             visiting: RefCell::new(FxHashSet::default()),
+            depth: RefCell::new(0),
         }
     }
 }
@@ -171,6 +173,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             no_unchecked_indexed_access: false,
             cache: RefCell::new(FxHashMap::default()),
             visiting: RefCell::new(FxHashSet::default()),
+            depth: RefCell::new(0),
         }
     }
 
@@ -225,20 +228,46 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             return cached;
         }
 
+        // Depth guard to prevent stack overflow from deeply recursive mapped types
+        const MAX_DEPTH: u32 = 50;
+        {
+            let mut depth = self.depth.borrow_mut();
+            *depth += 1;
+            if *depth > MAX_DEPTH {
+                *depth -= 1;
+                drop(depth);
+                // Return the type unevaluated to prevent deep recursion
+                self.cache.borrow_mut().insert(type_id, type_id);
+                return type_id;
+            }
+        }
+
         let key = match self.interner.lookup(type_id) {
             Some(k) => k,
-            None => return type_id,
+            None => {
+                *self.depth.borrow_mut() -= 1;
+                return type_id;
+            }
         };
 
         {
             let mut visiting = self.visiting.borrow_mut();
             if !visiting.insert(type_id) {
                 // Recursion guard for self-referential mapped/application types.
+                // Per TypeScript behavior, recursive mapped types evaluate to empty objects.
+                if matches!(key, TypeKey::Mapped(_)) {
+                    drop(visiting);
+                    *self.depth.borrow_mut() -= 1;
+                    let empty = self.interner.object(vec![]);
+                    self.cache.borrow_mut().insert(type_id, empty);
+                    return empty;
+                }
+                *self.depth.borrow_mut() -= 1;
                 return type_id;
             }
         }
 
-        match &key {
+        let result = match &key {
             TypeKey::Conditional(cond_id) => {
                 let cond = self.interner.conditional_type(*cond_id);
                 let result = self.evaluate_conditional(cond.as_ref());
@@ -298,7 +327,10 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                 self.cache.borrow_mut().insert(type_id, type_id);
                 type_id
             }
-        }
+        };
+
+        *self.depth.borrow_mut() -= 1;
+        result
     }
 
     /// Evaluate a generic type application: Base<Args>
