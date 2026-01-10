@@ -72,3 +72,4 @@ Yes
 - TS2564 literal property coverage: element access + string/numeric literal property names; `./wasm/test.sh ts2564` passing.
 - TS2792 module resolution: ambient module tracking + missing import tests; `./wasm/test.sh` fails at `cli::driver_tests::compile_generic_utility_library_type_utilities`.
 - Conformance tests: Docker runner has path issue (lib.d.ts not copied), skipped for now.
+- Fixed cli driver utility-type test by scoping mapped type parameters during missing-name checks; made DeepReadonly/DeepPartial non-recursive and stubbed Object; `./wasm/test.sh compile_generic_utility_library_type_utilities` passing.

@@ -12240,6 +12240,18 @@ impl<'a> ThinCheckerState<'a> {
             k if k == syntax_kind_ext::MAPPED_TYPE => {
                 if let Some(mapped) = self.ctx.arena.get_mapped_type(node) {
                     self.check_type_parameter_node_for_missing_names(mapped.type_parameter);
+                    let mut updates = Vec::new();
+                    if let Some(param_node) = self.ctx.arena.get(mapped.type_parameter) {
+                        if let Some(param) = self.ctx.arena.get_type_parameter(param_node) {
+                            if let Some(name_node) = self.ctx.arena.get(param.name) {
+                                if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
+                                    let name = ident.escaped_text.clone();
+                                    let previous = self.ctx.type_parameter_scope.insert(name.clone(), TypeId::ANY);
+                                    updates.push((name, previous));
+                                }
+                            }
+                        }
+                    }
                     if !mapped.name_type.is_none() {
                         self.check_type_for_missing_names(mapped.name_type);
                     }
@@ -12250,6 +12262,9 @@ impl<'a> ThinCheckerState<'a> {
                         for &member_idx in &members.nodes {
                             self.check_type_member_for_missing_names(member_idx);
                         }
+                    }
+                    if !updates.is_empty() {
+                        self.pop_type_parameters(updates);
                     }
                 }
             }
