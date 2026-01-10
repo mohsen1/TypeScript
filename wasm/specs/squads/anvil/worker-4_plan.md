@@ -185,4 +185,4 @@ Ready for Merge: Yes (current fix pushed; conformance still shows extra TS2769 i
 **After** (`find-ts2339.mjs --max=400 --samples=10`):
 - 0 extra TS2339 in first 400 files
 
-Ready for Merge: Yes
+Ready for Merge: No (merged)
