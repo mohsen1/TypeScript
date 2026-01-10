@@ -170,6 +170,7 @@ pub mod diagnostic_codes {
     // Scanner/Parser errors (1xxx)
     // =========================================================================
     pub const UNTERMINATED_STRING_LITERAL: u32 = 1002;
+    pub const UNTERMINATED_TEMPLATE_LITERAL: u32 = 1160;
     pub const IDENTIFIER_EXPECTED: u32 = 1003;
     pub const TOKEN_EXPECTED: u32 = 1005;  // '{0}' expected.
     pub const TRAILING_COMMA_NOT_ALLOWED: u32 = 1009;

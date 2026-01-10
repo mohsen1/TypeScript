@@ -355,6 +355,44 @@ fn test_thin_parser_unterminated_template_expression_no_crash() {
 }
 
 #[test]
+fn test_thin_parser_unterminated_template_literal_reports_ts1160() {
+    let source = "`";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    assert!(!root.is_none());
+    assert!(
+        parser.get_diagnostics().iter().any(|diag| diag.code == diagnostic_codes::UNTERMINATED_TEMPLATE_LITERAL),
+        "Expected unterminated template literal diagnostic, got: {:?}",
+        parser.get_diagnostics()
+    );
+}
+
+#[test]
+fn test_thin_parser_template_literal_property_name_no_ts1160() {
+    let source = "var x = { `abc${ 123 }def${ 456 }ghi`: 321 };";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    assert!(!root.is_none());
+    let diagnostics = parser.get_diagnostics();
+    assert!(
+        diagnostics
+            .iter()
+            .any(|diag| diag.code == diagnostic_codes::PROPERTY_ASSIGNMENT_EXPECTED),
+        "Expected property assignment expected diagnostic, got: {:?}",
+        diagnostics
+    );
+    assert!(
+        diagnostics
+            .iter()
+            .all(|diag| diag.code != diagnostic_codes::UNTERMINATED_TEMPLATE_LITERAL),
+        "Did not expect unterminated template literal diagnostic, got: {:?}",
+        diagnostics
+    );
+}
+
+#[test]
 fn test_thin_parser_call_expression() {
     let mut parser = ThinParserState::new(
         "test.ts".to_string(),
