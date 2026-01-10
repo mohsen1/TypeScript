@@ -193,7 +193,11 @@ impl<'a> ThinCheckerState<'a> {
                 continue;
             };
 
-            let Some(sym_id) = self.ctx.binder.get_node_symbol(param_idx) else {
+            let Some(sym_id) = self
+                .ctx
+                .binder
+                .get_node_symbol(param.name)
+                .or_else(|| self.ctx.binder.get_node_symbol(param_idx)) else {
                 continue;
             };
             self.push_symbol_dependency(sym_id, true);
@@ -6368,7 +6372,7 @@ impl<'a> ThinCheckerState<'a> {
     /// Get type of object literal.
     fn get_type_of_object_literal(&mut self, idx: NodeIndex) -> TypeId {
         use crate::solver::{PropertyInfo, QueryDatabase};
-        use std::sync::Arc;
+        use rustc_hash::FxHashMap;
 
         let Some(node) = self.ctx.arena.get(idx) else {
             return TypeId::ANY;
@@ -6378,8 +6382,8 @@ impl<'a> ThinCheckerState<'a> {
             return TypeId::ANY;
         };
 
-        // Collect properties from the object literal
-        let mut properties: Vec<PropertyInfo> = Vec::new();
+        // Collect properties from the object literal (later entries override earlier ones)
+        let mut properties: FxHashMap<Atom, PropertyInfo> = FxHashMap::default();
 
         for &elem_idx in &obj.elements.nodes {
             let Some(elem_node) = self.ctx.arena.get(elem_idx) else {
@@ -6400,8 +6404,9 @@ impl<'a> ThinCheckerState<'a> {
                     // Restore context
                     self.ctx.contextual_type = prev_context;
 
-                    properties.push(PropertyInfo {
-                        name: self.ctx.types.intern_string(&name),
+                    let name_atom = self.ctx.types.intern_string(&name);
+                    properties.insert(name_atom, PropertyInfo {
+                        name: name_atom,
                         type_id: value_type,
                         write_type: value_type,
                         optional: false,
@@ -6414,8 +6419,9 @@ impl<'a> ThinCheckerState<'a> {
             else if elem_node.kind == syntax_kind_ext::SHORTHAND_PROPERTY_ASSIGNMENT {
                 if let Some(ident) = self.ctx.arena.get_identifier(elem_node) {
                     let value_type = self.get_type_of_node(elem_idx);
-                    properties.push(PropertyInfo {
-                        name: self.ctx.types.intern_string(&ident.escaped_text),
+                    let name_atom = self.ctx.types.intern_string(&ident.escaped_text);
+                    properties.insert(name_atom, PropertyInfo {
+                        name: name_atom,
                         type_id: value_type,
                         write_type: value_type,
                         optional: false,
@@ -6438,8 +6444,9 @@ impl<'a> ThinCheckerState<'a> {
                     // Restore context
                     self.ctx.contextual_type = prev_context;
 
-                    properties.push(PropertyInfo {
-                        name: self.ctx.types.intern_string(&name),
+                    let name_atom = self.ctx.types.intern_string(&name);
+                    properties.insert(name_atom, PropertyInfo {
+                        name: name_atom,
                         type_id: method_type,
                         write_type: method_type,
                         optional: false,
@@ -6469,8 +6476,9 @@ impl<'a> ThinCheckerState<'a> {
                     } else {
                         TypeId::VOID
                     };
-                    properties.push(PropertyInfo {
-                        name: self.ctx.types.intern_string(&name),
+                    let name_atom = self.ctx.types.intern_string(&name);
+                    properties.insert(name_atom, PropertyInfo {
+                        name: name_atom,
                         type_id: accessor_type,
                         write_type: accessor_type,
                         optional: false,
@@ -6479,10 +6487,56 @@ impl<'a> ThinCheckerState<'a> {
                     });
                 }
             }
-            // Skip spread elements and computed properties for now
+            // Spread assignment: { ...obj }
+            else if elem_node.kind == syntax_kind_ext::SPREAD_ELEMENT
+                || elem_node.kind == syntax_kind_ext::SPREAD_ASSIGNMENT
+            {
+                let spread_expr = self
+                    .ctx
+                    .arena
+                    .get_spread(elem_node)
+                    .map(|spread| spread.expression)
+                    .or_else(|| self.ctx.arena.get_unary_expr_ex(elem_node).map(|unary| unary.expression));
+                if let Some(spread_expr) = spread_expr {
+                    let spread_type = self.get_type_of_node(spread_expr);
+                    for prop in self.collect_object_spread_properties(spread_type) {
+                        properties.insert(prop.name, prop);
+                    }
+                }
+            }
+            // Skip computed properties for now
         }
 
+        let properties: Vec<PropertyInfo> = properties.into_values().collect();
         self.ctx.types.object(properties)
+    }
+
+    fn collect_object_spread_properties(&mut self, type_id: TypeId) -> Vec<crate::solver::PropertyInfo> {
+        use crate::solver::TypeKey;
+        use rustc_hash::FxHashMap;
+
+        let resolved = self.resolve_type_for_property_access(type_id);
+        match self.ctx.types.lookup(resolved) {
+            Some(TypeKey::Object(shape_id)) | Some(TypeKey::ObjectWithIndex(shape_id)) => {
+                let shape = self.ctx.types.object_shape(shape_id);
+                shape.properties.iter().cloned().collect()
+            }
+            Some(TypeKey::Callable(shape_id)) => {
+                let shape = self.ctx.types.callable_shape(shape_id);
+                shape.properties.iter().cloned().collect()
+            }
+            Some(TypeKey::Intersection(list_id)) => {
+                let members = self.ctx.types.type_list(list_id);
+                let mut merged: FxHashMap<Atom, crate::solver::PropertyInfo> = FxHashMap::default();
+                for &member in members.iter() {
+                    for prop in self.collect_object_spread_properties(member) {
+                        merged.insert(prop.name, prop);
+                    }
+                }
+                merged.into_values().collect()
+            }
+            _ => Vec::new(),
+        }
     }
 
     /// Get property name as string from a property name node (identifier, string literal, etc.)

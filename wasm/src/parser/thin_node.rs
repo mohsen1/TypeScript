@@ -1445,12 +1445,15 @@ impl ThinNodeArena {
 
     /// Add an object/array literal expression node
     pub fn add_literal_expr(&mut self, kind: u16, pos: u32, end: u32, data: LiteralExprData) -> NodeIndex {
+        let elements = data.elements.clone();
         let data_index = self.literal_exprs.len() as u32;
         self.literal_exprs.push(data);
         let index = self.nodes.len() as u32;
         self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
-        NodeIndex(index)
+        let parent = NodeIndex(index);
+        self.set_parent_list(&elements, parent);
+        parent
     }
 
     /// Add a parenthesized expression node
@@ -1468,12 +1471,15 @@ impl ThinNodeArena {
 
     /// Add a spread/await/yield expression node
     pub fn add_unary_expr_ex(&mut self, kind: u16, pos: u32, end: u32, data: UnaryExprDataEx) -> NodeIndex {
+        let expression = data.expression;
         let data_index = self.unary_exprs_ex.len() as u32;
         self.unary_exprs_ex.push(data);
         let index = self.nodes.len() as u32;
         self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
-        NodeIndex(index)
+        let parent = NodeIndex(index);
+        self.set_parent(expression, parent);
+        parent
     }
 
     /// Add a type assertion expression node
