@@ -1206,6 +1206,17 @@ impl<'a> ThinCheckerState<'a> {
             return Some(combined);
         }
 
+        // Handle keyword literals in heritage clauses (e.g., extends null, extends true)
+        match node.kind {
+            k if k == SyntaxKind::NullKeyword as u16 => return Some("null".to_string()),
+            k if k == SyntaxKind::TrueKeyword as u16 => return Some("true".to_string()),
+            k if k == SyntaxKind::FalseKeyword as u16 => return Some("false".to_string()),
+            k if k == SyntaxKind::UndefinedKeyword as u16 => return Some("undefined".to_string()),
+            k if k == SyntaxKind::NumericLiteral as u16 => return Some("0".to_string()),
+            k if k == SyntaxKind::StringLiteral as u16 => return Some("0".to_string()),
+            _ => {}
+        }
+
         None
     }
 
