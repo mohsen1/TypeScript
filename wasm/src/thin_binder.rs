@@ -1903,6 +1903,7 @@ impl ThinBinderState {
 
             // Enter function scope and bind body
             self.enter_scope(ContainerKind::Function, idx);
+            self.declare_arguments_symbol();
 
             self.with_fresh_flow(|binder| {
                 // Bind parameters
@@ -1969,6 +1970,7 @@ impl ThinBinderState {
             self.bind_modifiers(arena, &func.modifiers);
             // Enter function scope
             self.enter_scope(ContainerKind::Function, idx);
+            self.declare_arguments_symbol();
 
             self.with_fresh_flow(|binder| {
                 // Bind parameters
@@ -1992,6 +1994,7 @@ impl ThinBinderState {
         idx: NodeIndex,
     ) {
         self.enter_scope(ContainerKind::Function, idx);
+        self.declare_arguments_symbol();
 
         self.with_fresh_flow(|binder| {
             for &param_idx in &parameters.nodes {
@@ -2012,6 +2015,15 @@ impl ThinBinderState {
                 self.bind_node(arena, modifier_idx);
             }
         }
+    }
+
+    fn declare_arguments_symbol(&mut self) {
+        self.declare_symbol(
+            "arguments",
+            symbol_flags::FUNCTION_SCOPED_VARIABLE,
+            NodeIndex::NONE,
+            false,
+        );
     }
 
     fn bind_class_declaration(&mut self, arena: &ThinNodeArena, node: &ThinNode, idx: NodeIndex) {
@@ -2071,6 +2083,11 @@ impl ThinBinderState {
                 k if k == syntax_kind_ext::METHOD_DECLARATION => {
                     if let Some(method) = arena.get_method_decl(node) {
                         self.bind_modifiers(arena, &method.modifiers);
+                        if let Some(name_node) = arena.get(method.name) {
+                            if name_node.kind == syntax_kind_ext::COMPUTED_PROPERTY_NAME {
+                                self.bind_node(arena, method.name);
+                            }
+                        }
                         if let Some(name) = self.get_identifier_name(arena, method.name) {
                             let mut flags = symbol_flags::METHOD;
                             if self.has_abstract_modifier(arena, &method.modifiers) {
@@ -2088,6 +2105,11 @@ impl ThinBinderState {
                 k if k == syntax_kind_ext::PROPERTY_DECLARATION => {
                     if let Some(prop) = arena.get_property_decl(node) {
                         self.bind_modifiers(arena, &prop.modifiers);
+                        if let Some(name_node) = arena.get(prop.name) {
+                            if name_node.kind == syntax_kind_ext::COMPUTED_PROPERTY_NAME {
+                                self.bind_node(arena, prop.name);
+                            }
+                        }
                         if let Some(name) = self.get_identifier_name(arena, prop.name) {
                             let mut flags = symbol_flags::PROPERTY;
                             if self.has_abstract_modifier(arena, &prop.modifiers) {
@@ -2108,6 +2130,11 @@ impl ThinBinderState {
                 k if k == syntax_kind_ext::GET_ACCESSOR || k == syntax_kind_ext::SET_ACCESSOR => {
                     if let Some(accessor) = arena.get_accessor(node) {
                         self.bind_modifiers(arena, &accessor.modifiers);
+                        if let Some(name_node) = arena.get(accessor.name) {
+                            if name_node.kind == syntax_kind_ext::COMPUTED_PROPERTY_NAME {
+                                self.bind_node(arena, accessor.name);
+                            }
+                        }
                         if let Some(name) = self.get_identifier_name(arena, accessor.name) {
                             let mut flags = if node.kind == syntax_kind_ext::GET_ACCESSOR {
                                 symbol_flags::GET_ACCESSOR

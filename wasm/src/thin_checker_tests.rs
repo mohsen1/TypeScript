@@ -170,6 +170,96 @@ let bad: object = "hi";
 }
 
 #[test]
+fn test_shorthand_property_resolves_parameter() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+const mk = (e: number) => ({ e });
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let not_found_count = codes.iter().filter(|&&code| code == 2304).count();
+    assert_eq!(
+        not_found_count,
+        0,
+        "Expected no 2304 errors for shorthand params, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_ambient_module_export_default_resolves_local() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+declare module "*!text" {
+    const x: string;
+    export default x;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let not_found_count = codes.iter().filter(|&&code| code == 2304).count();
+    assert_eq!(
+        not_found_count,
+        0,
+        "Expected no 2304 errors for ambient export default, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_await_type_reference_does_not_emit_ts2304() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+var v: await;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let not_found_count = codes.iter().filter(|&&code| code == 2304).count();
+    assert_eq!(
+        not_found_count,
+        0,
+        "Expected no 2304 errors for await type reference, got: {:?}",
+        codes
+    );
+}
+
+#[test]
 fn test_property_initializer_contextual_literal_type() {
     use crate::thin_parser::ThinParserState;
 
@@ -1674,6 +1764,95 @@ obj.missing;
     assert!(
         !codes.contains(&2304),
         "Unexpected TS2304 for missing property access, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_arguments_in_async_arrow_no_2304() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+function f() {
+    return async () => arguments.length;
+}
+
+class C {
+    method() {
+        var fn = async () => arguments[0];
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2304),
+        "Unexpected TS2304 for 'arguments' in async arrow, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_signature_type_params_no_2304() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+interface BaseConstructor {
+    new <T>(x: T): { value: T };
+    new <T, U>(x: T, y: U): { x: T, y: U };
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2304),
+        "Unexpected TS2304 for signature type params, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_extends_undefined_no_2304() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class C extends undefined {}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2304),
+        "Unexpected TS2304 for extends undefined, got: {:?}",
         codes
     );
 }
@@ -13343,6 +13522,12 @@ declare const readonly: Readonly<{x: number}>;
 declare const record: Record<string, number>;
 declare const iterator: Iterator<number>;
 declare const iterable: Iterable<string>;
+declare const element: Element;
+declare const htmlElement: HTMLElement;
+declare const doc: Document;
+declare const win: Window;
+declare const event: Event;
+declare const nodes: NodeList;
 
 // Type alias with builtin generic
 type MyPromise<T> = Promise<T>;
@@ -13380,6 +13565,67 @@ interface MyError extends Error {
         ts2304_errors.is_empty(),
         "Should not emit TS2304 errors for builtin types, got: {:?}",
         ts2304_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn test_mapped_type_param_no_ts2304() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type Types = "boolean" | "string";
+type Properties<T extends { [key: string]: Types }> = {
+    readonly [key in keyof T]: T[key] extends "boolean" ? boolean : string
+};
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2304),
+        "Unexpected TS2304 for mapped type parameter, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_accessor_modifier_declaration_no_ts2304() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+interface I1 {
+    accessor a: number;
+}
+
+accessor class C3 {}
+accessor var V1: any;
+accessor export default V1;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2304),
+        "Unexpected TS2304 for accessor modifier recovery, got: {:?}",
+        codes
     );
 }
 

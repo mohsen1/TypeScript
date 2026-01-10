@@ -624,6 +624,27 @@ impl ThinParserState {
                 // Look ahead to see if it's "async function"
                 if self.look_ahead_is_async_function() {
                     self.parse_async_function_declaration()
+                } else if self.look_ahead_is_async_declaration() {
+                    use crate::checker::types::diagnostics::diagnostic_codes;
+                    self.parse_error_at_current_token(
+                        "Modifiers cannot appear here.",
+                        diagnostic_codes::MODIFIERS_NOT_ALLOWED_HERE,
+                    );
+                    // Consume 'async' and parse the declaration for recovery.
+                    self.next_token();
+                    match self.token() {
+                        SyntaxKind::ClassKeyword => self.parse_class_declaration(),
+                        SyntaxKind::InterfaceKeyword => self.parse_interface_declaration(),
+                        SyntaxKind::EnumKeyword => self.parse_enum_declaration(),
+                        SyntaxKind::NamespaceKeyword | SyntaxKind::ModuleKeyword => {
+                            if self.look_ahead_is_module_declaration() {
+                                self.parse_module_declaration()
+                            } else {
+                                self.parse_expression_statement()
+                            }
+                        }
+                        _ => self.parse_expression_statement(),
+                    }
                 } else {
                     // It's an async arrow function as expression statement
                     self.parse_expression_statement()
@@ -638,9 +659,46 @@ impl ThinParserState {
                 // abstract class declaration
                 if self.look_ahead_is_abstract_class() {
                     self.parse_abstract_class_declaration()
+                } else if self.look_ahead_is_abstract_declaration() {
+                    use crate::checker::types::diagnostics::diagnostic_codes;
+                    self.parse_error_at_current_token(
+                        "Modifiers cannot appear here.",
+                        diagnostic_codes::MODIFIERS_NOT_ALLOWED_HERE,
+                    );
+                    self.next_token();
+                    match self.token() {
+                        SyntaxKind::InterfaceKeyword => self.parse_interface_declaration(),
+                        SyntaxKind::EnumKeyword => self.parse_enum_declaration(),
+                        SyntaxKind::NamespaceKeyword | SyntaxKind::ModuleKeyword => {
+                            if self.look_ahead_is_module_declaration() {
+                                self.parse_module_declaration()
+                            } else {
+                                self.parse_expression_statement()
+                            }
+                        }
+                        _ => self.parse_expression_statement(),
+                    }
                 } else {
                     self.parse_expression_statement()
                 }
+            }
+            SyntaxKind::AccessorKeyword => {
+                if self.look_ahead_is_accessor_declaration() {
+                    use crate::checker::types::diagnostics::diagnostic_codes;
+                    self.parse_error_at_current_token(
+                        "Modifiers cannot appear here.",
+                        diagnostic_codes::MODIFIERS_NOT_ALLOWED_HERE,
+                    );
+                    self.next_token();
+                    self.parse_statement()
+                } else {
+                    self.parse_expression_statement()
+                }
+            }
+            SyntaxKind::DefaultKeyword => {
+                self.error_unexpected_token();
+                self.next_token();
+                self.parse_statement()
             }
             SyntaxKind::InterfaceKeyword => self.parse_interface_declaration(),
             SyntaxKind::TypeKeyword => {
@@ -710,6 +768,27 @@ impl ThinParserState {
         is_function
     }
 
+    /// Look ahead to see if "async" is followed by a declaration keyword.
+    fn look_ahead_is_async_declaration(&mut self) -> bool {
+        let snapshot = self.scanner.save_state();
+        let current = self.current_token;
+
+        // Skip 'async'
+        self.next_token();
+        let is_decl = matches!(
+            self.token(),
+            SyntaxKind::ClassKeyword
+                | SyntaxKind::InterfaceKeyword
+                | SyntaxKind::EnumKeyword
+                | SyntaxKind::NamespaceKeyword
+                | SyntaxKind::ModuleKeyword
+        );
+
+        self.scanner.restore_state(snapshot);
+        self.current_token = current;
+        is_decl
+    }
+
     /// Look ahead to see if we have "abstract class"
     fn look_ahead_is_abstract_class(&mut self) -> bool {
         let snapshot = self.scanner.save_state();
@@ -722,6 +801,53 @@ impl ThinParserState {
         self.scanner.restore_state(snapshot);
         self.current_token = current;
         is_class
+    }
+
+    /// Look ahead to see if "abstract" is followed by another declaration keyword.
+    fn look_ahead_is_abstract_declaration(&mut self) -> bool {
+        let snapshot = self.scanner.save_state();
+        let current = self.current_token;
+
+        self.next_token(); // skip 'abstract'
+        let is_decl = matches!(
+            self.token(),
+            SyntaxKind::InterfaceKeyword
+                | SyntaxKind::EnumKeyword
+                | SyntaxKind::NamespaceKeyword
+                | SyntaxKind::ModuleKeyword
+        );
+
+        self.scanner.restore_state(snapshot);
+        self.current_token = current;
+        is_decl
+    }
+
+    /// Look ahead to see if "accessor" is followed by a declaration keyword.
+    fn look_ahead_is_accessor_declaration(&mut self) -> bool {
+        let snapshot = self.scanner.save_state();
+        let current = self.current_token;
+
+        self.next_token(); // skip 'accessor'
+        let is_decl = matches!(
+            self.token(),
+            SyntaxKind::ClassKeyword
+                | SyntaxKind::InterfaceKeyword
+                | SyntaxKind::EnumKeyword
+                | SyntaxKind::NamespaceKeyword
+                | SyntaxKind::ModuleKeyword
+                | SyntaxKind::DeclareKeyword
+                | SyntaxKind::VarKeyword
+                | SyntaxKind::LetKeyword
+                | SyntaxKind::ConstKeyword
+                | SyntaxKind::TypeKeyword
+                | SyntaxKind::FunctionKeyword
+                | SyntaxKind::ImportKeyword
+                | SyntaxKind::ExportKeyword
+        );
+
+        self.scanner.restore_state(snapshot);
+        self.current_token = current;
+        is_decl
     }
 
     /// Look ahead to see if we have "import identifier ="
@@ -1852,10 +1978,12 @@ impl ThinParserState {
         let mut expr = if self.is_token(SyntaxKind::ClassKeyword) {
             // Inline class expression in extends clause: class extends class Expr {} {...}
             self.parse_class_expression()
+        } else if self.is_token(SyntaxKind::ThisKeyword) {
+            self.parse_this_expression()
         } else if self.is_identifier_or_keyword() {
             self.parse_identifier_name()
         } else {
-            self.parse_identifier()
+            self.parse_primary_expression()
         };
 
         // Handle property access chain and call expressions: Foo.Bar.Baz or Mixin(Parent)
@@ -2409,11 +2537,7 @@ impl ThinParserState {
         self.next_token();
 
         // Check for property name (identifier, private identifier, string, number, or computed)
-        let has_name = self.is_token(SyntaxKind::Identifier) ||
-                       self.is_token(SyntaxKind::PrivateIdentifier) ||
-                       self.is_token(SyntaxKind::StringLiteral) ||
-                       self.is_token(SyntaxKind::NumericLiteral) ||
-                       self.is_token(SyntaxKind::OpenBracketToken);
+        let has_name = self.is_property_name();
 
         self.scanner.restore_state(snapshot);
         self.current_token = current;
@@ -2653,6 +2777,25 @@ impl ThinParserState {
     /// Parse a single type member (property signature, method signature, call signature, construct signature)
     fn parse_type_member(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
+
+        // Handle invalid access modifiers (private/protected/public) on type members.
+        if matches!(
+            self.token(),
+            SyntaxKind::PrivateKeyword
+                | SyntaxKind::ProtectedKeyword
+                | SyntaxKind::PublicKeyword
+                | SyntaxKind::AccessorKeyword
+        ) {
+            use crate::checker::types::diagnostics::diagnostic_codes;
+            self.parse_error_at_current_token(
+                "Modifiers cannot appear here.",
+                diagnostic_codes::MODIFIERS_NOT_ALLOWED_HERE,
+            );
+            self.next_token();
+            if self.is_token(SyntaxKind::OpenBracketToken) && self.look_ahead_is_index_signature() {
+                return self.parse_index_signature_with_modifiers(None, start_pos);
+            }
+        }
 
         // Handle generic call signature: <T>(): returnType
         if self.is_token(SyntaxKind::LessThanToken) {
@@ -3079,8 +3222,10 @@ impl ThinParserState {
             // Enum member names can be identifiers or string literals
             let name = if self.is_token(SyntaxKind::StringLiteral) {
                 self.parse_string_literal()
+            } else if self.is_token(SyntaxKind::PrivateIdentifier) {
+                self.parse_private_identifier()
             } else {
-                self.parse_identifier()
+                self.parse_identifier_name()
             };
 
             let initializer = if self.parse_optional(SyntaxKind::EqualsToken) {
@@ -3608,6 +3753,7 @@ impl ThinParserState {
         let expression = match self.token() {
             SyntaxKind::FunctionKeyword => self.parse_function_declaration(),
             SyntaxKind::ClassKeyword => self.parse_class_declaration(),
+            SyntaxKind::AbstractKeyword => self.parse_abstract_class_declaration(),
             _ => {
                 let expr = self.parse_assignment_expression();
                 self.parse_semicolon();
@@ -5318,6 +5464,7 @@ impl ThinParserState {
     fn parse_primary_expression(&mut self) -> NodeIndex {
         match self.token() {
             SyntaxKind::Identifier => self.parse_identifier(),
+            SyntaxKind::PrivateIdentifier => self.parse_private_identifier(),
             SyntaxKind::NumericLiteral => self.parse_numeric_literal(),
             SyntaxKind::BigIntLiteral => self.parse_bigint_literal(),
             SyntaxKind::StringLiteral => self.parse_string_literal(),
@@ -5977,7 +6124,9 @@ impl ThinParserState {
         let mut properties = Vec::new();
         while !self.is_token(SyntaxKind::CloseBraceToken) {
             let prop = self.parse_property_assignment();
-            properties.push(prop);
+            if !prop.is_none() {
+                properties.push(prop);
+            }
 
             if !self.parse_optional(SyntaxKind::CommaToken) {
                 break;
@@ -6016,6 +6165,23 @@ impl ThinParserState {
                     asterisk_token: false,
                 },
             );
+        }
+
+        // Handle invalid modifiers before index signatures in object literals.
+        if matches!(
+            self.token(),
+            SyntaxKind::PrivateKeyword | SyntaxKind::ProtectedKeyword | SyntaxKind::PublicKeyword
+        ) {
+            use crate::checker::types::diagnostics::diagnostic_codes;
+            self.parse_error_at_current_token(
+                "Modifiers cannot appear here.",
+                diagnostic_codes::MODIFIERS_NOT_ALLOWED_HERE,
+            );
+            self.next_token();
+            if self.is_token(SyntaxKind::OpenBracketToken) && self.look_ahead_is_index_signature() {
+                let _ = self.parse_index_signature_with_modifiers(None, start_pos);
+                return NodeIndex::NONE;
+            }
         }
 
         // Handle get accessor: get foo() { }
@@ -6770,6 +6936,7 @@ impl ThinParserState {
                 // Parse keyword as identifier for type reference
                 self.parse_keyword_as_identifier()
             }
+            SyntaxKind::PrivateIdentifier => self.parse_private_identifier(),
             _ => {
                 // Regular identifier
                 self.parse_identifier()
