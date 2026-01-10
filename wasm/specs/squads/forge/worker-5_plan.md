@@ -6,6 +6,24 @@ Execute tasks assigned by EM-Forge for the Forge squad (type system).
 Status: Active
 Priority: 5
 
+## Current Assignment (TS7010 - Implicit Any Return)
+- [x] Consulted Gemini to confirm TS7010 = implicit any return (not TS2366)
+- [x] Built WASM package (`./wasm/build-wasm.sh`)
+- [x] Ran conformance baseline (`bash run-conformance.sh --all --workers=10`)
+
+### Baseline (workers=10 due to 10 CPU limit)
+- Exact Match: 1289 (26.2%)
+- Same Error Count: 1464 (29.7%)
+- Missing Errors: 2872 (58.3%)
+- Extra Errors: 1910 (38.8%)
+- Crashed: 143
+- Missing TS7010: 151 occurrences
+- Extra TS7010: 292 occurrences
+
+### Notes
+- Initial conformance run failed due to missing `wasm/pkg`; rebuilt via `./wasm/build-wasm.sh`.
+- Docker run with `--workers=14` failed (CPU limit); reran with `--workers=10`.
+
 ## Current Assignment (Class `this`/Generic Constructor Typing)
 - [x] Use current class type parameters for instance `this` during member checking
 - [x] Run `./wasm/test.sh compile_class_with_generic_constructor`
