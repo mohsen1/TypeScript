@@ -185,3 +185,4 @@ Yes
 - Conformance before (max=500, process-pool): exact 88/487 (18.1%), same 104 (21.4%), missing 309, extra 255, missing TS2322 19, crashed 3, duration 11.9s, throughput 41.9 tests/sec.
 - Conformance after (max=500, process-pool): exact 86/487 (17.7%), same 103 (21.1%), missing 311, extra 255, missing TS2322 21, crashed 3, duration 42.6s, throughput 11.7 tests/sec (perf variance likely cache/noise).
 - TS2322 scan tool: `wasm/differential-test/find-ts2322.mjs` (exits immediately to avoid wasm finalizer crash).
+- TS2304 samples (post-fix, find-ts2304 --max=2000 --samples=5): tests/cases/conformance/async/es5/asyncInterface_es5.ts (async keyword), tests/cases/conformance/async/es5/asyncModule_es5.ts (async keyword), tests/cases/conformance/async/es6/asyncArrowFunction/asyncArrowFunctionCapturesArguments_es6.ts (arguments), tests/cases/conformance/async/es6/asyncInterface_es6.ts (async keyword), tests/cases/conformance/async/es6/asyncModule_es6.ts (async keyword).
