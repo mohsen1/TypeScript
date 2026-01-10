@@ -302,4 +302,4 @@ Ready for Merge: No (merged)
 - Conformance: `node wasm/differential-test/conformance-runner.mjs es6/templates --max=200 -v` (extra TS1160 removed; extra errors down to 13).
 - Test: `./wasm/test.sh test_thin_parser_template_literal_property_name_no_ts1160`.
 
-Ready for Merge: Yes (2026-01-10)
+Ready for Merge: No (merged 2026-01-10)
