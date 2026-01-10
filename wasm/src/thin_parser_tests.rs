@@ -198,6 +198,57 @@ fn test_thin_parser_array_binding_pattern_span() {
 }
 
 #[test]
+fn test_thin_parser_static_keyword_member_name() {
+    let source = "declare class C { static static(p): number; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    parser.parse_source_file();
+
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Unexpected diagnostics: {:?}",
+        parser.get_diagnostics()
+    );
+}
+
+#[test]
+fn test_thin_parser_async_function_expression_keyword_name() {
+    let source = "var v = async function await(): Promise<void> { }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    parser.parse_source_file();
+
+    let codes: Vec<u32> = parser.get_diagnostics().iter().map(|diag| diag.code).collect();
+    assert!(
+        !codes.contains(&diagnostic_codes::TOKEN_EXPECTED),
+        "Unexpected TS1005 diagnostics: {:?}",
+        parser.get_diagnostics()
+    );
+    assert!(
+        !codes.contains(&diagnostic_codes::EXPRESSION_EXPECTED),
+        "Unexpected TS1109 diagnostics: {:?}",
+        parser.get_diagnostics()
+    );
+}
+
+#[test]
+fn test_thin_parser_static_block_with_modifiers() {
+    let source = "class C { async static { } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    parser.parse_source_file();
+
+    let codes: Vec<u32> = parser.get_diagnostics().iter().map(|diag| diag.code).collect();
+    assert!(
+        !codes.contains(&diagnostic_codes::DECLARATION_OR_STATEMENT_EXPECTED),
+        "Unexpected TS1128 diagnostics: {:?}",
+        parser.get_diagnostics()
+    );
+    assert!(
+        codes.contains(&diagnostic_codes::MODIFIERS_NOT_ALLOWED_HERE),
+        "Expected TS1184 diagnostics: {:?}",
+        parser.get_diagnostics()
+    );
+}
+
+#[test]
 fn test_thin_parser_object_binding_pattern_span() {
     let source = "const { foo } = bar;";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
