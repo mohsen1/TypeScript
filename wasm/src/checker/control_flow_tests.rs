@@ -659,6 +659,35 @@ class Foo {
 }
 
 #[test]
+fn test_const_alias_condition_narrows() {
+    let source = r#"
+let x: string | number;
+const isString = typeof x === "string";
+if (isString) {
+  x;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let arena = parser.get_arena();
+    let types = TypeInterner::new();
+    let analyzer = FlowAnalyzer::new(arena, &binder, &types);
+
+    let ident_then = get_if_branch_expression(arena, root, 2, true);
+
+    let union = types.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    let flow_then = binder.get_node_flow(ident_then).expect("flow then");
+    let narrowed_then = analyzer.get_flow_type(ident_then, union, flow_then);
+    assert_eq!(narrowed_then, TypeId::STRING);
+}
+
+#[test]
 fn test_assignment_narrows_to_rhs_literal_without_cache() {
     let source = r#"
 let x: string | number;

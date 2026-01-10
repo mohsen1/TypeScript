@@ -83,7 +83,7 @@ This requires control flow analysis to track variable state through branches.
 - No false positives for properly assigned variables
 
 ## Task Queue
-- [ ] Investigate const-aliased condition narrowing in FlowAnalyzer to preserve TS2339 property access guards
+- [ ] Investigate assertion type predicate narrowing for remaining TS2339 false positive
 
 ## Completed
 - [x] TS2454 error code and message added to diagnostics
@@ -125,6 +125,7 @@ This requires control flow analysis to track variable state through branches.
 - [x] Assignment narrowing falls back to RHS literal/nullish types without node cache; updated flow tests
 - [x] Match `this`/`super` reference bases in control flow for property assignment narrowing; added test
 - [x] Loop label flow unions entry/back-edge types; added regression test
+- [x] Const-aliased condition narrowing uses initializer for flow analysis; added test
 
 ### Remaining TS2339 False Positives (pending re-run)
 - Mixin classes: mixin type inference issues (intersection handling added in new expressions, unit tests pass, conformance tests need more investigation)
@@ -133,7 +134,7 @@ This requires control flow analysis to track variable state through branches.
 - Re-run conformance to confirm private names/control-flow narrowing improvements
 
 ## Ready for Merge
-No (merged)
+Yes
 
 ## Notes
 - Similar infrastructure to TS2564 (property init) - share patterns with Workers 1-2
