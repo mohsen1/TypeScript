@@ -14483,3 +14483,48 @@ fn test_variadic_tuple_rest_param_no_ts2769() {
         ts2769_errors
     );
 }
+
+#[test]
+fn test_recursive_mapped_types_no_crash() {
+    use crate::thin_parser::ThinParserState;
+
+    // Regression test for recursive mapped type stack overflow
+    // Tests that simple recursive mapped types don't cause infinite loops or crashes
+    let code = r#"
+// Direct recursion
+type Recurse = {
+    [K in keyof Recurse]: Recurse[K]
+}
+
+// Mutual recursion
+type Recurse1 = {
+    [K in keyof Recurse2]: Recurse2[K]
+}
+
+type Recurse2 = {
+    [K in keyof Recurse1]: Recurse1[K]
+}
+
+// Generic recursive mapped type
+type Circular<T> = {[P in keyof T]: Circular<T>};
+type tup = [number, number];
+
+declare var x: Circular<tup>;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+
+    // Should complete without crashing or hanging
+    checker.check_source_file(root);
+
+    // May have errors, but should not crash
+    // The recursion guard should prevent infinite loops
+    assert!(checker.ctx.diagnostics.len() >= 0, "Checker should complete");
+}
