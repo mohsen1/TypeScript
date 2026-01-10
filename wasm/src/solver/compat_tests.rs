@@ -715,6 +715,39 @@ fn test_construct_signature_void_return_assignability() {
 }
 
 #[test]
+fn test_call_signature_void_return_assignability() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let returns_number = interner.callable(CallableShape {
+        call_signatures: vec![CallSignature {
+            params: Vec::new(),
+            this_type: None,
+            return_type: TypeId::NUMBER,
+            type_predicate: None,
+            type_params: Vec::new(),
+        }],
+        construct_signatures: Vec::new(),
+        properties: Vec::new(), ..Default::default()
+    });
+
+    let returns_void = interner.callable(CallableShape {
+        call_signatures: vec![CallSignature {
+            params: Vec::new(),
+            this_type: None,
+            return_type: TypeId::VOID,
+            type_predicate: None,
+            type_params: Vec::new(),
+        }],
+        construct_signatures: Vec::new(),
+        properties: Vec::new(), ..Default::default()
+    });
+
+    assert!(checker.is_assignable(returns_number, returns_void));
+    assert!(!checker.is_assignable(returns_void, returns_number));
+}
+
+#[test]
 fn test_explain_failure_missing_property() {
     let interner = TypeInterner::new();
     let mut checker = CompatChecker::new(&interner);

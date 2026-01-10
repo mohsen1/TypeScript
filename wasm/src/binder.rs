@@ -1071,6 +1071,7 @@ impl BinderState {
     /// - Namespace + Namespace
     /// - Namespace + Class/Function/Enum
     /// - Function + Function (overloads)
+    /// - Enum + Enum (declaration merging)
     fn can_merge_flags(existing_flags: u32, new_flags: u32) -> bool {
         // Interface can merge with interface
         if (existing_flags & symbol_flags::INTERFACE) != 0
@@ -1122,6 +1123,13 @@ impl BinderState {
         // Function overloads
         if (existing_flags & symbol_flags::FUNCTION) != 0
             && (new_flags & symbol_flags::FUNCTION) != 0
+        {
+            return true;
+        }
+
+        // Enum can merge with enum (members are combined)
+        if (existing_flags & symbol_flags::ENUM) != 0
+            && (new_flags & symbol_flags::ENUM) != 0
         {
             return true;
         }

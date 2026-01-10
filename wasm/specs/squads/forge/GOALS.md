@@ -159,7 +159,9 @@ bash run-conformance.sh --all --workers=14
 
 ---
 ## Squad Status
-- Last Update: 2026-01-09 14:00
+- Last Update: 2026-01-10 01:00
 - Conformance: **23.3% exact match** (up from 18.1%)
-- Workers: 5 available
-- Strategy: Each worker owns one error code, implement independently
+- Workers Active: 5/5
+- Branches Pending Merge: None (merged worker/forge-1, worker/forge-2, worker/forge-5)
+- Current Focus: TS2792 module resolution, TS2339 private names/control flow, TS2322 assignability, class this/generic constructor typing
+- Blockers: None

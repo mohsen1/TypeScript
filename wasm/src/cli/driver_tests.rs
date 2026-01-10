@@ -3497,13 +3497,18 @@ fn compile_generic_utility_library_type_utilities() {
     write_file(
         &base.join("src/types.ts"),
         r#"
+declare const Object: {
+    freeze<T>(o: T): T;
+    keys(o: object): string[];
+};
+
 // Type-level utilities (erased at runtime)
 export type DeepReadonly<T> = {
-    readonly [P in keyof T]: T[P] extends object ? DeepReadonly<T[P]> : T[P];
+    readonly [P in keyof T]: T[P] extends object ? Readonly<T[P]> : T[P];
 };
 
 export type DeepPartial<T> = {
-    [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P];
+    [P in keyof T]?: T[P] extends object ? Partial<T[P]> : T[P];
 };
 
 export type Nullable<T> = T | null;

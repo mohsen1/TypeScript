@@ -7,59 +7,43 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-Reduce false positives for property access errors by aligning TS2339 behavior with TypeScript.
+Reduce remaining TS2339 false positives (non-control-flow cases).
 
 **Error Code:** TS2339 - "Property 'X' does not exist on type 'Y'"
 
 **Impact:** 142 conformance tests affected
 
 ### Steps
-1. **Audit TS2339 emit points** in `thin_checker.rs` to ensure we skip diagnostics for:
-   - `any` and `unknown` flows
-   - `error` type (suppress cascades)
-   - Union members where at least one contains the property
-2. **Add tests first** in `wasm/src/thin_checker_tests.rs`:
-   - `any` access should not error
-   - `unknown` access should error only when narrowed
-   - Optional properties on unions should not error when present in some members
-3. **Implement fixes** and ensure existing TS2339 tests still pass.
-4. **Run conformance tests** and record delta.
+1. **Run a scan**: `cd wasm/differential-test && node find-ts2339.mjs --max=1000 --samples=30`.
+2. **Pick top non-control-flow pattern** (e.g., enum/namespace merging or static/instance property access).
+3. **Implement the fix** in `thin_checker.rs`/`binder.rs` and add a focused regression test.
+4. **Run focused tests** with `./wasm/test.sh` and report delta.
 
 ### Key Files
 - `wasm/src/thin_checker.rs`
-- `wasm/src/solver/operations.rs`
-- `wasm/src/checker/context.rs`
-- `wasm/src/checker/types/diagnostics.rs`
+- `wasm/src/binder.rs`
 - `wasm/src/thin_checker_tests.rs`
 
 ### Success Criteria
-- TS2339 missing errors reduced
-- Extra errors do not increase (no regressions)
+- TS2339 false positives reduced for the selected pattern
+- No new regressions in existing TS2339 tests
 
 ## Resume Notes
-- Branch: `worker/forge-2` (ahead of `origin/rust`).
-- Latest commit: `[wasm] checker: add static index signature support to CallableShape`
-- Recent changes: Added static index signature support to CallableShape for class constructors, fixed merge conflict in solver/subtype.rs, created find-ts2339.mjs conformance scan script.
-- Last tests: `./wasm/test.sh test_ts2339_` (9 tests pass).
+- Branch: `worker/forge-2`.
+- Latest commit: `[wasm] checker: narrow assignment flow types for TS2339`
+- Recent changes: Re-applied static index signature collection after squad/forge merge; narrowed flow types on direct assignments to use assigned expression types; added TS2339 test covering assignment-based narrowing on unions.
+- Last tests: `./wasm/test.sh ts2339_assignment_narrows_union_property_access`
 - **Latest TS2339 conformance scan results (1000 files):**
-  - Extra (false positives): 27 files (was 28, fixed staticIndexSignature4.ts)
-  - Missing: 29 files
+  - Extra (false positives): 22 files (was 27)
   - Main categories of false positives:
-    1. **Control flow narrowing** (10 files) - `length` property errors on narrowed unions (constLocalsInFunctionExpressions, controlFlowWhileStatement, etc.)
+    1. **Control flow narrowing** (11 files) - assertion predicates, const locals, various control flow tests
     2. **Private names** (6 files) - `#prop` access on class types
     3. **Mixin classes** (4 files) - Properties not found on mixin types
-    4. **Dynamic imports** (5 files) - importCallExpression tests
-  - Main categories of missing errors:
-    1. **Private names** (14 files) - Missing errors for invalid #prop access
-    2. **globalThis** (9 files) - Property access on globalThis
-    3. **Control flow aliasing** (1 file)
+    4. **Enum merging** (1 file) - enumMerging.ts
 - Conformance scan command: `cd wasm/differential-test && node find-ts2339.mjs --max=1000 --samples=30`
 - Remember: do not touch `.role/AGENTS.md`.
 
 ## Task Queue
-- Fix control flow narrowing for property access after type guards (highest priority - affects 10 files)
-  - **Root cause identified:** In `handle_assignment` in control_flow.rs, when an assignment affects a reference, we return the declared type instead of the assigned expression's type. For example, after `x = ""` where `x: string | number`, we should narrow `x` to `string`, but we return `string | number`.
-  - **Fix needed:** Track assigned types in flow nodes and use them for narrowing.
 - Investigate private name (#prop) handling - both extra and missing errors
 - Fix mixin class property resolution
 - Add globalThis property checking
@@ -80,14 +64,22 @@ Reduce false positives for property access errors by aligning TS2339 behavior wi
 - Fixed parser to preserve static modifier on index signatures (was dropping static keyword).
 - Fixed static index signature property access - staticIndexSignature4.ts now passes.
 - Conformance scan after fix: 27 extra, 29 missing (from 1000 files).
+- Narrowed flow assignment handling to use assigned expression types for TS2339.
+- Added TS2339 test for assignment-based union narrowing.
+- Re-applied static index signature collection after squad/forge merge.
+- Conformance scan after re-apply: 22 extra (from 1000 files).
+- Fixed mixin class inheritance to merge intersection base properties.
+- Allowed constructor callables to satisfy constructor function constraints.
+- Added TS2339 tests for mixins, globalThis property access, and private identifiers.
 
 ## Ready for Merge
-Yes
+No
 
 ## Notes
 - Full test run failing in `cli::driver_tests::compile_multi_file_project_with_imports`
   and `cli::driver_tests::compile_multi_file_project_with_default_and_named_imports` (TS2792).
 - Run `./wasm/test.sh` before pushing
+- Last run: `./wasm/test.sh test_ts2339_mixin_class_property_access`
 - Commit format: `[wasm] checker: improve TS2339 property access diagnostics`
 - Push to: `origin/worker/forge-2`
 - **NEVER edit**: `STRUCTURE.md`, `GOALS.md`, other workers' plan files, or anything in `orchestrator/`
