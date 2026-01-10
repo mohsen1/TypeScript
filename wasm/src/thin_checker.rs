@@ -4782,6 +4782,120 @@ impl<'a> ThinCheckerState<'a> {
         right_type
     }
 
+    /// Check a compound assignment expression (+=, &&=, ??=, etc.).
+    fn check_compound_assignment_expression(
+        &mut self,
+        left_idx: NodeIndex,
+        right_idx: NodeIndex,
+        operator: u16,
+        expr_idx: NodeIndex,
+    ) -> TypeId {
+        let left_target = self.get_type_of_assignment_target(left_idx);
+        let left_type = self.resolve_type_query_type(left_target);
+
+        let prev_context = self.ctx.contextual_type;
+        if left_type != TypeId::ANY && !self.type_contains_error(left_type) {
+            self.ctx.contextual_type = Some(left_type);
+        }
+
+        let right_raw = self.get_type_of_node(right_idx);
+        let right_type = self.resolve_type_query_type(right_raw);
+
+        self.ctx.contextual_type = prev_context;
+
+        self.ensure_application_symbols_resolved(right_type);
+        self.ensure_application_symbols_resolved(left_type);
+
+        self.check_readonly_assignment(left_idx, expr_idx);
+
+        let result_type = self.compound_assignment_result_type(left_type, right_type, operator);
+        let is_logical_assignment = matches!(
+            operator,
+            k if k == SyntaxKind::AmpersandAmpersandEqualsToken as u16
+                || k == SyntaxKind::BarBarEqualsToken as u16
+                || k == SyntaxKind::QuestionQuestionEqualsToken as u16
+        );
+        let assigned_type = if is_logical_assignment {
+            right_type
+        } else {
+            result_type
+        };
+
+        if left_type != TypeId::ANY {
+            if let Some((source_level, target_level)) =
+                self.constructor_accessibility_mismatch_for_assignment(left_idx, right_idx)
+            {
+                self.error_constructor_accessibility_not_assignable(
+                    assigned_type,
+                    left_type,
+                    source_level,
+                    target_level,
+                    right_idx,
+                );
+            } else if !self.is_assignable_to(assigned_type, left_type) {
+                self.error_type_not_assignable_with_reason_at(assigned_type, left_type, right_idx);
+            }
+
+            if left_type != TypeId::UNKNOWN {
+                if let Some(right_node) = self.ctx.arena.get(right_idx) {
+                    if right_node.kind == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION {
+                        self.check_object_literal_excess_properties(right_type, left_type, right_idx);
+                    }
+                }
+            }
+        }
+
+        result_type
+    }
+
+    fn compound_assignment_result_type(
+        &self,
+        left_type: TypeId,
+        right_type: TypeId,
+        operator: u16,
+    ) -> TypeId {
+        use crate::solver::{BinaryOpEvaluator, BinaryOpResult};
+        use crate::scanner::SyntaxKind;
+
+        let evaluator = BinaryOpEvaluator::new(self.ctx.types);
+        let op_str = match operator {
+            k if k == SyntaxKind::PlusEqualsToken as u16 => Some("+"),
+            k if k == SyntaxKind::MinusEqualsToken as u16 => Some("-"),
+            k if k == SyntaxKind::AsteriskEqualsToken as u16 => Some("*"),
+            k if k == SyntaxKind::AsteriskAsteriskEqualsToken as u16 => Some("*"),
+            k if k == SyntaxKind::SlashEqualsToken as u16 => Some("/"),
+            k if k == SyntaxKind::PercentEqualsToken as u16 => Some("%"),
+            k if k == SyntaxKind::AmpersandAmpersandEqualsToken as u16 => Some("&&"),
+            k if k == SyntaxKind::BarBarEqualsToken as u16 => Some("||"),
+            _ => None,
+        };
+
+        if let Some(op) = op_str {
+            return match evaluator.evaluate(left_type, right_type, op) {
+                BinaryOpResult::Success(result) => result,
+                BinaryOpResult::TypeError { .. } => TypeId::ANY,
+            };
+        }
+
+        if operator == SyntaxKind::QuestionQuestionEqualsToken as u16 {
+            return self.ctx.types.union2(left_type, right_type);
+        }
+
+        if matches!(
+            operator,
+            k if k == SyntaxKind::AmpersandEqualsToken as u16
+                || k == SyntaxKind::BarEqualsToken as u16
+                || k == SyntaxKind::CaretEqualsToken as u16
+                || k == SyntaxKind::LessThanLessThanEqualsToken as u16
+                || k == SyntaxKind::GreaterThanGreaterThanEqualsToken as u16
+                || k == SyntaxKind::GreaterThanGreaterThanGreaterThanEqualsToken as u16
+        ) {
+            return TypeId::NUMBER;
+        }
+
+        TypeId::ANY
+    }
+
     /// Get type of binary expression.
     fn get_type_of_binary_expression(&mut self, idx: NodeIndex) -> TypeId {
         use crate::solver::{BinaryOpEvaluator, BinaryOpResult};
@@ -4809,9 +4923,17 @@ impl<'a> ThinCheckerState<'a> {
             let op_kind = binary.operator_token;
 
             if !visited {
-                if op_kind == SyntaxKind::EqualsToken as u16 {
-                    let assign_type =
-                        self.check_assignment_expression(binary.left, binary.right, node_idx);
+                if self.is_assignment_operator(op_kind) {
+                    let assign_type = if op_kind == SyntaxKind::EqualsToken as u16 {
+                        self.check_assignment_expression(binary.left, binary.right, node_idx)
+                    } else {
+                        self.check_compound_assignment_expression(
+                            binary.left,
+                            binary.right,
+                            op_kind,
+                            node_idx,
+                        )
+                    };
                     type_stack.push(assign_type);
                     continue;
                 }
