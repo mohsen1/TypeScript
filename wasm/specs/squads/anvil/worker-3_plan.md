@@ -273,4 +273,11 @@ Ready for Merge: No (merged)
 ### Update (2026-01-10)
 - Broader sweep: `node wasm/differential-test/conformance-runner.mjs --max=500` (497 tests run, 13 multi-file; WASM Crashed: 0).
 
-Ready for Merge: No (merged)
+### Update (2026-01-10)
+- Added TS1160 `UNTERMINATED_TEMPLATE_LITERAL` diagnostic and parser reporting for unterminated template literals (template expressions, no-substitution, template literal types).
+- Added `test_thin_parser_unterminated_template_literal_reports_ts1160` in `wasm/src/thin_parser_tests.rs`.
+- Build: `./wasm/build-wasm.sh` (warnings only).
+- Conformance: `node wasm/differential-test/conformance-runner.mjs es6/templates --max=200 -v` (TS1160 no longer missing; extra TS1160 in `templateStringInPropertyName2` and `templateStringInPropertyNameES6_2`).
+- Test: `./wasm/test.sh test_thin_parser_unterminated_template_literal_reports_ts1160`.
+
+Ready for Merge: Yes (2026-01-10)

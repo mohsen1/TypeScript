@@ -325,6 +325,13 @@ impl ThinParserState {
         self.parse_error_at_current_token(&format!("'{}' expected", token), diagnostic_codes::TOKEN_EXPECTED);
     }
 
+    /// Error: Unterminated template literal (TS1160)
+    fn error_unterminated_template_literal_at(&mut self, start: u32, end: u32) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+        let length = end.saturating_sub(start).max(1);
+        self.parse_error_at(start, length, "Unterminated template literal.", diagnostic_codes::UNTERMINATED_TEMPLATE_LITERAL);
+    }
+
     /// Error: Declaration expected (TS1146)
     fn error_declaration_expected(&mut self) {
         use crate::checker::types::diagnostics::diagnostic_codes;
@@ -5919,9 +5926,13 @@ impl ThinParserState {
     /// Parse no-substitution template literal: `hello`
     fn parse_no_substitution_template_literal(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
+        let is_unterminated = self.scanner.is_unterminated();
         let text = self.scanner.get_token_value_ref().to_string();
         let end_pos = self.token_end();
         self.parse_expected(SyntaxKind::NoSubstitutionTemplateLiteral);
+        if is_unterminated {
+            self.error_unterminated_template_literal_at(start_pos, end_pos);
+        }
 
         self.arena.add_literal(
             SyntaxKind::NoSubstitutionTemplateLiteral as u16,
@@ -6006,6 +6017,7 @@ impl ThinParserState {
                 break literal_end;
             }
 
+            let is_unterminated = self.scanner.is_unterminated();
             let literal_text = self.scanner.get_token_value_ref().to_string();
             let literal_kind = if is_tail { SyntaxKind::TemplateTail } else { SyntaxKind::TemplateMiddle };
 
@@ -6018,6 +6030,9 @@ impl ThinParserState {
                 literal_end,
                 LiteralData { text: literal_text, raw_text: None, value: None },
             );
+            if is_unterminated {
+                self.error_unterminated_template_literal_at(literal_start, literal_end);
+            }
 
             let span_start = if let Some(node) = self.arena.get(expression) { node.pos } else { literal_start };
             let span = self.arena.add_template_span(
@@ -7353,10 +7368,15 @@ impl ThinParserState {
     /// Parse template literal head (NoSubstitutionTemplateLiteral or TemplateHead)
     fn parse_template_literal_head(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
+        let is_unterminated = self.scanner.is_unterminated();
         let kind = self.token() as u16;
         let text = self.scanner.get_token_value_ref().to_string();
+        let literal_end = self.token_end();
         self.next_token();
         let end_pos = self.token_end();
+        if is_unterminated {
+            self.error_unterminated_template_literal_at(start_pos, literal_end);
+        }
         self.arena.add_literal(
             kind,
             start_pos,
@@ -7368,10 +7388,15 @@ impl ThinParserState {
     /// Parse template literal span (TemplateMiddle or TemplateTail)
     fn parse_template_literal_span(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
+        let is_unterminated = self.scanner.is_unterminated();
         let kind = self.token() as u16;
         let text = self.scanner.get_token_value_ref().to_string();
+        let literal_end = self.token_end();
         self.next_token();
         let end_pos = self.token_end();
+        if is_unterminated {
+            self.error_unterminated_template_literal_at(start_pos, literal_end);
+        }
         self.arena.add_literal(
             kind,
             start_pos,
