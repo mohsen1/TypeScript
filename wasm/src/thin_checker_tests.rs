@@ -4602,14 +4602,20 @@ fn test_async_promise_void_no_2355() {
 
     let source = r#"
 interface Promise<T> {}
+interface PromiseLike<T> {}
 type PromiseAlias<T> = Promise<T>;
+type PromiseLikeAlias<T> = PromiseLike<T>;
 
 async function f1(): Promise<void> { }
 async function f2(): PromiseAlias<void> { }
+async function f3(): PromiseLike<void> { }
+async function f4(): PromiseLikeAlias<void> { }
 
 class C {
     async m1(): Promise<void> { }
     async m2(): PromiseAlias<void> { }
+    async m3(): PromiseLike<void> { }
+    async m4(): PromiseLikeAlias<void> { }
 }
 "#;
 
