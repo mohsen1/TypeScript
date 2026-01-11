@@ -74,7 +74,10 @@ This ensures:
 
 1. **Sync first**: `git fetch origin && git merge origin/rust --no-edit`
 2. Read your plan file.
-3. **Ask Gemini**: `./scripts/ask-gemini.mjs "How should I approach <task>?"` - Get a plan BEFORE coding!
+3. **🤖 ASK GEMINI FIRST (MANDATORY)**: Get a plan BEFORE coding!
+   ```bash
+   ./scripts/ask-gemini.mjs "I need to implement <your task>. What's the best approach?"
+   ```
 4. Write code, add tests, run `./wasm/test.sh`.
 5. Commit and push to your worker branch.
 6. Mark "Ready for Merge: Yes" in your plan.
@@ -142,27 +145,32 @@ The notification file is at `.notify/notify.sh` in the repository root.
 This is a complex compiler project. Take time to understand the code before making changes. Reading architecture docs, tracing call paths, and understanding existing patterns is valuable work - not wasted time.
 
 
-## 🤖 Gemini AI Assistant (USE THIS!)
+## 🤖 Gemini AI Assistant (MANDATORY BEFORE EVERY TASK!)
 
-**BEFORE starting ANY task**, consult Gemini for implementation guidance:
+> **⚠️ CRITICAL:** You MUST consult Gemini before starting ANY implementation task.
+> Gemini has 800k tokens of codebase context - use it!
 
+### Before Starting Work
 ```bash
-# Get a detailed implementation plan before starting work
-./scripts/ask-gemini.mjs "I need to implement <your task>. What's the best approach given the current codebase?"
+# REQUIRED: Get implementation guidance before coding
+./scripts/ask-gemini.mjs "I need to implement <your task>. What's the best approach?"
 
-# Interactive mode for complex exploration
+# For complex exploration
 ./scripts/ask-gemini.mjs --interactive
 ```
 
-**When to use Gemini:**
-1. **BEFORE starting a new task** - Get a plan, understand the approach
-2. **When things get complicated** - Gemini has full codebase context (800k tokens)
+### When to Use Gemini
+1. **BEFORE starting a new task** - Get a plan, understand the approach (MANDATORY)
+2. **When things get complicated** - Gemini has full codebase context
 3. **When you're stuck** - Ask for debugging help, alternative approaches
 4. **When crossing subsystems** - Understand how different parts connect
 
-**Example prompts:**
+### Example Prompts
 - "How should I implement TS2454 (variable used before assigned) in the checker?"
 - "What's the control flow analysis architecture in this codebase?"
 - "I'm seeing this error in thin_emitter, what's the fix?"
+- "What files do I need to modify for TS2564 property initialization?"
 
-Gemini has context on the ENTIRE codebase. Use it as your senior engineer pair programmer.
+Gemini has context on the ENTIRE codebase (800k tokens). Use it as your senior engineer pair programmer.
+
+**Skipping Gemini = wasted effort.** The 30 seconds to ask saves hours of wrong approaches.

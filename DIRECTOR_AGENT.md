@@ -421,24 +421,30 @@ tmux capture-pane -p -t zang-org:forge.2 -S -50  # Worker Forge-2
 When EMs need task ideas, reference these:
 
 ### Forge Squad (Type System) - Priority Order
-1. TS2300: Duplicate identifier (easy) - 105 tests
-2. TS7006/TS7008: Implicit any (easy) - 526 tests
-3. TS2792: Module resolution (easy) - 204 tests
-4. TS2454: Definite assignment (medium) - 573 tests
-5. TS2564: Property initialization (medium) - 443 tests
-6. TS7010: Return type checking (medium) - 179 tests
-7. TS2304: Cannot find name (hard) - 138 tests
-8. TS2339: Property does not exist (hard) - 142 tests
-9. TS2322: Type assignability (hard) - 310 tests
-10. TS2695: Comma operator edge cases (hard)
+**NEW PRIORITIES (Jan 11, 2026):**
+1. **TS2454: Definite assignment (HIGH)** - 573 missing - Flow Graph side-table
+2. **TS2564: Property initialization (HIGH)** - 443 missing - Extends CFA from TS2454
+3. **TS2322: Type assignability (HIGH)** - 310 missing - Solver strictness (Any→Unknown)
+4. TS2339: Property does not exist (medium) - 142 missing
+5. TS7010: Return type checking (medium) - 179 missing
+
+**COMPLETED (Reference only):**
+- ~~TS7006/TS7008: Implicit any~~ - 74% reduction (46→12)
+- ~~TS2304: Cannot find name~~ - 98.7% reduction (759→10)
+- ~~Parser recovery~~ - 92% reduction (1,122→85)
 
 ### Anvil Squad (Output/Tooling) - Priority Order
-1. CLI flag support (easy)
-2. Diagnostic output formatting (easy)
-3. Source map accuracy (medium)
-4. ES5 downleveling bugs (medium)
-5. LSP autocomplete (hard)
-6. LSP goto-definition (hard)
+**NEW PRIORITIES (Jan 11, 2026):**
+1. **TS2339: Property access (HIGH)** - 292 extra - Narrowing + index signatures
+2. **TS2355: Return analysis (MEDIUM)** - 116 extra - Control flow
+3. **TS2322: Type assignability (MEDIUM)** - 101 extra - False positives
+4. **TS2403: Subsequent declarations (MEDIUM)** - 96 extra
+5. TS2304: Namespace edge cases (easy) - 10 remaining
+
+**COMPLETED (Reference only):**
+- ~~Parser recovery~~ - TARGET MET (<100)
+- ~~TS2769: Overload matching~~ - Complete
+- ~~TS2339 Private members~~ - 100% fixed
 
 ## When to Intervene
 

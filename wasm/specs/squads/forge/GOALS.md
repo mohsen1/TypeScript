@@ -1,38 +1,41 @@
 # Squad Forge Goals
 
-Updated: 2026-01-09 (14:00)
+Updated: 2026-01-11
 
 Priority: 1
 
 ---
-## Current Conformance Baseline (5655 tests)
+## Current Conformance Baseline
 
-| Metric | Value | Notes |
-|--------|-------|-------|
-| Exact Match | 23.3% (1148/4928) | Up from 18.1% |
-| Same Error Count | 26.2% (1293) | |
-| Tests with Missing Errors | 68.2% (3361) | WASM misses errors TSC catches |
-| Tests with Extra Errors | 35.8% (1766) | False positives |
-| Skipped (multi-file) | 727 | Need WasmProgram API fixes |
-| Crashed | 2 | Stack overflow, unreachable |
+| Metric | Current | Previous | Target | Status |
+|--------|---------|----------|--------|--------|
+| Exact Match | **30.8%** | 23.3% | 50%+ | +7.5pp |
+| Missing Errors | **57.8%** | 68.2% | <30% | -10.4pp |
+| Extra Errors | **28.9%** | 35.8% | <20% | -6.9pp |
+| Parser Errors | **~85** | 1,122 | <100 | **TARGET MET** |
 
 ---
-## Top Missing Error Codes (PARALLELIZABLE WORK)
+## Completed Work (Reference)
 
-These are errors TSC produces that WASM doesn't. Each worker can own one error code independently.
+| TS Code | Result | Notes |
+|---------|--------|-------|
+| ~~TS7006~~ | 74% reduction | 46 → 12 false positives |
+| ~~TS2304~~ | 98.7% reduction | 759 → 10 false positives |
+| ~~TS2769~~ | Complete | Overload matching done |
+| ~~Parser~~ | 92% reduction | 1,122 → 85 errors |
+
+---
+## Next Phase: Control Flow + Solver Strictness
+
+**Priority Focus (Gemini-recommended):**
 
 | TS Code | Occurrences | Description | Difficulty | Worker |
 |---------|-------------|-------------|------------|--------|
 | **TS2454** | 573 | Variable used before assigned | Medium | W1 |
 | **TS2564** | 443 | Property not initialized in constructor | Medium | W2 |
-| **TS7006** | 357 | Parameter implicitly has 'any' type | Easy | W3 |
-| **TS2322** | 310 | Type not assignable | Hard | - |
-| **TS2792** | 204 | Cannot find module | Easy | W4 |
+| **TS2322** | 310 | Type not assignable (solver strictness) | Hard | W3 |
+| **TS2339** | 142 | Property does not exist (missing) | Hard | W4 |
 | **TS7010** | 179 | Function must return a value | Medium | W5 |
-| **TS7008** | 169 | Member implicitly has 'any' type | Easy | W3 |
-| **TS2339** | 142 | Property does not exist | Hard | - |
-| **TS2304** | 138 | Cannot find name | Hard | - |
-| **TS2300** | 105 | Duplicate identifier | Easy | - |
 
 ---
 ## Phase 10: Conformance Sprint
@@ -159,19 +162,21 @@ bash run-conformance.sh --all --workers=14
 
 ---
 ## Squad Status
-- Last Update: 2026-01-11 (🚀 EXCELLENCE CONTINUES: Worker wins merged to rust!)
-- Conformance: **~30.8% exact match** (up from 23.3%!) **+7.5 POINTS!**
-- **NEW WINS IN RUST** (Commit: 3b67f9a8a4):
-  - ✅ W3: **TS7010 async getters + TS2300 constructor** fixes!
-  - ✅ W4: **TS2339 private field assignability** fix!
-  - ✅ New: **find-ts2300.mjs** differential test script
-- Workers Active: **4/5** - SUSTAINED EXCELLENCE!
-- **ACTIVE WORKERS** (Delivering wins!):
-  - ✅ W1: Active (9m)
-  - ✅ W3: Active (15m) - TS7010 just merged!
-  - ✅ W4: Active (26m) - TS2339 just merged!
-  - ✅ W5: Active (32m) - Staying consistent!
-- **RESTING** (Post-critical solver fix):
-  - ⚠️ W2: Idle 70m - Delivered ERROR instead of Any fix
-- **FORGE SQUAD**: Workers delivering WINS to main branch! Keep momentum!
-- **ANVIL TS2339 BREAKTHROUGH**: Congratulations to Anvil squad!
+- Last Update: 2026-01-11
+- Conformance: **30.8% exact match** (+7.5pp from 23.3%)
+- Build: Passing
+
+### Worker Assignments (New Phase)
+| Worker | Assignment | Priority |
+|--------|------------|----------|
+| W1 | TS2454 - Definite Assignment (Control Flow) | HIGH |
+| W2 | TS2564 - Property Initialization | HIGH |
+| W3 | TS2322 - Solver Strictness (Any→Unknown) | HIGH |
+| W4 | TS2339 - Property Access (missing errors) | MEDIUM |
+| W5 | TS7010 - Return Type Checking | MEDIUM |
+
+### Before Starting Any Task
+**IMPORTANT:** Workers must consult Gemini before starting work:
+```bash
+./scripts/ask-gemini.mjs "I need to implement <your task>. What's the best approach?"
+```

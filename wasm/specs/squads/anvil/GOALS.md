@@ -1,50 +1,41 @@
 # Squad Anvil Goals
 
-Updated: 2026-01-11 (Director Priority Override)
+Updated: 2026-01-11
 
 Priority: 1
 
 ---
-## CRITICAL: Parser Recovery is Priority 0
+## Current Conformance Baseline
 
-**Architectural Insight: Cascading Failure Effect**
-
-Parse → Bind → Check pipeline means parser errors cascade:
-1. **1,122 Parser Errors** (TS1005/TS1109/TS1068/TS1128) → Incomplete AST
-2. **Incomplete AST** → Binder can't find declarations → **702 TS2304 errors**
-3. **Unresolved Symbols** → Solver defaults to `Any` → **Missing TS2322/TS7006**
-
-**By fixing ~1,122 parser errors, we will automatically fix hundreds of binding/checking errors.**
-
-**W2 EXCLUSIVE FOCUS:** Parser recovery until parser error count < 100. All other workers continue their assignments.
+| Metric | Current | Previous | Target | Status |
+|--------|---------|----------|--------|--------|
+| Exact Match | **30.8%** | 23.3% | 50%+ | +7.5pp |
+| Extra Errors | **28.9%** | 35.8% | <20% | -6.9pp |
+| Parser Errors | **~85** | 1,122 | <100 | **TARGET MET** |
 
 ---
-## Current Conformance Baseline (5655 tests)
+## Completed Work (Reference)
 
-| Metric | Value | Notes |
-|--------|-------|-------|
-| Exact Match | 23.3% (1148/4928) | Up from 18.1% |
-| Tests with Extra Errors | 35.8% (1766) | **20% are parser errors!** |
-| Skipped (multi-file) | 727 | Need WasmProgram API fixes |
-| Crashed | 2 | Stack overflow, unreachable |
+| Task | Result | Notes |
+|------|--------|-------|
+| ~~Parser Recovery~~ | **92% reduction** | 1,122 → 85 errors - **PRIORITY 0 COMPLETE** |
+| ~~TS2304 Binding~~ | **98.7% reduction** | 759 → 10 false positives |
+| ~~TS2769 Overloads~~ | **Complete** | All overload tests passing |
+| ~~TS2339 Private~~ | **100% fixed** | Private member access resolved |
+| ~~TS7006 Implicit Any~~ | **74% reduction** | 46 → 12 false positives |
 
 ---
-## Top Extra Error Codes (PARALLELIZABLE WORK - FALSE POSITIVES)
+## Next Phase: False Positive Elimination
 
-These are errors WASM reports that TSC doesn't. Each worker can own one error code independently.
+**Remaining Extra Errors (False Positives):**
 
 | TS Code | Occurrences | Description | Difficulty | Worker |
 |---------|-------------|-------------|------------|--------|
-| **TS2304** | 759 | Cannot find name (false positive) | Hard | W1 |
-| **TS1005** | 548 | Expected X (parser bug) | Medium | W2 |
-| **TS2339** | 292 | Property does not exist (false positive) | Hard | W3 |
-| **TS1109** | 273 | Expression expected (parser bug) | Medium | W2 |
-| **TS1068** | 200 | Unexpected token (parser bug) | Medium | W2 |
-| **TS2769** | 125 | No overload matches (false positive) | Hard | W4 |
-| **TS2355** | 116 | Function must return (false positive) | Medium | W5 |
-| **TS1128** | 101 | Declaration expected (parser bug) | Medium | W2 |
-| **TS2322** | 101 | Type not assignable (false positive) | Hard | - |
-| **TS2403** | 96 | Subsequent variable declarations (false positive) | Medium | - |
+| **TS2339** | 292 | Property does not exist (narrowing) | Hard | W1, W3 |
+| **TS2355** | 116 | Function must return (control flow) | Medium | W2 |
+| **TS2322** | 101 | Type not assignable (false positive) | Hard | W4 |
+| **TS2403** | 96 | Subsequent variable declarations | Medium | W5 |
+| **TS2304** | 10 | Cannot find name (namespace edge cases) | Easy | W1 |
 
 ---
 ## Phase 10: False Positive Elimination
@@ -188,17 +179,25 @@ bash run-conformance.sh --all --workers=14
 
 ---
 ## Squad Status
-- Last EM Report: 2026-01-11 12:15
-- Workers Active: 5/5
-- Branches Pending Merge: None
-- Current Focus:
-  - W1: TS2304 scope resolution false positives
-  - W2: Parser errors (TS1005/TS1109/TS1068/TS1128)
-  - W3: TS2339 property access false positives
-  - W4: recursiveMappedTypes crash / TS2456 detection
-  - W5: TS2355 return analysis false positives
-- Blockers: None (Fixed build blocker - compile_shorthand_methods test now passing)
-- Recent Actions:
-  - EM fixed binder issue: shorthand method parameters weren't being bound
-  - Pushed fix to origin/em/anvil, awaiting Director merge into rust
-- Strategy: Each worker owns one error code category, reduce false positives independently
+- Last Update: 2026-01-11
+- Conformance: **30.8% exact match** (+7.5pp from 23.3%)
+- Build: Passing
+
+### Worker Assignments (New Phase)
+| Worker | Assignment | Priority |
+|--------|------------|----------|
+| W1 | TS2339 - Property Narrowing + TS2304 edge cases | HIGH |
+| W2 | TS2355 - Return Analysis (control flow) | MEDIUM |
+| W3 | TS2339 - Index Signature handling | HIGH |
+| W4 | TS2322 - False Positive Reduction | MEDIUM |
+| W5 | TS2403 - Subsequent Variable Declarations | MEDIUM |
+
+### Before Starting Any Task
+**IMPORTANT:** Workers must consult Gemini before starting work:
+```bash
+./scripts/ask-gemini.mjs "I need to implement <your task>. What's the best approach?"
+```
+
+### Strategy
+Focus on reducing Extra Errors (false positives) - we report errors TSC doesn't.
+Each worker owns one error code category and works independently.
