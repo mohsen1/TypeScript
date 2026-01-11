@@ -17118,3 +17118,32 @@ type t1 = DeepMap<tpl, number>;
     // The test reaching here means we didn't crash on recursive mapped types
     eprintln!("[RECURSIVE_MAPPED_TEST] Test completed without crash - {} TS2456 errors found", ts2456_count);
 }
+
+#[test]
+fn test_type_parameter_in_function_body_no_ts2304() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+function identity<T>(x: T): T {
+    const y: T = x;
+    return y;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2304),
+        "Should not report TS2304 for type parameter T in function body, got diagnostics: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>()
+    );
+}
