@@ -26,7 +26,7 @@ Output of `wasm/differential-test/run-conformance.sh --max=10000` dictates where
 
 Based on the Conformance Report and the architectural constraints defined in `WASM_ARCHITECTURE.md`, here is a deep analysis of why conformance is low (23.4%) and where the fundamental architectural gaps lie.
 
-### Executive Summary: The "Permissive" Trap
+##### Executive Summary: The "Permissive" Trap
 
 The most alarming statistic is **Missing Errors: 68.2%**.
 This means your compiler is **too permissive**. It accepts code that TypeScript rejects.
@@ -39,9 +39,8 @@ You are failing to catch:
 
 This suggests the architecture prioritizes *throughput* and *memory* (Data-Oriented Design) but lacks the **Control Flow Graph (CFG)** and **Inference strictness** required to match `tsc`.
 
----
 
-### 1. Fundamental Issue: Data-Oriented Design vs. Control Flow Analysis (CFA)
+1. Fundamental Issue: Data-Oriented Design vs. Control Flow Analysis (CFA)
 
 **The Problem:**
 You are using a `ThinNode` architecture (Struct-of-Arrays). This is excellent for parsing speed (500 MB/s), but it makes **Control Flow Analysis** (CFA) significantly harder.
@@ -55,7 +54,7 @@ TS2454 ("Variable used before assigned") and TS2564 require a **Control Flow Gra
 **Architectural Fix:**
 You need a dedicated **Side Table** for Flow Nodes that is computed *after* binding but *before* checking. The Checker must query `flow_graph[node_index]` for every identifier usage. Currently, it seems the checker defaults to "Assigned" if it can't prove otherwise. It must default to "Unassigned".
 
-### 2. Fundamental Issue: The "Any" Fallback
+2. Fundamental Issue: The "Any" Fallback
 
 **The Problem:**
 The high number of missing **TS7006 (Implicit Any)** and **TS2322 (Type Not Assignable)** suggests that when your Solver encounters a complex type (generics, conditional types), it "bails out" and returns `Any` (or `true` for subtyping) to avoid crashing.
@@ -72,7 +71,7 @@ If the Binder cannot find `Array`, `Promise`, or `console`, the Solver treats th
 1.  **Fix the Library Context:** Ensure `lib.d.ts` is actually loaded and bound in the test runner. The `WasmProgram` class seems to handle this, but the high TS2304 count implies global scope pollution is failing.
 2.  **Strict Error Types:** Change the default bailout from `Any` to `Unknown`. `Unknown` is safe (errors on usage), whereas `Any` suppresses errors.
 
-### 3. Fundamental Issue: The Parser is "Too Strict"
+3. Fundamental Issue: The Parser is "Too Strict"
 
 **The Problem:**
 **TS1005 (Expected token)** and **TS1109 (Expression expected)** account for ~800 extra errors.
@@ -88,7 +87,7 @@ The parser needs a robust **Error Recovery** strategy.
 *   Current: Seems to bail or produce error nodes that stop further analysis.
 *   Required: "Resynchronization". If a statement is malformed, skip tokens until the next semicolon/brace and *continue parsing*. The AST must be as complete as possible even with syntax errors.
 
-### 4. Fundamental Issue: The "Judge vs. Lawyer" Gap
+4. Fundamental Issue: The "Judge vs. Lawyer" Gap
 
 **The Problem:**
 Your `specs/SOLVER.md` describes a "Judge" (Sound Set Theory) and a "Lawyer" (Compat Layer).
@@ -106,7 +105,7 @@ The `CompatChecker` in `src/solver/` needs to implement the "Unsoundness Catalog
 *   Implement **Apparent Members** for primitives (e.g., `string` has `.length`).
 *   Implement **Union Widening** correctly.
 
-### Summary of Recommendations
+##### Summary of Recommendations
 
 1.  **Priority 1: Fix the Parser Recovery (TS1005/1109).**
     *   You cannot trust semantic errors if the syntax tree is broken. 500+ parse errors are masking thousands of semantic issues.
@@ -138,35 +137,6 @@ Last updated: 2026-01-11
 | Extra Errors (False Positives) | 47.2% | <20% |
 | Build Status | Passing (4771/4789) | Green |
 
-### Current Squad Structure
-- **Squad Forge (5 workers)**: Missing error implementation (TS2454, TS2564, TS7006, TS2792, TS2339, TS2300)
-- **Squad Anvil (5 workers)**: False positive elimination (TS2304, TS2322, TS2339, TS2769, TS2355)
-
-### Top Missing Errors (Forge Focus)
-- TS2564: 64 occurrences (property initialization)
-- TS2454: 43 occurrences (definite assignment) - control flow analysis IMPLEMENTED
-- TS7006: 42 occurrences (implicit any)
-- TS2705: 37 occurrences
-- TS2322: 19 occurrences (type assignability)
-
-### Top False Positives (Anvil Focus)
-- TS2304: 136 occurrences (cannot find name)
-- TS2355: 82 occurrences (return analysis)
-- TS1005: 65 occurrences (parser) - parser fixes IMPLEMENTED
-- TS2339: 35 occurrences (property access)
-- TS1109: 25 occurrences (parser)
-
-### Recent Progress (Jan 11)
-- TS2304 namespace false-positive reductions and mixin call type resolution merged (Anvil).
-- TS2769 variadic tuple overload matching and TS2355 never-return flow handling improvements merged (Anvil).
-- Added thin_parser/thin_node updates and expanded thin_checker tests; conformance baselines not re-run yet.
-
-### Recent Progress (Jan 9)
-- TS2454 control flow analysis (+315 lines in checker/control_flow.rs)
-- TS1005/TS1068 parser fixes (+2568 lines in thin_parser.rs)
-- Spread argument expansion fix (+263 lines)
-- Inherited property access fix
-- DI tests (+674 lines), template literal tests (+388 lines)
 
 ### Direction
 Conformance-driven development. Both squads working in parallel on orthogonal error codes.

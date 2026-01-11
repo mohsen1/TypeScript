@@ -14,7 +14,7 @@
 //!
 //! Phase 7.5 integration - using solver type system for type checking.
 
-use crate::parser::NodeIndex;
+use crate::parser::{NodeIndex, NodeList};
 use crate::parser::thin_node::ThinNodeArena;
 use crate::parser::syntax_kind_ext;
 use crate::scanner::SyntaxKind;
@@ -1337,7 +1337,127 @@ impl<'a> ThinCheckerState<'a> {
         None
     }
 
-    fn base_constructor_type_from_expression(&mut self, expr_idx: NodeIndex) -> Option<TypeId> {
+    fn apply_type_arguments_to_constructor_type(
+        &mut self,
+        ctor_type: TypeId,
+        type_arguments: Option<&NodeList>,
+    ) -> TypeId {
+        use crate::solver::{CallableShape, TypeKey};
+
+        let Some(type_arguments) = type_arguments else {
+            return ctor_type;
+        };
+
+        if type_arguments.nodes.is_empty() {
+            return ctor_type;
+        }
+
+        let mut type_args: Vec<TypeId> = Vec::with_capacity(type_arguments.nodes.len());
+        for &arg_idx in &type_arguments.nodes {
+            type_args.push(self.get_type_from_type_node(arg_idx));
+        }
+
+        if type_args.is_empty() {
+            return ctor_type;
+        }
+
+        let Some(TypeKey::Callable(shape_id)) = self.ctx.types.lookup(ctor_type) else {
+            return ctor_type;
+        };
+
+        let shape = self.ctx.types.callable_shape(shape_id);
+        let mut matching: Vec<&crate::solver::CallSignature> = shape
+            .construct_signatures
+            .iter()
+            .filter(|sig| sig.type_params.len() == type_args.len())
+            .collect();
+
+        if matching.is_empty() {
+            matching = shape
+                .construct_signatures
+                .iter()
+                .filter(|sig| !sig.type_params.is_empty())
+                .collect();
+        }
+
+        if matching.is_empty() {
+            return ctor_type;
+        }
+
+        let instantiated_constructs: Vec<crate::solver::CallSignature> = matching
+            .iter()
+            .map(|sig| {
+                let mut args = type_args.clone();
+                if args.len() < sig.type_params.len() {
+                    for param in sig.type_params.iter().skip(args.len()) {
+                        let fallback = param.default.or(param.constraint).unwrap_or(TypeId::ANY);
+                        args.push(fallback);
+                    }
+                }
+                if args.len() > sig.type_params.len() {
+                    args.truncate(sig.type_params.len());
+                }
+                self.instantiate_constructor_signature(sig, &args)
+            })
+            .collect();
+
+        let new_shape = CallableShape {
+            call_signatures: shape.call_signatures.clone(),
+            construct_signatures: instantiated_constructs,
+            properties: shape.properties.clone(),
+            string_index: shape.string_index.clone(),
+            number_index: shape.number_index.clone(),
+        };
+        self.ctx.types.callable(new_shape)
+    }
+
+    fn instantiate_constructor_signature(
+        &self,
+        sig: &crate::solver::CallSignature,
+        type_args: &[TypeId],
+    ) -> crate::solver::CallSignature {
+        use crate::solver::{
+            instantiate_type, CallSignature, ParamInfo, TypePredicate, TypeSubstitution,
+        };
+
+        let substitution = TypeSubstitution::from_args(&sig.type_params, type_args);
+        let params: Vec<ParamInfo> = sig
+            .params
+            .iter()
+            .map(|param| ParamInfo {
+                name: param.name.clone(),
+                type_id: instantiate_type(self.ctx.types, param.type_id, &substitution),
+                optional: param.optional,
+                rest: param.rest,
+            })
+            .collect();
+
+        let this_type = sig
+            .this_type
+            .map(|type_id| instantiate_type(self.ctx.types, type_id, &substitution));
+        let return_type = instantiate_type(self.ctx.types, sig.return_type, &substitution);
+        let type_predicate = sig.type_predicate.as_ref().map(|predicate| TypePredicate {
+            asserts: predicate.asserts,
+            target: predicate.target.clone(),
+            type_id: predicate
+                .type_id
+                .map(|type_id| instantiate_type(self.ctx.types, type_id, &substitution)),
+        });
+
+        CallSignature {
+            type_params: Vec::new(),
+            params,
+            this_type,
+            return_type,
+            type_predicate,
+        }
+    }
+
+    fn base_constructor_type_from_expression(
+        &mut self,
+        expr_idx: NodeIndex,
+        type_arguments: Option<&NodeList>,
+    ) -> Option<TypeId> {
         if let Some(name) = self.heritage_name_text(expr_idx) {
             if matches!(name.as_str(), "null" | "undefined" | "true" | "false" | "void" | "0") {
                 return None;
@@ -1348,11 +1468,15 @@ impl<'a> ThinCheckerState<'a> {
         if ctor_types.is_empty() {
             return None;
         }
-        Some(if ctor_types.len() == 1 {
+        let ctor_type = if ctor_types.len() == 1 {
             ctor_types[0]
         } else {
             self.ctx.types.intersection(ctor_types)
-        })
+        };
+        Some(self.apply_type_arguments_to_constructor_type(
+            ctor_type,
+            type_arguments,
+        ))
     }
 
     fn constructor_types_from_type(&mut self, type_id: TypeId) -> Vec<TypeId> {
@@ -1509,8 +1633,12 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
-    fn base_instance_type_from_expression(&mut self, expr_idx: NodeIndex) -> Option<TypeId> {
-        let ctor_type = self.base_constructor_type_from_expression(expr_idx)?;
+    fn base_instance_type_from_expression(
+        &mut self,
+        expr_idx: NodeIndex,
+        type_arguments: Option<&NodeList>,
+    ) -> Option<TypeId> {
+        let ctor_type = self.base_constructor_type_from_expression(expr_idx, type_arguments)?;
         self.instance_type_from_constructor_type(ctor_type)
     }
 
@@ -3522,7 +3650,9 @@ impl<'a> ThinCheckerState<'a> {
                 let base_sym_id = match self.resolve_heritage_symbol(expr_idx) {
                     Some(base_sym_id) => base_sym_id,
                     None => {
-                        if let Some(base_instance_type) = self.base_instance_type_from_expression(expr_idx) {
+                        if let Some(base_instance_type) =
+                            self.base_instance_type_from_expression(expr_idx, type_arguments)
+                        {
                             self.merge_base_instance_properties(
                                 base_instance_type,
                                 &mut properties,
@@ -3558,7 +3688,9 @@ impl<'a> ThinCheckerState<'a> {
                     }
                 }
                 let Some(base_class_idx) = base_class_idx else {
-                    if let Some(base_instance_type) = self.base_instance_type_from_expression(expr_idx) {
+                    if let Some(base_instance_type) =
+                        self.base_instance_type_from_expression(expr_idx, type_arguments)
+                    {
                         self.merge_base_instance_properties(
                             base_instance_type,
                             &mut properties,
@@ -3867,6 +3999,9 @@ impl<'a> ThinCheckerState<'a> {
                     if !self.has_static_modifier(&prop.modifiers) {
                         continue;
                     }
+                    if self.is_private_identifier_name(prop.name) {
+                        continue;
+                    }
                     let Some(name) = self.get_property_name(prop.name) else {
                         continue;
                     };
@@ -3895,6 +4030,9 @@ impl<'a> ThinCheckerState<'a> {
                     if !self.has_static_modifier(&method.modifiers) {
                         continue;
                     }
+                    if self.is_private_identifier_name(method.name) {
+                        continue;
+                    }
                     let Some(name) = self.get_property_name(method.name) else {
                         continue;
                     };
@@ -3919,6 +4057,9 @@ impl<'a> ThinCheckerState<'a> {
                         continue;
                     };
                     if !self.has_static_modifier(&accessor.modifiers) {
+                        continue;
+                    }
+                    if self.is_private_identifier_name(accessor.name) {
                         continue;
                     }
                     let Some(name) = self.get_property_name(accessor.name) else {
@@ -4069,8 +4210,8 @@ impl<'a> ThinCheckerState<'a> {
                 let base_sym_id = match self.resolve_heritage_symbol(expr_idx) {
                     Some(base_sym_id) => base_sym_id,
                     None => {
-                        if let Some(base_constructor_type) =
-                            self.base_constructor_type_from_expression(expr_idx)
+                        if let Some(base_constructor_type) = self
+                            .base_constructor_type_from_expression(expr_idx, type_arguments)
                         {
                             self.merge_constructor_properties_from_type(
                                 base_constructor_type,
@@ -4102,8 +4243,8 @@ impl<'a> ThinCheckerState<'a> {
                     }
                 }
                 let Some(base_class_idx) = base_class_idx else {
-                    if let Some(base_constructor_type) =
-                        self.base_constructor_type_from_expression(expr_idx)
+                    if let Some(base_constructor_type) = self
+                        .base_constructor_type_from_expression(expr_idx, type_arguments)
                     {
                         self.merge_constructor_properties_from_type(
                             base_constructor_type,
@@ -4409,9 +4550,11 @@ impl<'a> ThinCheckerState<'a> {
     fn is_narrowable_type(&self, type_id: TypeId) -> bool {
         use crate::solver::TypeKey;
 
-        // Check if it's a union type
-        if let Some(TypeKey::Union(_)) = self.ctx.types.lookup(type_id) {
-            return true;
+        // Check if it's a union type or a type parameter (which can be narrowed)
+        if let Some(key) = self.ctx.types.lookup(type_id) {
+            if matches!(key, TypeKey::Union(_) | TypeKey::TypeParameter(_) | TypeKey::Infer(_)) {
+                return true;
+            }
         }
 
         // Could also check for types that include null/undefined
@@ -6556,6 +6699,17 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Get type of property access expression.
     fn get_type_of_property_access(&mut self, idx: NodeIndex) -> TypeId {
+        if *self.ctx.instantiation_depth.borrow() >= MAX_INSTANTIATION_DEPTH {
+            return TypeId::ANY;
+        }
+
+        *self.ctx.instantiation_depth.borrow_mut() += 1;
+        let result = self.get_type_of_property_access_inner(idx);
+        *self.ctx.instantiation_depth.borrow_mut() -= 1;
+        result
+    }
+
+    fn get_type_of_property_access_inner(&mut self, idx: NodeIndex) -> TypeId {
         use crate::solver::{PropertyAccessResult, QueryDatabase};
 
         let Some(node) = self.ctx.arena.get(idx) else {
@@ -7802,6 +7956,17 @@ impl<'a> ThinCheckerState<'a> {
             return self.ctx.types.tuple(tuple_elements);
         }
 
+        if let Some(ref helper) = ctx_helper {
+            if let Some(context_element_type) = helper.get_array_element_type() {
+                if element_types
+                    .iter()
+                    .all(|&elem_type| self.is_assignable_to(elem_type, context_element_type))
+                {
+                    return self.ctx.types.array(context_element_type);
+                }
+            }
+        }
+
         // Choose a best common type if any element is a supertype of all others.
         let element_type = if element_types.len() == 1 {
             element_types[0]
@@ -8852,12 +9017,35 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    /// Evaluate specific type constructs that are not directly handled in assignability.
+    fn evaluate_type_for_assignability(&mut self, type_id: TypeId) -> TypeId {
+        use crate::solver::TypeKey;
+
+        let Some(key) = self.ctx.types.lookup(type_id) else {
+            return type_id;
+        };
+
+        match key {
+            TypeKey::IndexAccess(_, _)
+            | TypeKey::KeyOf(_)
+            | TypeKey::Mapped(_)
+            | TypeKey::Conditional(_) => self.evaluate_type_with_env(type_id),
+            _ => type_id,
+        }
+    }
+
     /// Check if `source` type is assignable to `target` type.
     ///
     /// Uses the solver's SubtypeChecker with coinductive cycle detection.
     /// Uses the context's TypeEnvironment for resolving type references and expanding Applications.
-    pub fn is_assignable_to(&self, source: TypeId, target: TypeId) -> bool {
+    pub fn is_assignable_to(&mut self, source: TypeId, target: TypeId) -> bool {
         use crate::solver::CompatChecker;
+
+        self.ensure_application_symbols_resolved(source);
+        self.ensure_application_symbols_resolved(target);
+
+        let source = self.evaluate_type_for_assignability(source);
+        let target = self.evaluate_type_for_assignability(target);
 
         let env = self.ctx.type_env.borrow();
         if let Some(result) =
@@ -9103,8 +9291,15 @@ impl<'a> ThinCheckerState<'a> {
             return type_id;
         }
 
+        if *self.ctx.instantiation_depth.borrow() >= MAX_INSTANTIATION_DEPTH {
+            self.ctx.mapped_eval_set.remove(&type_id);
+            return type_id;
+        }
+        *self.ctx.instantiation_depth.borrow_mut() += 1;
+
         let result = self.evaluate_mapped_type_with_resolution_inner(type_id, mapped_id);
 
+        *self.ctx.instantiation_depth.borrow_mut() -= 1;
         self.ctx.mapped_eval_set.remove(&type_id);
         self.ctx.mapped_eval_cache.insert(type_id, result);
         result
@@ -9139,11 +9334,8 @@ impl<'a> ThinCheckerState<'a> {
             let mut subst = TypeSubstitution::new();
             subst.insert(mapped.type_param.name, key_literal);
 
-            // Instantiate the template
+            // Instantiate the template without recursively expanding nested applications.
             let property_type = instantiate_type(self.ctx.types, mapped.template, &subst);
-
-            // Recursively evaluate the property type (handles nested Applications)
-            let property_type = self.evaluate_application_type(property_type);
 
             let optional = matches!(mapped.optional_modifier, Some(crate::solver::MappedModifier::Add));
             let readonly = matches!(mapped.readonly_modifier, Some(crate::solver::MappedModifier::Add));

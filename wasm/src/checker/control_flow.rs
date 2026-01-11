@@ -21,7 +21,7 @@
 use crate::binder::{FlowNode, FlowNodeId, flow_flags, symbol_flags, SymbolId};
 use crate::interner::Atom;
 use crate::parser::thin_node::{BinaryExprData, CallExprData, ThinNodeArena};
-use crate::parser::{NodeIndex, node_flags, syntax_kind_ext};
+use crate::parser::{NodeIndex, NodeList, node_flags, syntax_kind_ext};
 use crate::scanner::SyntaxKind;
 use crate::solver::{LiteralValue, ParamInfo, TypeId, TypeInterner, TypeKey, TypePredicate, TypePredicateTarget, NarrowingContext};
 use crate::thin_binder::ThinBinderState;
@@ -45,6 +45,12 @@ enum PropertyPresence {
     Optional,
     Absent,
     Unknown,
+}
+
+#[derive(Clone, Copy, Debug)]
+enum PropertyKey {
+    Atom(Atom),
+    Index(usize),
 }
 
 #[derive(Clone)]
@@ -451,10 +457,13 @@ impl<'a> FlowAnalyzer<'a> {
 
         if node.kind == syntax_kind_ext::BINARY_EXPRESSION {
             let bin = self.arena.get_binary_expr(node)?;
-            if bin.operator_token == SyntaxKind::EqualsToken as u16
-                && self.is_matching_reference(bin.left, reference)
-            {
-                return Some(bin.right);
+            if bin.operator_token == SyntaxKind::EqualsToken as u16 {
+                if self.is_matching_reference(bin.left, reference) {
+                    return Some(bin.right);
+                }
+                if let Some(rhs) = self.match_destructuring_rhs(bin.left, bin.right, reference) {
+                    return Some(rhs);
+                }
             }
             return None;
         }
@@ -463,6 +472,13 @@ impl<'a> FlowAnalyzer<'a> {
             let decl = self.arena.get_variable_declaration(node)?;
             if self.is_matching_reference(decl.name, reference) && !decl.initializer.is_none() {
                 return Some(decl.initializer);
+            }
+            if !decl.initializer.is_none() {
+                if let Some(rhs) =
+                    self.match_destructuring_rhs(decl.name, decl.initializer, reference)
+                {
+                    return Some(rhs);
+                }
             }
             return None;
         }
@@ -486,10 +502,266 @@ impl<'a> FlowAnalyzer<'a> {
                     {
                         return Some(decl.initializer);
                     }
+                    if !decl.initializer.is_none() {
+                        if let Some(rhs) = self.match_destructuring_rhs(
+                            decl.name,
+                            decl.initializer,
+                            reference,
+                        ) {
+                            return Some(rhs);
+                        }
+                    }
                 }
             }
         }
 
+        None
+    }
+
+    fn match_destructuring_rhs(
+        &self,
+        pattern: NodeIndex,
+        rhs: NodeIndex,
+        target: NodeIndex,
+    ) -> Option<NodeIndex> {
+        if pattern.is_none() {
+            return None;
+        }
+
+        let pattern = self.skip_parens_and_assertions(pattern);
+        let rhs = if rhs.is_none() {
+            rhs
+        } else {
+            self.skip_parens_and_assertions(rhs)
+        };
+
+        if !rhs.is_none() && self.is_matching_reference(pattern, target) {
+            return Some(rhs);
+        }
+
+        let node = self.arena.get(pattern)?;
+        match node.kind {
+            k if k == syntax_kind_ext::BINARY_EXPRESSION => {
+                let bin = self.arena.get_binary_expr(node)?;
+                if bin.operator_token != SyntaxKind::EqualsToken as u16 {
+                    return None;
+                }
+                if let Some(found) = self.match_destructuring_rhs(bin.left, rhs, target) {
+                    return Some(found);
+                }
+                if self.assignment_targets_reference_internal(bin.left, target) {
+                    if let Some(found) = self.match_destructuring_rhs(bin.left, bin.right, target) {
+                        return Some(found);
+                    }
+                    return Some(bin.right);
+                }
+            }
+            k if k == syntax_kind_ext::ARRAY_LITERAL_EXPRESSION
+                || k == syntax_kind_ext::ARRAY_BINDING_PATTERN =>
+            {
+                let elements = if k == syntax_kind_ext::ARRAY_LITERAL_EXPRESSION {
+                    self.arena.get_literal_expr(node).map(|lit| &lit.elements)?
+                } else {
+                    self.arena.get_binding_pattern(node).map(|pat| &pat.elements)?
+                };
+                let rhs_elements = self.array_literal_elements(rhs);
+                for (index, &elem) in elements.nodes.iter().enumerate() {
+                    if elem.is_none() {
+                        continue;
+                    }
+                    if !self.assignment_targets_reference_internal(elem, target) {
+                        continue;
+                    }
+                    let rhs_elem = rhs_elements
+                        .and_then(|rhs_list| rhs_list.nodes.get(index).copied())
+                        .unwrap_or(NodeIndex::NONE);
+                    if let Some(found) = self.match_destructuring_rhs(elem, rhs_elem, target) {
+                        return Some(found);
+                    }
+                    if !rhs_elem.is_none() {
+                        return Some(rhs_elem);
+                    }
+                    return None;
+                }
+            }
+            k if k == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION
+                || k == syntax_kind_ext::OBJECT_BINDING_PATTERN =>
+            {
+                let elements = if k == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION {
+                    self.arena.get_literal_expr(node).map(|lit| &lit.elements)?
+                } else {
+                    self.arena.get_binding_pattern(node).map(|pat| &pat.elements)?
+                };
+                for &elem in &elements.nodes {
+                    if elem.is_none() {
+                        continue;
+                    }
+                    if let Some(found) = self.match_object_pattern_element(elem, rhs, target) {
+                        return Some(found);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::BINDING_ELEMENT => {
+                let binding = self.arena.get_binding_element(node)?;
+                if self.assignment_targets_reference_internal(binding.name, target) {
+                    if !rhs.is_none() {
+                        if let Some(found) = self.match_destructuring_rhs(binding.name, rhs, target)
+                        {
+                            return Some(found);
+                        }
+                        if self.is_matching_reference(binding.name, target) {
+                            return Some(rhs);
+                        }
+                    }
+                    if !binding.initializer.is_none() {
+                        if let Some(found) = self.match_destructuring_rhs(
+                            binding.name,
+                            binding.initializer,
+                            target,
+                        ) {
+                            return Some(found);
+                        }
+                        return Some(binding.initializer);
+                    }
+                }
+            }
+            _ => {}
+        }
+
+        None
+    }
+
+    fn match_object_pattern_element(
+        &self,
+        elem: NodeIndex,
+        rhs: NodeIndex,
+        target: NodeIndex,
+    ) -> Option<NodeIndex> {
+        let elem_node = self.arena.get(elem)?;
+        match elem_node.kind {
+            k if k == syntax_kind_ext::PROPERTY_ASSIGNMENT => {
+                let prop = self.arena.get_property_assignment(elem_node)?;
+                if !self.assignment_targets_reference_internal(prop.initializer, target) {
+                    return None;
+                }
+                if let Some(rhs_value) = self.lookup_property_in_rhs(rhs, prop.name) {
+                    if let Some(found) =
+                        self.match_destructuring_rhs(prop.initializer, rhs_value, target)
+                    {
+                        return Some(found);
+                    }
+                    return Some(rhs_value);
+                }
+                return self.match_destructuring_rhs(prop.initializer, NodeIndex::NONE, target);
+            }
+            k if k == syntax_kind_ext::SHORTHAND_PROPERTY_ASSIGNMENT => {
+                let prop = self.arena.get_shorthand_property(elem_node)?;
+                if !self.assignment_targets_reference_internal(prop.name, target) {
+                    return None;
+                }
+                if let Some(rhs_value) = self.lookup_property_in_rhs(rhs, prop.name) {
+                    return Some(rhs_value);
+                }
+            }
+            k if k == syntax_kind_ext::BINDING_ELEMENT => {
+                let binding = self.arena.get_binding_element(elem_node)?;
+                if !self.assignment_targets_reference_internal(binding.name, target) {
+                    return None;
+                }
+                let name_idx = if binding.property_name.is_none() {
+                    binding.name
+                } else {
+                    binding.property_name
+                };
+                if let Some(rhs_value) = self.lookup_property_in_rhs(rhs, name_idx) {
+                    if let Some(found) =
+                        self.match_destructuring_rhs(binding.name, rhs_value, target)
+                    {
+                        return Some(found);
+                    }
+                    return Some(rhs_value);
+                }
+                if !binding.initializer.is_none() {
+                    if let Some(found) =
+                        self.match_destructuring_rhs(binding.name, binding.initializer, target)
+                    {
+                        return Some(found);
+                    }
+                    return Some(binding.initializer);
+                }
+            }
+            _ => {}
+        }
+        None
+    }
+
+    fn array_literal_elements(&self, rhs: NodeIndex) -> Option<&NodeList> {
+        if rhs.is_none() {
+            return None;
+        }
+        let rhs = self.skip_parens_and_assertions(rhs);
+        let node = self.arena.get(rhs)?;
+        if node.kind != syntax_kind_ext::ARRAY_LITERAL_EXPRESSION {
+            return None;
+        }
+        self.arena.get_literal_expr(node).map(|lit| &lit.elements)
+    }
+
+    fn lookup_property_in_rhs(&self, rhs: NodeIndex, name: NodeIndex) -> Option<NodeIndex> {
+        if rhs.is_none() || name.is_none() {
+            return None;
+        }
+        let rhs = self.skip_parens_and_assertions(rhs);
+        let rhs_node = self.arena.get(rhs)?;
+        let key = self.property_key_from_name(name)?;
+
+        if rhs_node.kind == syntax_kind_ext::ARRAY_LITERAL_EXPRESSION {
+            let lit = self.arena.get_literal_expr(rhs_node)?;
+            if let PropertyKey::Index(index) = key {
+                return lit.elements.nodes.get(index).copied().filter(|n| !n.is_none());
+            }
+            return None;
+        }
+
+        if rhs_node.kind == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION {
+            let lit = self.arena.get_literal_expr(rhs_node)?;
+            if let PropertyKey::Atom(atom) = key {
+                return self.find_property_in_object_literal(lit, atom);
+            }
+        }
+
+        None
+    }
+
+    fn find_property_in_object_literal(
+        &self,
+        literal: &crate::parser::thin_node::LiteralExprData,
+        target: Atom,
+    ) -> Option<NodeIndex> {
+        for &elem in &literal.elements.nodes {
+            let Some(elem_node) = self.arena.get(elem) else {
+                continue;
+            };
+            match elem_node.kind {
+                k if k == syntax_kind_ext::PROPERTY_ASSIGNMENT => {
+                    let prop = self.arena.get_property_assignment(elem_node)?;
+                    if let Some(PropertyKey::Atom(name)) = self.property_key_from_name(prop.name) {
+                        if name == target {
+                            return Some(prop.initializer);
+                        }
+                    }
+                }
+                k if k == syntax_kind_ext::SHORTHAND_PROPERTY_ASSIGNMENT => {
+                    let prop = self.arena.get_shorthand_property(elem_node)?;
+                    if let Some(PropertyKey::Atom(name)) = self.property_key_from_name(prop.name) {
+                        if name == target {
+                            return Some(prop.name);
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
         None
     }
 
@@ -829,6 +1101,53 @@ impl<'a> FlowAnalyzer<'a> {
                     if let Some(narrowed) = self.narrow_by_call_predicate(type_id, call, target, is_true_branch) {
                         return narrowed;
                     }
+                    if is_true_branch {
+                        let optional_call =
+                            (cond_node.flags as u32 & node_flags::OPTIONAL_CHAIN) != 0;
+                        if optional_call && self.is_matching_reference(call.expression, target) {
+                            let narrowed =
+                                narrowing.narrow_excluding_type(type_id, TypeId::NULL);
+                            return narrowing.narrow_excluding_type(
+                                narrowed,
+                                TypeId::UNDEFINED,
+                            );
+                        }
+                        if let Some(callee_node) = self.arena.get(call.expression) {
+                            if let Some(access) = self.arena.get_access_expr(callee_node) {
+                                if access.question_dot_token
+                                    && self.is_matching_reference(access.expression, target)
+                                {
+                                    let narrowed =
+                                        narrowing.narrow_excluding_type(type_id, TypeId::NULL);
+                                    return narrowing.narrow_excluding_type(
+                                        narrowed,
+                                        TypeId::UNDEFINED,
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            k if k == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION
+                || k == syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION =>
+            {
+                if let Some(access) = self.arena.get_access_expr(cond_node) {
+                    if access.question_dot_token
+                        && is_true_branch
+                        && self.is_matching_reference(access.expression, target)
+                    {
+                        let narrowed = narrowing.narrow_excluding_type(type_id, TypeId::NULL);
+                        return narrowing.narrow_excluding_type(narrowed, TypeId::UNDEFINED);
+                    }
+                }
+                if let Some(prop_name) = self.discriminant_property(condition_idx, target) {
+                    let literal_true = self.interner.literal_boolean(true);
+                    if is_true_branch {
+                        return narrowing.narrow_by_discriminant(type_id, prop_name, literal_true);
+                    }
+                    return narrowing.narrow_by_excluding_discriminant(type_id, prop_name, literal_true);
                 }
             }
 
@@ -952,11 +1271,21 @@ impl<'a> FlowAnalyzer<'a> {
         }
 
         if is_strict {
-            if let Some((prop_name, literal_type)) = self.discriminant_comparison(bin.left, bin.right, target) {
-                if effective_truth {
-                    return narrowing.narrow_by_discriminant(type_id, prop_name, literal_type);
+            if let Some((prop_name, literal_type, is_optional)) =
+                self.discriminant_comparison(bin.left, bin.right, target)
+            {
+                let mut base_type = type_id;
+                if is_optional && effective_truth {
+                    let narrowed = narrowing.narrow_excluding_type(base_type, TypeId::NULL);
+                    base_type = narrowing.narrow_excluding_type(narrowed, TypeId::UNDEFINED);
                 }
-                return narrowing.narrow_by_excluding_discriminant(type_id, prop_name, literal_type);
+                return self.narrow_by_discriminant_for_type(
+                    base_type,
+                    prop_name,
+                    literal_type,
+                    effective_truth,
+                    narrowing,
+                );
             }
 
             if let Some(literal_type) = self.literal_comparison(bin.left, bin.right, target) {
@@ -1373,6 +1702,15 @@ impl<'a> FlowAnalyzer<'a> {
                     params: sig.params.clone(),
                 })
             }
+            TypeKey::Union(members) => {
+                let members = self.interner.type_list(members);
+                for &member in members.iter() {
+                    if let Some(sig) = self.predicate_signature_for_type(member) {
+                        return Some(sig);
+                    }
+                }
+                None
+            }
             _ => None,
         }
     }
@@ -1439,7 +1777,70 @@ impl<'a> FlowAnalyzer<'a> {
             return type_id;
         }
 
+        if let Some(instance_type) = self.instance_type_from_constructor(bin.right) {
+            let narrowing = NarrowingContext::new(self.interner);
+            return narrowing.narrow_to_type(type_id, instance_type);
+        }
+
         self.narrow_to_objectish(type_id)
+    }
+
+    fn instance_type_from_constructor(&self, expr: NodeIndex) -> Option<TypeId> {
+        if let Some(node_types) = self.node_types {
+            if let Some(&type_id) = node_types.get(&expr.0) {
+                if let Some(instance_type) = self.instance_type_from_constructor_type(type_id) {
+                    return Some(instance_type);
+                }
+            }
+        }
+
+        let expr = self.skip_parens_and_assertions(expr);
+        let sym_id = self.binder.resolve_identifier(self.arena, expr)?;
+        let symbol = self.binder.get_symbol(sym_id)?;
+        if (symbol.flags & symbol_flags::CLASS) != 0 {
+            return Some(self.interner.reference(crate::solver::SymbolRef(sym_id.0)));
+        }
+
+        None
+    }
+
+    fn instance_type_from_constructor_type(&self, type_id: TypeId) -> Option<TypeId> {
+        match self.interner.lookup(type_id)? {
+            TypeKey::Callable(shape_id) => {
+                let shape = self.interner.callable_shape(shape_id);
+                if shape.construct_signatures.is_empty() {
+                    return None;
+                }
+                let mut returns = Vec::new();
+                for sig in &shape.construct_signatures {
+                    returns.push(sig.return_type);
+                }
+                Some(if returns.len() == 1 {
+                    returns[0]
+                } else {
+                    self.interner.union(returns)
+                })
+            }
+            TypeKey::Union(members) => {
+                let members = self.interner.type_list(members);
+                let mut instance_types = Vec::new();
+                for &member in members.iter() {
+                    if let Some(instance_type) =
+                        self.instance_type_from_constructor_type(member)
+                    {
+                        instance_types.push(instance_type);
+                    }
+                }
+                if instance_types.is_empty() {
+                    None
+                } else if instance_types.len() == 1 {
+                    Some(instance_types[0])
+                } else {
+                    Some(self.interner.union(instance_types))
+                }
+            }
+            _ => None,
+        }
     }
 
     fn narrow_by_in_operator(
@@ -1458,6 +1859,19 @@ impl<'a> FlowAnalyzer<'a> {
         };
 
         if type_id == TypeId::ANY || type_id == TypeId::UNKNOWN {
+            return type_id;
+        }
+
+        if let Some(TypeKey::TypeParameter(info)) = self.interner.lookup(type_id) {
+            if let Some(constraint) = info.constraint {
+                if constraint != type_id {
+                    let narrowed_constraint =
+                        self.narrow_by_in_operator(constraint, bin, target, is_true_branch);
+                    if narrowed_constraint != constraint {
+                        return self.interner.intersection2(type_id, narrowed_constraint);
+                    }
+                }
+            }
             return type_id;
         }
 
@@ -1557,48 +1971,7 @@ impl<'a> FlowAnalyzer<'a> {
 
     fn in_property_name(&self, idx: NodeIndex) -> Option<(Atom, bool)> {
         let idx = self.skip_parenthesized(idx);
-        let node = self.arena.get(idx)?;
-
-        if node.kind == SyntaxKind::StringLiteral as u16
-            || node.kind == SyntaxKind::NoSubstitutionTemplateLiteral as u16
-        {
-            let lit = self.arena.get_literal(node)?;
-            let atom = self.interner.intern_string(&lit.text);
-            return Some((atom, false));
-        }
-
-        if node.kind == SyntaxKind::PrivateIdentifier as u16 {
-            let ident = self.arena.get_identifier(node)?;
-            let atom = self.interner.intern_string(&ident.escaped_text);
-            return Some((atom, false));
-        }
-
-        if node.kind == SyntaxKind::NumericLiteral as u16 {
-            let lit = self.arena.get_literal(node)?;
-            let atom = self.interner.intern_string(&lit.text);
-            return Some((atom, true));
-        }
-
-        if node.kind == syntax_kind_ext::PREFIX_UNARY_EXPRESSION {
-            let unary = self.arena.get_unary_expr(node)?;
-            let op = unary.operator;
-            if op == SyntaxKind::PlusToken as u16 || op == SyntaxKind::MinusToken as u16 {
-                let operand = self.skip_parenthesized(unary.operand);
-                let operand_node = self.arena.get(operand)?;
-                if operand_node.kind == SyntaxKind::NumericLiteral as u16 {
-                    let lit = self.arena.get_literal(operand_node)?;
-                    let mut text = String::new();
-                    if op == SyntaxKind::MinusToken as u16 {
-                        text.push('-');
-                    }
-                    text.push_str(&lit.text);
-                    let atom = self.interner.intern_string(&text);
-                    return Some((atom, true));
-                }
-            }
-        }
-
-        None
+        self.literal_atom_and_kind_from_node_or_type(idx)
     }
 
     fn keep_in_operator_member(
@@ -1712,6 +2085,31 @@ impl<'a> FlowAnalyzer<'a> {
             if node.kind == syntax_kind_ext::PARENTHESIZED_EXPRESSION {
                 if let Some(paren) = self.arena.get_parenthesized(node) {
                     idx = paren.expression;
+                    continue;
+                }
+            }
+            return idx;
+        }
+    }
+
+    fn skip_parens_and_assertions(&self, mut idx: NodeIndex) -> NodeIndex {
+        loop {
+            idx = self.skip_parenthesized(idx);
+            let Some(node) = self.arena.get(idx) else {
+                return idx;
+            };
+            if node.kind == syntax_kind_ext::NON_NULL_EXPRESSION {
+                if let Some(unary) = self.arena.get_unary_expr_ex(node) {
+                    idx = unary.expression;
+                    continue;
+                }
+            }
+            if node.kind == syntax_kind_ext::TYPE_ASSERTION
+                || node.kind == syntax_kind_ext::AS_EXPRESSION
+                || node.kind == syntax_kind_ext::SATISFIES_EXPRESSION
+            {
+                if let Some(assertion) = self.arena.get_type_assertion(node) {
+                    idx = assertion.expression;
                     continue;
                 }
             }
@@ -1873,26 +2271,36 @@ impl<'a> FlowAnalyzer<'a> {
     }
 
     fn discriminant_property(&self, expr: NodeIndex, target: NodeIndex) -> Option<Atom> {
+        self.discriminant_property_info(expr, target)
+            .and_then(|(prop, is_optional)| if is_optional { None } else { Some(prop) })
+    }
+
+    fn discriminant_property_info(
+        &self,
+        expr: NodeIndex,
+        target: NodeIndex,
+    ) -> Option<(Atom, bool)> {
         let expr = self.skip_parenthesized(expr);
         let node = self.arena.get(expr)?;
 
         if node.kind == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION {
             let access = self.arena.get_access_expr(node)?;
-            if access.question_dot_token || !self.is_matching_reference(access.expression, target) {
+            if !self.is_matching_reference(access.expression, target) {
                 return None;
             }
             let name_node = self.arena.get(access.name_or_argument)?;
             let ident = self.arena.get_identifier(name_node)?;
-            return Some(self.interner.intern_string(&ident.escaped_text));
+            let name = self.interner.intern_string(&ident.escaped_text);
+            return Some((name, access.question_dot_token));
         }
 
         if node.kind == syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION {
             let access = self.arena.get_access_expr(node)?;
-            if access.question_dot_token || !self.is_matching_reference(access.expression, target) {
+            if !self.is_matching_reference(access.expression, target) {
                 return None;
             }
             let name = self.literal_atom_from_node_or_type(access.name_or_argument)?;
-            return Some(name);
+            return Some((name, access.question_dot_token));
         }
 
         None
@@ -1903,20 +2311,54 @@ impl<'a> FlowAnalyzer<'a> {
         left: NodeIndex,
         right: NodeIndex,
         target: NodeIndex,
-    ) -> Option<(Atom, TypeId)> {
-        if let Some(prop) = self.discriminant_property(left, target) {
+    ) -> Option<(Atom, TypeId, bool)> {
+        if let Some((prop, is_optional)) = self.discriminant_property_info(left, target) {
             if let Some(literal) = self.literal_type_from_node(right) {
-                return Some((prop, literal));
+                return Some((prop, literal, is_optional));
             }
         }
 
-        if let Some(prop) = self.discriminant_property(right, target) {
+        if let Some((prop, is_optional)) = self.discriminant_property_info(right, target) {
             if let Some(literal) = self.literal_type_from_node(left) {
-                return Some((prop, literal));
+                return Some((prop, literal, is_optional));
             }
         }
 
         None
+    }
+
+    fn narrow_by_discriminant_for_type(
+        &self,
+        type_id: TypeId,
+        prop_name: Atom,
+        literal_type: TypeId,
+        is_true_branch: bool,
+        narrowing: &NarrowingContext,
+    ) -> TypeId {
+        if let Some(TypeKey::TypeParameter(info)) = self.interner.lookup(type_id) {
+            if let Some(constraint) = info.constraint {
+                if constraint != type_id {
+                    let narrowed_constraint = if is_true_branch {
+                        narrowing.narrow_by_discriminant(constraint, prop_name, literal_type)
+                    } else {
+                        narrowing.narrow_by_excluding_discriminant(
+                            constraint,
+                            prop_name,
+                            literal_type,
+                        )
+                    };
+                    if narrowed_constraint != constraint {
+                        return self.interner.intersection2(type_id, narrowed_constraint);
+                    }
+                }
+            }
+        }
+
+        if is_true_branch {
+            narrowing.narrow_by_discriminant(type_id, prop_name, literal_type)
+        } else {
+            narrowing.narrow_by_excluding_discriminant(type_id, prop_name, literal_type)
+        }
     }
 
     fn literal_comparison(
@@ -2268,6 +2710,37 @@ impl<'a> FlowAnalyzer<'a> {
         self.literal_atom_from_type(idx)
     }
 
+    fn literal_atom_and_kind_from_node_or_type(&self, idx: NodeIndex) -> Option<(Atom, bool)> {
+        if let Some(value) = self.literal_number_from_node(idx) {
+            return Some((self.atom_from_numeric_value(value), true));
+        }
+        if let Some(name) = self.literal_string_from_node(idx) {
+            return Some((self.interner.intern_string(name), false));
+        }
+
+        let node_types = self.node_types?;
+        let type_id = *node_types.get(&idx.0)?;
+        match self.interner.lookup(type_id)? {
+            TypeKey::Literal(LiteralValue::String(atom)) => Some((atom, false)),
+            TypeKey::Literal(LiteralValue::Number(num)) => {
+                Some((self.atom_from_numeric_value(num.0), true))
+            }
+            _ => None,
+        }
+    }
+
+    fn literal_number_from_node_or_type(&self, idx: NodeIndex) -> Option<f64> {
+        if let Some(value) = self.literal_number_from_node(idx) {
+            return Some(value);
+        }
+        let node_types = self.node_types?;
+        let type_id = *node_types.get(&idx.0)?;
+        match self.interner.lookup(type_id)? {
+            TypeKey::Literal(LiteralValue::Number(num)) => Some(num.0),
+            _ => None,
+        }
+    }
+
     fn literal_atom_from_type(&self, idx: NodeIndex) -> Option<Atom> {
         let node_types = self.node_types?;
         let type_id = *node_types.get(&idx.0)?;
@@ -2276,6 +2749,34 @@ impl<'a> FlowAnalyzer<'a> {
             TypeKey::Literal(LiteralValue::Number(num)) => Some(self.atom_from_numeric_value(num.0)),
             _ => None,
         }
+    }
+
+    fn property_key_from_name(&self, name_idx: NodeIndex) -> Option<PropertyKey> {
+        let name_idx = self.skip_parens_and_assertions(name_idx);
+        let node = self.arena.get(name_idx)?;
+
+        if node.kind == syntax_kind_ext::COMPUTED_PROPERTY_NAME {
+            let computed = self.arena.get_computed_property(node)?;
+            if let Some(value) = self.literal_number_from_node_or_type(computed.expression) {
+                if value.fract() == 0.0 && value >= 0.0 {
+                    return Some(PropertyKey::Index(value as usize));
+                }
+            }
+            if let Some(atom) = self.literal_atom_from_node_or_type(computed.expression) {
+                return Some(PropertyKey::Atom(atom));
+            }
+            return None;
+        }
+
+        if let Some(ident) = self.arena.get_identifier(node) {
+            return Some(PropertyKey::Atom(self.interner.intern_string(&ident.escaped_text)));
+        }
+
+        if let Some((atom, _)) = self.literal_atom_and_kind_from_node_or_type(name_idx) {
+            return Some(PropertyKey::Atom(atom));
+        }
+
+        None
     }
 
     fn literal_number_from_node(&self, idx: NodeIndex) -> Option<f64> {
@@ -2365,6 +2866,12 @@ impl<'a> FlowAnalyzer<'a> {
         }
 
         let node = self.arena.get(idx)?;
+        if node.kind == syntax_kind_ext::BINARY_EXPRESSION {
+            let bin = self.arena.get_binary_expr(node)?;
+            if self.is_assignment_operator(bin.operator_token) {
+                return self.reference_symbol_inner(bin.left, visited);
+            }
+        }
         if node.kind == syntax_kind_ext::QUALIFIED_NAME {
             let qn = self.arena.get_qualified_name(node)?;
             return self.resolve_namespace_member(qn.left, qn.right, visited);
@@ -2441,206 +2948,6 @@ impl<'a> FlowAnalyzer<'a> {
         }
         let import = self.arena.get_import_decl(decl_node)?;
         self.reference_symbol_inner(import.module_specifier, visited)
-    }
-}
-
-// ============================================================================
-// Return-path analysis helpers (used for implicit return diagnostics).
-// ============================================================================
-
-pub(crate) fn function_body_falls_through(arena: &ThinNodeArena, body_idx: NodeIndex) -> bool {
-    let Some(body_node) = arena.get(body_idx) else {
-        return true;
-    };
-
-    if body_node.kind == syntax_kind_ext::BLOCK {
-        if let Some(block) = arena.get_block(body_node) {
-            return block_falls_through(arena, &block.statements.nodes);
-        }
-    }
-
-    false
-}
-
-pub(crate) fn statement_falls_through(arena: &ThinNodeArena, stmt_idx: NodeIndex) -> bool {
-    let Some(node) = arena.get(stmt_idx) else {
-        return true;
-    };
-
-    match node.kind {
-        k if k == syntax_kind_ext::RETURN_STATEMENT || k == syntax_kind_ext::THROW_STATEMENT => false,
-        k if k == syntax_kind_ext::BLOCK => arena
-            .get_block(node)
-            .map(|block| block_falls_through(arena, &block.statements.nodes))
-            .unwrap_or(true),
-        k if k == syntax_kind_ext::IF_STATEMENT => {
-            let Some(if_data) = arena.get_if_statement(node) else {
-                return true;
-            };
-            let then_falls = statement_falls_through(arena, if_data.then_statement);
-            if if_data.else_statement.is_none() {
-                return true;
-            }
-            let else_falls = statement_falls_through(arena, if_data.else_statement);
-            then_falls || else_falls
-        }
-        k if k == syntax_kind_ext::SWITCH_STATEMENT => switch_falls_through(arena, stmt_idx),
-        k if k == syntax_kind_ext::TRY_STATEMENT => try_falls_through(arena, stmt_idx),
-        k if k == syntax_kind_ext::WHILE_STATEMENT
-            || k == syntax_kind_ext::DO_STATEMENT
-            || k == syntax_kind_ext::FOR_STATEMENT =>
-        {
-            loop_falls_through(arena, node)
-        }
-        k if k == syntax_kind_ext::FOR_IN_STATEMENT || k == syntax_kind_ext::FOR_OF_STATEMENT => true,
-        k if k == syntax_kind_ext::LABELED_STATEMENT => arena
-            .get_labeled_statement(node)
-            .map(|labeled| statement_falls_through(arena, labeled.statement))
-            .unwrap_or(true),
-        _ => true,
-    }
-}
-
-fn block_falls_through(arena: &ThinNodeArena, statements: &[NodeIndex]) -> bool {
-    for &stmt_idx in statements {
-        if !statement_falls_through(arena, stmt_idx) {
-            return false;
-        }
-    }
-    true
-}
-
-fn switch_falls_through(arena: &ThinNodeArena, switch_idx: NodeIndex) -> bool {
-    let Some(node) = arena.get(switch_idx) else {
-        return true;
-    };
-    let Some(switch_data) = arena.get_switch(node) else {
-        return true;
-    };
-    let Some(case_block_node) = arena.get(switch_data.case_block) else {
-        return true;
-    };
-    let Some(case_block) = arena.get_block(case_block_node) else {
-        return true;
-    };
-
-    let mut has_default = false;
-    for &clause_idx in &case_block.statements.nodes {
-        let Some(clause_node) = arena.get(clause_idx) else {
-            continue;
-        };
-        if clause_node.kind == syntax_kind_ext::DEFAULT_CLAUSE {
-            has_default = true;
-        }
-        let Some(clause) = arena.get_case_clause(clause_node) else {
-            continue;
-        };
-        if block_falls_through(arena, &clause.statements.nodes) {
-            return true;
-        }
-    }
-
-    !has_default
-}
-
-fn try_falls_through(arena: &ThinNodeArena, try_idx: NodeIndex) -> bool {
-    let Some(node) = arena.get(try_idx) else {
-        return true;
-    };
-    let Some(try_data) = arena.get_try(node) else {
-        return true;
-    };
-
-    let try_falls = statement_falls_through(arena, try_data.try_block);
-    let catch_falls = if !try_data.catch_clause.is_none() {
-        statement_falls_through(arena, try_data.catch_clause)
-    } else {
-        false
-    };
-
-    if !try_data.finally_block.is_none() {
-        let finally_falls = statement_falls_through(arena, try_data.finally_block);
-        if !finally_falls {
-            return false;
-        }
-    }
-
-    try_falls || catch_falls
-}
-
-fn loop_falls_through(arena: &ThinNodeArena, node: &crate::parser::thin_node::ThinNode) -> bool {
-    let Some(loop_data) = arena.get_loop(node) else {
-        return true;
-    };
-
-    let condition_always_true = if loop_data.condition.is_none() {
-        true
-    } else {
-        is_true_condition(arena, loop_data.condition)
-    };
-
-    if condition_always_true && !contains_break_statement(arena, loop_data.statement) {
-        return false;
-    }
-
-    true
-}
-
-fn is_true_condition(arena: &ThinNodeArena, condition_idx: NodeIndex) -> bool {
-    let Some(node) = arena.get(condition_idx) else {
-        return false;
-    };
-    node.kind == SyntaxKind::TrueKeyword as u16
-}
-
-fn contains_break_statement(arena: &ThinNodeArena, stmt_idx: NodeIndex) -> bool {
-    let Some(node) = arena.get(stmt_idx) else {
-        return false;
-    };
-
-    match node.kind {
-        k if k == syntax_kind_ext::BREAK_STATEMENT => true,
-        k if k == syntax_kind_ext::BLOCK => arena
-            .get_block(node)
-            .map(|block| {
-                block
-                    .statements
-                    .nodes
-                    .iter()
-                    .any(|&stmt| contains_break_statement(arena, stmt))
-            })
-            .unwrap_or(false),
-        k if k == syntax_kind_ext::IF_STATEMENT => arena
-            .get_if_statement(node)
-            .map(|if_data| {
-                contains_break_statement(arena, if_data.then_statement)
-                    || (!if_data.else_statement.is_none()
-                        && contains_break_statement(arena, if_data.else_statement))
-            })
-            .unwrap_or(false),
-        k if k == syntax_kind_ext::SWITCH_STATEMENT => false,
-        k if k == syntax_kind_ext::TRY_STATEMENT => arena
-            .get_try(node)
-            .map(|try_data| {
-                contains_break_statement(arena, try_data.try_block)
-                    || (!try_data.catch_clause.is_none()
-                        && contains_break_statement(arena, try_data.catch_clause))
-                    || (!try_data.finally_block.is_none()
-                        && contains_break_statement(arena, try_data.finally_block))
-            })
-            .unwrap_or(false),
-        k if k == syntax_kind_ext::WHILE_STATEMENT
-            || k == syntax_kind_ext::DO_STATEMENT
-            || k == syntax_kind_ext::FOR_STATEMENT =>
-        {
-            false
-        }
-        k if k == syntax_kind_ext::FOR_IN_STATEMENT || k == syntax_kind_ext::FOR_OF_STATEMENT => false,
-        k if k == syntax_kind_ext::LABELED_STATEMENT => arena
-            .get_labeled_statement(node)
-            .map(|labeled| contains_break_statement(arena, labeled.statement))
-            .unwrap_or(false),
-        _ => false,
     }
 }
 
