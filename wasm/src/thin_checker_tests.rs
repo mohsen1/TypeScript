@@ -17340,3 +17340,55 @@ var instance = MyClass();
         first_error_msg
     );
 }
+
+#[test]
+fn test_overload_arg_count_exceeds_all_only_ts2554_not_ts2769() {
+    use crate::thin_parser::ThinParserState;
+
+    // Regression test for overload calls where argument count exceeds ALL signatures
+    // When all overloads fail due to argument count mismatch, should emit TS2554 only, not TS2769
+    let code = r#"
+declare function mixed(x: string): void;
+declare function mixed(x: number, y: number): void;
+
+// This call has 3 arguments, which exceeds both overloads (1 param and 2 params)
+// Should emit TS2554 (argument count mismatch) only, not TS2769
+mixed(42, 99, 100);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2554_errors: Vec<_> = checker.ctx.diagnostics.iter().filter(|d| d.code == 2554).collect();
+    let ts2769_errors: Vec<_> = checker.ctx.diagnostics.iter().filter(|d| d.code == 2769).collect();
+
+    // Should have TS2554 (argument count mismatch)
+    assert!(
+        !ts2554_errors.is_empty(),
+        "Should emit TS2554 for argument count mismatch when all overloads fail due to arg count"
+    );
+
+    // Should NOT have TS2769 (No overload matches)
+    assert!(
+        ts2769_errors.is_empty(),
+        "Should not emit TS2769 when all overloads fail due to argument count mismatch, got {} TS2769 errors: {:?}",
+        ts2769_errors.len(),
+        ts2769_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>()
+    );
+
+    // Verify TS2554 message
+    let first_error_msg = &ts2554_errors[0].message_text;
+    assert!(
+        first_error_msg.contains("Expected") && first_error_msg.contains("arguments"),
+        "TS2554 message should mention expected arguments, got: {}",
+        first_error_msg
+    );
+}
