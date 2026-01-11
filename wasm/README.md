@@ -129,7 +129,7 @@ The `CompatChecker` in `src/solver/` needs to implement the "Unsoundness Catalog
 
 
 ## Executive Summary
-Last updated: 2026-01-11
+Last updated: 2026-01-11 (Director Loop 20)
 
 ### Conformance Metrics
 | Metric | Current | Previous | Target | Status |
@@ -151,6 +151,17 @@ Last updated: 2026-01-11
 1. **TS2454/TS2564 Control Flow** (1,016 missing) - Flow Graph side-table implementation
 2. **TS2322 Solver Strictness** (310 missing) - Change fallback from Any to Unknown
 3. **TS2339 Property Access** (292 extra) - Narrowing and index signature improvements
+
+### Director Loop Status
+**Recent Merges to rust:**
+- ✅ squad/anvil (5 commits) - TS2322 false positive fixes, test improvements
+- ✅ squad/forge (2 commits) - Worker wins merged
+
+**Idle Workers (pending EM action):**
+- Forge: W2 (32), W4 (6), W5 (35 commits ahead)
+- Anvil: W1 (41), W2 (10), W3 (5), W4 (14 commits ahead)
+
+**Active Workers:** Forge W1, W3; Anvil W5
 
 ## Status
 This project is not ready for general use yet. The interface and distribution are in progress.

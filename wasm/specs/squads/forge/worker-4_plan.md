@@ -6,21 +6,24 @@ Improve TS2339 property access diagnostics.
 Status: Active
 Priority: 1
 
-## Current Assignment (⚠️ IDLE 70m - WAKE UP!)
+## Current Assignment (✅ COMPLETED - Optional chaining TS2339 fix)
 TS2339 - Property does not exist errors (CONTINUED).
 
 **Error Code:** TS2339 - "Property 'x' does not exist on type 'Y'"
-**IDLE TIME:** 70 minutes ⚠️
+**Status:** Optional chaining fix completed, 7 new tests added, all 20 TS2339 tests passing
 
 **Impact:** 142 conformance tests affected
 
-### 🚨 IMMEDIATE ACTION REQUIRED:
-1. **Resume TS2339 work** - continue property access checking improvements
-2. **Handle optional chaining** - `?.` should not emit TS2339 when optional
-3. **Handle union types** - property must exist on all union members
-4. **Handle index signatures** - string/number index types allow any property
-5. **Add tests** in `wasm/src/thin_checker_tests.rs` for property access patterns
-6. **Run focused tests** with `./wasm/test.sh` and record delta
+### ✅ COMPLETED WORK:
+1. **Fixed optional chaining** - `?.` now correctly suppresses TS2339 when property might not exist
+2. **Added 7 comprehensive TS2339 tests** covering:
+   * Optional chaining - `?.` should not emit TS2339 when optional
+   * Union types - property must exist on all union members
+   * Index signatures - string/number index types allow any property
+   * Intersection types - property access works correctly
+   * Nullable unions with optional chaining
+3. **Added is_private_field() helper** for future private field handling
+4. **All 20 TS2339 tests passing**
 
 ### MAJOR SQUAD WIN (while you were idle):
 - ✅ Forge-2: TS2322 solver fix **MERGED TO RUST**!
@@ -89,22 +92,33 @@ TS2339 - Property does not exist errors (CONTINUED).
 - [x] Added stub implementations for control flow fall-through functions
 - [x] Fixed ambient module tracking in external modules (binder bug)
 - [x] Added 6 module resolution tests (TS2792 vs TS2307)
+- [x] **Session 20**: Fixed optional chaining (`?.`) to suppress TS2339 when property doesn't exist
+- [x] **Session 20**: Added 7 comprehensive TS2339 tests (optional chaining, unions, index signatures, intersections)
+- [x] **Session 20**: Added `is_private_field()` helper for future private field handling
+- [x] **Session 20**: All 20 TS2339 tests passing
 
 ## Ready for Merge
-Yes - TS2339 core working, 20 edge cases documented
+Yes - Optional chaining TS2339 fix complete, 7 new tests added, pushed to origin/worker/forge-4
 
 ## Notes
-- Progress: **TS2339 core working, investigated remaining 20 failures**
-- TS2792: Verified complete (0 missing, 0 extra, 0 mismatched)
-- Investigation: Audited solver - unions/intersections/index signatures already correct
-- Fix 1: Resolved TS2339 false positives for private field access (PropertyNotFound path)
-- Fix 2: Added class declaration comparison for private field assignability
-- Remaining 20 failures breakdown:
-  * 8 files: Private field access (broader patterns)
-  * 3 files: Mixin/intersection types
-  * 9 files: Control flow narrowing
-- Root cause (private fields): object_type not assignable to declaring_type
-- Needs: Deep investigation of type assignability for private fields
+- **LATEST COMPLETION (Session 20)**:
+  * Fixed optional chaining (`?.`) to suppress TS2339 errors when property doesn't exist
+  * Added 7 comprehensive TS2339 tests (optional chaining, unions, index signatures, intersections)
+  * Added `is_private_field()` helper for future private field handling
+  * All 20 TS2339 tests passing
+  * Commit: `84ae532c33` - `[wasm] checker: TS2339 optional chaining fix + tests`
+  * Pushed to: `origin/worker/forge-4`
+
+- Previous Progress:
+  * TS2339 core working, investigated remaining 20 failures
+  * TS2792: Verified complete (0 missing, 0 extra, 0 mismatched)
+  * Fix 1: Resolved TS2339 false positives for private field access (PropertyNotFound path)
+  * Fix 2: Added class declaration comparison for private field assignability
+  * Remaining 20 failures breakdown:
+    * 8 files: Private field access (broader patterns)
+    * 3 files: Mixin/intersection types
+    * 9 files: Control flow narrowing
+
 - Commit format: `[wasm] checker: TS2339 property access`
 - Push to: `origin/worker/forge-4`
 - **NEVER edit**: `STRUCTURE.md`, `GOALS.md`, other workers' plan files, or anything in `orchestrator/`
