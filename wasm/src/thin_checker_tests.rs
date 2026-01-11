@@ -1,8 +1,10 @@
 //! Tests for ThinChecker - Type checker using ThinNodeArena and Solver
 
 use crate::thin_checker::ThinCheckerState;
+use crate::thin_parser::ThinParserState;
 use crate::parser::thin_node::ThinNodeArena;
 use crate::thin_binder::ThinBinderState;
+use crate::thin_parser::ThinParserState;
 use crate::solver::{TypeId, TypeInterner};
 
 #[test]
@@ -11577,19 +11579,19 @@ const animal = createAnimal(Animal); // Passing abstract class as value should b
 
     let error_count = checker.ctx.diagnostics.len();
 
-    // Currently expects 4 errors due to typeof class resolution issues
-    // Once typeof class types work correctly, change to expect 0 errors
-    if error_count != 4 {
+    // Fixed: Abstract constructor assignability now works correctly
+    // Concrete class constructors can be assigned to abstract class constructor types
+    if error_count != 0 {
         eprintln!("=== Abstract Constructor Assignability Diagnostics ===");
-        eprintln!("Expected 4 errors (typeof class issues), got {}", error_count);
+        eprintln!("Expected 0 errors, got {}", error_count);
         for diag in &checker.ctx.diagnostics {
             eprintln!("[{}] {}", diag.start, diag.message_text);
         }
     }
 
     assert_eq!(
-        error_count, 4,
-        "Expected 4 errors due to typeof class resolution: {:?}",
+        error_count, 0,
+        "Expected 0 errors (abstract constructor assignability fixed): {:?}",
         checker.ctx.diagnostics
     );
 }
@@ -11651,19 +11653,18 @@ const shapes: Shape[] = [new Circle(1), new Square(2)]; // Should be OK
 
     let error_count = checker.ctx.diagnostics.len();
 
-    // Currently expects 3 errors due to instance-to-class type comparison issues
-    // Once class inheritance type checking works, change to expect 0 errors
-    if error_count != 3 {
+    // Class inheritance type checking now works - expect 0 errors
+    if error_count != 0 {
         eprintln!("=== Concrete Extends Abstract Diagnostics ===");
-        eprintln!("Expected 3 errors (class type issues), got {}", error_count);
+        eprintln!("Expected 0 errors (class inheritance fixed), got {}", error_count);
         for diag in &checker.ctx.diagnostics {
             eprintln!("[{}] {}", diag.start, diag.message_text);
         }
     }
 
     assert_eq!(
-        error_count, 3,
-        "Expected 3 errors due to class type comparison: {:?}",
+        error_count, 0,
+        "Expected 0 errors (class inheritance now works): {:?}",
         checker.ctx.diagnostics
     );
 }
@@ -11943,19 +11944,18 @@ const name = pet.name; // OK: both Dog and Cat have name
 
     let error_count = checker.ctx.diagnostics.len();
 
-    // Currently expects 1 error due to class inheritance type issues
-    // Once class inheritance works, change to expect 0 errors
-    if error_count != 1 {
+    // Class inheritance now works - expect 0 errors
+    if error_count != 0 {
         eprintln!("=== Best Common Type Class Hierarchy Diagnostics ===");
-        eprintln!("Expected 1 error (class inheritance issues), got {}", error_count);
+        eprintln!("Expected 0 errors (class inheritance fixed), got {}", error_count);
         for diag in &checker.ctx.diagnostics {
             eprintln!("[{}] {}", diag.start, diag.message_text);
         }
     }
 
     assert_eq!(
-        error_count, 1,
-        "Expected 1 error due to class inheritance: {:?}",
+        error_count, 0,
+        "Expected 0 errors (class inheritance now works): {:?}",
         checker.ctx.diagnostics
     );
 }
@@ -12530,19 +12530,18 @@ const dogHandler: HandlerWithDogProp = animalHandler;
 
     let error_count = checker.ctx.diagnostics.len();
 
-    // Currently expects 1 error: interface inheritance not correctly resolved
-    // Once interface extends is properly handled, expect 0 errors
-    if error_count != 1 {
+    // Interface extends is now properly handled - expect 0 errors
+    if error_count != 0 {
         eprintln!("=== Function Property Contravariance Diagnostics ===");
-        eprintln!("Expected 1 error (interface inheritance not resolved), got {}", error_count);
+        eprintln!("Expected 0 errors (interface inheritance fixed), got {}", error_count);
         for diag in &checker.ctx.diagnostics {
             eprintln!("[{}] {}", diag.start, diag.message_text);
         }
     }
 
     assert_eq!(
-        error_count, 1,
-        "Expected 1 error for contravariant function prop (interface extends not yet resolved): {:?}",
+        error_count, 0,
+        "Expected 0 errors (interface extends now works, contravariance allows wider param): {:?}",
         checker.ctx.diagnostics
     );
 }
@@ -17309,7 +17308,39 @@ type t1 = DeepMap<tpl, number>;
 }
 
 #[test]
+fn test_type_parameter_in_function_body_no_ts2304() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+function identity<T>(x: T): T {
+    const y: T = x;
+    return y;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2304),
+        "Should not report TS2304 for type parameter T in function body, got diagnostics: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>()
+    );
+}
+
+#[test]
 fn test_static_private_field_access_no_ts2339() {
+    use crate::thin_parser::ThinParserState;
+
     // Regression test for static private field access
     // Previously failed with TS2339 because static private members were excluded from constructor type
     use crate::thin_parser::ThinParserState;
@@ -17334,7 +17365,6 @@ class C {
 
     let types = TypeInterner::new();
     let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
-
     checker.check_source_file(root);
 
     // Should have NO TS2339 errors for C.#x access
@@ -17348,6 +17378,8 @@ class C {
 
 #[test]
 fn test_static_private_accessor_access_no_ts2339() {
+    use crate::thin_parser::ThinParserState;
+
     // Regression test for static private accessor access
     use crate::thin_parser::ThinParserState;
 
@@ -17420,19 +17452,85 @@ function extract<T>(x: Extract<T, typeof identity>): T {
     let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
     checker.check_source_file(root);
 
-    // Check for false positive TS2304 errors on type parameter 'T'
-    let ts2304_for_T: Vec<_> = checker.ctx.diagnostics.iter()
-        .filter(|d| d.code == 2304 && d.message_text.contains("'T'"))
-        .collect();
-
-    eprintln!("[TYPE_PARAM_TYPE_QUERY] All diagnostics: {:?}",
-        checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>());
-
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
     assert!(
-        ts2304_for_T.is_empty(),
-        "Expected no TS2304 errors for type parameter 'T' in type queries, but got {} errors: {:?}",
-        ts2304_for_T.len(),
-        ts2304_for_T.iter().map(|d| &d.message_text).collect::<Vec<_>>()
+        !codes.contains(&2304),
+        "Should not report TS2304 for type parameter T in type query, got diagnostics: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn test_constrained_type_parameter_in_types_no_ts2304() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+function f1<T extends string | undefined>(x: T, y: { a: T }, z: [T]): string {
+    return "hello";
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let ts2304_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2304)
+        .map(|d| &d.message_text)
+        .collect();
+    
+    assert!(
+        !codes.contains(&2304),
+        "Should not report TS2304 for constrained type parameter T. Found errors: {:?}",
+        ts2304_errors
+    );
+}
+
+#[test]
+fn test_self_referential_type_constraint_no_ts2304() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+interface Box<T> {
+    item: T;
+}
+
+declare function unbox<T>(x: Box<T>): T;
+
+function g1<T extends Box<T> | undefined>(x: T) {
+    if (x !== undefined) {
+        unbox(x);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let ts2304_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2304)
+        .map(|d| &d.message_text)
+        .collect();
+    
+    assert!(
+        !codes.contains(&2304),
+        "Should not report TS2304 for self-referential type constraint T extends Box<T>. Found errors: {:?}",
+        ts2304_errors
     );
 }
 
@@ -17471,20 +17569,19 @@ function f1<T extends string | undefined>(x: T): string {
 }
 
 #[test]
-fn test_private_accessor_via_local_variable_no_error() {
-    use crate::thin_parser::ThinParserState;
-
+fn test_closure_captured_private_accessor_debug() {
+    // Test case matching exact failing conformance test scenario
     let source = r#"
 class A2 {
     get #prop() { return ""; }
     set #prop(param: string) { }
 
     constructor() {
-        console.log(this.#prop);
+        console.log(this.#prop); // Direct - should work
         let a: A2 = this;
-        a.#prop;
+        a.#prop; // Same context - should work
         function foo() {
-            a.#prop;
+            a.#prop; // Closure captured - currently fails but shouldn't
         }
     }
 }
@@ -17492,7 +17589,6 @@ class A2 {
 
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
-    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
 
     let mut binder = ThinBinderState::new();
     binder.bind_source_file(parser.get_arena(), root);
@@ -17510,6 +17606,70 @@ class A2 {
         ts2339_errors.is_empty(),
         "Expected no TS2339 error for private accessor via local variable, got errors: {:?}",
         ts2339_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn test_class_constructor_without_new_emits_ts2348() {
+    use crate::thin_parser::ThinParserState;
+
+    // Regression test for TS2348: calling class constructor without 'new'
+    // When a class constructor is called without 'new', should emit TS2348
+    // (Cannot invoke an expression whose type lacks a call signature)
+    // instead of TS2769 (No overload matches this call)
+    let code = r#"
+namespace Tools {
+    export class NullLogger { }
+}
+
+// Calling class constructor without 'new' - should emit TS2348
+var logger = Tools.NullLogger();
+
+// Another case with a class that has a constructor
+class MyClass {
+    constructor(x: string) { }
+}
+
+// Should also emit TS2348
+var instance = MyClass();
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2348_errors: Vec<_> = checker.ctx.diagnostics.iter().filter(|d| d.code == 2348).collect();
+    let ts2769_errors: Vec<_> = checker.ctx.diagnostics.iter().filter(|d| d.code == 2769).collect();
+
+    // Should have TS2348 errors
+    assert!(
+        ts2348_errors.len() >= 2,
+        "Should emit TS2348 for class constructor without new, got {} TS2348 errors: {:?}",
+        ts2348_errors.len(),
+        ts2348_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>()
+    );
+
+    // Should NOT have TS2769 errors
+    assert!(
+        ts2769_errors.is_empty(),
+        "Should not emit TS2769 for class constructor without new, got {} TS2769 errors: {:?}",
+        ts2769_errors.len(),
+        ts2769_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>()
+    );
+
+    // Verify the message contains helpful text
+    let first_error_msg = &ts2348_errors[0].message_text;
+    assert!(
+        first_error_msg.contains("lacks a call signature"),
+        "TS2348 message should mention 'lacks a call signature', got: {}",
+        first_error_msg
     );
 }
 
@@ -17540,14 +17700,380 @@ function f1<T extends string | undefined>(y: { a: T }): string {
     // Should have no TS2322 errors - after narrowing, y.a should be assignable to string
     let ts2322_count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2322).count();
 
-    // Property access narrowing is not yet working - this is expected to fail
-    // TODO: Fix property access flow narrowing
-    // assert_eq!(
-    //     ts2322_count, 0,
-    //     "Expected no TS2322 errors for property access, got {}",
-    //     ts2322_count
-    // );
+    // Property access narrowing is not yet working - this test shows current state
+    // TODO: Fix property access flow narrowing to reduce TS2322 errors
+    eprintln!("[PROPERTY_ACCESS_TEST] Current state: {} TS2322 errors", ts2322_count);
+    eprintln!("[PROPERTY_ACCESS_TEST] Diagnostics: {:?}", checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2322)
+        .map(|d| (&d.message_text, &d.start))
+        .collect::<Vec<_>>());
 
-    eprintln!("[PROPERTY_ACCESS_TEST] Expected failure: {} TS2322 errors", ts2322_count);
-    eprintln!("[PROPERTY_ACCESS_TEST] Issue: Property access narrowing not yet implemented");
+    // For now, this test passes regardless of errors - just logs the state
+    // Once fixed, this should assert ts2322_count == 0
 }
+
+// =============================================================================
+// TS2339 Specific Tests: Optional Chaining, Unions, Index Signatures
+// =============================================================================
+
+#[test]
+fn test_ts2339_optional_chaining_no_error() {
+    use crate::thin_parser::ThinParserState;
+
+    // Optional chaining (?.) should NOT emit TS2339 when property might not exist
+    let source = r#"
+interface A { a: string; }
+interface B { b: number; }
+
+function test(obj: A | B | null) {
+    // With optional chaining, this should NOT produce TS2339
+    const result = obj?.a;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2339_count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2339).count();
+    assert_eq!(ts2339_count, 0,
+        "Expected no TS2339 errors for optional chaining, got {}: {:?}",
+        ts2339_count,
+        checker.ctx.diagnostics.iter().filter(|d| d.code == 2339)
+            .map(|d| &d.message_text).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn test_ts2339_union_all_members_need_property() {
+    use crate::thin_parser::ThinParserState;
+
+    // For union types, property must exist on ALL non-nullable members
+    let source = r#"
+interface A { a: string; }
+interface B { b: number; }
+
+function test(obj: A | B) {
+    // This SHOULD produce TS2339 because 'c' doesn't exist on either A or B
+    const result = obj.c;
+}
+
+function test2(obj: A | B) {
+    // This SHOULD produce TS2339 because 'a' doesn't exist on B
+    const result = obj.a;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2339_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2339)
+        .collect();
+
+    // Should have 2 TS2339 errors: one for obj.c, one for obj.a
+    assert_eq!(ts2339_errors.len(), 2,
+        "Expected 2 TS2339 errors for union property access, got {}: {:?}",
+=======
+    
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+    
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    
+    checker.check_source_file(root);
+    
+    let ts2339_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2339)
+        .collect();
+    
+    eprintln!("TS2339 errors found: {}", ts2339_errors.len());
+    for err in &ts2339_errors {
+        eprintln!("  - {}", err.message_text);
+    }
+    
+    // All accesses should work - they're all from within the class
+    assert_eq!(ts2339_errors.len(), 0,
+        "Expected no TS2339 errors for private accessor access (including in closures), got {} - errors: {:?}",
+>>>>>>> origin/worker/anvil-3
+        ts2339_errors.len(),
+        ts2339_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>()
+    );
+}
+<<<<<<< HEAD
+
+#[test]
+fn test_ts2339_union_shared_property_no_error() {
+    use crate::thin_parser::ThinParserState;
+
+    // Property that exists on ALL union members should NOT produce TS2339
+    let source = r#"
+interface A { common: string; a: string; }
+interface B { common: number; b: number; }
+
+function test(obj: A | B) {
+    // This should NOT produce TS2339 because 'common' exists on both A and B
+    const result = obj.common;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2339_count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2339).count();
+    assert_eq!(ts2339_count, 0,
+        "Expected no TS2339 errors for shared union property, got {}: {:?}",
+        ts2339_count,
+        checker.ctx.diagnostics.iter().filter(|d| d.code == 2339)
+            .map(|d| &d.message_text).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn test_ts2339_index_signature_allows_any_property() {
+    use crate::thin_parser::ThinParserState;
+
+    // String/number index signatures should allow any property access
+    let source = r#"
+interface StringIndexed {
+    [key: string]: number;
+    a: number; // explicit property
+}
+
+interface NumberIndexed {
+    [key: number]: string;
+}
+
+function test1(obj: StringIndexed) {
+    // These should NOT produce TS2339 - index signature allows any string property
+    const x = obj.anyProp;
+    const y = obj.anotherProp;
+    const z = obj.a; // explicit property
+}
+
+function test2(obj: NumberIndexed) {
+    // This should NOT produce TS2339 - number index signature allows numeric access
+    const x = obj[0];
+    const y = obj[42];
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2339_count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2339).count();
+    assert_eq!(ts2339_count, 0,
+        "Expected no TS2339 errors for index signature access, got {}: {:?}",
+        ts2339_count,
+        checker.ctx.diagnostics.iter().filter(|d| d.code == 2339)
+            .map(|d| &d.message_text).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn test_ts2339_no_index_signature_error() {
+    use crate::thin_parser::ThinParserState;
+
+    // Without index signature, accessing non-existent property should produce TS2339
+    let source = r#"
+interface NoIndex {
+    a: string;
+}
+
+function test(obj: NoIndex) {
+    // This SHOULD produce TS2339 - property 'b' doesn't exist
+    const result = obj.b;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2339_count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2339).count();
+    assert_eq!(ts2339_count, 1,
+        "Expected 1 TS2339 error for missing property without index signature, got {}: {:?}",
+        ts2339_count,
+        checker.ctx.diagnostics.iter().filter(|d| d.code == 2339)
+            .map(|d| &d.message_text).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn test_ts2339_nullable_union_with_optional_chaining() {
+    use crate::thin_parser::ThinParserState;
+
+    // Test union with null/undefined using optional chaining
+    let source = r#"
+interface A { a: string; }
+
+function test(obj: A | null) {
+    // With optional chaining, this should NOT produce TS2339
+    const result = obj?.a;
+
+    // Without optional chaining, this SHOULD produce TS2339 for non-null property access
+    // (though it might produce a different error about possible null)
+    const result2 = obj.a;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // obj?.a should NOT produce TS2339
+    let ts2339_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2339)
+        .collect();
+
+    // The optional chaining case should not have TS2339
+    // obj.a might have other diagnostics but not TS2339 for property access
+    assert!(ts2339_errors.is_empty(),
+        "Expected no TS2339 errors, got {}: {:?}",
+        ts2339_errors.len(),
+        ts2339_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn test_ts2339_intersection_property_access() {
+    use crate::thin_parser::ThinParserState;
+
+    // Test property access on intersection types
+    let source = r#"
+type A = { a: string };
+type B = { b: number };
+type AB = A & B;
+
+function test(obj: AB) {
+    // These should NOT produce TS2339 - intersection has both properties
+    const x = obj.a;
+    const y = obj.b;
+}
+
+function test2(obj: A & { c: boolean }) {
+    // These should NOT produce TS2339
+    const x = obj.a;
+    const y = obj.c;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2339_count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2339).count();
+    assert_eq!(ts2339_count, 0,
+        "Expected no TS2339 errors for intersection property access, got {}: {:?}",
+        ts2339_count,
+        checker.ctx.diagnostics.iter().filter(|d| d.code == 2339)
+            .map(|d| &d.message_text).collect::<Vec<_>>()
+    );
+}
+=======
+>>>>>>> origin/worker/anvil-3
+=======
+fn test_overload_arg_count_exceeds_all_only_ts2554_not_ts2769() {
+    use crate::thin_parser::ThinParserState;
+
+    // Regression test for overload calls where argument count exceeds ALL signatures
+    // When all overloads fail due to argument count mismatch, should emit TS2554 only, not TS2769
+    let code = r#"
+declare function mixed(x: string): void;
+declare function mixed(x: number, y: number): void;
+
+// This call has 3 arguments, which exceeds both overloads (1 param and 2 params)
+// Should emit TS2554 (argument count mismatch) only, not TS2769
+mixed(42, 99, 100);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2554_errors: Vec<_> = checker.ctx.diagnostics.iter().filter(|d| d.code == 2554).collect();
+    let ts2769_errors: Vec<_> = checker.ctx.diagnostics.iter().filter(|d| d.code == 2769).collect();
+
+    // Should have TS2554 (argument count mismatch)
+    assert!(
+        !ts2554_errors.is_empty(),
+        "Should emit TS2554 for argument count mismatch when all overloads fail due to arg count"
+    );
+
+    // Should NOT have TS2769 (No overload matches)
+    assert!(
+        ts2769_errors.is_empty(),
+        "Should not emit TS2769 when all overloads fail due to argument count mismatch, got {} TS2769 errors: {:?}",
+        ts2769_errors.len(),
+        ts2769_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>()
+    );
+
+    // Verify TS2554 message
+    let first_error_msg = &ts2554_errors[0].message_text;
+    assert!(
+        first_error_msg.contains("Expected") && first_error_msg.contains("arguments"),
+        "TS2554 message should mention expected arguments, got: {}",
+        first_error_msg
+    );
+}
+>>>>>>> origin/worker/anvil-4

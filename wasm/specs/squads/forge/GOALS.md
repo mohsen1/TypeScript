@@ -162,18 +162,20 @@ bash run-conformance.sh --all --workers=14
 
 ---
 ## Squad Status
-- Last Update: 2026-01-11
+- Last EM Update: 2026-01-11 (Post-Director merge)
 - Conformance: **30.8% exact match** (+7.5pp from 23.3%)
-- Build: Passing
+- Build: Compiling
+- Workers: All 5 synced from origin/rust, active on assigned tasks
+- EM Note: Only merge forge workers (W1-W5) into squad/forge, NOT anvil workers
 
-### Worker Assignments (New Phase)
+### Worker Assignments (Current)
 | Worker | Assignment | Priority |
 |--------|------------|----------|
 | W1 | TS2454 - Definite Assignment (Control Flow) | HIGH |
-| W2 | TS2564 - Property Initialization | HIGH |
-| W3 | TS2322 - Solver Strictness (Any→Unknown) | HIGH |
-| W4 | TS2339 - Property Access (missing errors) | MEDIUM |
-| W5 | TS7010 - Return Type Checking | MEDIUM |
+| W2 | TS2322 - Tuple-to-array & optional property assignability | HIGH |
+| W3 | TS7010 - Implicit any return (active with background tasks) | HIGH |
+| W4 | TS2339 - Opt chaining, unions, index signatures | MEDIUM |
+| W5 | TS2304 - Type parameter resolution (active with background tasks) | HIGH |
 
 ### Before Starting Any Task
 **IMPORTANT:** Workers must consult Gemini before starting work:

@@ -5,27 +5,75 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 
 Status: Active
 Priority: 1
-## Current Assignment (2026-01-11 - TS7006 Implicit 'any' Parameter False Positives)
+## Current Assignment (2026-01-11 - TS7011 Implicit 'any' Return Type False Positives)
 
-**Status:** IN PROGRESS - 74% reduction achieved (46 → 12)
+**Target:** Reduce TS7011 "Implicit 'any' return type" false positives (10 occurrences)
+
+**Status:** INVESTIGATING - Basic patterns work correctly
+
+**Investigation Findings:**
+- ✅ Tested: Functions with return statements - no error (correct)
+- ✅ Tested: Ambient functions with body and return - no error (correct)
+- ✅ Tested: Functions without type annotation - no error (correct)
+- ❓ Need to identify the 10 specific false positive patterns
+
+**TS7011 Emission** (thin_checker.rs:11688):
+- Only emitted for ambient functions (declare modifier or .d.ts file)
+- Only when no return type annotation
+- Only when noImplicitAny is enabled
+
+**Next Steps:**
+1. Identify specific test files with TS7011 extra errors
+2. Analyze those edge cases
+3. Fix return type inference logic if needed
+
+**Files:** `wasm/src/thin_checker.rs`
+
+**Success Criteria:** Reduce TS7011 from 10 to <5
+
+**Problem:** WASM incorrectly reports TS7011 when function return types are inferable from context
+
+**Why TS2300 Didn't Work:** Conformance scan revealed TS2300 is primarily MISSING (27 occurrences) - WASM under-reports duplicates, not over-reports. Need to focus on EXTRA errors (false positives).
+
+**Approach:**
+1. Collect TS7011 samples from conformance tests
+2. Analyze patterns in false positives
+3. Fix return type inference in `thin_checker.rs`
+4. Add regression tests
+
+**Files:** `wasm/src/thin_checker.rs`
+
+**Success Criteria:** Reduce TS7011 from 10 to <5
+
+## Previous Assignment - TS2300 (INVESTIGATED - Not False Positives)
+
+**Status:** Investigated but discovered TS2300 is primarily MISSING errors, not extra
+
+**Investigation Findings:**
+- ✅ Interface merging works: `interface A { x: number } interface A { y: string }` - no error
+- ✅ Namespace merging works: Multiple namespace declarations merge correctly
+- ✅ Class+Interface merging works: `class C {} interface C {}` - no error
+- ❌ **Key Discovery:** Conformance scan showed 27 MISSING TS2300 errors (WASM under-reports), only 2 extra
+
+**Conclusion:** TS2300 requires WASM to ADD more duplicate detection, not remove false positives.
+This is different work from reducing false positives. Switched to TS7011 which has more tractable extra errors.
+
+## Previous Assignment - TS7006 (COMPLETED - Target Achieved)
+
+**Status:** Target achieved - reduced from 46 to 12 (74% reduction)
 
 **Completed Fixes:**
 1. ✅ Setter parameter type inference from getter return type (46 → 15)
 2. ✅ Destructured parameter elements with default values (15 → 12)
 
-**Remaining 12 patterns** (require deeper type resolution work):
-- Contextual typing with tuple union function types: `(...args: ['A', number] | ['B', string]) => void`
-- Decorator parameter handling
+**Remaining 12 patterns** (mostly blocked by parser bug):
+- **Decorator parameter handling (7+ files)** - PARSER BUG (documented)
+- Contextual typing with tuple union function types
 - IIFE callback patterns
 - Instance member prototype assignment
 
-**Files Modified:** `wasm/src/thin_checker.rs`
-
-**Commits:**
-- b5f9502636: Fix TS7006 for setter parameters (67% reduction)
-- b55d30154b: Fix TS7006 for destructured parameters with default values (20% more)
-
-**Success Criteria:** Target <20 ✅ ACHIEVED (12 remaining)
+**Note:** Success criteria <20 ✅ ACHIEVED. Remaining patterns are complex and
+largely blocked by parser bugs. Moved to TS2300 for more immediate impact.
 
 ## Previous Assignment - TS2403 (COMPLETED)
 
