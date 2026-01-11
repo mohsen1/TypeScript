@@ -7,25 +7,26 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-Reduce remaining TS2304 false positives in heritage or decorator/noTypesAndSymbols cases.
+Reduce TS2304 false positives in decorator/noTypesAndSymbols parsing edge cases.
 
 **Error Code:** TS2304 - "Cannot find name 'X'."
 
-**Impact:** Remaining TS2304 false positives after predicate + exports fixes.
+**Impact:** Remaining TS2304 false positives after heritage fixes.
 
 ### Steps
 1. **Rebuild + scan**: `./wasm/build-wasm.sh` then `cd wasm/differential-test && node find-ts2304.mjs --max=1000 --samples=30`.
-2. **Pick top remaining pattern** (heritage null/namespace cycles or decorator/noTypesAndSymbols).
-3. **Implement fix** in `thin_checker.rs`/`thin_parser.rs` and add a focused regression test.
-4. **Run focused tests** with `./wasm/test.sh` and report delta.
+2. **Target decorator/noTypesAndSymbols cases** from the scan.
+3. **Fix parser/checker handling** in `wasm/src/thin_parser.rs` and/or `wasm/src/thin_checker.rs`.
+4. **Add tests** in `wasm/src/thin_checker_tests.rs`.
+5. **Run focused tests** with `./wasm/test.sh` and report delta.
 
 ### Key Files
-- `wasm/src/thin_checker.rs`
 - `wasm/src/thin_parser.rs`
+- `wasm/src/thin_checker.rs`
 - `wasm/src/thin_checker_tests.rs`
 
 ### Success Criteria
-- TS2304 false positives reduced for selected remaining pattern
+- TS2304 false positives reduced for decorator/noTypesAndSymbols cases
 - No new regressions in existing TS2304 tests
 
 ## Resume Notes
@@ -84,7 +85,7 @@ Reduce remaining TS2304 false positives in heritage or decorator/noTypesAndSymbo
 - Parsed decorated enum/interface/type/namespace/var declarations to avoid TS2304 on invalid decorator declarations; added `test_decorator_invalid_declarations_no_ts2304`.
 
 ## Ready for Merge
-Yes
+No
 
 ## Notes
 - **Post-merge test status:** 68 unit test failures after merging origin/rust + origin/squad/forge
