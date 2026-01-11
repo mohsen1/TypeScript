@@ -98,3 +98,9 @@ Ready for Merge: No (merged 2026-01-11)
 - 0 extra TS2339 in first 400 files
 
 Ready for Merge: No (merged)
+# Worker 4 Plan
+
+## Current Assignment (2026-01-11)
+- Investigate `tests/cases/conformance/types/mapped/recursiveMappedTypes.ts` crash / missing TS2456: add a regression test and fix recursion handling.
+- Likely files: `wasm/src/checker/control_flow.rs`, `wasm/src/thin_checker.rs`, `wasm/src/solver/operations.rs`.
+- Run `./wasm/test.sh <new_test_name>` and report crash status.

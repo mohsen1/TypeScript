@@ -166,14 +166,14 @@ bash run-conformance.sh --all --workers=14
 
 ---
 ## Squad Status
-- Last EM Report: 2026-01-11 05:39
+- Last EM Report: 2026-01-11 11:57
 - Workers Active: 5/5
 - Branches Pending Merge: None
 - Current Focus:
-  - W1: TemplateExpression1 crash repro (es6/templates)
-  - W2: TS2304 (Cannot find name) - scope resolution
-  - W3: TS2339 remaining extras (classExtendingClassLikeType)
-  - W4: recursiveMappedTypes crash verification
-  - W5: TS2355 regression scan
+  - W1: TS2304 scope resolution false positives
+  - W2: Parser errors (TS1005/TS1109/TS1068/TS1128)
+  - W3: TS2339 property access false positives
+  - W4: recursiveMappedTypes crash / TS2456 detection
+  - W5: TS2355 return analysis false positives
 - Blockers: None
 - Strategy: Each worker owns one error code category, reduce false positives independently

@@ -98,3 +98,8 @@ Ready for Merge: No (merged)
 - Test: `./wasm/test.sh test_thin_parser_template_literal_property_name_no_ts1160`.
 
 Ready for Merge: No (merged 2026-01-10)
+# Worker 3 Plan
+
+## Current Assignment (2026-01-11)
+- Continue TS2339 reduction: run `node wasm/differential-test/find-ts2339.mjs --max=500 --samples=5`, pick a sample, add a regression in `wasm/src/thin_checker_tests.rs`, and fix in `wasm/src/thin_checker.rs`.
+- Run `./wasm/test.sh <new_test_name>` and report before/after TS2339 samples.
