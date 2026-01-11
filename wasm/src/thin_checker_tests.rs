@@ -3,6 +3,7 @@
 use crate::thin_checker::ThinCheckerState;
 use crate::parser::thin_node::ThinNodeArena;
 use crate::thin_binder::ThinBinderState;
+use crate::thin_parser::ThinParserState;
 use crate::solver::{TypeId, TypeInterner};
 
 #[test]
@@ -17274,5 +17275,52 @@ function f1<T extends string | undefined>(x: T): string {
         "Expected no TS2322 errors, got {} - diagnostics: {:?}",
         ts2322_count,
         checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn test_closure_captured_private_accessor_debug() {
+    // Test case matching exact failing conformance test scenario
+    let source = r#"
+class A2 {
+    get #prop() { return ""; }
+    set #prop(param: string) { }
+    
+    constructor() {
+        console.log(this.#prop); // Direct - should work
+        let a: A2 = this;
+        a.#prop; // Same context - should work
+        function foo() {
+            a.#prop; // Closure captured - currently fails but shouldn't
+        }
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+    
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    
+    checker.check_source_file(root);
+    
+    let ts2339_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2339)
+        .collect();
+    
+    eprintln!("TS2339 errors found: {}", ts2339_errors.len());
+    for err in &ts2339_errors {
+        eprintln!("  - {}", err.message_text);
+    }
+    
+    // All accesses should work - they're all from within the class
+    assert_eq!(ts2339_errors.len(), 0,
+        "Expected no TS2339 errors for private accessor access (including in closures), got {} - errors: {:?}",
+        ts2339_errors.len(),
+        ts2339_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>()
     );
 }

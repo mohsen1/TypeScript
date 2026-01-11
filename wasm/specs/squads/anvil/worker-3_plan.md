@@ -397,3 +397,30 @@ Ready for Merge: Yes
 - Fixed 2 files completely: `classStaticBlock13.ts`, `privateNameStaticAccessors.ts`
 - Remaining 5 files with TS2339 errors require further investigation of property lookup mechanism
 - Commit: 6b9431de62
+
+### Investigation Update (2026-01-11 PM)
+**Status:** Root cause identified - is_assignable_to fails for private property access
+
+**Scan Results (1000 samples):**
+- 36 extra TS2339 errors across 10 files
+- 25 errors: Private member access through variables/static members/generic classes
+- 11 errors: Mixin class property inheritance
+
+**Root Cause:**
+In `wasm/src/thin_checker.rs:6924`, the check `is_assignable_to(object_type_for_check, declaring_type)` fails even when both types represent the same class. The error messages show properties ARE in types:
+
+```
+Property '#prop' does not exist on type '{ readonly __private_brand_1: any; #prop: string }'.
+```
+
+**Affected Patterns:**
+1. `let a: A2 = this; a.#prop;` - variable capture in closures
+2. `let a: typeof A2 = A2; a.#prop;` - static private access
+3. Private members in generic classes (`C<T>`)
+4. Destructuring with private members
+
+**Next Steps:**
+1. Fix `is_assignable_to` to recognize same-class private member access
+2. Ensure nominal type equality for private member accessibility
+3. Add regression tests for all affected patterns
+4. Fix mixin property inheritance (11 errors)
