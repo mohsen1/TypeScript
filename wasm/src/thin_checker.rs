@@ -6867,6 +6867,45 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    /// Get the type of a property access when we know the property name.
+    /// This is used for private member access when symbols resolution fails
+    /// but the property exists in the object type.
+    fn get_type_of_property_access_by_name(
+        &mut self,
+        idx: NodeIndex,
+        access: &crate::parser::thin_node::AccessExprData,
+        object_type: TypeId,
+        property_name: &str,
+    ) -> TypeId {
+        use crate::solver::{PropertyAccessResult, QueryDatabase};
+
+        let object_type = self.resolve_type_for_property_access(object_type);
+        let result_type = match self.ctx.types.property_access_type(object_type, property_name) {
+            PropertyAccessResult::Success { type_id, from_index_signature } => {
+                if from_index_signature {
+                    self.error_property_not_exist_at(&property_name.to_string(), object_type, idx);
+                    return TypeId::ERROR;
+                }
+                type_id
+            }
+            PropertyAccessResult::PropertyNotFound { .. } => {
+                self.error_property_not_exist_at(&property_name.to_string(), object_type, idx);
+                return TypeId::ERROR;
+            }
+            PropertyAccessResult::PossiblyNullOrUndefined { property_type, .. } => {
+                property_type.unwrap_or(TypeId::ANY)
+            }
+            PropertyAccessResult::IsUnknown => TypeId::ANY,
+        };
+
+        // Handle nullish coercion
+        if access.question_dot_token {
+            self.ctx.types.union(vec![result_type, TypeId::UNDEFINED])
+        } else {
+            result_type
+        }
+    }
+
     fn get_type_of_private_property_access(
         &mut self,
         idx: NodeIndex,
@@ -6885,12 +6924,6 @@ impl<'a> ThinCheckerState<'a> {
         let property_name = ident.escaped_text.clone();
 
         let (symbols, saw_class_scope) = self.resolve_private_identifier_symbols(name_idx);
-        if symbols.is_empty() {
-            if saw_class_scope {
-                self.error_property_not_exist_at(&property_name, object_type, name_idx);
-            }
-            return TypeId::ERROR;
-        }
 
         let object_type = self.evaluate_application_type(object_type);
         let (object_type_for_check, nullish_cause) = self.split_nullish_type(object_type);
@@ -6903,6 +6936,27 @@ impl<'a> ThinCheckerState<'a> {
             }
             return TypeId::ERROR;
         };
+
+        // When symbols are empty but we're inside a class scope, check if the object type
+        // itself has private properties matching the name. This handles cases like:
+        //   let a: A2 = this;
+        //   a.#prop;  // Should work if A2 has #prop
+        if symbols.is_empty() {
+            // Try to find the property directly in the object type
+            use crate::solver::{PropertyAccessResult, QueryDatabase};
+            match self.ctx.types.property_access_type(object_type_for_check, &property_name) {
+                PropertyAccessResult::Success { .. } => {
+                    // Property exists in the type, proceed with the access
+                    return self.get_type_of_property_access_by_name(idx, access, object_type_for_check, &property_name);
+                }
+                _ => {
+                    if saw_class_scope {
+                        self.error_property_not_exist_at(&property_name, object_type, name_idx);
+                    }
+                    return TypeId::ERROR;
+                }
+            }
+        }
 
         let declaring_type = match self.private_member_declaring_type(symbols[0]) {
             Some(ty) => ty,
@@ -6921,10 +6975,25 @@ impl<'a> ThinCheckerState<'a> {
             return TypeId::ANY;
         }
 
-        if !self.is_assignable_to(object_type_for_check, declaring_type) {
+        // For private member access, use nominal typing based on private brand.
+        // If both types have the same private brand, they're from the same class
+        // declaration and the access should be allowed.
+        let types_compatible = if self.types_have_same_private_brand(object_type_for_check, declaring_type) {
+            true
+        } else {
+            self.is_assignable_to(object_type_for_check, declaring_type)
+        };
+
+        if !types_compatible {
             let shadowed = symbols.iter().skip(1).any(|sym_id| {
                 self.private_member_declaring_type(*sym_id)
-                    .map(|ty| self.is_assignable_to(object_type_for_check, ty))
+                    .map(|ty| {
+                        if self.types_have_same_private_brand(object_type_for_check, ty) {
+                            true
+                        } else {
+                            self.is_assignable_to(object_type_for_check, ty)
+                        }
+                    })
                     .unwrap_or(false)
             });
             if shadowed {
@@ -16660,6 +16729,47 @@ impl<'a> ThinCheckerState<'a> {
                     .map(|accessor| self.has_static_modifier(&accessor.modifiers))
                     .unwrap_or(false)
             }
+            _ => false,
+        }
+    }
+
+    /// Extract the private brand property name from a type if it has one.
+    /// Returns `Some(brand_name)` if the type has a private brand, `None` otherwise.
+    fn get_private_brand(&self, type_id: TypeId) -> Option<String> {
+        use crate::solver::TypeKey;
+
+        let key = self.ctx.types.lookup(type_id)?;
+        match key {
+            TypeKey::Object(shape_id) | TypeKey::ObjectWithIndex(shape_id) => {
+                let shape = self.ctx.types.object_shape(shape_id);
+                for prop in &shape.properties {
+                    let name = self.ctx.types.resolve_atom(prop.name);
+                    if name.starts_with("__private_brand_") {
+                        return Some(name);
+                    }
+                }
+                None
+            }
+            TypeKey::Callable(callable_id) => {
+                // Constructor types (Callable) can also have private brands for static members
+                let callable = self.ctx.types.callable_shape(callable_id);
+                for prop in &callable.properties {
+                    let name = self.ctx.types.resolve_atom(prop.name);
+                    if name.starts_with("__private_brand_") {
+                        return Some(name);
+                    }
+                }
+                None
+            }
+            _ => None,
+        }
+    }
+
+    /// Check if two types have the same private brand (i.e., are from the same class declaration).
+    /// This is used for nominal typing of private member access.
+    fn types_have_same_private_brand(&self, type1: TypeId, type2: TypeId) -> bool {
+        match (self.get_private_brand(type1), self.get_private_brand(type2)) {
+            (Some(brand1), Some(brand2)) => brand1 == brand2,
             _ => false,
         }
     }
