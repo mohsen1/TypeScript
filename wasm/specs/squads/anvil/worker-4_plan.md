@@ -148,7 +148,7 @@ Ready for Merge: No (partial TS2456 implementation; needs investigation of pre-e
 - Built WASM package for conformance: `./wasm/build-wasm.sh` (warnings only).
 - Avoid committing `.role/AGENTS.md` change (expected local modification).
 
-Ready for Merge: Yes (current fix pushed; conformance still shows extra TS2769 in variadicTuples1)
+Ready for Merge: No (merged 2026-01-10; conformance still shows extra TS2769 in variadicTuples1)
 
 ## Follow-up (2026-01-10) - TS2769 Variadic Tuple Rest Parameters
 
@@ -192,7 +192,7 @@ Modified `rest_tuple_inference_target` in `wasm/src/solver/operations.rs:515-573
 - `wasm/src/solver/operations.rs` - Fixed variadic tuple rest parameter type inference
 - `wasm/src/thin_checker_tests.rs` - Added regression test
 
-Ready for Merge: Yes
+Ready for Merge: No (merged 2026-01-10)
 
 ## Follow-up (2026-01-09) - TS2339 False Positives (Class-Like Extends)
 
