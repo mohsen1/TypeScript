@@ -1,39 +1,36 @@
 # Worker 4 Plan - Squad Forge
 
 ## Mission
-Implement TS2322 improvements (type not assignable) for conformance.
+Improve TS2322 assignability diagnostics (type not assignable).
 
 Status: Active
 Priority: 1
 
 ## Current Assignment
-TS2322 object literal excess property + optionality.
+Improve TS2322 return-type assignability (void/undefined compatibility).
 
 **Error Code:** TS2322 - "Type 'X' is not assignable to type 'Y'"
 
 **Impact:** 310 conformance tests affected
 
 ### Steps
-1. **Add focused tests** in `wasm/src/solver/compat_tests.rs` and `wasm/src/thin_checker_tests.rs`.
-2. **Fix assignability** in `wasm/src/solver/compat.rs` for union optional property overlap.
-3. **Harden object literal excess property checks** for union targets.
-4. **Run focused tests** and record delta.
+1. **Add tests** in `wasm/src/solver/compat_tests.rs` for call/construct signature return compatibility with `void`/`undefined`.
+2. **Audit compat logic** in `wasm/src/solver/compat.rs` and `wasm/src/solver/subtype.rs` for return assignability.
+3. **Implement fix** for any mismatches found (void/undefined compatibility should match TS).
+4. **Run focused tests** with `./wasm/test.sh` and report delta.
 
 ### Key Files
 - `wasm/src/solver/compat.rs`
+- `wasm/src/solver/subtype.rs`
 - `wasm/src/solver/compat_tests.rs`
-- `wasm/src/thin_checker.rs`
 - `wasm/src/thin_checker_tests.rs`
-- `wasm/src/checker/types/assignability.rs` (if present)
 
 ### Success Criteria
-- TS2322 missing errors reduced for object literal assignability
-- Extra errors do not increase (no regressions)
+- TS2322 missing errors reduced for return-type assignability
+- No new TS2322 regressions
 
 ## Task Queue
-- Add TS2322 regression tests for object literal excess property and optionality.
-- Validate assignability for unions with contextual typing.
-- Confirm no regressions in existing assignability tests.
+- Add TS2322 regression tests for contextual typing with unions if time permits.
 
 ## Completed
 
@@ -79,7 +76,7 @@ TS2322 object literal excess property + optionality.
 - [x] Applied check_parameter_initializers to constructors, methods, accessors, functions
 
 ## Ready for Merge
-Yes
+No
 
 ## Notes
 - Progress: added weak-union assignability guard for optional object targets; extended object literal excess property checks to union targets; added compat + thin checker tests.

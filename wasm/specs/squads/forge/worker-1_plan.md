@@ -1,34 +1,38 @@
 # Worker 1 Plan - Squad Forge
 
 ## Mission
-Fix object spread type checking in CLI driver tests.
+Improve module resolution diagnostics (TS2792).
 
 Status: Active
 Priority: 1
 
 ## Current Assignment
-Implement TS2300 "Duplicate identifier" diagnostics for basic redeclaration cases.
+Reduce missing TS2792 diagnostics for unresolved module imports.
 
-**Error Code:** TS2300 - "Duplicate identifier '{0}'."
+**Error Code:** TS2792 - "Cannot find module 'X' or its corresponding type declarations."
 
-**Impact:** 105 conformance tests affected
+**Impact:** 204 conformance tests affected
 
 ### Steps
-1. **Review redeclaration checks** in `wasm/src/binder.rs` (symbol flags + declaration rules).
-2. **Emit TS2300** when incompatible declarations share a scope (var/let/const/function/type alias).
-3. **Add tests** in `wasm/src/thin_checker_tests.rs` for duplicate var/function/type alias combos.
-4. **Run focused tests** with `./wasm/test.sh` and report delta.
+1. **Create a scan script** `wasm/differential-test/find-ts2792.mjs` (copy `find-ts2339.mjs` pattern) to report missing TS2792.
+2. **Run a scan**: `cd wasm/differential-test && node find-ts2792.mjs --max=1000 --samples=30`.
+3. **Pick the top missing pattern** (package imports vs relative, ambient module resolution, or multi-file diagnostics).
+4. **Implement the fix** in `wasm/src/thin_binder.rs` and/or `wasm/src/cli/driver.rs`.
+5. **Add tests** in `wasm/src/cli/driver_tests.rs` or `wasm/src/thin_checker_tests.rs`.
+6. **Run focused tests** with `./wasm/test.sh` and report delta.
 
 ### Key Files
-- `wasm/src/binder.rs`
-- `wasm/src/thin_checker.rs`
+- `wasm/src/thin_binder.rs`
+- `wasm/src/cli/driver.rs`
+- `wasm/src/cli/driver_tests.rs`
+- `wasm/differential-test/find-ts2792.mjs`
 
 ### Success Criteria
-- TS2300 emitted for obvious duplicate declarations
-- Valid merges (interface/namespace) still allowed
+- Missing TS2792 diagnostics reduced for the selected pattern
+- No increase in extra TS2792 errors
 
 ## Task Queue
-(empty - single focused task)
+- After TS2792 fix, re-run the scan with a larger sample to confirm deltas.
 
 ## Completed
 - TS2454 implementation merged into squad/forge.
@@ -57,7 +61,7 @@ Implement TS2300 "Duplicate identifier" diagnostics for basic redeclaration case
 - Re-synced with `origin/rust` and reran `./wasm/test.sh duplicate_identifier` after API key setup (passed).
 
 ## Ready for Merge
-Yes
+No
 
 ## Notes
 - Run `./wasm/test.sh` before pushing

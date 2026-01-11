@@ -8,6 +8,7 @@ Status: Active
 - Investigate TS2403 false positives (subsequent variable declarations type mismatch).
 - Use conformance output to collect 3-5 samples; trace symbol/decl merging in `wasm/src/thin_checker.rs` and related solver checks.
 - Implement fix + regression test(s); run a targeted TS2403 scan and report delta.
+- Deliverables: sample list + root cause notes, regression test(s), and before/after TS2403 delta from a targeted conformance run.
 
 ### Update (2026-01-11)
 - Samples (pre-fix): `enums/enumBasics.ts`, `es6/spread/arrayLiteralSpread.ts`, `es6/spread/arrayLiteralSpreadES5iterable.ts`, `es6/templates/taggedTemplateStringsWithOverloadResolution3.ts`, `es6/templates/taggedTemplateStringsWithOverloadResolution3_ES6.ts`.
