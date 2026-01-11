@@ -32,7 +32,7 @@ Status: COMPLETED
 - Same error count: 3 → 5
 - `recursiveMappedTypes.ts` still missing TS2456/TS2313/TS2589/TS2502/TS2615; extra TS2322/TS2339/TS2304
 
-Ready for Merge: Yes
+Ready for Merge: No (merged 2026-01-11)
 
 ## Follow-up (2026-01-11) - Recursive Mapped Types Crash Verification
 
