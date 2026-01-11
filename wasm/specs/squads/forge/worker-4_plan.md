@@ -78,19 +78,24 @@ TS2792 module resolution errors.
 - [x] Fixed union object literal excess property handling (TS2322 vs TS2353)
 - [x] Added 6 union contextual typing tests for object literals
 - [x] Added stub implementations for control flow fall-through functions
+- [x] Fixed ambient module tracking in external modules (binder bug)
+- [x] Added 6 module resolution tests (TS2792 vs TS2307)
 
 ## Ready for Merge
-No
+Yes
 
 ## Notes
-- Progress: Starting TS2792 module resolution errors
-- Previous assignment (union contextual typing) merged to squad/forge
-- Synced with origin/rust
+- Progress: Completed TS2792 module resolution error handling
+- Found and fixed binder bug: ambient modules weren't tracked in files with imports
+- Implementation already existed, just needed bug fix and tests
+- Tests: All 6 new module resolution tests pass
+- Fix: Removed `&& !self.is_external_module` check in binder
+- Impact: Ambient modules now correctly suppress TS2792 errors
 - Commit format: `[wasm] checker: TS2792 module resolution`
 - Push to: `origin/worker/forge-4`
 - **NEVER edit**: `STRUCTURE.md`, `GOALS.md`, other workers' plan files, or anything in `orchestrator/`
 
 ## Resume
-- Branch/state: `worker/forge-4`, synced with origin/rust, starting TS2792 work.
-- Session work: None yet for this assignment.
-- Unit tests: Not run yet for this assignment.
+- Branch/state: `worker/forge-4`, work completed on TS2792, ready for merge.
+- Session work: Fixed binder ambient module bug, added comprehensive tests.
+- Unit tests: 6 new tests added and passing.
