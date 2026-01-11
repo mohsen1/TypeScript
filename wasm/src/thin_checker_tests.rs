@@ -17147,3 +17147,36 @@ function identity<T>(x: T): T {
         checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>()
     );
 }
+
+#[test]
+fn test_constrained_type_parameter_in_types_no_ts2304() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+function f1<T extends string | undefined>(x: T, y: { a: T }, z: [T]): string {
+    return "hello";
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let ts2304_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2304)
+        .map(|d| &d.message_text)
+        .collect();
+    
+    assert!(
+        !codes.contains(&2304),
+        "Should not report TS2304 for constrained type parameter T. Found errors: {:?}",
+        ts2304_errors
+    );
+}
