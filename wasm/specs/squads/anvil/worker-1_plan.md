@@ -9,7 +9,27 @@ Priority: 1
 
 **Target:** Reduce TS7011 "Implicit 'any' return type" false positives (10 occurrences)
 
-**Status:** STARTING - Just switched from TS2300 investigation
+**Status:** INVESTIGATING - Basic patterns work correctly
+
+**Investigation Findings:**
+- ✅ Tested: Functions with return statements - no error (correct)
+- ✅ Tested: Ambient functions with body and return - no error (correct)
+- ✅ Tested: Functions without type annotation - no error (correct)
+- ❓ Need to identify the 10 specific false positive patterns
+
+**TS7011 Emission** (thin_checker.rs:11688):
+- Only emitted for ambient functions (declare modifier or .d.ts file)
+- Only when no return type annotation
+- Only when noImplicitAny is enabled
+
+**Next Steps:**
+1. Identify specific test files with TS7011 extra errors
+2. Analyze those edge cases
+3. Fix return type inference logic if needed
+
+**Files:** `wasm/src/thin_checker.rs`
+
+**Success Criteria:** Reduce TS7011 from 10 to <5
 
 **Problem:** WASM incorrectly reports TS7011 when function return types are inferable from context
 
