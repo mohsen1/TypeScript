@@ -609,9 +609,9 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
         //   - we should infer T from ['a', 'b'], not ['a', 'b', 2]
         let rest_arg_count = arg_types.len() - rest_start;
         let infer_count = rest_arg_count.saturating_sub(trailing_count);
-        let end_index = start_index + infer_count;
 
-        let tuple_elements = arg_types[start_index..end_index]
+        // Slice from rest_start, not start_index, since infer_count is relative to rest_start
+        let tuple_elements = arg_types[rest_start..rest_start + infer_count]
             .iter()
             .map(|&ty| TupleElement {
                 type_id: ty,
