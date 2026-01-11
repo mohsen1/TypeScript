@@ -17153,6 +17153,8 @@ function identity<T>(x: T): T {
 fn test_static_private_field_access_no_ts2339() {
     // Regression test for static private field access
     // Previously failed with TS2339 because static private members were excluded from constructor type
+    use crate::thin_parser::ThinParserState;
+
     let source = r#"
 class C {
     static #x = 123;
@@ -17187,6 +17189,8 @@ class C {
 #[test]
 fn test_static_private_accessor_access_no_ts2339() {
     // Regression test for static private accessor access
+    use crate::thin_parser::ThinParserState;
+
     let source = r#"
 class A {
     static get #prop() { return ""; }
@@ -17335,20 +17339,6 @@ function g1<T extends Box<T> | undefined>(x: T) {
         !codes.contains(&2304),
         "Should not report TS2304 for self-referential type constraint T extends Box<T>. Found errors: {:?}",
         ts2304_errors
-=======
-    // Check for false positive TS2304 errors on type parameter 'T'
-    let ts2304_for_T: Vec<_> = checker.ctx.diagnostics.iter()
-        .filter(|d| d.code == 2304 && d.message_text.contains("'T'"))
-        .collect();
-
-    eprintln!("[TYPE_PARAM_TYPE_QUERY] All diagnostics: {:?}",
-        checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>());
-
-    assert!(
-        ts2304_for_T.is_empty(),
-        "Expected no TS2304 errors for type parameter 'T' in type queries, but got {} errors: {:?}",
-        ts2304_for_T.len(),
-        ts2304_for_T.iter().map(|d| &d.message_text).collect::<Vec<_>>()
     );
 }
 
