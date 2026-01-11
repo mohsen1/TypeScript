@@ -64,17 +64,38 @@ Priority: 1
   - GOALS.md reports: 310 missing errors (may be multiple errors per file or different baseline)
 - **Test Suite Issue**: Many failing tests have outdated expectations from before recent typeof/class fixes
 
+### Solver Fixes Implemented (2026-01-11)
+1. **operations.rs:269-277**: Fixed inference failure - now uses constraint type/default/ERROR instead of returning `Success(Any)`
+2. **operations.rs:286**: Changed ultimate fallback from `UNKNOWN` to `ERROR` for consistency
+3. **operations.rs:293-300**: Fixed constraint check violation - now returns `ArgumentTypeMismatch` instead of `Success(Any)`
+4. **operations.rs:112-114**: Fixed `infer_call_signature` fallback - returns `ERROR` instead of `Any`
+5. **operations.rs:122-124**: Fixed `infer_generic_function` fallback - returns `ERROR` instead of `Any`
+
+### Critical Discovery: TS2345 vs TS2322
+- **TS2322** (TYPE_NOT_ASSIGNABLE): General type assignability errors (variables, returns, etc.)
+- **TS2345** (ARG_NOT_ASSIGNABLE): Function argument-specific type errors
+- When solver returns `ArgumentTypeMismatch`, checker emits **TS2345** (not TS2322)
+- Conformance scan only looks for **TS2322**, so TS2345 improvements aren't counted
+- This may be correct behavior - TypeScript distinguishes between these error codes
+
+### Remaining Issues
+1. **ERROR type is still assignable to everything** (bottom type like `NEVER`)
+2. **Many other paths still return `Any`**: ~15+ locations in solver/evaluate.rs, solver/lower.rs, etc.
+3. **Complex type evaluation**: Conditional types, mapped types still return `Any` in many cases
+
 ### Tests Fixed
 1. `test_abstract_constructor_assignability` - typeof class now works (4 → 0 errors expected)
 2. `test_concrete_extends_abstract` - class inheritance works (3 → 0 errors expected)
 3. `test_function_property_contravariance` - interface extends works (1 → 0 errors expected)
 4. `test_function_property_rejects_covariant` - strictFunctionTypes implemented (now correctly errors)
-5. Test suite: 84 failures (stable)
+5. `test_best_common_type_class_hierarchy` - class inheritance works (1 → 0 errors expected)
+6. Test suite: 87 failures (up from 83 due to ERROR propagation - expected)
 
 ### Next Steps
-1. Continue updating outdated test expectations
-2. Investigate Solver returning `Any` - this is the REAL work for TS2322
-3. Focus on complex type handling: generics, conditional types, mapped types
+1. **Audit all `Any` fallbacks**: Find all places that return `Any` and replace with `ERROR` or proper error handling
+2. **Consider adding TS2345 scan**: Create `find-missing-ts2345.mjs` to measure argument type error improvements
+3. **Focus on non-argument contexts**: Variable declarations, return types don't use `ArgumentTypeMismatch`
+4. **Complex type evaluation**: Need better handling for conditional types, mapped types, index access
 
 ## Completed
 - Implemented property access on constrained type parameters in checker and solver.

@@ -11941,19 +11941,18 @@ const name = pet.name; // OK: both Dog and Cat have name
 
     let error_count = checker.ctx.diagnostics.len();
 
-    // Currently expects 1 error due to class inheritance type issues
-    // Once class inheritance works, change to expect 0 errors
-    if error_count != 1 {
+    // Class inheritance now works - expect 0 errors
+    if error_count != 0 {
         eprintln!("=== Best Common Type Class Hierarchy Diagnostics ===");
-        eprintln!("Expected 1 error (class inheritance issues), got {}", error_count);
+        eprintln!("Expected 0 errors (class inheritance fixed), got {}", error_count);
         for diag in &checker.ctx.diagnostics {
             eprintln!("[{}] {}", diag.start, diag.message_text);
         }
     }
 
     assert_eq!(
-        error_count, 1,
-        "Expected 1 error due to class inheritance: {:?}",
+        error_count, 0,
+        "Expected 0 errors (class inheritance now works): {:?}",
         checker.ctx.diagnostics
     );
 }
