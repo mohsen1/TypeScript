@@ -133,6 +133,11 @@ pub struct CheckerContext<'a> {
     /// The CLI driver handles module resolution in multi-file mode.
     pub report_unresolved_imports: bool,
 
+    /// Whether strict function types checking is enabled (contravariant parameters).
+    /// When true, function parameters are checked contravariantly.
+    /// When false, parameters are checked bivariantly (legacy, unsound).
+    pub strict_function_types: bool,
+
     // --- Caches ---
 
     /// Cached types for symbols.
@@ -263,6 +268,7 @@ impl<'a> CheckerContext<'a> {
             no_implicit_returns: false,
             use_unknown_in_catch_variables: true,
             report_unresolved_imports: true,
+            strict_function_types: true,  // Enable by default for modern TypeScript behavior
             symbol_types: FxHashMap::default(),
             var_decl_types: FxHashMap::default(),
             node_types: FxHashMap::default(),
@@ -316,6 +322,7 @@ impl<'a> CheckerContext<'a> {
             no_implicit_returns: false,
             use_unknown_in_catch_variables: true,
             report_unresolved_imports: true,
+            strict_function_types: true,  // Enable by default for modern TypeScript behavior
             symbol_types: cache.symbol_types,
             var_decl_types: FxHashMap::default(),
             node_types: cache.node_types,

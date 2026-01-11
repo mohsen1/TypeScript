@@ -41,6 +41,8 @@ use crate::parser::{
 const CONTEXT_FLAG_ASYNC: u32 = 1;
 /// Context flag: inside a generator function/method
 const CONTEXT_FLAG_GENERATOR: u32 = 2;
+/// Context flag: inside a static block (where 'await' is reserved)
+const CONTEXT_FLAG_STATIC_BLOCK: u32 = 4;
 
 // =============================================================================
 // Parse Diagnostic
@@ -216,6 +218,7 @@ impl ThinParserState {
             | SyntaxKind::ColonToken          // :
             | SyntaxKind::EqualsToken         // =
             | SyntaxKind::EqualsGreaterThanToken  // =>
+            | SyntaxKind::GreaterThanToken    // > (e.g., missing type in generic default: T = >)
             | SyntaxKind::BarToken            // | (when at start, not a union)
             | SyntaxKind::AmpersandToken      // & (when at start, not an intersection)
             | SyntaxKind::QuestionToken       // ?
@@ -238,6 +241,12 @@ impl ThinParserState {
         (self.context_flags & CONTEXT_FLAG_GENERATOR) != 0
     }
 
+    /// Check if we're inside a static block
+    #[inline]
+    fn in_static_block_context(&self) -> bool {
+        (self.context_flags & CONTEXT_FLAG_STATIC_BLOCK) != 0
+    }
+
     /// Set context flags and return the old value (for restoring later)
     #[inline]
     fn set_context_flags(&mut self, flags: u32) -> u32 {
@@ -250,6 +259,29 @@ impl ThinParserState {
     #[inline]
     fn restore_context_flags(&mut self, flags: u32) {
         self.context_flags = flags;
+    }
+
+    /// Check if the current token is an illegal binding identifier in the current context
+    /// Returns true if illegal and emits appropriate diagnostic
+    fn check_illegal_binding_identifier(&mut self) -> bool {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+
+        // In static blocks, 'await' cannot be used as a binding identifier
+        if self.in_static_block_context() {
+            // Check if current token is 'await' (either as keyword or identifier)
+            let is_await = self.is_token(SyntaxKind::AwaitKeyword) ||
+                (self.is_token(SyntaxKind::Identifier) && self.scanner.get_token_value_ref() == "await");
+
+            if is_await {
+                self.parse_error_at_current_token(
+                    "Identifier expected. 'await' is a reserved word that cannot be used here.",
+                    diagnostic_codes::AWAIT_IDENTIFIER_ILLEGAL
+                );
+                return true;
+            }
+        }
+
+        false
     }
 
     /// Parse optional token, returns true if found
@@ -1221,6 +1253,9 @@ impl ThinParserState {
         let start_pos = self.token_pos();
 
         // Parse name - can be identifier, keyword as identifier, or binding pattern
+        // Check for illegal binding identifiers (e.g., 'await' in static blocks)
+        self.check_illegal_binding_identifier();
+
         let name = if self.is_token(SyntaxKind::OpenBraceToken) {
             self.parse_object_binding_pattern()
         } else if self.is_token(SyntaxKind::OpenBracketToken) {
@@ -1297,6 +1332,9 @@ impl ThinParserState {
         let asterisk_token = self.parse_optional(SyntaxKind::AsteriskToken);
 
         // Parse name - keywords like 'abstract' can be used as function names
+        // Check for illegal binding identifiers (e.g., 'await' in static blocks)
+        self.check_illegal_binding_identifier();
+
         let name = if self.is_identifier_or_keyword() {
             self.parse_identifier_name()
         } else {
@@ -1916,6 +1954,9 @@ impl ThinParserState {
         self.parse_expected(SyntaxKind::ClassKeyword);
 
         // Parse class name
+        // Check for illegal binding identifiers (e.g., 'await' in static blocks)
+        self.check_illegal_binding_identifier();
+
         let name = if self.is_token(SyntaxKind::Identifier) {
             self.parse_identifier()
         } else {
@@ -2383,12 +2424,23 @@ impl ThinParserState {
 
     /// Parse constructor with modifiers
     fn parse_constructor_with_modifiers(&mut self, modifiers: Option<NodeList>) -> NodeIndex {
+        use crate::checker::types::diagnostics::diagnostic_codes;
         let start_pos = self.token_pos();
         self.parse_expected(SyntaxKind::ConstructorKeyword);
 
         self.parse_expected(SyntaxKind::OpenParenToken);
         let parameters = self.parse_parameter_list();
         self.parse_expected(SyntaxKind::CloseParenToken);
+
+        // Recovery: Handle return type annotation on constructor (invalid but users write it)
+        if self.parse_optional(SyntaxKind::ColonToken) {
+            self.parse_error_at_current_token(
+                "Constructor cannot have a return type annotation.",
+                diagnostic_codes::CONSTRUCTOR_CANNOT_HAVE_RETURN_TYPE,
+            );
+            // Consume the type annotation for recovery
+            let _ = self.parse_type();
+        };
 
         let body = if self.is_token(SyntaxKind::OpenBraceToken) {
             self.parse_block()
@@ -2571,6 +2623,34 @@ impl ThinParserState {
             return NodeIndex::NONE;
         }
 
+        // Recovery: Handle stray statements in class bodies (common copy-paste error)
+        // Users often accidentally leave statements like `if`, `while`, `return` in class bodies
+        let is_statement_keyword = matches!(
+            self.token(),
+            SyntaxKind::IfKeyword         // if (x) { }
+            | SyntaxKind::WhileKeyword     // while (x) { }
+            | SyntaxKind::DoKeyword        // do { } while (x)
+            | SyntaxKind::ForKeyword       // for (...) { }
+            | SyntaxKind::SwitchKeyword    // switch (x) { }
+            | SyntaxKind::ReturnKeyword    // return x;
+            | SyntaxKind::ThrowKeyword     // throw x;
+            | SyntaxKind::TryKeyword       // try { } catch { }
+            | SyntaxKind::WithKeyword      // with (x) { }
+            | SyntaxKind::DebuggerKeyword  // debugger;
+        );
+
+        if is_statement_keyword {
+            self.parse_error_at_current_token(
+                "Declaration or statement expected.",
+                diagnostic_codes::DECLARATION_OR_STATEMENT_EXPECTED,
+            );
+            // Parse the statement to consume it and balance braces
+            // This maintains parsing sync so we can continue parsing the rest of the class
+            let _ = self.parse_statement();
+            // Return NONE to indicate this is not a valid class member
+            return NodeIndex::NONE;
+        }
+
         // Parse decorators if present
         let decorators = self.parse_decorators();
 
@@ -2623,6 +2703,46 @@ impl ThinParserState {
         // Handle index signatures: [key: Type]: ValueType
         if self.is_token(SyntaxKind::OpenBracketToken) && self.look_ahead_is_index_signature() {
             return self.parse_index_signature_with_modifiers(modifiers, start_pos);
+        }
+
+        // Recovery: Handle 'function' keyword in class members
+        // Note: 'var', 'let', 'const' are allowed as property/method names (e.g., `var() {}`)
+        // But 'function' is always invalid as a class member keyword
+        if self.is_token(SyntaxKind::FunctionKeyword) {
+            self.parse_error_at_current_token(
+                "A class member cannot have the 'function' keyword.",
+                diagnostic_codes::UNEXPECTED_TOKEN_CLASS_MEMBER,
+            );
+            // Consume 'function' and continue parsing as method
+            self.next_token();
+        }
+
+        // Recovery: Handle 'const'/'let'/'var' used as modifiers in class members
+        // Distinguish between: `const x = 1` (invalid, error) vs `const() {}` (valid method name)
+        if matches!(
+            self.token(),
+            SyntaxKind::ConstKeyword | SyntaxKind::LetKeyword | SyntaxKind::VarKeyword
+        ) {
+            // Look ahead to determine if this is being used as a modifier or as a name
+            let snapshot = self.scanner.save_state();
+            let current = self.current_token;
+            self.next_token(); // skip const/let/var
+            let next_token = self.token();
+            self.scanner.restore_state(snapshot);
+            self.current_token = current;
+
+            // If followed by `(`, it's a method name (e.g., `const() {}`), which is valid
+            // If followed by identifier and then `:` or `=`, it's being used as a modifier (invalid)
+            if !matches!(next_token, SyntaxKind::OpenParenToken) {
+                // This is likely being used as a modifier, emit error and recover
+                self.parse_error_at_current_token(
+                    "A class member cannot have the 'const', 'let', or 'var' keyword.",
+                    diagnostic_codes::UNEXPECTED_TOKEN_CLASS_MEMBER,
+                );
+                // Consume the invalid keyword and continue parsing
+                // The next identifier will be treated as the property/method name
+                self.next_token();
+            }
         }
 
         // Handle methods and properties
@@ -2745,12 +2865,23 @@ impl ThinParserState {
 
     /// Parse constructor
     fn parse_constructor(&mut self) -> NodeIndex {
+        use crate::checker::types::diagnostics::diagnostic_codes;
         let start_pos = self.token_pos();
         self.parse_expected(SyntaxKind::ConstructorKeyword);
 
         self.parse_expected(SyntaxKind::OpenParenToken);
         let parameters = self.parse_parameter_list();
         self.parse_expected(SyntaxKind::CloseParenToken);
+
+        // Recovery: Handle return type annotation on constructor (invalid but users write it)
+        if self.parse_optional(SyntaxKind::ColonToken) {
+            self.parse_error_at_current_token(
+                "Constructor cannot have a return type annotation.",
+                diagnostic_codes::CONSTRUCTOR_CANNOT_HAVE_RETURN_TYPE,
+            );
+            // Consume the type annotation for recovery
+            let _ = self.parse_type();
+        };
 
         let body = if self.is_token(SyntaxKind::OpenBraceToken) {
             self.parse_block()
@@ -2780,12 +2911,24 @@ impl ThinParserState {
         // Skip 'get' or 'set'
         self.next_token();
 
-        // Check for property name (identifier, private identifier, string, number, or computed)
-        let has_name = self.is_property_name();
+        // Check the token AFTER 'get' or 'set' to determine what we have:
+        // - `:`, `=`, `;`, `}`, `?` → property named 'get'/'set' (e.g., `get: number`)
+        // - `(` → method named 'get'/'set' (e.g., `get() {}`)
+        // - identifier/string/etc → accessor (e.g., `get foo() {}`)
+        let next_token = self.token();
+        let is_accessor = !matches!(
+            next_token,
+            SyntaxKind::ColonToken          // `get: number` - property
+                | SyntaxKind::EqualsToken     // `get = 1` - property
+                | SyntaxKind::SemicolonToken  // `get;` - property
+                | SyntaxKind::CloseBraceToken // `get }` - property
+                | SyntaxKind::OpenParenToken  // `get()` - method
+                | SyntaxKind::QuestionToken   // `get?` - property
+        ) && self.is_property_name(); // Also ensure there's a valid property name
 
         self.scanner.restore_state(snapshot);
         self.current_token = current;
-        has_name
+        is_accessor
     }
 
     /// Look ahead to see if we have a static block: static { ... }
@@ -2810,9 +2953,12 @@ impl ThinParserState {
         // Consume 'static'
         self.parse_expected(SyntaxKind::StaticKeyword);
 
-        // Parse the block body
+        // Parse the block body with static block context (where 'await' is reserved)
         self.parse_expected(SyntaxKind::OpenBraceToken);
+        let saved_flags = self.context_flags;
+        self.context_flags |= CONTEXT_FLAG_STATIC_BLOCK;
         let statements = self.parse_statements();
+        self.context_flags = saved_flags;
         self.parse_expected(SyntaxKind::CloseBraceToken);
 
         let end_pos = self.token_end();
@@ -3460,6 +3606,7 @@ impl ThinParserState {
         start_pos: u32,
         modifiers: Option<NodeList>,
     ) -> NodeIndex {
+        use crate::checker::types::diagnostics::diagnostic_codes;
         self.parse_expected(SyntaxKind::TypeKeyword);
 
         let name = self.parse_identifier();
@@ -3471,7 +3618,30 @@ impl ThinParserState {
             None
         };
 
-        self.parse_expected(SyntaxKind::EqualsToken);
+        // Parse expected equals token, but recover gracefully if missing
+        // If the next token can start a type (e.g., {, (, [), emit error and continue parsing
+        if !self.is_token(SyntaxKind::EqualsToken) {
+            // Emit TS1005 for missing equals token
+            self.error_token_expected("=");
+            // If the next token looks like a type, continue parsing anyway
+            if !self.can_token_start_type() {
+                // Can't recover, return early with a dummy type
+                let end_pos = self.token_end();
+                return self.arena.add_type_alias(
+                    syntax_kind_ext::TYPE_ALIAS_DECLARATION,
+                    start_pos,
+                    end_pos,
+                    crate::parser::thin_node::TypeAliasData {
+                        modifiers,
+                        name,
+                        type_parameters,
+                        type_node: NodeIndex::NONE,
+                    },
+                );
+            }
+        } else {
+            self.next_token(); // Consume the equals token
+        }
 
         let type_node = self.parse_type();
 
@@ -3528,13 +3698,22 @@ impl ThinParserState {
 
     /// Parse enum members
     fn parse_enum_members(&mut self) -> NodeList {
+        use crate::checker::types::diagnostics::diagnostic_codes;
         let mut members = Vec::new();
 
         while !self.is_token(SyntaxKind::CloseBraceToken) && !self.is_token(SyntaxKind::EndOfFileToken) {
             let start_pos = self.token_pos();
 
-            // Enum member names can be identifiers or string literals
-            let name = if self.is_token(SyntaxKind::StringLiteral) {
+            // Enum member names can be identifiers, string literals, or computed property names
+            // Computed property names ([x]) are not valid in enums but we recover gracefully
+            let name = if self.is_token(SyntaxKind::OpenBracketToken) {
+                // Handle computed property name - emit TS1164 and recover
+                self.parse_error_at_current_token(
+                    "Computed property names are not allowed in enums.",
+                    diagnostic_codes::COMPUTED_PROPERTY_NAME_IN_ENUM,
+                );
+                self.parse_property_name()
+            } else if self.is_token(SyntaxKind::StringLiteral) {
                 self.parse_string_literal()
             } else if self.is_token(SyntaxKind::PrivateIdentifier) {
                 self.parse_private_identifier()
@@ -3557,7 +3736,22 @@ impl ThinParserState {
             );
             members.push(member);
 
+            // Parse comma or recover with missing comma
             if !self.parse_optional(SyntaxKind::CommaToken) {
+                // Recovery: If the next token looks like the start of a valid enum member,
+                // emit TS1005 and continue parsing instead of breaking
+                if self.is_token(SyntaxKind::Identifier)
+                    || self.is_token(SyntaxKind::StringLiteral)
+                    || self.is_token(SyntaxKind::PrivateIdentifier)
+                    || self.is_token(SyntaxKind::OpenBracketToken)
+                {
+                    self.parse_error_at_current_token(
+                        "',' expected",
+                        diagnostic_codes::TOKEN_EXPECTED,
+                    );
+                    // Continue to next iteration to parse the next member
+                    continue;
+                }
                 break;
             }
         }
@@ -5247,8 +5441,20 @@ impl ThinParserState {
             NodeIndex::NONE
         };
 
-        // Parse =>
-        self.parse_expected(SyntaxKind::EqualsGreaterThanToken);
+        // Recovery: Handle missing fat arrow - common typo: (a, b) { return a; }
+        // If we see { immediately after parameters/return type, the user forgot =>
+        if self.is_token(SyntaxKind::OpenBraceToken) {
+            use crate::checker::types::diagnostics::diagnostic_codes;
+            self.parse_error_at_current_token(
+                "'=>' expected.",
+                diagnostic_codes::TOKEN_EXPECTED,
+            );
+            // Don't consume the {, just continue to body parsing
+            // The arrow is logically present but missing
+        } else {
+            // Normal case: expect =>
+            self.parse_expected(SyntaxKind::EqualsGreaterThanToken);
+        }
 
         // Set async context for body parsing
         let saved_flags = self.context_flags;
@@ -6188,6 +6394,9 @@ impl ThinParserState {
 
     /// Parse binding element name (can be identifier or nested binding pattern)
     fn parse_binding_element_name(&mut self) -> NodeIndex {
+        // Check for illegal binding identifiers (e.g., 'await' in static blocks)
+        self.check_illegal_binding_identifier();
+
         if self.is_token(SyntaxKind::OpenBraceToken) {
             self.parse_object_binding_pattern()
         } else if self.is_token(SyntaxKind::OpenBracketToken) {

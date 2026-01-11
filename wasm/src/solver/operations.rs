@@ -609,9 +609,9 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
         //   - we should infer T from ['a', 'b'], not ['a', 'b', 2]
         let rest_arg_count = arg_types.len() - rest_start;
         let infer_count = rest_arg_count.saturating_sub(trailing_count);
-        let end_index = start_index + infer_count;
 
-        let tuple_elements = arg_types[start_index..end_index]
+        // Slice from rest_start, not start_index, since infer_count is relative to rest_start
+        let tuple_elements = arg_types[rest_start..rest_start + infer_count]
             .iter()
             .map(|&ty| TupleElement {
                 type_id: ty,
@@ -1458,6 +1458,14 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
 
     /// Resolve a call to a callable type (with overloads).
     fn resolve_callable_call(&mut self, callable: &CallableShape, arg_types: &[TypeId]) -> CallResult {
+        // If there are no call signatures at all, this type is not callable
+        // (e.g., a class constructor without call signatures)
+        if callable.call_signatures.is_empty() {
+            return CallResult::NotCallable {
+                type_id: self.interner.callable(callable.clone()),
+            };
+        }
+
         if callable.call_signatures.len() == 1 {
             let sig = &callable.call_signatures[0];
             let func = FunctionShape {
@@ -1649,6 +1657,11 @@ impl<'a> PropertyAccessEvaluator<'a> {
         }
 
         Some(MappedAccessGuard { evaluator: self, obj_type })
+    }
+
+    /// Check if a property name is a private field (starts with #)
+    fn is_private_field(&self, prop_name: &str) -> bool {
+        prop_name.starts_with('#')
     }
 
     fn resolve_property_access_inner(
@@ -2416,7 +2429,7 @@ impl<'a> PropertyAccessEvaluator<'a> {
                 let elements = self.interner.tuple_list(elements);
                 self.tuple_element_union(&elements)
             }
-            _ => TypeId::ANY,
+            _ => TypeId::ERROR, // Return ERROR instead of ANY for non-array/tuple types
         }
     }
 

@@ -5,27 +5,63 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 
 Status: Active
 Priority: 1
-## Current Assignment (2026-01-11 - TS7006 Implicit 'any' Parameter False Positives)
+## Current Assignment - TS7011/TS7010 (COMPLETED - Target Achieved)
 
-**Status:** IN PROGRESS - 74% reduction achieved (46 → 12)
+**Status:** Target achieved - reduced from 149 to 2 (99% reduction)
+
+**Completed Fixes:**
+1. ✅ Fixed TS7011 for arrow functions/function expressions in `get_type_of_function` (149 → 65)
+2. ✅ Fixed TS7011 for methods in `check_method_declaration` (65 → 41)
+3. ✅ Fixed TS7010 for function declarations in `check_statement` (41 → 25)
+4. ✅ Fixed TS7010 for accessors in `check_accessor_declaration` (25 → 2)
+
+**Root Cause:** WASM was emitting TS7011/TS7010 for ALL functions/methods without return type annotations when `noImplicitAny` was enabled. TypeScript only emits these errors for **ambient functions** (declare modifier or .d.ts file).
+
+**Fix Summary:** Added ambient context checks (`has_declare_modifier || file_name.ends_with(".d.ts")`) before emitting TS7011/TS7010 in four locations:
+1. `get_type_of_function` - arrow functions and function expressions
+2. `check_method_declaration` - class methods with bodies
+3. `check_statement` - function declarations
+4. `check_accessor_declaration` - getter accessors
+
+**Remaining 2 cases** (edge cases in type literals):
+- `dependentDestructuredVariables.ts` - methods in type literals with `// @declaration: true`
+- `arraySpreadInCall.ts` - method signature in generic type literal
+
+**Note:** Success criteria <5 ✅ ACHIEVED. 99% reduction from 149 to 2 false positives.
+
+**Files:** `wasm/src/thin_checker.rs`
+
+**Scanner:** Added `wasm/differential-test/find-ts7011.mjs` for detecting false positives
+
+## Previous Assignment - TS2300 (INVESTIGATED - Not False Positives)
+
+**Status:** Investigated but discovered TS2300 is primarily MISSING errors, not extra
+
+**Investigation Findings:**
+- ✅ Interface merging works: `interface A { x: number } interface A { y: string }` - no error
+- ✅ Namespace merging works: Multiple namespace declarations merge correctly
+- ✅ Class+Interface merging works: `class C {} interface C {}` - no error
+- ❌ **Key Discovery:** Conformance scan showed 27 MISSING TS2300 errors (WASM under-reports), only 2 extra
+
+**Conclusion:** TS2300 requires WASM to ADD more duplicate detection, not remove false positives.
+This is different work from reducing false positives. Switched to TS7011 which has more tractable extra errors.
+
+## Previous Assignment - TS7006 (COMPLETED - Target Achieved)
+
+**Status:** Target achieved - reduced from 46 to 12 (74% reduction)
 
 **Completed Fixes:**
 1. ✅ Setter parameter type inference from getter return type (46 → 15)
 2. ✅ Destructured parameter elements with default values (15 → 12)
 
-**Remaining 12 patterns** (require deeper type resolution work):
-- Contextual typing with tuple union function types: `(...args: ['A', number] | ['B', string]) => void`
-- Decorator parameter handling
+**Remaining 12 patterns** (mostly blocked by parser bug):
+- **Decorator parameter handling (7+ files)** - PARSER BUG (documented)
+- Contextual typing with tuple union function types
 - IIFE callback patterns
 - Instance member prototype assignment
 
-**Files Modified:** `wasm/src/thin_checker.rs`
-
-**Commits:**
-- b5f9502636: Fix TS7006 for setter parameters (67% reduction)
-- b55d30154b: Fix TS7006 for destructured parameters with default values (20% more)
-
-**Success Criteria:** Target <20 ✅ ACHIEVED (12 remaining)
+**Note:** Success criteria <20 ✅ ACHIEVED. Remaining patterns are complex and
+largely blocked by parser bugs. Moved to TS2300 for more immediate impact.
 
 ## Previous Assignment - TS2403 (COMPLETED)
 
@@ -198,7 +234,7 @@ Priority: 1
 - [x] Fixed TS2304 for local variables in object literal methods: Added METHOD_DECLARATION handling in bind_node() to create function scope for object literal method bodies. Local variables like `let dis = ...` inside `{ m() { let dis = ...; } }` are now properly bound. Added regression test `test_local_variable_in_object_literal_method`. Fixed compilation issues in statements.rs (commented out incomplete StatementChecker methods) and test_ts7010_return_path_analysis. All thin_binder_tests pass (28/28). Key files: thin_binder.rs, thin_checker_tests.rs.
 
 ## Ready for Merge
-Yes
+Yes - TS7011/TS7010 assignment completed. 149 → 2 false positives (99% reduction).
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize emitter fidelity (ES5 downleveling/source maps) before new features.
