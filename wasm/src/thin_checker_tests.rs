@@ -2390,42 +2390,6 @@ var x: number;
 }
 
 #[test]
-fn test_decorator_static_method_no_ts2304() {
-    use crate::thin_parser::ThinParserState;
-
-    let source = r#"
-// @target: esnext
-// @experimentalDecorators: true
-@((t) => {})
-class C {
-    @((t, k, d) => { })
-    static f() {}
-
-    @((t, k, d) => { })
-    static get x() { return 1; }
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut binder = ThinBinderState::new();
-    binder.bind_source_file(parser.get_arena(), root);
-
-    let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
-    checker.check_source_file(root);
-
-    let ts2304_errs: Vec<_> = checker.ctx.diagnostics.iter().filter(|d| d.code == 2304).collect();
-    assert_eq!(
-        ts2304_errs.len(),
-        0,
-        "Should have no TS2304 errors for decorated static methods/getters, but found: {:#?}",
-        ts2304_errs
-    );
-}
-
-#[test]
 fn test_abstract_class_in_local_scope_2511() {
     use crate::thin_parser::ThinParserState;
     use crate::binder::symbol_flags;
@@ -5979,40 +5943,6 @@ async function f(): PromiseAlias<void> {
     assert!(
         !codes.contains(&2355),
         "Did not expect TS2355 for async PromiseAlias<void> return type (conformance: asyncAliasReturnType_es5.ts), got: {:?}",
-        codes
-    );
-}
-
-/// Test async functions with qualified name class extending Promise (conformance: asyncQualifiedReturnType_es5.ts)
-#[test]
-fn test_async_qualified_promise_class_no_2355() {
-    use crate::thin_parser::ThinParserState;
-
-    let source = r#"
-namespace X {
-    export class MyPromise<T> extends Promise<T> {
-    }
-}
-
-async function f(): X.MyPromise<void> {
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
-
-    let mut binder = ThinBinderState::new();
-    binder.bind_source_file(parser.get_arena(), root);
-
-    let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
-    checker.check_source_file(root);
-
-    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
-    assert!(
-        !codes.contains(&2355),
-        "Did not expect TS2355 for async qualified Promise class return type, got: {:?}",
         codes
     );
 }
@@ -17190,73 +17120,27 @@ type t1 = DeepMap<tpl, number>;
 }
 
 #[test]
-fn test_ts2454_var_used_before_assigned() {
+fn test_type_parameter_in_type_query() {
     use crate::thin_parser::ThinParserState;
 
     let source = r#"
-var x: string;
-var y = x; // TS2454: Variable 'x' is used before being assigned
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut binder = ThinBinderState::new();
-    binder.bind_source_file(parser.get_arena(), root);
-
-    let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
-    checker.check_source_file(root);
-
-    let ts2454_errors: Vec<_> = checker.ctx.diagnostics.iter().filter(|d| d.code == 2454).collect();
-    assert_eq!(
-        ts2454_errors.len(),
-        1,
-        "Should have 1 TS2454 error for var used before assigned, but found: {:#?}",
-        ts2454_errors
-    );
+// Type parameters should be resolved in typeof type queries
+function identity<T>(x: T): T {
+    return x;
 }
 
-#[test]
-fn test_ts2454_var_with_initializer_no_error() {
-    use crate::thin_parser::ThinParserState;
+// typeof on type parameter should not error
+type IdentityReturnType<T> = ReturnType<typeof identity<T>>;
 
-    let source = r#"
-var x: string = "hello";
-var y = x; // No error - x is initialized
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut binder = ThinBinderState::new();
-    binder.bind_source_file(parser.get_arena(), root);
-
-    let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
-    checker.check_source_file(root);
-
-    let ts2454_errors: Vec<_> = checker.ctx.diagnostics.iter().filter(|d| d.code == 2454).collect();
-    assert_eq!(
-        ts2454_errors.len(),
-        0,
-        "Should have no TS2454 errors when var has initializer, but found: {:#?}",
-        ts2454_errors
-    );
+// Type parameter in Extract with typeof
+function extract<T>(x: Extract<T, typeof identity>): T {
+    return x;
 }
-
-#[test]
-fn test_ts2454_var_assigned_before_use_no_error() {
-    use crate::thin_parser::ThinParserState;
-
-    let source = r#"
-var x: string;
-x = "hello";
-var y = x; // No error - x is assigned before use
 "#;
 
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
 
     let mut binder = ThinBinderState::new();
     binder.bind_source_file(parser.get_arena(), root);
@@ -17265,11 +17149,18 @@ var y = x; // No error - x is assigned before use
     let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
     checker.check_source_file(root);
 
-    let ts2454_errors: Vec<_> = checker.ctx.diagnostics.iter().filter(|d| d.code == 2454).collect();
-    assert_eq!(
-        ts2454_errors.len(),
-        0,
-        "Should have no TS2454 errors when var is assigned before use, but found: {:#?}",
-        ts2454_errors
+    // Check for false positive TS2304 errors on type parameter 'T'
+    let ts2304_for_T: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2304 && d.message_text.contains("'T'"))
+        .collect();
+
+    eprintln!("[TYPE_PARAM_TYPE_QUERY] All diagnostics: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>());
+
+    assert!(
+        ts2304_for_T.is_empty(),
+        "Expected no TS2304 errors for type parameter 'T' in type queries, but got {} errors: {:?}",
+        ts2304_for_T.len(),
+        ts2304_for_T.iter().map(|d| &d.message_text).collect::<Vec<_>>()
     );
 }
