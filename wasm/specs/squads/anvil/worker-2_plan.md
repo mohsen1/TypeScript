@@ -7,16 +7,15 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- Prereq: run `./scripts/ask-gemini.mjs "I need to fix the crash in es6/templates/TemplateExpression1.ts. What's the best approach?"` once the API key is available.
-- Fix crash in `es6/templates/TemplateExpression1.ts` ("unreachable").
-- Reproduce via conformance runner or direct harness; trace template literal handling in `wasm/src/thin_checker.rs` and related template/type evaluation paths.
-- Add regression test and confirm crash is eliminated (or document if already fixed upstream).
-- Deliverables: crash repro notes + failing stack path, regression test, and conformance delta showing crash removed.
+- Reduce TS2304 false positives (namespace sibling exports, module augmentation merging, global ambient declarations).
+- Collect 3-5 failing samples via conformance or `node wasm/differential-test/find-ts2304.mjs`; trace scope resolution in `wasm/src/thin_binder.rs` and `wasm/src/thin_checker.rs`.
+- Implement fix + regression tests; report before/after TS2304 delta from a targeted conformance run.
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)
 
 ## Completed
+- [x] Ran `./scripts/ask-gemini.mjs` (key available). Repro attempts: `./wasm/build-wasm.sh` (timed out at 120s but pkg emitted), `node wasm/differential-test/conformance-runner.mjs es6/templates --max=1` (Exact Match, no crash), `node wasm/differential-test/process-pool-conformance.mjs es6/templates --max=1 --workers=1` (Exact Match, no crash), direct ThinParser harness on `TemplateExpression1.ts` (TS1005 + TS2304 only).
 - [x] Investigated `es6/templates/TemplateExpression1.ts` crash: could not reproduce in native or wasm; added `test_unterminated_template_expression_reports_missing_name` in `thin_checker_tests.rs` to assert TS1005 parser diagnostic + TS2304 checker output. Ran `./wasm/test.sh test_unterminated_template_expression_reports_missing_name` and `node wasm/differential-test/conformance-runner.mjs es6/templates --max=1` (0 crashes).
 - [x] Reduced TS2304 false positives: scoped mapped type parameters during missing-name checks, added DOM globals (HTMLElement/Element/Document/etc.) to builtin type/value allowlists, and recovered from invalid `accessor` modifiers in statement/type-member parsing. Added thin_checker regressions, rebuilt wasm, `find-ts2304.mjs --max=200 --samples=5` (0 false positives), conformance run `run-conformance.sh --max=200 --workers=10` (TS2304 missing: 6). `./wasm/test.sh thin_checker_tests` failed at pre-existing abstract class tests (TS2564 vs expected TS2511).
 - [x] Reduced TS2322 false positives: apply contextual typing for class property initializers, resolve Ref/index access types before assignability in var/property declarations, add thin_checker regressions for literal property init and class indexed access. `find-ts2322.mjs --max=500 --samples=5` now reports 0 false positives (previously hit derivedTypeDoesNotRequireExtendsClause + typeOfThisInStaticMembers12/13 + privateNamesAndIndexedAccess).
