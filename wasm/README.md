@@ -127,17 +127,19 @@ The `CompatChecker` in `src/solver/` needs to implement the "Unsoundness Catalog
 
 
 ## Executive Summary (Director report)
-Last updated: 2026-01-11 18:08 (Eleventh Director Loop - Squad/Anvil Merged to Rust!)
+Last updated: 2026-01-11 18:23 (Twelfth Director Loop - Forge-2 CRITICAL Solver Fix!)
 
-### System Status: 🟢 EXCELLENT - Major Squad Merge Complete!
+### System Status: 🟢 EXCELLENT - Major Solver Fix Pushed!
 
 **Organization Health:**
-- **🎉 MAJOR MILESTONE:** squad/anvil merged into rust!
-- Rust branch now has: TS7006 74% reduction, TS2769 complete, TS2348 implemented
-- Active workers: Anvil-2 (parser recovery), Forge-1 (squad merge)
-- **⚠️ CRITICAL:** Forge-2 has unpushed solver fixes (ERROR instead of Any!)
+- **🔥 CRITICAL FIX:** Forge-2 pushed ERROR instead of Any solver fix!
+  - Root cause of missing TS2322 errors FIXED
+  - 14 solver tests fixed
+  - Added find-missing-ts2322.mjs tool
+- Rust branch: TS7006 74% reduction, TS2769 complete, TS2348 implemented
+- Active workers: Forge-1, Forge-2 (both just pushed)
+- Still 7 workers idle (42-271m)
 - Build passing
-- Still 5 workers idle (187-226m)
 
 ### Conformance Metrics (Primary KPI)
 | Metric | Value | Target | Status |
@@ -163,6 +165,21 @@ Last updated: 2026-01-11 18:08 (Eleventh Director Loop - Squad/Anvil Merged to R
 - W3: TS2339 Closure Narrowing - Active
 - W4: TS2769 Overload Matching Continuation - Active
 - W5: TS2322 False Positive Reduction (101 occurrences) - Active
+
+### Recent Progress (Jan 11 18:23 - Twelfth Director Loop - Forge-2 CRITICAL Solver Fix!)
+- **🔥 CRITICAL FIX:** Forge-2's ERROR instead of Any solver fix PUSHED!
+  - Root cause of missing TS2322 errors FIXED
+  - Solver was returning `Any` for failed generic inference
+  - Now returns ERROR (proper type checking)
+  - 14 solver tests fixed
+  - Added find-missing-ts2322.mjs tool (141 lines)
+  - This is a MAJOR correctness improvement!
+- **Forge-1:** Active, merged into squad/forge again
+- **TS2322 Status:** Down to 7 files (from 14 fixed)
+- **Director Discovery:** Worker was NOT idle - had unpushed work!
+  - Highlighted need to check for unpushed work
+  - Prompted worker to push, major fix now visible
+- **Still Idle:** 7 workers (42-271m)
 
 ### Recent Progress (Jan 11 18:08 - Eleventh Director Loop - Squad/Anvil Merged to Rust!)
 - **🎉 MAJOR MILESTONE:** squad/anvil merged into rust!
