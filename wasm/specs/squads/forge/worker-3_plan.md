@@ -15,7 +15,8 @@ TS2339 missing errors: improve reporting + fix top missing pattern.
 1. Extend `find-ts2339.mjs` to report missing TS2339.
 2. Fix missing TS2339 pattern in checker (catch binding unknown).
 3. Add tests for catch binding TS2339.
-4. Run focused tests (`./wasm/test.sh thin_checker_tests`) and report delta.
+4. Parse catch binding patterns in thin parser + parent mapping for catch clause.
+5. Run focused tests (`./wasm/test.sh thin_checker_tests`) and report delta.
 
 ### Key Files
 - `wasm/src/checker/control_flow.rs`
@@ -73,6 +74,7 @@ TS2339 missing errors: improve reporting + fix top missing pattern.
 - [x] Assertion predicate calls create flow nodes and narrow asserted targets; added test
 - [x] Added missing TS2339 mode to `find-ts2339.mjs`
 - [x] Catch clause variables default to `unknown` for narrowing; added TS2339 test
+- [x] Parse catch binding patterns and set parent links for catch clause nodes
 
 ### Remaining TS2339 False Positives (pending re-run)
 - Mixin classes: mixin type inference issues (intersection handling added in new expressions, unit tests pass, conformance tests need more investigation)
@@ -80,7 +82,7 @@ TS2339 missing errors: improve reporting + fix top missing pattern.
 - Re-run conformance to confirm private names/control-flow narrowing improvements
 
 ## Ready for Merge
-No
+Yes
 
 ## Notes
 - Similar infrastructure to TS2564 (property init) - share patterns with Workers 1-2
@@ -96,3 +98,4 @@ No
 - Tests: `./wasm/test.sh control_flow_tests`, `./wasm/test.sh test_ts2339_`
 - `./scripts/ask-gemini.mjs` blocked: missing `GCP_VERTEX_EXPRESS_API_KEY`
 - `./wasm/test.sh thin_checker_tests` fails with existing abstract class tests (2511 vs 2564)
+- Missing TS2339 scan (`--mode=missing --max=400 --samples=20`): 0 files
