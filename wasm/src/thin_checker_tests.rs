@@ -11650,19 +11650,18 @@ const shapes: Shape[] = [new Circle(1), new Square(2)]; // Should be OK
 
     let error_count = checker.ctx.diagnostics.len();
 
-    // Currently expects 3 errors due to instance-to-class type comparison issues
-    // Once class inheritance type checking works, change to expect 0 errors
-    if error_count != 3 {
+    // Class inheritance type checking now works - expect 0 errors
+    if error_count != 0 {
         eprintln!("=== Concrete Extends Abstract Diagnostics ===");
-        eprintln!("Expected 3 errors (class type issues), got {}", error_count);
+        eprintln!("Expected 0 errors (class inheritance fixed), got {}", error_count);
         for diag in &checker.ctx.diagnostics {
             eprintln!("[{}] {}", diag.start, diag.message_text);
         }
     }
 
     assert_eq!(
-        error_count, 3,
-        "Expected 3 errors due to class type comparison: {:?}",
+        error_count, 0,
+        "Expected 0 errors (class inheritance now works): {:?}",
         checker.ctx.diagnostics
     );
 }
