@@ -17196,3 +17196,39 @@ class A {
         ts2339_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>()
     );
 }
+
+#[test]
+fn test_instance_private_accessor_lookup_debug() {
+    // Debug test for instance private accessor lookup issue
+    let source = r#"
+class A2 {
+    get #prop() { return ""; }
+    set #prop(param: string) { }
+    
+    constructor() {
+        console.log(this.#prop);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+    
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    
+    checker.check_source_file(root);
+    
+    eprintln!("Diagnostics: {:?}", checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>());
+    
+    // This should pass but currently fails
+    let ts2339_count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2339).count();
+    assert_eq!(ts2339_count, 0, 
+        "Expected no TS2339 errors for instance private accessor access, got {} - diagnostics: {:?}",
+        ts2339_count,
+        checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>()
+    );
+}
