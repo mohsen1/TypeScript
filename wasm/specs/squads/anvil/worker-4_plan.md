@@ -128,9 +128,10 @@ Expanded conformance scan (3000 tests) found **2 remaining TS2769 false positive
 - [x] Identify remaining TS2769 patterns
 - [x] Analyze forgottenNew.ts - class constructor without new
 - [x] Analyze callWithSpread4.ts - spread with overloads
-- [ ] Implement TS2348 diagnostic and detection
+- [x] Implement TS2348 diagnostic and detection
 - [ ] Implement fix for spread argument overload matching
-- [ ] Add regression tests
+- [x] Add regression test for TS2348
+- [ ] Add regression tests for spread overload case
 - [ ] Verify conformance improvement
 
 ### Impact
