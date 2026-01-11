@@ -1453,6 +1453,10 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
 
         // Try each call signature
         let mut failures = Vec::new();
+        let mut all_arg_count_mismatches = true;
+        let mut min_expected = usize::MAX;
+        let mut max_expected = 0;
+        let actual_count = arg_types.len();
 
         for sig in &callable.call_signatures {
             // Convert CallSignature to FunctionShape
@@ -1468,6 +1472,7 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
             match self.resolve_function_call(&func, arg_types) {
                 CallResult::Success(ret) => return CallResult::Success(ret),
                 CallResult::ArgumentTypeMismatch { index: _, expected, actual } => {
+                    all_arg_count_mismatches = false;
                     failures.push(
                         crate::solver::diagnostics::PendingDiagnosticBuilder::argument_not_assignable(
                             actual, expected
@@ -1476,14 +1481,27 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                 }
                 CallResult::ArgumentCountMismatch { expected_min, expected_max, actual } => {
                     let expected = expected_max.unwrap_or(expected_min);
+                    min_expected = min_expected.min(expected_min);
+                    max_expected = max_expected.max(expected);
                     failures.push(
                         crate::solver::diagnostics::PendingDiagnosticBuilder::argument_count_mismatch(
                             expected, actual
                         )
                     );
                 }
-                _ => {}
+                _ => {
+                    all_arg_count_mismatches = false;
+                }
             }
+        }
+
+        // If all signatures failed due to argument count mismatch, report TS2554 instead of TS2769
+        if all_arg_count_mismatches && !failures.is_empty() {
+            return CallResult::ArgumentCountMismatch {
+                expected_min: min_expected,
+                expected_max: if max_expected > min_expected { Some(max_expected) } else { None },
+                actual: actual_count,
+            };
         }
 
         // If we got here, no signature matched
