@@ -7,7 +7,11 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- Awaiting next assignment from EM-Anvil.
+- **TS2322 False Positives**: Reduce TS2322 'Type X is not assignable to type Y' false positives.
+  - Status: Investigating (5 false positives in 1000 tests)
+  - Files: controlFlowGenericTypes.ts, controlFlowInOperator.ts, controlFlowOptionalChain.ts, exhaustiveSwitchStatements1.ts, globalThisReadonlyProperties.ts
+  - Pattern: Control flow narrowing for generic types and property access
+  - Next: Identify root cause and implement fix
 
 ## Task Queue
 - [x] Verify whether `types/mapped/recursiveMappedTypes.ts` still crashes; if so, capture stack and coordinate with Forge.

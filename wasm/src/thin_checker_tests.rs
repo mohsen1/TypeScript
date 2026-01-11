@@ -17152,3 +17152,37 @@ type t1 = DeepMap<tpl, number>;
     // The test reaching here means we didn't crash on recursive mapped types
     eprintln!("[RECURSIVE_MAPPED_TEST] Test completed without crash - {} TS2456 errors found", ts2456_count);
 }
+
+#[test]
+fn test_generic_control_flow_narrowing() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+function f1<T extends string | undefined>(x: T): string {
+    if (x) {
+        return x;
+    }
+    return "hello";
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Should have no TS2322 errors - after narrowing, x should be assignable to string
+    let ts2322_count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2322).count();
+    assert_eq!(
+        ts2322_count, 0,
+        "Expected no TS2322 errors, got {} - diagnostics: {:?}",
+        ts2322_count,
+        checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>()
+    );
+}
