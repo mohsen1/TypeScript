@@ -7,12 +7,8 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- Investigate remaining TS2355 extras in:
-  - `types/asyncGenerators/types.asyncGenerators.es2018.1.ts`
-  - `types/asyncGenerators/types.asyncGenerators.es2018.2.ts`
-  - `types/contextualTypes/asyncFunctions/contextuallyTypeAsyncFunctionReturnType.ts`
-- Reproduce via targeted conformance runs; trace return analysis in `wasm/src/thin_checker.rs` and `wasm/src/checker/control_flow.rs`.
-- Implement fix + regression tests; report before/after TS2355 delta.
+- Investigate remaining TS2355 extras in asyncGenerators/contextualTypes (3 files).
+- Repro via targeted conformance, fix + regressions, report delta.
 
 ## Task Queue
 - [x] Verify whether `types/mapped/recursiveMappedTypes.ts` still crashes; if so, capture stack and coordinate with Forge.
