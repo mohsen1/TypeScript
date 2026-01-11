@@ -1913,11 +1913,6 @@ impl<'a> ThinCheckerState<'a> {
         if let Some(ident) = self.ctx.arena.get_identifier(node) {
             let name = &ident.escaped_text;
 
-            // Check type parameter scope first
-            if let Some(type_id) = self.lookup_type_parameter(name) {
-                return type_id;
-            }
-
             if let Some(sym_id) = self.resolve_identifier_symbol(idx) {
                 return self.type_reference_symbol_type(sym_id);
             }
@@ -1993,10 +1988,6 @@ impl<'a> ThinCheckerState<'a> {
             return TypeId::ERROR;
         } else if let Some(name) = name_text {
             if is_identifier {
-                // Check type parameter scope before reporting error
-                if let Some(type_id) = self.lookup_type_parameter(&name) {
-                    return type_id;
-                }
                 if self.is_known_global_value_name(&name) {
                     return TypeId::ANY;
                 }
@@ -4008,6 +3999,9 @@ impl<'a> ThinCheckerState<'a> {
                     if !self.has_static_modifier(&prop.modifiers) {
                         continue;
                     }
+                    if self.is_private_identifier_name(prop.name) {
+                        continue;
+                    }
                     let Some(name) = self.get_property_name(prop.name) else {
                         continue;
                     };
@@ -4036,6 +4030,9 @@ impl<'a> ThinCheckerState<'a> {
                     if !self.has_static_modifier(&method.modifiers) {
                         continue;
                     }
+                    if self.is_private_identifier_name(method.name) {
+                        continue;
+                    }
                     let Some(name) = self.get_property_name(method.name) else {
                         continue;
                     };
@@ -4060,6 +4057,9 @@ impl<'a> ThinCheckerState<'a> {
                         continue;
                     };
                     if !self.has_static_modifier(&accessor.modifiers) {
+                        continue;
+                    }
+                    if self.is_private_identifier_name(accessor.name) {
                         continue;
                     }
                     let Some(name) = self.get_property_name(accessor.name) else {
@@ -4567,22 +4567,21 @@ impl<'a> ThinCheckerState<'a> {
             return false;
         };
 
-        // Check if this is a variable (either block-scoped or function-scoped)
         if (symbol.flags & symbol_flags::VARIABLE) == 0 {
             return false;
         }
+        if (symbol.flags & symbol_flags::BLOCK_SCOPED_VARIABLE) == 0 {
+            return false;
+        }
 
-        // Skip parameters - they are always assigned by the caller
         if self.symbol_is_parameter(sym_id) {
             return false;
         }
 
-        // Skip if has definite assignment assertion (x!: Type)
         if self.symbol_has_definite_assignment_assertion(sym_id) {
             return false;
         }
 
-        // Skip if this is a for-in/for-of loop variable (always assigned by the loop)
         if self.is_for_in_of_assignment_target(idx) {
             return false;
         }
@@ -16583,28 +16582,6 @@ impl<'a> ThinCheckerState<'a> {
             return;
         }
 
-        // Check if parameter name is a binding pattern with default values
-        // For destructured parameters like ({ x = 1 }) => {}, binding elements have default values
-        if let Some(name_node) = self.ctx.arena.get(param.name) {
-            if name_node.kind == syntax_kind_ext::OBJECT_BINDING_PATTERN
-                || name_node.kind == syntax_kind_ext::ARRAY_BINDING_PATTERN
-            {
-                // Check if any binding element has an initializer (default value)
-                if let Some(pattern) = self.ctx.arena.get_binding_pattern(name_node) {
-                    for &element_idx in &pattern.elements.nodes {
-                        if let Some(element_node) = self.ctx.arena.get(element_idx) {
-                            if let Some(element) = self.ctx.arena.get_binding_element(element_node) {
-                                if !element.initializer.is_none() {
-                                    // Binding element has default value, type can be inferred
-                                    return;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
         let param_name = self.parameter_name_for_error(param.name);
         let message = format_message(diagnostic_messages::PARAMETER_IMPLICIT_ANY, &[&param_name, "any"]);
         self.error_at_node(param.name, &message, diagnostic_codes::IMPLICIT_ANY_PARAMETER);
@@ -17298,10 +17275,7 @@ impl<'a> ThinCheckerState<'a> {
         for &param_idx in &accessor.parameters.nodes {
             if let Some(param_node) = self.ctx.arena.get(param_idx) {
                 if let Some(param) = self.ctx.arena.get_parameter(param_node) {
-                    // For setters, skip implicit 'any' parameter check - the parameter type
-                    // is inferred from the corresponding getter's return type
-                    let is_setter_param = !is_getter;
-                    self.maybe_report_implicit_any_parameter(param, is_setter_param);
+                    self.maybe_report_implicit_any_parameter(param, false);
                 }
             }
         }
@@ -17504,6 +17478,90 @@ impl<'a> ThinCheckerState<'a> {
         None
     }
 
+    fn promise_like_type_argument_from_alias(
+        &mut self,
+        sym_id: SymbolId,
+        args: &[TypeId],
+        visited_aliases: &mut Vec<SymbolId>,
+    ) -> Option<TypeId> {
+        use crate::solver::TypeKey;
+
+        if visited_aliases.iter().any(|&seen| seen == sym_id) {
+            return None;
+        }
+        visited_aliases.push(sym_id);
+
+        let symbol = self.ctx.binder.get_symbol(sym_id)?;
+        let decl_idx = if !symbol.value_declaration.is_none() {
+            symbol.value_declaration
+        } else {
+            symbol.declarations.first().copied().unwrap_or(NodeIndex::NONE)
+        };
+        if decl_idx.is_none() {
+            return None;
+        }
+
+        let node = self.ctx.arena.get(decl_idx)?;
+        let type_alias = self.ctx.arena.get_type_alias(node)?;
+
+        let mut bindings = Vec::new();
+        if let Some(params) = &type_alias.type_parameters {
+            if params.nodes.len() != args.len() {
+                return None;
+            }
+            for (&param_idx, &arg) in params.nodes.iter().zip(args.iter()) {
+                let param_node = self.ctx.arena.get(param_idx)?;
+                let param = self.ctx.arena.get_type_parameter(param_node)?;
+                let name_node = self.ctx.arena.get(param.name)?;
+                let ident = self.ctx.arena.get_identifier(name_node)?;
+                bindings.push((self.ctx.types.intern_string(&ident.escaped_text), arg));
+            }
+        } else if !args.is_empty() {
+            return None;
+        }
+
+        // Check if the alias RHS is directly a Promise/PromiseLike type reference
+        // before lowering (e.g., Promise<T> where Promise is from lib and might not fully resolve)
+        if let Some(type_node) = self.ctx.arena.get(type_alias.type_node) {
+            if let Some(type_ref) = self.ctx.arena.get_type_ref(type_node) {
+                if let Some(name_node) = self.ctx.arena.get(type_ref.type_name) {
+                    if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
+                        if self.is_promise_like_name(ident.escaped_text.as_str()) {
+                            // It's Promise<...> or PromiseLike<...>
+                            // Get the first type argument and substitute bindings
+                            if let Some(type_args) = &type_ref.type_arguments {
+                                if let Some(&first_arg_idx) = type_args.nodes.first() {
+                                    // Try to substitute bindings in the type argument
+                                    let arg_type = self.lower_type_with_bindings(first_arg_idx, bindings.clone());
+                                    return Some(arg_type);
+                                }
+                            }
+                            // No type args means Promise (equivalent to Promise<any>)
+                            return Some(TypeId::ANY);
+                        }
+                    }
+                }
+            }
+        }
+
+        let lowered = self.lower_type_with_bindings(type_alias.type_node, bindings);
+        if let Some(TypeKey::Application(app_id)) = self.ctx.types.lookup(lowered) {
+            let app = self.ctx.types.type_application(app_id);
+            return self.promise_like_type_argument_from_base(app.base, &app.args, visited_aliases);
+        }
+
+        // Fallback: if the alias expands to a promise-like type reference (e.g., Promise from lib),
+        // treat it as Promise<any> even if we can't get the type argument.
+        // This handles cases like: type PromiseAlias<T> = Promise<T> where Promise comes from lib.
+        if self.type_ref_is_promise_like(lowered) {
+            // If we have args, try to return the first one (the T in Promise<T>)
+            // Otherwise return ANY as a safe fallback
+            return Some(args.first().copied().unwrap_or(TypeId::ANY));
+        }
+
+        None
+    }
+
     fn promise_like_type_argument_from_class(
         &mut self,
         sym_id: SymbolId,
@@ -17601,90 +17659,6 @@ impl<'a> ThinCheckerState<'a> {
 
             // Promise with no type argument defaults to Promise<any>
             return Some(TypeId::ANY);
-        }
-
-        None
-    }
-
-    fn promise_like_type_argument_from_alias(
-        &mut self,
-        sym_id: SymbolId,
-        args: &[TypeId],
-        visited_aliases: &mut Vec<SymbolId>,
-    ) -> Option<TypeId> {
-        use crate::solver::TypeKey;
-
-        if visited_aliases.iter().any(|&seen| seen == sym_id) {
-            return None;
-        }
-        visited_aliases.push(sym_id);
-
-        let symbol = self.ctx.binder.get_symbol(sym_id)?;
-        let decl_idx = if !symbol.value_declaration.is_none() {
-            symbol.value_declaration
-        } else {
-            symbol.declarations.first().copied().unwrap_or(NodeIndex::NONE)
-        };
-        if decl_idx.is_none() {
-            return None;
-        }
-
-        let node = self.ctx.arena.get(decl_idx)?;
-        let type_alias = self.ctx.arena.get_type_alias(node)?;
-
-        let mut bindings = Vec::new();
-        if let Some(params) = &type_alias.type_parameters {
-            if params.nodes.len() != args.len() {
-                return None;
-            }
-            for (&param_idx, &arg) in params.nodes.iter().zip(args.iter()) {
-                let param_node = self.ctx.arena.get(param_idx)?;
-                let param = self.ctx.arena.get_type_parameter(param_node)?;
-                let name_node = self.ctx.arena.get(param.name)?;
-                let ident = self.ctx.arena.get_identifier(name_node)?;
-                bindings.push((self.ctx.types.intern_string(&ident.escaped_text), arg));
-            }
-        } else if !args.is_empty() {
-            return None;
-        }
-
-        // Check if the alias RHS is directly a Promise/PromiseLike type reference
-        // before lowering (e.g., Promise<T> where Promise is from lib and might not fully resolve)
-        if let Some(type_node) = self.ctx.arena.get(type_alias.type_node) {
-            if let Some(type_ref) = self.ctx.arena.get_type_ref(type_node) {
-                if let Some(name_node) = self.ctx.arena.get(type_ref.type_name) {
-                    if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
-                        if self.is_promise_like_name(ident.escaped_text.as_str()) {
-                            // It's Promise<...> or PromiseLike<...>
-                            // Get the first type argument and substitute bindings
-                            if let Some(type_args) = &type_ref.type_arguments {
-                                if let Some(&first_arg_idx) = type_args.nodes.first() {
-                                    // Try to substitute bindings in the type argument
-                                    let arg_type = self.lower_type_with_bindings(first_arg_idx, bindings.clone());
-                                    return Some(arg_type);
-                                }
-                            }
-                            // No type args means Promise (equivalent to Promise<any>)
-                            return Some(TypeId::ANY);
-                        }
-                    }
-                }
-            }
-        }
-
-        let lowered = self.lower_type_with_bindings(type_alias.type_node, bindings);
-        if let Some(TypeKey::Application(app_id)) = self.ctx.types.lookup(lowered) {
-            let app = self.ctx.types.type_application(app_id);
-            return self.promise_like_type_argument_from_base(app.base, &app.args, visited_aliases);
-        }
-
-        // Fallback: if the alias expands to a promise-like type reference (e.g., Promise from lib),
-        // treat it as Promise<any> even if we can't get the type argument.
-        // This handles cases like: type PromiseAlias<T> = Promise<T> where Promise comes from lib.
-        if self.type_ref_is_promise_like(lowered) {
-            // If we have args, try to return the first one (the T in Promise<T>)
-            // Otherwise return ANY as a safe fallback
-            return Some(args.first().copied().unwrap_or(TypeId::ANY));
         }
 
         None
