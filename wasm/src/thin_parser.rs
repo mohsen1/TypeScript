@@ -41,6 +41,8 @@ use crate::parser::{
 const CONTEXT_FLAG_ASYNC: u32 = 1;
 /// Context flag: inside a generator function/method
 const CONTEXT_FLAG_GENERATOR: u32 = 2;
+/// Context flag: inside a static block (where 'await' is reserved)
+const CONTEXT_FLAG_STATIC_BLOCK: u32 = 4;
 
 // =============================================================================
 // Parse Diagnostic
@@ -238,6 +240,12 @@ impl ThinParserState {
         (self.context_flags & CONTEXT_FLAG_GENERATOR) != 0
     }
 
+    /// Check if we're inside a static block
+    #[inline]
+    fn in_static_block_context(&self) -> bool {
+        (self.context_flags & CONTEXT_FLAG_STATIC_BLOCK) != 0
+    }
+
     /// Set context flags and return the old value (for restoring later)
     #[inline]
     fn set_context_flags(&mut self, flags: u32) -> u32 {
@@ -250,6 +258,29 @@ impl ThinParserState {
     #[inline]
     fn restore_context_flags(&mut self, flags: u32) {
         self.context_flags = flags;
+    }
+
+    /// Check if the current token is an illegal binding identifier in the current context
+    /// Returns true if illegal and emits appropriate diagnostic
+    fn check_illegal_binding_identifier(&mut self) -> bool {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+
+        // In static blocks, 'await' cannot be used as a binding identifier
+        if self.in_static_block_context() {
+            // Check if current token is 'await' (either as keyword or identifier)
+            let is_await = self.is_token(SyntaxKind::AwaitKeyword) ||
+                (self.is_token(SyntaxKind::Identifier) && self.scanner.get_token_value_ref() == "await");
+
+            if is_await {
+                self.parse_error_at_current_token(
+                    "Identifier expected. 'await' is a reserved word that cannot be used here.",
+                    diagnostic_codes::AWAIT_IDENTIFIER_ILLEGAL
+                );
+                return true;
+            }
+        }
+
+        false
     }
 
     /// Parse optional token, returns true if found
@@ -1221,6 +1252,9 @@ impl ThinParserState {
         let start_pos = self.token_pos();
 
         // Parse name - can be identifier, keyword as identifier, or binding pattern
+        // Check for illegal binding identifiers (e.g., 'await' in static blocks)
+        self.check_illegal_binding_identifier();
+
         let name = if self.is_token(SyntaxKind::OpenBraceToken) {
             self.parse_object_binding_pattern()
         } else if self.is_token(SyntaxKind::OpenBracketToken) {
@@ -1297,6 +1331,9 @@ impl ThinParserState {
         let asterisk_token = self.parse_optional(SyntaxKind::AsteriskToken);
 
         // Parse name - keywords like 'abstract' can be used as function names
+        // Check for illegal binding identifiers (e.g., 'await' in static blocks)
+        self.check_illegal_binding_identifier();
+
         let name = if self.is_identifier_or_keyword() {
             self.parse_identifier_name()
         } else {
@@ -1916,6 +1953,9 @@ impl ThinParserState {
         self.parse_expected(SyntaxKind::ClassKeyword);
 
         // Parse class name
+        // Check for illegal binding identifiers (e.g., 'await' in static blocks)
+        self.check_illegal_binding_identifier();
+
         let name = if self.is_token(SyntaxKind::Identifier) {
             self.parse_identifier()
         } else {
@@ -2807,9 +2847,12 @@ impl ThinParserState {
         // Consume 'static'
         self.parse_expected(SyntaxKind::StaticKeyword);
 
-        // Parse the block body
+        // Parse the block body with static block context (where 'await' is reserved)
         self.parse_expected(SyntaxKind::OpenBraceToken);
+        let saved_flags = self.context_flags;
+        self.context_flags |= CONTEXT_FLAG_STATIC_BLOCK;
         let statements = self.parse_statements();
+        self.context_flags = saved_flags;
         self.parse_expected(SyntaxKind::CloseBraceToken);
 
         let end_pos = self.token_end();
@@ -6185,6 +6228,9 @@ impl ThinParserState {
 
     /// Parse binding element name (can be identifier or nested binding pattern)
     fn parse_binding_element_name(&mut self) -> NodeIndex {
+        // Check for illegal binding identifiers (e.g., 'await' in static blocks)
+        self.check_illegal_binding_identifier();
+
         if self.is_token(SyntaxKind::OpenBraceToken) {
             self.parse_object_binding_pattern()
         } else if self.is_token(SyntaxKind::OpenBracketToken) {
