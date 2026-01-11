@@ -1567,6 +1567,12 @@ impl<'a> FlowAnalyzer<'a> {
             return Some((atom, false));
         }
 
+        if node.kind == SyntaxKind::PrivateIdentifier as u16 {
+            let ident = self.arena.get_identifier(node)?;
+            let atom = self.interner.intern_string(&ident.escaped_text);
+            return Some((atom, false));
+        }
+
         if node.kind == SyntaxKind::NumericLiteral as u16 {
             let lit = self.arena.get_literal(node)?;
             let atom = self.interner.intern_string(&lit.text);
