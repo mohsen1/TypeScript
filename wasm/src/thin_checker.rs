@@ -5845,6 +5845,7 @@ impl<'a> ThinCheckerState<'a> {
                 if arg_node.kind == syntax_kind_ext::SPREAD_ELEMENT {
                     if let Some(spread_data) = self.ctx.arena.get_spread(arg_node) {
                         let spread_type = self.get_type_of_node(spread_data.expression);
+                        let spread_type = self.resolve_type_for_property_access(spread_type);
                         if let Some(TypeKey::Tuple(elems_id)) = self.ctx.types.lookup(spread_type) {
                             let elems = self.ctx.types.tuple_list(elems_id);
                             expanded_count += elems.len();
@@ -5865,6 +5866,7 @@ impl<'a> ThinCheckerState<'a> {
                 if arg_node.kind == syntax_kind_ext::SPREAD_ELEMENT {
                     if let Some(spread_data) = self.ctx.arena.get_spread(arg_node) {
                         let spread_type = self.get_type_of_node(spread_data.expression);
+                        let spread_type = self.resolve_type_for_property_access(spread_type);
 
                         // If it's a tuple type, expand its elements
                         if let Some(TypeKey::Tuple(elems_id)) = self.ctx.types.lookup(spread_type) {
@@ -7416,30 +7418,32 @@ impl<'a> ThinCheckerState<'a> {
                 }
             }
 
-            let elem_type = self.get_type_of_node(elem_idx);
+            let Some(elem_node) = self.ctx.arena.get(elem_idx) else {
+                continue;
+            };
+            let elem_is_spread = elem_node.kind == syntax_kind_ext::SPREAD_ELEMENT;
+            let elem_type = if elem_is_spread {
+                if let Some(spread_data) = self.ctx.arena.get_spread(elem_node) {
+                    self.get_type_of_node(spread_data.expression)
+                } else {
+                    TypeId::ANY
+                }
+            } else {
+                self.get_type_of_node(elem_idx)
+            };
 
             self.ctx.contextual_type = prev_context;
 
             if let Some(ref expected) = tuple_context {
-                let (name, optional, rest) = match expected.get(index) {
-                    Some(el) => (el.name, el.optional, el.rest),
-                    None => {
-                        if let Some(last) = expected.last() {
-                            if last.rest {
-                                (last.name, last.optional, last.rest)
-                            } else {
-                                (None, false, false)
-                            }
-                        } else {
-                            (None, false, false)
-                        }
-                    }
+                let (name, optional) = match expected.get(index) {
+                    Some(el) => (el.name, el.optional),
+                    None => (None, false),
                 };
                 tuple_elements.push(TupleElement {
                     type_id: elem_type,
                     name,
                     optional,
-                    rest,
+                    rest: elem_is_spread,
                 });
             } else {
                 element_types.push(elem_type);

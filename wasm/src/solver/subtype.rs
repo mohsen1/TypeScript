@@ -1159,7 +1159,33 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         for (i, t_elem) in target.iter().enumerate() {
             if t_elem.rest {
                 let expansion = self.expand_tuple_rest(t_elem.type_id);
-                let mut source_iter = source.iter().enumerate().skip(i);
+                let tail = &target[i + 1..];
+                let mut source_end = source.len();
+                for tail_elem in tail.iter().rev() {
+                    if source_end <= i {
+                        if !tail_elem.optional {
+                            return SubtypeResult::False;
+                        }
+                        break;
+                    }
+                    let s_elem = &source[source_end - 1];
+                    if s_elem.rest {
+                        if !tail_elem.optional {
+                            return SubtypeResult::False;
+                        }
+                        break;
+                    }
+                    let assignable = self.check_subtype(s_elem.type_id, tail_elem.type_id).is_true();
+                    if tail_elem.optional && !assignable {
+                        break;
+                    }
+                    if !assignable {
+                        return SubtypeResult::False;
+                    }
+                    source_end -= 1;
+                }
+
+                let mut source_iter = source.iter().enumerate().take(source_end).skip(i);
 
                 for t_fixed in &expansion.fixed {
                     match source_iter.next() {
@@ -3211,7 +3237,43 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         for (i, t_elem) in target.iter().enumerate() {
             if t_elem.rest {
                 let expansion = self.expand_tuple_rest(t_elem.type_id);
-                let mut source_iter = source.iter().enumerate().skip(i);
+                let tail = &target[i + 1..];
+                let mut source_end = source.len();
+                for tail_elem in tail.iter().rev() {
+                    if source_end <= i {
+                        if !tail_elem.optional {
+                            return Some(SubtypeFailureReason::TupleElementMismatch {
+                                source_count: source.len(),
+                                target_count: target.len(),
+                            });
+                        }
+                        break;
+                    }
+                    let s_elem = &source[source_end - 1];
+                    if s_elem.rest {
+                        if !tail_elem.optional {
+                            return Some(SubtypeFailureReason::TupleElementMismatch {
+                                source_count: source.len(),
+                                target_count: target.len(),
+                            });
+                        }
+                        break;
+                    }
+                    let assignable = self.check_subtype(s_elem.type_id, tail_elem.type_id).is_true();
+                    if tail_elem.optional && !assignable {
+                        break;
+                    }
+                    if !assignable {
+                        return Some(SubtypeFailureReason::TupleElementTypeMismatch {
+                            index: source_end - 1,
+                            source_element: s_elem.type_id,
+                            target_element: tail_elem.type_id,
+                        });
+                    }
+                    source_end -= 1;
+                }
+
+                let mut source_iter = source.iter().enumerate().take(source_end).skip(i);
 
                 for t_fixed in &expansion.fixed {
                     match source_iter.next() {
