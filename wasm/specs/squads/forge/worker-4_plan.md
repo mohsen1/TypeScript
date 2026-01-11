@@ -1,37 +1,36 @@
 # Worker 4 Plan - Squad Forge
 
 ## Mission
-Reduce TS2300 duplicate identifier false positives.
+Improve TS2322 assignability diagnostics (type not assignable).
 
 Status: Active
 Priority: 1
 
 ## Current Assignment
-Fix TS2300 false positives for class accessor pairs (get/set).
+Improve TS2322 return-type assignability (void/undefined compatibility).
 
-**Error Code:** TS2300 - "Duplicate identifier '{0}'."
+**Error Code:** TS2322 - "Type 'X' is not assignable to type 'Y'"
 
-**Impact:** Blocks `cli::driver_tests::compile_class_accessors`
+**Impact:** 310 conformance tests affected
 
 ### Steps
-1. **Reproduce** with `./wasm/test.sh compile_class_accessors`.
-2. **Identify** where duplicate identifier is emitted for accessor pairs in `thin_checker.rs`.
-3. **Allow get/set pairs** to merge without TS2300; keep true duplicates (two getters, two setters) reporting.
-4. **Add tests** in `wasm/src/thin_checker_tests.rs` or `wasm/src/cli/driver_tests.rs` for accessor pairs.
-5. **Run focused tests** and record delta.
+1. **Add tests** in `wasm/src/solver/compat_tests.rs` for call/construct signature return compatibility with `void`/`undefined`.
+2. **Audit compat logic** in `wasm/src/solver/compat.rs` and `wasm/src/solver/subtype.rs` for return assignability.
+3. **Implement fix** for any mismatches found (void/undefined compatibility should match TS).
+4. **Run focused tests** with `./wasm/test.sh` and report delta.
 
 ### Key Files
-- `wasm/src/thin_checker.rs`
-- `wasm/src/binder.rs`
+- `wasm/src/solver/compat.rs`
+- `wasm/src/solver/subtype.rs`
+- `wasm/src/solver/compat_tests.rs`
 - `wasm/src/thin_checker_tests.rs`
-- `wasm/src/cli/driver_tests.rs`
 
 ### Success Criteria
-- `compile_class_accessors` passes without TS2300
-- No new TS2300 regressions for true duplicates
+- TS2322 missing errors reduced for return-type assignability
+- No new TS2322 regressions
 
 ## Task Queue
-- After fix, re-run `./wasm/test.sh` (full) if time permits.
+- Add TS2322 regression tests for contextual typing with unions if time permits.
 
 ## Completed
 
