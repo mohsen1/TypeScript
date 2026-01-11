@@ -7,24 +7,24 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-TS2339 missing errors: extend control-flow narrowing for guard/switch cases.
+TS2339 missing errors: private-name access and static computed member cases.
 
 **Error Code:** TS2339 - "Property 'X' does not exist on type 'Y'"
 
 ### Steps
 1. **Run a missing scan**: `node wasm/differential-test/find-ts2339.mjs --mode=missing --max=2000 --samples=20`.
-2. **Pick top missing pattern** (likely switch-discriminant or `in`/`instanceof`/`typeof` guard narrowing).
-3. **Implement flow updates** in `wasm/src/checker/control_flow.rs` to narrow types in the chosen pattern.
-4. **Add tests** in `wasm/src/checker/control_flow_tests.rs`.
-5. **Run focused tests** with `./wasm/test.sh control_flow_tests` and report delta.
+2. **Target missing patterns** from the scan (private-name access + static computed `this.c`).
+3. **Fix property access** in `wasm/src/thin_checker.rs` for private names and computed static members.
+4. **Add tests** in `wasm/src/thin_checker_tests.rs`.
+5. **Run focused tests** with `./wasm/test.sh` and report delta.
 
 ### Key Files
-- `wasm/src/checker/control_flow.rs`
-- `wasm/src/checker/control_flow_tests.rs`
+- `wasm/src/thin_checker.rs`
+- `wasm/src/thin_checker_tests.rs`
 - `wasm/differential-test/find-ts2339.mjs`
 
 ### Success Criteria
-- Missing TS2339 reduced for the selected control-flow pattern
+- Missing TS2339 reduced for private-name/computed-member patterns
 - No new TS2339 extras introduced
 
 ## Task Queue

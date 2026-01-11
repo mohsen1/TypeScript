@@ -3428,7 +3428,7 @@ impl ThinParserState {
 
         let end_pos = self.token_end();
 
-        self.arena.add_module(
+        let module_idx = self.arena.add_module(
             syntax_kind_ext::MODULE_DECLARATION,
             start_pos,
             end_pos,
@@ -3437,7 +3437,15 @@ impl ThinParserState {
                 name,
                 body,
             },
-        )
+        );
+
+        if is_global {
+            if let Some(node) = self.arena.get_mut(module_idx) {
+                node.flags |= node_flags::GLOBAL_AUGMENTATION as u16;
+            }
+        }
+
+        module_idx
     }
 
     /// Parse declare module: declare module "name" {}
@@ -3481,7 +3489,7 @@ impl ThinParserState {
 
         let end_pos = self.token_end();
 
-        self.arena.add_module(
+        let module_idx = self.arena.add_module(
             syntax_kind_ext::MODULE_DECLARATION,
             start_pos,
             end_pos,
@@ -3490,7 +3498,15 @@ impl ThinParserState {
                 name,
                 body,
             },
-        )
+        );
+
+        if is_global {
+            if let Some(node) = self.arena.get_mut(module_idx) {
+                node.flags |= node_flags::GLOBAL_AUGMENTATION as u16;
+            }
+        }
+
+        module_idx
     }
 
     fn parse_nested_module_declaration(&mut self, modifiers: Option<NodeList>) -> NodeIndex {

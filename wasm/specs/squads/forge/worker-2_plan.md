@@ -11,7 +11,7 @@ Fix TS2304 false positives caused by type-predicate parsing (asserts/`this is`) 
 
 **Error Code:** TS2304 - "Cannot find name 'X'."
 
-**Impact:** 138 conformance tests affected
+**Impact:** Remaining TS2304 false positives after predicate + exports fixes.
 
 ### Steps
 1. **Reproduce** with `tests/cases/conformance/controlFlow/assertionTypePredicates1.ts` (look for parse + TS2304 noise).
@@ -21,12 +21,13 @@ Fix TS2304 false positives caused by type-predicate parsing (asserts/`this is`) 
 5. **Run focused tests** with `./wasm/test.sh` and report delta.
 
 ### Key Files
+- `wasm/src/thin_checker.rs`
 - `wasm/src/thin_parser.rs`
 - `wasm/src/thin_checker_tests.rs`
 
 ### Success Criteria
-- TS2304 false positives reduced for assertion/type predicate cases
-- No new parse errors for predicate syntax
+- TS2304 false positives reduced for selected remaining pattern
+- No new regressions in existing TS2304 tests
 
 ## Resume Notes
 - Branch: `worker/forge-2`.
