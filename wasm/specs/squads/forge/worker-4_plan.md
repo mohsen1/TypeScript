@@ -7,29 +7,31 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-TS2322 contextual typing with union object literals.
+TS2792 module resolution errors.
 
-**Error Code:** TS2322 - "Type 'X' is not assignable to type 'Y'"
+**Error Code:** TS2792 - "Cannot find module 'x' or its corresponding type declarations"
 
-**Impact:** 310 conformance tests affected
+**Impact:** 204 conformance tests affected
 
 ### Steps
-1. **Add tests** in `wasm/src/thin_checker_tests.rs` for union contextual typing with object literals.
-2. **Audit assignability** in `wasm/src/solver/compat.rs`/`wasm/src/thin_checker.rs` for contextual typing paths.
-3. **Implement fix** if union contextual typing emits wrong TS2322 vs TS2353.
-4. **Run focused tests** with `./wasm/test.sh` and record delta.
+1. **Track** which imports couldn't be resolved (in binder or checker)
+2. **Emit proper error code** - distinguish TS2792 vs TS2307
+3. **Handle** relative vs package imports correctly
+4. **Add tests** in `wasm/src/thin_checker_tests.rs` for module resolution failures
+5. **Run focused tests** with `./wasm/test.sh` and record delta
 
 ### Key Files
-- `wasm/src/solver/compat.rs`
 - `wasm/src/thin_checker.rs`
+- `wasm/src/thin_binder.rs`
 - `wasm/src/thin_checker_tests.rs`
 
 ### Success Criteria
-- TS2322 reduced for contextual typing with unions
-- No new TS2322 regressions
+- TS2792 emitted for unresolved module imports
+- Correct distinction between TS2792 and TS2307
+- No new regressions
 
 ## Task Queue
-- If time permits, add union contextual typing cases for array literals too.
+- (empty)
 
 ## Completed
 
@@ -78,18 +80,17 @@ TS2322 contextual typing with union object literals.
 - [x] Added stub implementations for control flow fall-through functions
 
 ## Ready for Merge
-Yes
+No
 
 ## Notes
-- Progress: Completed union object literal contextual typing fix
-- Tests: All 6 new union contextual typing tests pass
-- Fix: Modified `check_object_literal_excess_properties` to only report TS2353 when object matches at least one union member
-- Impact: Avoids spurious TS2353 errors when object doesn't match any union member
-- Commit format: `[wasm] checker: union object literal excess property errors`
+- Progress: Starting TS2792 module resolution errors
+- Previous assignment (union contextual typing) merged to squad/forge
+- Synced with origin/rust
+- Commit format: `[wasm] checker: TS2792 module resolution`
 - Push to: `origin/worker/forge-4`
 - **NEVER edit**: `STRUCTURE.md`, `GOALS.md`, other workers' plan files, or anything in `orchestrator/`
 
 ## Resume
-- Branch/state: `worker/forge-4`, work completed on union contextual typing, ready for merge.
-- Session work: Fixed TS2322/TS2353 handling for union object literals.
-- Unit tests: 6 new tests added and passing.
+- Branch/state: `worker/forge-4`, synced with origin/rust, starting TS2792 work.
+- Session work: None yet for this assignment.
+- Unit tests: Not run yet for this assignment.
