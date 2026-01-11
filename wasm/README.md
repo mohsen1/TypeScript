@@ -127,9 +127,9 @@ The `CompatChecker` in `src/solver/` needs to implement the "Unsoundness Catalog
 
 
 ## Executive Summary (Director report)
-Last updated: 2026-01-11 17:39 (Ninth Director Loop - Major Wins!)
+Last updated: 2026-01-11 17:52 (Tenth Director Loop - Squad Merge & Critical Worker Woke Up!)
 
-### System Status: 🟢 Excellent Progress - Workers Achieving Targets!
+### System Status: 🟢 Excellent Progress - Squad Merges Happening!
 
 **Organization Health:**
 - Active workers: 4/10 producing excellent results!
@@ -164,6 +164,21 @@ Last updated: 2026-01-11 17:39 (Ninth Director Loop - Major Wins!)
 - W3: TS2339 Closure Narrowing - Active
 - W4: TS2769 Overload Matching Continuation - Active
 - W5: TS2322 False Positive Reduction (101 occurrences) - Active
+
+### Recent Progress (Jan 11 17:52 - Tenth Director Loop - Squad Merge & Anvil-4 Woke Up!)
+- **🎉 SQUAD MERGE:** Anvil-1's TS7006 work merged into squad/anvil!
+  - 74% reduction (46→12 errors, target was <20)
+  - Regression tests included in merge
+  - Co-Authored-By: Multiple Anvil-1 commits + squad tests
+- **🔧 MAJOR ACHIEVEMENT:** Anvil-4 woke up after 241m idle!
+  - Urgent prompt FINALLY worked
+  - TS2769 extended analysis COMPLETE
+  - Implemented TS2348 for class constructors without 'new'
+  - Added is_class_constructor_type(), error_class_constructor_without_new_at()
+  - All regression tests passing
+- **Forge-3:** Fix TS7010 false positives for async getters
+- **Worker Response:** 3/10 active, squad merges happening!
+- **Still Idle:** 7 workers (190-241m)
 
 ### Recent Progress (Jan 11 17:39 - Ninth Director Loop - Major Wins!)
 - **🎯 TARGET ACHIEVED:** Anvil-1: TS7006 74% reduction!
