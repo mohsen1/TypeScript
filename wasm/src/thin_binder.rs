@@ -1139,6 +1139,11 @@ impl ThinBinderState {
                 self.bind_function_expression(arena, node, idx);
             }
 
+            // Method declarations (in object literals or classes) - bind body
+            k if k == syntax_kind_ext::METHOD_DECLARATION => {
+                self.bind_method_declaration(arena, node, idx);
+            }
+
             _ => {
                 // For other node types, no symbols to create
             }
@@ -2032,6 +2037,16 @@ impl ThinBinderState {
             });
 
             self.exit_scope(arena);
+        }
+    }
+
+    /// Bind a method declaration - creates a scope and binds the body.
+    /// Methods can appear in classes or object literals.
+    fn bind_method_declaration(&mut self, arena: &ThinNodeArena, node: &ThinNode, idx: NodeIndex) {
+        if let Some(method) = arena.get_method_decl(node) {
+            self.bind_modifiers(arena, &method.modifiers);
+            // Method bodies have function scope
+            self.bind_callable_body(arena, &method.parameters, method.body, idx);
         }
     }
 
