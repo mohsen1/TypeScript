@@ -11327,7 +11327,8 @@ impl<'a> ThinCheckerState<'a> {
                 | syntax_kind_ext::TYPE_ALIAS_DECLARATION
                 | syntax_kind_ext::ENUM_DECLARATION
                 | syntax_kind_ext::GET_ACCESSOR
-                | syntax_kind_ext::SET_ACCESSOR => {
+                | syntax_kind_ext::SET_ACCESSOR
+                | syntax_kind_ext::CONSTRUCTOR => {
                     return Some(current);
                 }
                 _ => {}
@@ -11442,6 +11443,18 @@ impl<'a> ThinCheckerState<'a> {
             };
 
             if symbol.declarations.len() <= 1 {
+                continue;
+            }
+
+            // Skip constructors - they use TS2392 (multiple constructor implementations), not TS2300
+            let has_constructor = symbol.declarations.iter().any(|&decl_idx| {
+                if let Some(node) = self.ctx.arena.get(decl_idx) {
+                    node.kind == syntax_kind_ext::CONSTRUCTOR
+                } else {
+                    false
+                }
+            });
+            if has_constructor {
                 continue;
             }
 
