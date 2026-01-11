@@ -17574,10 +17574,17 @@ impl<'a> ThinCheckerState<'a> {
         // Parameter properties are only allowed in constructors, not in accessors
         self.check_parameter_properties(&accessor.parameters.nodes);
 
+        // Check for implicit any in parameters
+        // For setters, skip implicit any check if there's a matching getter (parameter type inferred from getter)
+        let is_setter = node.kind == syntax_kind_ext::SET_ACCESSOR;
+        let has_matching_getter = is_setter && self.has_matching_getter(member_idx, accessor.name);
+
         for &param_idx in &accessor.parameters.nodes {
             if let Some(param_node) = self.ctx.arena.get(param_idx) {
                 if let Some(param) = self.ctx.arena.get_parameter(param_node) {
-                    self.maybe_report_implicit_any_parameter(param, false);
+                    // Skip implicit any check for setter parameters with matching getters
+                    let has_contextual_type = has_matching_getter;
+                    self.maybe_report_implicit_any_parameter(param, has_contextual_type);
                 }
             }
         }
@@ -17673,6 +17680,78 @@ impl<'a> ThinCheckerState<'a> {
                 );
             }
         }
+    }
+
+    /// Check if a setter has a matching getter in the same class/interface/type literal.
+    /// Used to determine if setter parameter type can be inferred from getter return type.
+    fn has_matching_getter(&self, setter_idx: NodeIndex, setter_name: NodeIndex) -> bool {
+        // Get the property name of the setter
+        let Some(name) = self.get_property_name(setter_name) else {
+            return false;
+        };
+
+        // Get parent node (should be class/interface/type literal body)
+        let Some(setter_ext) = self.ctx.arena.get_extended(setter_idx) else {
+            return false;
+        };
+        if setter_ext.parent.is_none() {
+            return false;
+        }
+        let parent_idx = setter_ext.parent;
+        let Some(parent_node) = self.ctx.arena.get(parent_idx) else {
+            return false;
+        };
+
+        // Get siblings from parent
+        let siblings = match parent_node.kind {
+            k if k == syntax_kind_ext::CLASS_DECLARATION || k == syntax_kind_ext::CLASS_EXPRESSION => {
+                self.ctx.arena.get_class(parent_node)
+                    .map(|c| &c.members.nodes)
+            }
+            k if k == syntax_kind_ext::INTERFACE_DECLARATION => {
+                self.ctx.arena.get_interface(parent_node)
+                    .map(|i| &i.members.nodes)
+            }
+            k if k == syntax_kind_ext::TYPE_LITERAL => {
+                self.ctx.arena.get_type_literal(parent_node)
+                    .map(|tl| &tl.members.nodes)
+            }
+            _ => None,
+        };
+
+        let Some(members) = siblings else {
+            return false;
+        };
+
+        // Look for a getter with the same name
+        for &member_idx in members.iter() {
+            if member_idx == setter_idx {
+                continue; // Skip the setter itself
+            }
+            let Some(member_node) = self.ctx.arena.get(member_idx) else {
+                continue;
+            };
+            if member_node.kind == syntax_kind_ext::GET_ACCESSOR {
+                if let Some(accessor) = self.ctx.arena.get_accessor(member_node) {
+                    if let Some(member_name) = self.get_property_name(accessor.name) {
+                        if member_name == name {
+                            // Check if both are static or both are not static
+                            let setter_node = self.ctx.arena.get(setter_idx);
+                            let setter_is_static = setter_node
+                                .and_then(|n| self.ctx.arena.get_accessor(n))
+                                .map(|a| self.has_static_modifier(&a.modifiers))
+                                .unwrap_or(false);
+                            let getter_is_static = self.has_static_modifier(&accessor.modifiers);
+                            if setter_is_static == getter_is_static {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        false
     }
 
     /// Check if a return type requires a return value.
