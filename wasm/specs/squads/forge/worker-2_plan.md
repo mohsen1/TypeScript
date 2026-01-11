@@ -67,7 +67,9 @@ Priority: 1
 ### Tests Fixed
 1. `test_abstract_constructor_assignability` - typeof class now works (4 → 0 errors expected)
 2. `test_concrete_extends_abstract` - class inheritance works (3 → 0 errors expected)
-3. Test suite: 85 failures (down from 88 at start)
+3. `test_function_property_contravariance` - interface extends works (1 → 0 errors expected)
+4. `test_function_property_rejects_covariant` - strictFunctionTypes implemented (now correctly errors)
+5. Test suite: 84 failures (stable)
 
 ### Next Steps
 1. Continue updating outdated test expectations
