@@ -3,11 +3,12 @@
 ## Mission
 Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transforms, cli, lsp).
 
-Status: Ready for Merge (TS2355 work complete)
+Status: Active
 Priority: 5
 
 ## Current Assignment
-- Awaiting new assignment from EM (TS2355 task complete).
+- Run broader TS2355 scan (or confirm no regressions) after never-return fix; report delta.
+- If clean, proceed to next backlog item or verify `types/mapped/recursiveMappedTypes.ts` crash status.
 
 ## Task Queue
 - [ ] Verify whether `types/mapped/recursiveMappedTypes.ts` still crashes; if so, capture stack and coordinate with Forge.
@@ -188,7 +189,7 @@ Priority: 5
 - [x] Added async computed object literal source-map coverage in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (PASS).
 
 ## Ready for Merge
-Yes
+No (merged 2026-01-11)
 
 ## Resume Notes
 - Branch: `worker/anvil-5`

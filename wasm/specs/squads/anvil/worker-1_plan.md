@@ -6,7 +6,10 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-- Awaiting next assignment from EM-Anvil.
+- Investigate crash in `es6/templates/TemplateExpression1.ts` (unreachable).
+- Reproduce via full conformance run or alternate harness; capture exact command + stack/log.
+- Trace template literal handling in `wasm/src/thin_checker.rs`/`wasm/src/thin_parser.rs`; implement fix + regression test if repro found.
+- Deliverables: repro command/logs or confirmation it's fixed upstream, regression test (if applicable), and conformance delta.
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)
@@ -168,7 +171,7 @@ Priority: 1
 - [x] Fixed TS2304 false positives (Cannot find name): Added builtin global type handling for Promise, PromiseLike, Map, Set, Iterator, Generator, and 30+ other global types. Fixed type alias type parameter scoping, heritage clause resolution, type queries. Added find-ts2304.mjs differential test script. Added regression test. Key files: thin_checker.rs.
 
 ## Ready for Merge
-Yes (2026-01-11)
+No (merged 2026-01-11)
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize emitter fidelity (ES5 downleveling/source maps) before new features.
