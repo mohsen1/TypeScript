@@ -340,3 +340,22 @@ Ready for Merge: No (merged)
 - Test: `./wasm/test.sh test_thin_parser_template_literal_property_name_no_ts1160`.
 
 Ready for Merge: No (merged 2026-01-10)
+
+### Update (2026-01-11)
+- Implemented closure flow capture for const/let narrowing in arrow functions and function expressions
+- Modified `with_fresh_flow_inner` in binder to capture enclosing flow for closures  
+- Updated flow analysis to continue past START nodes with antecedents (closure markers)
+- Added stub implementations for `function_body_falls_through` and `statement_falls_through`
+- Added regression tests in `thin_checker_tests.rs`:
+  - `test_const_locals_narrowing_in_function_expressions` (full test)
+  - `test_const_locals_narrowing_arrow_in_if` (✅ PASS)
+  - `test_const_locals_narrowing_arrow_after_return` (❌ FAIL - needs investigation)
+  - `test_const_locals_narrowing_function_expression` (✅ PASS)
+- Conformance: Reduced extra TS2339 from 5 files (18 errors) to 3 files (11 errors)
+  - ✅ FIXED: `controlFlow/assertionTypePredicates1.ts` (2 errors)
+  - ✅ FIXED: `controlFlow/constLocalsInFunctionExpressions.ts` (5 errors)
+  - Remaining: mixin-related issues (11 errors across 3 files)
+- Build: `cargo build` (warnings only)
+- Commit: 9b8f8f26db
+
+Ready for Merge: No (work in progress - 2/3 test cases pass, investigating early-return narrowing)
