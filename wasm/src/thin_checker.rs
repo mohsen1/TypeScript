@@ -8028,6 +8028,41 @@ impl<'a> ThinCheckerState<'a> {
                 }
             }
 
+            // TS2366 (not all code paths return value) for function expressions and arrow functions
+            // Check if all code paths return a value when return type requires it
+            if !is_function_declaration && !body.is_none() {
+                let check_return_type = return_type;
+                let requires_return = self.requires_return_value(check_return_type);
+                let has_return = self.body_has_return_with_value(body);
+                let falls_through = self.function_body_falls_through(body);
+
+                if has_type_annotation && requires_return && falls_through {
+                    use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
+                    if !has_return {
+                        self.error_at_node(
+                            type_annotation,
+                            "A function whose declared type is neither 'undefined', 'void', nor 'any' must return a value.",
+                            diagnostic_codes::FUNCTION_LACKS_RETURN_TYPE,
+                        );
+                    } else {
+                        self.error_at_node(
+                            type_annotation,
+                            diagnostic_messages::FUNCTION_LACKS_ENDING_RETURN_STATEMENT,
+                            diagnostic_codes::NOT_ALL_CODE_PATHS_RETURN_VALUE,
+                        );
+                    }
+                } else if self.ctx.no_implicit_returns && has_return && falls_through {
+                    // TS7030: noImplicitReturns - not all code paths return a value
+                    use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
+                    let error_node = if let Some(nn) = name_node { nn } else { body };
+                    self.error_at_node(
+                        error_node,
+                        diagnostic_messages::NOT_ALL_CODE_PATHS_RETURN,
+                        diagnostic_codes::NOT_ALL_CODE_PATHS_RETURN,
+                    );
+                }
+            }
+
             self.push_return_type(return_type);
             self.check_statement(body);
             self.pop_return_type();
