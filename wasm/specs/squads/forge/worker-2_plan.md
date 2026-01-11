@@ -7,7 +7,7 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-Fix TS2304 false positives caused by type-predicate parsing in parameter types.
+Fix TS2304 false positives caused by type-predicate parsing (asserts/`this is`) in type positions.
 
 **Error Code:** TS2304 - "Cannot find name 'X'."
 
@@ -15,15 +15,13 @@ Fix TS2304 false positives caused by type-predicate parsing in parameter types.
 
 ### Steps
 1. **Reproduce** with `tests/cases/conformance/controlFlow/assertionTypePredicates1.ts` (look for parse + TS2304 noise).
-2. **Parse type predicates** in parameter types: `x is T`, `asserts x is T`, and `asserts this is T`.
-3. **Lower type predicates** in `solver/lower.rs` so they become proper type nodes (avoid parse-error cascades).
+2. **Parse type predicates** in type positions: `x is T`, `asserts x is T`, and `asserts this is T`, including contextual `asserts`.
+3. **Confirm lowering** already handles `TYPE_PREDICATE` (no change needed unless missing).
 4. **Add tests** in `wasm/src/thin_checker_tests.rs` covering assertion predicates and missing-name behavior.
 5. **Run focused tests** with `./wasm/test.sh` and report delta.
 
 ### Key Files
 - `wasm/src/thin_parser.rs`
-- `wasm/src/parser/thin_node.rs`
-- `wasm/src/solver/lower.rs`
 - `wasm/src/thin_checker_tests.rs`
 
 ### Success Criteria
@@ -32,16 +30,16 @@ Fix TS2304 false positives caused by type-predicate parsing in parameter types.
 
 ## Resume Notes
 - Branch: `worker/forge-2`.
-- Latest commit: `[wasm] checker: reduce TS2304 in switch cases and predicates`
-- Recent changes: Added parent mapping for switch/case nodes, allowed type predicates in `parse_type`, added `exports` to known global values, and added tests for switch-case, type predicate params, and exports.
-- Last tests: `./wasm/test.sh test_switch_case_param_reference_no_ts2304` (pass), `./wasm/test.sh test_type_predicate_param_type_no_ts2304` (pass), `./wasm/test.sh test_exports_reference_no_ts2304` (pass)
-- **Latest TS2304 conformance scan results:** `find-ts2304.mjs --max=1000 --samples=30` timed out at 200s; partial results still show heritage null/namespace cycles, catch/flow false positives, decorator/noTypesAndSymbols cases, and asserts/exports (may need rebuild to confirm).
+- Latest commit: `[wasm] parser: handle asserts type predicates`
+- Recent changes: Added contextual `asserts` detection for type predicate parsing in `parse_type`/`parse_return_type` and tests covering asserts return types + `this is` methods.
+- Last tests: `./wasm/test.sh test_type_predicate_return_no_ts2304` (pass), `./wasm/test.sh test_type_predicate_this_return_no_ts2304` (pass)
+- **Latest TS2304 conformance scan results:** Not rerun after asserts parsing change (last run timed out at 200s; partial results still show heritage null/namespace cycles, catch/flow false positives, decorator/noTypesAndSymbols cases).
 - Conformance scan command: `cd wasm/differential-test && node find-ts2304.mjs --max=1000 --samples=30`
 - Remember: do not touch `.role/AGENTS.md`.
 
 ## Task Queue
 - Investigate remaining TS2304 in heritage cycles and invalid heritage literals (null/undefined).
-- Re-run conformance scan after rebuild to confirm switch-case + predicate fixes (and catch variable scoping).
+- Re-run conformance scan after rebuild to confirm asserts/`this is` predicate fixes (and catch variable scoping).
 - Review TS2304 in decorator/noTypesAndSymbols cases.
 
 ## Completed
@@ -81,6 +79,7 @@ Fix TS2304 false positives caused by type-predicate parsing in parameter types.
 - Set parent pointers for switch/case nodes to restore scope resolution in switch clauses.
 - Allowed type predicates in `parse_type` to avoid TS2304 for `asserts`/`is` in parameter types.
 - Added `exports` to known global values and tests covering switch-case, type predicate params, and exports.
+- Added contextual `asserts` parsing for type predicates in type positions and tests for asserts return types + `this is`.
 
 ## Ready for Merge
 No
