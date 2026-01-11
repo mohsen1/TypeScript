@@ -5058,6 +5058,25 @@ impl<'a> ThinCheckerState<'a> {
         (parent_node.flags as u32) & node_flags::CONST != 0
     }
 
+    fn is_block_scoped_variable_declaration(&self, var_decl_idx: NodeIndex) -> bool {
+        use crate::parser::node_flags;
+
+        let Some(ext) = self.ctx.arena.get_extended(var_decl_idx) else {
+            return false;
+        };
+        let parent_idx = ext.parent;
+        if parent_idx.is_none() {
+            return false;
+        }
+        let Some(parent_node) = self.ctx.arena.get(parent_idx) else {
+            return false;
+        };
+        if parent_node.kind != syntax_kind_ext::VARIABLE_DECLARATION_LIST {
+            return false;
+        }
+        (parent_node.flags as u32 & (node_flags::LET | node_flags::CONST)) != 0
+    }
+
     fn is_catch_clause_variable_declaration(&self, var_decl_idx: NodeIndex) -> bool {
         let Some(ext) = self.ctx.arena.get_extended(var_decl_idx) else {
             return false;
@@ -7824,6 +7843,9 @@ impl<'a> ThinCheckerState<'a> {
 
             // Check that parameter default values are assignable to declared types (TS2322)
             self.check_parameter_initializers(&parameters.nodes);
+
+            // Check for duplicate parameter names (TS2300)
+            self.check_duplicate_parameters(&parameters.nodes);
 
             let mut has_contextual_return = false;
             if !has_type_annotation {
@@ -11611,6 +11633,9 @@ impl<'a> ThinCheckerState<'a> {
                         // Check that parameter default values are assignable to declared types (TS2322)
                         self.check_parameter_initializers(&func.parameters.nodes);
 
+                        // Check for duplicate parameter names (TS2300)
+                        self.check_duplicate_parameters(&func.parameters.nodes);
+
                         if !has_type_annotation {
                             return_type = self.infer_return_type_from_body(func.body, None);
                         }
@@ -11989,7 +12014,9 @@ impl<'a> ThinCheckerState<'a> {
                 } else {
                     TypeId::ANY
                 };
-                self.check_binding_pattern(var_decl.name, pattern_type);
+                let check_duplicates = self.is_block_scoped_variable_declaration(decl_idx) || is_catch_variable;
+                let mut seen_names = FxHashSet::default();
+                self.check_binding_pattern(var_decl.name, pattern_type, check_duplicates, &mut seen_names);
             }
         }
     }
@@ -11998,7 +12025,14 @@ impl<'a> ThinCheckerState<'a> {
     ///
     /// This function traverses a binding pattern (object or array destructuring) and verifies
     /// that any default values provided in binding elements are assignable to their expected types.
-    fn check_binding_pattern(&mut self, pattern_idx: NodeIndex, pattern_type: TypeId) {
+    /// When enabled, it also reports duplicate identifiers within the pattern.
+    fn check_binding_pattern(
+        &mut self,
+        pattern_idx: NodeIndex,
+        pattern_type: TypeId,
+        check_duplicates: bool,
+        seen_names: &mut FxHashSet<String>,
+    ) {
         let Some(pattern_node) = self.ctx.arena.get(pattern_idx) else {
             return;
         };
@@ -12009,12 +12043,18 @@ impl<'a> ThinCheckerState<'a> {
 
         // Traverse binding elements
         for &element_idx in &pattern_data.elements.nodes {
-            self.check_binding_element(element_idx, pattern_type);
+            self.check_binding_element(element_idx, pattern_type, check_duplicates, seen_names);
         }
     }
 
     /// Check a single binding element for default value assignability.
-    fn check_binding_element(&mut self, element_idx: NodeIndex, parent_type: TypeId) {
+    fn check_binding_element(
+        &mut self,
+        element_idx: NodeIndex,
+        parent_type: TypeId,
+        check_duplicates: bool,
+        seen_names: &mut FxHashSet<String>,
+    ) {
         let Some(element_node) = self.ctx.arena.get(element_idx) else {
             return;
         };
@@ -12048,12 +12088,33 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
 
-        // If the name is a nested binding pattern, recursively check it
         if let Some(name_node) = self.ctx.arena.get(element_data.name) {
-            if name_node.kind == syntax_kind_ext::OBJECT_BINDING_PATTERN
+            if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
+                if check_duplicates {
+                    use crate::checker::types::diagnostics::{
+                        diagnostic_codes, diagnostic_messages, format_message,
+                    };
+
+                    let name = ident.escaped_text.clone();
+                    if !seen_names.insert(name.clone()) {
+                        let message =
+                            format_message(diagnostic_messages::DUPLICATE_IDENTIFIER, &[&name]);
+                        self.error_at_node(
+                            element_data.name,
+                            &message,
+                            diagnostic_codes::DUPLICATE_IDENTIFIER,
+                        );
+                    }
+                }
+            } else if name_node.kind == syntax_kind_ext::OBJECT_BINDING_PATTERN
                 || name_node.kind == syntax_kind_ext::ARRAY_BINDING_PATTERN
             {
-                self.check_binding_pattern(element_data.name, element_type);
+                self.check_binding_pattern(
+                    element_data.name,
+                    element_type,
+                    check_duplicates,
+                    seen_names,
+                );
             }
         }
     }
@@ -16513,6 +16574,104 @@ impl<'a> ThinCheckerState<'a> {
                 );
             }
         }
+    }
+
+    /// Check for duplicate parameter names (TS2300).
+    /// This checks both simple parameter names and names within destructuring patterns.
+    fn check_duplicate_parameters(&mut self, parameters: &[NodeIndex]) {
+        use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages, format_message};
+        use rustc_hash::FxHashMap;
+
+        let mut seen_names: FxHashMap<String, NodeIndex> = FxHashMap::default();
+
+        for &param_idx in parameters {
+            let Some(param_node) = self.ctx.arena.get(param_idx) else {
+                continue;
+            };
+            let Some(param) = self.ctx.arena.get_parameter(param_node) else {
+                continue;
+            };
+
+            // Skip 'this' parameter
+            if self.is_this_parameter_name(param.name) {
+                continue;
+            }
+
+            // Collect all names from this parameter (including destructured names)
+            self.collect_parameter_names(param.name, &mut seen_names);
+        }
+    }
+
+    /// Recursively collect parameter names from a binding pattern or identifier.
+    /// Reports TS2300 for duplicate names.
+    fn collect_parameter_names(&mut self, name_idx: NodeIndex, seen_names: &mut rustc_hash::FxHashMap<String, NodeIndex>) {
+        use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages, format_message};
+
+        if name_idx.is_none() {
+            return;
+        }
+
+        let Some(name_node) = self.ctx.arena.get(name_idx) else {
+            return;
+        };
+
+        match name_node.kind {
+            kind if kind == SyntaxKind::Identifier as u16 => {
+                // Simple identifier parameter
+                if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
+                    let name = ident.escaped_text.clone();
+                    if let Some(&first_occurrence) = seen_names.get(&name) {
+                        // Duplicate found - report error on both occurrences
+                        let message = format_message(diagnostic_messages::DUPLICATE_IDENTIFIER, &[&name]);
+                        self.error_at_node(name_idx, &message, diagnostic_codes::DUPLICATE_IDENTIFIER);
+                        // Also report on first occurrence if we haven't already
+                        if !self.has_error_at_node(first_occurrence, diagnostic_codes::DUPLICATE_IDENTIFIER) {
+                            self.error_at_node(first_occurrence, &message, diagnostic_codes::DUPLICATE_IDENTIFIER);
+                        }
+                    } else {
+                        seen_names.insert(name, name_idx);
+                    }
+                }
+            }
+            kind if kind == syntax_kind_ext::OBJECT_BINDING_PATTERN => {
+                // Object destructuring: { a, b: c, ...rest }
+                if let Some(pattern) = self.ctx.arena.get_binding_pattern(name_node) {
+                    for &element_idx in &pattern.elements.nodes {
+                        if let Some(element_node) = self.ctx.arena.get(element_idx) {
+                            if let Some(element) = self.ctx.arena.get_binding_element(element_node) {
+                                self.collect_parameter_names(element.name, seen_names);
+                            }
+                        }
+                    }
+                }
+            }
+            kind if kind == syntax_kind_ext::ARRAY_BINDING_PATTERN => {
+                // Array destructuring: [a, b, ...rest]
+                if let Some(pattern) = self.ctx.arena.get_binding_pattern(name_node) {
+                    for &element_idx in &pattern.elements.nodes {
+                        if let Some(element_node) = self.ctx.arena.get(element_idx) {
+                            if let Some(element) = self.ctx.arena.get_binding_element(element_node) {
+                                self.collect_parameter_names(element.name, seen_names);
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {
+                // Other kinds (like omitted array elements) - skip
+            }
+        }
+    }
+
+    /// Check if a node already has an error with a specific diagnostic code.
+    fn has_error_at_node(&self, node_idx: NodeIndex, code: u32) -> bool {
+        let Some((node_start, node_end)) = self.get_node_span(node_idx) else {
+            return false;
+        };
+
+        self.ctx.diagnostics.iter().any(|d| {
+            d.code == code && d.start == node_start && d.length == node_end.saturating_sub(node_start)
+        })
     }
 
     fn node_text(&self, node_idx: NodeIndex) -> Option<String> {
