@@ -202,6 +202,30 @@ impl ThinParserState {
         }
     }
 
+    /// Used to emit TS1110 (Type expected) instead of TS1005 (identifier expected)
+    /// when a type is expected but we encounter a token that can't start a type
+    #[inline]
+    fn can_token_start_type(&self) -> bool {
+        match self.current_token {
+            // Tokens that definitely cannot start a type
+            SyntaxKind::CloseParenToken       // )
+            | SyntaxKind::CloseBraceToken     // }
+            | SyntaxKind::CloseBracketToken   // ]
+            | SyntaxKind::CommaToken          // ,
+            | SyntaxKind::SemicolonToken      // ;
+            | SyntaxKind::ColonToken          // :
+            | SyntaxKind::EqualsToken         // =
+            | SyntaxKind::EqualsGreaterThanToken  // =>
+            | SyntaxKind::BarToken            // | (when at start, not a union)
+            | SyntaxKind::AmpersandToken      // & (when at start, not an intersection)
+            | SyntaxKind::QuestionToken       // ?
+            | SyntaxKind::EndOfFileToken => false,
+            // Everything else could potentially start a type
+            // (identifiers, keywords, literals, type operators, etc.)
+            _ => true
+        }
+    }
+
     /// Check if we're inside an async function/method/arrow
     #[inline]
     fn in_async_context(&self) -> bool {
@@ -2545,6 +2569,18 @@ impl ThinParserState {
             // Consume the semicolon and return NONE (empty class element)
             self.next_token();
             return NodeIndex::NONE;
+        }
+
+        // Parse decorators if present
+        let decorators = self.parse_decorators();
+
+        // If decorators were found before a static block, emit TS1206
+        if decorators.is_some() && self.is_token(SyntaxKind::StaticKeyword) && self.look_ahead_is_static_block() {
+            self.parse_error_at_current_token(
+                "Decorators are not valid here.",
+                diagnostic_codes::DECORATORS_NOT_VALID_HERE
+            );
+            return self.parse_static_block();
         }
 
         // Handle static block: static { ... }
@@ -7395,6 +7431,22 @@ impl ThinParserState {
     /// Parse primary type (keywords, references, parenthesized, tuples, arrays, function types)
     fn parse_primary_type(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
+
+        // If we encounter a token that can't start a type, emit TS1110 instead of TS1005
+        if !self.can_token_start_type() {
+            self.error_type_expected();
+            // Return a synthetic identifier node to allow parsing to continue
+            return self.arena.add_identifier(
+                SyntaxKind::Identifier as u16,
+                start_pos,
+                self.token_pos(),
+                crate::parser::thin_node::IdentifierData {
+                    escaped_text: String::new(),
+                    original_text: None,
+                    type_arguments: None,
+                }
+            );
+        }
 
         // Handle abstract constructor types: abstract new () => T
         if self.is_token(SyntaxKind::AbstractKeyword) {

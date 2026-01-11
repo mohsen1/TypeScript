@@ -33,6 +33,10 @@ TS2304 - Cannot find name errors.
 - No errors for known globals
 - No new regressions
 
+### Priority Notes
+- ALSO INVESTIGATE: Crash regression from 143→483 (+237%) after squad/forge merge
+- Crash investigation may take priority if it blocks conformance testing
+
 ## Current Assignment (TS7010 - Implicit Any Return)
 - [x] Consulted Gemini to confirm TS7010 = implicit any return (not TS2366)
 - [x] Built WASM package (`./wasm/build-wasm.sh`)

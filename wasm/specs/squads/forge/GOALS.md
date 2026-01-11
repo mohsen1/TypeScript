@@ -159,9 +159,13 @@ bash run-conformance.sh --all --workers=14
 
 ---
 ## Squad Status
-- Last Update: 2026-01-11 12:25
+- Last Update: 2026-01-11 (Director Loop)
 - Conformance: **23.3% exact match** (up from 18.1%)
 - Workers Active: 5/5
-- Branches Merged Today: worker/forge-1 (TS2300), worker/forge-4 (union typing), worker/forge-5 (TS7010 infra)
-- Current Focus: W1=TS2454 definite assignment, W2=TS2564 prop init, W3=TS7006/TS7008 implicit any, W4=TS2792 module resolution, W5=TS7010 return checking
-- Blockers: None (shorthand method binding fixed, pushed to em/forge)
+- **REASSIGNMENTS MADE** (2026-01-11):
+  - W1: Continue TS2454 (37 files still missing, complex control flow)
+  - W2: Triage 68 test failures + resume TS2322 (310 tests)
+  - W3: NEW → TS2322 type assignability (parallel with W2)
+  - W4: NEW → Resume TS2339 (142 tests, optional chaining focus)
+  - W5: NEW → TS2304 missing name (138 tests) + investigate crash regression
+- Blockers: W2 (68 unit test failures), W5 (crash regression 143→483)
