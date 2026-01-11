@@ -1,66 +1,101 @@
 # Worker 2 Plan - Squad Forge
 
 ## Mission
-Improve TS2304 missing-name diagnostics (identifier not found).
+Implement TS2322 type assignability checking.
 
 Status: Active
 Priority: 1
 
-## Current Assignment (🚨 CRITICAL - IDLE 207m!)
-TS2322 - Type is not assignable errors.
+## Current Assignment
+**HARD**: Implement missing TS2322 "Type is not assignable" error checks (310 missing diagnostics).
 
-**Error Code:** TS2322 - "Type 'X' is not assignable to type 'Y'"
+**Error Code:** TS2322 - "Type 'X' is not assignable to type 'Y'."
 
-**Impact:** 310 conformance tests affected
-**IDLE TIME:** 207 minutes ⚠️⚠️⚠️
-
-### 🚨 IMMEDIATE ACTION REQUIRED NOW:
-1. **Sync immediately:** `git fetch origin && git merge origin/squad/forge`
-2. **Fix 68 unit test failures** blocking TS2322 work
-3. **Start TS2322 implementation** - structural typing focus
-
-### Anvil Comparison (Learn from their success!)
-Anvil-1 just merged TS7006 with **74% reduction** (46→12) by:
-- Fixing destructured parameters with default values
-- Fixing setter parameter false positives
-
-**Forge needs similar wins!** Start TS2322 NOW!
+**Impact:** 310 conformance tests where TypeScript emits TS2322 but WASM doesn't. Core type checking feature.
 
 ### Steps
-1. **Check type assignability** - when assigning/returning values, verify type compatibility
-2. **Handle structural typing** - objects must have all required properties with compatible types
-3. **Handle unions/intersections** - check assignability rules for complex types
-4. **Handle generics** - verify type arguments satisfy constraints
-5. **Add tests** in `wasm/src/thin_checker_tests.rs` for assignability checks
-6. **Run focused tests** with `./wasm/test.sh` and record delta
+1. **Scan for missing TS2322**: `node differential-test/find-missing-ts2322.mjs --max=5000` to identify all 310 cases.
+2. **Categorize by type**: Group missing errors by scenario (variable assignments, return types, parameter types, etc.).
+3. **Implement assignability checks**: Add missing checks in `wasm/src/thin_checker.rs` where TypeScript checks type assignability.
+4. **Add tests**: Create comprehensive test cases in `wasm/src/thin_checker_tests.rs` for each implemented check.
+5. **Verify improvements**: Run conformance scan and unit tests to measure progress toward 310 target.
 
 ### Key Files
-- `wasm/src/thin_checker.rs`
-- `wasm/src/checker/expressions.rs`
-- `wasm/src/solver/subtype.rs`
-- `wasm/src/thin_checker_tests.rs`
+- `wasm/src/thin_checker.rs` - Main type checking logic
+- `wasm/src/solver/operations.rs` - Assignability/subtyping logic
+- `wasm/src/thin_checker_tests.rs` - Unit tests
+- `wasm/differential-test/find-missing-ts2322.mjs` - Conformance scanner
 
 ### Success Criteria
-- TS2322 emitted for incompatible assignments
-- Correct handling of structural typing, unions, generics
-- No new regressions
+- Reduce missing TS2322 errors from 310 toward 0
+- No new false positives (check with `find-ts2322.mjs`)
+- All new tests pass
 
 ## Resume Notes
 - Branch: `worker/forge-2`.
-- Latest commit: `[wasm] parser: restore decorator parsing in parse_class_member after merge`
-- Recent changes:
-  - Merged 27 commits from origin/rust
-  - Found merge removed decorator parsing from parse_class_member
-  - Restored decorator parsing to fix TS2304 errors
-  - Added test_decorator_static_method_no_ts2304 test
-- Last tests: `cargo test test_decorator_static_method_no_ts2304` (pass), `cargo test decorator` (172 passed)
-- **Merge conflict resolution:** squad/anvil merge removed the decorator parsing fix; restored it in commit 7c86ce4b35.
-- Conformance scan command: `cd wasm/differential-test && node find-ts2304.mjs --max=1000 --samples=30`
+- Latest commit: `[wasm] tests: fix abstract constructor assignability expectation`
+- **NEW ASSIGNMENT (2026-01-11)**: TS2322 type assignability checking - 310 missing diagnostics (HARD)
+- Investigation findings:
+  - Basic TS2322 checks ALREADY implemented: variable declarations, return statements, function arguments
+  - Root cause: Solver returns `Any` for complex types (generics, conditionals) → silences TS2322
+  - Many failing tests have OUTDATED expectations from before typeof/constructor fixes
+- Progress: Updated test_abstract_constructor_assignability (typeof class now works → expect 0 errors)
+- Test status: 86 failures (down from 88)
 - Remember: do not touch `.role/AGENTS.md`.
 
 ## Task Queue
-- Run conformance scan to verify decorator fix effectiveness
-- Review remaining TS2304 cases: privateNames, controlFlow generics, definite assignment, etc.
+- Update other failing tests with outdated expectations (check comments for "once X works, change to...")
+- Investigate Solver returning Any for complex types - this is the root cause of missing TS2322
+- Run conformance scan when ready to measure TS2322 missing errors baseline
+
+## TS2322 Assignment Progress (2026-01-11)
+
+### Investigation Summary
+- **Key Finding**: Basic TS2322 checks ALREADY implemented in checker for:
+  - Variable declarations with initializers (line 11902)
+  - Return statements (line 12703)
+  - Function call arguments (line 5712)
+- **Root Cause of Missing TS2322**: Solver returns `Any` for complex types (generics, conditional types, mapped types)
+  - When solver returns `Any`, assignability checks always pass
+  - This silences downstream TS2322 errors
+- **Baseline Measurement** (2026-01-11):
+  - Conformance scan (2000 tests): **44 files missing TS2322**
+  - Extrapolated to full suite (5655 tests): ~124 files
+  - GOALS.md reports: 310 missing errors (may be multiple errors per file or different baseline)
+- **Test Suite Issue**: Many failing tests have outdated expectations from before recent typeof/class fixes
+
+### Solver Fixes Implemented (2026-01-11)
+1. **operations.rs:269-277**: Fixed inference failure - now uses constraint type/default/ERROR instead of returning `Success(Any)`
+2. **operations.rs:286**: Changed ultimate fallback from `UNKNOWN` to `ERROR` for consistency
+3. **operations.rs:293-300**: Fixed constraint check violation - now returns `ArgumentTypeMismatch` instead of `Success(Any)`
+4. **operations.rs:112-114**: Fixed `infer_call_signature` fallback - returns `ERROR` instead of `Any`
+5. **operations.rs:122-124**: Fixed `infer_generic_function` fallback - returns `ERROR` instead of `Any`
+
+### Critical Discovery: TS2345 vs TS2322
+- **TS2322** (TYPE_NOT_ASSIGNABLE): General type assignability errors (variables, returns, etc.)
+- **TS2345** (ARG_NOT_ASSIGNABLE): Function argument-specific type errors
+- When solver returns `ArgumentTypeMismatch`, checker emits **TS2345** (not TS2322)
+- Conformance scan only looks for **TS2322**, so TS2345 improvements aren't counted
+- This may be correct behavior - TypeScript distinguishes between these error codes
+
+### Remaining Issues
+1. **ERROR type is still assignable to everything** (bottom type like `NEVER`)
+2. **Many other paths still return `Any`**: ~15+ locations in solver/evaluate.rs, solver/lower.rs, etc.
+3. **Complex type evaluation**: Conditional types, mapped types still return `Any` in many cases
+
+### Tests Fixed
+1. `test_abstract_constructor_assignability` - typeof class now works (4 → 0 errors expected)
+2. `test_concrete_extends_abstract` - class inheritance works (3 → 0 errors expected)
+3. `test_function_property_contravariance` - interface extends works (1 → 0 errors expected)
+4. `test_function_property_rejects_covariant` - strictFunctionTypes implemented (now correctly errors)
+5. `test_best_common_type_class_hierarchy` - class inheritance works (1 → 0 errors expected)
+6. Test suite: 87 failures (up from 83 due to ERROR propagation - expected)
+
+### Next Steps
+1. **Audit all `Any` fallbacks**: Find all places that return `Any` and replace with `ERROR` or proper error handling
+2. **Consider adding TS2345 scan**: Create `find-missing-ts2345.mjs` to measure argument type error improvements
+3. **Focus on non-argument contexts**: Variable declarations, return types don't use `ArgumentTypeMismatch`
+4. **Complex type evaluation**: Need better handling for conditional types, mapped types, index access
 
 ## Completed
 - Implemented property access on constrained type parameters in checker and solver.
