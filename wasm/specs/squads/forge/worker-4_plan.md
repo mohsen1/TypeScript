@@ -1,25 +1,33 @@
 # Worker 4 Plan - Squad Forge
 
 ## Mission
-Fix TS2322 async/generator return assignability (Promise/Iterator vs void/undefined).
+Improve TS2339 property access diagnostics.
 
 Status: Active
 Priority: 1
 
-## Current Assignment
-TS2339 - Property does not exist errors.
+## Current Assignment (⚠️ IDLE 70m - WAKE UP!)
+TS2339 - Property does not exist errors (CONTINUED).
 
 **Error Code:** TS2339 - "Property 'x' does not exist on type 'Y'"
+**IDLE TIME:** 70 minutes ⚠️
 
 **Impact:** 142 conformance tests affected
 
-### Steps
-1. **Check property access** - when accessing obj.prop, verify prop exists on obj's type
-2. **Handle unions** - property must exist on all union members
-3. **Handle intersections** - check combined type for property
+### 🚨 IMMEDIATE ACTION REQUIRED:
+1. **Resume TS2339 work** - continue property access checking improvements
+2. **Handle optional chaining** - `?.` should not emit TS2339 when optional
+3. **Handle union types** - property must exist on all union members
 4. **Handle index signatures** - string/number index types allow any property
 5. **Add tests** in `wasm/src/thin_checker_tests.rs` for property access patterns
 6. **Run focused tests** with `./wasm/test.sh` and record delta
+
+### MAJOR SQUAD WIN (while you were idle):
+- ✅ Forge-2: TS2322 solver fix **MERGED TO RUST**!
+- ERROR instead of Any - critical correctness fix
+- 14 solver tests fixed, TS2322 down to 7 files (from 14!)
+
+**Don't fall behind!** Forge-2 just delivered a major win - match that energy!
 
 ### Key Files
 - `wasm/src/thin_checker.rs`
@@ -28,11 +36,11 @@ TS2339 - Property does not exist errors.
 
 ### Success Criteria
 - TS2339 emitted when accessing non-existent properties
-- Correct handling of unions, intersections, index signatures
+- Correct handling of unions, intersections, index signatures, optional chaining
 - No new regressions
 
 ## Task Queue
-- (empty)
+- Complete remaining TS2339 patterns (optional chaining, computed properties)
 
 ## Completed
 

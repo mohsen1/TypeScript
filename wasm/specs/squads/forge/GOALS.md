@@ -159,9 +159,17 @@ bash run-conformance.sh --all --workers=14
 
 ---
 ## Squad Status
-- Last Update: 2026-01-11 12:25
+- Last Update: 2026-01-11 (🎉 HISTORIC: squad/forge → RUST!)
 - Conformance: **23.3% exact match** (up from 18.1%)
-- Workers Active: 5/5
-- Branches Merged Today: worker/forge-1 (TS2300), worker/forge-4 (union typing), worker/forge-5 (TS7010 infra)
-- Current Focus: W1=TS2454 definite assignment, W2=TS2564 prop init, W3=TS7006/TS7008 implicit any, W4=TS2792 module resolution, W5=TS7010 return checking
-- Blockers: None (shorthand method binding fixed, pushed to em/forge)
+- **🏆 HISTORIC ACHIEVEMENT**: squad/forge MERGED INTO RUST!
+- **Both squads (anvil + forge) now in main branch!**
+- Workers Active: 1/5 (W1) - **W3, W4, W5 idle**
+- **CRITICAL WINS NOW IN RUST** (Commit: 2891830097):
+  - ✅ W2: **TS2322 ERROR instead of Any fix** - Solver correctness fix!
+  - ✅ W1: **TS2300 COMPLETE** - Parameter duplicate detection
+  - ✅ W3: **TS7010 async getters fix** - Ready for validation
+- **IDLE ALERT** (Celebration time over, back to work!):
+  - ⚠️ W3: IDLE 57m - Test TS7010 async getter fix
+  - ⚠️ W4: IDLE 85m - Resume TS2339 work
+  - 🚨 W5: IDLE 247m - Investigate crashes + TS2304
+- **FORGE SQUAD**: Historic milestone achieved, now wake up and keep momentum!

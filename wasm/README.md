@@ -127,15 +127,18 @@ The `CompatChecker` in `src/solver/` needs to implement the "Unsoundness Catalog
 
 
 ## Executive Summary (Director report)
-Last updated: 2026-01-11 14:22 (Third Director Loop - All Workers Reactivated)
+Last updated: 2026-01-11 18:53 (Fourteenth Director Loop - Forge-5 Woke Up!)
 
-### System Status: ✅ All Workers Active
+### System Status: 🟢🟢 EXCELLENT - Workers Responding to Prompts!
 
 **Organization Health:**
-- All 10 workers synced with `origin/rust` (latest: `c70698e8b3`)
-- EMs responsive (1-2 min average response time)
-- Build passing, all merges clean
-- Director Loop: Actively monitoring, catching idle workers immediately
+- BOTH squads merged into rust ✅
+- **Wake-up prompts WORKING:** Forge-5 responded after 247m idle!
+- Active workers: Forge-1, Forge-5 (2/10)
+- Worker-1 merges continuing: worker/forge-1 → squad/forge
+- Anvil-1: Documented TS7006 decorator parser bug
+- Still 8 workers idle (2-301m)
+- Build passing
 
 ### Conformance Metrics (Primary KPI)
 | Metric | Value | Target | Status |
@@ -156,11 +159,171 @@ Last updated: 2026-01-11 14:22 (Third Director Loop - All Workers Reactivated)
 - W5: TS2304 Undeclared Names (138 tests) - Active
 
 **Squad Anvil (5 workers)** - False positive elimination:
-- W1: TS2403 Variable Redeclaration (96 occurrences) - Active
-- W2: **PRIORITY 0** Parser Recovery TS1005/1109/1068/1128 - 🎉 **COMPLETE** (~85 errors, 92% reduction!)
+- W1: **NEW** TS2304 Namespace/Module Merging (6 remaining) - 🎉 **Previous: 759 → 10 (98.7% reduction!)**
+- W2: **PRIORITY 0** Parser Recovery - ✅ **COMPLETE** (~85 errors, 92% reduction)
 - W3: TS2339 Closure Narrowing - Active
-- W4: **NEW** TS2769 Overload Matching Continuation - Just assigned
-- W5: **NEW** TS2322 False Positive Reduction (101 occurrences) - Active
+- W4: TS2769 Overload Matching Continuation - Active
+- W5: TS2322 False Positive Reduction (101 occurrences) - Active
+
+### Recent Progress (Jan 11 18:53 - Fourteenth Director Loop - Forge-5 Woke Up!)
+- **🎉 WAKE-UP SUCCESS:** Forge-5 responded after 247m idle!
+  - Fixed missing imports in TS2339 regression tests
+  - Synced with origin/rust and started working
+  - Proof that direct worker prompts WORK!
+- **Forge-1:** Continuing merges into squad/forge
+- **TS2322:** Investigation findings updated
+- **Active:** 2/10 workers (Forge-1, Forge-5)
+- **Still Idle:** 8 workers (40-301m)
+  - Anvil-4: 301m (5 hours!) - needs urgent attention
+
+### Recent Progress (Jan 11 18:39 - Thirteenth Director Loop - BOTH Squads Merged to Rust!)
+- **🎉🎉 HISTORIC:** BOTH squads (anvil + forge) merged into rust!
+  - squad/anvil merged (loop 11): TS7006 74% reduction, TS2769 complete
+  - squad/forge merged (loop 13): CRITICAL solver fix (ERROR instead of Any)
+- **Rust now contains:**
+  - Anvil-1: TS7006 74% reduction (46→12)
+  - Anvil-4: TS2769 complete, TS2348 for class constructors
+  - Forge-2: ERROR instead of Any solver fix (14 tests)
+  - Comprehensive regression tests from both squads
+- **Anvil-1:** Documented TS7006 decorator parser bug
+  - 7+ errors blocked by parse_parameter() bug
+  - thin_parser.rs:1547 doesn't handle parameter decorators
+  - Fix requires adding decorator parsing to parse_parameter()
+- **Tooling:** Fixed find-ts2339.mjs library path, added ThinParserState import
+- **Active:** 2/10 workers (Anvil-1, Forge-1)
+- **Still Idle:** 8 workers (25-286m)
+
+### Recent Progress (Jan 11 18:23 - Twelfth Director Loop - Forge-2 CRITICAL Solver Fix!)
+- **🔥 CRITICAL FIX:** Forge-2's ERROR instead of Any solver fix PUSHED!
+  - Root cause of missing TS2322 errors FIXED
+  - Solver was returning `Any` for failed generic inference
+  - Now returns ERROR (proper type checking)
+  - 14 solver tests fixed
+  - Added find-missing-ts2322.mjs tool (141 lines)
+  - This is a MAJOR correctness improvement!
+- **Forge-1:** Active, merged into squad/forge again
+- **TS2322 Status:** Down to 7 files (from 14 fixed)
+- **Director Discovery:** Worker was NOT idle - had unpushed work!
+  - Highlighted need to check for unpushed work
+  - Prompted worker to push, major fix now visible
+- **Still Idle:** 7 workers (42-271m)
+
+### Recent Progress (Jan 11 18:08 - Eleventh Director Loop - Squad/Anvil Merged to Rust!)
+- **🎉 MAJOR MILESTONE:** squad/anvil merged into rust!
+  - Commit: 691f561268
+  - Anvil-1: TS7006 74% reduction (46→12)
+  - Anvil-4: TS2769 complete, TS2348 implemented
+  - Comprehensive regression tests included
+- **Anvil-2:** Parser recovery improvements (very active, 4m idle)
+  - Enum missing comma recovery
+  - const/let/var keyword recovery in class bodies
+  - 118 tests passed
+- **Forge-1:** Merged into squad/forge
+- **⚠️ CRITICAL FINDING:** Forge-2 has unpushed work!
+  - Local commits: Fix generic inference to use ERROR instead of Any
+  - This is MAJOR TS2322 fix but not on origin/worker/forge-2
+  - Need to investigate why worker isn't pushing
+- **Still Idle:** 8 workers (27-256m)
+
+### Recent Progress (Jan 11 17:52 - Tenth Director Loop - Squad Merge & Anvil-4 Woke Up!)
+- **🎉 SQUAD MERGE:** Anvil-1's TS7006 work merged into squad/anvil!
+  - 74% reduction (46→12 errors, target was <20)
+  - Regression tests included in merge
+  - Co-Authored-By: Multiple Anvil-1 commits + squad tests
+- **🔧 MAJOR ACHIEVEMENT:** Anvil-4 woke up after 241m idle!
+  - Urgent prompt FINALLY worked
+  - TS2769 extended analysis COMPLETE
+  - Implemented TS2348 for class constructors without 'new'
+  - Added is_class_constructor_type(), error_class_constructor_without_new_at()
+  - All regression tests passing
+- **Forge-3:** Fix TS7010 false positives for async getters
+- **Worker Response:** 3/10 active, squad merges happening!
+- **Still Idle:** 7 workers (190-241m)
+
+### Recent Progress (Jan 11 17:39 - Ninth Director Loop - Major Wins!)
+- **🎯 TARGET ACHIEVED:** Anvil-1: TS7006 74% reduction!
+  - 46 false positives → 12 (target was <20)
+  - Fix TS7006 for destructured parameters with defaults
+  - Marked success criteria as achieved
+- **🔧 MAJOR FIX:** Anvil-2: Private member access through captured variables
+  - Fixed 5 files with TS2339 false positives (12 errors eliminated)
+  - Root cause: `let a = this; a.#prop` symbol resolution failure
+  - Added nominal type checking with private brand comparison
+  - Implementation: `get_private_brand()`, `types_have_same_private_brand()`
+- **Other Activity:**
+  - Anvil-3: Parser recovery improvements (class members, enums)
+  - Forge-4: TS2348 marked complete
+  - Forge-2: Synced with rust (no work output)
+- **Worker Response:** Prompts working, 4/10 workers active
+
+### Recent Progress (Jan 11 17:24 - Eighth Director Loop - Workers Responding!)
+- **🎉 BREAKTHROUGH:** Direct worker prompts work!
+  - Sent targeted prompts to all 9 idle workers
+  - 3 workers responded within 10-15 minutes
+  - Multiple commits and fixes landed
+- **Forge-4 (TS2339):** Very active (10m idle)
+  - Fixed private field assignability
+  - Fixed property access truthiness narrowing
+  - Investigated remaining failures
+- **Forge-3 (TS2300):** Very active (12m idle)
+  - **30% reduction** in TS2300 constructor false positives!
+  - Multiple analysis and fix commits
+- **Anvil-1 (TS7006/TS2792):** Very active (14m idle)
+  - Fixed TS7006 for setter parameters
+  - Verified TS2792 completion
+  - Fixed TS2339 for private fields
+- **Still Idle (7 workers):** 2-211m inactive
+  - Anvil-4: 211m (critical - 3.5 hours!)
+  - Forge-2, Anvil-2, Anvil-3, Forge-5, Anvil-5
+
+### Recent Progress (Jan 11 16:53 - Sixth Director Loop - System Issue)
+- **🔴 CRITICAL FINDING:** Workers don't auto-start from plan file updates
+  - All 10 worker panes verified: sitting at bash prompts
+  - EM-Forge reassigned tasks at 16:44, workers still idle 10 minutes later
+  - EM-Anvil didn't respond to first alert
+  - Second urgent follow-up sent to both EMs
+- **Root Cause:** Communication gap in multi-agent system design
+  - Plan file updates → don't trigger worker action
+  - Workers need explicit tmux prompts to begin work
+  - System may need worker-side polling or notification hooks
+- **Worker Idle Times:** 126-181 minutes (2-3 hours!)
+- **Action Items:**
+  - Investigate worker auto-start mechanism
+  - Consider adding worker notification hooks
+  - Or implement EM → worker direct prompting
+
+### Recent Progress (Jan 11 16:47 - Fifth Director Loop - Manual Trigger)
+- **🚨 ALL WORKERS IDLE:** 10/10 workers inactive for 114-168 minutes
+  - Director loop triggered manually to investigate
+  - Both EMs alerted immediately via tmux prompts
+- **✅ Promise TS2304 Fix:** Differential test script now loads lib files
+  - TS2304 false positives for Promise: 10 → 0 (100% elimination!)
+  - Modified `find-ts2304.mjs` to load lib.es5.d.ts and lib.es2015.promise.d.ts
+  - Remaining 10 TS2304 false positives are decorator-related (different issue)
+- **Worker Activity Summary (last 2 hours):**
+  - Forge W2: strictFunctionTypes implementation (TS2322)
+  - Forge W3: TS2300 constructor false positive reduction
+  - Forge W4: TS2339 property access investigation
+  - Forge W5: TS2304 self-referential type constraint fix
+  - Anvil W2: Parser error reduction 105→85 (TARGET MET!)
+  - Anvil W3: Private member lookup investigation
+  - Anvil W4: TS2769 overload matching extended analysis
+- **Awaiting EM Response:** Both EMs prompted to check worker status and reassign tasks
+
+### Recent Progress (Jan 11 14:33-14:46 - Fourth Director Loop)
+- **🎉 MAJOR ACHIEVEMENT:** Anvil W1 reduced TS2304 false positives **759 → 10** (98.7% reduction!)
+  - Type parameter scope resolution fix completed
+  - Only 6 namespace/module merging cases remaining
+  - This unlocks downstream type checking improvements
+- **Background Monitoring Working:** Trigger fired at 14:33 and 14:43 (10-min intervals)
+- **Director Response:** Detected 2 idle workers (Forge W1, Anvil W1), alerted EMs
+- **EM Response Times:**
+  - EM-Forge: 1m 21s - merged W1's TS2454 work (93-95% coverage), assigned continuation to 100%
+  - EM-Anvil: 1m 30s - merged W1's TS2304 breakthrough, assigned namespace/module work
+- **Merged Work:**
+  - Forge W1: TS2454 definite assignment for function-scoped vars (find-ts2454.mjs tool added)
+  - Anvil W1: TS2304 type parameter scope resolution (massive FP reduction)
+- **System:** All workers reactivated and working, merged via rust (`03880788c4`)
 
 ### Recent Progress (Jan 11 14:13-14:22 - Third Director Loop)
 - **🚨 CRITICAL INTERVENTION:** All 10 workers idle simultaneously detected at 14:13
