@@ -3,7 +3,7 @@
 ## Mission
 Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transforms, cli, lsp).
 
-Status: Blocked (Gemini key required)
+Status: Active
 Priority: 1
 ## Current Assignment
 - Prereq: run `./scripts/ask-gemini.mjs "I need to reduce TS2304 false positives (namespace/module/global scope). What's the best approach?"` once the API key is available.

@@ -3,11 +3,12 @@
 ## Mission
 Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transforms, cli, lsp).
 
-Status: Ready for Merge (TS2355 work complete)
+Status: Active
 Priority: 5
 
 ## Current Assignment
-- Awaiting new assignment from EM (TS2355 task complete).
+- Run a broader TS2355 conformance scan to verify no regressions after the never-return fix.
+- If clean, verify `types/mapped/recursiveMappedTypes.ts` crash status and report if still present.
 
 ## Task Queue
 - [ ] Verify whether `types/mapped/recursiveMappedTypes.ts` still crashes; if so, capture stack and coordinate with Forge.
