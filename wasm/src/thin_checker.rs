@@ -5675,6 +5675,7 @@ impl<'a> ThinCheckerState<'a> {
         let result = {
             let env = self.ctx.type_env.borrow();
             let mut checker = CompatChecker::with_resolver(self.ctx.types, &*env);
+            checker.set_strict_function_types(self.ctx.strict_function_types);
             let mut evaluator = CallEvaluator::new(self.ctx.types, &mut checker);
             evaluator.resolve_call(callee_type, &arg_types)
         };
@@ -9061,6 +9062,7 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         let mut checker = CompatChecker::with_resolver(self.ctx.types, &*env);
+        checker.set_strict_function_types(self.ctx.strict_function_types);
         checker.is_assignable(source, target)
     }
 
@@ -9088,6 +9090,7 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         let mut checker = CompatChecker::with_resolver(self.ctx.types, env);
+        checker.set_strict_function_types(self.ctx.strict_function_types);
         checker.is_assignable(source, target)
     }
 
