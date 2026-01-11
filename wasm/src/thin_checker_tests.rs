@@ -5641,7 +5641,6 @@ function createClass() {
 
 #[test]
 fn test_ts7010_return_path_analysis() {
-    use crate::checker::{CheckerContext, StatementChecker};
     use crate::thin_parser::ThinParserState;
 
     let source = r#"
@@ -5689,18 +5688,11 @@ function loopWithNestedSwitchBreak(flag: boolean) {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut ctx = CheckerContext::new(
-        parser.get_arena(),
-        &binder,
-        &types,
-        "test.ts".to_string(),
-    );
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
 
     let arena = parser.get_arena();
     let root_node = arena.get(root).expect("root node");
     let source_file = arena.get_source_file(root_node).expect("source file");
-
-    let checker = StatementChecker::new(&mut ctx);
 
     let body_at = |index: usize| {
         let stmt_idx = *source_file
@@ -5920,6 +5912,41 @@ async function* g4(): {} { yield 1; }
     );
 }
 
+/// Test async functions with type alias return types (conformance: asyncAliasReturnType_es5.ts)
+/// This replicates the scenario where Promise is not locally declared but comes from lib.
+#[test]
+fn test_async_alias_return_type_no_2355() {
+    use crate::thin_parser::ThinParserState;
+
+    // Note: Unlike test_async_promise_void_no_2355, this doesn't declare Promise interface.
+    // This matches the conformance test which relies on lib.es2015.promise.
+    // The type alias PromiseAlias<T> = Promise<T> should still unwrap to void.
+    let source = r#"
+type PromiseAlias<T> = Promise<T>;
+
+async function f(): PromiseAlias<void> {
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2355),
+        "Did not expect TS2355 for async PromiseAlias<void> return type (conformance: asyncAliasReturnType_es5.ts), got: {:?}",
+        codes
+    );
+}
+
 /// Test that calling a never-returning function doesn't trigger TS2355
 /// This is a known limitation - calls to functions returning `never` should
 /// terminate control flow but aren't currently detected.
@@ -5973,6 +6000,74 @@ function usesFailInList(): number {
         actual_2355_count,
         1,
         "Expected only fallsThrough() to get TS2355, got: {:?}",
+        codes
+    );
+}
+
+/// Test that try/catch blocks that always return or throw don't trigger TS2355.
+#[test]
+fn test_try_catch_no_2355() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+function fail(): never {
+    throw "boom";
+}
+
+function tryCatchReturn(): number {
+    try {
+        return 1;
+    } catch (e) {
+        return 2;
+    }
+}
+
+function tryCatchThrow(): number {
+    try {
+        throw "boom";
+    } catch (e) {
+        throw "boom";
+    }
+}
+
+function tryCatchNever(): number {
+    try {
+        fail();
+    } catch (e) {
+        return 1;
+    }
+}
+
+function tryCatchFallsThrough(): number {
+    try {
+        return 1;
+    } catch (e) {
+        console.log(e);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let count = |code| codes.iter().filter(|&&c| c == code).count();
+
+    let count_2355 = count(2355);
+    let count_2366 = count(2366);
+    assert_eq!(count_2355, 0, "Did not expect TS2355, got: {:?}", codes);
+    assert_eq!(
+        count_2366,
+        1,
+        "Expected only tryCatchFallsThrough() to get TS2366, got: {:?}",
         codes
     );
 }
