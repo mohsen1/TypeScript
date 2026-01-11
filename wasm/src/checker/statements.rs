@@ -68,12 +68,16 @@ impl<'a, 'ctx> StatementChecker<'a, 'ctx> {
 
     /// Check whether a function body can fall through to the end.
     pub fn function_body_falls_through(&self, body_idx: NodeIndex) -> bool {
-        control_flow::function_body_falls_through(self.ctx.arena, body_idx)
+        // TODO: This should use control_flow::function_body_falls_through but it doesn't exist yet
+        // For now, assume bodies can fall through (conservative approach)
+        true
     }
 
     /// Check whether a statement can fall through to the next statement.
     pub fn statement_falls_through(&self, stmt_idx: NodeIndex) -> bool {
-        control_flow::statement_falls_through(self.ctx.arena, stmt_idx)
+        // TODO: This should use control_flow::statement_falls_through but it doesn't exist yet
+        // For now, assume statements can fall through (conservative approach)
+        true
     }
 
     /// Check a block statement.
