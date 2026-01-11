@@ -294,7 +294,7 @@ impl<'a> ThinCheckerState<'a> {
         let name = self.ctx.arena.get_identifier(node)?.escaped_text.as_str();
 
         if let Some(mut scope_id) = self.find_enclosing_scope(idx) {
-            let mut require_export = false;
+            let require_export = false;
             while !scope_id.is_none() {
                 if let Some(scope) = self.ctx.binder.scopes.get(scope_id.0 as usize) {
                     if let Some(sym_id) = scope.table.get(name) {
@@ -328,13 +328,7 @@ impl<'a> ThinCheckerState<'a> {
                         }
                     }
                     let parent_id = scope.parent;
-                    if scope.kind == ContainerKind::Module {
-                        if let Some(parent_scope) = self.ctx.binder.scopes.get(parent_id.0 as usize) {
-                            require_export = parent_scope.kind == ContainerKind::Module;
-                        } else {
-                            require_export = false;
-                        }
-                    }
+                    // Nested namespaces can reference non-exported parent members (TSC behavior).
                     scope_id = parent_id;
                 } else {
                     break;
@@ -1311,6 +1305,11 @@ impl<'a> ThinCheckerState<'a> {
     }
 
     fn base_constructor_type_from_expression(&mut self, expr_idx: NodeIndex) -> Option<TypeId> {
+        if let Some(name) = self.heritage_name_text(expr_idx) {
+            if matches!(name.as_str(), "null" | "undefined" | "true" | "false" | "void" | "0") {
+                return None;
+            }
+        }
         let expr_type = self.get_type_of_node(expr_idx);
         let ctor_types = self.constructor_types_from_type(expr_type);
         if ctor_types.is_empty() {
@@ -10410,6 +10409,7 @@ impl<'a> ThinCheckerState<'a> {
                 | "Number" | "Boolean" | "Function" | "Date" | "RegExp" | "Error" | "Promise"
                 | "Map" | "Set" | "WeakMap" | "WeakSet" | "WeakRef" | "Proxy"
                 | "Reflect" | "globalThis" | "window" | "document"
+                | "exports" | "module" | "require" | "__dirname" | "__filename"
                 | "FinalizationRegistry" | "BigInt" | "ArrayBuffer" | "SharedArrayBuffer"
                 | "DataView" | "Int8Array" | "Uint8Array" | "Uint8ClampedArray"
                 | "Int16Array" | "Uint16Array" | "Int32Array" | "Uint32Array"
