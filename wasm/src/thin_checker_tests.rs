@@ -17116,11 +17116,43 @@ type t1 = DeepMap<tpl, number>;
 }
 
 #[test]
+fn test_type_parameter_in_function_body_no_ts2304() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+function identity<T>(x: T): T {
+    const y: T = x;
+    return y;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2304),
+        "Should not report TS2304 for type parameter T in function body, got diagnostics: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>()
+    );
+}
+
+#[test]
 fn test_static_private_field_access_no_ts2339() {
     use crate::thin_parser::ThinParserState;
 
     // Regression test for static private field access
     // Previously failed with TS2339 because static private members were excluded from constructor type
+    use crate::thin_parser::ThinParserState;
+
     let source = r#"
 class C {
     static #x = 123;
@@ -17141,7 +17173,6 @@ class C {
 
     let types = TypeInterner::new();
     let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
-
     checker.check_source_file(root);
 
     // Should have NO TS2339 errors for C.#x access
@@ -17158,6 +17189,8 @@ fn test_static_private_accessor_access_no_ts2339() {
     use crate::thin_parser::ThinParserState;
 
     // Regression test for static private accessor access
+    use crate::thin_parser::ThinParserState;
+
     let source = r#"
 class A {
     static get #prop() { return ""; }
@@ -17227,19 +17260,85 @@ function extract<T>(x: Extract<T, typeof identity>): T {
     let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
     checker.check_source_file(root);
 
-    // Check for false positive TS2304 errors on type parameter 'T'
-    let ts2304_for_T: Vec<_> = checker.ctx.diagnostics.iter()
-        .filter(|d| d.code == 2304 && d.message_text.contains("'T'"))
-        .collect();
-
-    eprintln!("[TYPE_PARAM_TYPE_QUERY] All diagnostics: {:?}",
-        checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>());
-
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
     assert!(
-        ts2304_for_T.is_empty(),
-        "Expected no TS2304 errors for type parameter 'T' in type queries, but got {} errors: {:?}",
-        ts2304_for_T.len(),
-        ts2304_for_T.iter().map(|d| &d.message_text).collect::<Vec<_>>()
+        !codes.contains(&2304),
+        "Should not report TS2304 for type parameter T in type query, got diagnostics: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn test_constrained_type_parameter_in_types_no_ts2304() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+function f1<T extends string | undefined>(x: T, y: { a: T }, z: [T]): string {
+    return "hello";
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let ts2304_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2304)
+        .map(|d| &d.message_text)
+        .collect();
+    
+    assert!(
+        !codes.contains(&2304),
+        "Should not report TS2304 for constrained type parameter T. Found errors: {:?}",
+        ts2304_errors
+    );
+}
+
+#[test]
+fn test_self_referential_type_constraint_no_ts2304() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+interface Box<T> {
+    item: T;
+}
+
+declare function unbox<T>(x: Box<T>): T;
+
+function g1<T extends Box<T> | undefined>(x: T) {
+    if (x !== undefined) {
+        unbox(x);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let ts2304_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2304)
+        .map(|d| &d.message_text)
+        .collect();
+    
+    assert!(
+        !codes.contains(&2304),
+        "Should not report TS2304 for self-referential type constraint T extends Box<T>. Found errors: {:?}",
+        ts2304_errors
     );
 }
 

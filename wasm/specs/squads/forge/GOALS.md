@@ -162,9 +162,10 @@ bash run-conformance.sh --all --workers=14
 
 ---
 ## Squad Status
-- Last Update: 2026-01-11
+- Last EM Update: 2026-01-11 (Post-merge)
 - Conformance: **30.8% exact match** (+7.5pp from 23.3%)
 - Build: Passing
+- Workers: W2, W4, W5 merged into squad/forge (32, 6, 35 commits each)
 
 ### Worker Assignments (New Phase)
 | Worker | Assignment | Priority |
@@ -173,7 +174,7 @@ bash run-conformance.sh --all --workers=14
 | W2 | TS2564 - Property Initialization | HIGH |
 | W3 | TS2322 - Solver Strictness (Any→Unknown) | HIGH |
 | W4 | TS2339 - Property Access (missing errors) | MEDIUM |
-| W5 | TS7010 - Return Type Checking | MEDIUM |
+| W5 | TS2304 - Cannot find name errors | HIGH |
 
 ### Before Starting Any Task
 **IMPORTANT:** Workers must consult Gemini before starting work:

@@ -2539,14 +2539,61 @@ impl<'a> ThinCheckerState<'a> {
 
         let mut params = Vec::new();
         let mut updates = Vec::new();
+        let mut param_indices = Vec::new();
 
+        // First pass: Add all type parameters to scope WITHOUT resolving constraints
+        // This allows self-referential constraints like T extends Box<T>
         for &param_idx in &list.nodes {
-            if let Some((info, name)) = self.lower_type_parameter_info(param_idx) {
-                let type_id = self.ctx.types.intern(TypeKey::TypeParameter(info.clone()));
-                let previous = self.ctx.type_parameter_scope.insert(name.clone(), type_id);
-                updates.push((name, previous));
-                params.push(info);
-            }
+            let Some(node) = self.ctx.arena.get(param_idx) else { continue };
+            let Some(data) = self.ctx.arena.get_type_parameter(node) else { continue };
+
+            let name = self.ctx.arena.get(data.name)
+                .and_then(|name_node| self.ctx.arena.get_identifier(name_node))
+                .map(|id_data| id_data.escaped_text.clone())
+                .unwrap_or_else(|| "T".to_string());
+            let atom = self.ctx.types.intern_string(&name);
+
+            // Create unconstrained type parameter initially
+            let info = crate::solver::TypeParamInfo {
+                name: atom,
+                constraint: None,
+                default: None,
+            };
+            let type_id = self.ctx.types.intern(TypeKey::TypeParameter(info));
+            let previous = self.ctx.type_parameter_scope.insert(name.clone(), type_id);
+            updates.push((name, previous));
+            param_indices.push(param_idx);
+        }
+
+        // Second pass: Now resolve constraints and defaults with all type parameters in scope
+        for &param_idx in &param_indices {
+            let Some(node) = self.ctx.arena.get(param_idx) else { continue };
+            let Some(data) = self.ctx.arena.get_type_parameter(node) else { continue };
+
+            let name = self.ctx.arena.get(data.name)
+                .and_then(|name_node| self.ctx.arena.get_identifier(name_node))
+                .map(|id_data| id_data.escaped_text.clone())
+                .unwrap_or_else(|| "T".to_string());
+            let atom = self.ctx.types.intern_string(&name);
+
+            let constraint = if data.constraint != NodeIndex::NONE {
+                Some(self.get_type_from_type_node(data.constraint))
+            } else {
+                None
+            };
+
+            let default = if data.default != NodeIndex::NONE {
+                Some(self.get_type_from_type_node(data.default))
+            } else {
+                None
+            };
+
+            let info = crate::solver::TypeParamInfo {
+                name: atom,
+                constraint,
+                default,
+            };
+            params.push(info);
         }
 
         (params, updates)
@@ -18355,30 +18402,8 @@ impl<'a> ThinCheckerState<'a> {
                             && self.contains_break_statement(if_data.else_statement))
                 })
                 .unwrap_or(false),
-            syntax_kind_ext::SWITCH_STATEMENT => {
-                let Some(switch_data) = self.ctx.arena.get_switch(node) else {
-                    return false;
-                };
-                let Some(case_block_node) = self.ctx.arena.get(switch_data.case_block) else {
-                    return false;
-                };
-                let Some(case_block) = self.ctx.arena.get_block(case_block_node) else {
-                    return false;
-                };
-                case_block.statements.nodes.iter().any(|&clause_idx| {
-                    let Some(clause_node) = self.ctx.arena.get(clause_idx) else {
-                        return false;
-                    };
-                    let Some(clause) = self.ctx.arena.get_case_clause(clause_node) else {
-                        return false;
-                    };
-                    clause
-                        .statements
-                        .nodes
-                        .iter()
-                        .any(|&stmt| self.contains_break_statement(stmt))
-                })
-            }
+            // Don't recurse into switch statements - breaks inside target the switch, not outer loop
+            syntax_kind_ext::SWITCH_STATEMENT => false,
             syntax_kind_ext::TRY_STATEMENT => self
                 .ctx
                 .arena
@@ -18391,20 +18416,12 @@ impl<'a> ThinCheckerState<'a> {
                             && self.contains_break_statement(try_data.finally_block))
                 })
                 .unwrap_or(false),
+            // Don't recurse into nested loops - breaks inside target the nested loop, not outer loop
             syntax_kind_ext::WHILE_STATEMENT
             | syntax_kind_ext::DO_STATEMENT
-            | syntax_kind_ext::FOR_STATEMENT => self
-                .ctx
-                .arena
-                .get_loop(node)
-                .map(|loop_data| self.contains_break_statement(loop_data.statement))
-                .unwrap_or(false),
-            syntax_kind_ext::FOR_IN_STATEMENT | syntax_kind_ext::FOR_OF_STATEMENT => self
-                .ctx
-                .arena
-                .get_for_in_of(node)
-                .map(|loop_data| self.contains_break_statement(loop_data.statement))
-                .unwrap_or(false),
+            | syntax_kind_ext::FOR_STATEMENT
+            | syntax_kind_ext::FOR_IN_STATEMENT
+            | syntax_kind_ext::FOR_OF_STATEMENT => false,
             syntax_kind_ext::LABELED_STATEMENT => self
                 .ctx
                 .arena

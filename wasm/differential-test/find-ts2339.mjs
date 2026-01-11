@@ -156,9 +156,25 @@ function runTscSingle(code, fileName, testOptions) {
   }));
 }
 
-function runWasmSingle(code, fileName, wasm) {
+let libPromiseCache = null;
+
+async function loadLibFiles(wasm, target) {
+  // Not used in synchronous context, but kept for compatibility
+  return loadLibFilesSync(wasm, '');
+}
+
+function runWasmSingle(code, fileName, wasm, testOptions) {
   const parser = new wasm.ThinParser(fileName, code);
   parser.parseSourceFile();
+
+  // Load lib files based on @lib directive
+  if (testOptions && testOptions.lib) {
+    const libFiles = loadLibFilesSync(wasm, testOptions.lib);
+    for (const lib of libFiles) {
+      parser.addLibFile(lib.name, lib.content);
+    }
+  }
+
   const parseDiags = JSON.parse(parser.getDiagnosticsJson());
   const checkResult = JSON.parse(parser.checkSourceFile());
   let wasmDiags = [
@@ -176,6 +192,42 @@ function runWasmSingle(code, fileName, wasm) {
     })),
   ];
   return wasmDiags;
+}
+
+// Synchronous wrapper for library loading (called during test iteration)
+function loadLibFilesSync(wasm, libDirective) {
+  // Create cache key based on lib directive
+  const cacheKey = `lib_${libDirective}`;
+  if (libPromiseCache && libPromiseCache.key === cacheKey) {
+    return libPromiseCache.files;
+  }
+
+  const { readFileSync } = require('fs');
+  const { join } = require('path');
+  const typescriptLibPath = join(__dirname, '../../node_modules/typescript/lib');
+
+  const libFiles = [];
+  const libs = libDirective.split(',').map(l => l.trim());
+
+  // Always load lib.es5.d.ts (core types)
+  libFiles.push({
+    name: 'lib.es5.d.ts',
+    content: readFileSync(join(typescriptLibPath, 'lib.es5.d.ts'), 'utf-8')
+  });
+
+  // Load requested lib files
+  for (const lib of libs) {
+    const fileName = `lib.${lib}.d.ts`;
+    try {
+      const content = readFileSync(join(typescriptLibPath, fileName), 'utf-8');
+      libFiles.push({ name: fileName, content });
+    } catch (e) {
+      // Lib file not found, skip
+    }
+  }
+
+  libPromiseCache = { key: cacheKey, files: libFiles };
+  return libFiles;
 }
 
 async function main() {
@@ -215,7 +267,7 @@ async function main() {
     try {
       const fileName = basename(filePath);
       tscDiags = runTscSingle(cleanCode, fileName, options);
-      wasmDiags = runWasmSingle(cleanCode, fileName, wasm);
+      wasmDiags = runWasmSingle(cleanCode, fileName, wasm, options);
     } catch (e) {
       continue;
     }
