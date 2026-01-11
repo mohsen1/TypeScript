@@ -11198,7 +11198,14 @@ impl<'a> ThinCheckerState<'a> {
 
                         // Check for error 2355: function with return type must return a value
                         // Only check if there's an explicit return type annotation
-                        let requires_return = self.requires_return_value(return_type);
+                        let is_async = func.is_async;
+                        let is_generator = func.asterisk_token;
+                        let check_return_type = self.return_type_for_implicit_return_check(
+                            return_type,
+                            is_async,
+                            is_generator,
+                        );
+                        let requires_return = self.requires_return_value(check_return_type);
                         let has_return = self.body_has_return_with_value(func.body);
                         let falls_through = self.function_body_falls_through(func.body);
 
@@ -13754,6 +13761,21 @@ impl<'a> ThinCheckerState<'a> {
             for &mod_idx in &mods.nodes {
                 if let Some(mod_node) = self.ctx.arena.get(mod_idx) {
                     if mod_node.kind == SyntaxKind::DeclareKeyword as u16 {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    /// Check if a node has the `async` modifier.
+    fn has_async_modifier(&self, modifiers: &Option<crate::parser::NodeList>) -> bool {
+        use crate::scanner::SyntaxKind;
+        if let Some(mods) = modifiers {
+            for &mod_idx in &mods.nodes {
+                if let Some(mod_node) = self.ctx.arena.get(mod_idx) {
+                    if mod_node.kind == SyntaxKind::AsyncKeyword as u16 {
                         return true;
                     }
                 }
@@ -16572,7 +16594,11 @@ impl<'a> ThinCheckerState<'a> {
             self.push_return_type(return_type);
             self.check_statement(method.body);
 
-            let requires_return = self.requires_return_value(return_type);
+            let is_async = self.has_async_modifier(&method.modifiers);
+            let is_generator = method.asterisk_token;
+            let check_return_type =
+                self.return_type_for_implicit_return_check(return_type, is_async, is_generator);
+            let requires_return = self.requires_return_value(check_return_type);
             let has_return = self.body_has_return_with_value(method.body);
             let falls_through = self.function_body_falls_through(method.body);
 
@@ -16845,6 +16871,7 @@ impl<'a> ThinCheckerState<'a> {
             || return_type == TypeId::ANY
             || return_type == TypeId::NEVER
             || return_type == TypeId::UNKNOWN
+            || return_type == TypeId::ERROR
         {
             return false;
         }
@@ -16860,6 +16887,152 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         true
+    }
+
+    fn return_type_for_implicit_return_check(
+        &mut self,
+        return_type: TypeId,
+        is_async: bool,
+        is_generator: bool,
+    ) -> TypeId {
+        if is_generator {
+            return TypeId::ANY;
+        }
+
+        if is_async {
+            if let Some(inner) = self.promise_like_return_type_argument(return_type) {
+                return inner;
+            }
+        }
+
+        return_type
+    }
+
+    fn promise_like_return_type_argument(&mut self, return_type: TypeId) -> Option<TypeId> {
+        use crate::solver::TypeKey;
+
+        if let Some(TypeKey::Application(app_id)) = self.ctx.types.lookup(return_type) {
+            let app = self.ctx.types.type_application(app_id);
+            return self.promise_like_type_argument_from_base(app.base, &app.args, &mut Vec::new());
+        }
+
+        if self.type_ref_is_promise_like(return_type) {
+            return Some(TypeId::ANY);
+        }
+
+        None
+    }
+
+    fn type_ref_is_promise_like(&self, type_id: TypeId) -> bool {
+        use crate::solver::{TypeKey, SymbolRef};
+
+        let Some(TypeKey::Ref(SymbolRef(sym_id))) = self.ctx.types.lookup(type_id) else {
+            return false;
+        };
+        let Some(symbol) = self.ctx.binder.get_symbol(SymbolId(sym_id)) else {
+            return false;
+        };
+        self.is_promise_like_name(symbol.escaped_name.as_str())
+    }
+
+    fn promise_like_type_argument_from_base(
+        &mut self,
+        base: TypeId,
+        args: &[TypeId],
+        visited_aliases: &mut Vec<SymbolId>,
+    ) -> Option<TypeId> {
+        use crate::solver::{TypeKey, SymbolRef};
+
+        let Some(TypeKey::Ref(SymbolRef(sym_id))) = self.ctx.types.lookup(base) else {
+            return None;
+        };
+        let sym_id = SymbolId(sym_id);
+        let symbol = self.ctx.binder.get_symbol(sym_id)?;
+        let name = symbol.escaped_name.as_str();
+
+        if self.is_promise_like_name(name) {
+            return Some(args.first().copied().unwrap_or(TypeId::ANY));
+        }
+
+        if symbol.flags & symbol_flags::TYPE_ALIAS != 0 {
+            return self.promise_like_type_argument_from_alias(sym_id, args, visited_aliases);
+        }
+
+        None
+    }
+
+    fn promise_like_type_argument_from_alias(
+        &mut self,
+        sym_id: SymbolId,
+        args: &[TypeId],
+        visited_aliases: &mut Vec<SymbolId>,
+    ) -> Option<TypeId> {
+        use crate::solver::TypeKey;
+
+        if visited_aliases.iter().any(|&seen| seen == sym_id) {
+            return None;
+        }
+        visited_aliases.push(sym_id);
+
+        let symbol = self.ctx.binder.get_symbol(sym_id)?;
+        let decl_idx = if !symbol.value_declaration.is_none() {
+            symbol.value_declaration
+        } else {
+            symbol.declarations.first().copied().unwrap_or(NodeIndex::NONE)
+        };
+        if decl_idx.is_none() {
+            return None;
+        }
+
+        let node = self.ctx.arena.get(decl_idx)?;
+        let type_alias = self.ctx.arena.get_type_alias(node)?;
+
+        let mut bindings = Vec::new();
+        if let Some(params) = &type_alias.type_parameters {
+            if params.nodes.len() != args.len() {
+                return None;
+            }
+            for (&param_idx, &arg) in params.nodes.iter().zip(args.iter()) {
+                let param_node = self.ctx.arena.get(param_idx)?;
+                let param = self.ctx.arena.get_type_parameter(param_node)?;
+                let name_node = self.ctx.arena.get(param.name)?;
+                let ident = self.ctx.arena.get_identifier(name_node)?;
+                bindings.push((self.ctx.types.intern_string(&ident.escaped_text), arg));
+            }
+        } else if !args.is_empty() {
+            return None;
+        }
+
+        let lowered = self.lower_type_with_bindings(type_alias.type_node, bindings);
+        if let Some(TypeKey::Application(app_id)) = self.ctx.types.lookup(lowered) {
+            let app = self.ctx.types.type_application(app_id);
+            return self.promise_like_type_argument_from_base(app.base, &app.args, visited_aliases);
+        }
+
+        None
+    }
+
+    fn lower_type_with_bindings(
+        &self,
+        type_node: NodeIndex,
+        bindings: Vec<(crate::interner::Atom, TypeId)>,
+    ) -> TypeId {
+        use crate::solver::TypeLowering;
+
+        let type_resolver = |node_idx: NodeIndex| self.resolve_type_symbol_for_lowering(node_idx);
+        let value_resolver = |node_idx: NodeIndex| self.resolve_value_symbol_for_lowering(node_idx);
+        let lowering = TypeLowering::with_resolvers(
+            self.ctx.arena,
+            self.ctx.types,
+            &type_resolver,
+            &value_resolver,
+        )
+        .with_type_param_bindings(bindings);
+        lowering.lower_type(type_node)
+    }
+
+    fn is_promise_like_name(&self, name: &str) -> bool {
+        matches!(name, "Promise" | "PromiseLike")
     }
 
     fn is_null_or_undefined_only(&self, return_type: TypeId) -> bool {
