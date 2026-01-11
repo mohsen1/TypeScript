@@ -3730,7 +3730,8 @@ impl ThinParserState {
         let name = if self.is_token(SyntaxKind::StringLiteral) {
             self.parse_string_literal()
         } else {
-            self.parse_identifier()
+            // Allow keywords in dotted namespace segments (e.g., namespace chrome.debugger {})
+            self.parse_identifier_name()
         };
 
         let body = if self.is_token(SyntaxKind::OpenBraceToken) {
