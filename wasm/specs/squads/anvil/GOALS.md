@@ -10,8 +10,19 @@ Priority: 1
 | Metric | Current | Previous | Target | Status |
 |--------|---------|----------|--------|--------|
 | Exact Match | **30.8%** | 23.3% | 50%+ | +7.5pp |
+| Missing Errors | **57.8%** | 68.2% | <30% | -10.4pp |
 | Extra Errors | **28.9%** | 35.8% | <20% | -6.9pp |
 | Parser Errors | **~85** | 1,122 | <100 | **TARGET MET** |
+| **Parser Noise** | **598** 📉 | - | **0** | **HIGH PRIORITY** |
+
+**Parser Noise Breakdown:**
+- **TS1005:** 384 errors (missing tokens, expected syntax)
+- **TS1109:** 214 errors (unexpected tokens, expression expected)
+
+**Impact:** These 598 parser failures cascade into:
+- False TS2304 (Cannot find name) - symbols not parsed
+- False `any` types - missing nodes prevent inference
+- Overall test invalidation
 
 ---
 ## Completed Work (Reference)
@@ -40,8 +51,16 @@ Priority: 1
 ---
 ## Phase 10: False Positive Elimination
 
-### Worker 1: Scope Resolution (TS2304) - 759 false positives
-**Problem:** "Cannot find name 'X'" when X is clearly defined
+### Worker 1: Scope Resolution (TS2304) - 759 false positives [⚠️ BLOCKED BY PARSER]
+
+**BLOCKED:** TS2304 fixes cannot be validated until parser TS1005/TS1109 errors are fixed
+
+**Alternative Work:**
+- Assist W2 with parser regression tests
+- Work on Emitter parity features
+- Document type resolution architecture
+
+**Original Problem:** "Cannot find name 'X'" when X is clearly defined
 
 Root Causes:
 1. Namespace members not finding sibling exports
@@ -67,9 +86,33 @@ Files: `thin_binder.rs`, `thin_checker.rs`
 
 **DO NOT WORK ON:** TS2454/TS7006 until parser fixed (can't trust control flow on broken AST)
 
+---
+
+**⚠️ CRITICAL: W1, W3, W4 ARE BLOCKED BY PARSER ISSUES**
+
+**Why:** Workers W1, W3, W4 work on type checking which requires a valid AST. Parser noise (598 errors) means:
+- Missing symbols → false TS2304
+- Incomplete AST → wrong type inference
+- Cannot accurately test type checking fixes
+
+**Immediate Actions:**
+- **W1, W3, W4:** ASSIST W2 with parser recovery
+  - Add regression tests for parser edge cases
+  - Test parser against real-world TS code
+  - Document expected parser behavior
+
+OR
+
+- **W1, W3, W4:** Work on ISOLATED subsystems
+  - Emitter parity (doesn't depend on parser)
+  - Documentation
+  - Build system improvements
+
+**DO NOT:** Work on type checking features until parser TS1005/TS1109 fixed
+
 Files: `wasm/src/parser/thin_parser.rs`, all parse functions
 
-### Worker 3: Property Access (TS2339) - 292 false positives
+### Worker 3: Property Access (TS2339) - 292 false positives [BLOCKED]
 **Problem:** "Property 'X' does not exist on type 'Y'" when it does
 
 Root Causes:
@@ -80,8 +123,16 @@ Root Causes:
 
 Files: `thin_checker.rs` - property access checking
 
-### Worker 4: Overload Matching (TS2769) - 125 false positives
-**Problem:** "No overload matches this call" when one should
+### Worker 4: Overload Matching (TS2769) - 125 false positives [⚠️ BLOCKED BY PARSER]
+
+**BLOCKED:** Overload testing requires valid AST. Parser noise prevents validation
+
+**Alternative Work:**
+- Assist W2 with parser regression tests
+- Work on Emitter parity features
+- Document overload resolution architecture
+
+**Original Problem:** "No overload matches this call" when one should
 
 Root Causes:
 1. Generic inference in overloads too strict
