@@ -7,24 +7,25 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-TS2339 missing errors: control-flow narrowing.
+TS2339 missing errors: extend control-flow narrowing for guard/switch cases.
 
 **Error Code:** TS2339 - "Property 'X' does not exist on type 'Y'"
 
 ### Steps
-1. Run missing scan for TS2339.
-2. Implement control-flow narrowing updates in `control_flow.rs`.
-3. Add `control_flow_tests` coverage.
-4. Run focused tests (`./wasm/test.sh control_flow_tests`) and report delta.
+1. **Run a missing scan**: `node wasm/differential-test/find-ts2339.mjs --mode=missing --max=2000 --samples=20`.
+2. **Pick top missing pattern** (likely switch-discriminant or `in`/`instanceof`/`typeof` guard narrowing).
+3. **Implement flow updates** in `wasm/src/checker/control_flow.rs` to narrow types in the chosen pattern.
+4. **Add tests** in `wasm/src/checker/control_flow_tests.rs`.
+5. **Run focused tests** with `./wasm/test.sh control_flow_tests` and report delta.
 
 ### Key Files
 - `wasm/src/checker/control_flow.rs`
-- `wasm/src/thin_checker.rs`
-- `wasm/src/thin_checker_tests.rs`
+- `wasm/src/checker/control_flow_tests.rs`
+- `wasm/differential-test/find-ts2339.mjs`
 
 ### Success Criteria
-- TS2339 extra errors reduced for control-flow narrowing cases
-- No regressions in existing TS2339 tests
+- Missing TS2339 reduced for the selected control-flow pattern
+- No new TS2339 extras introduced
 
 ## Task Queue
 - (empty)
@@ -73,8 +74,6 @@ TS2339 missing errors: control-flow narrowing.
 - [x] Assertion predicate calls create flow nodes and narrow asserted targets; added test
 - [x] Added missing TS2339 mode to `find-ts2339.mjs`
 - [x] Catch clause variables default to `unknown` for narrowing; added TS2339 test
-- [x] Parse catch binding patterns and set parent links for catch clause nodes
-- [x] Narrow `in` operator when left is a private identifier; add control flow test
 
 ### Remaining TS2339 False Positives (pending re-run)
 - Mixin classes: mixin type inference issues (intersection handling added in new expressions, unit tests pass, conformance tests need more investigation)
@@ -82,7 +81,7 @@ TS2339 missing errors: control-flow narrowing.
 - Re-run conformance to confirm private names/control-flow narrowing improvements
 
 ## Ready for Merge
-Yes
+No
 
 ## Notes
 - Similar infrastructure to TS2564 (property init) - share patterns with Workers 1-2
@@ -98,5 +97,3 @@ Yes
 - Tests: `./wasm/test.sh control_flow_tests`, `./wasm/test.sh test_ts2339_`
 - `./scripts/ask-gemini.mjs` blocked: missing `GCP_VERTEX_EXPRESS_API_KEY`
 - `./wasm/test.sh thin_checker_tests` fails with existing abstract class tests (2511 vs 2564)
-- Missing TS2339 scan (`--mode=missing --max=2000 --samples=20`): timed out; missing list includes private names and static `this.c` in computed members
-- `./wasm/test.sh control_flow_tests` passes
