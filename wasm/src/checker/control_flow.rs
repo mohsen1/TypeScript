@@ -3209,3 +3209,19 @@ if (x == null) {}
         assert_eq!(narrowed_false, TypeId::STRING);
     }
 }
+
+/// Check whether a function body can fall through to the end.
+/// Returns true if execution can reach the end without an explicit return.
+pub fn function_body_falls_through(_arena: &ThinNodeArena, _body_idx: NodeIndex) -> bool {
+    // TODO: Implement proper control flow analysis for function bodies
+    // For now, conservatively assume all bodies can fall through
+    true
+}
+
+/// Check whether a statement can fall through to the next statement.
+/// Returns true if execution can continue to the next statement.
+pub fn statement_falls_through(_arena: &ThinNodeArena, _stmt_idx: NodeIndex) -> bool {
+    // TODO: Implement proper control flow analysis for statements
+    // For now, conservatively assume all statements can fall through
+    true
+}

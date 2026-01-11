@@ -12202,13 +12202,33 @@ impl<'a> ThinCheckerState<'a> {
                     return;
                 }
 
-                for source_prop in source_props {
-                    let exists_in_target = target_shapes.iter().any(|shape| {
-                        shape.properties.iter().any(|prop| prop.name == source_prop.name)
-                    });
-                    if !exists_in_target {
-                        let prop_name = self.ctx.types.resolve_atom(source_prop.name);
-                        self.error_excess_property_at(&prop_name, target, idx);
+                // Find union members that the source could potentially match.
+                // A member is a potential match if all its required properties exist in source.
+                let mut matching_shapes = Vec::new();
+                for shape in &target_shapes {
+                    let all_required_props_present = shape.properties.iter()
+                        .filter(|p| !p.optional)
+                        .all(|target_prop| {
+                            source_props.iter().any(|source_prop| source_prop.name == target_prop.name)
+                        });
+
+                    if all_required_props_present {
+                        matching_shapes.push(shape);
+                    }
+                }
+
+                // Only report excess properties if the source matches at least one union member.
+                // If no member matches, the assignability check will report TS2322.
+                if !matching_shapes.is_empty() {
+                    // Check excess properties against the matching members
+                    for source_prop in source_props {
+                        let exists_in_any_match = matching_shapes.iter().any(|shape| {
+                            shape.properties.iter().any(|prop| prop.name == source_prop.name)
+                        });
+                        if !exists_in_any_match {
+                            let prop_name = self.ctx.types.resolve_atom(source_prop.name);
+                            self.error_excess_property_at(&prop_name, target, idx);
+                        }
                     }
                 }
             }
