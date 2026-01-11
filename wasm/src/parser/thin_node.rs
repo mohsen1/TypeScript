@@ -1988,22 +1988,32 @@ impl ThinNodeArena {
 
     /// Add a switch statement node
     pub fn add_switch(&mut self, kind: u16, pos: u32, end: u32, data: SwitchData) -> NodeIndex {
+        let expression = data.expression;
+        let case_block = data.case_block;
         let data_index = self.switch_data.len() as u32;
         self.switch_data.push(data);
         let index = self.nodes.len() as u32;
         self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
-        NodeIndex(index)
+        let parent = NodeIndex(index);
+        self.set_parent(expression, parent);
+        self.set_parent(case_block, parent);
+        parent
     }
 
     /// Add a case/default clause node
     pub fn add_case_clause(&mut self, kind: u16, pos: u32, end: u32, data: CaseClauseData) -> NodeIndex {
+        let expression = data.expression;
+        let statements = data.statements.clone();
         let data_index = self.case_clauses.len() as u32;
         self.case_clauses.push(data);
         let index = self.nodes.len() as u32;
         self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
-        NodeIndex(index)
+        let parent = NodeIndex(index);
+        self.set_parent(expression, parent);
+        self.set_parent_list(&statements, parent);
+        parent
     }
 
     /// Add a try statement node
