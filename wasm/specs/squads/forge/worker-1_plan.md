@@ -56,7 +56,7 @@ Implement TS2300 "Duplicate identifier" diagnostics for basic redeclaration case
 - Re-synced with `origin/rust` and reran `./wasm/test.sh duplicate_identifier` (passed).
 
 ## Ready for Merge
-Yes
+No
 
 ## Notes
 - Run `./wasm/test.sh` before pushing

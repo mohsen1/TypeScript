@@ -80,7 +80,7 @@ TS2339 missing errors: improve reporting + fix top missing pattern.
 - Re-run conformance to confirm private names/control-flow narrowing improvements
 
 ## Ready for Merge
-Yes
+No
 
 ## Notes
 - Similar infrastructure to TS2564 (property init) - share patterns with Workers 1-2
