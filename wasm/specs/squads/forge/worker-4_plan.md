@@ -1,39 +1,37 @@
 # Worker 4 Plan - Squad Forge
 
 ## Mission
-Implement TS2322 improvements (type not assignable) for conformance.
+Reduce TS2300 duplicate identifier false positives.
 
 Status: Active
 Priority: 1
 
 ## Current Assignment
-TS2322 object literal excess property + optionality.
+Fix TS2300 false positives for class accessor pairs (get/set).
 
-**Error Code:** TS2322 - "Type 'X' is not assignable to type 'Y'"
+**Error Code:** TS2300 - "Duplicate identifier '{0}'."
 
-**Impact:** 310 conformance tests affected
+**Impact:** Blocks `cli::driver_tests::compile_class_accessors`
 
 ### Steps
-1. **Add focused tests** in `wasm/src/solver/compat_tests.rs` and `wasm/src/thin_checker_tests.rs`.
-2. **Fix assignability** in `wasm/src/solver/compat.rs` for union optional property overlap.
-3. **Harden object literal excess property checks** for union targets.
-4. **Run focused tests** and record delta.
+1. **Reproduce** with `./wasm/test.sh compile_class_accessors`.
+2. **Identify** where duplicate identifier is emitted for accessor pairs in `thin_checker.rs`.
+3. **Allow get/set pairs** to merge without TS2300; keep true duplicates (two getters, two setters) reporting.
+4. **Add tests** in `wasm/src/thin_checker_tests.rs` or `wasm/src/cli/driver_tests.rs` for accessor pairs.
+5. **Run focused tests** and record delta.
 
 ### Key Files
-- `wasm/src/solver/compat.rs`
-- `wasm/src/solver/compat_tests.rs`
 - `wasm/src/thin_checker.rs`
+- `wasm/src/binder.rs`
 - `wasm/src/thin_checker_tests.rs`
-- `wasm/src/checker/types/assignability.rs` (if present)
+- `wasm/src/cli/driver_tests.rs`
 
 ### Success Criteria
-- TS2322 missing errors reduced for object literal assignability
-- Extra errors do not increase (no regressions)
+- `compile_class_accessors` passes without TS2300
+- No new TS2300 regressions for true duplicates
 
 ## Task Queue
-- Add TS2322 regression tests for object literal excess property and optionality.
-- Validate assignability for unions with contextual typing.
-- Confirm no regressions in existing assignability tests.
+- After fix, re-run `./wasm/test.sh` (full) if time permits.
 
 ## Completed
 
@@ -79,7 +77,7 @@ TS2322 object literal excess property + optionality.
 - [x] Applied check_parameter_initializers to constructors, methods, accessors, functions
 
 ## Ready for Merge
-Yes
+No
 
 ## Notes
 - Progress: added weak-union assignability guard for optional object targets; extended object literal excess property checks to union targets; added compat + thin checker tests.
