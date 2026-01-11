@@ -2,13 +2,37 @@
 
 ## Current Assignment (2026-01-11) - Recursive Mapped Types Property Access Guard
 
-Status: Active
+Status: Completed
 
-- Implement recursion guard/fallback for property access on recursive mapped types to prevent `unreachable` crash.
-- Start in `wasm/src/solver/operations.rs` (PropertyAccessEvaluator) and/or `wasm/src/thin_checker.rs` evaluation paths.
-- Add regression test using minimal repro from `types/mapped/recursiveMappedTypes.ts` (property access on Transform<T>).
-- Verify with targeted conformance run (`node wasm/differential-test/conformance-runner.mjs types/mapped --max=200 -v`) and report crash delta.
+- [x] Add recursion guard/fallback for property access on recursive mapped types.
+- [x] Add regression test (Transform<T> property access).
+- [x] Run targeted conformance (types/mapped) and report crash delta.
 - Queue: TS2769 variadic tuple false positives (see follow-up sections).
+
+## Follow-up (2026-01-11) - Property Access Guard Implementation
+
+Status: COMPLETED
+
+### Changes
+
+- Added recursion guard for mapped/application property access in `wasm/src/solver/operations.rs`.
+- Capped mapped eval depth and wrapped property access with instantiation depth guard in `wasm/src/thin_checker.rs`.
+- Avoided recursive expansion of mapped property types in `evaluate_mapped_type_with_resolution_inner`.
+- Regression test: `test_recursive_mapped_property_access_no_crash`.
+
+### Tests
+
+- `./wasm/test.sh test_recursive_mapped_property_access_no_crash` (PASS)
+
+### Conformance (types/mapped, max=200)
+
+- `node wasm/differential-test/conformance-runner.mjs types/mapped --max=200 -v`
+- Crashes: 2 → 0 (`mappedTypes2.ts`, `recursiveMappedTypes.ts`)
+- Exact match: 3 → 5
+- Same error count: 3 → 5
+- `recursiveMappedTypes.ts` still missing TS2456/TS2313/TS2589/TS2502/TS2615; extra TS2322/TS2339/TS2304
+
+Ready for Merge: Yes
 
 ## Follow-up (2026-01-11) - Recursive Mapped Types Crash Verification
 

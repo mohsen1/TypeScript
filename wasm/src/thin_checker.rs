@@ -6641,6 +6641,17 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Get type of property access expression.
     fn get_type_of_property_access(&mut self, idx: NodeIndex) -> TypeId {
+        if *self.ctx.instantiation_depth.borrow() >= MAX_INSTANTIATION_DEPTH {
+            return TypeId::ANY;
+        }
+
+        *self.ctx.instantiation_depth.borrow_mut() += 1;
+        let result = self.get_type_of_property_access_inner(idx);
+        *self.ctx.instantiation_depth.borrow_mut() -= 1;
+        result
+    }
+
+    fn get_type_of_property_access_inner(&mut self, idx: NodeIndex) -> TypeId {
         use crate::solver::{PropertyAccessResult, QueryDatabase};
 
         let Some(node) = self.ctx.arena.get(idx) else {
@@ -9047,8 +9058,15 @@ impl<'a> ThinCheckerState<'a> {
             return type_id;
         }
 
+        if *self.ctx.instantiation_depth.borrow() >= MAX_INSTANTIATION_DEPTH {
+            self.ctx.mapped_eval_set.remove(&type_id);
+            return type_id;
+        }
+        *self.ctx.instantiation_depth.borrow_mut() += 1;
+
         let result = self.evaluate_mapped_type_with_resolution_inner(type_id, mapped_id);
 
+        *self.ctx.instantiation_depth.borrow_mut() -= 1;
         self.ctx.mapped_eval_set.remove(&type_id);
         self.ctx.mapped_eval_cache.insert(type_id, result);
         result
@@ -9083,11 +9101,8 @@ impl<'a> ThinCheckerState<'a> {
             let mut subst = TypeSubstitution::new();
             subst.insert(mapped.type_param.name, key_literal);
 
-            // Instantiate the template
+            // Instantiate the template without recursively expanding nested applications.
             let property_type = instantiate_type(self.ctx.types, mapped.template, &subst);
-
-            // Recursively evaluate the property type (handles nested Applications)
-            let property_type = self.evaluate_application_type(property_type);
 
             let optional = matches!(mapped.optional_modifier, Some(crate::solver::MappedModifier::Add));
             let readonly = matches!(mapped.readonly_modifier, Some(crate::solver::MappedModifier::Add));
