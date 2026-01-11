@@ -5,26 +5,38 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 
 Status: Active
 Priority: 1
-## Current Assignment (2026-01-11 - TS2300 Duplicate Identifier False Positives)
+## Current Assignment (2026-01-11 - TS7011 Implicit 'any' Return Type False Positives)
 
-**Target:** Reduce TS2300 "Duplicate identifier" false positives (41 occurrences)
+**Target:** Reduce TS7011 "Implicit 'any' return type" false positives (10 occurrences)
 
-**Status:** INVESTIGATING - Common merge patterns work correctly
+**Status:** STARTING - Just switched from TS2300 investigation
+
+**Problem:** WASM incorrectly reports TS7011 when function return types are inferable from context
+
+**Why TS2300 Didn't Work:** Conformance scan revealed TS2300 is primarily MISSING (27 occurrences) - WASM under-reports duplicates, not over-reports. Need to focus on EXTRA errors (false positives).
+
+**Approach:**
+1. Collect TS7011 samples from conformance tests
+2. Analyze patterns in false positives
+3. Fix return type inference in `thin_checker.rs`
+4. Add regression tests
+
+**Files:** `wasm/src/thin_checker.rs`
+
+**Success Criteria:** Reduce TS7011 from 10 to <5
+
+## Previous Assignment - TS2300 (INVESTIGATED - Not False Positives)
+
+**Status:** Investigated but discovered TS2300 is primarily MISSING errors, not extra
 
 **Investigation Findings:**
 - ✅ Interface merging works: `interface A { x: number } interface A { y: string }` - no error
 - ✅ Namespace merging works: Multiple namespace declarations merge correctly
 - ✅ Class+Interface merging works: `class C {} interface C {}` - no error
-- ❓ Need to identify actual false positive patterns from 40 extra errors
+- ❌ **Key Discovery:** Conformance scan showed 27 MISSING TS2300 errors (WASM under-reports), only 2 extra
 
-**Next Steps:**
-1. Get specific list of test files with TS2300 EXTRA errors (not missing)
-2. Analyze those specific files to identify patterns
-3. Fix duplicate detection logic in `thin_binder.rs` or `thin_checker.rs`
-
-**Files:** `wasm/src/thin_binder.rs`, `wasm/src/thin_checker.rs`
-
-**Success Criteria:** Reduce TS2300 from 40 to <20
+**Conclusion:** TS2300 requires WASM to ADD more duplicate detection, not remove false positives.
+This is different work from reducing false positives. Switched to TS7011 which has more tractable extra errors.
 
 ## Previous Assignment - TS7006 (COMPLETED - Target Achieved)
 
