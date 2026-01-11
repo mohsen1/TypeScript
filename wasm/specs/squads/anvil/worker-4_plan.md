@@ -39,11 +39,38 @@ Ready for Merge: Yes
 
 ## Current Assignment (2026-01-11) - TS2769 Overload Matching (remaining cases)
 
-Status: Active
+Status: COMPLETED
 
-- Collect remaining TS2769 samples (e.g., `node wasm/differential-test/conformance-runner.mjs types --max=500 -v | rg TS2769` or add a `find-ts2769.mjs` helper).
-- Focus on rest/optional parameter matching and generic inference in overload resolution (`wasm/src/thin_checker.rs`, `wasm/src/solver/operations.rs`).
-- Add regression tests in `wasm/src/thin_checker_tests.rs` and report before/after TS2769 delta.
+### Mission
+Fix TS2769 false positives for overloaded constructors/functions when all overloads fail due to argument count mismatch.
+
+### Checklist
+
+- [x] Create find-ts2769.mjs diagnostic scanner
+- [x] Collect TS2769 samples from conformance tests
+- [x] Identify root cause: overloaded calls with arg count mismatch emit TS2769 instead of TS2554
+- [x] Implement fix in resolve_callable_call to detect all-arg-count-mismatch case
+- [x] Add regression test test_overloaded_constructor_arg_count_mismatch_ts2554_not_ts2769
+- [x] Verify fix with conformance scanner
+
+### Results
+
+- Root cause: When all overload signatures fail due to argument count (not type) mismatch, TSC emits TS2554, but we were emitting TS2769
+- Fix: Modified resolve_callable_call to track whether all failures are ArgumentCountMismatch and return unified TS2554 error
+- Conformance impact: 1 → 0 files with extra TS2769 in first 1000 tests
+
+### Files Modified
+
+- `wasm/src/solver/operations.rs` - Fixed resolve_callable_call to emit TS2554 for all-arg-count-mismatch cases
+- `wasm/src/thin_checker_tests.rs` - Added regression test
+- `wasm/differential-test/find-ts2769.mjs` - Added TS2769 diagnostic scanner
+
+### Tests
+
+- `cargo test test_overloaded_constructor_arg_count_mismatch_ts2554_not_ts2769` (PASS)
+- `node wasm/differential-test/find-ts2769.mjs --max=1000` (0 extra TS2769 errors)
+
+Ready for Merge: Yes
 
 ## Current Assignment (2026-01-11) - Recursive Mapped Types Property Access Guard
 
