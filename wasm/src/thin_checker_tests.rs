@@ -14191,6 +14191,15 @@ declare const doc: Document;
 declare const win: Window;
 declare const event: Event;
 declare const nodes: NodeList;
+declare const date: Date;
+declare const regex: RegExp;
+declare const regexExec: RegExpExecArray;
+declare const key: PropertyKey;
+declare const desc: PropertyDescriptor;
+
+type NN = NonNullable<string | null>;
+type Ex = Extract<string | number, string>;
+type Th = ThisType<{ x: number }>;
 
 // Type alias with builtin generic
 type MyPromise<T> = Promise<T>;
@@ -14227,6 +14236,46 @@ interface MyError extends Error {
     assert!(
         ts2304_errors.is_empty(),
         "Should not emit TS2304 errors for builtin types, got: {:?}",
+        ts2304_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn test_builtin_types_in_type_literal_no_ts2304() {
+    // Ensure builtin generics used inside type literals don't emit TS2304 when lib is absent.
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type Box<T> = { value: T };
+type Foo = {
+  promise: Promise<string>;
+  map: Map<string, number>;
+  list: ReadonlyArray<number>;
+  partial: Partial<{ x: number }>;
+  node: NodeList;
+  doc: Document;
+};
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2304_errors: Vec<_> = checker.ctx.diagnostics
+        .iter()
+        .filter(|d| d.code == 2304)
+        .collect();
+
+    assert!(
+        ts2304_errors.is_empty(),
+        "Unexpected TS2304 for builtin types in type literals, got: {:?}",
         ts2304_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>()
     );
 }
