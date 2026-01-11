@@ -17203,17 +17203,18 @@ impl<'a> ThinCheckerState<'a> {
             }
 
             self.pop_return_type();
-        } else if self.ctx.no_implicit_any && !has_type_annotation {
-            if let Some(class_info) = self.ctx.enclosing_class.as_ref() {
-                if class_info.is_declared && !self.has_private_modifier(&method.modifiers) {
-                    if let Some(name) = self.property_name_for_error(method.name) {
-                        use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages, format_message};
-                        let message =
-                            format_message(diagnostic_messages::IMPLICIT_ANY_RETURN, &[&name, "any"]);
-                        self.error_at_node(method.name, &message, diagnostic_codes::IMPLICIT_ANY_RETURN);
-                    }
-                }
-            }
+        } else {
+            // Abstract method or method overload signature
+            // Report TS7010 for abstract methods without return type annotation
+            let method_name = self.get_property_name(method.name);
+            self.maybe_report_implicit_any_return(
+                method_name,
+                Some(method.name),
+                return_type,
+                has_type_annotation,
+                false,
+                member_idx,
+            );
         }
 
         self.pop_type_parameters(type_param_updates);
