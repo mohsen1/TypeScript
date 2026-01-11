@@ -1651,6 +1651,11 @@ impl<'a> PropertyAccessEvaluator<'a> {
         Some(MappedAccessGuard { evaluator: self, obj_type })
     }
 
+    /// Check if a property name is a private field (starts with #)
+    fn is_private_field(&self, prop_name: &str) -> bool {
+        prop_name.starts_with('#')
+    }
+
     fn resolve_property_access_inner(
         &self,
         obj_type: TypeId,

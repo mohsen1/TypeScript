@@ -6875,6 +6875,11 @@ impl<'a> ThinCheckerState<'a> {
                 }
 
                 PropertyAccessResult::PropertyNotFound { .. } => {
+                    // Check for optional chaining (?.) - suppress TS2339 error when using optional chaining
+                    if access.question_dot_token {
+                        // With optional chaining, missing property results in undefined
+                        return TypeId::UNDEFINED;
+                    }
                     // Don't emit TS2339 for private fields (starting with #) - they're handled elsewhere
                     if !property_name.starts_with('#') {
                         self.error_property_not_exist_at(property_name, object_type_for_access, idx);
