@@ -159,16 +159,17 @@ bash run-conformance.sh --all --workers=14
 
 ---
 ## Squad Status
-- Last Update: 2026-01-11 (Forge-2 MAJOR WIN unblocked!)
+- Last Update: 2026-01-11 (🎉 HISTORIC: squad/forge → RUST!)
 - Conformance: **23.3% exact match** (up from 18.1%)
-- Workers Active: 3/5 (W1, W2, W3) - **W5 still idle**
-- **MAJOR WIN** (Just merged!):
-  - ✅ W2: **TS2322 ERROR instead of Any fix** - Solver now uses ERROR for failed generic inference instead of Any (which silenced type errors). **14 solver tests fixed!**
-  - ✅ W1: **TS2300 COMPLETE** - Parameter duplicate detection, 9 tests passing
-  - ✅ W3: **TS7010 async getters fix** - Just completed
-- **IDLE ALERT**:
-  - ⚠️⚠️ W5: IDLE 202m - TS2304 (138 tests), crash regression (143→483, +237%)
-- **Anvil Comparison**:
-  - ✅ Anvil-1: TS7006 **74% reduction** (46→12) - MERGED!
-  - ✅ Anvil-4: TS2769 complete
-- **FORGE IS CRUSHING IT NOW!** W2's unpushed work has been merged - major TS2322 progress!
+- **🏆 HISTORIC ACHIEVEMENT**: squad/forge MERGED INTO RUST!
+- **Both squads (anvil + forge) now in main branch!**
+- Workers Active: 1/5 (W1) - **W3, W4, W5 idle**
+- **CRITICAL WINS NOW IN RUST** (Commit: 2891830097):
+  - ✅ W2: **TS2322 ERROR instead of Any fix** - Solver correctness fix!
+  - ✅ W1: **TS2300 COMPLETE** - Parameter duplicate detection
+  - ✅ W3: **TS7010 async getters fix** - Ready for validation
+- **IDLE ALERT** (Celebration time over, back to work!):
+  - ⚠️ W3: IDLE 57m - Test TS7010 async getter fix
+  - ⚠️ W4: IDLE 85m - Resume TS2339 work
+  - 🚨 W5: IDLE 247m - Investigate crashes + TS2304
+- **FORGE SQUAD**: Historic milestone achieved, now wake up and keep momentum!
