@@ -80,8 +80,26 @@ Reduce remaining TS7006/TS7008 implicit-any diagnostics gaps.
 - Static index signatures: would require adding index signatures to CallableShape
 - Re-run conformance to confirm private names/control-flow narrowing improvements
 
+### TS7006/TS7008 Work (NEW)
+- [x] Created `find-ts7006.mjs` and `find-ts7008.mjs` differential test tools
+- [x] Implemented `has_matching_getter()` helper in `thin_checker.rs`
+- [x] Fixed TS7006 false positives for setter parameters with matching getters
+- [x] Fixed pre-existing compilation errors in `checker/statements.rs`
+- [x] Added tests for setter parameter implicit any behavior
+- TS7006 results (500 conformance tests):
+  * Before: 23 extra (false positives), 7 missing
+  * After: 3 extra (false positives), 7 missing
+  * **Improvement: Reduced false positives by 20 (87% reduction)**
+- TS7008 results (500 conformance tests):
+  * 9 extra (false positives) - mostly class static blocks and private names
+  * 1 missing (not detected)
+- Remaining TS7006 gaps:
+  * 3 extra: complex destructuring patterns with class expressions
+  * 7 missing: async function default parameters, class static blocks
+- Tests: `./wasm/test.sh test_ts7006_setter`, `./wasm/test.sh test_implicit_any_parameters`
+
 ## Ready for Merge
-No
+Yes
 
 ## Notes
 - Similar infrastructure to TS2564 (property init) - share patterns with Workers 1-2

@@ -133,13 +133,18 @@ Most of the time, you should be idle. That's a good sign - it means the org is r
 
 ## Director Loop
 
-Run this cycle **infrequently** (every 30-60 minutes, not continuously).
+Run this cycle when the user says "work" or when you receive notifications.
 
 ### 1. Check if Intervention Needed
 Before doing anything, ask: "Is there a problem that requires my attention?"
 - If EMs are working and workers are active: **do nothing**
 - If Project Direction hasn't changed: **do nothing**
+- **CRITICAL: If workers are merge-ready (idle), assign new tasks IMMEDIATELY**
 - Only proceed if there's an actual issue to address
+
+**Merge-ready = Idle = Your Problem to Solve**
+
+A worker marked "merge-ready" has finished their task and is sitting idle. This is your #1 priority to fix.
 
 ### 2. Sync Knowledge (Only When Needed)
 ```bash
@@ -162,8 +167,43 @@ For each squad, ensure `GOALS.md` reflects the current Project Direction:
 Glance at EM panes (via tmux capture) for:
 - Idle EMs (they need goals update or unblocking)
 - Cross-squad conflicts (same file edited by both squads)
+- **Workers marked "merge-ready" (CRITICAL - they need new tasks NOW)**
 
 **Do NOT** micromanage workers - that's the EM's job.
+
+#### Handling Merge-Ready (Idle) Workers
+
+When you see workers reported as "merge-ready", they are IDLE and need tasks immediately:
+
+```bash
+# Check EM panes for status
+tmux capture-pane -p -t zang-org:director.1 -S -100  # EM-Forge
+tmux capture-pane -p -t zang-org:director.2 -S -100  # EM-Anvil
+
+# If you see "W1: merge-ready" or similar, send specific assignment prompt:
+.notify/send-prompt.sh zang-org:director.1 "W1, W3 are merge-ready (IDLE). Immediately assign new tasks from GOALS.md backlog. For each: (1) Pick next task (TS2454/TS2564/TS7006/TS2792/TS7010), (2) Update worker plan file, (3) Commit and push, (4) Send worker task prompt. Report which workers got which tasks."
+
+# Verify EMs took action (check pane again after 30 seconds):
+sleep 30
+tmux capture-pane -p -t zang-org:director.1 -S -20 | grep -i "assigned\|NOW ASSIGNED"
+```
+
+**Good EM Response (Takes Action):**
+```
+Worker status:
+- W1: was merge-ready → NOW ASSIGNED TS2454 (definite assignment)
+- W3: was merge-ready → NOW ASSIGNED TS2564 (property initialization)
+
+Actions: Updated plans, committed, pushed, sent task prompts. All workers active.
+```
+
+**Bad EM Response (Just Reports):**
+```
+Worker status:
+- W1: merge-ready
+- W3: merge-ready
+```
+⚠️ **This is a problem!** EM reported status but didn't assign tasks. Send follow-up prompt.
 
 ### 5. Coordinate Cross-Squad Work (Only if Conflict)
 If both squads need to touch the same area:
@@ -297,9 +337,113 @@ tmux send-keys -t zang-org:director.1 Escape  # EM-Forge
 tmux send-keys -t zang-org:director.2 Escape  # EM-Anvil
 ```
 
+## Effective Prompt Templates
+
+Use these specific, actionable prompts when communicating with EMs:
+
+### Status Check with Action Requirement
+```bash
+.notify/send-prompt.sh zang-org:director.1 "Status check: Capture all 5 worker panes. For each worker report: (1) current task, (2) status (active/merge-ready/blocked), (3) last commit. For any merge-ready workers, immediately assign new task from GOALS.md backlog. Report format: 'W1: [task] - [status] (if was merge-ready: → NOW ASSIGNED [new task])'"
+```
+
+### Assigning Tasks to Specific Idle Workers
+```bash
+# If you see W1 and W3 are merge-ready in pane output:
+.notify/send-prompt.sh zang-org:director.1 "W1 and W3 are IDLE (merge-ready). Assign now: (1) Read GOALS.md for next tasks, (2) Update worker-1_plan.md and worker-3_plan.md with new assignments, (3) git add/commit/push plans, (4) Send task prompts to workers, (5) Report which tasks assigned."
+```
+
+### Checking for Idle Workers
+```bash
+.notify/send-prompt.sh zang-org:director.1 "Check all workers now. Any showing 'merge-ready' or 'ready for merge' in status = IDLE. These workers need tasks immediately. Assign from backlog (TS2454/TS2564/TS7006/TS2792/TS7010/TS2300/TS2304/TS2339/TS2322/TS2695). Update plans, sync from rust, send prompts. Report which workers were idle and what you assigned them."
+
+.notify/send-prompt.sh zang-org:director.2 "Check all workers now. Any showing 'merge-ready' or 'ready for merge' in status = IDLE. These workers need tasks immediately. Assign from backlog (ES5 bugs, LSP features, CLI flags, source maps, diagnostic formatting). Update plans, sync from rust, send prompts. Report which workers were idle and what you assigned them."
+```
+
+### After Merging (Workers Become Idle Again)
+```bash
+.notify/send-prompt.sh zang-org:director.1 "You just merged worker branches. Those workers are now IDLE. Immediately assign them new tasks from GOALS.md backlog. Each merged worker needs a new assignment right now."
+```
+
+### Unblocking Workers
+```bash
+.notify/send-prompt.sh zang-org:director.1 "W4 is blocked by [specific issue]. Send W4 this guidance: '[how to fix]'. Then verify W4 is unblocked by checking their pane in 5 minutes. Report when resolved."
+```
+
+## Quick Reference: Common Issues
+
+### Issue: EM Reports "W1, W3, W5 merge-ready" But Doesn't Assign Tasks
+
+**Problem:** EM just reported status without taking action.
+
+**Solution:**
+```bash
+.notify/send-prompt.sh zang-org:director.1 "You reported 3 workers merge-ready but didn't assign tasks. This means 3 workers are IDLE right now. Immediately assign: W1 gets [task], W3 gets [task], W5 gets [task]. Update their plans, commit, push, send prompts. Do this now, not later."
+```
+
+### Issue: Can't Tell If Workers Are Actually Idle
+
+**Problem:** Pane output doesn't clearly show worker status.
+
+**Solution:**
+```bash
+# Check individual worker panes directly (not through EM)
+tmux capture-pane -p -t zang-org:forge.1 -S -50  # Worker Forge-1
+tmux capture-pane -p -t zang-org:forge.2 -S -50  # Worker Forge-2
+# ... etc
+
+# Look for these patterns:
+# - Recent commits = active
+# - "mark ready", "pushed branch" = idle (merge-ready)
+# - Error messages, stack traces = blocked
+```
+
+### Issue: EM Not Responding to Prompts
+
+**Problem:** Codex agent doesn't see tmux prompts as user input.
+
+**Solution:**
+1. Try sending prompt again (maybe agent was busy)
+2. Check if EM pane shows recent activity (timestamp)
+3. If no activity for 10+ minutes, escalate to user
+4. As last resort: Update worker plan files directly and notify user
+
+### Issue: Same Workers Idle Multiple Loops in a Row
+
+**Problem:** EM isn't managing workers proactively.
+
+**Solution:**
+```bash
+.notify/send-prompt.sh zang-org:director.1 "CRITICAL: W1 has been merge-ready for 3+ loops (30+ minutes idle). This is unacceptable. Assign W1 a new task from GOALS.md backlog RIGHT NOW. Update worker-1_plan.md, commit, push, send prompt. Report task assigned within 2 minutes."
+```
+
+## Task Backlogs for Quick Assignment
+
+When EMs need task ideas, reference these:
+
+### Forge Squad (Type System) - Priority Order
+1. TS2300: Duplicate identifier (easy) - 105 tests
+2. TS7006/TS7008: Implicit any (easy) - 526 tests
+3. TS2792: Module resolution (easy) - 204 tests
+4. TS2454: Definite assignment (medium) - 573 tests
+5. TS2564: Property initialization (medium) - 443 tests
+6. TS7010: Return type checking (medium) - 179 tests
+7. TS2304: Cannot find name (hard) - 138 tests
+8. TS2339: Property does not exist (hard) - 142 tests
+9. TS2322: Type assignability (hard) - 310 tests
+10. TS2695: Comma operator edge cases (hard)
+
+### Anvil Squad (Output/Tooling) - Priority Order
+1. CLI flag support (easy)
+2. Diagnostic output formatting (easy)
+3. Source map accuracy (medium)
+4. ES5 downleveling bugs (medium)
+5. LSP autocomplete (hard)
+6. LSP goto-definition (hard)
+
 ## When to Intervene
 
 Escalate or coordinate when:
+- **Workers are merge-ready (idle) and EM hasn't assigned new tasks** ← YOUR #1 PRIORITY
 - An EM is idle for more than 2 cycles
 - Workers in different squads edit the same file
 - A critical objective is blocked across squads
@@ -324,30 +468,56 @@ Watch for these duplicate-work signals:
 - Both EMs editing the same file
 - Both EMs saying "fixing build" at the same time
 
-## 🔔 Notification System (CRITICAL)
+## 🔔 Notification System (IMPORTANT NOTES)
 
-**Your EMs will notify you when they need attention. You receive notifications automatically via tmux.**
+**The notification system is UNRELIABLE with Codex agents.** They don't respond well to programmatic tmux prompts.
 
-When you receive a notification:
-1. **Read the notification** - It tells you what the EM needs
-2. **Take action** - Help with blockers, acknowledge merges, or provide guidance
-3. **The notification watcher handles routing** - You don't need to poll or check manually
+### How It's Supposed to Work
+- EMs write notifications to `.notify/em-forge.notify` and `.notify/em-anvil.notify`
+- You can read these files to see notification history
+- `send-prompt.sh` tries to send prompts to EM panes
 
-**You will receive notifications like:**
+### Reality with Codex
+- Codex agents often don't respond to `tmux send-keys` (they expect human input)
+- The `send-prompt.sh` script is "best effort" - it may or may not work
+- **Most reliable approach: Check EM panes directly with tmux capture**
+
+### Best Practice Workflow
+
+```bash
+# 1. Check notification files for history
+cat .notify/em-forge.notify | tail -5
+cat .notify/em-anvil.notify | tail -5
+
+# 2. Check EM panes directly (most reliable)
+tmux capture-pane -p -t zang-org:director.1 -S -100  # EM-Forge
+tmux capture-pane -p -t zang-org:director.2 -S -100  # EM-Anvil
+
+# 3. Look for keywords:
+#    - "merge-ready" = idle workers (assign tasks)
+#    - "blocked" = needs help
+#    - "Worked for Xm Ys" = recent activity timestamp
+
+# 4. Send prompts optimistically (may not work, but try anyway)
+.notify/send-prompt.sh zang-org:director.1 "your prompt here"
+
+# 5. Verify prompt was received and acted upon
+sleep 30
+tmux capture-pane -p -t zang-org:director.1 -S -20
 ```
-[10:30:15] NOTIFICATION from em/forge: Merge ready. Merged workers 1,3,4 into squad/forge, pushed
-[10:45:22] STATUS from em/anvil: Resolved build blocker, all workers unblocked
-[11:00:00] NOTIFICATION from em/forge: BLOCKED - Cross-squad conflict with Anvil on types.rs
-```
 
-**No need to send notifications yourself** - You are at the top of the hierarchy. The notification system is for upward communication (workers → EMs → Director).
+### Notification Types (When They Work)
+- **merge_ready**: EM merged workers into squad branch, pushed
+- **status_update**: General status update
+- **blocked**: EM or workers blocked, need help
 
-**Your response to notifications:**
-- **merge**: Run the coordinated merge (see "MERGE TIME!" section)
-- **status**: Acknowledge and log if needed
-- **blocked**: Help resolve the cross-squad issue
+### Your Response to Notifications
+- **merge**: Run coordinated merge (see "MERGE TIME!" section)
+- **status**: Acknowledge if needed
+- **blocked**: Help resolve cross-squad issues
+- **Workers idle/merge-ready**: Tell EM to assign new tasks immediately
 
-The notification system replaces the old time-based idle monitoring. EMs will proactively notify you when they have updates.
+**Don't rely on notifications alone** - actively check EM panes every loop.
 
 ## Safety Rules
 - Never run `cargo test` or `cargo bench` directly

@@ -5,6 +5,7 @@
 
 use crate::parser::NodeIndex;
 use crate::parser::syntax_kind_ext;
+use super::control_flow;
 use super::context::CheckerContext;
 
 /// Statement type checker that operates on the shared context.
@@ -65,8 +66,19 @@ impl<'a, 'ctx> StatementChecker<'a, 'ctx> {
         }
     }
 
-    // Note: fallthrough analysis has been moved to ThinCheckerState in thin_checker.rs
-    // These methods were delegating to control_flow module but that module has been refactored.
+    // TODO: These methods are temporarily commented out because they depend on
+    // control_flow functions that don't exist yet. The functionality is available
+    // in ThinCheckerState. This will be refactored properly later.
+
+    // /// Check whether a function body can fall through to the end.
+    // pub fn function_body_falls_through(&self, body_idx: NodeIndex) -> bool {
+    //     control_flow::function_body_falls_through(self.ctx.arena, body_idx)
+    // }
+
+    // /// Check whether a statement can fall through to the next statement.
+    // pub fn statement_falls_through(&self, stmt_idx: NodeIndex) -> bool {
+    //     control_flow::statement_falls_through(self.ctx.arena, stmt_idx)
+    // }
 
     /// Check a block statement.
     fn check_block(&mut self, block_idx: NodeIndex) {

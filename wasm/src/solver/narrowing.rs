@@ -291,12 +291,39 @@ impl<'a> NarrowingContext<'a> {
 
     /// Narrow a type to exclude members assignable to target.
     pub fn narrow_excluding_type(&self, source_type: TypeId, excluded_type: TypeId) -> TypeId {
+        if let Some(TypeKey::Intersection(members)) = self.interner.lookup(source_type) {
+            let members = self.interner.type_list(members);
+            let mut narrowed_members = Vec::with_capacity(members.len());
+            let mut changed = false;
+            for &member in members.iter() {
+                let narrowed = self.narrow_excluding_type(member, excluded_type);
+                if narrowed == TypeId::NEVER {
+                    return TypeId::NEVER;
+                }
+                if narrowed != member {
+                    changed = true;
+                }
+                narrowed_members.push(narrowed);
+            }
+            if !changed {
+                return source_type;
+            }
+            return self.interner.intersection(narrowed_members);
+        }
+
         // If source is a union, filter out matching members
         if let Some(TypeKey::Union(members)) = self.interner.lookup(source_type) {
             let members = self.interner.type_list(members);
             let remaining: Vec<TypeId> = members
                 .iter()
                 .filter_map(|&member| {
+                    if matches!(self.interner.lookup(member), Some(TypeKey::Intersection(_))) {
+                        let narrowed = self.narrow_excluding_type(member, excluded_type);
+                        if narrowed == TypeId::NEVER {
+                            return None;
+                        }
+                        return Some(narrowed);
+                    }
                     if let Some(narrowed) = self.narrow_type_param_excluding(member, excluded_type) {
                         if narrowed == TypeId::NEVER {
                             return None;

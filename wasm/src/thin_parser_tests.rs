@@ -338,6 +338,83 @@ fn test_thin_parser_static_block_with_modifiers() {
 }
 
 #[test]
+fn test_thin_parser_enum_computed_property_reports_ts1164() {
+    let source = "enum E { [e] = 1 }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    parser.parse_source_file();
+
+    let codes: Vec<u32> = parser.get_diagnostics().iter().map(|diag| diag.code).collect();
+    assert!(
+        codes.contains(&diagnostic_codes::COMPUTED_PROPERTY_NAME_IN_ENUM),
+        "Expected TS1164 diagnostics: {:?}",
+        parser.get_diagnostics()
+    );
+    assert!(
+        !codes.contains(&diagnostic_codes::TOKEN_EXPECTED),
+        "Unexpected TS1005 diagnostics: {:?}",
+        parser.get_diagnostics()
+    );
+}
+
+#[test]
+fn test_thin_parser_type_assertion_in_new_expression_reports_ts1109() {
+    let source = "new <T>Foo()";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    parser.parse_source_file();
+
+    let codes: Vec<u32> = parser.get_diagnostics().iter().map(|diag| diag.code).collect();
+    assert!(
+        codes.contains(&diagnostic_codes::EXPRESSION_EXPECTED),
+        "Expected TS1109 diagnostics: {:?}",
+        parser.get_diagnostics()
+    );
+    assert!(
+        !codes.contains(&diagnostic_codes::TOKEN_EXPECTED),
+        "Unexpected TS1005 diagnostics: {:?}",
+        parser.get_diagnostics()
+    );
+}
+
+#[test]
+fn test_thin_parser_generic_default_missing_type_reports_ts1110() {
+    let source = "type Box<T = > = T;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    parser.parse_source_file();
+
+    let codes: Vec<u32> = parser.get_diagnostics().iter().map(|diag| diag.code).collect();
+    assert!(
+        codes.contains(&diagnostic_codes::TYPE_EXPECTED),
+        "Expected TS1110 diagnostics: {:?}",
+        parser.get_diagnostics()
+    );
+    assert!(
+        !codes.contains(&diagnostic_codes::TOKEN_EXPECTED),
+        "Unexpected TS1005 diagnostics: {:?}",
+        parser.get_diagnostics()
+    );
+}
+
+#[test]
+fn test_thin_parser_jsx_like_syntax_in_ts_recovers() {
+    let source = "const x = <div />;\nconst y = 1;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    parser.parse_source_file();
+
+    let codes: Vec<u32> = parser.get_diagnostics().iter().map(|diag| diag.code).collect();
+    assert!(
+        codes.contains(&diagnostic_codes::TOKEN_EXPECTED),
+        "Expected TS1005 diagnostics: {:?}",
+        parser.get_diagnostics()
+    );
+
+    let arena = parser.get_arena();
+    assert!(
+        arena.identifiers.iter().any(|ident| ident.escaped_text == "y"),
+        "Expected identifier 'y' to be parsed after JSX-like syntax"
+    );
+}
+
+#[test]
 fn test_thin_parser_object_binding_pattern_span() {
     let source = "const { foo } = bar;";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -2871,4 +2948,44 @@ fn test_thin_parser_await_type_in_async_context() {
     assert!(!root.is_none());
     assert!(parser.get_diagnostics().is_empty(),
         "'await' as type in async context should not error: {:?}", parser.get_diagnostics());
+}
+
+// Error Recovery Tests for TS1005/TS1109/TS1068/TS1128 (ArrowFunctions + Expressions)
+
+#[test]
+fn test_thin_parser_arrow_function_missing_param_type() {
+    // ArrowFunction1.ts: var v = (a: ) => {};
+    // Should emit TS1110 (Type expected), not TS1005
+    let source = "var v = (a: ) => {};";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    parser.parse_source_file();
+
+    let codes: Vec<u32> = parser.get_diagnostics().iter().map(|diag| diag.code).collect();
+    assert!(
+        codes.contains(&diagnostic_codes::TYPE_EXPECTED),
+        "Expected TS1110 for missing parameter type: {:?}",
+        parser.get_diagnostics()
+    );
+    // Should not emit generic "identifier expected" TS1005
+    assert!(
+        !codes.contains(&diagnostic_codes::TOKEN_EXPECTED),
+        "Should not emit TS1005 for missing type, got: {:?}",
+        parser.get_diagnostics()
+    );
+}
+
+#[test]
+fn test_thin_parser_arrow_function_missing_param_type_paren() {
+    // parserX_ArrowFunction1.ts: var v = (a: ) => {};
+    // Similar to above, ensure we emit TS1110
+    let source = "var v = (a: ) => { };";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    parser.parse_source_file();
+
+    let codes: Vec<u32> = parser.get_diagnostics().iter().map(|diag| diag.code).collect();
+    assert!(
+        codes.contains(&diagnostic_codes::TYPE_EXPECTED),
+        "Expected TS1110 for missing parameter type: {:?}",
+        parser.get_diagnostics()
+    );
 }

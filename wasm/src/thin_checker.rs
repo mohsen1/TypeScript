@@ -349,6 +349,47 @@ impl<'a> ThinCheckerState<'a> {
         None
     }
 
+    fn resolve_identifier_symbol_allow_unexported(&self, idx: NodeIndex) -> Option<SymbolId> {
+        let node = self.ctx.arena.get(idx)?;
+        let name = self.ctx.arena.get_identifier(node)?.escaped_text.as_str();
+
+        let mut scope_id = self.find_enclosing_scope(idx)?;
+        while !scope_id.is_none() {
+            if let Some(scope) = self.ctx.binder.scopes.get(scope_id.0 as usize) {
+                if let Some(sym_id) = scope.table.get(name) {
+                    if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
+                        if !Self::is_class_member_symbol(symbol.flags) {
+                            return Some(sym_id);
+                        }
+                    } else {
+                        return Some(sym_id);
+                    }
+                }
+                if scope.kind == ContainerKind::Module {
+                    if let Some(container_sym_id) = self.ctx.binder.get_node_symbol(scope.container_node) {
+                        if let Some(container_symbol) = self.ctx.binder.get_symbol(container_sym_id) {
+                            if let Some(exports) = container_symbol.exports.as_ref() {
+                                if let Some(member_id) = exports.get(name) {
+                                    if let Some(member_symbol) = self.ctx.binder.get_symbol(member_id) {
+                                        if !Self::is_class_member_symbol(member_symbol.flags) {
+                                            return Some(member_id);
+                                        }
+                                    } else {
+                                        return Some(member_id);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                scope_id = scope.parent;
+            } else {
+                break;
+            }
+        }
+        None
+    }
+
     fn resolve_private_identifier_symbols(&self, idx: NodeIndex) -> (Vec<SymbolId>, bool) {
         let node = match self.ctx.arena.get(idx) {
             Some(node) => node,
@@ -692,6 +733,15 @@ impl<'a> ThinCheckerState<'a> {
                     let type_param = self.lookup_type_parameter(name);
                     let sym_id = self.resolve_identifier_symbol(type_name_idx);
                     if !is_builtin_array && type_param.is_none() && sym_id.is_none() {
+                        if name == "Extract" {
+                            if let Some(args) = &type_ref.type_arguments {
+                                if args.nodes.len() == 2 {
+                                    let source = self.get_type_from_type_node(args.nodes[0]);
+                                    let target = self.get_type_from_type_node(args.nodes[1]);
+                                    return self.ctx.types.intersection2(source, target);
+                                }
+                            }
+                        }
                         if self.is_known_global_type_name(name) {
                             if let Some(args) = &type_ref.type_arguments {
                                 for &arg_idx in &args.nodes {
@@ -1299,6 +1349,72 @@ impl<'a> ThinCheckerState<'a> {
         None
     }
 
+    fn resolve_heritage_symbol_allow_unexported(&self, idx: NodeIndex) -> Option<SymbolId> {
+        let node = self.ctx.arena.get(idx)?;
+
+        if node.kind == SyntaxKind::Identifier as u16 {
+            return self.resolve_identifier_symbol_allow_unexported(idx);
+        }
+
+        if node.kind == syntax_kind_ext::QUALIFIED_NAME {
+            let qn = self.ctx.arena.get_qualified_name(node)?;
+            let left_sym = self.resolve_heritage_symbol_allow_unexported(qn.left)?;
+            let right_name = self.ctx.arena.get(qn.right)
+                .and_then(|node| self.ctx.arena.get_identifier(node))
+                .map(|ident| ident.escaped_text.clone())?;
+            let left_symbol = self.ctx.binder.get_symbol(left_sym)?;
+            let exports = left_symbol.exports.as_ref()?;
+            return exports.get(&right_name);
+        }
+
+        if node.kind == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION {
+            let access = self.ctx.arena.get_access_expr(node)?;
+            let left_sym = self.resolve_heritage_symbol_allow_unexported(access.expression)?;
+            let name = self.ctx.arena.get(access.name_or_argument)
+                .and_then(|name_node| self.ctx.arena.get_identifier(name_node))
+                .map(|ident| ident.escaped_text.clone())?;
+            let left_symbol = self.ctx.binder.get_symbol(left_sym)?;
+            let exports = left_symbol.exports.as_ref()?;
+            return exports.get(&name);
+        }
+
+        None
+    }
+
+    fn heritage_left_resolves(&self, idx: NodeIndex, allow_unexported: bool) -> bool {
+        use crate::parser::syntax_kind_ext;
+        use crate::scanner::SyntaxKind;
+
+        let Some(node) = self.ctx.arena.get(idx) else {
+            return false;
+        };
+
+        match node.kind {
+            k if k == SyntaxKind::Identifier as u16 => {
+                if allow_unexported {
+                    self.resolve_identifier_symbol_allow_unexported(idx).is_some()
+                } else {
+                    self.resolve_identifier_symbol(idx).is_some()
+                }
+            }
+            syntax_kind_ext::QUALIFIED_NAME => {
+                let qn = match self.ctx.arena.get_qualified_name(node) {
+                    Some(qn) => qn,
+                    None => return false,
+                };
+                self.heritage_left_resolves(qn.left, allow_unexported)
+            }
+            syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION => {
+                let access = match self.ctx.arena.get_access_expr(node) {
+                    Some(access) => access,
+                    None => return false,
+                };
+                self.heritage_left_resolves(access.expression, allow_unexported)
+            }
+            _ => false,
+        }
+    }
+
     fn heritage_name_text(&self, idx: NodeIndex) -> Option<String> {
         let node = self.ctx.arena.get(idx)?;
 
@@ -1463,7 +1579,11 @@ impl<'a> ThinCheckerState<'a> {
                 return None;
             }
         }
-        let expr_type = self.get_type_of_node(expr_idx);
+        let expr_type = if let Some(sym_id) = self.resolve_heritage_symbol_allow_unexported(expr_idx) {
+            self.get_type_of_symbol(sym_id)
+        } else {
+            self.get_type_of_node(expr_idx)
+        };
         let ctor_types = self.constructor_types_from_type(expr_type);
         if ctor_types.is_empty() {
             return None;
@@ -5058,6 +5178,25 @@ impl<'a> ThinCheckerState<'a> {
         (parent_node.flags as u32) & node_flags::CONST != 0
     }
 
+    fn is_block_scoped_variable_declaration(&self, var_decl_idx: NodeIndex) -> bool {
+        use crate::parser::node_flags;
+
+        let Some(ext) = self.ctx.arena.get_extended(var_decl_idx) else {
+            return false;
+        };
+        let parent_idx = ext.parent;
+        if parent_idx.is_none() {
+            return false;
+        }
+        let Some(parent_node) = self.ctx.arena.get(parent_idx) else {
+            return false;
+        };
+        if parent_node.kind != syntax_kind_ext::VARIABLE_DECLARATION_LIST {
+            return false;
+        }
+        (parent_node.flags as u32 & (node_flags::LET | node_flags::CONST)) != 0
+    }
+
     fn is_catch_clause_variable_declaration(&self, var_decl_idx: NodeIndex) -> bool {
         let Some(ext) = self.ctx.arena.get_extended(var_decl_idx) else {
             return false;
@@ -5205,6 +5344,17 @@ impl<'a> ThinCheckerState<'a> {
                 }
                 false
             }
+            TypeKey::KeyOf(_) => {
+                let expanded = self.evaluate_type_with_env(ctx_type);
+                if expanded != ctx_type {
+                    return self.contextual_type_allows_literal_inner(
+                        expanded,
+                        literal_type,
+                        visited,
+                    );
+                }
+                false
+            }
             _ => false,
         }
     }
@@ -5283,29 +5433,31 @@ impl<'a> ThinCheckerState<'a> {
         self.ensure_application_symbols_resolved(right_type);
         self.ensure_application_symbols_resolved(left_type);
 
-        self.check_readonly_assignment(left_idx, expr_idx);
+        let readonly = self.check_readonly_assignment(left_idx, expr_idx);
 
         if left_type != TypeId::ANY {
-            if let Some((source_level, target_level)) =
-                self.constructor_accessibility_mismatch_for_assignment(left_idx, right_idx)
-            {
-                self.error_constructor_accessibility_not_assignable(
-                    right_type,
-                    left_type,
-                    source_level,
-                    target_level,
-                    right_idx,
-                );
-            } else if !self.is_assignable_to(right_type, left_type) {
-                if !self.should_skip_weak_union_error(right_type, left_type, right_idx) {
-                    self.error_type_not_assignable_with_reason_at(right_type, left_type, right_idx);
+            if !readonly {
+                if let Some((source_level, target_level)) =
+                    self.constructor_accessibility_mismatch_for_assignment(left_idx, right_idx)
+                {
+                    self.error_constructor_accessibility_not_assignable(
+                        right_type,
+                        left_type,
+                        source_level,
+                        target_level,
+                        right_idx,
+                    );
+                } else if !self.is_assignable_to(right_type, left_type) {
+                    if !self.should_skip_weak_union_error(right_type, left_type, right_idx) {
+                        self.error_type_not_assignable_with_reason_at(right_type, left_type, right_idx);
+                    }
                 }
-            }
 
-            if left_type != TypeId::UNKNOWN {
-                if let Some(right_node) = self.ctx.arena.get(right_idx) {
-                    if right_node.kind == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION {
-                        self.check_object_literal_excess_properties(right_type, left_type, right_idx);
+                if left_type != TypeId::UNKNOWN {
+                    if let Some(right_node) = self.ctx.arena.get(right_idx) {
+                        if right_node.kind == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION {
+                            self.check_object_literal_excess_properties(right_type, left_type, right_idx);
+                        }
                     }
                 }
             }
@@ -5338,7 +5490,7 @@ impl<'a> ThinCheckerState<'a> {
         self.ensure_application_symbols_resolved(right_type);
         self.ensure_application_symbols_resolved(left_type);
 
-        self.check_readonly_assignment(left_idx, expr_idx);
+        let readonly = self.check_readonly_assignment(left_idx, expr_idx);
 
         let result_type = self.compound_assignment_result_type(left_type, right_type, operator);
         let is_logical_assignment = matches!(
@@ -5354,26 +5506,28 @@ impl<'a> ThinCheckerState<'a> {
         };
 
         if left_type != TypeId::ANY {
-            if let Some((source_level, target_level)) =
-                self.constructor_accessibility_mismatch_for_assignment(left_idx, right_idx)
-            {
-                self.error_constructor_accessibility_not_assignable(
-                    assigned_type,
-                    left_type,
-                    source_level,
-                    target_level,
-                    right_idx,
-                );
-            } else if !self.is_assignable_to(assigned_type, left_type) {
-                if !self.should_skip_weak_union_error(right_type, left_type, right_idx) {
-                    self.error_type_not_assignable_with_reason_at(assigned_type, left_type, right_idx);
+            if !readonly {
+                if let Some((source_level, target_level)) =
+                    self.constructor_accessibility_mismatch_for_assignment(left_idx, right_idx)
+                {
+                    self.error_constructor_accessibility_not_assignable(
+                        assigned_type,
+                        left_type,
+                        source_level,
+                        target_level,
+                        right_idx,
+                    );
+                } else if !self.is_assignable_to(assigned_type, left_type) {
+                    if !self.should_skip_weak_union_error(right_type, left_type, right_idx) {
+                        self.error_type_not_assignable_with_reason_at(assigned_type, left_type, right_idx);
+                    }
                 }
-            }
 
-            if left_type != TypeId::UNKNOWN {
-                if let Some(right_node) = self.ctx.arena.get(right_idx) {
-                    if right_node.kind == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION {
-                        self.check_object_literal_excess_properties(right_type, left_type, right_idx);
+                if left_type != TypeId::UNKNOWN {
+                    if let Some(right_node) = self.ctx.arena.get(right_idx) {
+                        if right_node.kind == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION {
+                            self.check_object_literal_excess_properties(right_type, left_type, right_idx);
+                        }
                     }
                 }
             }
@@ -7824,6 +7978,9 @@ impl<'a> ThinCheckerState<'a> {
 
             // Check that parameter default values are assignable to declared types (TS2322)
             self.check_parameter_initializers(&parameters.nodes);
+
+            // Check for duplicate parameter names (TS2300)
+            self.check_duplicate_parameters(&parameters.nodes);
 
             let mut has_contextual_return = false;
             if !has_type_annotation {
@@ -10933,6 +11090,24 @@ impl<'a> ThinCheckerState<'a> {
         self.ctx.binder.file_locals.get(name)
     }
 
+    fn is_readonly_global_this_property(&self, name: &str) -> bool {
+        let Some(sym_id) = self.resolve_global_value_symbol(name) else {
+            return false;
+        };
+        let Some(symbol) = self.ctx.binder.get_symbol(sym_id) else {
+            return false;
+        };
+        let decl_idx = if !symbol.value_declaration.is_none() {
+            symbol.value_declaration
+        } else {
+            *symbol.declarations.first().unwrap_or(&NodeIndex::NONE)
+        };
+        if decl_idx.is_none() {
+            return false;
+        }
+        self.is_const_variable_declaration(decl_idx)
+    }
+
     fn is_known_global_value_name(&self, name: &str) -> bool {
         matches!(
             name,
@@ -11611,6 +11786,9 @@ impl<'a> ThinCheckerState<'a> {
                         // Check that parameter default values are assignable to declared types (TS2322)
                         self.check_parameter_initializers(&func.parameters.nodes);
 
+                        // Check for duplicate parameter names (TS2300)
+                        self.check_duplicate_parameters(&func.parameters.nodes);
+
                         if !has_type_annotation {
                             return_type = self.infer_return_type_from_body(func.body, None);
                         }
@@ -11989,7 +12167,9 @@ impl<'a> ThinCheckerState<'a> {
                 } else {
                     TypeId::ANY
                 };
-                self.check_binding_pattern(var_decl.name, pattern_type);
+                let check_duplicates = self.is_block_scoped_variable_declaration(decl_idx) || is_catch_variable;
+                let mut seen_names = FxHashSet::default();
+                self.check_binding_pattern(var_decl.name, pattern_type, check_duplicates, &mut seen_names);
             }
         }
     }
@@ -11998,7 +12178,14 @@ impl<'a> ThinCheckerState<'a> {
     ///
     /// This function traverses a binding pattern (object or array destructuring) and verifies
     /// that any default values provided in binding elements are assignable to their expected types.
-    fn check_binding_pattern(&mut self, pattern_idx: NodeIndex, pattern_type: TypeId) {
+    /// When enabled, it also reports duplicate identifiers within the pattern.
+    fn check_binding_pattern(
+        &mut self,
+        pattern_idx: NodeIndex,
+        pattern_type: TypeId,
+        check_duplicates: bool,
+        seen_names: &mut FxHashSet<String>,
+    ) {
         let Some(pattern_node) = self.ctx.arena.get(pattern_idx) else {
             return;
         };
@@ -12009,12 +12196,18 @@ impl<'a> ThinCheckerState<'a> {
 
         // Traverse binding elements
         for &element_idx in &pattern_data.elements.nodes {
-            self.check_binding_element(element_idx, pattern_type);
+            self.check_binding_element(element_idx, pattern_type, check_duplicates, seen_names);
         }
     }
 
     /// Check a single binding element for default value assignability.
-    fn check_binding_element(&mut self, element_idx: NodeIndex, parent_type: TypeId) {
+    fn check_binding_element(
+        &mut self,
+        element_idx: NodeIndex,
+        parent_type: TypeId,
+        check_duplicates: bool,
+        seen_names: &mut FxHashSet<String>,
+    ) {
         let Some(element_node) = self.ctx.arena.get(element_idx) else {
             return;
         };
@@ -12048,12 +12241,33 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
 
-        // If the name is a nested binding pattern, recursively check it
         if let Some(name_node) = self.ctx.arena.get(element_data.name) {
-            if name_node.kind == syntax_kind_ext::OBJECT_BINDING_PATTERN
+            if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
+                if check_duplicates {
+                    use crate::checker::types::diagnostics::{
+                        diagnostic_codes, diagnostic_messages, format_message,
+                    };
+
+                    let name = ident.escaped_text.clone();
+                    if !seen_names.insert(name.clone()) {
+                        let message =
+                            format_message(diagnostic_messages::DUPLICATE_IDENTIFIER, &[&name]);
+                        self.error_at_node(
+                            element_data.name,
+                            &message,
+                            diagnostic_codes::DUPLICATE_IDENTIFIER,
+                        );
+                    }
+                }
+            } else if name_node.kind == syntax_kind_ext::OBJECT_BINDING_PATTERN
                 || name_node.kind == syntax_kind_ext::ARRAY_BINDING_PATTERN
             {
-                self.check_binding_pattern(element_data.name, element_type);
+                self.check_binding_pattern(
+                    element_data.name,
+                    element_type,
+                    check_duplicates,
+                    seen_names,
+                );
             }
         }
     }
@@ -12202,13 +12416,33 @@ impl<'a> ThinCheckerState<'a> {
                     return;
                 }
 
-                for source_prop in source_props {
-                    let exists_in_target = target_shapes.iter().any(|shape| {
-                        shape.properties.iter().any(|prop| prop.name == source_prop.name)
-                    });
-                    if !exists_in_target {
-                        let prop_name = self.ctx.types.resolve_atom(source_prop.name);
-                        self.error_excess_property_at(&prop_name, target, idx);
+                // Find union members that the source could potentially match.
+                // A member is a potential match if all its required properties exist in source.
+                let mut matching_shapes = Vec::new();
+                for shape in &target_shapes {
+                    let all_required_props_present = shape.properties.iter()
+                        .filter(|p| !p.optional)
+                        .all(|target_prop| {
+                            source_props.iter().any(|source_prop| source_prop.name == target_prop.name)
+                        });
+
+                    if all_required_props_present {
+                        matching_shapes.push(shape);
+                    }
+                }
+
+                // Only report excess properties if the source matches at least one union member.
+                // If no member matches, the assignability check will report TS2322.
+                if !matching_shapes.is_empty() {
+                    // Check excess properties against the matching members
+                    for source_prop in source_props {
+                        let exists_in_any_match = matching_shapes.iter().any(|shape| {
+                            shape.properties.iter().any(|prop| prop.name == source_prop.name)
+                        });
+                        if !exists_in_any_match {
+                            let prop_name = self.ctx.types.resolve_atom(source_prop.name);
+                            self.error_excess_property_at(&prop_name, target, idx);
+                        }
                     }
                 }
             }
@@ -12219,21 +12453,32 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Check if an assignment target is a readonly property.
     /// Reports error TS2540 if trying to assign to a readonly property.
-    fn check_readonly_assignment(&mut self, target_idx: NodeIndex, expr_idx: NodeIndex) {
+    fn check_readonly_assignment(&mut self, target_idx: NodeIndex, _expr_idx: NodeIndex) -> bool {
         let Some(target_node) = self.ctx.arena.get(target_idx) else {
-            return;
+            return false;
         };
 
         match target_node.kind {
             syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION => {}
             syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION => {
                 if let Some(access) = self.ctx.arena.get_access_expr(target_node) {
+                    if self.is_global_this_expression(access.expression) {
+                        if let Some(name) =
+                            self.get_literal_string_from_node(access.name_or_argument)
+                        {
+                            if self.is_readonly_global_this_property(&name) {
+                                self.error_readonly_property_at(&name, target_idx);
+                                return true;
+                            }
+                        }
+                    }
+
                     let object_type = self.get_type_of_node(access.expression);
                     if object_type == TypeId::ANY
                         || object_type == TypeId::UNKNOWN
                         || object_type == TypeId::ERROR
                     {
-                        return;
+                        return false;
                     }
 
                     let index_type = self.get_type_of_node(access.name_or_argument);
@@ -12243,27 +12488,35 @@ impl<'a> ThinCheckerState<'a> {
                         index_type,
                     ) {
                         self.error_readonly_property_at(&name, target_idx);
+                        return true;
                     }
                 }
-                return;
+                return false;
             }
-            _ => return,
+            _ => return false,
         }
 
         let Some(access) = self.ctx.arena.get_access_expr(target_node) else {
-            return;
+            return false;
         };
 
         // Get the property name
         let Some(name_node) = self.ctx.arena.get(access.name_or_argument) else {
-            return;
+            return false;
         };
 
         let Some(ident) = self.ctx.arena.get_identifier(name_node) else {
-            return;
+            return false;
         };
 
         let prop_name = ident.escaped_text.clone();
+
+        if self.is_global_this_expression(access.expression)
+            && self.is_readonly_global_this_property(&prop_name)
+        {
+            self.error_readonly_property_at(&prop_name, target_idx);
+            return true;
+        }
 
         // Get the type of the object being accessed
         let obj_type = self.get_type_of_node(access.expression);
@@ -12271,7 +12524,7 @@ impl<'a> ThinCheckerState<'a> {
         // Check if the property is readonly in the object type (solver types)
         if self.is_property_readonly(obj_type, &prop_name) {
             self.error_readonly_property_at(&prop_name, target_idx);
-            return;
+            return true;
         }
 
         // Also check AST-level readonly on class properties
@@ -12279,8 +12532,11 @@ impl<'a> ThinCheckerState<'a> {
         if let Some(class_name) = self.get_class_name_from_expression(access.expression) {
             if self.is_class_property_readonly(&class_name, &prop_name) {
                 self.error_readonly_property_at(&prop_name, target_idx);
+                return true;
             }
         }
+
+        false
     }
 
     /// Get the class name from an expression, if it's a class instance.
@@ -12775,7 +13031,11 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Check heritage clauses (extends/implements) for unresolved names.
     /// Emits TS2304 when a referenced name cannot be resolved.
-    fn check_heritage_clauses_for_unresolved_names(&mut self, heritage_clauses: &Option<crate::parser::NodeList>) {
+    fn check_heritage_clauses_for_unresolved_names(
+        &mut self,
+        heritage_clauses: &Option<crate::parser::NodeList>,
+        allow_unexported_in_extends: bool,
+    ) {
         use crate::parser::syntax_kind_ext::HERITAGE_CLAUSE;
         use crate::scanner::SyntaxKind;
 
@@ -12811,6 +13071,11 @@ impl<'a> ThinCheckerState<'a> {
 
                 // Try to resolve the heritage symbol
                 if self.resolve_heritage_symbol(expr_idx).is_none() {
+                    let allow_unexported = allow_unexported_in_extends
+                        && heritage.token == SyntaxKind::ExtendsKeyword as u16;
+                    if self.heritage_left_resolves(expr_idx, allow_unexported) {
+                        continue;
+                    }
                     if let Some(expr_node) = self.ctx.arena.get(expr_idx) {
                         match expr_node.kind {
                             k if k == SyntaxKind::NullKeyword as u16
@@ -12819,7 +13084,10 @@ impl<'a> ThinCheckerState<'a> {
                                 || k == SyntaxKind::FalseKeyword as u16
                                 || k == SyntaxKind::VoidKeyword as u16
                                 || k == SyntaxKind::NumericLiteral as u16
-                                || k == SyntaxKind::StringLiteral as u16 => {
+                                || k == SyntaxKind::BigIntLiteral as u16
+                                || k == SyntaxKind::StringLiteral as u16
+                                || k == SyntaxKind::NoSubstitutionTemplateLiteral as u16
+                                || k == SyntaxKind::RegularExpressionLiteral as u16 => {
                                 continue;
                             }
                             _ => {}
@@ -12948,7 +13216,7 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         // Check heritage clauses for unresolved names (TS2304)
-        self.check_heritage_clauses_for_unresolved_names(&class.heritage_clauses);
+        self.check_heritage_clauses_for_unresolved_names(&class.heritage_clauses, true);
 
         let (_type_params, type_param_updates) = self.push_type_parameters(&class.type_parameters);
 
@@ -14206,7 +14474,7 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         // Check heritage clauses for unresolved names (TS2304)
-        self.check_heritage_clauses_for_unresolved_names(&iface.heritage_clauses);
+        self.check_heritage_clauses_for_unresolved_names(&iface.heritage_clauses, false);
 
         let (_type_params, type_param_updates) = self.push_type_parameters(&iface.type_parameters);
 
@@ -16515,6 +16783,104 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    /// Check for duplicate parameter names (TS2300).
+    /// This checks both simple parameter names and names within destructuring patterns.
+    fn check_duplicate_parameters(&mut self, parameters: &[NodeIndex]) {
+        use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages, format_message};
+        use rustc_hash::FxHashMap;
+
+        let mut seen_names: FxHashMap<String, NodeIndex> = FxHashMap::default();
+
+        for &param_idx in parameters {
+            let Some(param_node) = self.ctx.arena.get(param_idx) else {
+                continue;
+            };
+            let Some(param) = self.ctx.arena.get_parameter(param_node) else {
+                continue;
+            };
+
+            // Skip 'this' parameter
+            if self.is_this_parameter_name(param.name) {
+                continue;
+            }
+
+            // Collect all names from this parameter (including destructured names)
+            self.collect_parameter_names(param.name, &mut seen_names);
+        }
+    }
+
+    /// Recursively collect parameter names from a binding pattern or identifier.
+    /// Reports TS2300 for duplicate names.
+    fn collect_parameter_names(&mut self, name_idx: NodeIndex, seen_names: &mut rustc_hash::FxHashMap<String, NodeIndex>) {
+        use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages, format_message};
+
+        if name_idx.is_none() {
+            return;
+        }
+
+        let Some(name_node) = self.ctx.arena.get(name_idx) else {
+            return;
+        };
+
+        match name_node.kind {
+            kind if kind == SyntaxKind::Identifier as u16 => {
+                // Simple identifier parameter
+                if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
+                    let name = ident.escaped_text.clone();
+                    if let Some(&first_occurrence) = seen_names.get(&name) {
+                        // Duplicate found - report error on both occurrences
+                        let message = format_message(diagnostic_messages::DUPLICATE_IDENTIFIER, &[&name]);
+                        self.error_at_node(name_idx, &message, diagnostic_codes::DUPLICATE_IDENTIFIER);
+                        // Also report on first occurrence if we haven't already
+                        if !self.has_error_at_node(first_occurrence, diagnostic_codes::DUPLICATE_IDENTIFIER) {
+                            self.error_at_node(first_occurrence, &message, diagnostic_codes::DUPLICATE_IDENTIFIER);
+                        }
+                    } else {
+                        seen_names.insert(name, name_idx);
+                    }
+                }
+            }
+            kind if kind == syntax_kind_ext::OBJECT_BINDING_PATTERN => {
+                // Object destructuring: { a, b: c, ...rest }
+                if let Some(pattern) = self.ctx.arena.get_binding_pattern(name_node) {
+                    for &element_idx in &pattern.elements.nodes {
+                        if let Some(element_node) = self.ctx.arena.get(element_idx) {
+                            if let Some(element) = self.ctx.arena.get_binding_element(element_node) {
+                                self.collect_parameter_names(element.name, seen_names);
+                            }
+                        }
+                    }
+                }
+            }
+            kind if kind == syntax_kind_ext::ARRAY_BINDING_PATTERN => {
+                // Array destructuring: [a, b, ...rest]
+                if let Some(pattern) = self.ctx.arena.get_binding_pattern(name_node) {
+                    for &element_idx in &pattern.elements.nodes {
+                        if let Some(element_node) = self.ctx.arena.get(element_idx) {
+                            if let Some(element) = self.ctx.arena.get_binding_element(element_node) {
+                                self.collect_parameter_names(element.name, seen_names);
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {
+                // Other kinds (like omitted array elements) - skip
+            }
+        }
+    }
+
+    /// Check if a node already has an error with a specific diagnostic code.
+    fn has_error_at_node(&self, node_idx: NodeIndex, code: u32) -> bool {
+        let Some((node_start, node_end)) = self.get_node_span(node_idx) else {
+            return false;
+        };
+
+        self.ctx.diagnostics.iter().any(|d| {
+            d.code == code && d.start == node_start && d.length == node_end.saturating_sub(node_start)
+        })
+    }
+
     fn node_text(&self, node_idx: NodeIndex) -> Option<String> {
         let (start, end) = self.get_node_span(node_idx)?;
         let source = self.ctx.arena.source_files.first()?.text.as_str();
@@ -17272,10 +17638,17 @@ impl<'a> ThinCheckerState<'a> {
         // Parameter properties are only allowed in constructors, not in accessors
         self.check_parameter_properties(&accessor.parameters.nodes);
 
+        // Check for implicit any in parameters
+        // For setters, skip implicit any check if there's a matching getter (parameter type inferred from getter)
+        let is_setter = node.kind == syntax_kind_ext::SET_ACCESSOR;
+        let has_matching_getter = is_setter && self.has_matching_getter(member_idx, accessor.name);
+
         for &param_idx in &accessor.parameters.nodes {
             if let Some(param_node) = self.ctx.arena.get(param_idx) {
                 if let Some(param) = self.ctx.arena.get_parameter(param_node) {
-                    self.maybe_report_implicit_any_parameter(param, false);
+                    // Skip implicit any check for setter parameters with matching getters
+                    let has_contextual_type = has_matching_getter;
+                    self.maybe_report_implicit_any_parameter(param, has_contextual_type);
                 }
             }
         }
@@ -17371,6 +17744,78 @@ impl<'a> ThinCheckerState<'a> {
                 );
             }
         }
+    }
+
+    /// Check if a setter has a matching getter in the same class/interface/type literal.
+    /// Used to determine if setter parameter type can be inferred from getter return type.
+    fn has_matching_getter(&self, setter_idx: NodeIndex, setter_name: NodeIndex) -> bool {
+        // Get the property name of the setter
+        let Some(name) = self.get_property_name(setter_name) else {
+            return false;
+        };
+
+        // Get parent node (should be class/interface/type literal body)
+        let Some(setter_ext) = self.ctx.arena.get_extended(setter_idx) else {
+            return false;
+        };
+        if setter_ext.parent.is_none() {
+            return false;
+        }
+        let parent_idx = setter_ext.parent;
+        let Some(parent_node) = self.ctx.arena.get(parent_idx) else {
+            return false;
+        };
+
+        // Get siblings from parent
+        let siblings = match parent_node.kind {
+            k if k == syntax_kind_ext::CLASS_DECLARATION || k == syntax_kind_ext::CLASS_EXPRESSION => {
+                self.ctx.arena.get_class(parent_node)
+                    .map(|c| &c.members.nodes)
+            }
+            k if k == syntax_kind_ext::INTERFACE_DECLARATION => {
+                self.ctx.arena.get_interface(parent_node)
+                    .map(|i| &i.members.nodes)
+            }
+            k if k == syntax_kind_ext::TYPE_LITERAL => {
+                self.ctx.arena.get_type_literal(parent_node)
+                    .map(|tl| &tl.members.nodes)
+            }
+            _ => None,
+        };
+
+        let Some(members) = siblings else {
+            return false;
+        };
+
+        // Look for a getter with the same name
+        for &member_idx in members.iter() {
+            if member_idx == setter_idx {
+                continue; // Skip the setter itself
+            }
+            let Some(member_node) = self.ctx.arena.get(member_idx) else {
+                continue;
+            };
+            if member_node.kind == syntax_kind_ext::GET_ACCESSOR {
+                if let Some(accessor) = self.ctx.arena.get_accessor(member_node) {
+                    if let Some(member_name) = self.get_property_name(accessor.name) {
+                        if member_name == name {
+                            // Check if both are static or both are not static
+                            let setter_node = self.ctx.arena.get(setter_idx);
+                            let setter_is_static = setter_node
+                                .and_then(|n| self.ctx.arena.get_accessor(n))
+                                .map(|a| self.has_static_modifier(&a.modifiers))
+                                .unwrap_or(false);
+                            let getter_is_static = self.has_static_modifier(&accessor.modifiers);
+                            if setter_is_static == getter_is_static {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        false
     }
 
     /// Check if a return type requires a return value.
@@ -17516,43 +17961,10 @@ impl<'a> ThinCheckerState<'a> {
             return None;
         }
 
-        // Check if the alias RHS is directly a Promise/PromiseLike type reference
-        // before lowering (e.g., Promise<T> where Promise is from lib and might not fully resolve)
-        if let Some(type_node) = self.ctx.arena.get(type_alias.type_node) {
-            if let Some(type_ref) = self.ctx.arena.get_type_ref(type_node) {
-                if let Some(name_node) = self.ctx.arena.get(type_ref.type_name) {
-                    if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
-                        if self.is_promise_like_name(ident.escaped_text.as_str()) {
-                            // It's Promise<...> or PromiseLike<...>
-                            // Get the first type argument and substitute bindings
-                            if let Some(type_args) = &type_ref.type_arguments {
-                                if let Some(&first_arg_idx) = type_args.nodes.first() {
-                                    // Try to substitute bindings in the type argument
-                                    let arg_type = self.lower_type_with_bindings(first_arg_idx, bindings.clone());
-                                    return Some(arg_type);
-                                }
-                            }
-                            // No type args means Promise (equivalent to Promise<any>)
-                            return Some(TypeId::ANY);
-                        }
-                    }
-                }
-            }
-        }
-
         let lowered = self.lower_type_with_bindings(type_alias.type_node, bindings);
         if let Some(TypeKey::Application(app_id)) = self.ctx.types.lookup(lowered) {
             let app = self.ctx.types.type_application(app_id);
             return self.promise_like_type_argument_from_base(app.base, &app.args, visited_aliases);
-        }
-
-        // Fallback: if the alias expands to a promise-like type reference (e.g., Promise from lib),
-        // treat it as Promise<any> even if we can't get the type argument.
-        // This handles cases like: type PromiseAlias<T> = Promise<T> where Promise comes from lib.
-        if self.type_ref_is_promise_like(lowered) {
-            // If we have args, try to return the first one (the T in Promise<T>)
-            // Otherwise return ANY as a safe fallback
-            return Some(args.first().copied().unwrap_or(TypeId::ANY));
         }
 
         None
@@ -17973,7 +18385,7 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
-    pub(crate) fn function_body_falls_through(&mut self, body_idx: NodeIndex) -> bool {
+    pub fn function_body_falls_through(&mut self, body_idx: NodeIndex) -> bool {
         let Some(body_node) = self.ctx.arena.get(body_idx) else {
             return true;
         };
@@ -18056,12 +18468,6 @@ impl<'a> ThinCheckerState<'a> {
             }
             syntax_kind_ext::SWITCH_STATEMENT => self.switch_falls_through(stmt_idx),
             syntax_kind_ext::TRY_STATEMENT => self.try_falls_through(stmt_idx),
-            syntax_kind_ext::CATCH_CLAUSE => self
-                .ctx
-                .arena
-                .get_catch_clause(node)
-                .map(|catch_data| self.statement_falls_through(catch_data.block))
-                .unwrap_or(true),
             syntax_kind_ext::WHILE_STATEMENT | syntax_kind_ext::DO_STATEMENT | syntax_kind_ext::FOR_STATEMENT => {
                 self.loop_falls_through(node)
             }
@@ -18408,10 +18814,18 @@ impl<'a> ThinCheckerState<'a> {
             }
             syntax_kind_ext::WHILE_STATEMENT
             | syntax_kind_ext::DO_STATEMENT
-            | syntax_kind_ext::FOR_STATEMENT
-            | syntax_kind_ext::FOR_IN_STATEMENT
-            | syntax_kind_ext::FOR_OF_STATEMENT => {
+            | syntax_kind_ext::FOR_STATEMENT => {
                 if let Some(loop_data) = self.ctx.arena.get_loop(node) {
+                    self.collect_return_types_in_statement(
+                        loop_data.statement,
+                        return_types,
+                        saw_empty,
+                        return_context,
+                    );
+                }
+            }
+            syntax_kind_ext::FOR_IN_STATEMENT | syntax_kind_ext::FOR_OF_STATEMENT => {
+                if let Some(loop_data) = self.ctx.arena.get_for_in_of(node) {
                     self.collect_return_types_in_statement(
                         loop_data.statement,
                         return_types,
@@ -18526,8 +18940,14 @@ impl<'a> ThinCheckerState<'a> {
                 }
                 false
             }
-            syntax_kind_ext::WHILE_STATEMENT | syntax_kind_ext::DO_STATEMENT | syntax_kind_ext::FOR_STATEMENT | syntax_kind_ext::FOR_IN_STATEMENT | syntax_kind_ext::FOR_OF_STATEMENT => {
+            syntax_kind_ext::WHILE_STATEMENT | syntax_kind_ext::DO_STATEMENT | syntax_kind_ext::FOR_STATEMENT => {
                 if let Some(loop_data) = self.ctx.arena.get_loop(node) {
+                    return self.statement_has_return_with_value(loop_data.statement);
+                }
+                false
+            }
+            syntax_kind_ext::FOR_IN_STATEMENT | syntax_kind_ext::FOR_OF_STATEMENT => {
+                if let Some(loop_data) = self.ctx.arena.get_for_in_of(node) {
                     return self.statement_has_return_with_value(loop_data.statement);
                 }
                 false
