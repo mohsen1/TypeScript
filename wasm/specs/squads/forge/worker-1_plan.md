@@ -1,35 +1,30 @@
 # Worker 1 Plan - Squad Forge
 
 ## Mission
-Improve module resolution diagnostics (TS2792).
+Improve duplicate identifier diagnostics for binding patterns (TS2300).
 
 Status: Active
 Priority: 1
 
 ## Current Assignment
-Reduce missing TS2792 diagnostics for unresolved module imports.
+Add TS2300 duplicate identifier errors for destructuring/binding patterns.
 
-**Error Code:** TS2792 - "Cannot find module 'X' or its corresponding type declarations."
+**Error Code:** TS2300 - "Duplicate identifier 'X'."
 
-**Impact:** 204 conformance tests affected
+**Impact:** Binding pattern duplicates currently unreported.
 
 ### Steps
-1. **Create a scan script** `wasm/differential-test/find-ts2792.mjs` (copy `find-ts2339.mjs` pattern) to report missing TS2792.
-2. **Run a scan**: `cd wasm/differential-test && node find-ts2792.mjs --max=1000 --samples=30`.
-3. **Pick the top missing pattern** (package imports vs relative, ambient module resolution, or multi-file diagnostics).
-4. **Implement the fix** in `wasm/src/thin_binder.rs` and/or `wasm/src/cli/driver.rs`.
-5. **Add tests** in `wasm/src/cli/driver_tests.rs` or `wasm/src/thin_checker_tests.rs`.
-6. **Run focused tests** with `./wasm/test.sh` and report delta.
+1. **Implement duplicate detection** in `check_binding_pattern` for destructuring patterns.
+2. **Add tests** in `wasm/src/thin_checker_tests.rs` for object/array binding duplicates.
+3. **Run focused tests**: `./wasm/test.sh duplicate_identifier`.
 
 ### Key Files
-- `wasm/src/thin_binder.rs`
-- `wasm/src/cli/driver.rs`
-- `wasm/src/cli/driver_tests.rs`
-- `wasm/differential-test/find-ts2792.mjs`
+- `wasm/src/thin_checker.rs`
+- `wasm/src/thin_checker_tests.rs`
 
 ### Success Criteria
-- Missing TS2792 diagnostics reduced for the selected pattern
-- No increase in extra TS2792 errors
+- Binding pattern duplicates emit TS2300
+- Tests for duplicate identifiers pass
 
 ## Task Queue
 - None.
@@ -63,6 +58,7 @@ Reduce missing TS2792 diagnostics for unresolved module imports.
 - Updated binder to avoid recording ambient module declarations in external modules; driver now suppresses checker import diagnostics in multi-file mode.
 - Added TS2792 tests for module augmentation resolution and declared module recording; ran `./wasm/test.sh ts2792` and `./wasm/test.sh declared_module_recorded_in_script`.
 - Re-ran `find-ts2792.mjs --max=1000 --samples=30`: 0 missing, 0 extra, 0 mismatched.
+- Added TS2300 detection for duplicate identifiers in binding patterns and tests; ran `./wasm/test.sh duplicate_identifier`.
 
 ## Ready for Merge
 Yes

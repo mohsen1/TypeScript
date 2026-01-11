@@ -4883,6 +4883,25 @@ impl<'a> ThinCheckerState<'a> {
         (parent_node.flags as u32) & node_flags::CONST != 0
     }
 
+    fn is_block_scoped_variable_declaration(&self, var_decl_idx: NodeIndex) -> bool {
+        use crate::parser::node_flags;
+
+        let Some(ext) = self.ctx.arena.get_extended(var_decl_idx) else {
+            return false;
+        };
+        let parent_idx = ext.parent;
+        if parent_idx.is_none() {
+            return false;
+        }
+        let Some(parent_node) = self.ctx.arena.get(parent_idx) else {
+            return false;
+        };
+        if parent_node.kind != syntax_kind_ext::VARIABLE_DECLARATION_LIST {
+            return false;
+        }
+        (parent_node.flags as u32 & (node_flags::LET | node_flags::CONST)) != 0
+    }
+
     fn is_catch_clause_variable_declaration(&self, var_decl_idx: NodeIndex) -> bool {
         let Some(ext) = self.ctx.arena.get_extended(var_decl_idx) else {
             return false;
@@ -11424,7 +11443,9 @@ impl<'a> ThinCheckerState<'a> {
                 } else {
                     TypeId::ANY
                 };
-                self.check_binding_pattern(var_decl.name, pattern_type);
+                let check_duplicates = self.is_block_scoped_variable_declaration(decl_idx) || is_catch_variable;
+                let mut seen_names = FxHashSet::default();
+                self.check_binding_pattern(var_decl.name, pattern_type, check_duplicates, &mut seen_names);
             }
         }
     }
@@ -11433,7 +11454,14 @@ impl<'a> ThinCheckerState<'a> {
     ///
     /// This function traverses a binding pattern (object or array destructuring) and verifies
     /// that any default values provided in binding elements are assignable to their expected types.
-    fn check_binding_pattern(&mut self, pattern_idx: NodeIndex, pattern_type: TypeId) {
+    /// When enabled, it also reports duplicate identifiers within the pattern.
+    fn check_binding_pattern(
+        &mut self,
+        pattern_idx: NodeIndex,
+        pattern_type: TypeId,
+        check_duplicates: bool,
+        seen_names: &mut FxHashSet<String>,
+    ) {
         let Some(pattern_node) = self.ctx.arena.get(pattern_idx) else {
             return;
         };
@@ -11444,12 +11472,18 @@ impl<'a> ThinCheckerState<'a> {
 
         // Traverse binding elements
         for &element_idx in &pattern_data.elements.nodes {
-            self.check_binding_element(element_idx, pattern_type);
+            self.check_binding_element(element_idx, pattern_type, check_duplicates, seen_names);
         }
     }
 
     /// Check a single binding element for default value assignability.
-    fn check_binding_element(&mut self, element_idx: NodeIndex, parent_type: TypeId) {
+    fn check_binding_element(
+        &mut self,
+        element_idx: NodeIndex,
+        parent_type: TypeId,
+        check_duplicates: bool,
+        seen_names: &mut FxHashSet<String>,
+    ) {
         let Some(element_node) = self.ctx.arena.get(element_idx) else {
             return;
         };
@@ -11483,12 +11517,33 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
 
-        // If the name is a nested binding pattern, recursively check it
         if let Some(name_node) = self.ctx.arena.get(element_data.name) {
-            if name_node.kind == syntax_kind_ext::OBJECT_BINDING_PATTERN
+            if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
+                if check_duplicates {
+                    use crate::checker::types::diagnostics::{
+                        diagnostic_codes, diagnostic_messages, format_message,
+                    };
+
+                    let name = ident.escaped_text.clone();
+                    if !seen_names.insert(name.clone()) {
+                        let message =
+                            format_message(diagnostic_messages::DUPLICATE_IDENTIFIER, &[&name]);
+                        self.error_at_node(
+                            element_data.name,
+                            &message,
+                            diagnostic_codes::DUPLICATE_IDENTIFIER,
+                        );
+                    }
+                }
+            } else if name_node.kind == syntax_kind_ext::OBJECT_BINDING_PATTERN
                 || name_node.kind == syntax_kind_ext::ARRAY_BINDING_PATTERN
             {
-                self.check_binding_pattern(element_data.name, element_type);
+                self.check_binding_pattern(
+                    element_data.name,
+                    element_type,
+                    check_duplicates,
+                    seen_names,
+                );
             }
         }
     }
