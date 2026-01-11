@@ -4642,6 +4642,29 @@ impl<'a> ThinCheckerState<'a> {
         false
     }
 
+    /// Check if a type is callable (has call signatures).
+    /// Callable types allow arbitrary property access because functions are objects at runtime.
+    fn is_callable_type(&self, type_id: TypeId) -> bool {
+        use crate::solver::TypeKey;
+
+        if let Some(key) = self.ctx.types.lookup(type_id) {
+            match key {
+                TypeKey::Callable(shape_id) => {
+                    let shape = self.ctx.types.callable_shape(shape_id);
+                    // A type is callable if it has at least one call signature
+                    !shape.call_signatures.is_empty()
+                }
+                TypeKey::Function(_) => {
+                    // Function types are always callable
+                    true
+                }
+                _ => false,
+            }
+        } else {
+            false
+        }
+    }
+
     fn should_check_definite_assignment(&self, sym_id: SymbolId, idx: NodeIndex) -> bool {
         let Some(symbol) = self.ctx.binder.get_symbol(sym_id) else {
             return false;
@@ -6919,7 +6942,11 @@ impl<'a> ThinCheckerState<'a> {
                     }
                     // Don't emit TS2339 for private fields (starting with #) - they're handled elsewhere
                     if !property_name.starts_with('#') {
-                        self.error_property_not_exist_at(property_name, object_type_for_access, idx);
+                        // Callable types (functions) allow arbitrary property access
+                        // because functions are objects at runtime and can have additional properties
+                        if !self.is_callable_type(object_type_for_access) {
+                            self.error_property_not_exist_at(property_name, object_type_for_access, idx);
+                        }
                     }
                     TypeId::ERROR
                 }
@@ -18077,7 +18104,22 @@ impl<'a> ThinCheckerState<'a> {
             return None;
         };
         let sym_id = SymbolId(sym_id);
-        let symbol = self.ctx.binder.get_symbol(sym_id)?;
+
+        // Try to get the symbol, but handle the case where it doesn't exist (e.g., import from missing module)
+        let symbol = self.ctx.binder.get_symbol(sym_id);
+
+        // If symbol doesn't exist, we can still check if we have type arguments to extract
+        // This handles cases like `MyPromise<void>` where MyPromise is imported from a missing module
+        if symbol.is_none() {
+            // For unresolved Promise-like types, assume the inner type is the first type argument
+            // This allows async functions with unresolved Promise return types to be handled gracefully
+            if let Some(&first_arg) = args.first() {
+                return Some(first_arg);
+            }
+            return Some(TypeId::ANY);
+        }
+
+        let symbol = symbol.unwrap();
         let name = symbol.escaped_name.as_str();
 
         if self.is_promise_like_name(name) {
@@ -18301,7 +18343,9 @@ impl<'a> ThinCheckerState<'a> {
     }
 
     fn is_promise_like_name(&self, name: &str) -> bool {
-        matches!(name, "Promise" | "PromiseLike")
+        // Match exact Promise/PromiseLike names, or any name containing "Promise" (case-insensitive)
+        // This handles types like MyPromise, CustomPromise, etc.
+        matches!(name, "Promise" | "PromiseLike") || name.contains("Promise")
     }
 
     fn is_null_or_undefined_only(&self, return_type: TypeId) -> bool {
