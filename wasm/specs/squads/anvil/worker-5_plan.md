@@ -3,18 +3,19 @@
 ## Mission
 Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transforms, cli, lsp).
 
-Status: Active
+Status: Awaiting Assignment (TS2355 scan + recursiveMappedTypes check complete)
 Priority: 5
 
 ## Current Assignment
-- Run broader TS2355 scan (or confirm no regressions) after never-return fix; report delta.
-- If clean, proceed to next backlog item or verify `types/mapped/recursiveMappedTypes.ts` crash status.
+- Awaiting new assignment from EM.
 
 ## Task Queue
-- [ ] Verify whether `types/mapped/recursiveMappedTypes.ts` still crashes; if so, capture stack and coordinate with Forge.
+- [x] Verify whether `types/mapped/recursiveMappedTypes.ts` still crashes; if so, capture stack and coordinate with Forge.
 
 
 ## Completed
+- [x] Broader TS2355 scan: ran `conformance-runner.mjs` for `statements`, `expressions`, `classes`, `types` (200 each). No TS2355 extras in statements/expressions/classes; types still has TS2355 extras in `types/asyncGenerators/types.asyncGenerators.es2018.1.ts`, `types/asyncGenerators/types.asyncGenerators.es2018.2.ts`, `types/contextualTypes/asyncFunctions/contextuallyTypeAsyncFunctionReturnType.ts`. Outputs in `/tmp/conformance_{statements,expressions,classes,types}_after.txt`.
+- [x] Verified `types/mapped/recursiveMappedTypes.ts` still crashes in ThinParser: `RuntimeError: unreachable` (stack captured).
 - [x] Reduced TS2355 false positives for never-returning calls/initializers; TS2355 now requires fallthrough and treats `never` expression statements as terminal; updated `test_never_returning_call_no_2355` and added `usesFailInInit`/`usesFailInList`; conformance delta TS2355 extras -5 (controlflow -1, functions -1, async -3). Commit: `ebc080b312`.
 - [x] Fixed merge conflicts from origin/rust sync: binder.rs can_merge_flags and CallableShape missing fields in thin_checker.rs. Added test documenting never-returning call limitation. Commit: `bb137e9631d`.
 - [x] Fixed TS2355 false positives for throw-only functions. Added `falls_through` check to TS2355 condition for functions, methods, and getters. Functions that only throw no longer incorrectly trigger "must return a value". Added tests `test_throw_only_function_no_2355` and `test_infinite_loop_no_2355`. Commit: `3eea80b3d93`.
@@ -189,13 +190,13 @@ Priority: 5
 - [x] Added async computed object literal source-map coverage in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (PASS).
 
 ## Ready for Merge
-No (merged 2026-01-11)
+Yes
 
 ## Resume Notes
 - Branch: `worker/anvil-5`
-- Last commit: `ebc080b312` (`[wasm] checker: treat never returns as terminal`)
+- Last commit: `f2e9cdb867` (merge origin/rust into worker/anvil-5)
 - Docker: working
-- Tests: `./wasm/test.sh test_never_returning_call_no_2355` (PASS). Conformance: `node wasm/differential-test/conformance-runner.mjs controlFlow --max=200 -v`, `node wasm/differential-test/conformance-runner.mjs functions --max=200 -v`, `node wasm/differential-test/conformance-runner.mjs async --max=200 -v` (TS2355 extras -5). Known failures when running `./wasm/test.sh thin_checker_tests`: `test_abstract_class_through_type_alias_2511`, `test_abstract_class_union_type_2511` expecting 2511 vs 2564.
+- Tests: `./wasm/test.sh test_never_returning_call_no_2355` (PASS). Conformance: `node wasm/differential-test/conformance-runner.mjs controlFlow --max=200 -v`, `node wasm/differential-test/conformance-runner.mjs functions --max=200 -v`, `node wasm/differential-test/conformance-runner.mjs async --max=200 -v` (TS2355 extras -5), plus `node wasm/differential-test/conformance-runner.mjs statements --max=200 -v`, `node wasm/differential-test/conformance-runner.mjs expressions --max=200 -v`, `node wasm/differential-test/conformance-runner.mjs classes --max=200 -v`, `node wasm/differential-test/conformance-runner.mjs types --max=200 -v` (TS2355 extras in types only). Known failures when running `./wasm/test.sh thin_checker_tests`: `test_abstract_class_through_type_alias_2511`, `test_abstract_class_union_type_2511` expecting 2511 vs 2564.
 - Stashed work: `enum_es5_tests.rs` was stashed (incomplete) when new assignment arrived
 - TS2355 status:
   - Fixed: throw-only functions (commit `3eea80b3d93`)
@@ -204,6 +205,7 @@ No (merged 2026-01-11)
   - Covered: async PromiseLike<void>/alias returns (commit `9a40689eb0`)
   - Fixed: never-returning calls in expression statements/variable initializers now treated as terminal (commit `ebc080b312`)
   - Samples: `controlflow/controlFlowIterationErrorsAsync.ts`, `functions/functionImplementations.ts`, `async/es2017/asyncFunctionDeclaration14_es2017.ts`, `async/es5/asyncFunctionDeclaration14_es5.ts`, `async/es6/asyncFunctionDeclaration14_es6.ts`
+  - Broader scan samples (types): `types/asyncGenerators/types.asyncGenerators.es2018.1.ts`, `types/asyncGenerators/types.asyncGenerators.es2018.2.ts`, `types/contextualTypes/asyncFunctions/contextuallyTypeAsyncFunctionReturnType.ts`
 - TS2769 status:
   - Fixed: spread tuple args now resolve in overload calls (commit `c7d86a60c5`)
   - Fixed: tuple literal rest elements no longer marked as rest during inference (commit `3f3315eada`).
