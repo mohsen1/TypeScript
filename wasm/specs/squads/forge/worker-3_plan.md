@@ -7,24 +7,25 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-TS2339 missing errors: improve reporting + fix top missing pattern.
+TS2339 missing errors: private-name access and static computed member cases.
 
 **Error Code:** TS2339 - "Property 'X' does not exist on type 'Y'"
 
 ### Steps
-1. Extend `find-ts2339.mjs` to report missing TS2339.
-2. Fix missing TS2339 pattern in checker (catch binding unknown).
-3. Add tests for catch binding TS2339.
-4. Run focused tests (`./wasm/test.sh thin_checker_tests`) and report delta.
+1. **Run a missing scan**: `node wasm/differential-test/find-ts2339.mjs --mode=missing --max=2000 --samples=20`.
+2. **Target missing patterns** from the scan (private-name access + static computed `this.c`).
+3. **Fix property access** in `wasm/src/thin_checker.rs` for private names and computed static members.
+4. **Add tests** in `wasm/src/thin_checker_tests.rs`.
+5. **Run focused tests** with `./wasm/test.sh` and report delta.
 
 ### Key Files
-- `wasm/src/checker/control_flow.rs`
 - `wasm/src/thin_checker.rs`
 - `wasm/src/thin_checker_tests.rs`
+- `wasm/differential-test/find-ts2339.mjs`
 
 ### Success Criteria
-- TS2339 extra errors reduced for control-flow narrowing cases
-- No regressions in existing TS2339 tests
+- Missing TS2339 reduced for private-name/computed-member patterns
+- No new TS2339 extras introduced
 
 ## Task Queue
 - (empty)

@@ -2586,19 +2586,21 @@ impl ThinBinderState {
 
     fn bind_module_declaration(&mut self, arena: &ThinNodeArena, node: &ThinNode, idx: NodeIndex) {
         if let Some(module) = arena.get_module(node) {
-            let is_global = arena.get(module.name)
-                .and_then(|name_node| {
-                    if let Some(ident) = arena.get_identifier(name_node) {
-                        return Some(ident.escaped_text == "global");
-                    }
-                    if name_node.kind == SyntaxKind::GlobalKeyword as u16 {
-                        return Some(true);
-                    }
-                    None
-                })
-                .unwrap_or(false);
+            let is_global_augmentation =
+                (node.flags as u32) & node_flags::GLOBAL_AUGMENTATION != 0
+                    || arena.get(module.name)
+                        .and_then(|name_node| {
+                            if let Some(ident) = arena.get_identifier(name_node) {
+                                return Some(ident.escaped_text == "global");
+                            }
+                            if name_node.kind == SyntaxKind::GlobalKeyword as u16 {
+                                return Some(true);
+                            }
+                            None
+                        })
+                        .unwrap_or(false);
 
-            if is_global {
+            if is_global_augmentation {
                 if !module.body.is_none() {
                     self.node_scope_ids.insert(module.body.0, self.current_scope_id);
                     self.bind_node(arena, module.body);
@@ -2625,6 +2627,7 @@ impl ThinBinderState {
                         .and_then(|name_node| arena.get_literal(name_node))
                         .map(|lit| lit.text.clone())
                 });
+            let mut prior_exports: Option<SymbolTable> = None;
             if let Some(name) = name {
                 let mut is_exported = self.has_export_modifier(arena, &module.modifiers);
                 if !is_exported {
@@ -2642,11 +2645,22 @@ impl ThinBinderState {
                     }
                 }
                 let flags = symbol_flags::VALUE_MODULE | symbol_flags::NAMESPACE_MODULE;
-                self.declare_symbol(&name, flags, idx, is_exported);
+                let sym_id = self.declare_symbol(&name, flags, idx, is_exported);
+                prior_exports = self
+                    .symbols
+                    .get(sym_id)
+                    .and_then(|symbol| symbol.exports.as_ref())
+                    .map(|exports| exports.as_ref().clone());
             }
 
             // Enter module scope
             self.enter_scope(ContainerKind::Module, idx);
+
+            if let Some(exports) = prior_exports {
+                for (name, &child_id) in exports.iter() {
+                    self.current_scope.set(name.clone(), child_id);
+                }
+            }
 
             // Also register the MODULE_BLOCK body node with the same scope
             // so that identifiers inside the namespace can find their enclosing scope

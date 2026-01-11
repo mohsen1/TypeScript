@@ -14273,6 +14273,101 @@ fn test_unterminated_template_expression_reports_missing_name() {
 }
 
 #[test]
+fn test_global_augmentation_binds_to_file_scope() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+export {};
+declare global {
+  var augmented: number;
+}
+augmented;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&diagnostic_codes::CANNOT_FIND_NAME),
+        "Unexpected TS2304 for global augmentation: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_namespace_merging_resolves_prior_exports() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+namespace Utils { export const x = 1; }
+namespace Utils { export const y = x; }
+const z = Utils.y;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&diagnostic_codes::CANNOT_FIND_NAME),
+        "Unexpected TS2304 for merged namespace export lookup: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_module_augmentation_merges_exports() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+declare module "pkg" {
+  export const x: number;
+}
+declare module "pkg" {
+  export const y: typeof x;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&diagnostic_codes::CANNOT_FIND_NAME),
+        "Unexpected TS2304 for module augmentation export lookup: {:?}",
+        codes
+    );
+}
+
+#[test]
 fn test_circular_type_alias_ts2456() {
     use crate::thin_parser::ThinParserState;
     use crate::checker::types::diagnostics::diagnostic_codes;
@@ -14797,6 +14892,70 @@ class Thing3 extends Thing2 {
     assert!(
         !codes.contains(&2339),
         "Should not emit TS2339 for mixin constructor/instance properties, got errors: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_class_extends_class_like_constructor_properties() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+interface Base<T, U> {
+    x: T;
+    y: U;
+}
+
+interface BaseConstructor {
+    new (x: string, y: string): Base<string, string>;
+    new <T>(x: T): Base<T, T>;
+    new <T, U>(x: T, y: U): Base<T, U>;
+}
+
+declare function getBase(): BaseConstructor;
+
+class D1 extends getBase() {
+    constructor() {
+        super("abc", "def");
+        this.x;
+        this.y;
+    }
+}
+
+class D2 extends getBase() <number> {
+    constructor() {
+        super(10);
+        super(10, 20);
+        this.x;
+        this.y;
+    }
+}
+
+class D3 extends getBase() <string, number> {
+    constructor() {
+        super("abc", 42);
+        this.x;
+        this.y;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker =
+        ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2339),
+        "Should not emit TS2339 for class-like constructor inheritance, got errors: {:?}",
         checker.ctx.diagnostics
     );
 }
@@ -15444,6 +15603,37 @@ declare var x: Circular<tup>;
 
     // May have errors, but should not crash
     // The recursion guard should prevent infinite loops
+    assert!(checker.ctx.diagnostics.len() >= 0, "Checker should complete");
+}
+
+#[test]
+fn test_recursive_mapped_property_access_no_crash() {
+    use crate::thin_parser::ThinParserState;
+
+    // Regression test for recursive mapped type property access
+    let code = r#"
+type Transform<T> = { [K in keyof T]: Transform<T[K]> };
+
+interface Product {
+    users: string[];
+}
+
+declare var product: Transform<Product>;
+product.users;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+
+    // Should complete without crashing or hanging
+    checker.check_source_file(root);
+
     assert!(checker.ctx.diagnostics.len() >= 0, "Checker should complete");
 }
 #[test]

@@ -1551,6 +1551,102 @@ impl<'a> ThinCheckerState<'a> {
                     );
                 }
             }
+            Some(TypeKey::Union(members_id)) => {
+                use rustc_hash::FxHashMap;
+                let members = self.ctx.types.type_list(members_id);
+                let mut common_props: Option<FxHashMap<Atom, crate::solver::PropertyInfo>> = None;
+                let mut common_string_index: Option<crate::solver::IndexSignature> = None;
+                let mut common_number_index: Option<crate::solver::IndexSignature> = None;
+
+                for &member in members.iter() {
+                    let mut member_props: FxHashMap<Atom, crate::solver::PropertyInfo> = FxHashMap::default();
+                    let mut member_string_index = None;
+                    let mut member_number_index = None;
+                    let mut member_visited = rustc_hash::FxHashSet::default();
+                    member_visited.insert(base_instance_type);
+
+                    self.merge_base_instance_properties_inner(
+                        member,
+                        &mut member_props,
+                        &mut member_string_index,
+                        &mut member_number_index,
+                        &mut member_visited,
+                    );
+
+                    if common_props.is_none() {
+                        common_props = Some(member_props);
+                        common_string_index = member_string_index;
+                        common_number_index = member_number_index;
+                        continue;
+                    }
+
+                    let mut props = common_props.take().unwrap();
+                    props.retain(|name, prop| {
+                        let Some(member_prop) = member_props.get(name) else {
+                            return false;
+                        };
+                        let merged_type = if prop.type_id == member_prop.type_id {
+                            prop.type_id
+                        } else {
+                            self.ctx.types.union(vec![prop.type_id, member_prop.type_id])
+                        };
+                        let merged_write_type = if prop.write_type == member_prop.write_type {
+                            prop.write_type
+                        } else {
+                            self.ctx.types.union(vec![prop.write_type, member_prop.write_type])
+                        };
+                        prop.type_id = merged_type;
+                        prop.write_type = merged_write_type;
+                        prop.optional |= member_prop.optional;
+                        prop.readonly &= member_prop.readonly;
+                        prop.is_method &= member_prop.is_method;
+                        true
+                    });
+                    common_props = Some(props);
+
+                    common_string_index = match (common_string_index.take(), member_string_index) {
+                        (Some(mut left), Some(right)) => {
+                            if left.value_type != right.value_type {
+                                left.value_type =
+                                    self.ctx.types.union(vec![left.value_type, right.value_type]);
+                            }
+                            left.readonly &= right.readonly;
+                            Some(left)
+                        }
+                        _ => None,
+                    };
+                    common_number_index = match (common_number_index.take(), member_number_index) {
+                        (Some(mut left), Some(right)) => {
+                            if left.value_type != right.value_type {
+                                left.value_type =
+                                    self.ctx.types.union(vec![left.value_type, right.value_type]);
+                            }
+                            left.readonly &= right.readonly;
+                            Some(left)
+                        }
+                        _ => None,
+                    };
+
+                    if common_props.as_ref().map_or(true, |props| props.is_empty())
+                        && common_string_index.is_none()
+                        && common_number_index.is_none()
+                    {
+                        break;
+                    }
+                }
+
+                if let Some(props) = common_props {
+                    for prop in props.into_values() {
+                        properties.entry(prop.name).or_insert(prop);
+                    }
+                }
+                if let Some(idx) = common_string_index {
+                    Self::merge_index_signature(string_index, idx);
+                }
+                if let Some(idx) = common_number_index {
+                    Self::merge_index_signature(number_index, idx);
+                }
+            }
             _ => {}
         }
     }

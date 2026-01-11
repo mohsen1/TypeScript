@@ -1,33 +1,38 @@
 # Worker 1 Plan - Squad Forge
 
 ## Mission
-Fix object spread type checking in CLI driver tests.
+Improve module resolution diagnostics (TS2792).
 
 Status: Active
 Priority: 1
 
 ## Current Assignment
-Implement TS2792 module resolution diagnostics updates (scan + binder/driver fix).
+Reduce missing TS2792 diagnostics for unresolved module imports.
 
-**Error Code:** TS2792 - "Cannot find module '{0}' or its corresponding type declarations."
+**Error Code:** TS2792 - "Cannot find module 'X' or its corresponding type declarations."
+
+**Impact:** 204 conformance tests affected
 
 ### Steps
-1. Add `find-ts2792.mjs` scanner and verify missing patterns.
-2. Fix module declaration handling in `wasm/src/thin_binder.rs` and driver behavior in `wasm/src/cli/driver.rs`.
-3. Add tests in `wasm/src/thin_checker_tests.rs`.
-4. Run focused tests with `./wasm/test.sh` and report results.
+1. **Create a scan script** `wasm/differential-test/find-ts2792.mjs` (copy `find-ts2339.mjs` pattern) to report missing TS2792.
+2. **Run a scan**: `cd wasm/differential-test && node find-ts2792.mjs --max=1000 --samples=30`.
+3. **Pick the top missing pattern** (package imports vs relative, ambient module resolution, or multi-file diagnostics).
+4. **Implement the fix** in `wasm/src/thin_binder.rs` and/or `wasm/src/cli/driver.rs`.
+5. **Add tests** in `wasm/src/cli/driver_tests.rs` or `wasm/src/thin_checker_tests.rs`.
+6. **Run focused tests** with `./wasm/test.sh` and report delta.
 
 ### Key Files
 - `wasm/src/thin_binder.rs`
 - `wasm/src/cli/driver.rs`
-- `wasm/src/thin_checker_tests.rs`
+- `wasm/src/cli/driver_tests.rs`
+- `wasm/differential-test/find-ts2792.mjs`
 
 ### Success Criteria
-- TS2792 emitted for unresolved module augmentations in external modules
-- Ambient module declarations still recorded in script files
+- Missing TS2792 diagnostics reduced for the selected pattern
+- No increase in extra TS2792 errors
 
 ## Task Queue
-(empty - single focused task)
+- After TS2792 fix, re-run the scan with a larger sample to confirm deltas.
 
 ## Completed
 - TS2454 implementation merged into squad/forge.
@@ -54,7 +59,7 @@ Implement TS2792 module resolution diagnostics updates (scan + binder/driver fix
 - Implemented TS2300 duplicate identifier detection using declaration conflict rules; added tests for var/function, var/let, type alias conflicts, and type alias + function allowed. Ran `./wasm/test.sh duplicate_identifier` and `./wasm/test.sh type_alias_with_function_no_duplicate_2300`.
 - Re-synced with `origin/rust` and reran `./wasm/test.sh duplicate_identifier` (passed).
 - Re-synced with `origin/rust` and reran `./wasm/test.sh duplicate_identifier` after API key setup (passed).
-- Added `find-ts2792.mjs` scan with virtual FS support and directive parsing; no mismatches in first 500 tests.
+- Added `find-ts2792.mjs` scan (virtual FS + directive parsing) and verified no mismatches in first 500 tests.
 - Updated binder to avoid recording ambient module declarations in external modules; driver now suppresses checker import diagnostics in multi-file mode.
 - Added TS2792 tests for module augmentation resolution and declared module recording; ran `./wasm/test.sh ts2792` and `./wasm/test.sh declared_module_recorded_in_script`.
 
