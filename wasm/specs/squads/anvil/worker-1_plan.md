@@ -14,8 +14,14 @@ Priority: 1
 2. ✅ Destructured parameter elements with default values (15 → 12)
 
 **Remaining 12 patterns** (require deeper type resolution work):
+- **Decorator parameter handling (7+ files)** - PARSER BUG FOUND
+  - `wasm/src/thin_parser.rs:1547` - `parse_parameter()` doesn't handle decorators
+  - When parsing `constructor(@dec p: number)`, the parser doesn't skip `@dec`
+  - Tries to parse `@` as parameter name, resulting in empty name
+  - Fix requires: adding decorator parsing to `parse_parameter`, updating `ParameterData` struct
+  - **BLOCKER:** Complex parser change, beyond current scope
+
 - Contextual typing with tuple union function types: `(...args: ['A', number] | ['B', string]) => void`
-- Decorator parameter handling
 - IIFE callback patterns
 - Instance member prototype assignment
 
