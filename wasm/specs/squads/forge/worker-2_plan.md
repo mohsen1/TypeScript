@@ -55,9 +55,13 @@ Priority: 1
   - Variable declarations with initializers (line 11902)
   - Return statements (line 12703)
   - Function call arguments (line 5712)
-- **Root Cause of 310 Missing**: Solver returns `Any` for complex types (generics, conditional types, mapped types)
+- **Root Cause of Missing TS2322**: Solver returns `Any` for complex types (generics, conditional types, mapped types)
   - When solver returns `Any`, assignability checks always pass
   - This silences downstream TS2322 errors
+- **Baseline Measurement** (2026-01-11):
+  - Conformance scan (2000 tests): **44 files missing TS2322**
+  - Extrapolated to full suite (5655 tests): ~124 files
+  - GOALS.md reports: 310 missing errors (may be multiple errors per file or different baseline)
 - **Test Suite Issue**: Many failing tests have outdated expectations from before recent typeof/class fixes
 
 ### Tests Fixed
