@@ -2253,6 +2253,52 @@ var x: number;
 }
 
 #[test]
+fn test_extends_namespace_cycle_no_ts2304() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class C extends N.E { foo: string; }
+
+namespace M {
+    export class D extends C { bar: string; }
+}
+
+namespace N {
+    export class E extends M.D { baz: number; }
+}
+
+namespace O {
+    class C2<T> extends Q.E2<T> { foo: T; }
+
+    namespace P {
+        export class D2<T> extends C2<T> { bar: T; }
+    }
+
+    namespace Q {
+        export class E2<T> extends P.D2<T> { baz: T; }
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2304),
+        "Unexpected TS2304 for namespace heritage cycles, got: {:?}",
+        codes
+    );
+}
+
+#[test]
 fn test_abstract_class_in_local_scope_2511() {
     use crate::thin_parser::ThinParserState;
     use crate::binder::symbol_flags;
