@@ -3757,6 +3757,111 @@ class C {
 }
 
 #[test]
+fn test_ts2339_computed_name_this_in_class_expression() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class C {
+    static readonly c: "foo" = "foo";
+    static bar = class Inner {
+        static [this.c] = 123;
+        [this.c] = 123;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let count = codes.iter().filter(|&&c| c == 2339).count();
+    assert_eq!(
+        count,
+        2,
+        "Expected two 2339 errors for class expression computed this, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_ts2339_private_name_missing_on_index_signature() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class A {
+    [k: string]: any;
+    #foo = 3;
+    constructor() {
+        this.#f = 3;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let count = codes.iter().filter(|&&c| c == 2339).count();
+    assert_eq!(
+        count,
+        1,
+        "Expected one 2339 error for missing private name, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_ts2339_private_name_in_expression_typo() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Foo {
+    #field = 1;
+    check(v: any) {
+        const ok = #field in v;
+        const bad = #fiel in v;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let count = codes.iter().filter(|&&c| c == 2339).count();
+    assert_eq!(
+        count,
+        1,
+        "Expected one 2339 error for misspelled private name in 'in' expression, got: {:?}",
+        codes
+    );
+}
+
+#[test]
 fn test_ts2339_class_interface_merge() {
     use crate::thin_parser::ThinParserState;
 

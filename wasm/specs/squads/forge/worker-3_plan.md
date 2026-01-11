@@ -7,23 +7,25 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-TS2339 missing errors: static index signatures on constructors/classes.
+TS2339 missing errors: private-name access and static computed member cases.
 
 **Error Code:** TS2339 - "Property 'X' does not exist on type 'Y'"
 
 ### Steps
-1. **Add regression tests** in `wasm/src/thin_checker_tests.rs` for static index signature access on classes/constructors.
-2. **Ensure property access** on callable/constructor types uses `CallableShape` string/number index signatures.
-3. **Update access logic** in `wasm/src/thin_checker.rs` if index signatures are ignored for callable types.
-4. **Run focused tests** with `./wasm/test.sh` and report delta.
+1. **Run a missing scan**: `node wasm/differential-test/find-ts2339.mjs --mode=missing --max=2000 --samples=20`.
+2. **Target missing patterns** from the scan (private-name access + static computed `this.c`).
+3. **Fix private-name access** in `wasm/src/thin_checker.rs` (property access + `in` operator).
+4. **Fix class expression computed names** in `wasm/src/thin_checker.rs`.
+5. **Add tests** in `wasm/src/thin_checker_tests.rs`.
+6. **Run focused tests** with `./wasm/test.sh thin_checker_tests` and report delta.
 
 ### Key Files
 - `wasm/src/thin_checker.rs`
-- `wasm/src/solver/types.rs` (CallableShape index signatures)
 - `wasm/src/thin_checker_tests.rs`
+- `wasm/differential-test/find-ts2339.mjs`
 
 ### Success Criteria
-- TS2339 reduced for static index signature access
+- Missing TS2339 reduced for private-name/computed-member patterns
 - No new TS2339 extras introduced
 
 ## Task Queue
@@ -73,6 +75,8 @@ TS2339 missing errors: static index signatures on constructors/classes.
 - [x] Assertion predicate calls create flow nodes and narrow asserted targets; added test
 - [x] Added missing TS2339 mode to `find-ts2339.mjs`
 - [x] Catch clause variables default to `unknown` for narrowing; added TS2339 test
+- [x] Enforce private identifier access by scope + receiver type (incl. `in` operator)
+- [x] Check class expressions for computed `this` in member names; added tests
 
 ### Remaining TS2339 False Positives (pending re-run)
 - Mixin classes: mixin type inference issues (intersection handling added in new expressions, unit tests pass, conformance tests need more investigation)
@@ -80,7 +84,7 @@ TS2339 missing errors: static index signatures on constructors/classes.
 - Re-run conformance to confirm private names/control-flow narrowing improvements
 
 ## Ready for Merge
-No
+Yes
 
 ## Notes
 - Similar infrastructure to TS2564 (property init) - share patterns with Workers 1-2
@@ -96,3 +100,4 @@ No
 - Tests: `./wasm/test.sh control_flow_tests`, `./wasm/test.sh test_ts2339_`
 - `./scripts/ask-gemini.mjs` blocked: missing `GCP_VERTEX_EXPRESS_API_KEY`
 - `./wasm/test.sh thin_checker_tests` fails with existing abstract class tests (2511 vs 2564)
+- Latest run: `test_abstract_class_through_type_alias_2511` + `test_abstract_class_union_type_2511` expect 2511 but got 2564 (pre-existing)

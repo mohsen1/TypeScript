@@ -355,6 +355,38 @@ impl<'a> ThinCheckerState<'a> {
         None
     }
 
+    fn resolve_private_identifier_symbols(&self, idx: NodeIndex) -> (Vec<SymbolId>, bool) {
+        let node = match self.ctx.arena.get(idx) {
+            Some(node) => node,
+            None => return (Vec::new(), false),
+        };
+        let name = match self.ctx.arena.get_identifier(node) {
+            Some(ident) => ident.escaped_text.as_str(),
+            None => return (Vec::new(), false),
+        };
+
+        let mut symbols = Vec::new();
+        let mut saw_class_scope = false;
+        let Some(mut scope_id) = self.find_enclosing_scope(idx) else {
+            return (symbols, saw_class_scope);
+        };
+
+        while !scope_id.is_none() {
+            let Some(scope) = self.ctx.binder.scopes.get(scope_id.0 as usize) else {
+                break;
+            };
+            if scope.kind == ContainerKind::Class {
+                saw_class_scope = true;
+            }
+            if let Some(sym_id) = scope.table.get(name) {
+                symbols.push(sym_id);
+            }
+            scope_id = scope.parent;
+        }
+
+        (symbols, saw_class_scope)
+    }
+
     // =========================================================================
     // Type Resolution - Core Methods
     // =========================================================================
@@ -449,8 +481,9 @@ impl<'a> ThinCheckerState<'a> {
 
             // Class expressions
             k if k == syntax_kind_ext::CLASS_EXPRESSION => {
-                if let Some(class) = self.ctx.arena.get_class(node) {
-                    self.get_class_constructor_type(idx, class)
+                if let Some(class) = self.ctx.arena.get_class(node).cloned() {
+                    self.check_class_expression(idx, &class);
+                    self.get_class_constructor_type(idx, &class)
                 } else {
                     TypeId::ANY
                 }
@@ -5315,6 +5348,15 @@ impl<'a> ThinCheckerState<'a> {
                 type_stack.push(right_type);
                 continue;
             }
+            if op_kind == SyntaxKind::InKeyword as u16 {
+                if let Some(left_node) = self.ctx.arena.get(left_idx) {
+                    if left_node.kind == SyntaxKind::PrivateIdentifier as u16 {
+                        self.check_private_identifier_in_expression(left_idx, right_type);
+                    }
+                }
+                type_stack.push(TypeId::BOOLEAN);
+                continue;
+            }
             let op_str = match op_kind {
                 k if k == SyntaxKind::PlusToken as u16 => "+",
                 k if k == SyntaxKind::MinusToken as u16 => "-",
@@ -6543,6 +6585,10 @@ impl<'a> ThinCheckerState<'a> {
         // Evaluate Application types to resolve generic type aliases/interfaces
         let object_type = self.evaluate_application_type(object_type);
 
+        if name_node.kind == SyntaxKind::PrivateIdentifier as u16 {
+            return self.get_type_of_private_property_access(idx, access, access.name_or_argument, object_type);
+        }
+
         if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
             let property_name = &ident.escaped_text;
             if self.is_global_this_expression(access.expression) {
@@ -6648,6 +6694,154 @@ impl<'a> ThinCheckerState<'a> {
             }
         } else {
             TypeId::ANY
+        }
+    }
+
+    fn get_type_of_private_property_access(
+        &mut self,
+        idx: NodeIndex,
+        access: &crate::parser::thin_node::AccessExprData,
+        name_idx: NodeIndex,
+        object_type: TypeId,
+    ) -> TypeId {
+        use crate::solver::{PropertyAccessResult, QueryDatabase};
+
+        let Some(name_node) = self.ctx.arena.get(name_idx) else {
+            return TypeId::ANY;
+        };
+        let Some(ident) = self.ctx.arena.get_identifier(name_node) else {
+            return TypeId::ANY;
+        };
+        let property_name = ident.escaped_text.clone();
+
+        let (symbols, saw_class_scope) = self.resolve_private_identifier_symbols(name_idx);
+        if symbols.is_empty() {
+            if saw_class_scope {
+                self.error_property_not_exist_at(&property_name, object_type, name_idx);
+            }
+            return TypeId::ERROR;
+        }
+
+        let object_type = self.evaluate_application_type(object_type);
+        let (object_type_for_check, nullish_cause) = self.split_nullish_type(object_type);
+        let Some(object_type_for_check) = object_type_for_check else {
+            if access.question_dot_token {
+                return TypeId::UNDEFINED;
+            }
+            if let Some(cause) = nullish_cause {
+                self.report_possibly_nullish_object(access.expression, cause);
+            }
+            return TypeId::ERROR;
+        };
+
+        let declaring_type = match self.private_member_declaring_type(symbols[0]) {
+            Some(ty) => ty,
+            None => {
+                if saw_class_scope {
+                    self.error_property_not_exist_at(&property_name, object_type_for_check, name_idx);
+                }
+                return TypeId::ERROR;
+            }
+        };
+
+        if object_type_for_check == TypeId::ANY
+            || object_type_for_check == TypeId::ERROR
+            || object_type_for_check == TypeId::UNKNOWN
+        {
+            return TypeId::ANY;
+        }
+
+        if !self.is_assignable_to(object_type_for_check, declaring_type) {
+            let shadowed = symbols.iter().skip(1).any(|sym_id| {
+                self.private_member_declaring_type(*sym_id)
+                    .map(|ty| self.is_assignable_to(object_type_for_check, ty))
+                    .unwrap_or(false)
+            });
+            if shadowed {
+                return TypeId::ANY;
+            }
+
+            self.error_property_not_exist_at(&property_name, object_type_for_check, name_idx);
+            return TypeId::ERROR;
+        }
+
+        let declaring_type = self.resolve_type_for_property_access(declaring_type);
+        let mut result_type = match self.ctx.types.property_access_type(declaring_type, &property_name) {
+            PropertyAccessResult::Success { type_id, from_index_signature } => {
+                if from_index_signature {
+                    self.error_property_not_exist_at(&property_name, object_type_for_check, name_idx);
+                    return TypeId::ERROR;
+                }
+                type_id
+            }
+            PropertyAccessResult::PropertyNotFound { .. } => {
+                self.error_property_not_exist_at(&property_name, object_type_for_check, name_idx);
+                return TypeId::ERROR;
+            }
+            PropertyAccessResult::PossiblyNullOrUndefined { property_type, .. } => {
+                property_type.unwrap_or(TypeId::ANY)
+            }
+            PropertyAccessResult::IsUnknown => TypeId::ANY,
+        };
+
+        if let Some(cause) = nullish_cause {
+            if access.question_dot_token {
+                result_type = self.ctx.types.union(vec![result_type, TypeId::UNDEFINED]);
+            } else {
+                self.report_possibly_nullish_object(access.expression, cause);
+            }
+        }
+
+        self.apply_flow_narrowing(idx, result_type)
+    }
+
+    fn check_private_identifier_in_expression(
+        &mut self,
+        name_idx: NodeIndex,
+        rhs_type: TypeId,
+    ) {
+        let Some(name_node) = self.ctx.arena.get(name_idx) else {
+            return;
+        };
+        let Some(ident) = self.ctx.arena.get_identifier(name_node) else {
+            return;
+        };
+        let property_name = ident.escaped_text.clone();
+
+        let (symbols, saw_class_scope) = self.resolve_private_identifier_symbols(name_idx);
+        if symbols.is_empty() {
+            if saw_class_scope {
+                self.error_property_not_exist_at(&property_name, rhs_type, name_idx);
+            }
+            return;
+        }
+
+        let rhs_type = self.evaluate_application_type(rhs_type);
+        if rhs_type == TypeId::ANY || rhs_type == TypeId::ERROR || rhs_type == TypeId::UNKNOWN {
+            return;
+        }
+
+        let declaring_type = match self.private_member_declaring_type(symbols[0]) {
+            Some(ty) => ty,
+            None => {
+                if saw_class_scope {
+                    self.error_property_not_exist_at(&property_name, rhs_type, name_idx);
+                }
+                return;
+            }
+        };
+
+        if !self.is_assignable_to(rhs_type, declaring_type) {
+            let shadowed = symbols.iter().skip(1).any(|sym_id| {
+                self.private_member_declaring_type(*sym_id)
+                    .map(|ty| self.is_assignable_to(rhs_type, ty))
+                    .unwrap_or(false)
+            });
+            if shadowed {
+                return;
+            }
+
+            self.error_property_not_exist_at(&property_name, rhs_type, name_idx);
         }
     }
 
@@ -12448,6 +12642,33 @@ impl<'a> ThinCheckerState<'a> {
         self.pop_type_parameters(type_param_updates);
     }
 
+    fn check_class_expression(
+        &mut self,
+        class_idx: NodeIndex,
+        class: &crate::parser::thin_node::ClassData,
+    ) {
+        let (_type_params, type_param_updates) = self.push_type_parameters(&class.type_parameters);
+
+        let class_name = self.get_class_name_from_decl(class_idx);
+
+        let prev_enclosing_class = self.ctx.enclosing_class.take();
+        self.ctx.enclosing_class = Some(EnclosingClassInfo {
+            name: class_name,
+            class_idx,
+            member_nodes: class.members.nodes.clone(),
+            in_constructor: false,
+            is_declared: false,
+        });
+
+        for &member_idx in &class.members.nodes {
+            self.check_class_member(member_idx);
+        }
+
+        self.ctx.enclosing_class = prev_enclosing_class;
+
+        self.pop_type_parameters(type_param_updates);
+    }
+
     fn check_property_initialization(
         &mut self,
         _class_idx: NodeIndex,
@@ -16031,6 +16252,51 @@ impl<'a> ThinCheckerState<'a> {
             }
             _ => false,
         }
+    }
+
+    fn private_member_declaring_type(&mut self, sym_id: SymbolId) -> Option<TypeId> {
+        let symbol = self.ctx.binder.get_symbol(sym_id)?;
+
+        for &decl_idx in &symbol.declarations {
+            let Some(node) = self.ctx.arena.get(decl_idx) else {
+                continue;
+            };
+            if !matches!(
+                node.kind,
+                k if k == syntax_kind_ext::PROPERTY_DECLARATION
+                    || k == syntax_kind_ext::METHOD_DECLARATION
+                    || k == syntax_kind_ext::GET_ACCESSOR
+                    || k == syntax_kind_ext::SET_ACCESSOR
+            ) {
+                continue;
+            }
+
+            let Some(ext) = self.ctx.arena.get_extended(decl_idx) else {
+                continue;
+            };
+            if ext.parent.is_none() {
+                continue;
+            }
+            let Some(parent_node) = self.ctx.arena.get(ext.parent) else {
+                continue;
+            };
+            if parent_node.kind != syntax_kind_ext::CLASS_DECLARATION
+                && parent_node.kind != syntax_kind_ext::CLASS_EXPRESSION
+            {
+                continue;
+            }
+            let Some(class) = self.ctx.arena.get_class(parent_node) else {
+                continue;
+            };
+            let is_static = self.class_member_is_static(decl_idx);
+            return Some(if is_static {
+                self.get_class_constructor_type(ext.parent, class)
+            } else {
+                self.get_class_instance_type(ext.parent, class)
+            });
+        }
+
+        None
     }
 
     fn class_member_this_type(&mut self, member_idx: NodeIndex) -> Option<TypeId> {
