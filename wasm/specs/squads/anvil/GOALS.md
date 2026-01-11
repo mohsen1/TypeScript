@@ -188,7 +188,7 @@ bash run-conformance.sh --all --workers=14
 
 ---
 ## Squad Status
-- Last EM Report: 2026-01-11 11:57
+- Last EM Report: 2026-01-11 12:15
 - Workers Active: 5/5
 - Branches Pending Merge: None
 - Current Focus:
@@ -197,5 +197,8 @@ bash run-conformance.sh --all --workers=14
   - W3: TS2339 property access false positives
   - W4: recursiveMappedTypes crash / TS2456 detection
   - W5: TS2355 return analysis false positives
-- Blockers: None
+- Blockers: None (Fixed build blocker - compile_shorthand_methods test now passing)
+- Recent Actions:
+  - EM fixed binder issue: shorthand method parameters weren't being bound
+  - Pushed fix to origin/em/anvil, awaiting Director merge into rust
 - Strategy: Each worker owns one error code category, reduce false positives independently
