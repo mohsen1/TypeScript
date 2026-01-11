@@ -17188,3 +17188,88 @@ type t1 = DeepMap<tpl, number>;
     // The test reaching here means we didn't crash on recursive mapped types
     eprintln!("[RECURSIVE_MAPPED_TEST] Test completed without crash - {} TS2456 errors found", ts2456_count);
 }
+
+#[test]
+fn test_ts2454_var_used_before_assigned() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+var x: string;
+var y = x; // TS2454: Variable 'x' is used before being assigned
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2454_errors: Vec<_> = checker.ctx.diagnostics.iter().filter(|d| d.code == 2454).collect();
+    assert_eq!(
+        ts2454_errors.len(),
+        1,
+        "Should have 1 TS2454 error for var used before assigned, but found: {:#?}",
+        ts2454_errors
+    );
+}
+
+#[test]
+fn test_ts2454_var_with_initializer_no_error() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+var x: string = "hello";
+var y = x; // No error - x is initialized
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2454_errors: Vec<_> = checker.ctx.diagnostics.iter().filter(|d| d.code == 2454).collect();
+    assert_eq!(
+        ts2454_errors.len(),
+        0,
+        "Should have no TS2454 errors when var has initializer, but found: {:#?}",
+        ts2454_errors
+    );
+}
+
+#[test]
+fn test_ts2454_var_assigned_before_use_no_error() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+var x: string;
+x = "hello";
+var y = x; // No error - x is assigned before use
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2454_errors: Vec<_> = checker.ctx.diagnostics.iter().filter(|d| d.code == 2454).collect();
+    assert_eq!(
+        ts2454_errors.len(),
+        0,
+        "Should have no TS2454 errors when var is assigned before use, but found: {:#?}",
+        ts2454_errors
+    );
+}
