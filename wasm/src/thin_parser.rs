@@ -2424,12 +2424,23 @@ impl ThinParserState {
 
     /// Parse constructor with modifiers
     fn parse_constructor_with_modifiers(&mut self, modifiers: Option<NodeList>) -> NodeIndex {
+        use crate::checker::types::diagnostics::diagnostic_codes;
         let start_pos = self.token_pos();
         self.parse_expected(SyntaxKind::ConstructorKeyword);
 
         self.parse_expected(SyntaxKind::OpenParenToken);
         let parameters = self.parse_parameter_list();
         self.parse_expected(SyntaxKind::CloseParenToken);
+
+        // Recovery: Handle return type annotation on constructor (invalid but users write it)
+        if self.parse_optional(SyntaxKind::ColonToken) {
+            self.parse_error_at_current_token(
+                "Constructor cannot have a return type annotation.",
+                diagnostic_codes::CONSTRUCTOR_CANNOT_HAVE_RETURN_TYPE,
+            );
+            // Consume the type annotation for recovery
+            let _ = self.parse_type();
+        };
 
         let body = if self.is_token(SyntaxKind::OpenBraceToken) {
             self.parse_block()
@@ -2609,6 +2620,34 @@ impl ThinParserState {
         if self.is_token(SyntaxKind::SemicolonToken) {
             // Consume the semicolon and return NONE (empty class element)
             self.next_token();
+            return NodeIndex::NONE;
+        }
+
+        // Recovery: Handle stray statements in class bodies (common copy-paste error)
+        // Users often accidentally leave statements like `if`, `while`, `return` in class bodies
+        let is_statement_keyword = matches!(
+            self.token(),
+            SyntaxKind::IfKeyword         // if (x) { }
+            | SyntaxKind::WhileKeyword     // while (x) { }
+            | SyntaxKind::DoKeyword        // do { } while (x)
+            | SyntaxKind::ForKeyword       // for (...) { }
+            | SyntaxKind::SwitchKeyword    // switch (x) { }
+            | SyntaxKind::ReturnKeyword    // return x;
+            | SyntaxKind::ThrowKeyword     // throw x;
+            | SyntaxKind::TryKeyword       // try { } catch { }
+            | SyntaxKind::WithKeyword      // with (x) { }
+            | SyntaxKind::DebuggerKeyword  // debugger;
+        );
+
+        if is_statement_keyword {
+            self.parse_error_at_current_token(
+                "Declaration or statement expected.",
+                diagnostic_codes::DECLARATION_OR_STATEMENT_EXPECTED,
+            );
+            // Parse the statement to consume it and balance braces
+            // This maintains parsing sync so we can continue parsing the rest of the class
+            let _ = self.parse_statement();
+            // Return NONE to indicate this is not a valid class member
             return NodeIndex::NONE;
         }
 
@@ -2826,12 +2865,23 @@ impl ThinParserState {
 
     /// Parse constructor
     fn parse_constructor(&mut self) -> NodeIndex {
+        use crate::checker::types::diagnostics::diagnostic_codes;
         let start_pos = self.token_pos();
         self.parse_expected(SyntaxKind::ConstructorKeyword);
 
         self.parse_expected(SyntaxKind::OpenParenToken);
         let parameters = self.parse_parameter_list();
         self.parse_expected(SyntaxKind::CloseParenToken);
+
+        // Recovery: Handle return type annotation on constructor (invalid but users write it)
+        if self.parse_optional(SyntaxKind::ColonToken) {
+            self.parse_error_at_current_token(
+                "Constructor cannot have a return type annotation.",
+                diagnostic_codes::CONSTRUCTOR_CANNOT_HAVE_RETURN_TYPE,
+            );
+            // Consume the type annotation for recovery
+            let _ = self.parse_type();
+        };
 
         let body = if self.is_token(SyntaxKind::OpenBraceToken) {
             self.parse_block()
@@ -5377,8 +5427,20 @@ impl ThinParserState {
             NodeIndex::NONE
         };
 
-        // Parse =>
-        self.parse_expected(SyntaxKind::EqualsGreaterThanToken);
+        // Recovery: Handle missing fat arrow - common typo: (a, b) { return a; }
+        // If we see { immediately after parameters/return type, the user forgot =>
+        if self.is_token(SyntaxKind::OpenBraceToken) {
+            use crate::checker::types::diagnostics::diagnostic_codes;
+            self.parse_error_at_current_token(
+                "'=>' expected.",
+                diagnostic_codes::TOKEN_EXPECTED,
+            );
+            // Don't consume the {, just continue to body parsing
+            // The arrow is logically present but missing
+        } else {
+            // Normal case: expect =>
+            self.parse_expected(SyntaxKind::EqualsGreaterThanToken);
+        }
 
         // Set async context for body parsing
         let saved_flags = self.context_flags;
