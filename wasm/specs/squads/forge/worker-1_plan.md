@@ -62,9 +62,10 @@ Emit TS2300 for duplicate identifiers in parameter lists (including destructured
 - **TS2300 parameter duplicate detection complete**: Implemented `check_duplicate_parameters()` and `collect_parameter_names()` to detect duplicate parameter names in function/method/constructor/accessor parameter lists. Handles simple parameters (a, b, a), object destructuring ({ a, b, a }), array destructuring ([x, y, x]), and nested patterns. Added 9 comprehensive tests covering all scenarios. All tests passing: `./wasm/test.sh duplicate_parameter` (9/9 passed), `./wasm/test.sh duplicate_identifier` (3/3 passed). Pushed to `origin/worker/forge-1`.
 - **Control flow narrowing fix**: Fixed assignment narrowing to distinguish between direct assignments (`x = 1` narrows to RHS type) vs destructuring assignments (`[x] = [1]` clears narrowing to declared type). All assignment control flow tests passing (9/9).
 - **TS2454 differential testing**: Created `find-ts2454.mjs` to measure TS2454 coverage. Initial scan (500 tests): 37 files where TSC emits TS2454 but WASM doesn't. This establishes baseline for implementing definite assignment analysis.
+- **TS2454 enhancement**: Expanded definite assignment checks from let/const only to include var declarations. Added 3 tests for var-related cases (all passing). Still 37 files missing in differential test, indicating the gaps are in more complex control flow scenarios (loops, conditionals, etc.) rather than simple var vs let/const differences.
 
 ## Ready for Merge
-Yes (TS2300 complete; TS2454 measurement complete, implementation pending)
+Yes (TS2300 complete; TS2454 partially enhanced, needs control flow improvements)
 
 ## Notes
 - Run `./wasm/test.sh` before pushing
