@@ -8953,6 +8953,7 @@ impl<'a> ThinCheckerState<'a> {
         use crate::solver::TypeKey;
         use crate::binder::SymbolId;
 
+        // First check the cached set
         if self.ctx.abstract_constructor_types.contains(&type_id) {
             return true;
         }
@@ -8973,6 +8974,16 @@ impl<'a> ThinCheckerState<'a> {
                 .resolve_type_env_symbol(symbol, env)
                 .map(|resolved| resolved != type_id && self.is_abstract_constructor_type(resolved, env))
                 .unwrap_or(false),
+            TypeKey::Callable(shape_id) => {
+                // For Callable types (constructor types), check if they're in the abstract set
+                // This handles `typeof AbstractClass` which returns a Callable type
+                self.ctx.abstract_constructor_types.contains(&type_id)
+            }
+            TypeKey::Application(app_id) => {
+                // For generic type applications, check the base type
+                let app = self.ctx.types.type_application(app_id);
+                self.is_abstract_constructor_type(app.base, env)
+            }
             _ => false,
         }
     }
