@@ -1913,6 +1913,11 @@ impl<'a> ThinCheckerState<'a> {
         if let Some(ident) = self.ctx.arena.get_identifier(node) {
             let name = &ident.escaped_text;
 
+            // Check type parameter scope first
+            if let Some(type_id) = self.lookup_type_parameter(name) {
+                return type_id;
+            }
+
             if let Some(sym_id) = self.resolve_identifier_symbol(idx) {
                 return self.type_reference_symbol_type(sym_id);
             }
@@ -1988,6 +1993,10 @@ impl<'a> ThinCheckerState<'a> {
             return TypeId::ERROR;
         } else if let Some(name) = name_text {
             if is_identifier {
+                // Check type parameter scope before reporting error
+                if let Some(type_id) = self.lookup_type_parameter(&name) {
+                    return type_id;
+                }
                 if self.is_known_global_value_name(&name) {
                     return TypeId::ANY;
                 }
