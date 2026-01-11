@@ -17516,10 +17516,43 @@ impl<'a> ThinCheckerState<'a> {
             return None;
         }
 
+        // Check if the alias RHS is directly a Promise/PromiseLike type reference
+        // before lowering (e.g., Promise<T> where Promise is from lib and might not fully resolve)
+        if let Some(type_node) = self.ctx.arena.get(type_alias.type_node) {
+            if let Some(type_ref) = self.ctx.arena.get_type_ref(type_node) {
+                if let Some(name_node) = self.ctx.arena.get(type_ref.type_name) {
+                    if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
+                        if self.is_promise_like_name(ident.escaped_text.as_str()) {
+                            // It's Promise<...> or PromiseLike<...>
+                            // Get the first type argument and substitute bindings
+                            if let Some(type_args) = &type_ref.type_arguments {
+                                if let Some(&first_arg_idx) = type_args.nodes.first() {
+                                    // Try to substitute bindings in the type argument
+                                    let arg_type = self.lower_type_with_bindings(first_arg_idx, bindings.clone());
+                                    return Some(arg_type);
+                                }
+                            }
+                            // No type args means Promise (equivalent to Promise<any>)
+                            return Some(TypeId::ANY);
+                        }
+                    }
+                }
+            }
+        }
+
         let lowered = self.lower_type_with_bindings(type_alias.type_node, bindings);
         if let Some(TypeKey::Application(app_id)) = self.ctx.types.lookup(lowered) {
             let app = self.ctx.types.type_application(app_id);
             return self.promise_like_type_argument_from_base(app.base, &app.args, visited_aliases);
+        }
+
+        // Fallback: if the alias expands to a promise-like type reference (e.g., Promise from lib),
+        // treat it as Promise<any> even if we can't get the type argument.
+        // This handles cases like: type PromiseAlias<T> = Promise<T> where Promise comes from lib.
+        if self.type_ref_is_promise_like(lowered) {
+            // If we have args, try to return the first one (the T in Promise<T>)
+            // Otherwise return ANY as a safe fallback
+            return Some(args.first().copied().unwrap_or(TypeId::ANY));
         }
 
         None

@@ -5912,6 +5912,41 @@ async function* g4(): {} { yield 1; }
     );
 }
 
+/// Test async functions with type alias return types (conformance: asyncAliasReturnType_es5.ts)
+/// This replicates the scenario where Promise is not locally declared but comes from lib.
+#[test]
+fn test_async_alias_return_type_no_2355() {
+    use crate::thin_parser::ThinParserState;
+
+    // Note: Unlike test_async_promise_void_no_2355, this doesn't declare Promise interface.
+    // This matches the conformance test which relies on lib.es2015.promise.
+    // The type alias PromiseAlias<T> = Promise<T> should still unwrap to void.
+    let source = r#"
+type PromiseAlias<T> = Promise<T>;
+
+async function f(): PromiseAlias<void> {
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2355),
+        "Did not expect TS2355 for async PromiseAlias<void> return type (conformance: asyncAliasReturnType_es5.ts), got: {:?}",
+        codes
+    );
+}
+
 /// Test that calling a never-returning function doesn't trigger TS2355
 /// This is a known limitation - calls to functions returning `never` should
 /// terminate control flow but aren't currently detected.
