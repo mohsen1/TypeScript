@@ -2444,7 +2444,7 @@ impl<'a> FlowAnalyzer<'a> {
 
 pub(crate) fn function_body_falls_through(arena: &ThinNodeArena, body_idx: NodeIndex) -> bool {
     let Some(body_node) = arena.get(body_idx) else {
-        return true;
+        return false;
     };
 
     if body_node.kind == syntax_kind_ext::BLOCK {
