@@ -11672,16 +11672,23 @@ impl<'a> ThinCheckerState<'a> {
                             return_type = self.infer_return_type_from_body(func.body, None);
                         }
 
-                        let func_name = self.get_function_name_from_node(stmt_idx);
-                        let name_node = if !func.name.is_none() { Some(func.name) } else { None };
-                        self.maybe_report_implicit_any_return(
-                            func_name,
-                            name_node,
-                            return_type,
-                            has_type_annotation,
-                            false,
-                            stmt_idx,
-                        );
+                        // TS7010 (implicit any return) is only emitted for ambient functions
+                        // (declare modifier or .d.ts file), matching TypeScript's behavior
+                        let is_ambient = self.has_declare_modifier(&func.modifiers)
+                            || self.ctx.file_name.ends_with(".d.ts");
+
+                        if is_ambient {
+                            let func_name = self.get_function_name_from_node(stmt_idx);
+                            let name_node = if !func.name.is_none() { Some(func.name) } else { None };
+                            self.maybe_report_implicit_any_return(
+                                func_name,
+                                name_node,
+                                return_type,
+                                has_type_annotation,
+                                false,
+                                stmt_idx,
+                            );
+                        }
 
                         self.push_return_type(return_type);
                         self.check_statement(func.body);
