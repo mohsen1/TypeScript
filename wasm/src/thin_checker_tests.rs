@@ -12481,6 +12481,80 @@ function getResult(): Result {
     );
 }
 
+#[test]
+fn test_union_optional_object_literal_excess_property() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type U = { a?: number } | { b?: number };
+const u: U = { a: 1, c: 2 };
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let excess_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2353)
+        .collect();
+
+    if excess_errors.is_empty() {
+        eprintln!("=== Union Optional Excess Property Diagnostics ===");
+        for diag in &checker.ctx.diagnostics {
+            eprintln!("[{}] code={} {}", diag.start, diag.code, diag.message_text);
+        }
+    }
+
+    assert_eq!(
+        excess_errors.len(), 1,
+        "Expected excess property error for union optional object literal: {:?}",
+        checker.ctx.diagnostics
+    );
+
+    let ts2322_count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2322).count();
+    assert_eq!(
+        ts2322_count, 0,
+        "Did not expect TS2322 for union optional excess property, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_union_optional_variable_assignment_no_common_properties() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type U = { a?: number } | { b?: number };
+const obj = { c: 1 };
+const u: U = obj;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<_> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        codes.contains(&2322),
+        "Expected TS2322 for union optional variable assignment, got: {:?}",
+        codes
+    );
+}
+
 /// TS Unsoundness #4: Freshness / Excess Property Checks - Spread removes freshness
 ///
 /// Using spread on an object can remove freshness in some contexts.
@@ -14764,6 +14838,70 @@ class Thing3 extends Thing2 {
 }
 
 #[test]
+fn test_class_extends_class_like_constructor_properties() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+interface Base<T, U> {
+    x: T;
+    y: U;
+}
+
+interface BaseConstructor {
+    new (x: string, y: string): Base<string, string>;
+    new <T>(x: T): Base<T, T>;
+    new <T, U>(x: T, y: U): Base<T, U>;
+}
+
+declare function getBase(): BaseConstructor;
+
+class D1 extends getBase() {
+    constructor() {
+        super("abc", "def");
+        this.x;
+        this.y;
+    }
+}
+
+class D2 extends getBase() <number> {
+    constructor() {
+        super(10);
+        super(10, 20);
+        this.x;
+        this.y;
+    }
+}
+
+class D3 extends getBase() <string, number> {
+    constructor() {
+        super("abc", 42);
+        this.x;
+        this.y;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker =
+        ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2339),
+        "Should not emit TS2339 for class-like constructor inheritance, got errors: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
 fn test_interface_extension_property_access_ts2339() {
     use crate::thin_parser::ThinParserState;
 
@@ -15218,6 +15356,62 @@ aFn(), b;
         2,
         "Expected two TS2695 errors, got: {:?}",
         checker.ctx.diagnostics.iter().map(|d| d.code).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn test_ts2695_comma_operator_edge_cases() {
+    use crate::thin_parser::ThinParserState;
+    use crate::checker::types::diagnostics::diagnostic_codes;
+
+    let source = r#"
+declare function eval(input: string): any;
+let a = 1;
+let b = 2;
+const obj = { method() {} };
+
+a + b, b;
+!a, b;
+a ? b : 3, b;
+a!, b;
+typeof a, b;
+`template`, b;
+
+void a, b;
+(a as any), b;
+(0, eval)("1");
+(0, obj.method)();
+(0, obj["method"])();
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2695_errors: Vec<_> = checker
+        .ctx
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == diagnostic_codes::LEFT_SIDE_OF_COMMA_OPERATOR_IS_UNUSED_AND_HAS_NO_SIDE_EFFECTS)
+        .collect();
+
+    assert_eq!(
+        ts2695_errors.len(),
+        6,
+        "Expected six TS2695 errors, got: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| d.code).collect::<Vec<_>>()
+    );
+    assert!(
+        checker.ctx.diagnostics.iter().all(|d| d.code == diagnostic_codes::LEFT_SIDE_OF_COMMA_OPERATOR_IS_UNUSED_AND_HAS_NO_SIDE_EFFECTS),
+        "Expected only TS2695 diagnostics, got: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>()
     );
 }
 

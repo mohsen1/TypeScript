@@ -1551,6 +1551,102 @@ impl<'a> ThinCheckerState<'a> {
                     );
                 }
             }
+            Some(TypeKey::Union(members_id)) => {
+                use rustc_hash::FxHashMap;
+                let members = self.ctx.types.type_list(members_id);
+                let mut common_props: Option<FxHashMap<Atom, crate::solver::PropertyInfo>> = None;
+                let mut common_string_index: Option<crate::solver::IndexSignature> = None;
+                let mut common_number_index: Option<crate::solver::IndexSignature> = None;
+
+                for &member in members.iter() {
+                    let mut member_props: FxHashMap<Atom, crate::solver::PropertyInfo> = FxHashMap::default();
+                    let mut member_string_index = None;
+                    let mut member_number_index = None;
+                    let mut member_visited = rustc_hash::FxHashSet::default();
+                    member_visited.insert(base_instance_type);
+
+                    self.merge_base_instance_properties_inner(
+                        member,
+                        &mut member_props,
+                        &mut member_string_index,
+                        &mut member_number_index,
+                        &mut member_visited,
+                    );
+
+                    if common_props.is_none() {
+                        common_props = Some(member_props);
+                        common_string_index = member_string_index;
+                        common_number_index = member_number_index;
+                        continue;
+                    }
+
+                    let mut props = common_props.take().unwrap();
+                    props.retain(|name, prop| {
+                        let Some(member_prop) = member_props.get(name) else {
+                            return false;
+                        };
+                        let merged_type = if prop.type_id == member_prop.type_id {
+                            prop.type_id
+                        } else {
+                            self.ctx.types.union(vec![prop.type_id, member_prop.type_id])
+                        };
+                        let merged_write_type = if prop.write_type == member_prop.write_type {
+                            prop.write_type
+                        } else {
+                            self.ctx.types.union(vec![prop.write_type, member_prop.write_type])
+                        };
+                        prop.type_id = merged_type;
+                        prop.write_type = merged_write_type;
+                        prop.optional |= member_prop.optional;
+                        prop.readonly &= member_prop.readonly;
+                        prop.is_method &= member_prop.is_method;
+                        true
+                    });
+                    common_props = Some(props);
+
+                    common_string_index = match (common_string_index.take(), member_string_index) {
+                        (Some(mut left), Some(right)) => {
+                            if left.value_type != right.value_type {
+                                left.value_type =
+                                    self.ctx.types.union(vec![left.value_type, right.value_type]);
+                            }
+                            left.readonly &= right.readonly;
+                            Some(left)
+                        }
+                        _ => None,
+                    };
+                    common_number_index = match (common_number_index.take(), member_number_index) {
+                        (Some(mut left), Some(right)) => {
+                            if left.value_type != right.value_type {
+                                left.value_type =
+                                    self.ctx.types.union(vec![left.value_type, right.value_type]);
+                            }
+                            left.readonly &= right.readonly;
+                            Some(left)
+                        }
+                        _ => None,
+                    };
+
+                    if common_props.as_ref().map_or(true, |props| props.is_empty())
+                        && common_string_index.is_none()
+                        && common_number_index.is_none()
+                    {
+                        break;
+                    }
+                }
+
+                if let Some(props) = common_props {
+                    for prop in props.into_values() {
+                        properties.entry(prop.name).or_insert(prop);
+                    }
+                }
+                if let Some(idx) = common_string_index {
+                    Self::merge_index_signature(string_index, idx);
+                }
+                if let Some(idx) = common_number_index {
+                    Self::merge_index_signature(number_index, idx);
+                }
+            }
             _ => {}
         }
     }
@@ -11483,33 +11579,76 @@ impl<'a> ThinCheckerState<'a> {
 
         // Get the properties of both types
         let source_shape = match self.ctx.types.lookup(source) {
-            Some(TypeKey::Object(shape_id)) => self.ctx.types.object_shape(shape_id),
-            _ => return,
-        };
-
-        let target_shape = match self.ctx.types.lookup(target) {
-            Some(TypeKey::Object(shape_id)) => self.ctx.types.object_shape(shape_id),
+            Some(TypeKey::Object(shape_id)) | Some(TypeKey::ObjectWithIndex(shape_id)) => {
+                self.ctx.types.object_shape(shape_id)
+            }
             _ => return,
         };
 
         let source_props = source_shape.properties.as_slice();
-        let target_props = target_shape.properties.as_slice();
+        let resolved_target = self.resolve_type_for_property_access(target);
 
-        // Empty object {} accepts any properties - no excess property check needed.
-        // This is a key TypeScript behavior: {} means "any non-nullish value".
-        // See https://github.com/microsoft/TypeScript/issues/60582
-        if target_props.is_empty() {
-            return;
-        }
+        match self.ctx.types.lookup(resolved_target) {
+            Some(TypeKey::Object(shape_id)) => {
+                let target_shape = self.ctx.types.object_shape(shape_id);
+                let target_props = target_shape.properties.as_slice();
 
-        // Check for excess properties in source that don't exist in target
-        // This is the "freshness" or "strict object literal" check
-        for source_prop in source_props {
-            let exists_in_target = target_props.iter().any(|p| p.name == source_prop.name);
-            if !exists_in_target {
-                let prop_name = self.ctx.types.resolve_atom(source_prop.name);
-                self.error_excess_property_at(&prop_name, target, idx);
+                // Empty object {} accepts any properties - no excess property check needed.
+                // This is a key TypeScript behavior: {} means "any non-nullish value".
+                // See https://github.com/microsoft/TypeScript/issues/60582
+                if target_props.is_empty() {
+                    return;
+                }
+
+                // Check for excess properties in source that don't exist in target
+                // This is the "freshness" or "strict object literal" check
+                for source_prop in source_props {
+                    let exists_in_target = target_props.iter().any(|p| p.name == source_prop.name);
+                    if !exists_in_target {
+                        let prop_name = self.ctx.types.resolve_atom(source_prop.name);
+                        self.error_excess_property_at(&prop_name, target, idx);
+                    }
+                }
             }
+            Some(TypeKey::Union(members_id)) => {
+                let members = self.ctx.types.type_list(members_id);
+                let mut target_shapes = Vec::new();
+
+                for &member in members.iter() {
+                    let resolved_member = self.resolve_type_for_property_access(member);
+                    let shape = match self.ctx.types.lookup(resolved_member) {
+                        Some(TypeKey::Object(shape_id))
+                        | Some(TypeKey::ObjectWithIndex(shape_id)) => {
+                            self.ctx.types.object_shape(shape_id)
+                        }
+                        _ => continue,
+                    };
+
+                    if shape.properties.is_empty()
+                        || shape.string_index.is_some()
+                        || shape.number_index.is_some()
+                    {
+                        return;
+                    }
+
+                    target_shapes.push(shape);
+                }
+
+                if target_shapes.is_empty() {
+                    return;
+                }
+
+                for source_prop in source_props {
+                    let exists_in_target = target_shapes.iter().any(|shape| {
+                        shape.properties.iter().any(|prop| prop.name == source_prop.name)
+                    });
+                    if !exists_in_target {
+                        let prop_name = self.ctx.types.resolve_atom(source_prop.name);
+                        self.error_excess_property_at(&prop_name, target, idx);
+                    }
+                }
+            }
+            _ => return,
         }
         // Note: Missing property checks are handled by solver's explain_failure
     }

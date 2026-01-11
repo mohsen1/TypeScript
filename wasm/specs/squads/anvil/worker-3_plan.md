@@ -1,21 +1,25 @@
 # Anvil Worker 3 - TS2339 Property Resolution (Inherited Properties)
 
-Ready for Merge: Yes
+Ready for Merge: No (merged 2026-01-11)
 Status: Active
 
 ## Current Assignment (2026-01-11)
 
-- Prereq: run `./scripts/ask-gemini.mjs "I need to reduce TS2339 false positives (property lookup/inheritance). What's the best approach?"` once the API key is available.
-- Reduce TS2339 false positives (property access on inherited/prototype chain, mixins, and interface merges).
-- Collect 3-5 failing samples from conformance output; capture the failing expression + expected property resolution.
-- Trace property lookup in `wasm/src/thin_checker.rs` (class instance types, interface heritage, index signatures, and union/intersection property merges).
-- Implement fix + regression tests; run a targeted TS2339 scan and report the delta.
+- Reduce TS2403 false positives (subsequent variable declarations).
+- Collect 3-5 failing samples via conformance output (search for TS2403); capture file + expected vs actual diagnostics.
+- Trace symbol/decl merging in `wasm/src/thin_checker.rs` and `wasm/src/solver/subtype.rs`; implement fix + regression tests.
+- Deliverables: sample list + root cause notes, regression test(s), and before/after TS2403 delta from a targeted conformance run.
 
 ### Update (2026-01-11)
 - Fix: use TypeEnvironment-backed assignability in call/new resolution, and resolve Application symbols (including type param constraints) to improve generic mixin inference (commit 5cf3894068).
 - Regression: `test_mixin_return_type_preserves_base_properties` in `wasm/src/thin_checker_tests.rs`.
 - Samples (pre-fix): `classes/mixinAbstractClasses.ts`, `classes/mixinClassesAnnotated.ts`, `classes/mixinClassesAnonymous.ts`, `classes/mixinClassesMembers.ts`, `controlFlow/assertionTypePredicates1.ts`.
 - TS2339 scan (post-fix): `node wasm/differential-test/find-ts2339.mjs --max=500 --samples=5` → 1 extra (`classes/classDeclarations/classExtendingClassLikeType.ts`, 6 errors).
+
+### Update (2026-01-11)
+- Fix: merge common properties/index signatures for union base instance types (overloaded class-like constructors) so `extends getBase()` preserves base members (commit 9b23466626).
+- Regression: `test_class_extends_class_like_constructor_properties` in `wasm/src/thin_checker_tests.rs`.
+- TS2339 scan: `node wasm/differential-test/find-ts2339.mjs --max=500 --samples=5` → 0 extra.
 
 ## Current Assignment (Crash triage: privateNamesInterfaceExtendingClass) - COMPLETED
 

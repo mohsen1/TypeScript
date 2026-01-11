@@ -7,26 +7,28 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-Reduce remaining TS2304 missing-name false positives.
+Fix TS2304 false positives caused by type-predicate parsing in parameter types.
 
 **Error Code:** TS2304 - "Cannot find name 'X'."
 
-**Impact:** 30 false positives in 1000-file scan (Promise/await resolved; remaining in heritage/literal/parse contexts)
+**Impact:** 138 conformance tests affected
 
 ### Steps
-1. **Run a scan**: `cd wasm/differential-test && node find-ts2304.mjs --max=1000 --samples=30` (done; timed out at 180s, partial results captured).
-2. **Pick top missing-name pattern** (done: builtin/global types + missing-name scope for signature type params).
-3. **Implement the fix** in `thin_checker.rs`/`binder.rs` and add a focused regression test (done).
-4. **Run focused tests** with `./wasm/test.sh` and report delta (done; see Resume Notes).
+1. **Reproduce** with `tests/cases/conformance/controlFlow/assertionTypePredicates1.ts` (look for parse + TS2304 noise).
+2. **Parse type predicates** in parameter types: `x is T`, `asserts x is T`, and `asserts this is T`.
+3. **Lower type predicates** in `solver/lower.rs` so they become proper type nodes (avoid parse-error cascades).
+4. **Add tests** in `wasm/src/thin_checker_tests.rs` covering assertion predicates and missing-name behavior.
+5. **Run focused tests** with `./wasm/test.sh` and report delta.
 
 ### Key Files
-- `wasm/src/thin_checker.rs`
-- `wasm/src/binder.rs`
+- `wasm/src/thin_parser.rs`
+- `wasm/src/parser/thin_node.rs`
+- `wasm/src/solver/lower.rs`
 - `wasm/src/thin_checker_tests.rs`
 
 ### Success Criteria
-- TS2304 false positives reduced for the selected pattern
-- No new regressions in existing TS2304 tests
+- TS2304 false positives reduced for assertion/type predicate cases
+- No new parse errors for predicate syntax
 
 ## Resume Notes
 - Branch: `worker/forge-2`.
@@ -81,7 +83,7 @@ Reduce remaining TS2304 missing-name false positives.
 - Added `exports` to known global values and tests covering switch-case, type predicate params, and exports.
 
 ## Ready for Merge
-Yes
+No
 
 ## Notes
 - **Post-merge test status:** 68 unit test failures after merging origin/rust + origin/squad/forge
