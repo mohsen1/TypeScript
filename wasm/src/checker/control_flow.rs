@@ -1149,6 +1149,14 @@ impl<'a> FlowAnalyzer<'a> {
                     }
                     return narrowing.narrow_by_excluding_discriminant(type_id, prop_name, literal_true);
                 }
+
+                if self.is_matching_reference(condition_idx, target) {
+                    if is_true_branch {
+                        let narrowed = narrowing.narrow_excluding_type(type_id, TypeId::NULL);
+                        return narrowing.narrow_excluding_type(narrowed, TypeId::UNDEFINED);
+                    }
+                    return self.narrow_to_falsy(type_id);
+                }
             }
 
             // Truthiness check: if (x)
@@ -1233,6 +1241,9 @@ impl<'a> FlowAnalyzer<'a> {
         }
 
         if operator == SyntaxKind::InKeyword as u16 {
+            if self.is_matching_reference(bin.left, target) {
+                return self.narrow_by_in_operator_left(type_id, is_true_branch, narrowing);
+            }
             return self.narrow_by_in_operator(type_id, bin, target, is_true_branch);
         }
 
@@ -1785,6 +1796,16 @@ impl<'a> FlowAnalyzer<'a> {
         self.narrow_to_objectish(type_id)
     }
 
+    fn narrow_by_in_operator_left(
+        &self,
+        type_id: TypeId,
+        _is_true_branch: bool,
+        narrowing: &NarrowingContext,
+    ) -> TypeId {
+        let narrowed = narrowing.narrow_excluding_type(type_id, TypeId::NULL);
+        narrowing.narrow_excluding_type(narrowed, TypeId::UNDEFINED)
+    }
+
     fn instance_type_from_constructor(&self, expr: NodeIndex) -> Option<TypeId> {
         if let Some(node_types) = self.node_types {
             if let Some(&type_id) = node_types.get(&expr.0) {
@@ -1980,6 +2001,14 @@ impl<'a> FlowAnalyzer<'a> {
             let ident = self.arena.get_identifier(node)?;
             let atom = self.interner.intern_string(&ident.escaped_text);
             return Some((atom, false));
+        }
+
+        if node.kind == SyntaxKind::Identifier as u16 {
+            if let Some((_, init)) = self.const_condition_initializer(idx) {
+                if let Some(result) = self.literal_atom_and_kind_from_node_or_type(init) {
+                    return Some(result);
+                }
+            }
         }
 
         None
