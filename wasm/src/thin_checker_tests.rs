@@ -7404,6 +7404,74 @@ var e: typeof E;
 }
 
 #[test]
+fn test_variable_redeclaration_enum_object_literal_no_2403() {
+    use crate::thin_parser::ThinParserState;
+
+    // Ensure enum value redeclaration with structural type does not trigger TS2403.
+    let source = r#"
+enum E1 {
+    A,
+    B,
+    C
+}
+
+var e = E1;
+var e: {
+    readonly A: number;
+    readonly B: number;
+    readonly C: number;
+    readonly [n: number]: string;
+};
+var e: typeof E1;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let error_2403_count = codes.iter().filter(|&&c| c == 2403).count();
+
+    assert_eq!(error_2403_count, 0,
+        "Expected no error 2403 for enum object redeclaration, got: {:?}", codes);
+}
+
+#[test]
+fn test_variable_redeclaration_array_spread_no_2403() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+function f1() {
+    var a = [1, 2, 3];
+    var b = ["hello", ...a, true];
+    var b: (string | number | boolean)[];
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let error_2403_count = codes.iter().filter(|&&c| c == 2403).count();
+
+    assert_eq!(error_2403_count, 0,
+        "Expected no error 2403 for array spread redeclaration, got: {:?}", codes);
+}
+
+#[test]
 fn test_variable_redeclaration_inferred_vs_annotated_no_2403() {
     use crate::thin_parser::ThinParserState;
 
