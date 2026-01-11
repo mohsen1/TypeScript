@@ -8,10 +8,12 @@ Priority: 5
 
 ## Current Assignment
 - **TS2322 False Positives**: Reduce TS2322 'Type X is not assignable to type Y' false positives.
-  - Status: Investigating (5 false positives in 1000 tests)
-  - Files: controlFlowGenericTypes.ts, controlFlowInOperator.ts, controlFlowOptionalChain.ts, exhaustiveSwitchStatements1.ts, globalThisReadonlyProperties.ts
-  - Pattern: Control flow narrowing for generic types and property access
-  - Next: Identify root cause and implement fix
+  - Status: Partially fixed (basic case works, complex cases remain)
+  - Files: controlFlowGenericTypes.ts (3 FP), controlFlowInOperator.ts (1 FP), controlFlowOptionalChain.ts (1 FP), exhaustiveSwitchStatements1.ts (1 FP), globalThisReadonlyProperties.ts (1 FP)
+  - Pattern: Control flow narrowing for generic types
+  - Fixed: Basic `T extends string | undefined` with truthiness checks (commit in progress)
+  - Remaining: Property access (`y.a`), tuple access (`z[0]`), `Extract<T, ...>` types
+  - Next: Investigate complex cases and implement remaining fixes
 
 ## Task Queue
 - [x] Verify whether `types/mapped/recursiveMappedTypes.ts` still crashes; if so, capture stack and coordinate with Forge.

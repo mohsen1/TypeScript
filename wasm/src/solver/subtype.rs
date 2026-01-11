@@ -422,11 +422,43 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             // Intersection source: source is subtype if any constituent is
             (TypeKey::Intersection(members), _) => {
                 let members = self.interner.type_list(*members);
+
+                // First, check if any member is directly a subtype
                 for &member in members.iter() {
                     if self.check_subtype(member, target).is_true() {
                         return SubtypeResult::True;
                     }
                 }
+
+                // For type parameters in intersections, try narrowing the constraint
+                // by the other members. This handles cases like:
+                // `T & string` where T extends `string | undefined` should be a subtype of `string`
+                for &member in members.iter() {
+                    if let Some(TypeKey::TypeParameter(param_info)) | Some(TypeKey::Infer(param_info)) =
+                        self.interner.lookup(member)
+                    {
+                        if let Some(constraint) = param_info.constraint {
+                            // Create intersection of constraint with other members
+                            let other_members: Vec<TypeId> = members
+                                .iter()
+                                .filter(|&&m| m != member)
+                                .copied()
+                                .collect();
+
+                            if !other_members.is_empty() {
+                                let mut all_members = vec![constraint];
+                                all_members.extend(other_members);
+                                let narrowed_constraint = self.interner.intersection(all_members);
+
+                                // Check if the narrowed constraint is a subtype of target
+                                if self.check_subtype(narrowed_constraint, target).is_true() {
+                                    return SubtypeResult::True;
+                                }
+                            }
+                        }
+                    }
+                }
+
                 SubtypeResult::False
             }
 
