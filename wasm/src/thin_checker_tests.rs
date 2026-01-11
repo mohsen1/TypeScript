@@ -14937,6 +14937,263 @@ class Foo {
     assert_eq!(count2, 0, "Expected 0 TS2564 errors with flag disabled");
 }
 
+/// Test that parameter properties are considered definitely assigned
+#[test]
+fn test_ts2564_parameter_properties_are_initialized() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Foo {
+    name: string;
+    value: number;
+    constructor(public name: string, private value: number) {
+        // Parameter properties are automatically initialized
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Should have NO TS2564 errors - parameter properties are definitely assigned
+    let has_2564 = checker.ctx.diagnostics.iter().any(|d| d.code == 2564);
+    assert!(
+        !has_2564,
+        "Expected no TS2564 errors for parameter properties, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// Test that readonly parameter properties are considered definitely assigned
+#[test]
+fn test_ts2564_readonly_parameter_properties_are_initialized() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Foo {
+    readonly name: string;
+    constructor(public readonly name: string) {
+        // Readonly parameter property
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Should have NO TS2564 errors - readonly parameter properties are definitely assigned
+    let has_2564 = checker.ctx.diagnostics.iter().any(|d| d.code == 2564);
+    assert!(
+        !has_2564,
+        "Expected no TS2564 errors for readonly parameter properties, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// Test definite assignment through if/else branches
+#[test]
+fn test_ts2564_definite_assignment_if_else() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Foo {
+    value: number;
+    constructor(flag: boolean) {
+        if (flag) {
+            this.value = 1;
+        } else {
+            this.value = 2;
+        }
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Should have NO TS2564 errors - value is assigned in both branches
+    let has_2564 = checker.ctx.diagnostics.iter().any(|d| d.code == 2564);
+    assert!(
+        !has_2564,
+        "Expected no TS2564 errors - property assigned in both if/else branches, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// Test definite assignment through try/catch
+#[test]
+fn test_ts2564_definite_assignment_try_catch() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Foo {
+    value: number;
+    constructor() {
+        try {
+            this.value = 1;
+        } catch {
+            this.value = 2;
+        }
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Should have NO TS2564 errors - value is assigned in both try and catch
+    let has_2564 = checker.ctx.diagnostics.iter().any(|d| d.code == 2564);
+    assert!(
+        !has_2564,
+        "Expected no TS2564 errors - property assigned in both try/catch, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// Test definite assignment through loop
+#[test]
+fn test_ts2564_definite_assignment_loop() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Foo {
+    value: number;
+    constructor() {
+        this.value = 0;
+        for (let i = 0; i < 10; i++) {
+            this.value += i;
+        }
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Should have NO TS2564 errors - value is assigned before loop
+    let has_2564 = checker.ctx.diagnostics.iter().any(|d| d.code == 2564);
+    assert!(
+        !has_2564,
+        "Expected no TS2564 errors - property assigned before loop, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// Test that incomplete assignment in if/else emits TS2564
+#[test]
+fn test_ts2564_incomplete_if_else_emits_error() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Foo {
+    value: number;
+    constructor(flag: boolean) {
+        if (flag) {
+            this.value = 1;
+        }
+        // Missing else branch - value not always assigned
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Should have TS2564 error - value not assigned in else branch
+    let count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2564).count();
+    assert_eq!(
+        count, 1,
+        "Expected 1 TS2564 error for incomplete if/else assignment, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// Test that early return doesn't affect definite assignment
+#[test]
+fn test_ts2564_early_return_definite_assignment() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Foo {
+    value: number;
+    constructor(flag: boolean) {
+        if (flag) {
+            this.value = 1;
+            return;
+        }
+        this.value = 2;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Should have NO TS2564 errors - value is assigned on all paths
+    let has_2564 = checker.ctx.diagnostics.iter().any(|d| d.code == 2564);
+    assert!(
+        !has_2564,
+        "Expected no TS2564 errors - property assigned on all paths including early return, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
 #[test]
 fn test_recursive_mapped_type_stack_guard() {
     use crate::thin_parser::ThinParserState;

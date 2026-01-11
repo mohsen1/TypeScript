@@ -13323,7 +13323,40 @@ impl<'a> ThinCheckerState<'a> {
 
         let mut properties = Vec::new();
         let mut tracked = FxHashSet::default();
+        let mut parameter_properties = FxHashSet::default();
 
+        // First pass: collect parameter properties from constructor
+        // Parameter properties are always definitely assigned
+        for &member_idx in &class.members.nodes {
+            let Some(node) = self.ctx.arena.get(member_idx) else {
+                continue;
+            };
+            if node.kind != syntax_kind_ext::CONSTRUCTOR {
+                continue;
+            }
+            let Some(ctor) = self.ctx.arena.get_constructor(node) else {
+                continue;
+            };
+
+            // Collect parameter properties from constructor parameters
+            for &param_idx in &ctor.parameters.nodes {
+                let Some(param_node) = self.ctx.arena.get(param_idx) else {
+                    continue;
+                };
+                let Some(param) = self.ctx.arena.get_parameter(param_node) else {
+                    continue;
+                };
+
+                // Parameter properties have modifiers (public/private/protected/readonly)
+                if param.modifiers.is_some() {
+                    if let Some(key) = self.property_key_from_name(param.name) {
+                        parameter_properties.insert(key.clone());
+                    }
+                }
+            }
+        }
+
+        // Second pass: collect class properties that need initialization
         for &member_idx in &class.members.nodes {
             let Some(node) = self.ctx.arena.get(member_idx) else {
                 continue;
@@ -13365,7 +13398,8 @@ impl<'a> ThinCheckerState<'a> {
         };
 
         for (key, name, name_node) in properties {
-            if assigned.contains(&key) {
+            // Property is assigned if it's in the assigned set OR it's a parameter property
+            if assigned.contains(&key) || parameter_properties.contains(&key) {
                 continue;
             }
             use crate::checker::types::diagnostics::format_message;
