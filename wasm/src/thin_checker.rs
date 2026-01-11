@@ -524,6 +524,19 @@ impl<'a> ThinCheckerState<'a> {
                 }
             }
 
+            // Type assertions (x as T / <T>x)
+            k if k == syntax_kind_ext::AS_EXPRESSION || k == syntax_kind_ext::TYPE_ASSERTION => {
+                if let Some(assertion) = self.ctx.arena.get_type_assertion(node) {
+                    if !assertion.type_node.is_none() {
+                        self.get_type_from_type_node(assertion.type_node)
+                    } else {
+                        self.get_type_of_node(assertion.expression)
+                    }
+                } else {
+                    TypeId::ANY
+                }
+            }
+
             // Template expression (template literals with substitutions)
             k if k == syntax_kind_ext::TEMPLATE_EXPRESSION => {
                 self.get_type_of_template_expression(idx)
@@ -4610,7 +4623,9 @@ impl<'a> ThinCheckerState<'a> {
 
         // Check cache first
         if let Some(&cached) = self.ctx.symbol_types.get(&sym_id) {
-            return cached;
+            if !self.symbol_is_parameter(sym_id) || cached != TypeId::ANY {
+                return cached;
+            }
         }
 
         // Check for circular reference
@@ -4804,8 +4819,37 @@ impl<'a> ThinCheckerState<'a> {
 
         // Variable - get type from annotation or infer from initializer
         if flags & (symbol_flags::FUNCTION_SCOPED_VARIABLE | symbol_flags::BLOCK_SCOPED_VARIABLE) != 0 {
+            if self.symbol_is_parameter(sym_id) {
+                for &decl_idx in &symbol.declarations {
+                    if let Some(node) = self.ctx.arena.get(decl_idx) {
+                        if let Some(param) = self.ctx.arena.get_parameter(node) {
+                            if !param.type_annotation.is_none() {
+                                return (self.get_type_from_type_node(param.type_annotation), Vec::new());
+                            }
+                            if let Some(jsdoc_type) = self.jsdoc_type_annotation_for_node(decl_idx) {
+                                return (jsdoc_type, Vec::new());
+                            }
+                            if !param.initializer.is_none() {
+                                return (self.get_type_of_node(param.initializer), Vec::new());
+                            }
+                        }
+                    }
+                }
+            }
             if !value_decl.is_none() {
                 if let Some(node) = self.ctx.arena.get(value_decl) {
+                    if let Some(param) = self.ctx.arena.get_parameter(node) {
+                        if !param.type_annotation.is_none() {
+                            return (self.get_type_from_type_node(param.type_annotation), Vec::new());
+                        }
+                        if let Some(jsdoc_type) = self.jsdoc_type_annotation_for_node(value_decl) {
+                            return (jsdoc_type, Vec::new());
+                        }
+                        if !param.initializer.is_none() {
+                            return (self.get_type_of_node(param.initializer), Vec::new());
+                        }
+                        return (TypeId::ANY, Vec::new());
+                    }
                     if let Some(var_decl) = self.ctx.arena.get_variable_declaration(node) {
                         // First try type annotation using type-node lowering (resolves through binder).
                         if !var_decl.type_annotation.is_none() {
@@ -5963,6 +6007,17 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    fn spread_expression_from_node(
+        &self,
+        node: &crate::parser::thin_node::ThinNode,
+    ) -> Option<NodeIndex> {
+        self.ctx
+            .arena
+            .get_spread(node)
+            .map(|spread| spread.expression)
+            .or_else(|| self.ctx.arena.get_unary_expr_ex(node).map(|unary| unary.expression))
+    }
+
     fn collect_call_argument_types_with_context<F>(
         &mut self,
         args: &[NodeIndex],
@@ -5979,9 +6034,12 @@ impl<'a> ThinCheckerState<'a> {
         for &arg_idx in args.iter() {
             if let Some(arg_node) = self.ctx.arena.get(arg_idx) {
                 if arg_node.kind == syntax_kind_ext::SPREAD_ELEMENT {
-                    if let Some(spread_data) = self.ctx.arena.get_spread(arg_node) {
-                        let spread_type = self.get_type_of_node(spread_data.expression);
+                    if let Some(spread_expr) = self.spread_expression_from_node(arg_node) {
+                        let spread_type = self.get_type_of_node(spread_expr);
                         let spread_type = self.resolve_type_for_property_access(spread_type);
+                        let spread_type = self
+                            .annotated_tuple_type_for_spread(spread_expr)
+                            .unwrap_or(spread_type);
                         if let Some(TypeKey::Tuple(elems_id)) = self.ctx.types.lookup(spread_type) {
                             let elems = self.ctx.types.tuple_list(elems_id);
                             expanded_count += elems.len();
@@ -6000,9 +6058,12 @@ impl<'a> ThinCheckerState<'a> {
             if let Some(arg_node) = self.ctx.arena.get(arg_idx) {
                 // Handle spread elements specially - expand tuple types
                 if arg_node.kind == syntax_kind_ext::SPREAD_ELEMENT {
-                    if let Some(spread_data) = self.ctx.arena.get_spread(arg_node) {
-                        let spread_type = self.get_type_of_node(spread_data.expression);
+                    if let Some(spread_expr) = self.spread_expression_from_node(arg_node) {
+                        let spread_type = self.get_type_of_node(spread_expr);
                         let spread_type = self.resolve_type_for_property_access(spread_type);
+                        let spread_type = self
+                            .annotated_tuple_type_for_spread(spread_expr)
+                            .unwrap_or(spread_type);
 
                         // If it's a tuple type, expand its elements
                         if let Some(TypeKey::Tuple(elems_id)) = self.ctx.types.lookup(spread_type) {
@@ -6055,6 +6116,46 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         arg_types
+    }
+
+    fn annotated_tuple_type_for_spread(&mut self, expr_idx: NodeIndex) -> Option<TypeId> {
+        use crate::solver::TypeKey;
+        use crate::scanner::SyntaxKind;
+
+        let node = self.ctx.arena.get(expr_idx)?;
+        if node.kind != SyntaxKind::Identifier as u16 {
+            return None;
+        }
+
+        let sym_id = self.resolve_identifier_symbol(expr_idx)?;
+        let symbol = self.ctx.binder.get_symbol(sym_id)?;
+        let decl_idx = symbol.value_declaration;
+        if decl_idx.is_none() {
+            return None;
+        }
+
+        let decl_node = self.ctx.arena.get(decl_idx)?;
+        let type_node = if let Some(param) = self.ctx.arena.get_parameter(decl_node) {
+            param.type_annotation
+        } else if let Some(var_decl) = self.ctx.arena.get_variable_declaration(decl_node) {
+            var_decl.type_annotation
+        } else {
+            NodeIndex::NONE
+        };
+
+        if type_node.is_none() {
+            return None;
+        }
+
+        let annotated_type = self.get_type_from_type_node(type_node);
+        match self.ctx.types.lookup(annotated_type) {
+            Some(TypeKey::Tuple(_)) => Some(annotated_type),
+            Some(TypeKey::ReadonlyType(inner)) => match self.ctx.types.lookup(inner) {
+                Some(TypeKey::Tuple(_)) => Some(inner),
+                _ => None,
+            },
+            _ => None,
+        }
     }
 
     fn check_call_argument_excess_properties<F>(
@@ -7532,13 +7633,16 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         let tuple_context = match self.ctx.contextual_type {
-            Some(ctx_type) => match self.ctx.types.lookup(ctx_type) {
-                Some(TypeKey::Tuple(elements)) => {
-                    let elements = self.ctx.types.tuple_list(elements);
-                    Some(elements.as_ref().to_vec())
+            Some(ctx_type) => {
+                let ctx_type = self.resolve_type_for_property_access(ctx_type);
+                match self.ctx.types.lookup(ctx_type) {
+                    Some(TypeKey::Tuple(elements)) => {
+                        let elements = self.ctx.types.tuple_list(elements);
+                        Some(elements.as_ref().to_vec())
+                    }
+                    _ => None,
                 }
-                _ => None,
-            },
+            }
             None => None,
         };
 
@@ -7570,8 +7674,17 @@ impl<'a> ThinCheckerState<'a> {
             };
             let elem_is_spread = elem_node.kind == syntax_kind_ext::SPREAD_ELEMENT;
             let elem_type = if elem_is_spread {
-                if let Some(spread_data) = self.ctx.arena.get_spread(elem_node) {
-                    self.get_type_of_node(spread_data.expression)
+                if let Some(spread_expr) = self.spread_expression_from_node(elem_node) {
+                    let spread_type = self.get_type_of_node(spread_expr);
+                    let spread_type = self.resolve_type_for_property_access(spread_type);
+                    let spread_type = self
+                        .annotated_tuple_type_for_spread(spread_expr)
+                        .unwrap_or(spread_type);
+                    if tuple_context.is_some() {
+                        spread_type
+                    } else {
+                        self.get_element_access_type(spread_type, TypeId::NUMBER, None)
+                    }
                 } else {
                     TypeId::ANY
                 }
@@ -9595,6 +9708,33 @@ impl<'a> ThinCheckerState<'a> {
         result
     }
 
+    fn append_tuple_indices(
+        &self,
+        elements: &[crate::solver::TupleElement],
+        base: usize,
+        out: &mut Vec<TypeId>,
+    ) -> Option<usize> {
+        use crate::solver::TypeKey;
+
+        let mut index = base;
+        for element in elements {
+            if element.rest {
+                match self.ctx.types.lookup(element.type_id) {
+                    Some(TypeKey::Tuple(rest_id)) => {
+                        let rest = self.ctx.types.tuple_list(rest_id);
+                        index = self.append_tuple_indices(rest.as_ref(), index, out)?;
+                    }
+                    Some(TypeKey::Array(_)) => return None,
+                    _ => return None,
+                }
+            } else {
+                out.push(self.ctx.types.literal_string(&index.to_string()));
+                index += 1;
+            }
+        }
+        Some(index)
+    }
+
     /// Get keyof a type - extract the keys of an object type.
     fn get_keyof_type(&self, operand: TypeId) -> TypeId {
         use crate::solver::{TypeKey, LiteralValue};
@@ -9604,6 +9744,7 @@ impl<'a> ThinCheckerState<'a> {
         };
 
         match key {
+            TypeKey::ReadonlyType(inner) => self.get_keyof_type(inner),
             TypeKey::Object(shape_id) | TypeKey::ObjectWithIndex(shape_id) => {
                 let shape = self.ctx.types.object_shape(shape_id);
                 if shape.properties.is_empty() {
@@ -9614,6 +9755,17 @@ impl<'a> ThinCheckerState<'a> {
                     .iter()
                     .map(|p| self.ctx.types.intern(TypeKey::Literal(LiteralValue::String(p.name))))
                     .collect();
+                self.ctx.types.union(key_types)
+            }
+            TypeKey::Tuple(elements_id) => {
+                let elements = self.ctx.types.tuple_list(elements_id);
+                let mut key_types: Vec<TypeId> = Vec::new();
+                let _ = self.append_tuple_indices(elements.as_ref(), 0, &mut key_types);
+                key_types.push(TypeId::NUMBER);
+                key_types.push(self.ctx.types.literal_string("length"));
+                if key_types.is_empty() {
+                    return TypeId::NEVER;
+                }
                 self.ctx.types.union(key_types)
             }
             _ => TypeId::NEVER,
@@ -13135,8 +13287,8 @@ impl<'a> ThinCheckerState<'a> {
                 k if k == syntax_kind_ext::SPREAD_ELEMENT
                     || k == syntax_kind_ext::SPREAD_ASSIGNMENT =>
                 {
-                    if let Some(spread) = self.ctx.arena.get_spread(node) {
-                        stack.push(spread.expression);
+                    if let Some(spread_expr) = self.spread_expression_from_node(node) {
+                        stack.push(spread_expr);
                     }
                 }
                 k if k == syntax_kind_ext::AS_EXPRESSION
