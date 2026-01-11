@@ -7,17 +7,16 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-TS2322 object literal excess property + optionality.
+TS2300 duplicate identifier in class accessor get/set pairs (compile_class_accessors).
 
-**Error Code:** TS2322 - "Type 'X' is not assignable to type 'Y'"
+**Error Code:** TS2300 - "Duplicate identifier 'X'"
 
-**Impact:** 310 conformance tests affected
+**Impact:** `cli::driver_tests::compile_class_accessors` failing
 
 ### Steps
-1. **Add focused tests** in `wasm/src/solver/compat_tests.rs` and `wasm/src/thin_checker_tests.rs`.
-2. **Fix assignability** in `wasm/src/solver/compat.rs` for union optional property overlap.
-3. **Harden object literal excess property checks** for union targets.
-4. **Run focused tests** and record delta.
+1. **Add focused tests** in `wasm/src/thin_checker_tests.rs` for accessor pairs vs duplicate getters.
+2. **Fix duplicate identifier handling** for accessors in `wasm/src/thin_checker.rs`.
+3. **Run focused tests** and re-check `compile_class_accessors`.
 
 ### Key Files
 - `wasm/src/solver/compat.rs`
@@ -27,13 +26,12 @@ TS2322 object literal excess property + optionality.
 - `wasm/src/checker/types/assignability.rs` (if present)
 
 ### Success Criteria
-- TS2322 missing errors reduced for object literal assignability
-- Extra errors do not increase (no regressions)
+- No TS2300 for getter/setter pairs
+- `cli::driver_tests::compile_class_accessors` passes
 
 ## Task Queue
-- Add TS2322 regression tests for object literal excess property and optionality.
-- Validate assignability for unions with contextual typing.
-- Confirm no regressions in existing assignability tests.
+- Verify getter/setter pairs don't report TS2300.
+- Ensure duplicate getters still report TS2300.
 
 ## Completed
 
@@ -82,13 +80,13 @@ TS2322 object literal excess property + optionality.
 Yes
 
 ## Notes
-- Progress: skip weak-union TS2322 for object literal contexts so TS2353 is emitted; added union optional object literal + call argument tests; added compat coverage for weak union refs.
-- Tests: `./wasm/test.sh weak_union_rejects_no_common_properties_with_refs`; `./wasm/test.sh` (failed: `cli::driver_tests::compile_class_accessors` duplicate identifier 'width' TS2300).
-- Commit format: `[wasm] checker: refine weak union diagnostics`
+- Progress: duplicate identifier logic now treats accessors with GET/SET excludes; added class accessor pair/duplicate getter tests.
+- Tests: `./wasm/test.sh class_accessor_pair_no_duplicate_2300`; `./wasm/test.sh class_duplicate_getter_2300`; `./wasm/test.sh compile_class_accessors`.
+- Commit format: `[wasm] checker: fix accessor duplicate identifier`
 - Push to: `origin/worker/forge-4`
 - **NEVER edit**: `STRUCTURE.md`, `GOALS.md`, other workers' plan files, or anything in `orchestrator/`
 
 ## Resume
-- Branch/state: `worker/forge-4`, changes committed/pushed, ready for merge.
-- Session work: added weak-union bypass for object literals in assignments/returns/calls to avoid extra TS2322; added tests for no-common-property literals and call arguments; added weak union ref compat test.
-- Unit tests: `./wasm/test.sh weak_union_rejects_no_common_properties_with_refs`; `./wasm/test.sh` (failed: `cli::driver_tests::compile_class_accessors` duplicate identifier 'width' TS2300); `./wasm/test.sh union_optional`.
+- Branch/state: `worker/forge-4`, changes pending commit/push.
+- Session work: fix duplicate identifier handling for accessors (GET/SET excludes) to allow getter+setter pairs; added class accessor tests.
+- Unit tests: `./wasm/test.sh class_accessor_pair_no_duplicate_2300`; `./wasm/test.sh class_duplicate_getter_2300`; `./wasm/test.sh compile_class_accessors`.

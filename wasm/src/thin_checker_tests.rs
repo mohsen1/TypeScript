@@ -1053,6 +1053,86 @@ function Foo() {}
 }
 
 #[test]
+fn test_class_accessor_pair_no_duplicate_2300() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Rectangle {
+    private _width: number = 0;
+
+    get width(): number {
+        return this._width;
+    }
+
+    set width(value: number) {
+        this._width = value;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&diagnostic_codes::DUPLICATE_IDENTIFIER),
+        "Did not expect TS2300 for getter/setter pair, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_class_duplicate_getter_2300() {
+    use crate::checker::types::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Rectangle {
+    get width(): number {
+        return 1;
+    }
+
+    get width(): number {
+        return 2;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let duplicate_count = checker
+        .ctx
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == diagnostic_codes::DUPLICATE_IDENTIFIER)
+        .count();
+    assert_eq!(
+        duplicate_count,
+        2,
+        "Expected TS2300 for duplicate getters, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
 fn test_overload_call_reports_no_overload_matches() {
     use crate::checker::types::diagnostics::diagnostic_codes;
     use crate::thin_parser::ThinParserState;

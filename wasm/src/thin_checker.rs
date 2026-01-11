@@ -10828,7 +10828,9 @@ impl<'a> ThinCheckerState<'a> {
                 | syntax_kind_ext::CLASS_DECLARATION
                 | syntax_kind_ext::INTERFACE_DECLARATION
                 | syntax_kind_ext::TYPE_ALIAS_DECLARATION
-                | syntax_kind_ext::ENUM_DECLARATION => {
+                | syntax_kind_ext::ENUM_DECLARATION
+                | syntax_kind_ext::GET_ACCESSOR
+                | syntax_kind_ext::SET_ACCESSOR => {
                     return Some(current);
                 }
                 _ => {}
@@ -10876,6 +10878,8 @@ impl<'a> ThinCheckerState<'a> {
             syntax_kind_ext::INTERFACE_DECLARATION => Some(symbol_flags::INTERFACE),
             syntax_kind_ext::TYPE_ALIAS_DECLARATION => Some(symbol_flags::TYPE_ALIAS),
             syntax_kind_ext::ENUM_DECLARATION => Some(symbol_flags::REGULAR_ENUM),
+            syntax_kind_ext::GET_ACCESSOR => Some(symbol_flags::GET_ACCESSOR),
+            syntax_kind_ext::SET_ACCESSOR => Some(symbol_flags::SET_ACCESSOR),
             _ => None,
         }
     }
@@ -10901,6 +10905,12 @@ impl<'a> ThinCheckerState<'a> {
         }
         if (flags & symbol_flags::REGULAR_ENUM) != 0 {
             return symbol_flags::REGULAR_ENUM_EXCLUDES;
+        }
+        if (flags & symbol_flags::GET_ACCESSOR) != 0 {
+            return symbol_flags::GET_ACCESSOR_EXCLUDES;
+        }
+        if (flags & symbol_flags::SET_ACCESSOR) != 0 {
+            return symbol_flags::SET_ACCESSOR_EXCLUDES;
         }
         symbol_flags::NONE
     }
