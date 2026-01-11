@@ -832,6 +832,18 @@ impl<'a> FlowAnalyzer<'a> {
                 }
             }
 
+            k if k == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION
+                || k == syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION =>
+            {
+                if let Some(prop_name) = self.discriminant_property(condition_idx, target) {
+                    let literal_true = self.interner.literal_boolean(true);
+                    if is_true_branch {
+                        return narrowing.narrow_by_discriminant(type_id, prop_name, literal_true);
+                    }
+                    return narrowing.narrow_by_excluding_discriminant(type_id, prop_name, literal_true);
+                }
+            }
+
             // Truthiness check: if (x)
             _ => {
                 if self.is_matching_reference(condition_idx, target) {
@@ -2359,6 +2371,12 @@ impl<'a> FlowAnalyzer<'a> {
         }
 
         let node = self.arena.get(idx)?;
+        if node.kind == syntax_kind_ext::BINARY_EXPRESSION {
+            let bin = self.arena.get_binary_expr(node)?;
+            if self.is_assignment_operator(bin.operator_token) {
+                return self.reference_symbol_inner(bin.left, visited);
+            }
+        }
         if node.kind == syntax_kind_ext::QUALIFIED_NAME {
             let qn = self.arena.get_qualified_name(node)?;
             return self.resolve_namespace_member(qn.left, qn.right, visited);
