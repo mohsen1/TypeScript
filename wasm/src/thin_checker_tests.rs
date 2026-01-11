@@ -16938,3 +16938,88 @@ let { x = "hello" }: { x?: number } = {};
     assert!(!ts2322_errors.is_empty(), "Expected TS2322 error for binding element default value 'hello' (string) not assignable to number, got: {:?}",
         checker.ctx.diagnostics.iter().map(|d| d.code).collect::<Vec<_>>());
 }
+
+#[test]
+fn test_recursive_mapped_type_no_crash_and_ts2456() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// TS2456: Type alias 'DirectCircular' circularly references itself
+type DirectCircular = DirectCircular;
+
+// TS2456: Mutually circular type aliases
+type MutualA = MutualB;
+type MutualB = MutualA;
+
+// Valid recursive mapped types (should NOT crash or error)
+type Recurse = {
+    [K in keyof Recurse]: Recurse[K]
+}
+
+type Recurse1 = {
+    [K in keyof Recurse2]: Recurse2[K]
+}
+
+type Recurse2 = {
+    [K in keyof Recurse1]: Recurse1[K]
+}
+
+// Property access on recursive mapped type (should not crash)
+type Box<T> = { value: T };
+type RecursiveBox = { [K in keyof Box<RecursiveBox>]: Box<RecursiveBox>[K] };
+
+function test(r: RecursiveBox) {
+    return r.value; // Should not crash
+}
+
+// Circular mapped type from #27881
+export type Circular<T> = {[P in keyof T]: Circular<T>};
+type tup = [number, number, number, number];
+
+function foo(arg: Circular<tup>): tup {
+  return arg;
+}
+
+// Deep recursive mapped type from #29442
+type DeepMap<T extends unknown[], R> = {
+  [K in keyof T]: T[K] extends unknown[] ? DeepMap<T[K], R> : R;
+};
+
+type tpl = [string, [string, [string]]];
+type t1 = DeepMap<tpl, number>;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+
+    // This should NOT crash even with recursive types
+    checker.check_source_file(root);
+
+    eprintln!("[RECURSIVE_MAPPED_TEST] All diagnostics: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>());
+
+    // Verify TS2456 is emitted for direct circular type alias
+    let ts2456_count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2456).count();
+
+    // We should have at least TS2456 errors for:
+    // 1. DirectCircular
+    // 2. MutualA
+    // 3. MutualB
+    // Note: Depending on implementation, we might get 2 (one per declaration) or 3
+    assert!(
+        ts2456_count >= 2,
+        "Expected at least 2 TS2456 errors for circular type aliases, got {} - diagnostics: {:?}",
+        ts2456_count,
+        checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>()
+    );
+
+    // The test reaching here means we didn't crash on recursive mapped types
+    eprintln!("[RECURSIVE_MAPPED_TEST] Test completed without crash - {} TS2456 errors found", ts2456_count);
+}

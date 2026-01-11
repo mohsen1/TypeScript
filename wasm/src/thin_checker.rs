@@ -4790,6 +4790,35 @@ impl<'a> ThinCheckerState<'a> {
 
         // Check for circular reference
         if self.ctx.symbol_resolution_set.contains(&sym_id) {
+            // Cycle detected! Check if this is a type alias (not allowed to be circular)
+            // Interfaces CAN be recursive, but type aliases cannot
+            if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
+                use crate::binder::symbol_flags;
+                if symbol.flags & symbol_flags::TYPE_ALIAS != 0 {
+                    // Get the declaration node for error reporting
+                    if let Some(&decl_idx) = symbol.declarations.first() {
+                        if let Some(node) = self.ctx.arena.get(decl_idx) {
+                            // Check if we've already reported this to avoid spam
+                            let already_reported = self.ctx.diagnostics.iter().any(|d|
+                                d.code == 2456 && d.start == node.pos
+                            );
+
+                            if !already_reported {
+                                use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
+                                self.ctx.error(
+                                    node.pos,
+                                    node.end - node.pos,
+                                    diagnostic_messages::TYPE_ALIAS_CIRCULARLY_REFERENCES_ITSELF
+                                        .replace("{0}", &symbol.escaped_name),
+                                    diagnostic_codes::TYPE_ALIAS_CIRCULARLY_REFERENCES_ITSELF,
+                                );
+                            }
+                        }
+                    }
+                    return TypeId::ERROR;
+                }
+            }
+            // For non-type-alias symbols (like interfaces), circular references are OK
             return TypeId::ANY;
         }
 

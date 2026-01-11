@@ -2951,6 +2951,24 @@ impl<'a> FlowAnalyzer<'a> {
     }
 }
 
+/// Check whether a function body can fall through to the end.
+/// Returns true if execution can reach the end of the function body without
+/// encountering a return/throw statement.
+pub fn function_body_falls_through(_arena: &ThinNodeArena, _body_idx: NodeIndex) -> bool {
+    // Simplified stub: assume function bodies can fall through
+    // A full implementation would analyze control flow to detect
+    // if all paths have return/throw statements
+    true
+}
+
+/// Check whether a statement can fall through to the next statement.
+/// Returns true if execution can continue past this statement.
+pub fn statement_falls_through(_arena: &ThinNodeArena, _stmt_idx: NodeIndex) -> bool {
+    // Simplified stub: assume statements can fall through
+    // A full implementation would analyze control flow
+    true
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
