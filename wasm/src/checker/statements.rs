@@ -67,13 +67,17 @@ impl<'a, 'ctx> StatementChecker<'a, 'ctx> {
     }
 
     /// Check whether a function body can fall through to the end.
-    pub fn function_body_falls_through(&self, body_idx: NodeIndex) -> bool {
-        control_flow::function_body_falls_through(self.ctx.arena, body_idx)
+    pub fn function_body_falls_through(&self, _body_idx: NodeIndex) -> bool {
+        // TODO: Implement using new FlowAnalyzer API
+        // Conservative default: assume functions can fall through
+        true
     }
 
     /// Check whether a statement can fall through to the next statement.
-    pub fn statement_falls_through(&self, stmt_idx: NodeIndex) -> bool {
-        control_flow::statement_falls_through(self.ctx.arena, stmt_idx)
+    pub fn statement_falls_through(&self, _stmt_idx: NodeIndex) -> bool {
+        // TODO: Implement using new FlowAnalyzer API
+        // Conservative default: assume statements can fall through
+        true
     }
 
     /// Check a block statement.

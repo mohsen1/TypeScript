@@ -16938,3 +16938,58 @@ let { x = "hello" }: { x?: number } = {};
     assert!(!ts2322_errors.is_empty(), "Expected TS2322 error for binding element default value 'hello' (string) not assignable to number, got: {:?}",
         checker.ctx.diagnostics.iter().map(|d| d.code).collect::<Vec<_>>());
 }
+
+/// Test that decorated class members with accessor keyword don't produce TS2304 errors
+#[test]
+fn test_decorated_class_members_no_ts2304() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class A {
+    @((t, c) => {})
+    static accessor x = 1;
+
+    @((t, c) => {})
+    accessor y = 2;
+
+    @((t, k, d) => {})
+    static f() {}
+
+    @((t, k, d) => {})
+    static get g() { return 1; }
+
+    @((t, k) => {})
+    static z = 1;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Filter for TS2304 errors
+    let ts2304_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2304)
+        .collect();
+
+    if !ts2304_errors.is_empty() {
+        eprintln!("=== Unexpected TS2304 errors in decorated class members ===");
+        for diag in &ts2304_errors {
+            eprintln!("[{}] {}", diag.start, diag.message_text);
+        }
+    }
+
+    // Should have NO TS2304 errors for properly parsed decorated members
+    assert_eq!(
+        ts2304_errors.len(), 0,
+        "Expected no TS2304 errors for decorated class members with accessor keyword, got: {:?}",
+        ts2304_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>()
+    );
+}
