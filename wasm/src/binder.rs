@@ -1003,6 +1003,28 @@ impl BinderState {
                 }
             }
 
+            // Method declarations (in object literals or classes)
+            Node::MethodDeclaration(method) => {
+                self.bind_method_declaration(arena, method, idx);
+            }
+
+            // Function expressions
+            Node::FunctionExpression(func) => {
+                self.bind_function_expression(arena, func, idx);
+            }
+
+            // Arrow functions
+            Node::ArrowFunction(arrow) => {
+                self.bind_arrow_function(arena, arrow, idx);
+            }
+
+            // Object literals - traverse into properties to find methods
+            Node::ObjectLiteralExpression(obj) => {
+                for &prop_idx in &obj.properties.nodes {
+                    self.bind_node(arena, prop_idx);
+                }
+            }
+
             _ => {
                 // For other node types, no symbols to create
             }
@@ -1203,6 +1225,11 @@ impl BinderState {
                 self.declare_symbol(name.to_string(), flags, decl_idx);
             }
         }
+
+        // Traverse into the initializer to bind any function expressions or object literals
+        if !decl.initializer.is_none() {
+            self.bind_node(arena, decl.initializer);
+        }
     }
 
     fn bind_function_declaration(
@@ -1240,6 +1267,113 @@ impl BinderState {
 
             // Bind the function body
             self.bind_node(arena, func.body);
+            self.exit_scope();
+        }
+    }
+
+    fn bind_method_declaration(
+        &mut self,
+        arena: &NodeArena,
+        method: &crate::parser::MethodDeclaration,
+        method_idx: NodeIndex,
+    ) {
+        // Method declarations can appear in classes or object literals
+        // For methods in object literals, we don't declare the method name,
+        // but we still need to create a function scope and bind parameters
+
+        // Bind method body in new function scope
+        if !method.body.is_none() {
+            self.enter_scope(ContainerKind::Function, method_idx);
+
+            // Collect hoisted declarations within method
+            if let Some(Node::Block(block)) = arena.get(method.body) {
+                self.collect_hoisted_declarations(arena, &block.statements.nodes);
+                self.process_hoisted_functions(arena);
+            }
+
+            // Bind parameters first (they're in function scope)
+            for &param_idx in &method.parameters.nodes {
+                if let Some(Node::ParameterDeclaration(param)) = arena.get(param_idx) {
+                    if let Some(name) = self.get_identifier_name(arena, param.name) {
+                        self.declare_symbol(name.to_string(), symbol_flags::FUNCTION_SCOPED_VARIABLE, param_idx);
+                    }
+                }
+            }
+
+            // Bind the method body
+            self.bind_node(arena, method.body);
+            self.exit_scope();
+        }
+    }
+
+    fn bind_function_expression(
+        &mut self,
+        arena: &NodeArena,
+        func: &crate::parser::FunctionExpression,
+        func_idx: NodeIndex,
+    ) {
+        // Function expressions can be named or anonymous
+        // Named function expressions declare their name in their own scope
+
+        // Bind function body in new function scope
+        if !func.body.is_none() {
+            self.enter_scope(ContainerKind::Function, func_idx);
+
+            // If this is a named function expression, declare the name in the function scope
+            if let Some(name) = self.get_identifier_name(arena, func.name) {
+                self.declare_symbol(name.to_string(), symbol_flags::FUNCTION, func_idx);
+            }
+
+            // Collect hoisted declarations within function
+            if let Some(Node::Block(block)) = arena.get(func.body) {
+                self.collect_hoisted_declarations(arena, &block.statements.nodes);
+                self.process_hoisted_functions(arena);
+            }
+
+            // Bind parameters first (they're in function scope)
+            for &param_idx in &func.parameters.nodes {
+                if let Some(Node::ParameterDeclaration(param)) = arena.get(param_idx) {
+                    if let Some(name) = self.get_identifier_name(arena, param.name) {
+                        self.declare_symbol(name.to_string(), symbol_flags::FUNCTION_SCOPED_VARIABLE, param_idx);
+                    }
+                }
+            }
+
+            // Bind the function body
+            self.bind_node(arena, func.body);
+            self.exit_scope();
+        }
+    }
+
+    fn bind_arrow_function(
+        &mut self,
+        arena: &NodeArena,
+        arrow: &crate::parser::ArrowFunction,
+        arrow_idx: NodeIndex,
+    ) {
+        // Arrow functions are always anonymous and create a function scope
+
+        // Bind arrow body in new function scope
+        if !arrow.body.is_none() {
+            self.enter_scope(ContainerKind::Function, arrow_idx);
+
+            // Collect hoisted declarations if body is a block
+            if let Some(Node::Block(block)) = arena.get(arrow.body) {
+                self.collect_hoisted_declarations(arena, &block.statements.nodes);
+                self.process_hoisted_functions(arena);
+            }
+
+            // Bind parameters first (they're in function scope)
+            for &param_idx in &arrow.parameters.nodes {
+                if let Some(Node::ParameterDeclaration(param)) = arena.get(param_idx) {
+                    if let Some(name) = self.get_identifier_name(arena, param.name) {
+                        self.declare_symbol(name.to_string(), symbol_flags::FUNCTION_SCOPED_VARIABLE, param_idx);
+                    }
+                }
+            }
+
+            // Bind the arrow body
+            self.bind_node(arena, arrow.body);
             self.exit_scope();
         }
     }
