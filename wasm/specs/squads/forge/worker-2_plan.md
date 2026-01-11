@@ -7,39 +7,39 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-Fix TS2304 false positives in heritage namespace cycles and invalid heritage literals.
+Reduce remaining TS2304 false positives in heritage or decorator/noTypesAndSymbols cases.
 
 **Error Code:** TS2304 - "Cannot find name 'X'."
 
-**Impact:** 138 conformance tests affected
+**Impact:** Remaining TS2304 false positives after predicate + exports fixes.
 
 ### Steps
-1. **Rebuild + scan**: `./wasm/build-wasm.sh` then `node wasm/differential-test/find-ts2304.mjs --max=1000 --samples=30`.
-2. **Collect top heritage cases** (namespace cycles or `extends null/undefined`).
-3. **Implement fix** in `wasm/src/thin_parser.rs` and/or `wasm/src/thin_checker.rs` to avoid spurious TS2304.
-4. **Add tests** in `wasm/src/thin_checker_tests.rs` for heritage edge cases.
-5. **Run focused tests** with `./wasm/test.sh` and report delta.
+1. **Rebuild + scan**: `./wasm/build-wasm.sh` then `cd wasm/differential-test && node find-ts2304.mjs --max=1000 --samples=30`.
+2. **Pick top remaining pattern** (heritage null/namespace cycles or decorator/noTypesAndSymbols).
+3. **Implement fix** in `thin_checker.rs`/`thin_parser.rs` and add a focused regression test.
+4. **Run focused tests** with `./wasm/test.sh` and report delta.
 
 ### Key Files
-- `wasm/src/thin_parser.rs`
 - `wasm/src/thin_checker.rs`
+- `wasm/src/thin_parser.rs`
 - `wasm/src/thin_checker_tests.rs`
 
 ### Success Criteria
-- TS2304 false positives reduced for heritage namespace/literal cases
-- No new TS2304 regressions
+- TS2304 false positives reduced for selected remaining pattern
+- No new regressions in existing TS2304 tests
 
 ## Resume Notes
 - Branch: `worker/forge-2`.
-- Latest commit: `[wasm] checker: reduce TS2304 missing-name false positives`
-- Recent changes: Added TS2552 for `await`, added builtin/global type fallback list (Promise/NonNullable/etc), scoped type params in missing-name checks, suppressed TS2304 for heritage literals, and expanded tests.
-- Last tests: `./wasm/test.sh test_builtin_types_no_ts2304_errors` (pass), `./wasm/test.sh test_builtin_types_in_type_literal_no_ts2304` (pass), `./wasm/test.sh test_await_type_context_suggests_awaited` (pass)
-- **Latest TS2304 conformance scan results:** `find-ts2304.mjs --max=1000 --samples=30` timed out at 180s; partial results show remaining false positives in heritage null/namespace cycles, private name misuse, type predicate parsing (`asserts`/`is`), and some decorator/noTypesAndSymbols cases.
+- Latest commit: `[wasm] parser: parse decorated declarations`
+- Recent changes: Parsed decorated enum/interface/type/namespace/var declarations to avoid TS2304 on invalid decorator declarations; added `test_decorator_invalid_declarations_no_ts2304`.
+- Last tests: `./wasm/test.sh test_decorator_invalid_declarations_no_ts2304` (pass)
+- **Latest TS2304 conformance scan results:** After rebuild, `find-ts2304.mjs --max=1000 --samples=30` timed out at 200s; partial results still show heritage null/namespace cycles and decorator/noTypesAndSymbols cases (scan captured before the extends-null fix).
 - Conformance scan command: `cd wasm/differential-test && node find-ts2304.mjs --max=1000 --samples=30`
 - Remember: do not touch `.role/AGENTS.md`.
 
 ## Task Queue
-- Investigate remaining TS2304 in heritage cycles and invalid heritage literals (null/undefined).
+- Re-run conformance scan after rebuild to confirm extends-null fix.
+- Investigate remaining TS2304 in heritage cycles/namespace resolution.
 - Review TS2304 in decorator/noTypesAndSymbols cases.
 
 ## Completed
@@ -76,9 +76,15 @@ Fix TS2304 false positives in heritage namespace cycles and invalid heritage lit
 - Added TS2552 for `await` in type position and fallback handling for missing builtin/global types in TS2304 checks.
 - Scoped missing-name checks for signature type parameters and suppressed TS2304 in heritage literal expressions.
 - Added tests for builtin types in type literals and expanded builtin coverage (Promise/NonNullable/PropertyKey/etc).
+- Set parent pointers for switch/case nodes to restore scope resolution in switch clauses.
+- Allowed type predicates in `parse_type` to avoid TS2304 for `asserts`/`is` in parameter types.
+- Added `exports` to known global values and tests covering switch-case, type predicate params, and exports.
+- Added contextual `asserts` parsing for type predicates in type positions and tests for asserts return types + `this is`.
+- Parsed heritage literals as expressions to avoid TS2304 for `extends null`; added `test_extends_null_no_2304`.
+- Parsed decorated enum/interface/type/namespace/var declarations to avoid TS2304 on invalid decorator declarations; added `test_decorator_invalid_declarations_no_ts2304`.
 
 ## Ready for Merge
-No
+Yes
 
 ## Notes
 - **Post-merge test status:** 68 unit test failures after merging origin/rust + origin/squad/forge

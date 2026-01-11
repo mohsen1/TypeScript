@@ -1817,6 +1817,21 @@ impl ThinParserState {
                 // Full decorator support would need function modifications
                 self.parse_function_declaration()
             }
+            SyntaxKind::EnumKeyword => {
+                self.parse_enum_declaration_with_modifiers(start_pos, decorators)
+            }
+            SyntaxKind::InterfaceKeyword => {
+                self.parse_interface_declaration_with_modifiers(start_pos, decorators)
+            }
+            SyntaxKind::TypeKeyword => {
+                self.parse_type_alias_declaration_with_modifiers(start_pos, decorators)
+            }
+            SyntaxKind::NamespaceKeyword | SyntaxKind::ModuleKeyword => {
+                self.parse_module_declaration_with_modifiers(start_pos, decorators)
+            }
+            SyntaxKind::VarKeyword | SyntaxKind::LetKeyword | SyntaxKind::ConstKeyword => {
+                self.parse_variable_statement_with_modifiers(Some(start_pos), decorators)
+            }
             SyntaxKind::ExportKeyword => {
                 // Export with decorators: @decorator export class Foo {}
                 self.parse_export_declaration()
@@ -2047,6 +2062,20 @@ impl ThinParserState {
             self.parse_this_expression()
         } else if self.is_token(SyntaxKind::OpenParenToken) || self.is_token(SyntaxKind::NewKeyword) {
             self.parse_left_hand_side_expression()
+        } else if matches!(
+            self.token(),
+            SyntaxKind::NullKeyword
+                | SyntaxKind::TrueKeyword
+                | SyntaxKind::FalseKeyword
+                | SyntaxKind::UndefinedKeyword
+                | SyntaxKind::VoidKeyword
+                | SyntaxKind::NumericLiteral
+                | SyntaxKind::StringLiteral
+                | SyntaxKind::BigIntLiteral
+                | SyntaxKind::NoSubstitutionTemplateLiteral
+                | SyntaxKind::TemplateHead
+        ) {
+            self.parse_primary_expression()
         } else if self.is_identifier_or_keyword() {
             self.parse_identifier_name()
         } else {
@@ -2749,6 +2778,15 @@ impl ThinParserState {
     /// Parse interface declaration
     fn parse_interface_declaration(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
+        self.parse_interface_declaration_with_modifiers(start_pos, None)
+    }
+
+    /// Parse interface declaration with explicit modifiers
+    fn parse_interface_declaration_with_modifiers(
+        &mut self,
+        start_pos: u32,
+        modifiers: Option<NodeList>,
+    ) -> NodeIndex {
         self.parse_expected(SyntaxKind::InterfaceKeyword);
 
         // Parse interface name - keywords like 'string', 'abstract' can be used as interface names
@@ -2806,7 +2844,7 @@ impl ThinParserState {
             start_pos,
             end_pos,
             crate::parser::thin_node::InterfaceData {
-                modifiers: None,
+                modifiers,
                 name,
                 type_parameters,
                 heritage_clauses,
@@ -3213,6 +3251,14 @@ impl ThinParserState {
     /// Parse type alias declaration: type Foo = ... or type Foo<T> = ...
     fn parse_type_alias_declaration(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
+        self.parse_type_alias_declaration_with_modifiers(start_pos, None)
+    }
+
+    fn parse_type_alias_declaration_with_modifiers(
+        &mut self,
+        start_pos: u32,
+        modifiers: Option<NodeList>,
+    ) -> NodeIndex {
         self.parse_expected(SyntaxKind::TypeKeyword);
 
         let name = self.parse_identifier();
@@ -3236,7 +3282,7 @@ impl ThinParserState {
             start_pos,
             end_pos,
             crate::parser::thin_node::TypeAliasData {
-                modifiers: None,
+                modifiers,
                 name,
                 type_parameters,
                 type_node,
@@ -3389,7 +3435,14 @@ impl ThinParserState {
     /// Parse module or namespace declaration: module "name" { } or namespace X { }
     fn parse_module_declaration(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
+        self.parse_module_declaration_with_modifiers(start_pos, None)
+    }
 
+    fn parse_module_declaration_with_modifiers(
+        &mut self,
+        start_pos: u32,
+        modifiers: Option<NodeList>,
+    ) -> NodeIndex {
         // Skip module/namespace/global keyword
         let is_global = self.is_token(SyntaxKind::GlobalKeyword);
         let name = if is_global {
@@ -3433,7 +3486,7 @@ impl ThinParserState {
             start_pos,
             end_pos,
             crate::parser::thin_node::ModuleData {
-                modifiers: None,
+                modifiers,
                 name,
                 body,
             },
@@ -6855,13 +6908,84 @@ impl ThinParserState {
     // Parse Methods - Types (minimal implementation)
     // =========================================================================
 
+    fn is_asserts_keyword(&self) -> bool {
+        self.is_token(SyntaxKind::AssertsKeyword)
+            || (self.is_token(SyntaxKind::Identifier)
+                && self.scanner.get_token_value_ref() == "asserts")
+    }
+
+    fn is_asserts_type_predicate_start(&mut self) -> bool {
+        if !self.is_asserts_keyword() {
+            return false;
+        }
+
+        let snapshot = self.scanner.save_state();
+        let current = self.current_token;
+        self.next_token();
+        let is_param = self.is_identifier_or_keyword() || self.is_token(SyntaxKind::ThisKeyword);
+        self.scanner.restore_state(snapshot);
+        self.current_token = current;
+        is_param
+    }
+
+    fn consume_asserts_keyword(&mut self) {
+        if self.is_asserts_keyword() {
+            self.next_token();
+        } else {
+            self.parse_expected(SyntaxKind::AssertsKeyword);
+        }
+    }
+
     /// Parse a type (handles keywords, type references, unions, intersections, conditionals)
     fn parse_type(&mut self) -> NodeIndex {
+        if self.is_asserts_type_predicate_start() {
+            return self.parse_asserts_type_predicate();
+        }
+
+        // Allow type predicate parsing in type positions to avoid cascading errors.
+        if self.is_identifier_or_keyword() || self.is_token(SyntaxKind::ThisKeyword) {
+            let snapshot = self.scanner.save_state();
+            let current = self.current_token;
+
+            self.next_token();
+            let is_predicate = self.is_token(SyntaxKind::IsKeyword);
+            self.scanner.restore_state(snapshot);
+            self.current_token = current;
+
+            if is_predicate {
+                let name = self.parse_type_predicate_parameter_name();
+                let start_pos = if let Some(node) = self.arena.get(name) {
+                    node.pos
+                } else {
+                    self.token_pos()
+                };
+
+                self.next_token(); // consume 'is'
+                let type_node = self.parse_type();
+                let end_pos = self.token_end();
+
+                return self.arena.add_type_predicate(
+                    syntax_kind_ext::TYPE_PREDICATE,
+                    start_pos,
+                    end_pos,
+                    crate::parser::thin_node::TypePredicateData {
+                        asserts_modifier: false,
+                        parameter_name: name,
+                        type_node,
+                    },
+                );
+            }
+        }
+
         self.parse_conditional_type()
     }
 
     /// Parse return type, which may be a type predicate (x is T) or a regular type
     fn parse_return_type(&mut self) -> NodeIndex {
+        if self.is_asserts_type_predicate_start() {
+            return self.parse_asserts_type_predicate();
+        }
+
         // Check if this is a type predicate: identifier 'is' Type
         // We need to look ahead to see if there's an identifier followed by 'is'
         if self.is_identifier_or_keyword() || self.is_token(SyntaxKind::ThisKeyword) {
@@ -6899,11 +7023,6 @@ impl ThinParserState {
             }
         }
 
-        // Check for 'asserts' type predicate: asserts x is T
-        if self.is_token(SyntaxKind::AssertsKeyword) {
-            return self.parse_asserts_type_predicate();
-        }
-
         self.parse_type()
     }
 
@@ -6921,7 +7040,7 @@ impl ThinParserState {
     /// Parse 'asserts' type predicate: asserts x or asserts x is T
     fn parse_asserts_type_predicate(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
-        self.parse_expected(SyntaxKind::AssertsKeyword);
+        self.consume_asserts_keyword();
 
         let parameter_name = self.parse_type_predicate_parameter_name();
 
@@ -7209,7 +7328,8 @@ impl ThinParserState {
             | SyntaxKind::UnknownKeyword
             | SyntaxKind::ObjectKeyword
             | SyntaxKind::AwaitKeyword
-            | SyntaxKind::YieldKeyword => {
+            | SyntaxKind::YieldKeyword
+            | SyntaxKind::AssertsKeyword => {
                 // Parse keyword as identifier for type reference
                 self.parse_keyword_as_identifier()
             }
