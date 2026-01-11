@@ -5791,6 +5791,109 @@ function loopWithNestedSwitchBreak(flag: boolean) {
     );
 }
 
+#[test]
+fn test_ts7010_return_path_async_generator_arrows() {
+    use crate::checker::{CheckerContext, StatementChecker};
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+function* genYieldOnly() {
+    yield 1;
+}
+
+function* genReturn() {
+    yield 1;
+    return 2;
+}
+
+async function asyncMaybeReturn(flag: boolean) {
+    if (flag) {
+        return 1;
+    }
+}
+
+const arrowExpr = () => 1;
+const asyncArrowExpr = async () => 1;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut ctx = CheckerContext::new(
+        parser.get_arena(),
+        &binder,
+        &types,
+        "test.ts".to_string(),
+    );
+
+    let arena = parser.get_arena();
+    let root_node = arena.get(root).expect("root node");
+    let source_file = arena.get_source_file(root_node).expect("source file");
+
+    let checker = StatementChecker::new(&mut ctx);
+
+    let func_at = |index: usize| {
+        *source_file
+            .statements
+            .nodes
+            .get(index)
+            .expect("statement index")
+    };
+
+    let arrow_at = |index: usize| {
+        let stmt_idx = *source_file
+            .statements
+            .nodes
+            .get(index)
+            .expect("statement index");
+        let stmt_node = arena.get(stmt_idx).expect("statement node");
+        let var_stmt = arena.get_variable(stmt_node).expect("variable statement");
+        let list_idx = *var_stmt
+            .declarations
+            .nodes
+            .first()
+            .expect("variable declaration list");
+        let list_node = arena.get(list_idx).expect("variable list node");
+        let var_list = arena.get_variable(list_node).expect("variable list");
+        let decl_idx = *var_list
+            .declarations
+            .nodes
+            .first()
+            .expect("variable declaration");
+        let decl_node = arena.get(decl_idx).expect("declaration node");
+        let decl = arena
+            .get_variable_declaration(decl_node)
+            .expect("declaration data");
+        decl.initializer
+    };
+
+    assert!(
+        checker.function_like_falls_through(func_at(0)),
+        "genYieldOnly should fall through"
+    );
+    assert!(
+        !checker.function_like_falls_through(func_at(1)),
+        "genReturn should not fall through"
+    );
+    assert!(
+        checker.function_like_falls_through(func_at(2)),
+        "asyncMaybeReturn should fall through"
+    );
+    assert!(
+        !checker.function_like_falls_through(arrow_at(3)),
+        "arrowExpr should not fall through"
+    );
+    assert!(
+        !checker.function_like_falls_through(arrow_at(4)),
+        "asyncArrowExpr should not fall through"
+    );
+}
+
 /// Test that functions that only throw don't trigger TS2355.
 /// TS2355: "A function whose declared type is neither 'void' nor 'any' must return a value"
 /// This should NOT fire for functions that only throw since throwing is a valid exit.

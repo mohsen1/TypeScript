@@ -71,6 +71,20 @@ impl<'a, 'ctx> StatementChecker<'a, 'ctx> {
         control_flow::function_body_falls_through(self.ctx.arena, body_idx)
     }
 
+    /// Check whether a function-like node can fall through to the end.
+    pub fn function_like_falls_through(&self, func_idx: NodeIndex) -> bool {
+        let Some(node) = self.ctx.arena.get(func_idx) else {
+            return false;
+        };
+        let Some(func) = self.ctx.arena.get_function(node) else {
+            return false;
+        };
+        if func.body.is_none() {
+            return false;
+        }
+        control_flow::function_body_falls_through(self.ctx.arena, func.body)
+    }
+
     /// Check whether a statement can fall through to the next statement.
     pub fn statement_falls_through(&self, stmt_idx: NodeIndex) -> bool {
         control_flow::statement_falls_through(self.ctx.arena, stmt_idx)
