@@ -7,8 +7,9 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- Investigate remaining TS2355 extras in asyncGenerators/contextualTypes (3 files).
-- Repro via targeted conformance, fix + regressions, report delta.
+- Quantify remaining TS2304 extras in internalModules/moduleResolution/externalModules categories.
+- Run targeted conformance (`node wasm/differential-test/conformance-runner.mjs internalModules --max=200 -v`, etc.) and collect top samples.
+- If a clear root cause appears, implement fix + regression tests; otherwise, report delta and sample list.
 
 ## Task Queue
 - [x] Verify whether `types/mapped/recursiveMappedTypes.ts` still crashes; if so, capture stack and coordinate with Forge.

@@ -1,14 +1,14 @@
 # Anvil Worker 3 - TS2339 Property Resolution (Inherited Properties)
 
-Ready for Merge: Yes
+Ready for Merge: No
 Status: Active
 
 ## Current Assignment (2026-01-11)
 
-- Investigate TS2403 false positives (subsequent variable declarations type mismatch).
-- Use conformance output to collect 3-5 samples; trace symbol/decl merging in `wasm/src/thin_checker.rs` and related solver checks.
-- Implement fix + regression test(s); run a targeted TS2403 scan and report delta.
-- Deliverables: sample list + root cause notes, regression test(s), and before/after TS2403 delta from a targeted conformance run.
+- Reduce TS2339 property access false positives.
+- Run `node wasm/differential-test/find-ts2339.mjs --max=500 --samples=5` and collect 3-5 samples.
+- Trace property lookup in `wasm/src/thin_checker.rs` (narrowing/index signatures/interface merging/prototype chain).
+- Implement minimal fix + regression tests; report before/after TS2339 delta.
 
 ### Update (2026-01-11)
 - Samples (pre-fix): `enums/enumBasics.ts`, `es6/spread/arrayLiteralSpread.ts`, `es6/spread/arrayLiteralSpreadES5iterable.ts`, `es6/templates/taggedTemplateStringsWithOverloadResolution3.ts`, `es6/templates/taggedTemplateStringsWithOverloadResolution3_ES6.ts`.
