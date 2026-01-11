@@ -7,16 +7,14 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- Reduce TS2355 false positives for async `Promise<void>`/alias returns (remaining samples in async es5/es2017).
-- Use `node wasm/differential-test/find-ts2355.mjs --max=500 --samples=5` to confirm the current sample set.
-- Inspect `requires_return_value` / `return_type_for_implicit_return_check` for async functions in `wasm/src/thin_checker.rs` and control-flow fallthrough in `wasm/src/checker/control_flow.rs`.
-- Add regression tests in `wasm/src/thin_checker_tests.rs` and report before/after TS2355 delta.
+- Awaiting next assignment from EM.
 
 ## Task Queue
 - [x] Verify whether `types/mapped/recursiveMappedTypes.ts` still crashes; if so, capture stack and coordinate with Forge.
 
 
 ## Completed
+- [x] Fixed TS2355 for async type alias returns: Fixed `promise_like_type_argument_from_alias` to handle Promise/PromiseLike types from lib by checking AST structure before lowering. Added regression test `test_async_alias_return_type_no_2355` matching conformance test `asyncAliasReturnType_es5.ts`. TS2355 false positives reduced from 10 to 5 (50% reduction). Remaining 5 are: imported unresolvable types (legitimate) and qualified names like `X.MyPromise<void>` (different issue). Also fixed build break from control_flow refactor. Commits: `d54611f310`, `3afa1f8d5d`. Ran `./wasm/test.sh test_async_alias_return_type_no_2355` (PASS), all async promise tests (PASS), and `node wasm/differential-test/find-ts2355.mjs --max=500 --samples=5`.
 - [x] TS2355 return-analysis: added catch-clause fallthrough handling, added `test_try_catch_no_2355`, and added `wasm/differential-test/find-ts2355.mjs` with sample collection. Samples (`--max=500 --samples=5`) still point to async Promise<void>/alias cases; total false positive files within 500 tests: 10 (no delta from sample set). Ran `./wasm/test.sh test_try_catch_no_2355` (PASS), `./wasm/build-wasm.sh`, and `node wasm/differential-test/find-ts2355.mjs --max=500 --samples=5` (output `/tmp/find_ts2355_samples_after.txt`).
 - [x] Quantified TS2304 extras in `internalModules`, `moduleResolution`, `externalModules` (max=200 each). Extra TS2304 counts: internalModules=5, moduleResolution=5, externalModules=26. Outputs: `/tmp/conformance_internalModules_ts2304.txt`, `/tmp/conformance_moduleResolution_ts2304.txt`, `/tmp/conformance_externalModules_ts2304.txt`.
 - [x] Fixed remaining TS2355 extras in asyncGenerators/contextualTypes by unwrapping async promise-like return types and skipping implicit-return checks for async generators; added `test_async_promise_number_requires_return` and `test_async_generator_no_2355`. Targeted conformance (`types/asyncGenerators`, `types/contextualTypes/asyncFunctions`) shows TS2355 extras removed (outputs in `/tmp/conformance_types_asyncGenerators_after.txt` and `/tmp/conformance_types_contextual_asyncFunctions_after.txt`). Ran `./wasm/test.sh test_async_promise_void_no_2355`, `./wasm/test.sh test_async_promise_number_requires_return`, `./wasm/test.sh test_async_generator_no_2355` (PASS).
