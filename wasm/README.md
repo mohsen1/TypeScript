@@ -127,15 +127,23 @@ The `CompatChecker` in `src/solver/` needs to implement the "Unsoundness Catalog
 
 
 ## Executive Summary (Director report)
-Last updated: 2026-01-11 16:47 (Fifth Director Loop - Manual Trigger)
+Last updated: 2026-01-11 16:53 (Sixth Director Loop - System Issue Identified)
 
-### System Status: ⚠️ All Workers Idle - EMs Alerted
+### System Status: 🔴 Workers Not Auto-Starting - Communication Gap Found
 
 **Organization Health:**
-- Current rust branch: `495da89e91` (Promise TS2304 fix just committed)
-- All 10 workers: **IDLE** (114-168 minutes inactive)
-- Director loop triggered manually, EMs alerted
+- Current rust branch: `7bf14c53e2` (Director loop 5)
+- **SYSTEMIC ISSUE:** Workers don't auto-start from plan file updates
+- All 10 workers sitting at bash prompts (126-181m idle)
+- EM-Forge: Reassigned tasks at 16:44, workers didn't start
+- EM-Anvil: Didn't respond to first alert (16:47)
 - Build passing, ready for merges
+
+**Communication Gap Identified:**
+1. EMs update plan files in worktrees ✅
+2. Workers sit at bash prompts ❌
+3. Workers don't automatically check assignments ❌
+4. Workers need explicit prompts to start work ❌
 
 ### Conformance Metrics (Primary KPI)
 | Metric | Value | Target | Status |
@@ -161,6 +169,22 @@ Last updated: 2026-01-11 16:47 (Fifth Director Loop - Manual Trigger)
 - W3: TS2339 Closure Narrowing - Active
 - W4: TS2769 Overload Matching Continuation - Active
 - W5: TS2322 False Positive Reduction (101 occurrences) - Active
+
+### Recent Progress (Jan 11 16:53 - Sixth Director Loop - System Issue)
+- **🔴 CRITICAL FINDING:** Workers don't auto-start from plan file updates
+  - All 10 worker panes verified: sitting at bash prompts
+  - EM-Forge reassigned tasks at 16:44, workers still idle 10 minutes later
+  - EM-Anvil didn't respond to first alert
+  - Second urgent follow-up sent to both EMs
+- **Root Cause:** Communication gap in multi-agent system design
+  - Plan file updates → don't trigger worker action
+  - Workers need explicit tmux prompts to begin work
+  - System may need worker-side polling or notification hooks
+- **Worker Idle Times:** 126-181 minutes (2-3 hours!)
+- **Action Items:**
+  - Investigate worker auto-start mechanism
+  - Consider adding worker notification hooks
+  - Or implement EM → worker direct prompting
 
 ### Recent Progress (Jan 11 16:47 - Fifth Director Loop - Manual Trigger)
 - **🚨 ALL WORKERS IDLE:** 10/10 workers inactive for 114-168 minutes
