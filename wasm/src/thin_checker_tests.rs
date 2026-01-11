@@ -3,6 +3,7 @@
 use crate::thin_checker::ThinCheckerState;
 use crate::parser::thin_node::ThinNodeArena;
 use crate::thin_binder::ThinBinderState;
+use crate::thin_parser::ThinParserState;
 use crate::solver::{TypeId, TypeInterner};
 
 #[test]
@@ -17377,13 +17378,19 @@ function f1<T extends string | undefined>(x: T): string {
 }
 
 #[test]
+<<<<<<< HEAD
 fn test_private_accessor_via_local_variable_no_error() {
     use crate::thin_parser::ThinParserState;
 
+=======
+fn test_closure_captured_private_accessor_debug() {
+    // Test case matching exact failing conformance test scenario
+>>>>>>> origin/worker/anvil-3
     let source = r#"
 class A2 {
     get #prop() { return ""; }
     set #prop(param: string) { }
+<<<<<<< HEAD
 
     constructor() {
         console.log(this.#prop);
@@ -17391,6 +17398,15 @@ class A2 {
         a.#prop;
         function foo() {
             a.#prop;
+=======
+    
+    constructor() {
+        console.log(this.#prop); // Direct - should work
+        let a: A2 = this;
+        a.#prop; // Same context - should work
+        function foo() {
+            a.#prop; // Closure captured - currently fails but shouldn't
+>>>>>>> origin/worker/anvil-3
         }
     }
 }
@@ -17398,6 +17414,7 @@ class A2 {
 
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
+<<<<<<< HEAD
     assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
 
     let mut binder = ThinBinderState::new();
@@ -17535,10 +17552,34 @@ function test2(obj: A | B) {
     // Should have 2 TS2339 errors: one for obj.c, one for obj.a
     assert_eq!(ts2339_errors.len(), 2,
         "Expected 2 TS2339 errors for union property access, got {}: {:?}",
+=======
+    
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+    
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    
+    checker.check_source_file(root);
+    
+    let ts2339_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2339)
+        .collect();
+    
+    eprintln!("TS2339 errors found: {}", ts2339_errors.len());
+    for err in &ts2339_errors {
+        eprintln!("  - {}", err.message_text);
+    }
+    
+    // All accesses should work - they're all from within the class
+    assert_eq!(ts2339_errors.len(), 0,
+        "Expected no TS2339 errors for private accessor access (including in closures), got {} - errors: {:?}",
+>>>>>>> origin/worker/anvil-3
         ts2339_errors.len(),
         ts2339_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>()
     );
 }
+<<<<<<< HEAD
 
 #[test]
 fn test_ts2339_union_shared_property_no_error() {
@@ -17745,3 +17786,5 @@ function test2(obj: A & { c: boolean }) {
             .map(|d| &d.message_text).collect::<Vec<_>>()
     );
 }
+=======
+>>>>>>> origin/worker/anvil-3
