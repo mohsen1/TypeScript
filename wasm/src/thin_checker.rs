@@ -4776,7 +4776,7 @@ impl<'a> ThinCheckerState<'a> {
     fn is_definitely_assigned_at(&self, idx: NodeIndex) -> bool {
         let flow_node = match self.ctx.binder.get_node_flow(idx) {
             Some(flow) => flow,
-            None => return true,
+            None => return false,  // No flow info means variable is not definitely assigned
         };
         let analyzer = FlowAnalyzer::new(self.ctx.arena, self.ctx.binder, self.ctx.types);
         analyzer.is_definitely_assigned(idx, flow_node)
@@ -7008,8 +7008,11 @@ impl<'a> ThinCheckerState<'a> {
                 type_id
             }
             PropertyAccessResult::PropertyNotFound { .. } => {
-                self.error_property_not_exist_at(&property_name.to_string(), object_type, idx);
-                return TypeId::ERROR;
+                // Don't emit TS2339 for private fields (starting with #) - they're handled elsewhere
+                if !property_name.starts_with('#') {
+                    self.error_property_not_exist_at(&property_name.to_string(), object_type, idx);
+                }
+                TypeId::ERROR
             }
             PropertyAccessResult::PossiblyNullOrUndefined { property_type, .. } => {
                 property_type.unwrap_or(TypeId::ANY)
@@ -7908,6 +7911,14 @@ impl<'a> ThinCheckerState<'a> {
 
         // Function declarations don't report implicit any for parameters (handled by check_statement)
         let is_function_declaration = node.kind == syntax_kind_ext::FUNCTION_DECLARATION;
+        let is_method_or_constructor = matches!(node.kind, syntax_kind_ext::METHOD_DECLARATION | syntax_kind_ext::CONSTRUCTOR);
+
+        // Check for duplicate parameter names in function expressions and arrow functions (TS2300)
+        // Note: Methods and constructors are checked in check_method_declaration and check_constructor_declaration
+        // Function declarations are checked in check_statement
+        if !is_function_declaration && !is_method_or_constructor {
+            self.check_duplicate_parameters(parameters);
+        }
 
         let (type_params, type_param_updates) = self.push_type_parameters(type_parameters);
 
@@ -8051,6 +8062,41 @@ impl<'a> ThinCheckerState<'a> {
                         has_type_annotation,
                         has_contextual_return,
                         idx,
+                    );
+                }
+            }
+
+            // TS2366 (not all code paths return value) for function expressions and arrow functions
+            // Check if all code paths return a value when return type requires it
+            if !is_function_declaration && !body.is_none() {
+                let check_return_type = return_type;
+                let requires_return = self.requires_return_value(check_return_type);
+                let has_return = self.body_has_return_with_value(body);
+                let falls_through = self.function_body_falls_through(body);
+
+                if has_type_annotation && requires_return && falls_through {
+                    use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
+                    if !has_return {
+                        self.error_at_node(
+                            type_annotation,
+                            "A function whose declared type is neither 'undefined', 'void', nor 'any' must return a value.",
+                            diagnostic_codes::FUNCTION_LACKS_RETURN_TYPE,
+                        );
+                    } else {
+                        self.error_at_node(
+                            type_annotation,
+                            diagnostic_messages::FUNCTION_LACKS_ENDING_RETURN_STATEMENT,
+                            diagnostic_codes::NOT_ALL_CODE_PATHS_RETURN_VALUE,
+                        );
+                    }
+                } else if self.ctx.no_implicit_returns && has_return && falls_through {
+                    // TS7030: noImplicitReturns - not all code paths return a value
+                    use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
+                    let error_node = if let Some(nn) = name_node { nn } else { body };
+                    self.error_at_node(
+                        error_node,
+                        diagnostic_messages::NOT_ALL_CODE_PATHS_RETURN,
+                        diagnostic_codes::NOT_ALL_CODE_PATHS_RETURN,
                     );
                 }
             }
@@ -11116,6 +11162,54 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    /// Check if two symbol declarations can merge (for TS2403 checking).
+    /// Returns true if the declarations are mergeable and should NOT trigger TS2403.
+    fn can_merge_symbols(&self, existing_flags: u32, new_flags: u32) -> bool {
+        // Interface can merge with interface
+        if (existing_flags & symbol_flags::INTERFACE) != 0
+            && (new_flags & symbol_flags::INTERFACE) != 0
+        {
+            return true;
+        }
+
+        // Class can merge with interface
+        if ((existing_flags & symbol_flags::CLASS) != 0
+            && (new_flags & symbol_flags::INTERFACE) != 0)
+            || ((existing_flags & symbol_flags::INTERFACE) != 0
+                && (new_flags & symbol_flags::CLASS) != 0)
+        {
+            return true;
+        }
+
+        // Namespace/module can merge with namespace/module
+        if (existing_flags & symbol_flags::MODULE) != 0
+            && (new_flags & symbol_flags::MODULE) != 0
+        {
+            return true;
+        }
+
+        // Namespace can merge with class, function, or enum
+        if (existing_flags & symbol_flags::MODULE) != 0 {
+            if (new_flags & (symbol_flags::CLASS | symbol_flags::FUNCTION | symbol_flags::ENUM)) != 0 {
+                return true;
+            }
+        }
+        if (new_flags & symbol_flags::MODULE) != 0 {
+            if (existing_flags & (symbol_flags::CLASS | symbol_flags::FUNCTION | symbol_flags::ENUM)) != 0 {
+                return true;
+            }
+        }
+
+        // Function overloads
+        if (existing_flags & symbol_flags::FUNCTION) != 0
+            && (new_flags & symbol_flags::FUNCTION) != 0
+        {
+            return true;
+        }
+
+        false
+    }
+
     /// Report error 2403: Subsequent variable declarations must have the same type.
     pub fn error_subsequent_variable_declaration(
         &mut self,
@@ -11845,6 +11939,81 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    /// Check for duplicate parameter names in a parameter list (TS2300).
+    fn check_duplicate_parameters(&mut self, parameters: &NodeList) {
+        let mut seen_names = FxHashSet::default();
+        for &param_idx in &parameters.nodes {
+            let Some(param_node) = self.ctx.arena.get(param_idx) else {
+                continue;
+            };
+            // Parameters can be identifiers or binding patterns
+            if let Some(param) = self.ctx.arena.get_parameter(param_node) {
+                self.collect_and_check_parameter_names(param.name, &mut seen_names);
+            }
+        }
+    }
+
+    /// Recursively collect names from identifiers or binding patterns and check for duplicates.
+    fn collect_and_check_parameter_names(&mut self, name_idx: NodeIndex, seen: &mut FxHashSet<String>) {
+        use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages, format_message};
+
+        let Some(node) = self.ctx.arena.get(name_idx) else {
+            return;
+        };
+
+        match node.kind {
+            // Simple Identifier: parameter name
+            k if k == SyntaxKind::Identifier as u16 => {
+                if let Some(name) = self.node_text(name_idx) {
+                    let name_str = name.to_string();
+                    if !seen.insert(name_str.clone()) {
+                        self.error_at_node(
+                            name_idx,
+                            &format_message(diagnostic_messages::DUPLICATE_IDENTIFIER, &[&name_str]),
+                            diagnostic_codes::DUPLICATE_IDENTIFIER,
+                        );
+                    }
+                }
+            }
+            // Object Binding Pattern: { a, b: c }
+            k if k == syntax_kind_ext::OBJECT_BINDING_PATTERN => {
+                if let Some(pattern) = self.ctx.arena.get_binding_pattern(node) {
+                    for &elem_idx in &pattern.elements.nodes {
+                        self.collect_and_check_binding_element(elem_idx, seen);
+                    }
+                }
+            }
+            // Array Binding Pattern: [a, b]
+            k if k == syntax_kind_ext::ARRAY_BINDING_PATTERN => {
+                if let Some(pattern) = self.ctx.arena.get_binding_pattern(node) {
+                    for &elem_idx in &pattern.elements.nodes {
+                        self.collect_and_check_binding_element(elem_idx, seen);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn collect_and_check_binding_element(&mut self, elem_idx: NodeIndex, seen: &mut FxHashSet<String>) {
+        if elem_idx.is_none() {
+            return;
+        }
+        let Some(node) = self.ctx.arena.get(elem_idx) else {
+            return;
+        };
+
+        // Handle holes in array destructuring: [a, , b]
+        if node.kind == syntax_kind_ext::OMITTED_EXPRESSION {
+            return;
+        }
+
+        if let Some(elem) = self.ctx.arena.get_binding_element(node) {
+            // Recurse on the name (which can be an identifier or another pattern)
+            self.collect_and_check_parameter_names(elem.name, seen);
+        }
+    }
+
     /// Check a statement and produce type errors.
     fn check_statement(&mut self, stmt_idx: NodeIndex) {
         let Some(node) = self.ctx.arena.get(stmt_idx) else {
@@ -11878,6 +12047,8 @@ impl<'a> ThinCheckerState<'a> {
             }
             syntax_kind_ext::BLOCK => {
                 if let Some(block) = self.ctx.arena.get_block(node) {
+                    // Check for unreachable code before checking individual statements
+                    self.check_unreachable_code_in_block(&block.statements.nodes);
                     for &inner_stmt in &block.statements.nodes {
                         self.check_statement(inner_stmt);
                     }
@@ -11892,6 +12063,9 @@ impl<'a> ThinCheckerState<'a> {
                     // Check for parameter properties (error 2369)
                     // Parameter properties are only allowed in constructors
                     self.check_parameter_properties(&func.parameters.nodes);
+
+                    // Check for duplicate parameter names (TS2300)
+                    self.check_duplicate_parameters(&func.parameters);
 
                     // Check return type annotation for parameter properties in function types
                     if !func.type_annotation.is_none() {
@@ -12279,20 +12453,37 @@ impl<'a> ThinCheckerState<'a> {
             // Check for variable redeclaration in the current scope (TS2403).
             // Note: This applies specifically to 'var' merging where types must match.
             // let/const duplicates are caught earlier by the binder (TS2451).
+            // Skip TS2403 for mergeable declarations (namespace, enum, class, interface, function overloads).
             if let Some(prev_type) = self.ctx.var_decl_types.get(&sym_id).copied() {
-                if let Some(ref name) = var_name {
-                    if !self.are_var_decl_types_compatible(prev_type, final_type) {
+                // Check if this is a mergeable declaration by looking at the node kind.
+                // Mergeable declarations: namespace/module, enum, class, interface, function.
+                // When these are declared with the same name, they merge instead of conflicting.
+                let is_mergeable_declaration = if let Some(decl_node) = self.ctx.arena.get(decl_idx) {
+                    matches!(
+                        decl_node.kind,
+                        syntax_kind_ext::MODULE_DECLARATION  // namespace/module
+                            | syntax_kind_ext::ENUM_DECLARATION // enum
+                            | syntax_kind_ext::CLASS_DECLARATION // class
+                            | syntax_kind_ext::INTERFACE_DECLARATION // interface
+                            | syntax_kind_ext::FUNCTION_DECLARATION // function
+                    )
+                } else {
+                    false
+                };
+
+                if !is_mergeable_declaration && !self.are_var_decl_types_compatible(prev_type, final_type) {
+                    if let Some(ref name) = var_name {
                         self.error_subsequent_variable_declaration(
                             name,
                             prev_type,
                             final_type,
                             decl_idx,
                         );
-                    } else {
-                        let refined = self.refine_var_decl_type(prev_type, final_type);
-                        if refined != prev_type {
-                            self.ctx.var_decl_types.insert(sym_id, refined);
-                        }
+                    }
+                } else {
+                    let refined = self.refine_var_decl_type(prev_type, final_type);
+                    if refined != prev_type {
+                        self.ctx.var_decl_types.insert(sym_id, refined);
                     }
                 }
             } else {
@@ -13382,9 +13573,47 @@ impl<'a> ThinCheckerState<'a> {
             return;
         }
 
+        // Only check property initialization when strictPropertyInitialization is enabled
+        if !self.ctx.strict_property_initialization {
+            return;
+        }
+
         let mut properties = Vec::new();
         let mut tracked = FxHashSet::default();
+        let mut parameter_properties = FxHashSet::default();
 
+        // First pass: collect parameter properties from constructor
+        // Parameter properties are always definitely assigned
+        for &member_idx in &class.members.nodes {
+            let Some(node) = self.ctx.arena.get(member_idx) else {
+                continue;
+            };
+            if node.kind != syntax_kind_ext::CONSTRUCTOR {
+                continue;
+            }
+            let Some(ctor) = self.ctx.arena.get_constructor(node) else {
+                continue;
+            };
+
+            // Collect parameter properties from constructor parameters
+            for &param_idx in &ctor.parameters.nodes {
+                let Some(param_node) = self.ctx.arena.get(param_idx) else {
+                    continue;
+                };
+                let Some(param) = self.ctx.arena.get_parameter(param_node) else {
+                    continue;
+                };
+
+                // Parameter properties have modifiers (public/private/protected/readonly)
+                if param.modifiers.is_some() {
+                    if let Some(key) = self.property_key_from_name(param.name) {
+                        parameter_properties.insert(key.clone());
+                    }
+                }
+            }
+        }
+
+        // Second pass: collect class properties that need initialization
         for &member_idx in &class.members.nodes {
             let Some(node) = self.ctx.arena.get(member_idx) else {
                 continue;
@@ -13426,7 +13655,8 @@ impl<'a> ThinCheckerState<'a> {
         };
 
         for (key, name, name_node) in properties {
-            if assigned.contains(&key) {
+            // Property is assigned if it's in the assigned set OR it's a parameter property
+            if assigned.contains(&key) || parameter_properties.contains(&key) {
                 continue;
             }
             use crate::checker::types::diagnostics::format_message;
@@ -17436,6 +17666,9 @@ impl<'a> ThinCheckerState<'a> {
 
         self.cache_parameter_types(&method.parameters.nodes, None);
 
+        // Check for duplicate parameter names (TS2300)
+        self.check_duplicate_parameters(&method.parameters);
+
         // Check that parameter default values are assignable to declared types (TS2322)
         self.check_parameter_initializers(&method.parameters.nodes);
 
@@ -17588,6 +17821,9 @@ impl<'a> ThinCheckerState<'a> {
         // Get the class instance type to validate constructor return expressions (TS2322)
 
         self.cache_parameter_types(&ctor.parameters.nodes, None);
+
+        // Check for duplicate parameter names (TS2300)
+        self.check_duplicate_parameters(&ctor.parameters);
 
         // Check that parameter default values are assignable to declared types (TS2322)
         self.check_parameter_initializers(&ctor.parameters.nodes);
@@ -18505,6 +18741,78 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
         true
+    }
+
+    /// Check for unreachable code after return/throw statements in a block.
+    /// Emits TS7027 for any statements that come after a return or throw.
+    fn check_unreachable_code_in_block(&mut self, statements: &[NodeIndex]) {
+        use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
+
+        let mut unreachable = false;
+        for &stmt_idx in statements {
+            if unreachable {
+                // This statement is unreachable
+                self.error_at_node(
+                    stmt_idx,
+                    diagnostic_messages::UNREACHABLE_CODE_DETECTED,
+                    diagnostic_codes::UNREACHABLE_CODE_DETECTED,
+                );
+            } else {
+                // Check if this statement makes subsequent statements unreachable
+                let Some(node) = self.ctx.arena.get(stmt_idx) else {
+                    continue;
+                };
+                match node.kind {
+                    syntax_kind_ext::RETURN_STATEMENT | syntax_kind_ext::THROW_STATEMENT => {
+                        unreachable = true;
+                    }
+                    syntax_kind_ext::EXPRESSION_STATEMENT => {
+                        // Check if the expression is of type 'never' (e.g., throw(), assertNever())
+                        let Some(expr_stmt) = self.ctx.arena.get_expression_statement(node) else {
+                            continue;
+                        };
+                        let expr_type = self.get_type_of_node(expr_stmt.expression);
+                        if expr_type.is_never() {
+                            unreachable = true;
+                        }
+                    }
+                    syntax_kind_ext::VARIABLE_STATEMENT => {
+                        // Check if any variable has a 'never' initializer
+                        let Some(var_stmt) = self.ctx.arena.get_variable(node) else {
+                            continue;
+                        };
+                        for &decl_idx in &var_stmt.declarations.nodes {
+                            let Some(list_node) = self.ctx.arena.get(decl_idx) else {
+                                continue;
+                            };
+                            let Some(var_list) = self.ctx.arena.get_variable(list_node) else {
+                                continue;
+                            };
+                            for &list_decl_idx in &var_list.declarations.nodes {
+                                let Some(list_decl_node) = self.ctx.arena.get(list_decl_idx) else {
+                                    continue;
+                                };
+                                let Some(decl) = self.ctx.arena.get_variable_declaration(list_decl_node) else {
+                                    continue;
+                                };
+                                if decl.initializer.is_none() {
+                                    continue;
+                                }
+                                let init_type = self.get_type_of_node(decl.initializer);
+                                if init_type.is_never() {
+                                    unreachable = true;
+                                    break;
+                                }
+                            }
+                            if unreachable {
+                                break;
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
     }
 
     fn statement_falls_through(&mut self, stmt_idx: NodeIndex) -> bool {

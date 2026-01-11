@@ -13,8 +13,26 @@ Priority: 1
 | Missing Errors | **57.8%** | 68.2% | <30% | -10.4pp |
 | Extra Errors | **28.9%** | 35.8% | <20% | -6.9pp |
 | Parser Errors | **~85** | 1,122 | <100 | **TARGET MET** |
+| **Crashes** | **~478** 🚨 | ~143 | **0** | **CRITICAL REGRESSION** |
 
 ---
+
+## 🚨 CRISIS: Crash Investigation (P0) - ASSIGNED TO W5
+
+**Status:** Parser panics increased from ~143 to ~478 (10% test suite invalidation)
+
+**Root Cause:** Recent merges (72+ commits affecting checker/binder) introduced regressions
+
+**Investigation Priority:**
+1. 1,453 potential panic sites in checker/solver/binder
+2. Recent `unwrap()`/`expect()` calls in type checking
+3. Missing null checks in property access
+4. Symbol resolution failures
+
+**Action:** W5 reassigned from TS7010 to **CRASH INVESTIGATION** 🔥
+
+---
+
 ## Completed Work (Reference)
 
 | TS Code | Result | Notes |
@@ -80,15 +98,20 @@ Implementation:
 
 Files: `thin_checker.rs`, `thin_binder.rs`
 
-### Worker 5: Return Type Checking (TS7010) - 179 tests
-**Error:** "Function lacks ending return statement and return type does not include 'undefined'"
+### Worker 5: 🚨 CRASH INVESTIGATION (P0) - ~478 parser panics
+**CRITICAL:** 10% of test suite is invalidating due to panics
 
-Implementation:
-1. Analyze all code paths in function body
-2. Check if all paths return a value
-3. If return type is non-void/undefined, emit error
+**Root Cause:** Recent checker/binder commits introduced regressions
 
-Files: `thin_checker.rs`, `checker/statements.rs`
+**Investigation Steps:**
+1. Find all `unwrap()`, `expect()`, `panic!` in checker/solver/binder
+2. Add proper error handling and propagation
+3. Test against failing test cases to identify specific crash
+4. Fix regressions with proper Option/Result handling
+
+**Files:** `thin_checker.rs`, `checker/*.rs`, `solver/*.rs`, `binder/*.rs`
+
+**Previous Task (TS7010):** Suspended due to P0 crisis - will resume after crashes fixed
 
 ---
 ## Category Breakdown (from conformance tests)
@@ -162,20 +185,27 @@ bash run-conformance.sh --all --workers=14
 
 ---
 ## Squad Status
-- Last EM Update: 2026-01-11 (Post-Director merge)
+- Last EM Update: 2026-01-11 (🚨 CRISIS RESPONSE ACTIVE)
 - Conformance: **30.8% exact match** (+7.5pp from 23.3%)
-- Build: Compiling
-- Workers: All 5 synced from origin/rust, active on assigned tasks
-- EM Note: Only merge forge workers (W1-W5) into squad/forge, NOT anvil workers
+- Build: Passing
+- **Crashes**: 478 panics (CRITICAL REGRESSION - 10% test suite broken) 🚨
+- Workers: Crisis reassignments executed, all 5 active
 
-### Worker Assignments (Current)
-| Worker | Assignment | Priority |
-|--------|------------|----------|
-| W1 | TS2454 - Definite Assignment (Control Flow) | HIGH |
-| W2 | TS2322 - Tuple-to-array & optional property assignability | HIGH |
-| W3 | TS7010 - Implicit any return (active with background tasks) | HIGH |
-| W4 | TS2339 - Opt chaining, unions, index signatures | MEDIUM |
-| W5 | TS2304 - Type parameter resolution (active with background tasks) | HIGH |
+### Worker Assignments (🚨 CRISIS RESPONSE)
+
+| Worker | Priority | Assignment | Status |
+|--------|----------|------------|--------|
+| W5 | **P0** 🔥 | **CRASH INVESTIGATION** (478→0 panics) | **ASSIGNED - Fix crashes NOW!** |
+| W3 | **P1** | **TS2322** Solver Strictness (149 missing) | **REASSIGNED - Stop TS7006** |
+| W4 | P1 | TS2792 Module Resolution | Active - correctly assigned |
+| W1 | HIGH | TS2454 Definite Assignment | Continue current work |
+| W2 | HIGH | TS2564 Property Initialization | Continue current work |
+
+**PRIORITY ORDER:**
+1. **W5** 🚨 - Fix crashes immediately (10% test suite broken)
+2. **W3** - TS2322 solver strictness (reduce permissiveness)
+3. **W4** - Module resolution (fix `any` in imports)
+4. **W1/W2** - Continue control flow (important but not urgent)
 
 ### Before Starting Any Task
 **IMPORTANT:** Workers must consult Gemini before starting work:
