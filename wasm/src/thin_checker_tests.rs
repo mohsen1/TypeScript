@@ -16325,7 +16325,196 @@ class Derived extends Base {
 }
 
 #[test]
-fn test_class_extends_constructor_expression_includes_base_props() {
+fn test_intersection_type_typeof_declare_classes_ts2339() {
+    use crate::thin_parser::ThinParserState;
+
+    // Tests that property access works on intersection types of declare class constructors
+    // Regression test for: typeof M1 & typeof C1 should resolve properties from both sides
+    let source = r#"
+declare class C1 {
+    a: number;
+    constructor(s: string);
+}
+
+declare class M1 {
+    p: number;
+    constructor(...args: any[]);
+}
+
+declare const Mixed1: typeof M1 & typeof C1;
+
+function f() {
+    let x = new Mixed1("hello");
+    x.a;
+    x.p;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2339),
+        "Should not emit TS2339 for intersection type (typeof M1 & typeof C1) property access, got errors: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_intersection_type_three_way_constructor_ts2339() {
+    use crate::thin_parser::ThinParserState;
+
+    // Tests that three-way intersection types work correctly
+    let source = r#"
+declare class C1 {
+    a: number;
+    constructor(s: string);
+}
+
+declare class M1 {
+    p: number;
+    constructor(...args: any[]);
+}
+
+declare class M2 {
+    f(): number;
+    constructor(...args: any[]);
+}
+
+declare const Mixed3: typeof M2 & typeof M1 & typeof C1;
+
+function f() {
+    let x = new Mixed3("hello");
+    x.a;
+    x.p;
+    x.f();
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2339),
+        "Should not emit TS2339 for three-way intersection type property access, got errors: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_class_extends_intersection_type_ts2339() {
+    use crate::thin_parser::ThinParserState;
+
+    // Tests that classes extending intersection types can access properties from both sides
+    let source = r#"
+declare class C1 {
+    a: number;
+    constructor(s: string);
+}
+
+declare class M1 {
+    p: number;
+    constructor(...args: any[]);
+}
+
+declare const Mixed1: typeof M1 & typeof C1;
+
+class C2 extends Mixed1 {
+    constructor() {
+        super("hello");
+        this.a;
+        this.p;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2339),
+        "Should not emit TS2339 for class extending intersection type, got errors: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_abstract_mixin_intersection_ts2339() {
+    use crate::thin_parser::ThinParserState;
+
+    // Tests that abstract mixin patterns with intersection types resolve properties
+    let source = r#"
+interface IMixin {
+    mixinMethod(): void;
+}
+
+function Mixin<TBaseClass extends abstract new (...args: any) => any>(baseClass: TBaseClass): TBaseClass & (abstract new (...args: any) => IMixin) {
+    abstract class MixinClass extends baseClass implements IMixin {
+        mixinMethod() {}
+    }
+    return MixinClass;
+}
+
+class ConcreteBase {
+    baseMethod() {}
+}
+
+class DerivedFromConcrete extends Mixin(ConcreteBase) {
+}
+
+const wasConcrete = new DerivedFromConcrete();
+wasConcrete.baseMethod();
+wasConcrete.mixinMethod();
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2339),
+        "Should not emit TS2339 for abstract mixin pattern, got errors: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_intersection_type_lowercase() {
     use crate::thin_parser::ThinParserState;
 
     let source = r#"
@@ -17511,16 +17700,16 @@ function f1<T extends string | undefined>(y: { a: T }): string {
     // Should have no TS2322 errors - after narrowing, y.a should be assignable to string
     let ts2322_count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2322).count();
 
-    // Property access narrowing is not yet working - this test shows current state
-    // TODO: Fix property access flow narrowing to reduce TS2322 errors
-    eprintln!("[PROPERTY_ACCESS_TEST] Current state: {} TS2322 errors", ts2322_count);
-    eprintln!("[PROPERTY_ACCESS_TEST] Diagnostics: {:?}", checker.ctx.diagnostics.iter()
-        .filter(|d| d.code == 2322)
-        .map(|d| (&d.message_text, &d.start))
-        .collect::<Vec<_>>());
-
-    // For now, this test passes regardless of errors - just logs the state
-    // Once fixed, this should assert ts2322_count == 0
+    // Property access narrowing now works! y.a should be narrowed from T to T & string
+    assert_eq!(
+        ts2322_count, 0,
+        "Expected no TS2322 errors for property access, got {}: {:?}",
+        ts2322_count,
+        checker.ctx.diagnostics.iter()
+            .filter(|d| d.code == 2322)
+            .map(|d| (&d.message_text, &d.start))
+            .collect::<Vec<_>>()
+    );
 }
 
 // =============================================================================

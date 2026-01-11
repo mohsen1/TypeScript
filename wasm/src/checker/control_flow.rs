@@ -1177,20 +1177,35 @@ impl<'a> FlowAnalyzer<'a> {
                 || k == syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION =>
             {
                 if let Some(access) = self.arena.get_access_expr(cond_node) {
+                    // Handle optional chaining: y?.a
                     if access.question_dot_token
                         && is_true_branch
                         && self.is_matching_reference(access.expression, target)
                     {
                         let narrowed = narrowing.narrow_excluding_type(type_id, TypeId::NULL);
-                        return narrowing.narrow_excluding_type(narrowed, TypeId::UNDEFINED);
+                        let narrowed = narrowing.narrow_excluding_type(narrowed, TypeId::UNDEFINED);
+                        return narrowed;
                     }
                 }
+                // Handle discriminant narrowing (discriminated unions)
                 if let Some(prop_name) = self.discriminant_property(condition_idx, target) {
                     let literal_true = self.interner.literal_boolean(true);
                     if is_true_branch {
                         return narrowing.narrow_by_discriminant(type_id, prop_name, literal_true);
                     }
                     return narrowing.narrow_by_excluding_discriminant(type_id, prop_name, literal_true);
+                }
+
+                // Handle truthiness narrowing for property/element access: if (y.a)
+                if self.is_matching_reference(condition_idx, target) {
+                    if is_true_branch {
+                        // Remove null/undefined (truthy narrowing)
+                        let narrowed = narrowing.narrow_excluding_type(type_id, TypeId::NULL);
+                        let narrowed = narrowing.narrow_excluding_type(narrowed, TypeId::UNDEFINED);
+                        return narrowed;
+                    }
+                    // False branch - keep only falsy types
+                    return self.narrow_to_falsy(type_id);
                 }
             }
 
