@@ -1,36 +1,35 @@
 # Worker 2 Plan - Squad Forge
 
 ## Mission
-Improve TS2304 missing-name diagnostics (identifier not found).
+Implement TS2322 type assignability checking.
 
 Status: Active
 Priority: 1
 
 ## Current Assignment
-TS2322 - Type is not assignable errors.
+**HARD**: Implement missing TS2322 "Type is not assignable" error checks (310 missing diagnostics).
 
-**Error Code:** TS2322 - "Type 'X' is not assignable to type 'Y'"
+**Error Code:** TS2322 - "Type 'X' is not assignable to type 'Y'."
 
-**Impact:** 310 conformance tests affected
+**Impact:** 310 conformance tests where TypeScript emits TS2322 but WASM doesn't. Core type checking feature.
 
 ### Steps
-1. **Check type assignability** - when assigning/returning values, verify type compatibility
-2. **Handle structural typing** - objects must have all required properties with compatible types
-3. **Handle unions/intersections** - check assignability rules for complex types
-4. **Handle generics** - verify type arguments satisfy constraints
-5. **Add tests** in `wasm/src/thin_checker_tests.rs` for assignability checks
-6. **Run focused tests** with `./wasm/test.sh` and record delta
+1. **Scan for missing TS2322**: `node differential-test/find-missing-ts2322.mjs --max=5000` to identify all 310 cases.
+2. **Categorize by type**: Group missing errors by scenario (variable assignments, return types, parameter types, etc.).
+3. **Implement assignability checks**: Add missing checks in `wasm/src/thin_checker.rs` where TypeScript checks type assignability.
+4. **Add tests**: Create comprehensive test cases in `wasm/src/thin_checker_tests.rs` for each implemented check.
+5. **Verify improvements**: Run conformance scan and unit tests to measure progress toward 310 target.
 
 ### Key Files
-- `wasm/src/thin_checker.rs`
-- `wasm/src/checker/expressions.rs`
-- `wasm/src/solver/subtype.rs`
-- `wasm/src/thin_checker_tests.rs`
+- `wasm/src/thin_checker.rs` - Main type checking logic
+- `wasm/src/solver/operations.rs` - Assignability/subtyping logic
+- `wasm/src/thin_checker_tests.rs` - Unit tests
+- `wasm/differential-test/find-missing-ts2322.mjs` - Conformance scanner
 
 ### Success Criteria
-- TS2322 emitted for incompatible assignments
-- Correct handling of structural typing, unions, generics
-- No new regressions
+- Reduce missing TS2322 errors from 310 toward 0
+- No new false positives (check with `find-ts2322.mjs`)
+- All new tests pass
 
 ## Resume Notes
 - Branch: `worker/forge-2`.
