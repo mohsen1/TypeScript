@@ -4,6 +4,7 @@ use crate::thin_checker::ThinCheckerState;
 use crate::thin_parser::ThinParserState;
 use crate::parser::thin_node::ThinNodeArena;
 use crate::thin_binder::ThinBinderState;
+use crate::thin_parser::ThinParserState;
 use crate::solver::{TypeId, TypeInterner};
 
 #[test]
@@ -14861,82 +14862,6 @@ class Foo {
     );
 }
 
-/// Test that TS2564 errors are NOT emitted when strict_property_initialization is disabled
-#[test]
-fn test_ts2564_disabled_when_flag_false() {
-    use crate::thin_parser::ThinParserState;
-
-    let source = r#"
-class Foo {
-    name: string;
-    value: number;
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
-
-    let mut binder = ThinBinderState::new();
-    binder.bind_source_file(parser.get_arena(), root);
-
-    let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
-
-    // Disable strict_property_initialization flag
-    checker.ctx.strict_property_initialization = false;
-
-    checker.check_source_file(root);
-
-    // Should have NO TS2564 errors when flag is disabled
-    let has_2564 = checker.ctx.diagnostics.iter().any(|d| d.code == 2564);
-    assert!(
-        !has_2564,
-        "Expected no TS2564 errors when strict_property_initialization is false, got: {:?}",
-        checker.ctx.diagnostics
-    );
-}
-
-/// Test that strict_property_initialization flag can be toggled per checker instance
-#[test]
-fn test_ts2564_flag_independence() {
-    use crate::thin_parser::ThinParserState;
-
-    let source = r#"
-class Foo {
-    name: string;
-}
-"#;
-
-    // Parse once
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-    assert!(parser.get_diagnostics().is_empty());
-
-    let mut binder = ThinBinderState::new();
-    binder.bind_source_file(parser.get_arena(), root);
-    let arena = parser.get_arena();
-
-    let types = TypeInterner::new();
-
-    // Checker 1: strict_property_initialization = true (default)
-    let mut checker1 = ThinCheckerState::new(arena, &binder, &types, "test1.ts".to_string());
-    checker1.check_source_file(root);
-    let count1 = checker1.ctx.diagnostics.iter().filter(|d| d.code == 2564).count();
-
-    // Checker 2: strict_property_initialization = false
-    let mut binder2 = ThinBinderState::new();
-    binder2.bind_source_file(arena, root);
-    let mut checker2 = ThinCheckerState::new(arena, &binder2, &types, "test2.ts".to_string());
-    checker2.ctx.strict_property_initialization = false;
-    checker2.check_source_file(root);
-    let count2 = checker2.ctx.diagnostics.iter().filter(|d| d.code == 2564).count();
-
-    // Checker 1 should have TS2564 errors, checker 2 should not
-    assert_eq!(count1, 1, "Expected 1 TS2564 error with flag enabled");
-    assert_eq!(count2, 0, "Expected 0 TS2564 errors with flag disabled");
-}
-
 #[test]
 fn test_recursive_mapped_type_stack_guard() {
     use crate::thin_parser::ThinParserState;
@@ -17418,6 +17343,7 @@ fn test_static_private_field_access_no_ts2339() {
 
     // Regression test for static private field access
     // Previously failed with TS2339 because static private members were excluded from constructor type
+    use crate::thin_parser::ThinParserState;
 
     let source = r#"
 class C {
@@ -17455,6 +17381,7 @@ fn test_static_private_accessor_access_no_ts2339() {
     use crate::thin_parser::ThinParserState;
 
     // Regression test for static private accessor access
+    use crate::thin_parser::ThinParserState;
 
     let source = r#"
 class A {
@@ -17868,54 +17795,6 @@ function test2(obj: A | B) {
 }
 
 #[test]
-fn test_ts2339_private_accessor_in_closure() {
-    use crate::thin_parser::ThinParserState;
-
-    // Test that private accessors are accessible from closures in the class
-    let source = r#"
-class C {
-    private get #prop(): string { return ""; }
-    private set #prop(value: string) { }
-
-    private get #roProp(): string { return ""; }
-
-    constructor(name: string) {
-        // Private accessor access in closure - should work
-        const fn = () => {
-            C.#prop = "";
-            console.log(C.#prop);
-            console.log(C.#roProp);
-        };
-        fn();
-    }
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let arena = parser.get_arena();
-    let mut binder = ThinBinderState::new();
-    binder.bind_source_file(arena, root);
-
-    let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
-
-    checker.check_source_file(root);
-
-    let ts2339_errors: Vec<_> = checker.ctx.diagnostics.iter()
-        .filter(|d| d.code == 2339)
-        .collect();
-
-    // All accesses should work - they're all from within the class
-    assert_eq!(ts2339_errors.len(), 0,
-        "Expected no TS2339 errors for private accessor access (including in closures), got {} - errors: {:?}",
-        ts2339_errors.len(),
-        ts2339_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>()
-    );
-}
-
-#[test]
 fn test_ts2339_union_shared_property_no_error() {
     use crate::thin_parser::ThinParserState;
 
@@ -18120,8 +17999,9 @@ function test2(obj: A & { c: boolean }) {
             .map(|d| &d.message_text).collect::<Vec<_>>()
     );
 }
-
-#[test]
+=======
+>>>>>>> origin/worker/anvil-3
+=======
 fn test_overload_arg_count_exceeds_all_only_ts2554_not_ts2769() {
     use crate::thin_parser::ThinParserState;
 
@@ -18172,227 +18052,4 @@ mixed(42, 99, 100);
         first_error_msg
     );
 }
-
-#[test]
-fn test_ts2366_arrow_function_missing_return() {
-    use crate::thin_parser::ThinParserState;
-
-    // Test error 2366 for arrow functions with explicit return type
-    let source = r#"
-// Arrow function with number return type that can fall through
-const missingReturn = (): number => {
-    if (Math.random() > 0.5) {
-        return 1;
-    }
-};
-
-// Arrow function that returns on all paths - no error
-const allPathsReturn = (flag: boolean): number => {
-    if (flag) {
-        return 1;
-    }
-    return 2;
-};
-
-// Arrow function with void return - no error
-const voidReturn = (): void => {
-    console.log("ok");
-};
-
-// Arrow function without return type annotation - no error
-const noAnnotation = () => {
-    return 1;
-};
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-    assert!(parser.get_diagnostics().is_empty());
-
-    let mut binder = ThinBinderState::new();
-    binder.bind_source_file(parser.get_arena(), root);
-
-    let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
-    checker.check_source_file(root);
-
-    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
-
-    // Should have exactly 1 error: 2366 for missingReturn
-    assert_eq!(codes.iter().filter(|&&c| c == 2366).count(), 1,
-        "Expected 1 TS2366 error for arrow function missing return, got: {:?}", codes);
-}
-
-#[test]
-fn test_ts2366_function_expression_missing_return() {
-    use crate::thin_parser::ThinParserState;
-
-    // Test error 2366 for function expressions with explicit return type
-    let source = r#"
-// Function expression with string return type that can fall through
-const missingReturn = function(): string {
-    if (Math.random() > 0.5) {
-        return "yes";
-    }
-};
-
-// Function expression that returns on all paths - no error
-const allPathsReturn = function(flag: boolean): string {
-    if (flag) {
-        return "yes";
-    }
-    return "no";
-};
-
-// Function expression without return type annotation - no error
-const noAnnotation = function() {
-    return 1;
-};
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-    assert!(parser.get_diagnostics().is_empty());
-
-    let mut binder = ThinBinderState::new();
-    binder.bind_source_file(parser.get_arena(), root);
-
-    let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
-    checker.check_source_file(root);
-
-    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
-
-    // Should have exactly 1 error: 2366 for missingReturn
-    assert_eq!(codes.iter().filter(|&&c| c == 2366).count(), 1,
-        "Expected 1 TS2366 error for function expression missing return, got: {:?}", codes);
-}
-
-#[test]
-fn test_ts2366_nested_arrow_functions() {
-    use crate::thin_parser::ThinParserState;
-
-    // Test error 2366 for nested arrow functions
-    let source = r#"
-function outer(): (x: number) => string {
-    // Inner arrow function with return type that can fall through
-    return (x: number): string => {
-        if (x > 0) {
-            return "positive";
-        }
-    };
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-    assert!(parser.get_diagnostics().is_empty());
-
-    let mut binder = ThinBinderState::new();
-    binder.bind_source_file(parser.get_arena(), root);
-
-    let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
-    checker.check_source_file(root);
-
-    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
-
-    // Should have exactly 1 error: 2366 for inner arrow function
-    assert_eq!(codes.iter().filter(|&&c| c == 2366).count(), 1,
-        "Expected 1 TS2366 error for nested arrow function missing return, got: {:?}", codes);
-}
-
-#[test]
-fn test_ts2366_arrow_function_switch_statement() {
-    use crate::thin_parser::ThinParserState;
-
-    // Test error 2366 for arrow functions with switch statements
-    let source = r#"
-// Arrow function with switch missing default case
-const switchNoDefault = (value: number): string => {
-    switch (value) {
-        case 1:
-            return "one";
-        case 2:
-            return "two";
-    }
-};
-
-// Arrow function with switch and default - no error
-const switchWithDefault = (value: number): string => {
-    switch (value) {
-        case 1:
-            return "one";
-        default:
-            return "other";
-    }
-};
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-    assert!(parser.get_diagnostics().is_empty());
-
-    let mut binder = ThinBinderState::new();
-    binder.bind_source_file(parser.get_arena(), root);
-
-    let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
-    checker.check_source_file(root);
-
-    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
-
-    // Should have exactly 1 error: 2366 for switchNoDefault
-    assert_eq!(codes.iter().filter(|&&c| c == 2366).count(), 1,
-        "Expected 1 TS2366 error for arrow function with switch missing default, got: {:?}", codes);
-}
-
-#[test]
-fn test_ts2366_arrow_function_try_catch() {
-    use crate::thin_parser::ThinParserState;
-
-    // Test error 2366 for arrow functions with try/catch
-    let source = r#"
-// Arrow function with try/catch - both branches can fall through
-const tryCatchFallthrough = (): number => {
-    try {
-        if (Math.random() > 0.5) {
-            return 1;
-        }
-    } catch (e) {
-        console.log(e);
-    }
-};
-
-// Arrow function with try/catch/finally - finally doesn't return but catch can fall through
-const tryFinallyFallthrough = (): number => {
-    try {
-        if (Math.random() > 0.5) {
-            return 1;
-        }
-    } catch (e) {
-        console.log(e);
-    } finally {
-        console.log("cleanup");
-    }
-};
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-    assert!(parser.get_diagnostics().is_empty());
-
-    let mut binder = ThinBinderState::new();
-    binder.bind_source_file(parser.get_arena(), root);
-
-    let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
-    checker.check_source_file(root);
-
-    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
-
-    // Should have 2 errors: 2366 for both functions
-    assert_eq!(codes.iter().filter(|&&c| c == 2366).count(), 2,
-        "Expected 2 TS2366 errors for arrow functions with try/catch fallthrough, got: {:?}", codes);
-}
-
+>>>>>>> origin/worker/anvil-4

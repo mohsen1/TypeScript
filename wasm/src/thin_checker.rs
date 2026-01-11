@@ -11135,6 +11135,54 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    /// Check if two symbol declarations can merge (for TS2403 checking).
+    /// Returns true if the declarations are mergeable and should NOT trigger TS2403.
+    fn can_merge_symbols(&self, existing_flags: u32, new_flags: u32) -> bool {
+        // Interface can merge with interface
+        if (existing_flags & symbol_flags::INTERFACE) != 0
+            && (new_flags & symbol_flags::INTERFACE) != 0
+        {
+            return true;
+        }
+
+        // Class can merge with interface
+        if ((existing_flags & symbol_flags::CLASS) != 0
+            && (new_flags & symbol_flags::INTERFACE) != 0)
+            || ((existing_flags & symbol_flags::INTERFACE) != 0
+                && (new_flags & symbol_flags::CLASS) != 0)
+        {
+            return true;
+        }
+
+        // Namespace/module can merge with namespace/module
+        if (existing_flags & symbol_flags::MODULE) != 0
+            && (new_flags & symbol_flags::MODULE) != 0
+        {
+            return true;
+        }
+
+        // Namespace can merge with class, function, or enum
+        if (existing_flags & symbol_flags::MODULE) != 0 {
+            if (new_flags & (symbol_flags::CLASS | symbol_flags::FUNCTION | symbol_flags::ENUM)) != 0 {
+                return true;
+            }
+        }
+        if (new_flags & symbol_flags::MODULE) != 0 {
+            if (existing_flags & (symbol_flags::CLASS | symbol_flags::FUNCTION | symbol_flags::ENUM)) != 0 {
+                return true;
+            }
+        }
+
+        // Function overloads
+        if (existing_flags & symbol_flags::FUNCTION) != 0
+            && (new_flags & symbol_flags::FUNCTION) != 0
+        {
+            return true;
+        }
+
+        false
+    }
+
     /// Report error 2403: Subsequent variable declarations must have the same type.
     pub fn error_subsequent_variable_declaration(
         &mut self,
@@ -12376,20 +12424,37 @@ impl<'a> ThinCheckerState<'a> {
             // Check for variable redeclaration in the current scope (TS2403).
             // Note: This applies specifically to 'var' merging where types must match.
             // let/const duplicates are caught earlier by the binder (TS2451).
+            // Skip TS2403 for mergeable declarations (namespace, enum, class, interface, function overloads).
             if let Some(prev_type) = self.ctx.var_decl_types.get(&sym_id).copied() {
-                if let Some(ref name) = var_name {
-                    if !self.are_var_decl_types_compatible(prev_type, final_type) {
+                // Check if this is a mergeable declaration by looking at the node kind.
+                // Mergeable declarations: namespace/module, enum, class, interface, function.
+                // When these are declared with the same name, they merge instead of conflicting.
+                let is_mergeable_declaration = if let Some(decl_node) = self.ctx.arena.get(decl_idx) {
+                    matches!(
+                        decl_node.kind,
+                        syntax_kind_ext::MODULE_DECLARATION  // namespace/module
+                            | syntax_kind_ext::ENUM_DECLARATION // enum
+                            | syntax_kind_ext::CLASS_DECLARATION // class
+                            | syntax_kind_ext::INTERFACE_DECLARATION // interface
+                            | syntax_kind_ext::FUNCTION_DECLARATION // function
+                    )
+                } else {
+                    false
+                };
+
+                if !is_mergeable_declaration && !self.are_var_decl_types_compatible(prev_type, final_type) {
+                    if let Some(ref name) = var_name {
                         self.error_subsequent_variable_declaration(
                             name,
                             prev_type,
                             final_type,
                             decl_idx,
                         );
-                    } else {
-                        let refined = self.refine_var_decl_type(prev_type, final_type);
-                        if refined != prev_type {
-                            self.ctx.var_decl_types.insert(sym_id, refined);
-                        }
+                    }
+                } else {
+                    let refined = self.refine_var_decl_type(prev_type, final_type);
+                    if refined != prev_type {
+                        self.ctx.var_decl_types.insert(sym_id, refined);
                     }
                 }
             } else {
