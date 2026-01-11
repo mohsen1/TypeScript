@@ -7916,7 +7916,7 @@ impl<'a> ThinCheckerState<'a> {
                     }
 
                     if !is_function_declaration {
-                        self.maybe_report_implicit_any_parameter(param, has_contextual_type);
+                        self.maybe_report_implicit_any_parameter(param, has_contextual_type, type_id);
                     }
 
                     // Check if optional or has initializer
@@ -11860,7 +11860,15 @@ impl<'a> ThinCheckerState<'a> {
                         let Some(param) = self.ctx.arena.get_parameter(param_node) else {
                             continue;
                         };
-                        self.maybe_report_implicit_any_parameter(param, false);
+                        // Infer the parameter type to check if it's 'any'
+                        let inferred_type = if !param.type_annotation.is_none() {
+                            self.get_type_from_type_node(param.type_annotation)
+                        } else if !param.initializer.is_none() {
+                            self.get_type_of_node(param.initializer)
+                        } else {
+                            TypeId::ANY
+                        };
+                        self.maybe_report_implicit_any_parameter(param, false, inferred_type);
                     }
 
                     // Check function body if present
@@ -14973,7 +14981,15 @@ impl<'a> ThinCheckerState<'a> {
                             if !param.type_annotation.is_none() {
                                 self.check_type_for_parameter_properties(param.type_annotation);
                             }
-                            self.maybe_report_implicit_any_parameter(param, false);
+                            // Infer the parameter type to check if it's 'any'
+                            let inferred_type = if !param.type_annotation.is_none() {
+                                self.get_type_from_type_node(param.type_annotation)
+                            } else if !param.initializer.is_none() {
+                                self.get_type_of_node(param.initializer)
+                            } else {
+                                TypeId::ANY
+                            };
+                            self.maybe_report_implicit_any_parameter(param, false, inferred_type);
                         }
                     }
                 }
@@ -15296,7 +15312,15 @@ impl<'a> ThinCheckerState<'a> {
                                 if !param.type_annotation.is_none() {
                                     self.check_type_for_parameter_properties(param.type_annotation);
                                 }
-                                self.maybe_report_implicit_any_parameter(param, false);
+                                // Infer the parameter type to check if it's 'any'
+                                let inferred_type = if !param.type_annotation.is_none() {
+                                    self.get_type_from_type_node(param.type_annotation)
+                                } else if !param.initializer.is_none() {
+                                    self.get_type_of_node(param.initializer)
+                                } else {
+                                    TypeId::ANY
+                                };
+                                self.maybe_report_implicit_any_parameter(param, false, inferred_type);
                             }
                         }
                     }
@@ -15316,7 +15340,15 @@ impl<'a> ThinCheckerState<'a> {
                                 if !param.type_annotation.is_none() {
                                     self.check_type_for_parameter_properties(param.type_annotation);
                                 }
-                                self.maybe_report_implicit_any_parameter(param, false);
+                                // Infer the parameter type to check if it's 'any'
+                                let inferred_type = if !param.type_annotation.is_none() {
+                                    self.get_type_from_type_node(param.type_annotation)
+                                } else if !param.initializer.is_none() {
+                                    self.get_type_of_node(param.initializer)
+                                } else {
+                                    TypeId::ANY
+                                };
+                                self.maybe_report_implicit_any_parameter(param, false, inferred_type);
                             }
                         }
                     }
@@ -16838,22 +16870,54 @@ impl<'a> ThinCheckerState<'a> {
         &mut self,
         param: &crate::parser::thin_node::ParameterData,
         has_contextual_type: bool,
+        inferred_type: TypeId,
     ) {
         use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages, format_message};
+        use crate::scanner::SyntaxKind;
 
         if !self.ctx.no_implicit_any || has_contextual_type {
             return;
         }
-        if !param.type_annotation.is_none() || !param.initializer.is_none() || param.dot_dot_dot_token {
+        // Don't report if there's an explicit type annotation
+        if !param.type_annotation.is_none() {
+            return;
+        }
+        // Don't report for rest parameters or 'this' parameter
+        if param.dot_dot_dot_token {
             return;
         }
         if self.is_this_parameter_name(param.name) {
             return;
         }
 
-        let param_name = self.parameter_name_for_error(param.name);
-        let message = format_message(diagnostic_messages::PARAMETER_IMPLICIT_ANY, &[&param_name, "any"]);
-        self.error_at_node(param.name, &message, diagnostic_codes::IMPLICIT_ANY_PARAMETER);
+        // Check if the parameter has an initializer
+        if !param.initializer.is_none() {
+            // For function/arrow function initializers, check if they have explicit return type
+            // Report TS7006 if the inferred type is 'any'
+            if let Some(init_node) = self.ctx.arena.get(param.initializer) {
+                let is_function_like = init_node.kind == syntax_kind_ext::FUNCTION_EXPRESSION
+                    || init_node.kind == syntax_kind_ext::ARROW_FUNCTION;
+
+                if is_function_like {
+                    // Function expressions without explicit return type can infer to 'any'
+                    // Report TS7006 in this case
+                    if inferred_type == TypeId::ANY || self.is_null_or_undefined_only(inferred_type) {
+                        let param_name = self.parameter_name_for_error(param.name);
+                        let message = format_message(diagnostic_messages::PARAMETER_IMPLICIT_ANY, &[&param_name, "any"]);
+                        self.error_at_node(param.name, &message, diagnostic_codes::IMPLICIT_ANY_PARAMETER);
+                    }
+                }
+                // For non-function initializers (identifiers, literals), don't report TS7006
+                // even if they infer to 'any', matching TypeScript's behavior
+            }
+        } else {
+            // No initializer - report if inferred type is 'any' or 'null | undefined'
+            if inferred_type == TypeId::ANY || self.is_null_or_undefined_only(inferred_type) {
+                let param_name = self.parameter_name_for_error(param.name);
+                let message = format_message(diagnostic_messages::PARAMETER_IMPLICIT_ANY, &[&param_name, "any"]);
+                self.error_at_node(param.name, &message, diagnostic_codes::IMPLICIT_ANY_PARAMETER);
+            }
+        }
     }
 
     /// Report an error at a specific node.
@@ -17388,7 +17452,15 @@ impl<'a> ThinCheckerState<'a> {
                     if !param.type_annotation.is_none() {
                         self.check_type_for_parameter_properties(param.type_annotation);
                     }
-                    self.maybe_report_implicit_any_parameter(param, false);
+                    // Infer the parameter type to check if it's 'any'
+                    let inferred_type = if !param.type_annotation.is_none() {
+                        self.get_type_from_type_node(param.type_annotation)
+                    } else if !param.initializer.is_none() {
+                        self.get_type_of_node(param.initializer)
+                    } else {
+                        TypeId::ANY
+                    };
+                    self.maybe_report_implicit_any_parameter(param, false, inferred_type);
                 }
             }
         }
@@ -17520,7 +17592,15 @@ impl<'a> ThinCheckerState<'a> {
                     if !param.type_annotation.is_none() {
                         self.check_type_for_parameter_properties(param.type_annotation);
                     }
-                    self.maybe_report_implicit_any_parameter(param, false);
+                    // Infer the parameter type to check if it's 'any'
+                    let inferred_type = if !param.type_annotation.is_none() {
+                        self.get_type_from_type_node(param.type_annotation)
+                    } else if !param.initializer.is_none() {
+                        self.get_type_of_node(param.initializer)
+                    } else {
+                        TypeId::ANY
+                    };
+                    self.maybe_report_implicit_any_parameter(param, false, inferred_type);
                 }
             }
         }
@@ -17614,7 +17694,15 @@ impl<'a> ThinCheckerState<'a> {
         for &param_idx in &accessor.parameters.nodes {
             if let Some(param_node) = self.ctx.arena.get(param_idx) {
                 if let Some(param) = self.ctx.arena.get_parameter(param_node) {
-                    self.maybe_report_implicit_any_parameter(param, false);
+                    // Infer the parameter type to check if it's 'any'
+                    let inferred_type = if !param.type_annotation.is_none() {
+                        self.get_type_from_type_node(param.type_annotation)
+                    } else if !param.initializer.is_none() {
+                        self.get_type_of_node(param.initializer)
+                    } else {
+                        TypeId::ANY
+                    };
+                    self.maybe_report_implicit_any_parameter(param, false, inferred_type);
                 }
             }
         }
