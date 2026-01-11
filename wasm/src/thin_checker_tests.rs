@@ -12481,6 +12481,80 @@ function getResult(): Result {
     );
 }
 
+#[test]
+fn test_union_optional_object_literal_excess_property() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type U = { a?: number } | { b?: number };
+const u: U = { a: 1, c: 2 };
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let excess_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2353)
+        .collect();
+
+    if excess_errors.is_empty() {
+        eprintln!("=== Union Optional Excess Property Diagnostics ===");
+        for diag in &checker.ctx.diagnostics {
+            eprintln!("[{}] code={} {}", diag.start, diag.code, diag.message_text);
+        }
+    }
+
+    assert_eq!(
+        excess_errors.len(), 1,
+        "Expected excess property error for union optional object literal: {:?}",
+        checker.ctx.diagnostics
+    );
+
+    let ts2322_count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2322).count();
+    assert_eq!(
+        ts2322_count, 0,
+        "Did not expect TS2322 for union optional excess property, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_union_optional_variable_assignment_no_common_properties() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type U = { a?: number } | { b?: number };
+const obj = { c: 1 };
+const u: U = obj;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<_> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        codes.contains(&2322),
+        "Expected TS2322 for union optional variable assignment, got: {:?}",
+        codes
+    );
+}
+
 /// TS Unsoundness #4: Freshness / Excess Property Checks - Spread removes freshness
 ///
 /// Using spread on an object can remove freshness in some contexts.

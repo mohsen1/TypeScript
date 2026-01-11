@@ -106,6 +106,8 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
             true
         } else if source == TypeId::UNKNOWN {
             false
+        } else if self.violates_weak_union(source, target) {
+            false
         } else if self.violates_weak_type(source, target) {
             false
         } else if self.is_empty_object_target(target) {
@@ -161,6 +163,12 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
         if source == TypeId::NEVER || source == TypeId::ERROR || target == TypeId::ERROR {
             return None;
         }
+        if self.violates_weak_union(source, target) {
+            return Some(SubtypeFailureReason::TypeMismatch {
+                source_type: source,
+                target_type: target,
+            });
+        }
         if self.violates_weak_type(source, target) {
             return Some(SubtypeFailureReason::NoCommonProperties {
                 source_type: source,
@@ -212,6 +220,50 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
         self.violates_weak_type_with_target_props(source, target_props)
     }
 
+    fn violates_weak_union(&self, source: TypeId, target: TypeId) -> bool {
+        let target = self.resolve_weak_type_ref(target);
+        let target_key = match self.interner.lookup(target) {
+            Some(TypeKey::Union(members)) => members,
+            _ => return false,
+        };
+
+        let members = self.interner.type_list(target_key);
+        if members.is_empty() {
+            return false;
+        }
+
+        let mut has_weak_member = false;
+        for member in members.iter() {
+            let resolved_member = self.resolve_weak_type_ref(*member);
+            let Some(member_key) = self.interner.lookup(resolved_member) else {
+                continue;
+            };
+            let shape = match member_key {
+                TypeKey::Object(shape_id) | TypeKey::ObjectWithIndex(shape_id) => {
+                    self.interner.object_shape(shape_id)
+                }
+                _ => continue,
+            };
+
+            if shape.properties.is_empty()
+                || shape.string_index.is_some()
+                || shape.number_index.is_some()
+            {
+                return false;
+            }
+
+            if shape.properties.iter().all(|prop| prop.optional) {
+                has_weak_member = true;
+            }
+        }
+
+        if !has_weak_member {
+            return false;
+        }
+
+        self.source_lacks_union_common_property(source, members.as_ref())
+    }
+
     fn violates_weak_type_with_target_props(
         &self,
         source: TypeId,
@@ -247,6 +299,61 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
         }
     }
 
+    fn source_lacks_union_common_property(&self, source: TypeId, target_members: &[TypeId]) -> bool {
+        let source = self.resolve_weak_type_ref(source);
+        let source_key = match self.interner.lookup(source) {
+            Some(key) => key,
+            None => return false,
+        };
+
+        match &source_key {
+            TypeKey::Union(members) => {
+                let members = self.interner.type_list(*members);
+                members
+                    .iter()
+                    .any(|member| self.source_lacks_union_common_property(*member, target_members))
+            }
+            TypeKey::TypeParameter(param) => match param.constraint {
+                Some(constraint) => self.source_lacks_union_common_property(constraint, target_members),
+                None => false,
+            },
+            TypeKey::Object(shape_id) | TypeKey::ObjectWithIndex(shape_id) => {
+                let shape = self.interner.object_shape(*shape_id);
+                if shape.string_index.is_some() || shape.number_index.is_some() {
+                    return false;
+                }
+                let source_props = shape.properties.as_slice();
+                if source_props.is_empty() {
+                    return false;
+                }
+
+                let mut has_common = false;
+                for member in target_members {
+                    let resolved_member = self.resolve_weak_type_ref(*member);
+                    let Some(member_key) = self.interner.lookup(resolved_member) else {
+                        continue;
+                    };
+                    let shape = match member_key {
+                        TypeKey::Object(shape_id) | TypeKey::ObjectWithIndex(shape_id) => {
+                            self.interner.object_shape(shape_id)
+                        }
+                        _ => continue,
+                    };
+                    if shape.string_index.is_some() || shape.number_index.is_some() {
+                        return false;
+                    }
+                    if self.has_common_property(source_props, shape.properties.as_slice()) {
+                        has_common = true;
+                        break;
+                    }
+                }
+
+                !has_common
+            }
+            _ => false,
+        }
+    }
+
     fn has_common_property(&self, source_props: &[PropertyInfo], target_props: &[PropertyInfo]) -> bool {
         let mut source_idx = 0;
         let mut target_idx = 0;
@@ -265,6 +372,10 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
         }
 
         false
+    }
+
+    fn resolve_weak_type_ref(&self, type_id: TypeId) -> TypeId {
+        self.subtype.resolve_ref_type(type_id)
     }
 
     fn is_empty_object_target(&self, target: TypeId) -> bool {

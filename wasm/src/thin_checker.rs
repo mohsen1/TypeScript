@@ -11482,33 +11482,76 @@ impl<'a> ThinCheckerState<'a> {
 
         // Get the properties of both types
         let source_shape = match self.ctx.types.lookup(source) {
-            Some(TypeKey::Object(shape_id)) => self.ctx.types.object_shape(shape_id),
-            _ => return,
-        };
-
-        let target_shape = match self.ctx.types.lookup(target) {
-            Some(TypeKey::Object(shape_id)) => self.ctx.types.object_shape(shape_id),
+            Some(TypeKey::Object(shape_id)) | Some(TypeKey::ObjectWithIndex(shape_id)) => {
+                self.ctx.types.object_shape(shape_id)
+            }
             _ => return,
         };
 
         let source_props = source_shape.properties.as_slice();
-        let target_props = target_shape.properties.as_slice();
+        let resolved_target = self.resolve_type_for_property_access(target);
 
-        // Empty object {} accepts any properties - no excess property check needed.
-        // This is a key TypeScript behavior: {} means "any non-nullish value".
-        // See https://github.com/microsoft/TypeScript/issues/60582
-        if target_props.is_empty() {
-            return;
-        }
+        match self.ctx.types.lookup(resolved_target) {
+            Some(TypeKey::Object(shape_id)) => {
+                let target_shape = self.ctx.types.object_shape(shape_id);
+                let target_props = target_shape.properties.as_slice();
 
-        // Check for excess properties in source that don't exist in target
-        // This is the "freshness" or "strict object literal" check
-        for source_prop in source_props {
-            let exists_in_target = target_props.iter().any(|p| p.name == source_prop.name);
-            if !exists_in_target {
-                let prop_name = self.ctx.types.resolve_atom(source_prop.name);
-                self.error_excess_property_at(&prop_name, target, idx);
+                // Empty object {} accepts any properties - no excess property check needed.
+                // This is a key TypeScript behavior: {} means "any non-nullish value".
+                // See https://github.com/microsoft/TypeScript/issues/60582
+                if target_props.is_empty() {
+                    return;
+                }
+
+                // Check for excess properties in source that don't exist in target
+                // This is the "freshness" or "strict object literal" check
+                for source_prop in source_props {
+                    let exists_in_target = target_props.iter().any(|p| p.name == source_prop.name);
+                    if !exists_in_target {
+                        let prop_name = self.ctx.types.resolve_atom(source_prop.name);
+                        self.error_excess_property_at(&prop_name, target, idx);
+                    }
+                }
             }
+            Some(TypeKey::Union(members_id)) => {
+                let members = self.ctx.types.type_list(members_id);
+                let mut target_shapes = Vec::new();
+
+                for &member in members.iter() {
+                    let resolved_member = self.resolve_type_for_property_access(member);
+                    let shape = match self.ctx.types.lookup(resolved_member) {
+                        Some(TypeKey::Object(shape_id))
+                        | Some(TypeKey::ObjectWithIndex(shape_id)) => {
+                            self.ctx.types.object_shape(shape_id)
+                        }
+                        _ => continue,
+                    };
+
+                    if shape.properties.is_empty()
+                        || shape.string_index.is_some()
+                        || shape.number_index.is_some()
+                    {
+                        return;
+                    }
+
+                    target_shapes.push(shape);
+                }
+
+                if target_shapes.is_empty() {
+                    return;
+                }
+
+                for source_prop in source_props {
+                    let exists_in_target = target_shapes.iter().any(|shape| {
+                        shape.properties.iter().any(|prop| prop.name == source_prop.name)
+                    });
+                    if !exists_in_target {
+                        let prop_name = self.ctx.types.resolve_atom(source_prop.name);
+                        self.error_excess_property_at(&prop_name, target, idx);
+                    }
+                }
+            }
+            _ => return,
         }
         // Note: Missing property checks are handled by solver's explain_failure
     }
