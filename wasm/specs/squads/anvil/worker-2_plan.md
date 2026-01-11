@@ -16,6 +16,7 @@ Priority: 2
 (empty - will receive new tasks from EM after completing current assignment)
 
 ## Completed
+- [x] Parser recovery gaps: treat `<...>` as type assertions in `.ts`, emit TS1109 for `new <T>Foo()`, report TS1164 for computed enum members, and recover missing default type params with TS1110. Added thin_parser regressions for enum computed names, `new <T>Foo()`, missing default type, and JSX-like `.ts` recovery. Tests: `./wasm/test.sh thin_parser`. Conformance: `conformance-runner.mjs parser --max=200 --verbose`, plus `parser/ecmascript5/{Expressions,ComputedPropertyNames,Generics}` (TS1109 now present for `parserTypeAssertionInObjectCreationExpression1.ts`; computed property names suite no extra errors).
 - [x] Parser recovery for TS1005/TS1109/TS1068/TS1128: generalized class member modifier lookahead so keywords like `public` can be member names, parse accessors with invalid type parameters/parameters/return types to emit TS1094/TS1054/TS1095 instead of TS1005/TS1068/TS1128, allow `async * get/set` to parse without class-member sync loss, and recover duplicate/invalid heritage clauses with TS1172/TS1173/TS1174/TS1175. Added thin_parser regressions for modifier keyword names, accessor invalid forms, and duplicate extends. Tests: `./wasm/test.sh thin_parser`.
 - [x] Reduced TS2304 false positives for nested namespaces/heritage literals/CommonJS globals: allow nested namespaces to see non-exported parent members, skip `extends null/undefined/true/false` in base constructor resolution, and whitelist `exports/module/require/__dirname/__filename` as global values. Updated nested namespace test to align with TSC and added regressions for `extends null` and `exports`. Tests: `./wasm/test.sh test_checker_nested_namespace_non_exported_not_visible`, `./wasm/test.sh test_class_extends_null_no_ts2304`, `./wasm/test.sh test_exports_global_no_ts2304`.
 - [x] Follow-up TS2304 scan for namespace/module augmentation/global ambient: rebuilt wasm (`./wasm/build-wasm.sh`), ran `node wasm/differential-test/find-ts2304.mjs --max=500 --samples=10` (samples: `classes/classDeclarations/classExtendingNull.ts`, `classes/classDeclarations/classHeritageSpecification/classExtendsItselfIndirectly2.ts`, `classes/members/privateNames/privateNameBadAssignment.ts`), and targeted conformance runs: `internalModules` (76 files, extra TS2304: 4), `ambient` (22 files, extra TS2304: 0), `moduleResolution` (51 files, extra TS2304: 5), `externalModules` (200 files, extra TS2304: 26).
@@ -205,7 +206,7 @@ Priority: 2
 - [x] Further fixed TS2403 false positives: changed from TypeId equality to bi-directional assignability check. TypeScript's "same type" semantics requires mutual assignability, not identical TypeIds. Fixes patterns like `var e = E1; var e: typeof E1;` (enum/typeof) and `var n = 42; var n: number;` (inferred vs annotated). Also fixed compilation error in solver/subtype.rs (s_sym referenced but undefined). Added regression tests for enum typeof and inferred vs annotated patterns. Quick conformance (200 files): TS2403 removed from top 10 extra errors list; appears only as 7 missing errors (legitimate cases where TSC emits but we don't).
 
 ## Ready for Merge
-No
+Yes
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize emitter fidelity (ES5 downleveling/source maps) before new features.
