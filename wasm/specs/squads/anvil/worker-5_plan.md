@@ -3,7 +3,7 @@
 ## Mission
 Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transforms, cli, lsp).
 
-Status: Blocked (Gemini key required)
+Status: Active
 Priority: 5
 
 ## Current Assignment
