@@ -84,7 +84,7 @@ TS2339 missing errors: private-name access and static computed member cases.
 - Re-run conformance to confirm private names/control-flow narrowing improvements
 
 ## Ready for Merge
-No
+Yes
 
 ## Notes
 - Similar infrastructure to TS2564 (property init) - share patterns with Workers 1-2
