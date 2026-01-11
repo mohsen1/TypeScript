@@ -4601,6 +4601,26 @@ impl<'a> ThinCheckerState<'a> {
         (parent_node.flags as u32) & node_flags::CONST != 0
     }
 
+    fn is_catch_clause_variable_declaration(&self, var_decl_idx: NodeIndex) -> bool {
+        let Some(ext) = self.ctx.arena.get_extended(var_decl_idx) else {
+            return false;
+        };
+        let parent_idx = ext.parent;
+        if parent_idx.is_none() {
+            return false;
+        }
+        let Some(parent_node) = self.ctx.arena.get(parent_idx) else {
+            return false;
+        };
+        if parent_node.kind != syntax_kind_ext::CATCH_CLAUSE {
+            return false;
+        }
+        let Some(catch) = self.ctx.arena.get_catch_clause(parent_node) else {
+            return false;
+        };
+        catch.variable_declaration == var_decl_idx
+    }
+
     fn literal_type_from_initializer(&self, idx: NodeIndex) -> Option<TypeId> {
         use crate::scanner::SyntaxKind;
 
@@ -5054,6 +5074,12 @@ impl<'a> ThinCheckerState<'a> {
         // First check type annotation - this takes precedence
         if !var_decl.type_annotation.is_none() {
             return self.get_type_from_type_node(var_decl.type_annotation);
+        }
+
+        if self.is_catch_clause_variable_declaration(idx)
+            && self.ctx.use_unknown_in_catch_variables
+        {
+            return TypeId::UNKNOWN;
         }
 
         // Infer from initializer
@@ -10125,6 +10151,16 @@ impl<'a> ThinCheckerState<'a> {
         false
     }
 
+    fn resolve_use_unknown_in_catch_variables_from_source(&self, text: &str) -> bool {
+        if let Some(value) = Self::parse_test_option_bool(text, "@useunknownincatchvariables") {
+            return value;
+        }
+        if let Some(strict) = Self::parse_test_option_bool(text, "@strict") {
+            return strict;
+        }
+        true
+    }
+
     fn parse_test_option_bool(text: &str, key: &str) -> Option<bool> {
         for line in text.lines().take(32) {
             let trimmed = line.trim();
@@ -10171,6 +10207,8 @@ impl<'a> ThinCheckerState<'a> {
         if let Some(sf) = self.ctx.arena.get_source_file(node) {
             self.ctx.no_implicit_any = self.resolve_no_implicit_any_from_source(&sf.text);
             self.ctx.no_implicit_returns = self.resolve_no_implicit_returns_from_source(&sf.text);
+            self.ctx.use_unknown_in_catch_variables =
+                self.resolve_use_unknown_in_catch_variables_from_source(&sf.text);
 
             // Type check each top-level statement
             for &stmt_idx in &sf.statements.nodes {
@@ -10595,6 +10633,9 @@ impl<'a> ThinCheckerState<'a> {
                     if !try_data.catch_clause.is_none() {
                         if let Some(catch_node) = self.ctx.arena.get(try_data.catch_clause) {
                             if let Some(catch) = self.ctx.arena.get_catch_clause(catch_node) {
+                                if !catch.variable_declaration.is_none() {
+                                    self.check_variable_declaration(catch.variable_declaration);
+                                }
                                 self.check_statement(catch.block);
                             }
                         }
@@ -10710,10 +10751,14 @@ impl<'a> ThinCheckerState<'a> {
             None
         };
 
+        let is_catch_variable = self.is_catch_clause_variable_declaration(decl_idx);
+
         let compute_final_type = |checker: &mut ThinCheckerState| -> TypeId {
             let mut has_type_annotation = !var_decl.type_annotation.is_none();
             let mut declared_type = if has_type_annotation {
                 checker.get_type_from_type_node(var_decl.type_annotation)
+            } else if is_catch_variable && checker.ctx.use_unknown_in_catch_variables {
+                TypeId::UNKNOWN
             } else {
                 TypeId::ANY
             };
@@ -10816,6 +10861,8 @@ impl<'a> ThinCheckerState<'a> {
             {
                 let pattern_type = if !var_decl.type_annotation.is_none() {
                     self.get_type_from_type_node(var_decl.type_annotation)
+                } else if is_catch_variable && self.ctx.use_unknown_in_catch_variables {
+                    TypeId::UNKNOWN
                 } else {
                     TypeId::ANY
                 };
@@ -10891,7 +10938,7 @@ impl<'a> ThinCheckerState<'a> {
     /// Get the expected type for a binding element from its parent type.
     fn get_binding_element_type(
         &mut self,
-        _element_idx: NodeIndex,
+        element_idx: NodeIndex,
         parent_type: TypeId,
         element_data: &crate::parser::thin_node::BindingElementData,
     ) -> TypeId {
@@ -10921,6 +10968,20 @@ impl<'a> ThinCheckerState<'a> {
                 None
             }
         };
+
+        if parent_type == TypeId::UNKNOWN {
+            if let Some(prop_name_str) = property_name.as_deref() {
+                let error_node = if !element_data.property_name.is_none() {
+                    element_data.property_name
+                } else if !element_data.name.is_none() {
+                    element_data.name
+                } else {
+                    element_idx
+                };
+                self.error_property_not_exist_at(prop_name_str, parent_type, error_node);
+            }
+            return TypeId::UNKNOWN;
+        }
 
         if let Some(prop_name_str) = property_name {
             // Look up the property type in the parent type

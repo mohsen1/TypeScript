@@ -126,6 +126,9 @@ pub struct CheckerContext<'a> {
     /// Whether noImplicitReturns checks are enabled.
     pub no_implicit_returns: bool,
 
+    /// Whether catch clause variables should default to unknown.
+    pub use_unknown_in_catch_variables: bool,
+
     /// Whether unresolved import diagnostics should be emitted by the checker.
     /// The CLI driver handles module resolution in multi-file mode.
     pub report_unresolved_imports: bool,
@@ -258,6 +261,7 @@ impl<'a> CheckerContext<'a> {
             file_name,
             no_implicit_any: true,
             no_implicit_returns: false,
+            use_unknown_in_catch_variables: true,
             report_unresolved_imports: true,
             symbol_types: FxHashMap::default(),
             var_decl_types: FxHashMap::default(),
@@ -310,6 +314,7 @@ impl<'a> CheckerContext<'a> {
             file_name,
             no_implicit_any: true,
             no_implicit_returns: false,
+            use_unknown_in_catch_variables: true,
             report_unresolved_imports: true,
             symbol_types: cache.symbol_types,
             var_decl_types: FxHashMap::default(),
