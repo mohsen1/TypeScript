@@ -3,6 +3,7 @@
 use crate::thin_checker::ThinCheckerState;
 use crate::parser::thin_node::ThinNodeArena;
 use crate::thin_binder::ThinBinderState;
+use crate::thin_parser::ThinParserState;
 use crate::solver::{TypeId, TypeInterner};
 
 #[test]
@@ -17117,4 +17118,81 @@ type t1 = DeepMap<tpl, number>;
 
     // The test reaching here means we didn't crash on recursive mapped types
     eprintln!("[RECURSIVE_MAPPED_TEST] Test completed without crash - {} TS2456 errors found", ts2456_count);
+}
+
+#[test]
+fn test_static_private_field_access_no_ts2339() {
+    // Regression test for static private field access
+    // Previously failed with TS2339 because static private members were excluded from constructor type
+    let source = r#"
+class C {
+    static #x = 123;
+    static {
+        console.log(C.#x);
+    }
+    foo() {
+        return C.#x;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+    
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    
+    checker.check_source_file(root);
+    
+    // Should have NO TS2339 errors for C.#x access
+    let ts2339_count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2339).count();
+    assert_eq!(ts2339_count, 0, 
+        "Expected no TS2339 errors for static private field access, got {} - diagnostics: {:?}",
+        ts2339_count,
+        checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn test_static_private_accessor_access_no_ts2339() {
+    // Regression test for static private accessor access
+    let source = r#"
+class A {
+    static get #prop() { return ""; }
+    static set #prop(param: string) { }
+    
+    static get #roProp() { return ""; }
+    
+    constructor(name: string) {
+        A.#prop = "";
+        console.log(A.#prop);
+        console.log(A.#roProp);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+    
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    
+    checker.check_source_file(root);
+    
+    // Filter out TS2540 for read-only property assignment (expected error)
+    let ts2339_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2339)
+        .collect();
+    
+    assert_eq!(ts2339_errors.len(), 0,
+        "Expected no TS2339 errors for static private accessor access, got {} - TS2339 diagnostics: {:?}",
+        ts2339_errors.len(),
+        ts2339_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>()
+    );
 }
