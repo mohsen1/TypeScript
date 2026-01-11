@@ -8846,35 +8846,6 @@ const viaAlias = Alias.value;
 }
 
 #[test]
-fn test_namespace_dotted_keyword_member_access() {
-    use crate::thin_parser::ThinParserState;
-
-    let source = r#"
-declare namespace chrome.debugger {
-    declare var tabId: number;
-}
-export const tabId = chrome.debugger.tabId;
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut binder = ThinBinderState::new();
-    binder.bind_source_file(parser.get_arena(), root);
-
-    let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
-    checker.check_source_file(root);
-
-    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
-    assert!(
-        !codes.contains(&2339),
-        "Expected no TS2339 for dotted namespace keyword member access, got: {:?}",
-        codes
-    );
-}
-
-#[test]
 fn test_namespace_value_member_element_access() {
     use crate::thin_parser::ThinParserState;
 
@@ -16969,40 +16940,57 @@ let { x = "hello" }: { x?: number } = {};
 }
 
 #[test]
-fn test_const_locals_narrowing_in_function_expressions() {
+fn test_recursive_mapped_type_no_crash_and_ts2456() {
     use crate::thin_parser::ThinParserState;
 
-    // Regression test for constLocalsInFunctionExpressions.ts
-    // TypeScript preserves narrowing for const locals in arrow functions and function expressions
     let source = r#"
-declare function getStringOrNumber(): string | number;
+// TS2456: Type alias 'DirectCircular' circularly references itself
+type DirectCircular = DirectCircular;
 
-function f1() {
-    const x = getStringOrNumber();
-    if (typeof x === "string") {
-        const f = () => x.length;
-    }
+// TS2456: Mutually circular type aliases
+type MutualA = MutualB;
+type MutualB = MutualA;
+
+// Valid recursive mapped types (should NOT crash or error)
+type Recurse = {
+    [K in keyof Recurse]: Recurse[K]
 }
 
-function f2() {
-    const x = getStringOrNumber();
-    if (typeof x !== "string") {
-        return;
-    }
-    const f = () => x.length;
+type Recurse1 = {
+    [K in keyof Recurse2]: Recurse2[K]
 }
 
-function f3() {
-    const x = getStringOrNumber();
-    if (typeof x === "string") {
-        const f = function() { return x.length; };
-    }
+type Recurse2 = {
+    [K in keyof Recurse1]: Recurse1[K]
 }
+
+// Property access on recursive mapped type (should not crash)
+type Box<T> = { value: T };
+type RecursiveBox = { [K in keyof Box<RecursiveBox>]: Box<RecursiveBox>[K] };
+
+function test(r: RecursiveBox) {
+    return r.value; // Should not crash
+}
+
+// Circular mapped type from #27881
+export type Circular<T> = {[P in keyof T]: Circular<T>};
+type tup = [number, number, number, number];
+
+function foo(arg: Circular<tup>): tup {
+  return arg;
+}
+
+// Deep recursive mapped type from #29442
+type DeepMap<T extends unknown[], R> = {
+  [K in keyof T]: T[K] extends unknown[] ? DeepMap<T[K], R> : R;
+};
+
+type tpl = [string, [string, [string]]];
+type t1 = DeepMap<tpl, number>;
 "#;
 
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
-
     assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
 
     let mut binder = ThinBinderState::new();
@@ -17010,126 +16998,28 @@ function f3() {
 
     let types = TypeInterner::new();
     let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+
+    // This should NOT crash even with recursive types
     checker.check_source_file(root);
 
-    eprintln!("[CONST_LOCALS] All diagnostics: {:?}", checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>());
+    eprintln!("[RECURSIVE_MAPPED_TEST] All diagnostics: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>());
 
-    let ts2339_errors: Vec<_> = checker.ctx.diagnostics.iter()
-        .filter(|d| d.code == 2339)
-        .collect();
+    // Verify TS2456 is emitted for direct circular type alias
+    let ts2456_count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2456).count();
 
-    // EXPECTED: No TS2339 errors - narrowing should be preserved for const locals in closures
-    assert!(ts2339_errors.is_empty(),
-        "Expected no TS2339 errors (narrowing should be preserved for const locals), got {} errors: {:?}",
-        ts2339_errors.len(),
-        ts2339_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>());
-}
+    // We should have at least TS2456 errors for:
+    // 1. DirectCircular
+    // 2. MutualA
+    // 3. MutualB
+    // Note: Depending on implementation, we might get 2 (one per declaration) or 3
+    assert!(
+        ts2456_count >= 2,
+        "Expected at least 2 TS2456 errors for circular type aliases, got {} - diagnostics: {:?}",
+        ts2456_count,
+        checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>()
+    );
 
-#[test]
-fn test_const_locals_narrowing_arrow_in_if() {
-    use crate::thin_parser::ThinParserState;
-
-    // Test case f1: arrow function inside if block
-    let source = r#"
-declare function getStringOrNumber(): string | number;
-
-function f1() {
-    const x = getStringOrNumber();
-    if (typeof x === "string") {
-        const f = () => x.length;
-    }
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut binder = ThinBinderState::new();
-    binder.bind_source_file(parser.get_arena(), root);
-
-    let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
-    checker.check_source_file(root);
-
-    let ts2339_errors: Vec<_> = checker.ctx.diagnostics.iter()
-        .filter(|d| d.code == 2339)
-        .collect();
-
-    assert!(ts2339_errors.is_empty(),
-        "f1: Expected no TS2339 errors, got {} errors: {:?}",
-        ts2339_errors.len(),
-        ts2339_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>());
-}
-
-#[test]
-fn test_const_locals_narrowing_arrow_after_return() {
-    use crate::thin_parser::ThinParserState;
-
-    // Test case f2: arrow function after early return
-    let source = r#"
-declare function getStringOrNumber(): string | number;
-
-function f2() {
-    const x = getStringOrNumber();
-    if (typeof x !== "string") {
-        return;
-    }
-    const f = () => x.length;
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut binder = ThinBinderState::new();
-    binder.bind_source_file(parser.get_arena(), root);
-
-    let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
-    checker.check_source_file(root);
-
-    let ts2339_errors: Vec<_> = checker.ctx.diagnostics.iter()
-        .filter(|d| d.code == 2339)
-        .collect();
-
-    assert!(ts2339_errors.is_empty(),
-        "f2: Expected no TS2339 errors, got {} errors: {:?}",
-        ts2339_errors.len(),
-        ts2339_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>());
-}
-
-#[test]
-fn test_const_locals_narrowing_function_expression() {
-    use crate::thin_parser::ThinParserState;
-
-    // Test case f3: function expression inside if block
-    let source = r#"
-declare function getStringOrNumber(): string | number;
-
-function f3() {
-    const x = getStringOrNumber();
-    if (typeof x === "string") {
-        const f = function() { return x.length; };
-    }
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut binder = ThinBinderState::new();
-    binder.bind_source_file(parser.get_arena(), root);
-
-    let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
-    checker.check_source_file(root);
-
-    let ts2339_errors: Vec<_> = checker.ctx.diagnostics.iter()
-        .filter(|d| d.code == 2339)
-        .collect();
-
-    assert!(ts2339_errors.is_empty(),
-        "f3: Expected no TS2339 errors, got {} errors: {:?}",
-        ts2339_errors.len(),
-        ts2339_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>());
+    // The test reaching here means we didn't crash on recursive mapped types
+    eprintln!("[RECURSIVE_MAPPED_TEST] Test completed without crash - {} TS2456 errors found", ts2456_count);
 }

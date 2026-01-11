@@ -359,7 +359,8 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
             return (required, Some(params.len()));
         };
 
-        match self.interner.lookup(rest_param.type_id) {
+        let rest_param_type = self.unwrap_readonly(rest_param.type_id);
+        match self.interner.lookup(rest_param_type) {
             Some(TypeKey::Tuple(elements)) => {
                 let elements = self.interner.tuple_list(elements);
                 let (rest_min, rest_max) = self.tuple_length_bounds(&elements);
@@ -388,13 +389,14 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
         let offset = arg_index - rest_start;
         let rest_arg_count = arg_count.saturating_sub(rest_start);
 
-        match self.interner.lookup(rest_param.type_id) {
+        let rest_param_type = self.unwrap_readonly(rest_param.type_id);
+        match self.interner.lookup(rest_param_type) {
             Some(TypeKey::Array(elem)) => Some(elem),
             Some(TypeKey::Tuple(elements)) => {
                 let elements = self.interner.tuple_list(elements);
                 self.tuple_rest_element_type(&elements, offset, rest_arg_count)
             }
-            _ => Some(rest_param.type_id),
+            _ => Some(rest_param_type),
         }
     }
 
@@ -481,6 +483,17 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
         }
     }
 
+    fn unwrap_readonly(&self, mut type_id: TypeId) -> TypeId {
+        loop {
+            match self.interner.lookup(type_id) {
+                Some(TypeKey::ReadonlyType(inner)) => {
+                    type_id = inner;
+                }
+                _ => return type_id,
+            }
+        }
+    }
+
     fn expand_tuple_rest(&self, type_id: TypeId) -> TupleRestExpansion {
         match self.interner.lookup(type_id) {
             Some(TypeKey::Array(elem)) => TupleRestExpansion {
@@ -522,9 +535,10 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
         let rest_param = params.last().filter(|param| param.rest)?;
         let rest_start = params.len().saturating_sub(1);
 
-        let target = match self.interner.lookup(rest_param.type_id) {
-            Some(TypeKey::TypeParameter(_)) if var_map.contains_key(&rest_param.type_id) => {
-                Some((rest_start, rest_param.type_id, 0))
+        let rest_param_type = self.unwrap_readonly(rest_param.type_id);
+        let target = match self.interner.lookup(rest_param_type) {
+            Some(TypeKey::TypeParameter(_)) if var_map.contains_key(&rest_param_type) => {
+                Some((rest_start, rest_param_type, 0))
             }
             Some(TypeKey::Tuple(elements)) => {
                 let elements = self.interner.tuple_list(elements);
@@ -1424,6 +1438,19 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
 
     /// Resolve a call to a callable type (with overloads).
     fn resolve_callable_call(&mut self, callable: &CallableShape, arg_types: &[TypeId]) -> CallResult {
+        if callable.call_signatures.len() == 1 {
+            let sig = &callable.call_signatures[0];
+            let func = FunctionShape {
+                params: sig.params.clone(),
+                this_type: sig.this_type,
+                return_type: sig.return_type,
+                type_params: sig.type_params.clone(),
+                type_predicate: sig.type_predicate.clone(),
+                is_constructor: false,
+            };
+            return self.resolve_function_call(&func, arg_types);
+        }
+
         // Try each call signature
         let mut failures = Vec::new();
 

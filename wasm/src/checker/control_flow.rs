@@ -154,12 +154,7 @@ impl<'a> FlowAnalyzer<'a> {
         }
 
         if flow.has_any_flags(flow_flags::START) {
-            // For closures (arrow functions, function expressions), the START node has an antecedent
-            // pointing to the enclosing flow, allowing const/let variables to preserve narrowing
-            if let Some(&ant) = flow.antecedent.first() {
-                return self.check_flow(reference, type_id, ant, visited);
-            }
-            // Reached start of flow with no antecedent - return initial type
+            // Reached start of flow - return initial type
             return type_id;
         }
 
@@ -228,12 +223,7 @@ impl<'a> FlowAnalyzer<'a> {
                     })
                 }
             } else if flow.has_any_flags(flow_flags::START) {
-                // For closures, continue checking in enclosing flow
-                if let Some(&ant) = flow.antecedent.first() {
-                    self.check_definite_assignment(reference, ant, visited, cache)
-                } else {
-                    false
-                }
+                false
             } else if let Some(&ant) = flow.antecedent.first() {
                 self.check_definite_assignment(reference, ant, visited, cache)
             } else {
@@ -2962,18 +2952,20 @@ impl<'a> FlowAnalyzer<'a> {
 }
 
 /// Check whether a function body can fall through to the end.
-/// Returns true if execution can reach the end of the function without returning.
+/// Returns true if execution can reach the end of the function body without
+/// encountering a return/throw statement.
 pub fn function_body_falls_through(_arena: &ThinNodeArena, _body_idx: NodeIndex) -> bool {
-    // TODO: Implement proper fall-through analysis
-    // For now, conservatively return true (assume all functions can fall through)
+    // Simplified stub: assume function bodies can fall through
+    // A full implementation would analyze control flow to detect
+    // if all paths have return/throw statements
     true
 }
 
 /// Check whether a statement can fall through to the next statement.
-/// Returns true if execution can continue to the next statement.
+/// Returns true if execution can continue past this statement.
 pub fn statement_falls_through(_arena: &ThinNodeArena, _stmt_idx: NodeIndex) -> bool {
-    // TODO: Implement proper fall-through analysis
-    // For now, conservatively return true (assume all statements can fall through)
+    // Simplified stub: assume statements can fall through
+    // A full implementation would analyze control flow
     true
 }
 
