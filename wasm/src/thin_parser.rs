@@ -2047,6 +2047,20 @@ impl ThinParserState {
             self.parse_this_expression()
         } else if self.is_token(SyntaxKind::OpenParenToken) || self.is_token(SyntaxKind::NewKeyword) {
             self.parse_left_hand_side_expression()
+        } else if matches!(
+            self.token(),
+            SyntaxKind::NullKeyword
+                | SyntaxKind::TrueKeyword
+                | SyntaxKind::FalseKeyword
+                | SyntaxKind::UndefinedKeyword
+                | SyntaxKind::VoidKeyword
+                | SyntaxKind::NumericLiteral
+                | SyntaxKind::StringLiteral
+                | SyntaxKind::BigIntLiteral
+                | SyntaxKind::NoSubstitutionTemplateLiteral
+                | SyntaxKind::TemplateHead
+        ) {
+            self.parse_primary_expression()
         } else if self.is_identifier_or_keyword() {
             self.parse_identifier_name()
         } else {

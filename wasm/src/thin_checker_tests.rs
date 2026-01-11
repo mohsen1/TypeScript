@@ -2185,6 +2185,33 @@ class C extends undefined {}
 }
 
 #[test]
+fn test_extends_null_no_2304() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class C extends null {}
+class D extends (null) {}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2304),
+        "Unexpected TS2304 for extends null, got: {:?}",
+        codes
+    );
+}
+
+#[test]
 fn test_abstract_class_in_local_scope_2511() {
     use crate::thin_parser::ThinParserState;
     use crate::binder::symbol_flags;
