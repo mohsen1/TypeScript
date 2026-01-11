@@ -1293,49 +1293,186 @@ impl<'a> ThinCheckerState<'a> {
     }
 
     fn base_constructor_type_from_expression(&mut self, expr_idx: NodeIndex) -> Option<TypeId> {
-        use crate::solver::TypeKey;
-
-        let mut ctor_type = self.get_type_of_node(expr_idx);
-        if ctor_type == TypeId::ANY || ctor_type == TypeId::ERROR {
+        let expr_type = self.get_type_of_node(expr_idx);
+        let ctor_types = self.constructor_types_from_type(expr_type);
+        if ctor_types.is_empty() {
             return None;
         }
-        ctor_type = self.evaluate_application_type(ctor_type);
+        Some(if ctor_types.len() == 1 {
+            ctor_types[0]
+        } else {
+            self.ctx.types.intersection(ctor_types)
+        })
+    }
 
-        match self.ctx.types.lookup(ctor_type) {
-            Some(TypeKey::Callable(_)) => Some(ctor_type),
-            Some(TypeKey::Function(shape_id)) => {
+    fn constructor_types_from_type(&mut self, type_id: TypeId) -> Vec<TypeId> {
+        use rustc_hash::FxHashSet;
+
+        self.ensure_application_symbols_resolved(type_id);
+        let mut ctor_types = Vec::new();
+        let mut visited = FxHashSet::default();
+        self.collect_constructor_types_from_type_inner(type_id, &mut ctor_types, &mut visited);
+        ctor_types
+    }
+
+    fn collect_constructor_types_from_type_inner(
+        &mut self,
+        type_id: TypeId,
+        ctor_types: &mut Vec<TypeId>,
+        visited: &mut rustc_hash::FxHashSet<TypeId>,
+    ) {
+        use crate::solver::TypeKey;
+
+        if matches!(type_id, TypeId::ANY | TypeId::ERROR | TypeId::UNKNOWN) {
+            return;
+        }
+
+        let evaluated = self.evaluate_application_type(type_id);
+        if !visited.insert(evaluated) {
+            return;
+        }
+
+        let Some(key) = self.ctx.types.lookup(evaluated) else {
+            return;
+        };
+
+        match key {
+            TypeKey::Callable(_) => {
+                ctor_types.push(evaluated);
+            }
+            TypeKey::Function(shape_id) => {
                 let shape = self.ctx.types.function_shape(shape_id);
                 if shape.is_constructor {
-                    Some(ctor_type)
-                } else {
-                    None
+                    ctor_types.push(evaluated);
                 }
             }
-            _ => None,
+            TypeKey::Intersection(members_id) | TypeKey::Union(members_id) => {
+                let members = self.ctx.types.type_list(members_id);
+                for &member in members.iter() {
+                    self.collect_constructor_types_from_type_inner(member, ctor_types, visited);
+                }
+            }
+            TypeKey::ReadonlyType(inner) => {
+                self.collect_constructor_types_from_type_inner(inner, ctor_types, visited);
+            }
+            TypeKey::TypeParameter(info) | TypeKey::Infer(info) => {
+                if let Some(constraint) = info.constraint {
+                    self.collect_constructor_types_from_type_inner(constraint, ctor_types, visited);
+                }
+            }
+            TypeKey::Conditional(_)
+            | TypeKey::Mapped(_)
+            | TypeKey::IndexAccess(_, _)
+            | TypeKey::KeyOf(_) => {
+                let expanded = self.evaluate_type_with_env(evaluated);
+                if expanded != evaluated {
+                    self.collect_constructor_types_from_type_inner(expanded, ctor_types, visited);
+                }
+            }
+            TypeKey::Application(_) => {
+                let expanded = self.evaluate_application_type(evaluated);
+                if expanded != evaluated {
+                    self.collect_constructor_types_from_type_inner(expanded, ctor_types, visited);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn static_properties_from_type(
+        &mut self,
+        type_id: TypeId,
+    ) -> rustc_hash::FxHashMap<Atom, crate::solver::PropertyInfo> {
+        use rustc_hash::{FxHashMap, FxHashSet};
+
+        self.ensure_application_symbols_resolved(type_id);
+        let mut props = FxHashMap::default();
+        let mut visited = FxHashSet::default();
+        self.collect_static_properties_from_type_inner(type_id, &mut props, &mut visited);
+        props
+    }
+
+    fn collect_static_properties_from_type_inner(
+        &mut self,
+        type_id: TypeId,
+        props: &mut rustc_hash::FxHashMap<Atom, crate::solver::PropertyInfo>,
+        visited: &mut rustc_hash::FxHashSet<TypeId>,
+    ) {
+        use crate::solver::TypeKey;
+
+        if matches!(type_id, TypeId::ANY | TypeId::ERROR | TypeId::UNKNOWN) {
+            return;
+        }
+
+        let evaluated = self.evaluate_application_type(type_id);
+        if !visited.insert(evaluated) {
+            return;
+        }
+
+        let Some(key) = self.ctx.types.lookup(evaluated) else {
+            return;
+        };
+
+        match key {
+            TypeKey::Callable(shape_id) => {
+                let shape = self.ctx.types.callable_shape(shape_id);
+                for prop in shape.properties.iter() {
+                    props.entry(prop.name).or_insert_with(|| prop.clone());
+                }
+            }
+            TypeKey::Object(shape_id) | TypeKey::ObjectWithIndex(shape_id) => {
+                let shape = self.ctx.types.object_shape(shape_id);
+                for prop in shape.properties.iter() {
+                    props.entry(prop.name).or_insert_with(|| prop.clone());
+                }
+            }
+            TypeKey::Intersection(members_id) | TypeKey::Union(members_id) => {
+                let members = self.ctx.types.type_list(members_id);
+                for &member in members.iter() {
+                    self.collect_static_properties_from_type_inner(member, props, visited);
+                }
+            }
+            TypeKey::TypeParameter(info) | TypeKey::Infer(info) => {
+                if let Some(constraint) = info.constraint {
+                    self.collect_static_properties_from_type_inner(constraint, props, visited);
+                }
+            }
+            TypeKey::ReadonlyType(inner) => {
+                self.collect_static_properties_from_type_inner(inner, props, visited);
+            }
+            TypeKey::Conditional(_)
+            | TypeKey::Mapped(_)
+            | TypeKey::IndexAccess(_, _)
+            | TypeKey::KeyOf(_) => {
+                let expanded = self.evaluate_type_with_env(evaluated);
+                if expanded != evaluated {
+                    self.collect_static_properties_from_type_inner(expanded, props, visited);
+                }
+            }
+            TypeKey::Application(_) => {
+                let expanded = self.evaluate_application_type(evaluated);
+                if expanded != evaluated {
+                    self.collect_static_properties_from_type_inner(expanded, props, visited);
+                }
+            }
+            _ => {}
         }
     }
 
     fn base_instance_type_from_expression(&mut self, expr_idx: NodeIndex) -> Option<TypeId> {
-        use crate::solver::TypeKey;
-
         let ctor_type = self.base_constructor_type_from_expression(expr_idx)?;
-        let instance_type = match self.ctx.types.lookup(ctor_type) {
-            Some(TypeKey::Callable(shape_id)) => {
-                let shape = self.ctx.types.callable_shape(shape_id);
-                shape.construct_signatures.first().map(|sig| sig.return_type)
-            }
-            Some(TypeKey::Function(shape_id)) => {
-                let shape = self.ctx.types.function_shape(shape_id);
-                if shape.is_constructor {
-                    Some(shape.return_type)
-                } else {
-                    None
-                }
-            }
-            _ => None,
-        }?;
+        self.instance_type_from_constructor_type(ctor_type)
+    }
 
-        Some(self.resolve_type_for_property_access(instance_type))
+    fn merge_constructor_properties_from_type(
+        &mut self,
+        ctor_type: TypeId,
+        properties: &mut rustc_hash::FxHashMap<Atom, crate::solver::PropertyInfo>,
+    ) {
+        let base_props = self.static_properties_from_type(ctor_type);
+        for (name, prop) in base_props {
+            properties.entry(name).or_insert(prop);
+        }
     }
 
     fn merge_base_instance_properties(
@@ -3767,14 +3904,10 @@ impl<'a> ThinCheckerState<'a> {
                         if let Some(base_constructor_type) =
                             self.base_constructor_type_from_expression(expr_idx)
                         {
-                            if let Some(TypeKey::Callable(base_shape_id)) =
-                                self.ctx.types.lookup(base_constructor_type)
-                            {
-                                let base_shape = self.ctx.types.callable_shape(base_shape_id);
-                                for base_prop in base_shape.properties.iter() {
-                                    properties.entry(base_prop.name).or_insert_with(|| base_prop.clone());
-                                }
-                            }
+                            self.merge_constructor_properties_from_type(
+                                base_constructor_type,
+                                &mut properties,
+                            );
                         }
                         break;
                     }
@@ -3804,14 +3937,10 @@ impl<'a> ThinCheckerState<'a> {
                     if let Some(base_constructor_type) =
                         self.base_constructor_type_from_expression(expr_idx)
                     {
-                        if let Some(TypeKey::Callable(base_shape_id)) =
-                            self.ctx.types.lookup(base_constructor_type)
-                        {
-                            let base_shape = self.ctx.types.callable_shape(base_shape_id);
-                            for base_prop in base_shape.properties.iter() {
-                                properties.entry(base_prop.name).or_insert_with(|| base_prop.clone());
-                            }
-                        }
+                        self.merge_constructor_properties_from_type(
+                            base_constructor_type,
+                            &mut properties,
+                        );
                     }
                     break;
                 };
@@ -5213,9 +5342,16 @@ impl<'a> ThinCheckerState<'a> {
         );
 
         // Use CallEvaluator to resolve the call
-        let mut checker = CompatChecker::new(self.ctx.types);
-        let mut evaluator = CallEvaluator::new(self.ctx.types, &mut checker);
-        let result = evaluator.resolve_call(callee_type, &arg_types);
+        self.ensure_application_symbols_resolved(callee_type);
+        for &arg_type in &arg_types {
+            self.ensure_application_symbols_resolved(arg_type);
+        }
+        let result = {
+            let env = self.ctx.type_env.borrow();
+            let mut checker = CompatChecker::with_resolver(self.ctx.types, &*env);
+            let mut evaluator = CallEvaluator::new(self.ctx.types, &mut checker);
+            evaluator.resolve_call(callee_type, &arg_types)
+        };
 
         match result {
             CallResult::Success(return_type) => {
@@ -5284,11 +5420,26 @@ impl<'a> ThinCheckerState<'a> {
         let Some(&base_arg_type) = arg_types.get(base_param_index) else {
             return return_type;
         };
-        let Some(base_instance_type) = self.instance_type_from_constructor_type(base_arg_type) else {
+        if matches!(base_arg_type, TypeId::ANY | TypeId::ERROR) {
             return return_type;
-        };
+        }
 
-        self.merge_base_instance_into_constructor_return(return_type, base_instance_type)
+        let mut refined_return = self.ctx.types.intersection2(return_type, base_arg_type);
+
+        if let Some(base_instance_type) = self.instance_type_from_constructor_type(base_arg_type) {
+            refined_return =
+                self.merge_base_instance_into_constructor_return(refined_return, base_instance_type);
+        }
+
+        let base_props = self.static_properties_from_type(base_arg_type);
+        if !base_props.is_empty() {
+            refined_return = self.merge_base_constructor_properties_into_constructor_return(
+                refined_return,
+                &base_props,
+            );
+        }
+
+        refined_return
     }
 
     fn function_decl_from_callee(&self, callee_idx: NodeIndex) -> Option<NodeIndex> {
@@ -5339,6 +5490,37 @@ impl<'a> ThinCheckerState<'a> {
             }
             if let Some(expr_idx) = self.class_expression_from_expr(ret.expression) {
                 return Some(expr_idx);
+            }
+            let expr_node = self.ctx.arena.get(ret.expression)?;
+            if let Some(ident) = self.ctx.arena.get_identifier(expr_node) {
+                if let Some(class_idx) =
+                    self.class_declaration_from_identifier_in_block(block, &ident.escaped_text)
+                {
+                    return Some(class_idx);
+                }
+            }
+        }
+        None
+    }
+
+    fn class_declaration_from_identifier_in_block(
+        &self,
+        block: &crate::parser::thin_node::BlockData,
+        name: &str,
+    ) -> Option<NodeIndex> {
+        for &stmt_idx in &block.statements.nodes {
+            let stmt = self.ctx.arena.get(stmt_idx)?;
+            if stmt.kind != syntax_kind_ext::CLASS_DECLARATION {
+                continue;
+            }
+            let class = self.ctx.arena.get_class(stmt)?;
+            if class.name.is_none() {
+                continue;
+            }
+            let name_node = self.ctx.arena.get(class.name)?;
+            let ident = self.ctx.arena.get_identifier(name_node)?;
+            if ident.escaped_text == name {
+                return Some(stmt_idx);
             }
         }
         None
@@ -5413,8 +5595,18 @@ impl<'a> ThinCheckerState<'a> {
     }
 
     fn instance_type_from_constructor_type(&mut self, ctor_type: TypeId) -> Option<TypeId> {
-        use crate::solver::TypeKey;
         use rustc_hash::FxHashSet;
+
+        let mut visited = FxHashSet::default();
+        self.instance_type_from_constructor_type_inner(ctor_type, &mut visited)
+    }
+
+    fn instance_type_from_constructor_type_inner(
+        &mut self,
+        ctor_type: TypeId,
+        visited: &mut rustc_hash::FxHashSet<TypeId>,
+    ) -> Option<TypeId> {
+        use crate::solver::TypeKey;
 
         if ctor_type == TypeId::ERROR {
             return None;
@@ -5423,7 +5615,6 @@ impl<'a> ThinCheckerState<'a> {
             return Some(TypeId::ANY);
         }
 
-        let mut visited = FxHashSet::default();
         let mut current = ctor_type;
         loop {
             if !visited.insert(current) {
@@ -5456,6 +5647,49 @@ impl<'a> ThinCheckerState<'a> {
                         return None;
                     }
                     return Some(self.resolve_type_for_property_access(shape.return_type));
+                }
+                TypeKey::Intersection(members_id) => {
+                    let members = self.ctx.types.type_list(members_id);
+                    let mut instance_types = Vec::new();
+                    for &member in members.iter() {
+                        if let Some(instance_type) =
+                            self.instance_type_from_constructor_type_inner(member, visited)
+                        {
+                            instance_types.push(instance_type);
+                        }
+                    }
+                    if instance_types.is_empty() {
+                        return None;
+                    }
+                    let instance_type = if instance_types.len() == 1 {
+                        instance_types[0]
+                    } else {
+                        self.ctx.types.intersection(instance_types)
+                    };
+                    return Some(self.resolve_type_for_property_access(instance_type));
+                }
+                TypeKey::Union(members_id) => {
+                    let members = self.ctx.types.type_list(members_id);
+                    let mut instance_types = Vec::new();
+                    for &member in members.iter() {
+                        if let Some(instance_type) =
+                            self.instance_type_from_constructor_type_inner(member, visited)
+                        {
+                            instance_types.push(instance_type);
+                        }
+                    }
+                    if instance_types.is_empty() {
+                        return None;
+                    }
+                    let instance_type = if instance_types.len() == 1 {
+                        instance_types[0]
+                    } else {
+                        self.ctx.types.union(instance_types)
+                    };
+                    return Some(self.resolve_type_for_property_access(instance_type));
+                }
+                TypeKey::ReadonlyType(inner) => {
+                    return self.instance_type_from_constructor_type_inner(inner, visited);
                 }
                 TypeKey::TypeParameter(info) | TypeKey::Infer(info) => {
                     let Some(constraint) = info.constraint else {
@@ -5517,6 +5751,77 @@ impl<'a> ThinCheckerState<'a> {
                 new_shape.return_type =
                     self.ctx.types.intersection2(new_shape.return_type, base_instance_type);
                 self.ctx.types.function(new_shape)
+            }
+            TypeKey::Intersection(members_id) => {
+                let members = self.ctx.types.type_list(members_id);
+                let mut updated_members = Vec::with_capacity(members.len());
+                let mut changed = false;
+                for &member in members.iter() {
+                    let updated =
+                        self.merge_base_instance_into_constructor_return(member, base_instance_type);
+                    if updated != member {
+                        changed = true;
+                    }
+                    updated_members.push(updated);
+                }
+                if changed {
+                    self.ctx.types.intersection(updated_members)
+                } else {
+                    ctor_type
+                }
+            }
+            _ => ctor_type,
+        }
+    }
+
+    fn merge_base_constructor_properties_into_constructor_return(
+        &mut self,
+        ctor_type: TypeId,
+        base_props: &rustc_hash::FxHashMap<Atom, crate::solver::PropertyInfo>,
+    ) -> TypeId {
+        use crate::solver::TypeKey;
+        use rustc_hash::FxHashMap;
+
+        if base_props.is_empty() {
+            return ctor_type;
+        }
+
+        let Some(key) = self.ctx.types.lookup(ctor_type) else {
+            return ctor_type;
+        };
+
+        match key {
+            TypeKey::Callable(shape_id) => {
+                let shape = self.ctx.types.callable_shape(shape_id);
+                let mut prop_map: FxHashMap<Atom, crate::solver::PropertyInfo> = shape
+                    .properties
+                    .iter()
+                    .map(|prop| (prop.name, prop.clone()))
+                    .collect();
+                for (name, prop) in base_props.iter() {
+                    prop_map.entry(*name).or_insert_with(|| prop.clone());
+                }
+                let mut new_shape = (*shape).clone();
+                new_shape.properties = prop_map.into_values().collect();
+                self.ctx.types.callable(new_shape)
+            }
+            TypeKey::Intersection(members_id) => {
+                let members = self.ctx.types.type_list(members_id);
+                let mut updated_members = Vec::with_capacity(members.len());
+                let mut changed = false;
+                for &member in members.iter() {
+                    let updated =
+                        self.merge_base_constructor_properties_into_constructor_return(member, base_props);
+                    if updated != member {
+                        changed = true;
+                    }
+                    updated_members.push(updated);
+                }
+                if changed {
+                    self.ctx.types.intersection(updated_members)
+                } else {
+                    ctor_type
+                }
             }
             _ => ctor_type,
         }
@@ -5649,8 +5954,6 @@ impl<'a> ThinCheckerState<'a> {
             return None;
         }
 
-        let mut checker = CompatChecker::new(self.ctx.types);
-        let mut evaluator = CallEvaluator::new(self.ctx.types, &mut checker);
         let mut original_node_types = std::mem::take(&mut self.ctx.node_types);
 
         for sig in signatures {
@@ -5674,7 +5977,16 @@ impl<'a> ThinCheckerState<'a> {
             let temp_node_types = std::mem::take(&mut self.ctx.node_types);
 
             self.ctx.node_types = std::mem::take(&mut original_node_types);
-            let result = evaluator.resolve_call(func_type, &arg_types);
+            self.ensure_application_symbols_resolved(func_type);
+            for &arg_type in &arg_types {
+                self.ensure_application_symbols_resolved(arg_type);
+            }
+            let result = {
+                let env = self.ctx.type_env.borrow();
+                let mut checker = CompatChecker::with_resolver(self.ctx.types, &*env);
+                let mut evaluator = CallEvaluator::new(self.ctx.types, &mut checker);
+                evaluator.resolve_call(func_type, &arg_types)
+            };
 
             if let CallResult::Success(return_type) = result {
                 self.ctx.node_types.extend(temp_node_types);
@@ -5805,9 +6117,16 @@ impl<'a> ThinCheckerState<'a> {
             overload_signatures.is_none(),
         );
 
-        let mut checker = CompatChecker::new(self.ctx.types);
-        let mut evaluator = CallEvaluator::new(self.ctx.types, &mut checker);
-        let result = evaluator.resolve_call(construct_type, &arg_types);
+        self.ensure_application_symbols_resolved(construct_type);
+        for &arg_type in &arg_types {
+            self.ensure_application_symbols_resolved(arg_type);
+        }
+        let result = {
+            let env = self.ctx.type_env.borrow();
+            let mut checker = CompatChecker::with_resolver(self.ctx.types, &*env);
+            let mut evaluator = CallEvaluator::new(self.ctx.types, &mut checker);
+            evaluator.resolve_call(construct_type, &arg_types)
+        };
 
         match result {
             CallResult::Success(return_type) => return_type,
@@ -9233,6 +9552,14 @@ impl<'a> ThinCheckerState<'a> {
                 let resolved = self.type_reference_symbol_type(sym_id);
                 self.insert_type_env_symbol(sym_id, resolved);
             }
+            TypeKey::TypeParameter(param) => {
+                if let Some(constraint) = param.constraint {
+                    self.ensure_application_symbols_resolved_inner(constraint, visited);
+                }
+                if let Some(default) = param.default {
+                    self.ensure_application_symbols_resolved_inner(default, visited);
+                }
+            }
             TypeKey::Union(members_id) => {
                 let members = self.ctx.types.type_list(members_id);
                 for member in members.iter() {
@@ -9247,6 +9574,14 @@ impl<'a> ThinCheckerState<'a> {
             }
             TypeKey::Function(shape_id) => {
                 let shape = self.ctx.types.function_shape(shape_id);
+                for type_param in shape.type_params.iter() {
+                    if let Some(constraint) = type_param.constraint {
+                        self.ensure_application_symbols_resolved_inner(constraint, visited);
+                    }
+                    if let Some(default) = type_param.default {
+                        self.ensure_application_symbols_resolved_inner(default, visited);
+                    }
+                }
                 for param in shape.params.iter() {
                     self.ensure_application_symbols_resolved_inner(param.type_id, visited);
                 }
@@ -9263,6 +9598,14 @@ impl<'a> ThinCheckerState<'a> {
             TypeKey::Callable(shape_id) => {
                 let shape = self.ctx.types.callable_shape(shape_id);
                 for sig in shape.call_signatures.iter().chain(shape.construct_signatures.iter()) {
+                    for type_param in sig.type_params.iter() {
+                        if let Some(constraint) = type_param.constraint {
+                            self.ensure_application_symbols_resolved_inner(constraint, visited);
+                        }
+                        if let Some(default) = type_param.default {
+                            self.ensure_application_symbols_resolved_inner(default, visited);
+                        }
+                    }
                     for param in sig.params.iter() {
                         self.ensure_application_symbols_resolved_inner(param.type_id, visited);
                     }

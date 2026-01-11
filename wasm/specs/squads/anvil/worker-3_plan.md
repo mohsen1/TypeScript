@@ -1,6 +1,6 @@
 # Anvil Worker 3 - TS2339 Property Resolution (Inherited Properties)
 
-Ready for Merge: No (merged)
+Ready for Merge: Yes
 Status: Active
 
 ## Current Assignment (2026-01-11)
@@ -10,6 +10,12 @@ Status: Active
 - Collect 3-5 failing samples from conformance output; capture the failing expression + expected property resolution.
 - Trace property lookup in `wasm/src/thin_checker.rs` (class instance types, interface heritage, index signatures, and union/intersection property merges).
 - Implement fix + regression tests; run a targeted TS2339 scan and report the delta.
+
+### Update (2026-01-11)
+- Fix: use TypeEnvironment-backed assignability in call/new resolution, and resolve Application symbols (including type param constraints) to improve generic mixin inference (commit 5cf3894068).
+- Regression: `test_mixin_return_type_preserves_base_properties` in `wasm/src/thin_checker_tests.rs`.
+- Samples (pre-fix): `classes/mixinAbstractClasses.ts`, `classes/mixinClassesAnnotated.ts`, `classes/mixinClassesAnonymous.ts`, `classes/mixinClassesMembers.ts`, `controlFlow/assertionTypePredicates1.ts`.
+- TS2339 scan (post-fix): `node wasm/differential-test/find-ts2339.mjs --max=500 --samples=5` → 1 extra (`classes/classDeclarations/classExtendingClassLikeType.ts`, 6 errors).
 
 ## Current Assignment (Crash triage: privateNamesInterfaceExtendingClass) - COMPLETED
 
