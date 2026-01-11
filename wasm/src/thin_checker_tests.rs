@@ -17351,14 +17351,14 @@ function f1<T extends string | undefined>(y: { a: T }): string {
     // Should have no TS2322 errors - after narrowing, y.a should be assignable to string
     let ts2322_count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2322).count();
 
-    // Property access narrowing is not yet working - this is expected to fail
-    // TODO: Fix property access flow narrowing
-    // assert_eq!(
-    //     ts2322_count, 0,
-    //     "Expected no TS2322 errors for property access, got {}",
-    //     ts2322_count
-    // );
+    // Property access narrowing is not yet working - this test shows current state
+    // TODO: Fix property access flow narrowing to reduce TS2322 errors
+    eprintln!("[PROPERTY_ACCESS_TEST] Current state: {} TS2322 errors", ts2322_count);
+    eprintln!("[PROPERTY_ACCESS_TEST] Diagnostics: {:?}", checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2322)
+        .map(|d| (&d.message_text, &d.start))
+        .collect::<Vec<_>>());
 
-    eprintln!("[PROPERTY_ACCESS_TEST] Expected failure: {} TS2322 errors", ts2322_count);
-    eprintln!("[PROPERTY_ACCESS_TEST] Issue: Property access narrowing not yet implemented");
+    // For now, this test passes regardless of errors - just logs the state
+    // Once fixed, this should assert ts2322_count == 0
 }
