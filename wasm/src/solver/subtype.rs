@@ -209,6 +209,16 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         }
     }
 
+    pub(crate) fn resolve_ref_type(&self, type_id: TypeId) -> TypeId {
+        match self.interner.lookup(type_id) {
+            Some(TypeKey::Ref(symbol)) => self
+                .resolver
+                .resolve_ref(symbol, self.interner)
+                .unwrap_or(type_id),
+            _ => type_id,
+        }
+    }
+
     /// Check if `source` is a subtype of `target`.
     /// This is the main entry point for subtype checking.
     pub fn is_subtype_of(&mut self, source: TypeId, target: TypeId) -> bool {

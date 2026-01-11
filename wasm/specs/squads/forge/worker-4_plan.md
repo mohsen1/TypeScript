@@ -7,21 +7,22 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-Improve TS2322 assignability by tightening return-type compatibility and void/undefined handling.
+TS2322 object literal excess property + optionality.
 
 **Error Code:** TS2322 - "Type 'X' is not assignable to type 'Y'"
 
 **Impact:** 310 conformance tests affected
 
 ### Steps
-1. **Audit return compatibility** in `wasm/src/solver/compat.rs` and `wasm/src/solver/subtype.rs`.
-2. **Add focused tests** in `wasm/src/solver/compat_tests.rs` for void/undefined return assignability.
-3. **Implement fixes** for any mismatches and rerun the new tests.
-4. **Run a focused TS2322 pass** (targeted tests) and record delta.
+1. **Add focused tests** in `wasm/src/solver/compat_tests.rs` and `wasm/src/thin_checker_tests.rs`.
+2. **Fix assignability** in `wasm/src/solver/compat.rs` for union optional property overlap.
+3. **Harden object literal excess property checks** for union targets.
+4. **Run focused tests** and record delta.
 
 ### Key Files
+- `wasm/src/solver/compat.rs`
+- `wasm/src/solver/compat_tests.rs`
 - `wasm/src/thin_checker.rs`
-- `wasm/src/checker/types/assignability.rs` (if present)
 - `wasm/src/thin_checker_tests.rs`
 
 ### Success Criteria
@@ -80,13 +81,13 @@ Improve TS2322 assignability by tightening return-type compatibility and void/un
 Yes
 
 ## Notes
-- Progress: fixed mapped type param scope in missing-name checks; relaxed recursive generic type alias resolution to avoid TS2456 for DeepReadonly/DeepPartial; added mapped type param scope regression test; added TS2322 tests for union mismatch and intersection literal assignment; added TS2322 compound assignment checks (+=, &&=, ??=) to use assigned type for diagnostics; added binding element default value TS2322 checks for destructuring patterns; fixed pre-existing compilation error in cli/driver.rs.
-- Tests: `./wasm/test.sh compile_generic_utility_library_type_utilities`, `./wasm/test.sh mapped_type_parameter_scope_in_template`, `./wasm/test.sh contextual_typing_for_union_object_assignment_mismatch`, `./wasm/test.sh intersection_object_literal_assignment`, `./wasm/test.sh compound_assignment_plus_equals_assignability`, `./wasm/test.sh compound_assignment_logical_nullish_assignability`, `./wasm/test.sh test_object_destructuring_assignability`, `./wasm/test.sh test_array_destructuring_assignability`, `./wasm/test.sh test_destructuring_with_default_values_assignability`, `./wasm/test.sh test_nested_destructuring_assignability`, `./wasm/test.sh test_destructuring_binding_element_default_value_mismatch`, `./wasm/test.sh test_binding_element_default_value_isolated_check`.
-- Commit format: `[wasm] checker: add TS2322 checks for destructuring binding element default values`
+- Progress: added weak-union assignability guard for optional object targets; extended object literal excess property checks to union targets; added compat + thin checker tests.
+- Tests: `./wasm/test.sh` (fails: `cli::driver_tests::compile_shorthand_methods`), `./wasm/test.sh union_optional`.
+- Commit format: `[wasm] checker: tighten union optional assignability`
 - Push to: `origin/worker/forge-4`
 - **NEVER edit**: `STRUCTURE.md`, `GOALS.md`, other workers' plan files, or anything in `orchestrator/`
 
 ## Resume
-- Branch/state: `worker/forge-4`, changes ready for commit.
-- Session work: completed destructuring assignment TS2322 audit; found and fixed gap in binding element default value type checking; added 6 new tests; all tests passing; fixed cli/driver.rs compilation error.
-- Unit tests: `./wasm/test.sh compile_generic_utility_library_type_utilities`, `./wasm/test.sh mapped_type_parameter_scope_in_template`, `./wasm/test.sh contextual_typing_for_union_object_assignment_mismatch`, `./wasm/test.sh intersection_object_literal_assignment`, `./wasm/test.sh compound_assignment_plus_equals_assignability`, `./wasm/test.sh compound_assignment_logical_nullish_assignability`.
+- Branch/state: `worker/forge-4`, changes committed and ready to push.
+- Session work: implemented union optional assignability guard in `wasm/src/solver/compat.rs`; added union excess property handling in `wasm/src/thin_checker.rs`; added tests for TS2322/TS2353 behavior.
+- Unit tests: `./wasm/test.sh` (fails: `cli::driver_tests::compile_shorthand_methods`), `./wasm/test.sh union_optional`.
