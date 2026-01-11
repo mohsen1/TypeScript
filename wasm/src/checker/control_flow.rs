@@ -154,7 +154,12 @@ impl<'a> FlowAnalyzer<'a> {
         }
 
         if flow.has_any_flags(flow_flags::START) {
-            // Reached start of flow - return initial type
+            // For closures (arrow functions, function expressions), the START node has an antecedent
+            // pointing to the enclosing flow, allowing const/let variables to preserve narrowing
+            if let Some(&ant) = flow.antecedent.first() {
+                return self.check_flow(reference, type_id, ant, visited);
+            }
+            // Reached start of flow with no antecedent - return initial type
             return type_id;
         }
 
@@ -223,7 +228,12 @@ impl<'a> FlowAnalyzer<'a> {
                     })
                 }
             } else if flow.has_any_flags(flow_flags::START) {
-                false
+                // For closures, continue checking in enclosing flow
+                if let Some(&ant) = flow.antecedent.first() {
+                    self.check_definite_assignment(reference, ant, visited, cache)
+                } else {
+                    false
+                }
             } else if let Some(&ant) = flow.antecedent.first() {
                 self.check_definite_assignment(reference, ant, visited, cache)
             } else {
@@ -2949,6 +2959,22 @@ impl<'a> FlowAnalyzer<'a> {
         let import = self.arena.get_import_decl(decl_node)?;
         self.reference_symbol_inner(import.module_specifier, visited)
     }
+}
+
+/// Check whether a function body can fall through to the end.
+/// Returns true if execution can reach the end of the function without returning.
+pub fn function_body_falls_through(_arena: &ThinNodeArena, _body_idx: NodeIndex) -> bool {
+    // TODO: Implement proper fall-through analysis
+    // For now, conservatively return true (assume all functions can fall through)
+    true
+}
+
+/// Check whether a statement can fall through to the next statement.
+/// Returns true if execution can continue to the next statement.
+pub fn statement_falls_through(_arena: &ThinNodeArena, _stmt_idx: NodeIndex) -> bool {
+    // TODO: Implement proper fall-through analysis
+    // For now, conservatively return true (assume all statements can fall through)
+    true
 }
 
 #[cfg(test)]

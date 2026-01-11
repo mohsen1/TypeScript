@@ -16967,3 +16967,169 @@ let { x = "hello" }: { x?: number } = {};
     assert!(!ts2322_errors.is_empty(), "Expected TS2322 error for binding element default value 'hello' (string) not assignable to number, got: {:?}",
         checker.ctx.diagnostics.iter().map(|d| d.code).collect::<Vec<_>>());
 }
+
+#[test]
+fn test_const_locals_narrowing_in_function_expressions() {
+    use crate::thin_parser::ThinParserState;
+
+    // Regression test for constLocalsInFunctionExpressions.ts
+    // TypeScript preserves narrowing for const locals in arrow functions and function expressions
+    let source = r#"
+declare function getStringOrNumber(): string | number;
+
+function f1() {
+    const x = getStringOrNumber();
+    if (typeof x === "string") {
+        const f = () => x.length;
+    }
+}
+
+function f2() {
+    const x = getStringOrNumber();
+    if (typeof x !== "string") {
+        return;
+    }
+    const f = () => x.length;
+}
+
+function f3() {
+    const x = getStringOrNumber();
+    if (typeof x === "string") {
+        const f = function() { return x.length; };
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    eprintln!("[CONST_LOCALS] All diagnostics: {:?}", checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>());
+
+    let ts2339_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2339)
+        .collect();
+
+    // EXPECTED: No TS2339 errors - narrowing should be preserved for const locals in closures
+    assert!(ts2339_errors.is_empty(),
+        "Expected no TS2339 errors (narrowing should be preserved for const locals), got {} errors: {:?}",
+        ts2339_errors.len(),
+        ts2339_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>());
+}
+
+#[test]
+fn test_const_locals_narrowing_arrow_in_if() {
+    use crate::thin_parser::ThinParserState;
+
+    // Test case f1: arrow function inside if block
+    let source = r#"
+declare function getStringOrNumber(): string | number;
+
+function f1() {
+    const x = getStringOrNumber();
+    if (typeof x === "string") {
+        const f = () => x.length;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2339_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2339)
+        .collect();
+
+    assert!(ts2339_errors.is_empty(),
+        "f1: Expected no TS2339 errors, got {} errors: {:?}",
+        ts2339_errors.len(),
+        ts2339_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>());
+}
+
+#[test]
+fn test_const_locals_narrowing_arrow_after_return() {
+    use crate::thin_parser::ThinParserState;
+
+    // Test case f2: arrow function after early return
+    let source = r#"
+declare function getStringOrNumber(): string | number;
+
+function f2() {
+    const x = getStringOrNumber();
+    if (typeof x !== "string") {
+        return;
+    }
+    const f = () => x.length;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2339_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2339)
+        .collect();
+
+    assert!(ts2339_errors.is_empty(),
+        "f2: Expected no TS2339 errors, got {} errors: {:?}",
+        ts2339_errors.len(),
+        ts2339_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>());
+}
+
+#[test]
+fn test_const_locals_narrowing_function_expression() {
+    use crate::thin_parser::ThinParserState;
+
+    // Test case f3: function expression inside if block
+    let source = r#"
+declare function getStringOrNumber(): string | number;
+
+function f3() {
+    const x = getStringOrNumber();
+    if (typeof x === "string") {
+        const f = function() { return x.length; };
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2339_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2339)
+        .collect();
+
+    assert!(ts2339_errors.is_empty(),
+        "f3: Expected no TS2339 errors, got {} errors: {:?}",
+        ts2339_errors.len(),
+        ts2339_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>());
+}
