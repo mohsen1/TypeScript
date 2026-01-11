@@ -13,6 +13,7 @@ Priority: 2
 (empty - will receive new tasks from EM after completing current assignment)
 
 ## Completed
+- [x] Follow-up TS2304 scan for namespace/module augmentation/global ambient: rebuilt wasm (`./wasm/build-wasm.sh`), ran `node wasm/differential-test/find-ts2304.mjs --max=500 --samples=10` (samples: `classes/classDeclarations/classExtendingNull.ts`, `classes/classDeclarations/classHeritageSpecification/classExtendsItselfIndirectly2.ts`, `classes/members/privateNames/privateNameBadAssignment.ts`), and targeted conformance runs: `internalModules` (76 files, extra TS2304: 4), `ambient` (22 files, extra TS2304: 0), `moduleResolution` (51 files, extra TS2304: 5), `externalModules` (200 files, extra TS2304: 26).
 - [x] Fixed TS2304 false positives for global augmentation + namespace/module merging: parse `declare global` with GLOBAL_AUGMENTATION flag, bind global bodies in file scope, prepopulate module scopes with prior exports, and add regressions for global/namespace/module augmentation. Targeted tests: `./wasm/test.sh test_global_augmentation_binds_to_file_scope`, `./wasm/test.sh test_namespace_merging_resolves_prior_exports`, `./wasm/test.sh test_module_augmentation_merges_exports`.
 - [x] Ran `./scripts/ask-gemini.mjs` (key available). Repro attempts: `./wasm/build-wasm.sh` (timed out at 120s but pkg emitted), `node wasm/differential-test/conformance-runner.mjs es6/templates --max=1` (Exact Match, no crash), `node wasm/differential-test/process-pool-conformance.mjs es6/templates --max=1 --workers=1` (Exact Match, no crash), direct ThinParser harness on `TemplateExpression1.ts` (TS1005 + TS2304 only).
 - [x] Investigated `es6/templates/TemplateExpression1.ts` crash: could not reproduce in native or wasm; added `test_unterminated_template_expression_reports_missing_name` in `thin_checker_tests.rs` to assert TS1005 parser diagnostic + TS2304 checker output. Ran `./wasm/test.sh test_unterminated_template_expression_reports_missing_name` and `node wasm/differential-test/conformance-runner.mjs es6/templates --max=1` (0 crashes).
@@ -212,4 +213,5 @@ Yes (2026-01-11)
 - **NEVER edit**: `DIRECTOR_AGENT.md`, `SQUAD_LEAD_AGENT.md`, `MANAGER_AGENT.md`, `AGENTS.md`, `start_*.sh`
 ## Resume
 - TS2304 augmentation false positives addressed (global/namespace/module), with targeted regressions.
+- Latest scan shows extra TS2304 still present in internalModules (4), moduleResolution (5), externalModules (26); ambient had 0.
 - Awaiting next assignment from EM-Anvil.
