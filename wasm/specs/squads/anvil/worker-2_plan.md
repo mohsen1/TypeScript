@@ -3,7 +3,7 @@
 ## Mission
 Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transforms, cli, lsp).
 
-Status: Active
+Status: Blocked (Gemini key required)
 Priority: 2
 
 ## Current Assignment
@@ -17,6 +17,7 @@ Priority: 2
 (empty - will receive new tasks from EM after completing current assignment)
 
 ## Completed
+- [x] Added regression test for unterminated template expression in `wasm/src/thin_checker_tests.rs`; test command: `./wasm/test.sh test_unterminated_template_expression_reports_missing_name`.
 - [x] Reduced TS2304 false positives: scoped mapped type parameters during missing-name checks, added DOM globals (HTMLElement/Element/Document/etc.) to builtin type/value allowlists, and recovered from invalid `accessor` modifiers in statement/type-member parsing. Added thin_checker regressions, rebuilt wasm, `find-ts2304.mjs --max=200 --samples=5` (0 false positives), conformance run `run-conformance.sh --max=200 --workers=10` (TS2304 missing: 6). `./wasm/test.sh thin_checker_tests` failed at pre-existing abstract class tests (TS2564 vs expected TS2511).
 - [x] Reduced TS2322 false positives: apply contextual typing for class property initializers, resolve Ref/index access types before assignability in var/property declarations, add thin_checker regressions for literal property init and class indexed access. `find-ts2322.mjs --max=500 --samples=5` now reports 0 false positives (previously hit derivedTypeDoesNotRequireExtendsClause + typeOfThisInStaticMembers12/13 + privateNamesAndIndexedAccess).
 - [x] Fixed parser extra errors TS1005/TS1109/TS1068/TS1128 (static name parsing, static blocks with modifiers, async function expression keyword names). Added regression tests in `thin_parser_tests.rs`; `./wasm/test.sh thin_parser` passed.
@@ -200,7 +201,7 @@ Priority: 2
 - [x] Further fixed TS2403 false positives: changed from TypeId equality to bi-directional assignability check. TypeScript's "same type" semantics requires mutual assignability, not identical TypeIds. Fixes patterns like `var e = E1; var e: typeof E1;` (enum/typeof) and `var n = 42; var n: number;` (inferred vs annotated). Also fixed compilation error in solver/subtype.rs (s_sym referenced but undefined). Added regression tests for enum typeof and inferred vs annotated patterns. Quick conformance (200 files): TS2403 removed from top 10 extra errors list; appears only as 7 missing errors (legitimate cases where TSC emits but we don't).
 
 ## Ready for Merge
-No (merged 2026-01-10)
+No (merged 2026-01-11)
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize emitter fidelity (ES5 downleveling/source maps) before new features.

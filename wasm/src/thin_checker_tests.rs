@@ -14066,6 +14066,43 @@ type AbstractConstructor<T> = abstract new (...args: any[]) => T;
 }
 
 #[test]
+fn test_unterminated_template_expression_reports_missing_name() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = "var v = `foo ${ a ";
+
+    let mut parser = ThinParserState::new("TemplateExpression1.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let parse_codes: Vec<u32> = parser.get_diagnostics().iter().map(|d| d.code).collect();
+    assert!(
+        parse_codes.contains(&diagnostic_codes::TOKEN_EXPECTED),
+        "Expected TS1005 for unterminated template expression, got: {:?}",
+        parse_codes
+    );
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(
+        parser.get_arena(),
+        &binder,
+        &types,
+        "TemplateExpression1.ts".to_string(),
+    );
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        codes.contains(&diagnostic_codes::CANNOT_FIND_NAME),
+        "Expected TS2304 for missing name in template expression, got: {:?}",
+        codes
+    );
+}
+
+#[test]
 fn test_circular_type_alias_ts2456() {
     use crate::thin_parser::ThinParserState;
     use crate::checker::types::diagnostics::diagnostic_codes;
