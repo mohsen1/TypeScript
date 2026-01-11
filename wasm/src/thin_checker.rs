@@ -310,6 +310,23 @@ impl<'a> ThinCheckerState<'a> {
                             return Some(sym_id);
                         }
                     }
+                    if scope.kind == ContainerKind::Module {
+                        if let Some(container_sym_id) = self.ctx.binder.get_node_symbol(scope.container_node) {
+                            if let Some(container_symbol) = self.ctx.binder.get_symbol(container_sym_id) {
+                                if let Some(exports) = container_symbol.exports.as_ref() {
+                                    if let Some(member_id) = exports.get(name) {
+                                        if let Some(member_symbol) = self.ctx.binder.get_symbol(member_id) {
+                                            if !Self::is_class_member_symbol(member_symbol.flags) {
+                                                return Some(member_id);
+                                            }
+                                        } else {
+                                            return Some(member_id);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                     let parent_id = scope.parent;
                     if scope.kind == ContainerKind::Module {
                         if let Some(parent_scope) = self.ctx.binder.scopes.get(parent_id.0 as usize) {
@@ -645,10 +662,21 @@ impl<'a> ThinCheckerState<'a> {
 
                 if has_type_args {
                     let is_builtin_array = name == "Array" || name == "ReadonlyArray";
-                    if !is_builtin_array
-                        && self.lookup_type_parameter(name).is_none()
-                        && self.resolve_identifier_symbol(type_name_idx).is_none()
-                    {
+                    let type_param = self.lookup_type_parameter(name);
+                    let sym_id = self.resolve_identifier_symbol(type_name_idx);
+                    if !is_builtin_array && type_param.is_none() && sym_id.is_none() {
+                        if self.is_known_global_type_name(name) {
+                            if let Some(args) = &type_ref.type_arguments {
+                                for &arg_idx in &args.nodes {
+                                    let _ = self.get_type_from_type_node(arg_idx);
+                                }
+                            }
+                            return TypeId::UNKNOWN;
+                        }
+                        if name == "await" {
+                            self.error_cannot_find_name_did_you_mean_at(name, "Awaited", type_name_idx);
+                            return TypeId::ERROR;
+                        }
                         self.error_cannot_find_name_at(name, type_name_idx);
                         return TypeId::ERROR;
                     }
@@ -739,6 +767,13 @@ impl<'a> ThinCheckerState<'a> {
 
                 if let Some(type_id) = self.resolve_named_type_reference(name, type_name_idx) {
                     return type_id;
+                }
+                if name == "await" {
+                    self.error_cannot_find_name_did_you_mean_at(name, "Awaited", type_name_idx);
+                    return TypeId::ERROR;
+                }
+                if self.is_known_global_type_name(name) {
+                    return TypeId::UNKNOWN;
                 }
                 self.error_cannot_find_name_at(name, type_name_idx);
                 return TypeId::ERROR;
@@ -1793,6 +1828,9 @@ impl<'a> ThinCheckerState<'a> {
             return TypeId::ERROR;
         } else if let Some(name) = name_text {
             if is_identifier {
+                if self.is_known_global_value_name(&name) {
+                    return TypeId::ANY;
+                }
                 self.error_cannot_find_name_at(&name, type_query.expr_name);
                 return TypeId::ERROR;
             }
@@ -1959,6 +1997,18 @@ impl<'a> ThinCheckerState<'a> {
                     }
 
                     if !is_builtin_array && type_param.is_none() && sym_id.is_none() {
+                        if self.is_known_global_type_name(name) {
+                            if let Some(args) = &type_ref.type_arguments {
+                                for &arg_idx in &args.nodes {
+                                    let _ = self.get_type_from_type_node_in_type_literal(arg_idx);
+                                }
+                            }
+                            return TypeId::UNKNOWN;
+                        }
+                        if name == "await" {
+                            self.error_cannot_find_name_did_you_mean_at(name, "Awaited", type_name_idx);
+                            return TypeId::ERROR;
+                        }
                         self.error_cannot_find_name_at(name, type_name_idx);
                         return TypeId::ERROR;
                     }
@@ -2038,6 +2088,13 @@ impl<'a> ThinCheckerState<'a> {
                     return self.ctx.types.intern(TypeKey::Ref(SymbolRef(sym_id.0)));
                 }
 
+                if name == "await" {
+                    self.error_cannot_find_name_did_you_mean_at(name, "Awaited", type_name_idx);
+                    return TypeId::ERROR;
+                }
+                if self.is_known_global_type_name(name) {
+                    return TypeId::UNKNOWN;
+                }
                 self.error_cannot_find_name_at(name, type_name_idx);
                 return TypeId::ERROR;
             }
@@ -5924,6 +5981,7 @@ impl<'a> ThinCheckerState<'a> {
                 if arg_node.kind == syntax_kind_ext::SPREAD_ELEMENT {
                     if let Some(spread_data) = self.ctx.arena.get_spread(arg_node) {
                         let spread_type = self.get_type_of_node(spread_data.expression);
+                        let spread_type = self.resolve_type_for_property_access(spread_type);
                         if let Some(TypeKey::Tuple(elems_id)) = self.ctx.types.lookup(spread_type) {
                             let elems = self.ctx.types.tuple_list(elems_id);
                             expanded_count += elems.len();
@@ -5944,6 +6002,7 @@ impl<'a> ThinCheckerState<'a> {
                 if arg_node.kind == syntax_kind_ext::SPREAD_ELEMENT {
                     if let Some(spread_data) = self.ctx.arena.get_spread(arg_node) {
                         let spread_type = self.get_type_of_node(spread_data.expression);
+                        let spread_type = self.resolve_type_for_property_access(spread_type);
 
                         // If it's a tuple type, expand its elements
                         if let Some(TypeKey::Tuple(elems_id)) = self.ctx.types.lookup(spread_type) {
@@ -7495,30 +7554,32 @@ impl<'a> ThinCheckerState<'a> {
                 }
             }
 
-            let elem_type = self.get_type_of_node(elem_idx);
+            let Some(elem_node) = self.ctx.arena.get(elem_idx) else {
+                continue;
+            };
+            let elem_is_spread = elem_node.kind == syntax_kind_ext::SPREAD_ELEMENT;
+            let elem_type = if elem_is_spread {
+                if let Some(spread_data) = self.ctx.arena.get_spread(elem_node) {
+                    self.get_type_of_node(spread_data.expression)
+                } else {
+                    TypeId::ANY
+                }
+            } else {
+                self.get_type_of_node(elem_idx)
+            };
 
             self.ctx.contextual_type = prev_context;
 
             if let Some(ref expected) = tuple_context {
-                let (name, optional, rest) = match expected.get(index) {
-                    Some(el) => (el.name, el.optional, el.rest),
-                    None => {
-                        if let Some(last) = expected.last() {
-                            if last.rest {
-                                (last.name, last.optional, last.rest)
-                            } else {
-                                (None, false, false)
-                            }
-                        } else {
-                            (None, false, false)
-                        }
-                    }
+                let (name, optional) = match expected.get(index) {
+                    Some(el) => (el.name, el.optional),
+                    None => (None, false),
                 };
                 tuple_elements.push(TupleElement {
                     type_id: elem_type,
                     name,
                     optional,
-                    rest,
+                    rest: elem_is_spread,
                 });
             } else {
                 element_types.push(elem_type);
@@ -10211,6 +10272,32 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    /// Report error 2552: Cannot find name 'X'. Did you mean 'Y'?
+    pub fn error_cannot_find_name_did_you_mean_at(
+        &mut self,
+        name: &str,
+        suggestion: &str,
+        idx: NodeIndex,
+    ) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+
+        if let Some(loc) = self.get_source_location(idx) {
+            let message = format!(
+                "Cannot find name '{}'. Did you mean '{}'?",
+                name, suggestion
+            );
+            self.ctx.diagnostics.push(Diagnostic {
+                code: diagnostic_codes::CANNOT_FIND_NAME_DID_YOU_MEAN,
+                category: DiagnosticCategory::Error,
+                message_text: message,
+                file: self.ctx.file_name.clone(),
+                start: loc.start,
+                length: loc.length(),
+                related_information: Vec::new(),
+            });
+        }
+    }
+
     /// Report error 2662: Cannot find name 'X'. Did you mean the static member 'C.X'?
     pub fn error_cannot_find_name_static_member_at(
         &mut self,
@@ -10320,7 +10407,7 @@ impl<'a> ThinCheckerState<'a> {
         matches!(
             name,
             "console" | "Math" | "JSON" | "Object" | "Array" | "String"
-                | "Number" | "Boolean" | "Date" | "RegExp" | "Error" | "Promise"
+                | "Number" | "Boolean" | "Function" | "Date" | "RegExp" | "Error" | "Promise"
                 | "Map" | "Set" | "WeakMap" | "WeakSet" | "WeakRef" | "Proxy"
                 | "Reflect" | "globalThis" | "window" | "document"
                 | "FinalizationRegistry" | "BigInt" | "ArrayBuffer" | "SharedArrayBuffer"
@@ -10335,6 +10422,22 @@ impl<'a> ThinCheckerState<'a> {
                 | "fetch" | "setTimeout" | "setInterval" | "clearTimeout" | "clearInterval"
                 | "queueMicrotask" | "structuredClone" | "atob" | "btoa"
                 | "performance" | "crypto" | "navigator" | "location" | "history"
+        )
+    }
+
+    fn is_known_global_type_name(&self, name: &str) -> bool {
+        matches!(
+            name,
+            "Object" | "String" | "Number" | "Boolean" | "Symbol" | "Function"
+                | "Promise" | "PromiseLike" | "PromiseConstructor" | "PromiseConstructorLike" | "Awaited"
+                | "Array" | "ReadonlyArray" | "ArrayLike"
+                | "Map" | "Set" | "WeakMap" | "WeakSet" | "WeakRef" | "Date" | "RegExp" | "RegExpExecArray"
+                | "Partial" | "Required" | "Readonly" | "Record" | "Pick" | "Omit"
+                | "Iterator" | "Iterable" | "AsyncIterator" | "AsyncIterable"
+                | "Generator" | "AsyncGenerator"
+                | "NonNullable" | "Extract" | "ThisType" | "PropertyKey" | "PropertyDescriptor"
+                | "Element" | "HTMLElement" | "Document" | "Window" | "Event" | "NodeList" | "NodeListOf"
+                | "Error" | "TypeError" | "RangeError" | "EvalError" | "URIError" | "ReferenceError" | "SyntaxError"
         )
     }
 
@@ -10990,20 +11093,22 @@ impl<'a> ThinCheckerState<'a> {
                         let has_return = self.body_has_return_with_value(func.body);
                         let falls_through = self.function_body_falls_through(func.body);
 
-                        if has_type_annotation && requires_return && !has_return {
-                            use crate::checker::types::diagnostics::diagnostic_codes;
-                            self.error_at_node(
-                                func.type_annotation,
-                                "A function whose declared type is neither 'undefined', 'void', nor 'any' must return a value.",
-                                diagnostic_codes::FUNCTION_LACKS_RETURN_TYPE,
-                            );
-                        } else if has_type_annotation && requires_return && falls_through {
-                            use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
-                            self.error_at_node(
-                                func.type_annotation,
-                                diagnostic_messages::FUNCTION_LACKS_ENDING_RETURN_STATEMENT,
-                                diagnostic_codes::NOT_ALL_CODE_PATHS_RETURN_VALUE,
-                            );
+                        if has_type_annotation && requires_return && falls_through {
+                            if !has_return {
+                                use crate::checker::types::diagnostics::diagnostic_codes;
+                                self.error_at_node(
+                                    func.type_annotation,
+                                    "A function whose declared type is neither 'undefined', 'void', nor 'any' must return a value.",
+                                    diagnostic_codes::FUNCTION_LACKS_RETURN_TYPE,
+                                );
+                            } else {
+                                use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
+                                self.error_at_node(
+                                    func.type_annotation,
+                                    diagnostic_messages::FUNCTION_LACKS_ENDING_RETURN_STATEMENT,
+                                    diagnostic_codes::NOT_ALL_CODE_PATHS_RETURN_VALUE,
+                                );
+                            }
                         } else if self.ctx.no_implicit_returns && has_return && falls_through {
                             // TS7030: noImplicitReturns - not all code paths return a value
                             use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
@@ -11473,33 +11578,76 @@ impl<'a> ThinCheckerState<'a> {
 
         // Get the properties of both types
         let source_shape = match self.ctx.types.lookup(source) {
-            Some(TypeKey::Object(shape_id)) => self.ctx.types.object_shape(shape_id),
-            _ => return,
-        };
-
-        let target_shape = match self.ctx.types.lookup(target) {
-            Some(TypeKey::Object(shape_id)) => self.ctx.types.object_shape(shape_id),
+            Some(TypeKey::Object(shape_id)) | Some(TypeKey::ObjectWithIndex(shape_id)) => {
+                self.ctx.types.object_shape(shape_id)
+            }
             _ => return,
         };
 
         let source_props = source_shape.properties.as_slice();
-        let target_props = target_shape.properties.as_slice();
+        let resolved_target = self.resolve_type_for_property_access(target);
 
-        // Empty object {} accepts any properties - no excess property check needed.
-        // This is a key TypeScript behavior: {} means "any non-nullish value".
-        // See https://github.com/microsoft/TypeScript/issues/60582
-        if target_props.is_empty() {
-            return;
-        }
+        match self.ctx.types.lookup(resolved_target) {
+            Some(TypeKey::Object(shape_id)) => {
+                let target_shape = self.ctx.types.object_shape(shape_id);
+                let target_props = target_shape.properties.as_slice();
 
-        // Check for excess properties in source that don't exist in target
-        // This is the "freshness" or "strict object literal" check
-        for source_prop in source_props {
-            let exists_in_target = target_props.iter().any(|p| p.name == source_prop.name);
-            if !exists_in_target {
-                let prop_name = self.ctx.types.resolve_atom(source_prop.name);
-                self.error_excess_property_at(&prop_name, target, idx);
+                // Empty object {} accepts any properties - no excess property check needed.
+                // This is a key TypeScript behavior: {} means "any non-nullish value".
+                // See https://github.com/microsoft/TypeScript/issues/60582
+                if target_props.is_empty() {
+                    return;
+                }
+
+                // Check for excess properties in source that don't exist in target
+                // This is the "freshness" or "strict object literal" check
+                for source_prop in source_props {
+                    let exists_in_target = target_props.iter().any(|p| p.name == source_prop.name);
+                    if !exists_in_target {
+                        let prop_name = self.ctx.types.resolve_atom(source_prop.name);
+                        self.error_excess_property_at(&prop_name, target, idx);
+                    }
+                }
             }
+            Some(TypeKey::Union(members_id)) => {
+                let members = self.ctx.types.type_list(members_id);
+                let mut target_shapes = Vec::new();
+
+                for &member in members.iter() {
+                    let resolved_member = self.resolve_type_for_property_access(member);
+                    let shape = match self.ctx.types.lookup(resolved_member) {
+                        Some(TypeKey::Object(shape_id))
+                        | Some(TypeKey::ObjectWithIndex(shape_id)) => {
+                            self.ctx.types.object_shape(shape_id)
+                        }
+                        _ => continue,
+                    };
+
+                    if shape.properties.is_empty()
+                        || shape.string_index.is_some()
+                        || shape.number_index.is_some()
+                    {
+                        return;
+                    }
+
+                    target_shapes.push(shape);
+                }
+
+                if target_shapes.is_empty() {
+                    return;
+                }
+
+                for source_prop in source_props {
+                    let exists_in_target = target_shapes.iter().any(|shape| {
+                        shape.properties.iter().any(|prop| prop.name == source_prop.name)
+                    });
+                    if !exists_in_target {
+                        let prop_name = self.ctx.types.resolve_atom(source_prop.name);
+                        self.error_excess_property_at(&prop_name, target, idx);
+                    }
+                }
+            }
+            _ => return,
         }
         // Note: Missing property checks are handled by solver's explain_failure
     }
@@ -12062,6 +12210,7 @@ impl<'a> ThinCheckerState<'a> {
     /// Emits TS2304 when a referenced name cannot be resolved.
     fn check_heritage_clauses_for_unresolved_names(&mut self, heritage_clauses: &Option<crate::parser::NodeList>) {
         use crate::parser::syntax_kind_ext::HERITAGE_CLAUSE;
+        use crate::scanner::SyntaxKind;
 
         let Some(clauses) = heritage_clauses else {
             return;
@@ -12095,8 +12244,28 @@ impl<'a> ThinCheckerState<'a> {
 
                 // Try to resolve the heritage symbol
                 if self.resolve_heritage_symbol(expr_idx).is_none() {
+                    if let Some(expr_node) = self.ctx.arena.get(expr_idx) {
+                        match expr_node.kind {
+                            k if k == SyntaxKind::NullKeyword as u16
+                                || k == SyntaxKind::UndefinedKeyword as u16
+                                || k == SyntaxKind::TrueKeyword as u16
+                                || k == SyntaxKind::FalseKeyword as u16
+                                || k == SyntaxKind::VoidKeyword as u16
+                                || k == SyntaxKind::NumericLiteral as u16
+                                || k == SyntaxKind::StringLiteral as u16 => {
+                                continue;
+                            }
+                            _ => {}
+                        }
+                    }
                     // Get the name for the error message
                     if let Some(name) = self.heritage_name_text(expr_idx) {
+                        if matches!(name.as_str(), "undefined" | "null" | "true" | "false" | "void" | "0") {
+                            continue;
+                        }
+                        if self.is_known_global_type_name(&name) {
+                            continue;
+                        }
                         self.error_cannot_find_name_at(&name, expr_idx);
                     }
                 }
@@ -13987,6 +14156,7 @@ impl<'a> ThinCheckerState<'a> {
             }
             k if k == syntax_kind_ext::FUNCTION_TYPE || k == syntax_kind_ext::CONSTRUCTOR_TYPE => {
                 if let Some(func_type) = self.ctx.arena.get_function_type(node) {
+                    let updates = self.push_missing_name_type_parameters(&func_type.type_parameters);
                     self.check_type_parameters_for_missing_names(&func_type.type_parameters);
                     for &param_idx in &func_type.parameters.nodes {
                         self.check_parameter_type_for_missing_names(param_idx);
@@ -13994,6 +14164,7 @@ impl<'a> ThinCheckerState<'a> {
                     if !func_type.type_annotation.is_none() {
                         self.check_type_for_missing_names(func_type.type_annotation);
                     }
+                    self.pop_type_parameters(updates);
                 }
             }
             k if k == syntax_kind_ext::ARRAY_TYPE => {
@@ -14123,6 +14294,44 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    fn push_missing_name_type_parameters(
+        &mut self,
+        type_parameters: &Option<crate::parser::NodeList>,
+    ) -> Vec<(String, Option<TypeId>)> {
+        use crate::solver::{TypeKey, TypeParamInfo};
+
+        let Some(list) = type_parameters else {
+            return Vec::new();
+        };
+
+        let mut updates = Vec::new();
+        for &param_idx in &list.nodes {
+            let Some(param_node) = self.ctx.arena.get(param_idx) else {
+                continue;
+            };
+            let Some(param) = self.ctx.arena.get_type_parameter(param_node) else {
+                continue;
+            };
+            let Some(name_node) = self.ctx.arena.get(param.name) else {
+                continue;
+            };
+            let Some(ident) = self.ctx.arena.get_identifier(name_node) else {
+                continue;
+            };
+            let name = ident.escaped_text.clone();
+            let atom = self.ctx.types.intern_string(&name);
+            let type_id = self.ctx.types.intern(TypeKey::TypeParameter(TypeParamInfo {
+                name: atom,
+                constraint: None,
+                default: None,
+            }));
+            let previous = self.ctx.type_parameter_scope.insert(name.clone(), type_id);
+            updates.push((name, previous));
+        }
+
+        updates
+    }
+
     fn check_type_parameter_node_for_missing_names(&mut self, param_idx: NodeIndex) {
         let Some(param_node) = self.ctx.arena.get(param_idx) else {
             return;
@@ -14169,6 +14378,7 @@ impl<'a> ThinCheckerState<'a> {
         };
 
         if let Some(sig) = self.ctx.arena.get_signature(member_node) {
+            let updates = self.push_missing_name_type_parameters(&sig.type_parameters);
             self.check_type_parameters_for_missing_names(&sig.type_parameters);
             if let Some(ref params) = sig.parameters {
                 for &param_idx in &params.nodes {
@@ -14178,6 +14388,7 @@ impl<'a> ThinCheckerState<'a> {
             if !sig.type_annotation.is_none() {
                 self.check_type_for_missing_names(sig.type_annotation);
             }
+            self.pop_type_parameters(updates);
             return;
         }
 
@@ -16246,19 +16457,21 @@ impl<'a> ThinCheckerState<'a> {
             let has_return = self.body_has_return_with_value(method.body);
             let falls_through = self.function_body_falls_through(method.body);
 
-            if has_type_annotation && requires_return && !has_return {
-                self.error_at_node(
-                    method.type_annotation,
-                    "A function whose declared type is neither 'undefined', 'void', nor 'any' must return a value.",
-                    diagnostic_codes::FUNCTION_LACKS_RETURN_TYPE,
-                );
-            } else if has_type_annotation && requires_return && falls_through {
-                use crate::checker::types::diagnostics::diagnostic_messages;
-                self.error_at_node(
-                    method.type_annotation,
-                    diagnostic_messages::FUNCTION_LACKS_ENDING_RETURN_STATEMENT,
-                    diagnostic_codes::NOT_ALL_CODE_PATHS_RETURN_VALUE,
-                );
+            if has_type_annotation && requires_return && falls_through {
+                if !has_return {
+                    self.error_at_node(
+                        method.type_annotation,
+                        "A function whose declared type is neither 'undefined', 'void', nor 'any' must return a value.",
+                        diagnostic_codes::FUNCTION_LACKS_RETURN_TYPE,
+                    );
+                } else {
+                    use crate::checker::types::diagnostics::diagnostic_messages;
+                    self.error_at_node(
+                        method.type_annotation,
+                        diagnostic_messages::FUNCTION_LACKS_ENDING_RETURN_STATEMENT,
+                        diagnostic_codes::NOT_ALL_CODE_PATHS_RETURN_VALUE,
+                    );
+                }
             } else if self.ctx.no_implicit_returns && has_return && falls_through {
                 // TS7030: noImplicitReturns - not all code paths return a value
                 use crate::checker::types::diagnostics::diagnostic_messages;
@@ -16438,19 +16651,21 @@ impl<'a> ThinCheckerState<'a> {
                 let requires_return = self.requires_return_value(return_type);
                 let has_return = self.body_has_return_with_value(accessor.body);
                 let falls_through = self.function_body_falls_through(accessor.body);
-                if has_type_annotation && requires_return && !has_return {
-                    self.error_at_node(
-                        accessor.type_annotation,
-                        "A function whose declared type is neither 'undefined', 'void', nor 'any' must return a value.",
-                        diagnostic_codes::FUNCTION_LACKS_RETURN_TYPE,
-                    );
-                } else if has_type_annotation && requires_return && falls_through {
-                    use crate::checker::types::diagnostics::diagnostic_messages;
-                    self.error_at_node(
-                        accessor.type_annotation,
-                        diagnostic_messages::FUNCTION_LACKS_ENDING_RETURN_STATEMENT,
-                        diagnostic_codes::NOT_ALL_CODE_PATHS_RETURN_VALUE,
-                    );
+                if has_type_annotation && requires_return && falls_through {
+                    if !has_return {
+                        self.error_at_node(
+                            accessor.type_annotation,
+                            "A function whose declared type is neither 'undefined', 'void', nor 'any' must return a value.",
+                            diagnostic_codes::FUNCTION_LACKS_RETURN_TYPE,
+                        );
+                    } else {
+                        use crate::checker::types::diagnostics::diagnostic_messages;
+                        self.error_at_node(
+                            accessor.type_annotation,
+                            diagnostic_messages::FUNCTION_LACKS_ENDING_RETURN_STATEMENT,
+                            diagnostic_codes::NOT_ALL_CODE_PATHS_RETURN_VALUE,
+                        );
+                    }
                 } else if self.ctx.no_implicit_returns && has_return && falls_through {
                     // TS7030: noImplicitReturns - not all code paths return a value
                     use crate::checker::types::diagnostics::diagnostic_messages;
@@ -16920,7 +17135,7 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
-    fn function_body_falls_through(&self, body_idx: NodeIndex) -> bool {
+    fn function_body_falls_through(&mut self, body_idx: NodeIndex) -> bool {
         let Some(body_node) = self.ctx.arena.get(body_idx) else {
             return true;
         };
@@ -16932,7 +17147,7 @@ impl<'a> ThinCheckerState<'a> {
         false
     }
 
-    fn block_falls_through(&self, statements: &[NodeIndex]) -> bool {
+    fn block_falls_through(&mut self, statements: &[NodeIndex]) -> bool {
         for &stmt_idx in statements {
             if !self.statement_falls_through(stmt_idx) {
                 return false;
@@ -16941,7 +17156,7 @@ impl<'a> ThinCheckerState<'a> {
         true
     }
 
-    fn statement_falls_through(&self, stmt_idx: NodeIndex) -> bool {
+    fn statement_falls_through(&mut self, stmt_idx: NodeIndex) -> bool {
         let Some(node) = self.ctx.arena.get(stmt_idx) else {
             return true;
         };
@@ -16954,6 +17169,42 @@ impl<'a> ThinCheckerState<'a> {
                 .get_block(node)
                 .map(|block| self.block_falls_through(&block.statements.nodes))
                 .unwrap_or(true),
+            syntax_kind_ext::EXPRESSION_STATEMENT => {
+                let Some(expr_stmt) = self.ctx.arena.get_expression_statement(node) else {
+                    return true;
+                };
+                let expr_type = self.get_type_of_node(expr_stmt.expression);
+                !expr_type.is_never()
+            }
+            syntax_kind_ext::VARIABLE_STATEMENT => {
+                let Some(var_stmt) = self.ctx.arena.get_variable(node) else {
+                    return true;
+                };
+                for &decl_idx in &var_stmt.declarations.nodes {
+                    let Some(list_node) = self.ctx.arena.get(decl_idx) else {
+                        continue;
+                    };
+                    let Some(var_list) = self.ctx.arena.get_variable(list_node) else {
+                        continue;
+                    };
+                    for &list_decl_idx in &var_list.declarations.nodes {
+                        let Some(list_decl_node) = self.ctx.arena.get(list_decl_idx) else {
+                            continue;
+                        };
+                        let Some(decl) = self.ctx.arena.get_variable_declaration(list_decl_node) else {
+                            continue;
+                        };
+                        if decl.initializer.is_none() {
+                            continue;
+                        }
+                        let init_type = self.get_type_of_node(decl.initializer);
+                        if init_type.is_never() {
+                            return false;
+                        }
+                    }
+                }
+                true
+            }
             syntax_kind_ext::IF_STATEMENT => {
                 let Some(if_data) = self.ctx.arena.get_if_statement(node) else {
                     return true;
@@ -16981,7 +17232,7 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
-    fn switch_falls_through(&self, switch_idx: NodeIndex) -> bool {
+    fn switch_falls_through(&mut self, switch_idx: NodeIndex) -> bool {
         let Some(node) = self.ctx.arena.get(switch_idx) else {
             return true;
         };
@@ -17014,7 +17265,7 @@ impl<'a> ThinCheckerState<'a> {
         !has_default
     }
 
-    fn try_falls_through(&self, try_idx: NodeIndex) -> bool {
+    fn try_falls_through(&mut self, try_idx: NodeIndex) -> bool {
         let Some(node) = self.ctx.arena.get(try_idx) else {
             return true;
         };
@@ -17039,7 +17290,7 @@ impl<'a> ThinCheckerState<'a> {
         try_falls || catch_falls
     }
 
-    fn loop_falls_through(&self, node: &crate::parser::thin_node::ThinNode) -> bool {
+    fn loop_falls_through(&mut self, node: &crate::parser::thin_node::ThinNode) -> bool {
         let Some(loop_data) = self.ctx.arena.get_loop(node) else {
             return true;
         };

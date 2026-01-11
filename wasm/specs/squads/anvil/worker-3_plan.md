@@ -1,15 +1,13 @@
 # Anvil Worker 3 - TS2339 Property Resolution (Inherited Properties)
 
-Ready for Merge: Yes
+Ready for Merge: No (merged 2026-01-11)
 Status: Active
 
 ## Current Assignment (2026-01-11)
 
-- Prereq: run `./scripts/ask-gemini.mjs "I need to reduce TS2339 false positives (property lookup/inheritance). What's the best approach?"` once the API key is available.
-- Reduce TS2339 false positives (property access on inherited/prototype chain, mixins, and interface merges).
-- Collect 3-5 failing samples from conformance output; capture the failing expression + expected property resolution.
-- Trace property lookup in `wasm/src/thin_checker.rs` (class instance types, interface heritage, index signatures, and union/intersection property merges).
-- Implement fix + regression tests; run a targeted TS2339 scan and report the delta.
+- Investigate remaining TS2339 extras in `classes/classDeclarations/classExtendingClassLikeType.ts` (class-like constructors).
+- Trace property lookup/heritage typing in `wasm/src/thin_checker.rs` for class-like constructor types and overloads.
+- Add regression test; run `node wasm/differential-test/find-ts2339.mjs --max=500 --samples=5` and report delta.
 
 ### Update (2026-01-11)
 - Fix: use TypeEnvironment-backed assignability in call/new resolution, and resolve Application symbols (including type param constraints) to improve generic mixin inference (commit 5cf3894068).

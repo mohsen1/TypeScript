@@ -166,14 +166,14 @@ bash run-conformance.sh --all --workers=14
 
 ---
 ## Squad Status
-- Last EM Report: 2026-01-11 00:53
-- Workers Active: 0/5 (blocked on Gemini access)
-- Branches Pending Merge: None (worker/anvil-4 already merged)
+- Last EM Report: 2026-01-11 05:39
+- Workers Active: 5/5
+- Branches Pending Merge: None
 - Current Focus:
-  - W1: TS2304 (Cannot find name) - scope resolution
-  - W2: Parser bugs (TS1005/TS1109/TS1068/TS1128)
-  - W3: TS2339 (Property not exist) - private/mixin property access
-  - W4: TS2769 (Overload matching) - variadic tuple cases
-  - W5: TS2355 (Return analysis) - follow-up reductions
-- Blockers: `./scripts/ask-gemini.mjs` missing `GCP_VERTEX_EXPRESS_API_KEY` (all workers blocked)
+  - W1: TemplateExpression1 crash repro (es6/templates)
+  - W2: TS2304 (Cannot find name) - scope resolution
+  - W3: TS2339 remaining extras (classExtendingClassLikeType)
+  - W4: recursiveMappedTypes crash verification
+  - W5: TS2355 regression scan
+- Blockers: None
 - Strategy: Each worker owns one error code category, reduce false positives independently
