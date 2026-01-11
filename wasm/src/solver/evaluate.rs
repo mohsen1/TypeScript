@@ -1178,8 +1178,11 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         if evaluated_object != object_type || evaluated_index != index_type {
             return self.evaluate_index_access(evaluated_object, evaluated_index);
         }
+        // Be more strict: don't fall back to 'any' for index access
+        // This improves type safety by requiring proper types
+        // Returning ERROR instead of ANY makes the solver stricter
         if evaluated_object == TypeId::ANY || evaluated_index == TypeId::ANY {
-            return TypeId::ANY;
+            return TypeId::ERROR;
         }
 
         // Get the object structure
