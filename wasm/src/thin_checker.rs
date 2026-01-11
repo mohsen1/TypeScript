@@ -15398,11 +15398,11 @@ impl<'a> ThinCheckerState<'a> {
     /// Infer the return type of a getter from its body.
     fn infer_getter_return_type(&mut self, body_idx: NodeIndex) -> TypeId {
         if body_idx.is_none() {
-            return TypeId::ANY;
+            return TypeId::VOID;
         }
 
         let Some(body_node) = self.ctx.arena.get(body_idx) else {
-            return TypeId::ANY;
+            return TypeId::VOID;
         };
 
         // If it's a block, look for return statements
@@ -15422,7 +15422,9 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
 
-        TypeId::ANY
+        // No return statements with values found - return void (not any)
+        // This prevents false positive TS7010 errors for getters without return statements
+        TypeId::VOID
     }
 
     /// Find the position of the first return statement's expression in a body.
@@ -17295,7 +17297,7 @@ impl<'a> ThinCheckerState<'a> {
             if has_type_annotation {
                 self.get_type_from_type_node(accessor.type_annotation)
             } else {
-                TypeId::ANY
+                TypeId::VOID  // Default to void for getters without type annotation
             }
         } else {
             TypeId::VOID

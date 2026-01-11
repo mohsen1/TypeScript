@@ -7,33 +7,27 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-TS7010 - Implicit any return type errors (42→40 FP, investigating remaining cases)
+TS7010 - Implicit any return type errors (42→40 FP fixed, investigating remaining)
 
 **Error Code:** TS7010 - "'{0}', which lacks return-type annotation, implicitly has an '{1}' return type."
 
 **Impact:** 66 conformance tests affected (40 extra false positives, 15 missing)
 
-### Previous Assignment (Completed)
-- TS2300 30% reduction (duplicate identifiers in constructors)
-- TS2339 improvements (captured variables, property access)
-
-### Next Steps
-1. Continue TS7010 work (test and verify async getter fix)
-2. Run conformance baseline to measure impact
-3. Consider next assignment after TS7010 validation
+### Steps
+1. **Investigate false positives** - async functions, class expressions reporting TS7010 incorrectly
+2. **Investigate missing cases** - abstract classes, overload cases not reporting TS7010
+3. **Fix implementation** in `thin_checker.rs` for return type inference
+4. **Add tests** in `wasm/src/thin_checker_tests.rs` for TS7010 cases
+5. **Run focused tests** with `./wasm/test.sh` and record delta
 
 ### Key Files
 - `wasm/src/thin_checker.rs`
-- `wasm/src/checker/expressions.rs`
-- `wasm/src/solver/subtype.rs`
 - `wasm/src/thin_checker_tests.rs`
 
 ### Success Criteria
-- TS2322 emitted for incompatible assignments
-- Correct handling of structural typing, unions, generics
-- No new regressions
-
-### Focus Areas (split with W2)
+- TS7010 emitted for functions with implicit any return types
+- No false positives for async functions, class expressions
+- Abstract classes handled correctly
 - Function return type assignability
 - Variable declaration assignability
 - Generic constraint checking
