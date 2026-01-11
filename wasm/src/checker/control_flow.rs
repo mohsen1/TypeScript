@@ -2951,6 +2951,132 @@ impl<'a> FlowAnalyzer<'a> {
     }
 }
 
+// =============================================================================
+// Return Path Analysis (Fall-Through Detection)
+// =============================================================================
+
+/// Check if a function body can fall through to the end (complete normally).
+pub fn function_body_falls_through(arena: &ThinNodeArena, body_idx: NodeIndex) -> bool {
+    statement_falls_through(arena, body_idx)
+}
+
+/// Check if a statement can fall through (complete normally).
+pub fn statement_falls_through(arena: &ThinNodeArena, stmt_idx: NodeIndex) -> bool {
+    let Some(node) = arena.get(stmt_idx) else {
+        return true;
+    };
+
+    use crate::parser::syntax_kind_ext::*;
+
+    match node.kind {
+        RETURN_STATEMENT | THROW_STATEMENT => false,
+        BLOCK => {
+            let Some(block) = arena.get_block(node) else {
+                return true;
+            };
+            block.statements.nodes.iter().all(|&stmt| statement_falls_through(arena, stmt))
+        }
+        IF_STATEMENT => {
+            let Some(if_stmt) = arena.get_if_statement(node) else {
+                return true;
+            };
+            if if_stmt.else_statement.is_none() {
+                return true;
+            }
+            let then_falls = statement_falls_through(arena, if_stmt.then_statement);
+            let else_falls = statement_falls_through(arena, if_stmt.else_statement);
+            then_falls || else_falls
+        }
+        SWITCH_STATEMENT => {
+            let Some(switch) = arena.get_switch(node) else {
+                return true;
+            };
+            let Some(case_block_node) = arena.get(switch.case_block) else {
+                return true;
+            };
+            let Some(case_block) = arena.get_block(case_block_node) else {
+                return true;
+            };
+            let mut has_default = false;
+            for &clause_idx in &case_block.statements.nodes {
+                let Some(clause_node) = arena.get(clause_idx) else {
+                    continue;
+                };
+                let Some(clause) = arena.get_case_clause(clause_node) else {
+                    continue;
+                };
+                if clause.expression.is_none() {
+                    has_default = true;
+                    if clause.statements.nodes.iter().all(|&stmt| statement_falls_through(arena, stmt)) {
+                        return true;
+                    }
+                }
+            }
+            !has_default
+        }
+        TRY_STATEMENT => {
+            let Some(try_stmt) = arena.get_try(node) else {
+                return true;
+            };
+            if !try_stmt.finally_block.is_none() {
+                return statement_falls_through(arena, try_stmt.finally_block);
+            }
+            statement_falls_through(arena, try_stmt.try_block)
+        }
+        WHILE_STATEMENT | DO_STATEMENT | FOR_STATEMENT => {
+            let Some(loop_data) = arena.get_loop(node) else {
+                return true;
+            };
+            let is_infinite = if loop_data.condition.is_none() {
+                true
+            } else {
+                is_constant_true_condition(arena, loop_data.condition)
+            };
+            if is_infinite {
+                return contains_break(arena, loop_data.statement);
+            }
+            true
+        }
+        FOR_IN_STATEMENT | FOR_OF_STATEMENT => true,
+        BREAK_STATEMENT | CONTINUE_STATEMENT => false,
+        _ => true,
+    }
+}
+
+fn is_constant_true_condition(arena: &ThinNodeArena, condition_idx: NodeIndex) -> bool {
+    let Some(node) = arena.get(condition_idx) else {
+        return false;
+    };
+    node.kind == SyntaxKind::TrueKeyword as u16
+}
+
+fn contains_break(arena: &ThinNodeArena, stmt_idx: NodeIndex) -> bool {
+    let Some(node) = arena.get(stmt_idx) else {
+        return false;
+    };
+
+    use crate::parser::syntax_kind_ext::*;
+
+    match node.kind {
+        BREAK_STATEMENT => true,
+        BLOCK => {
+            let Some(block) = arena.get_block(node) else {
+                return false;
+            };
+            block.statements.nodes.iter().any(|&stmt| contains_break(arena, stmt))
+        }
+        IF_STATEMENT => {
+            let Some(if_stmt) = arena.get_if_statement(node) else {
+                return false;
+            };
+            contains_break(arena, if_stmt.then_statement)
+                || contains_break(arena, if_stmt.else_statement)
+        }
+        WHILE_STATEMENT | DO_STATEMENT | FOR_STATEMENT | FOR_IN_STATEMENT | FOR_OF_STATEMENT | SWITCH_STATEMENT => false,
+        _ => false,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3208,4 +3334,20 @@ if (x == null) {}
         assert_eq!(narrowed_true, expected_true);
         assert_eq!(narrowed_false, TypeId::STRING);
     }
+}
+
+/// Check whether a function body can fall through to the end.
+/// Returns true if execution can reach the end without an explicit return.
+pub fn function_body_falls_through(_arena: &ThinNodeArena, _body_idx: NodeIndex) -> bool {
+    // TODO: Implement proper control flow analysis for function bodies
+    // For now, conservatively assume all bodies can fall through
+    true
+}
+
+/// Check whether a statement can fall through to the next statement.
+/// Returns true if execution can continue to the next statement.
+pub fn statement_falls_through(_arena: &ThinNodeArena, _stmt_idx: NodeIndex) -> bool {
+    // TODO: Implement proper control flow analysis for statements
+    // For now, conservatively assume all statements can fall through
+    true
 }

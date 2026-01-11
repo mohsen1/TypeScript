@@ -1053,6 +1053,73 @@ function Foo() {}
 }
 
 #[test]
+fn test_duplicate_identifier_binding_pattern_object_2300() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+const { a, a } = foo;
+const { a: b, c: b } = foo;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let duplicate_count = checker
+        .ctx
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == diagnostic_codes::DUPLICATE_IDENTIFIER)
+        .count();
+    assert!(
+        duplicate_count >= 2,
+        "Expected TS2300 for binding pattern duplicates, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_duplicate_identifier_binding_pattern_nested_2300() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+const [a, { a }] = foo;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let duplicate_count = checker
+        .ctx
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == diagnostic_codes::DUPLICATE_IDENTIFIER)
+        .count();
+    assert!(
+        duplicate_count >= 1,
+        "Expected TS2300 for nested binding pattern duplicates, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
 fn test_class_accessor_pair_no_duplicate_2300() {
     use crate::checker::types::diagnostics::diagnostic_codes;
     use crate::thin_parser::ThinParserState;
@@ -1092,7 +1159,7 @@ class Rectangle {
 
 #[test]
 fn test_class_duplicate_getter_2300() {
-    use crate::checker::types::diagnostic_codes;
+    use crate::checker::types::diagnostics::diagnostic_codes;
     use crate::thin_parser::ThinParserState;
 
     let source = r#"
@@ -2385,6 +2452,52 @@ var x: number;
     assert!(
         !codes.contains(&2304),
         "Unexpected TS2304 for invalid decorator declarations, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_extends_namespace_cycle_no_ts2304() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class C extends N.E { foo: string; }
+
+namespace M {
+    export class D extends C { bar: string; }
+}
+
+namespace N {
+    export class E extends M.D { baz: number; }
+}
+
+namespace O {
+    class C2<T> extends Q.E2<T> { foo: T; }
+
+    namespace P {
+        export class D2<T> extends C2<T> { bar: T; }
+    }
+
+    namespace Q {
+        export class E2<T> extends P.D2<T> { baz: T; }
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2304),
+        "Unexpected TS2304 for namespace heritage cycles, got: {:?}",
         codes
     );
 }
@@ -5721,6 +5834,109 @@ function loopWithNestedSwitchBreak(flag: boolean) {
     assert!(
         !checker.function_body_falls_through(body_at(5)),
         "loopWithNestedSwitchBreak should not fall through"
+    );
+}
+
+#[test]
+fn test_ts7010_return_path_async_generator_arrows() {
+    use crate::checker::{CheckerContext, StatementChecker};
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+function* genYieldOnly() {
+    yield 1;
+}
+
+function* genReturn() {
+    yield 1;
+    return 2;
+}
+
+async function asyncMaybeReturn(flag: boolean) {
+    if (flag) {
+        return 1;
+    }
+}
+
+const arrowExpr = () => 1;
+const asyncArrowExpr = async () => 1;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut ctx = CheckerContext::new(
+        parser.get_arena(),
+        &binder,
+        &types,
+        "test.ts".to_string(),
+    );
+
+    let arena = parser.get_arena();
+    let root_node = arena.get(root).expect("root node");
+    let source_file = arena.get_source_file(root_node).expect("source file");
+
+    let checker = StatementChecker::new(&mut ctx);
+
+    let func_at = |index: usize| {
+        *source_file
+            .statements
+            .nodes
+            .get(index)
+            .expect("statement index")
+    };
+
+    let arrow_at = |index: usize| {
+        let stmt_idx = *source_file
+            .statements
+            .nodes
+            .get(index)
+            .expect("statement index");
+        let stmt_node = arena.get(stmt_idx).expect("statement node");
+        let var_stmt = arena.get_variable(stmt_node).expect("variable statement");
+        let list_idx = *var_stmt
+            .declarations
+            .nodes
+            .first()
+            .expect("variable declaration list");
+        let list_node = arena.get(list_idx).expect("variable list node");
+        let var_list = arena.get_variable(list_node).expect("variable list");
+        let decl_idx = *var_list
+            .declarations
+            .nodes
+            .first()
+            .expect("variable declaration");
+        let decl_node = arena.get(decl_idx).expect("declaration node");
+        let decl = arena
+            .get_variable_declaration(decl_node)
+            .expect("declaration data");
+        decl.initializer
+    };
+
+    assert!(
+        checker.function_like_falls_through(func_at(0)),
+        "genYieldOnly should fall through"
+    );
+    assert!(
+        !checker.function_like_falls_through(func_at(1)),
+        "genReturn should not fall through"
+    );
+    assert!(
+        checker.function_like_falls_through(func_at(2)),
+        "asyncMaybeReturn should fall through"
+    );
+    assert!(
+        !checker.function_like_falls_through(arrow_at(3)),
+        "arrowExpr should not fall through"
+    );
+    assert!(
+        !checker.function_like_falls_through(arrow_at(4)),
+        "asyncArrowExpr should not fall through"
     );
 }
 
@@ -16937,4 +17153,529 @@ let { x = "hello" }: { x?: number } = {};
     // This test may currently fail if default values in binding elements aren't being checked
     assert!(!ts2322_errors.is_empty(), "Expected TS2322 error for binding element default value 'hello' (string) not assignable to number, got: {:?}",
         checker.ctx.diagnostics.iter().map(|d| d.code).collect::<Vec<_>>());
+}
+#[test]
+fn test_duplicate_parameter_simple() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+function foo(a: number, b: string, a: boolean) {
+    return a;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let duplicate_count = checker
+        .ctx
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == diagnostic_codes::DUPLICATE_IDENTIFIER)
+        .count();
+    assert_eq!(
+        duplicate_count,
+        2,
+        "Expected TS2300 for duplicate parameter 'a' (2 occurrences), got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_duplicate_parameter_in_arrow_function() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+const bar = (x: number, y: string, x: boolean) => x;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let duplicate_count = checker
+        .ctx
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == diagnostic_codes::DUPLICATE_IDENTIFIER)
+        .count();
+    assert_eq!(
+        duplicate_count,
+        2,
+        "Expected TS2300 for duplicate parameter 'x' in arrow function, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_duplicate_parameter_in_method() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class MyClass {
+    method(p: number, q: string, p: boolean) {
+        return p;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let duplicate_count = checker
+        .ctx
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == diagnostic_codes::DUPLICATE_IDENTIFIER)
+        .count();
+    assert_eq!(
+        duplicate_count,
+        2,
+        "Expected TS2300 for duplicate parameter 'p' in method, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_duplicate_parameter_in_constructor() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class MyClass {
+    constructor(arg: number, other: string, arg: boolean) {
+        console.log(arg);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let duplicate_count = checker
+        .ctx
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == diagnostic_codes::DUPLICATE_IDENTIFIER)
+        .count();
+    assert_eq!(
+        duplicate_count,
+        2,
+        "Expected TS2300 for duplicate parameter 'arg' in constructor, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_duplicate_parameter_in_object_destructuring() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+function foo({ a, b, a }: { a: number, b: string }) {
+    return a + b;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let duplicate_count = checker
+        .ctx
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == diagnostic_codes::DUPLICATE_IDENTIFIER)
+        .count();
+    assert_eq!(
+        duplicate_count,
+        2,
+        "Expected TS2300 for duplicate destructured parameter 'a', got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_duplicate_parameter_in_array_destructuring() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+function bar([x, y, x]: [number, string, boolean]) {
+    return x + y;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let duplicate_count = checker
+        .ctx
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == diagnostic_codes::DUPLICATE_IDENTIFIER)
+        .count();
+    assert_eq!(
+        duplicate_count,
+        2,
+        "Expected TS2300 for duplicate array destructured parameter 'x', got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_duplicate_parameter_across_simple_and_destructured() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+function baz(a: number, { a }: { a: string }) {
+    return a;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let duplicate_count = checker
+        .ctx
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == diagnostic_codes::DUPLICATE_IDENTIFIER)
+        .count();
+    assert_eq!(
+        duplicate_count,
+        2,
+        "Expected TS2300 for duplicate parameter 'a' (simple and destructured), got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_no_duplicate_parameter_distinct_names() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+function distinct(a: number, b: string, c: boolean) {
+    return a + b + c;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&diagnostic_codes::DUPLICATE_IDENTIFIER),
+        "Did not expect TS2300 for distinct parameters, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_duplicate_parameter_nested_destructuring() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+function nested({ x, inner: { x } }: { x: number, inner: { x: string } }) {
+    return x;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let duplicate_count = checker
+        .ctx
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == diagnostic_codes::DUPLICATE_IDENTIFIER)
+        .count();
+    assert_eq!(
+        duplicate_count,
+        2,
+        "Expected TS2300 for duplicate nested destructured parameter 'x', got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+// ========================================
+// Module Resolution Errors (TS2792 vs TS2307)
+// ========================================
+// Tests for distinguishing between package imports (TS2792) and relative imports (TS2307)
+
+#[test]
+fn test_module_resolution_package_import_unresolved() {
+    use crate::thin_parser::ThinParserState;
+    use crate::checker::types::diagnostics::diagnostic_codes;
+
+    // Package import (bare specifier) that's not resolved should emit TS2792
+    let source = r#"
+import { foo } from "some-package";
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.ctx.report_unresolved_imports = true; // Enable import checking
+    checker.check_source_file(root);
+
+    eprintln!("[PKG_UNRESOLVED] All diagnostics: {:?}", checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>());
+
+    let ts2792_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == diagnostic_codes::CANNOT_FIND_MODULE)
+        .collect();
+
+    // Should emit TS2792 for unresolved package import
+    assert!(!ts2792_errors.is_empty(), "Expected TS2792 error for unresolved package import, got: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| d.code).collect::<Vec<_>>());
+}
+
+#[test]
+fn test_module_resolution_relative_import_unresolved() {
+    use crate::thin_parser::ThinParserState;
+    use crate::checker::types::diagnostics::diagnostic_codes;
+
+    // Relative import that's not resolved should emit TS2307
+    let source = r#"
+import { foo } from "./some-file";
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.ctx.report_unresolved_imports = true; // Enable import checking
+    checker.check_source_file(root);
+
+    eprintln!("[REL_UNRESOLVED] All diagnostics: {:?}", checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>());
+
+    let ts2307_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == diagnostic_codes::MODULE_NOT_FOUND)
+        .collect();
+
+    // Should emit TS2307 for unresolved relative import
+    assert!(!ts2307_errors.is_empty(), "Expected TS2307 error for unresolved relative import, got: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| d.code).collect::<Vec<_>>());
+}
+
+#[test]
+fn test_module_resolution_parent_relative_import() {
+    use crate::thin_parser::ThinParserState;
+    use crate::checker::types::diagnostics::diagnostic_codes;
+
+    // Parent relative import (../) should emit TS2307
+    let source = r#"
+import { bar } from "../parent-file";
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.ctx.report_unresolved_imports = true;
+    checker.check_source_file(root);
+
+    eprintln!("[PARENT_REL] All diagnostics: {:?}", checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>());
+
+    let ts2307_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == diagnostic_codes::MODULE_NOT_FOUND)
+        .collect();
+
+    // Should emit TS2307 for parent relative import
+    assert!(!ts2307_errors.is_empty(), "Expected TS2307 error for parent relative import, got: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| d.code).collect::<Vec<_>>());
+}
+
+#[test]
+fn test_module_resolution_scoped_package() {
+    use crate::thin_parser::ThinParserState;
+    use crate::checker::types::diagnostics::diagnostic_codes;
+
+    // Scoped package (@types/node) should emit TS2792
+    let source = r#"
+import { EventEmitter } from "@types/node";
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.ctx.report_unresolved_imports = true;
+    checker.check_source_file(root);
+
+    eprintln!("[SCOPED_PKG] All diagnostics: {:?}", checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>());
+
+    let ts2792_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == diagnostic_codes::CANNOT_FIND_MODULE)
+        .collect();
+
+    // Should emit TS2792 for unresolved scoped package
+    assert!(!ts2792_errors.is_empty(), "Expected TS2792 error for unresolved scoped package, got: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| d.code).collect::<Vec<_>>());
+}
+
+#[test]
+fn test_module_resolution_absolute_path() {
+    use crate::thin_parser::ThinParserState;
+    use crate::checker::types::diagnostics::diagnostic_codes;
+
+    // Absolute path import should emit TS2307
+    let source = r#"
+import { baz } from "/absolute/path/to/file";
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.ctx.report_unresolved_imports = true;
+    checker.check_source_file(root);
+
+    eprintln!("[ABS_PATH] All diagnostics: {:?}", checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>());
+
+    let ts2307_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == diagnostic_codes::MODULE_NOT_FOUND)
+        .collect();
+
+    // Should emit TS2307 for absolute path import
+    assert!(!ts2307_errors.is_empty(), "Expected TS2307 error for absolute path import, got: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| d.code).collect::<Vec<_>>());
+}
+
+#[test]
+fn test_module_resolution_ambient_module_no_error() {
+    use crate::thin_parser::ThinParserState;
+
+    // Import from ambient module declaration should not emit error
+    let source = r#"
+declare module "my-module" {
+    export const value: number;
+}
+
+import { value } from "my-module";
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.ctx.report_unresolved_imports = true;
+    checker.check_source_file(root);
+
+    eprintln!("[AMBIENT_OK] All diagnostics: {:?}", checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>());
+
+    // Should have no TS2792 or TS2307 errors
+    let module_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2792 || d.code == 2307)
+        .collect();
+
+    assert!(module_errors.is_empty(), "Expected no module resolution errors for ambient module, got: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>());
 }

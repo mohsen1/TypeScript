@@ -1139,27 +1139,6 @@ impl ThinBinderState {
                 self.bind_function_expression(arena, node, idx);
             }
 
-            // Object literal expressions - traverse into properties
-            k if k == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION => {
-                if let Some(literal) = arena.get_literal_expr(node) {
-                    for &prop_idx in &literal.elements.nodes {
-                        self.bind_node(arena, prop_idx);
-                    }
-                }
-            }
-
-            // Property assignments - traverse into initializer (which could be a function)
-            k if k == syntax_kind_ext::PROPERTY_ASSIGNMENT => {
-                if let Some(prop) = arena.get_property_assignment(node) {
-                    self.bind_node(arena, prop.initializer);
-                }
-            }
-
-            // Method declarations (in object literals or classes) - bind body
-            k if k == syntax_kind_ext::METHOD_DECLARATION => {
-                self.bind_method_declaration(arena, node, idx);
-            }
-
             _ => {
                 // For other node types, no symbols to create
             }
@@ -2056,15 +2035,6 @@ impl ThinBinderState {
         }
     }
 
-    /// Methods can appear in classes or object literals.
-    fn bind_method_declaration(&mut self, arena: &ThinNodeArena, node: &ThinNode, idx: NodeIndex) {
-        if let Some(method) = arena.get_method_decl(node) {
-            self.bind_modifiers(arena, &method.modifiers);
-            // Method bodies have function scope
-            self.bind_callable_body(arena, &method.parameters, method.body, idx);
-        }
-    }
-
     fn bind_callable_body(
         &mut self,
         arena: &ThinNodeArena,
@@ -2642,8 +2612,10 @@ impl ThinBinderState {
                 if name_node.kind == SyntaxKind::StringLiteral as u16
                     || name_node.kind == SyntaxKind::NoSubstitutionTemplateLiteral as u16
                 {
+                    // Ambient module declaration with string literal name
+                    // These should always be tracked, regardless of whether the file is an external module
                     if let Some(lit) = arena.get_literal(name_node) {
-                        if !lit.text.is_empty() && !self.is_external_module {
+                        if !lit.text.is_empty() {
                             self.declared_modules.insert(lit.text.clone());
                         }
                     }
