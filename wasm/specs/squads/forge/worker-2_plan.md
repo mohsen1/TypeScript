@@ -30,17 +30,17 @@ Reduce remaining TS2304 missing-name false positives.
 
 ## Resume Notes
 - Branch: `worker/forge-2`.
-- Latest commit: `[wasm] checker: reduce TS2304 missing-name false positives`
-- Recent changes: Added TS2552 for `await`, added builtin/global type fallback list (Promise/NonNullable/etc), scoped type params in missing-name checks, suppressed TS2304 for heritage literals, and expanded tests.
-- Last tests: `./wasm/test.sh test_builtin_types_no_ts2304_errors` (pass), `./wasm/test.sh test_builtin_types_in_type_literal_no_ts2304` (pass), `./wasm/test.sh test_await_type_context_suggests_awaited` (pass)
-- **Latest TS2304 conformance scan results:** `find-ts2304.mjs --max=1000 --samples=30` timed out at 180s; partial results show remaining false positives in heritage null/namespace cycles, private name misuse, type predicate parsing (`asserts`/`is`), and some decorator/noTypesAndSymbols cases.
+- Latest commit: `[wasm] checker: reduce TS2304 in switch cases and predicates`
+- Recent changes: Added parent mapping for switch/case nodes, allowed type predicates in `parse_type`, added `exports` to known global values, and added tests for switch-case, type predicate params, and exports.
+- Last tests: `./wasm/test.sh test_switch_case_param_reference_no_ts2304` (pass), `./wasm/test.sh test_type_predicate_param_type_no_ts2304` (pass), `./wasm/test.sh test_exports_reference_no_ts2304` (pass)
+- **Latest TS2304 conformance scan results:** `find-ts2304.mjs --max=1000 --samples=30` timed out at 200s; partial results still show heritage null/namespace cycles, catch/flow false positives, decorator/noTypesAndSymbols cases, and asserts/exports (may need rebuild to confirm).
 - Conformance scan command: `cd wasm/differential-test && node find-ts2304.mjs --max=1000 --samples=30`
 - Remember: do not touch `.role/AGENTS.md`.
 
 ## Task Queue
 - Investigate remaining TS2304 in heritage cycles and invalid heritage literals (null/undefined).
-- Fix TS2304 for type predicate parsing (`asserts`/`is`) if parser is mis-tokenizing.
-- Review TS2304 in private name + decorator/noTypesAndSymbols cases.
+- Re-run conformance scan after rebuild to confirm switch-case + predicate fixes (and catch variable scoping).
+- Review TS2304 in decorator/noTypesAndSymbols cases.
 
 ## Completed
 - Implemented property access on constrained type parameters in checker and solver.
@@ -76,6 +76,9 @@ Reduce remaining TS2304 missing-name false positives.
 - Added TS2552 for `await` in type position and fallback handling for missing builtin/global types in TS2304 checks.
 - Scoped missing-name checks for signature type parameters and suppressed TS2304 in heritage literal expressions.
 - Added tests for builtin types in type literals and expanded builtin coverage (Promise/NonNullable/PropertyKey/etc).
+- Set parent pointers for switch/case nodes to restore scope resolution in switch clauses.
+- Allowed type predicates in `parse_type` to avoid TS2304 for `asserts`/`is` in parameter types.
+- Added `exports` to known global values and tests covering switch-case, type predicate params, and exports.
 
 ## Ready for Merge
 Yes
