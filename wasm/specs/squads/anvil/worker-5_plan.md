@@ -7,13 +7,14 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- Fix crash in `types/mapped/recursiveMappedTypes.ts` (stack overflow).
-- Reproduce with conformance runner; locate recursion in mapped type evaluation (`wasm/src/thin_checker.rs`, `wasm/src/solver/evaluate.rs`).
-- Add guard/fix + regression test; report conformance delta.
-- Deliverables: crash repro notes + failing stack path, regression test(s), and conformance delta showing crash removed.
+- Prereq: run `./scripts/ask-gemini.mjs "I need to reduce TS2355 false positives (return analysis). What's the best approach?"` once the API key is available.
+- Reduce TS2355 false positives (return analysis: throw-only paths, never-returning calls, unreachable code).
+- Collect 3-5 failing samples from conformance output; trace control flow in `wasm/src/thin_checker.rs` and `wasm/src/checker/control_flow.rs`.
+- Implement fix + regression tests; run a targeted TS2355 scan and report the delta.
+- Deliverables: sample list + root cause notes, regression test(s), and a before/after conformance delta.
 
 ## Task Queue
-(empty - will receive new tasks from EM after completing current assignment)
+- [ ] Verify whether `types/mapped/recursiveMappedTypes.ts` still crashes; if so, capture stack and coordinate with Forge.
 
 
 ## Completed

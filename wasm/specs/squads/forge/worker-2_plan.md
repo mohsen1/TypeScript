@@ -1,21 +1,21 @@
 # Worker 2 Plan - Squad Forge
 
 ## Mission
-Implement TS2339 property access checking improvements (property does not exist).
+Improve TS2304 missing-name diagnostics (identifier not found).
 
 Status: Active
 Priority: 1
 
 ## Current Assignment
-Reduce remaining TS2339 false positives (non-control-flow cases).
+Reduce remaining TS2304 missing-name false positives.
 
-**Error Code:** TS2339 - "Property 'X' does not exist on type 'Y'"
+**Error Code:** TS2304 - "Cannot find name 'X'."
 
-**Impact:** 142 conformance tests affected
+**Impact:** TBD (awaiting scan)
 
 ### Steps
-1. **Run a scan**: `cd wasm/differential-test && node find-ts2339.mjs --max=1000 --samples=30`.
-2. **Pick top non-control-flow pattern** (e.g., enum/namespace merging or static/instance property access).
+1. **Run a scan**: `cd wasm/differential-test && node find-ts2304.mjs --max=1000 --samples=30` (add script if missing).
+2. **Pick top missing-name pattern** (e.g., global augmentations, merged namespaces, or module scope leakage).
 3. **Implement the fix** in `thin_checker.rs`/`binder.rs` and add a focused regression test.
 4. **Run focused tests** with `./wasm/test.sh` and report delta.
 
@@ -25,21 +25,21 @@ Reduce remaining TS2339 false positives (non-control-flow cases).
 - `wasm/src/thin_checker_tests.rs`
 
 ### Success Criteria
-- TS2339 false positives reduced for the selected pattern
-- No new regressions in existing TS2339 tests
+- TS2304 false positives reduced for the selected pattern
+- No new regressions in existing TS2304 tests
 
 ## Resume Notes
 - Branch: `worker/forge-2`.
-- Latest commit: `[wasm] driver: adapt to collect_module_specifiers tuple return`
-- Recent changes: Merged origin/rust and origin/squad/forge; fixed driver.rs to handle collect_module_specifiers returning (String, NodeIndex) tuples; re-applied static index signature collection after squad/forge merge; narrowed flow types on direct assignments to use assigned expression types; added TS2339 test covering assignment-based narrowing on unions; tracked resolved module specifiers in multi-file CLI diagnostics to avoid TS2792 for in-program imports; marked optional call expressions and stripped nullish callee types for optional chaining calls.
+- Latest commit: merge `origin/rust` into `worker/forge-2`.
+- Recent changes: Merged origin/rust; no TS2304-specific changes yet.
 - Last tests: `./wasm/test.sh compile_optional_chaining_with_call` (pass), `./wasm/test.sh compile_object_spread` (pass)
-- **Latest TS2339 conformance scan results (1000 files):**
-  - Extra (false positives): 0 files (was 3)
-- Conformance scan command: `cd wasm/differential-test && node find-ts2339.mjs --max=1000 --samples=20`
+- **Latest TS2304 conformance scan results:** not run yet.
+- Conformance scan command: `cd wasm/differential-test && node find-ts2304.mjs --max=1000 --samples=20`
 - Remember: do not touch `.role/AGENTS.md`.
 
 ## Task Queue
-- None (1000-file TS2339 scan shows 0 extras; waiting on new assignment)
+- Create/find `find-ts2304.mjs` scan script if missing.
+- Run TS2304 scan and identify top false-positive pattern.
 
 ## Completed
 - Implemented property access on constrained type parameters in checker and solver.
@@ -84,7 +84,7 @@ No
   - ~18 other type system failures (needs triage)
   - See POST_MERGE_TEST_FAILURES.md for details
 - CLI tests: `./wasm/test.sh compile_optional_chaining_with_call` (pass), `./wasm/test.sh compile_object_spread` (pass)
-- Last conformance scan: `cd wasm/differential-test && node find-ts2339.mjs --max=1000 --samples=20` (0 false positives)
-- Commit format: `[wasm] checker: improve TS2339 property access diagnostics`
+- Last conformance scan: none for TS2304 yet.
+- Commit format: `[wasm] checker: improve TS2304 missing-name diagnostics`
 - Push to: `origin/worker/forge-2`
 - **NEVER edit**: `STRUCTURE.md`, `GOALS.md`, other workers' plan files, or anything in `orchestrator/`

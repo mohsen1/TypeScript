@@ -7,6 +7,7 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
+- Prereq: run `./scripts/ask-gemini.mjs "I need to fix the crash in es6/templates/TemplateExpression1.ts. What's the best approach?"` once the API key is available.
 - Fix crash in `es6/templates/TemplateExpression1.ts` ("unreachable").
 - Reproduce via conformance runner or direct harness; trace template literal handling in `wasm/src/thin_checker.rs` and related template/type evaluation paths.
 - Add regression test and confirm crash is eliminated.
