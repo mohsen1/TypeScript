@@ -1,11 +1,28 @@
 # Anvil Worker 3 - TS2339 Property Resolution (Inherited Properties)
 
-Ready for Merge: No
+Ready for Merge: Yes
 Status: Active
 
-## Current Assignment (2026-01-11) - Index Signature Handling (HIGH priority)
+## Current Assignment (2026-01-11) - TS2454 Definite Assignment Analysis
 
-Fix TS2339 false positives for index signature property access. Test with: `node wasm/differential-test/find-ts2339.mjs --max=1000`
+Fix false positives for "variable used before assignment" errors. Focus on control flow analysis in `checker/control_flow.rs`.
+
+**Command**: `node wasm/differential-test/conformance-runner.mjs controlFlow --max=500`
+
+**Results**:
+- 10 extra TS2454 errors (false positives) - priority
+- 3 missing TS2454 errors (not reporting when should)
+
+**Analysis (2026-01-11)**:
+
+Definite assignment logic is in `checker/control_flow.rs`:
+- `check_definite_assignment()` - recursively checks if variable is assigned in all reachable paths
+- `assignment_targets_reference_node()` - checks if assignment targets specific variable
+- Key flow flags: `ASSIGNMENT`, `BRANCH_LABEL`, `LOOP_LABEL`, `CONDITION`, `UNREACHABLE`
+
+The logic traverses the flow graph from the reference point backward to the START, checking if the variable was assigned in all reachable paths. If any path doesn't have an assignment, TS2454 is reported.
+
+**Investigation in progress**: Need to identify specific failing cases and root causes.
 
 ### Analysis (2026-01-11)
 
