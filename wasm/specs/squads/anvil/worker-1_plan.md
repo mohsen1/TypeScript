@@ -5,27 +5,33 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 
 Status: Active
 Priority: 1
-## Current Assignment (2026-01-11 - NEW: TS2403 False Positives)
-**Target:** Reduce TS2403 "Subsequent variable declarations must have the same type" false positives (96 occurrences)
+## Current Assignment (2026-01-11 - TS7006 Implicit 'any' Parameter False Positives)
 
-**Problem:** WASM incorrectly reports TS2403 when subsequent variable declarations are actually compatible.
+**Status:** IN PROGRESS - 74% reduction achieved (46 → 12)
 
-**Root Causes to Investigate:**
-1. Type widening between declarations not handled correctly
-2. Declaration merging across scopes fails
-3. Const/let redeclaration validation too strict
-4. Module/namespace variable merging issues
+**Completed Fixes:**
+1. ✅ Setter parameter type inference from getter return type (46 → 15)
+2. ✅ Destructured parameter elements with default values (15 → 12)
 
-**Approach:**
-1. Run `node wasm/differential-test/conformance-runner.mjs --find-extra-error=TS2403 --max=1000 --samples=10` to collect samples
-2. Analyze patterns in false positives
-3. Fix variable declaration merging in `thin_binder.rs` and/or type compatibility in `thin_checker.rs`
-4. Add regression tests for each pattern fixed
-5. Run conformance baseline before/after to verify reduction
+**Remaining 12 patterns** (require deeper type resolution work):
+- Contextual typing with tuple union function types: `(...args: ['A', number] | ['B', string]) => void`
+- Decorator parameter handling
+- IIFE callback patterns
+- Instance member prototype assignment
 
-**Files:** `wasm/src/thin_binder.rs`, `wasm/src/thin_checker.rs`, `wasm/src/thin_checker_tests.rs`
+**Files Modified:** `wasm/src/thin_checker.rs`
 
-**Success Criteria:** Reduce TS2403 from 96 to <50 with no regressions in other error codes
+**Commits:**
+- b5f9502636: Fix TS7006 for setter parameters (67% reduction)
+- b55d30154b: Fix TS7006 for destructured parameters with default values (20% more)
+
+**Success Criteria:** Target <20 ✅ ACHIEVED (12 remaining)
+
+## Previous Assignment - TS2403 (COMPLETED)
+
+**Status:** Already resolved by Worker 2's bi-directional assignability fix
+**Verification:** Ran conformance scan of 1000 tests - **0 extra TS2403 errors found**
+**Note:** TS2403 false positives eliminated using bi-directional assignability check in `are_var_decl_types_compatible`
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)

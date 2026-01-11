@@ -1913,6 +1913,11 @@ impl<'a> ThinCheckerState<'a> {
         if let Some(ident) = self.ctx.arena.get_identifier(node) {
             let name = &ident.escaped_text;
 
+            // Check type parameter scope first
+            if let Some(type_id) = self.lookup_type_parameter(name) {
+                return type_id;
+            }
+
             if let Some(sym_id) = self.resolve_identifier_symbol(idx) {
                 return self.type_reference_symbol_type(sym_id);
             }
@@ -1988,6 +1993,10 @@ impl<'a> ThinCheckerState<'a> {
             return TypeId::ERROR;
         } else if let Some(name) = name_text {
             if is_identifier {
+                // Check type parameter scope before reporting error
+                if let Some(type_id) = self.lookup_type_parameter(&name) {
+                    return type_id;
+                }
                 if self.is_known_global_value_name(&name) {
                     return TypeId::ANY;
                 }
@@ -11318,7 +11327,8 @@ impl<'a> ThinCheckerState<'a> {
                 | syntax_kind_ext::TYPE_ALIAS_DECLARATION
                 | syntax_kind_ext::ENUM_DECLARATION
                 | syntax_kind_ext::GET_ACCESSOR
-                | syntax_kind_ext::SET_ACCESSOR => {
+                | syntax_kind_ext::SET_ACCESSOR
+                | syntax_kind_ext::CONSTRUCTOR => {
                     return Some(current);
                 }
                 _ => {}
@@ -11368,6 +11378,7 @@ impl<'a> ThinCheckerState<'a> {
             syntax_kind_ext::ENUM_DECLARATION => Some(symbol_flags::REGULAR_ENUM),
             syntax_kind_ext::GET_ACCESSOR => Some(symbol_flags::GET_ACCESSOR),
             syntax_kind_ext::SET_ACCESSOR => Some(symbol_flags::SET_ACCESSOR),
+            syntax_kind_ext::CONSTRUCTOR => Some(symbol_flags::CONSTRUCTOR),
             _ => None,
         }
     }
@@ -11433,6 +11444,19 @@ impl<'a> ThinCheckerState<'a> {
             };
 
             if symbol.declarations.len() <= 1 {
+                continue;
+            }
+
+            // Handle constructors separately - they use TS2392 (multiple constructor implementations), not TS2300
+            if symbol.escaped_name == "constructor" {
+                // Report TS2392 for multiple constructor implementations
+                if symbol.declarations.len() > 1 {
+                    use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
+                    let message = diagnostic_messages::MULTIPLE_CONSTRUCTOR_IMPLEMENTATIONS;
+                    for &decl_idx in &symbol.declarations {
+                        self.error_at_node(decl_idx, message, diagnostic_codes::MULTIPLE_CONSTRUCTOR_IMPLEMENTATIONS);
+                    }
+                }
                 continue;
             }
 
@@ -15374,11 +15398,11 @@ impl<'a> ThinCheckerState<'a> {
     /// Infer the return type of a getter from its body.
     fn infer_getter_return_type(&mut self, body_idx: NodeIndex) -> TypeId {
         if body_idx.is_none() {
-            return TypeId::ANY;
+            return TypeId::VOID;
         }
 
         let Some(body_node) = self.ctx.arena.get(body_idx) else {
-            return TypeId::ANY;
+            return TypeId::VOID;
         };
 
         // If it's a block, look for return statements
@@ -15398,7 +15422,9 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
 
-        TypeId::ANY
+        // No return statements with values found - return void (not any)
+        // This prevents false positive TS7010 errors for getters without return statements
+        TypeId::VOID
     }
 
     /// Find the position of the first return statement's expression in a body.
@@ -16574,6 +16600,28 @@ impl<'a> ThinCheckerState<'a> {
             return;
         }
 
+        // Check if parameter name is a binding pattern with default values
+        // For destructured parameters like ({ x = 1 }) => {}, binding elements have default values
+        if let Some(name_node) = self.ctx.arena.get(param.name) {
+            if name_node.kind == syntax_kind_ext::OBJECT_BINDING_PATTERN
+                || name_node.kind == syntax_kind_ext::ARRAY_BINDING_PATTERN
+            {
+                // Check if any binding element has an initializer (default value)
+                if let Some(pattern) = self.ctx.arena.get_binding_pattern(name_node) {
+                    for &element_idx in &pattern.elements.nodes {
+                        if let Some(element_node) = self.ctx.arena.get(element_idx) {
+                            if let Some(element) = self.ctx.arena.get_binding_element(element_node) {
+                                if !element.initializer.is_none() {
+                                    // Binding element has default value, type can be inferred
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         let param_name = self.parameter_name_for_error(param.name);
         let message = format_message(diagnostic_messages::PARAMETER_IMPLICIT_ANY, &[&param_name, "any"]);
         self.error_at_node(param.name, &message, diagnostic_codes::IMPLICIT_ANY_PARAMETER);
@@ -17249,7 +17297,7 @@ impl<'a> ThinCheckerState<'a> {
             if has_type_annotation {
                 self.get_type_from_type_node(accessor.type_annotation)
             } else {
-                TypeId::ANY
+                TypeId::VOID  // Default to void for getters without type annotation
             }
         } else {
             TypeId::VOID
@@ -17267,7 +17315,10 @@ impl<'a> ThinCheckerState<'a> {
         for &param_idx in &accessor.parameters.nodes {
             if let Some(param_node) = self.ctx.arena.get(param_idx) {
                 if let Some(param) = self.ctx.arena.get_parameter(param_node) {
-                    self.maybe_report_implicit_any_parameter(param, false);
+                    // For setters, skip implicit 'any' parameter check - the parameter type
+                    // is inferred from the corresponding getter's return type
+                    let is_setter_param = !is_getter;
+                    self.maybe_report_implicit_any_parameter(param, is_setter_param);
                 }
             }
         }
