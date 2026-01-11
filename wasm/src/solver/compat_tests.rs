@@ -930,6 +930,55 @@ fn test_weak_union_rejects_no_common_properties() {
 }
 
 #[test]
+fn test_weak_union_rejects_no_common_properties_with_refs() {
+    let interner = TypeInterner::new();
+    let mut env = TypeEnvironment::new();
+
+    let a = interner.intern_string("a");
+    let b = interner.intern_string("b");
+    let c = interner.intern_string("c");
+
+    let weak_a = interner.object(vec![PropertyInfo {
+        name: a,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+    let weak_b = interner.object(vec![PropertyInfo {
+        name: b,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let sym_a = SymbolRef(1);
+    let sym_b = SymbolRef(2);
+    env.insert(sym_a, weak_a);
+    env.insert(sym_b, weak_b);
+
+    let target = interner.union(vec![interner.reference(sym_a), interner.reference(sym_b)]);
+    let source = interner.object(vec![PropertyInfo {
+        name: c,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let mut checker = CompatChecker::with_resolver(&interner, &env);
+    assert!(!checker.is_assignable(source, target));
+    assert!(matches!(
+        checker.explain_failure(source, target),
+        Some(SubtypeFailureReason::TypeMismatch { .. })
+    ));
+}
+
+#[test]
 fn test_weak_union_allows_overlap() {
     let interner = TypeInterner::new();
     let mut checker = CompatChecker::new(&interner);

@@ -82,13 +82,13 @@ TS2322 object literal excess property + optionality.
 Yes
 
 ## Notes
-- Progress: skip weak-union TS2322 for object literal contexts so TS2353 is emitted; added union optional object literal + call argument tests.
-- Tests: `./wasm/test.sh` (failed: `cli::driver_tests::compile_class_accessors` duplicate identifier 'width' TS2300).
+- Progress: skip weak-union TS2322 for object literal contexts so TS2353 is emitted; added union optional object literal + call argument tests; added compat coverage for weak union refs.
+- Tests: `./wasm/test.sh weak_union_rejects_no_common_properties_with_refs`; `./wasm/test.sh` (failed: `cli::driver_tests::compile_class_accessors` duplicate identifier 'width' TS2300).
 - Commit format: `[wasm] checker: refine weak union diagnostics`
 - Push to: `origin/worker/forge-4`
 - **NEVER edit**: `STRUCTURE.md`, `GOALS.md`, other workers' plan files, or anything in `orchestrator/`
 
 ## Resume
 - Branch/state: `worker/forge-4`, changes committed/pushed, ready for merge.
-- Session work: added weak-union bypass for object literals in assignments/returns/calls to avoid extra TS2322; added tests for no-common-property literals and call arguments.
-- Unit tests: `./wasm/test.sh` (failed: `cli::driver_tests::compile_class_accessors` duplicate identifier 'width' TS2300); `./wasm/test.sh union_optional`.
+- Session work: added weak-union bypass for object literals in assignments/returns/calls to avoid extra TS2322; added tests for no-common-property literals and call arguments; added weak union ref compat test.
+- Unit tests: `./wasm/test.sh weak_union_rejects_no_common_properties_with_refs`; `./wasm/test.sh` (failed: `cli::driver_tests::compile_class_accessors` duplicate identifier 'width' TS2300); `./wasm/test.sh union_optional`.
