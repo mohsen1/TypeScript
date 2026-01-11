@@ -12020,6 +12020,8 @@ impl<'a> ThinCheckerState<'a> {
             }
             syntax_kind_ext::BLOCK => {
                 if let Some(block) = self.ctx.arena.get_block(node) {
+                    // Check for unreachable code before checking individual statements
+                    self.check_unreachable_code_in_block(&block.statements.nodes);
                     for &inner_stmt in &block.statements.nodes {
                         self.check_statement(inner_stmt);
                     }
@@ -18712,6 +18714,78 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
         true
+    }
+
+    /// Check for unreachable code after return/throw statements in a block.
+    /// Emits TS7027 for any statements that come after a return or throw.
+    fn check_unreachable_code_in_block(&mut self, statements: &[NodeIndex]) {
+        use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
+
+        let mut unreachable = false;
+        for &stmt_idx in statements {
+            if unreachable {
+                // This statement is unreachable
+                self.error_at_node(
+                    stmt_idx,
+                    diagnostic_messages::UNREACHABLE_CODE_DETECTED,
+                    diagnostic_codes::UNREACHABLE_CODE_DETECTED,
+                );
+            } else {
+                // Check if this statement makes subsequent statements unreachable
+                let Some(node) = self.ctx.arena.get(stmt_idx) else {
+                    continue;
+                };
+                match node.kind {
+                    syntax_kind_ext::RETURN_STATEMENT | syntax_kind_ext::THROW_STATEMENT => {
+                        unreachable = true;
+                    }
+                    syntax_kind_ext::EXPRESSION_STATEMENT => {
+                        // Check if the expression is of type 'never' (e.g., throw(), assertNever())
+                        let Some(expr_stmt) = self.ctx.arena.get_expression_statement(node) else {
+                            continue;
+                        };
+                        let expr_type = self.get_type_of_node(expr_stmt.expression);
+                        if expr_type.is_never() {
+                            unreachable = true;
+                        }
+                    }
+                    syntax_kind_ext::VARIABLE_STATEMENT => {
+                        // Check if any variable has a 'never' initializer
+                        let Some(var_stmt) = self.ctx.arena.get_variable(node) else {
+                            continue;
+                        };
+                        for &decl_idx in &var_stmt.declarations.nodes {
+                            let Some(list_node) = self.ctx.arena.get(decl_idx) else {
+                                continue;
+                            };
+                            let Some(var_list) = self.ctx.arena.get_variable(list_node) else {
+                                continue;
+                            };
+                            for &list_decl_idx in &var_list.declarations.nodes {
+                                let Some(list_decl_node) = self.ctx.arena.get(list_decl_idx) else {
+                                    continue;
+                                };
+                                let Some(decl) = self.ctx.arena.get_variable_declaration(list_decl_node) else {
+                                    continue;
+                                };
+                                if decl.initializer.is_none() {
+                                    continue;
+                                }
+                                let init_type = self.get_type_of_node(decl.initializer);
+                                if init_type.is_never() {
+                                    unreachable = true;
+                                    break;
+                                }
+                            }
+                            if unreachable {
+                                break;
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
     }
 
     fn statement_falls_through(&mut self, stmt_idx: NodeIndex) -> bool {
