@@ -5641,7 +5641,6 @@ function createClass() {
 
 #[test]
 fn test_ts7010_return_path_analysis() {
-    use crate::checker::{CheckerContext, StatementChecker};
     use crate::thin_parser::ThinParserState;
 
     let source = r#"
@@ -5689,18 +5688,11 @@ function loopWithNestedSwitchBreak(flag: boolean) {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut ctx = CheckerContext::new(
-        parser.get_arena(),
-        &binder,
-        &types,
-        "test.ts".to_string(),
-    );
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
 
     let arena = parser.get_arena();
     let root_node = arena.get(root).expect("root node");
     let source_file = arena.get_source_file(root_node).expect("source file");
-
-    let checker = StatementChecker::new(&mut ctx);
 
     let body_at = |index: usize| {
         let stmt_idx = *source_file
