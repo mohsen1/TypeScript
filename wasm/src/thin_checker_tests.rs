@@ -11577,19 +11577,18 @@ const animal = createAnimal(Animal); // Passing abstract class as value should b
 
     let error_count = checker.ctx.diagnostics.len();
 
-    // Currently expects 4 errors due to typeof class resolution issues
-    // Once typeof class types work correctly, change to expect 0 errors
-    if error_count != 4 {
+    // typeof class types now work correctly - expect 0 errors
+    if error_count != 0 {
         eprintln!("=== Abstract Constructor Assignability Diagnostics ===");
-        eprintln!("Expected 4 errors (typeof class issues), got {}", error_count);
+        eprintln!("Expected 0 errors (typeof class fixed), got {}", error_count);
         for diag in &checker.ctx.diagnostics {
             eprintln!("[{}] {}", diag.start, diag.message_text);
         }
     }
 
     assert_eq!(
-        error_count, 4,
-        "Expected 4 errors due to typeof class resolution: {:?}",
+        error_count, 0,
+        "Expected 0 errors (typeof class now works): {:?}",
         checker.ctx.diagnostics
     );
 }
