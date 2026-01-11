@@ -4675,7 +4675,7 @@ impl<'a> ThinCheckerState<'a> {
     fn is_definitely_assigned_at(&self, idx: NodeIndex) -> bool {
         let flow_node = match self.ctx.binder.get_node_flow(idx) {
             Some(flow) => flow,
-            None => return true,
+            None => return false,  // No flow info means variable is not definitely assigned
         };
         let analyzer = FlowAnalyzer::new(self.ctx.arena, self.ctx.binder, self.ctx.types);
         analyzer.is_definitely_assigned(idx, flow_node)
@@ -7738,6 +7738,14 @@ impl<'a> ThinCheckerState<'a> {
 
         // Function declarations don't report implicit any for parameters (handled by check_statement)
         let is_function_declaration = node.kind == syntax_kind_ext::FUNCTION_DECLARATION;
+        let is_method_or_constructor = matches!(node.kind, syntax_kind_ext::METHOD_DECLARATION | syntax_kind_ext::CONSTRUCTOR);
+
+        // Check for duplicate parameter names in function expressions and arrow functions (TS2300)
+        // Note: Methods and constructors are checked in check_method_declaration and check_constructor_declaration
+        // Function declarations are checked in check_statement
+        if !is_function_declaration && !is_method_or_constructor {
+            self.check_duplicate_parameters(parameters);
+        }
 
         let (type_params, type_param_updates) = self.push_type_parameters(type_parameters);
 
@@ -11560,6 +11568,81 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    /// Check for duplicate parameter names in a parameter list (TS2300).
+    fn check_duplicate_parameters(&mut self, parameters: &NodeList) {
+        let mut seen_names = FxHashSet::default();
+        for &param_idx in &parameters.nodes {
+            let Some(param_node) = self.ctx.arena.get(param_idx) else {
+                continue;
+            };
+            // Parameters can be identifiers or binding patterns
+            if let Some(param) = self.ctx.arena.get_parameter(param_node) {
+                self.collect_and_check_parameter_names(param.name, &mut seen_names);
+            }
+        }
+    }
+
+    /// Recursively collect names from identifiers or binding patterns and check for duplicates.
+    fn collect_and_check_parameter_names(&mut self, name_idx: NodeIndex, seen: &mut FxHashSet<String>) {
+        use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages, format_message};
+
+        let Some(node) = self.ctx.arena.get(name_idx) else {
+            return;
+        };
+
+        match node.kind {
+            // Simple Identifier: parameter name
+            k if k == SyntaxKind::Identifier as u16 => {
+                if let Some(name) = self.node_text(name_idx) {
+                    let name_str = name.to_string();
+                    if !seen.insert(name_str.clone()) {
+                        self.error_at_node(
+                            name_idx,
+                            &format_message(diagnostic_messages::DUPLICATE_IDENTIFIER, &[&name_str]),
+                            diagnostic_codes::DUPLICATE_IDENTIFIER,
+                        );
+                    }
+                }
+            }
+            // Object Binding Pattern: { a, b: c }
+            k if k == syntax_kind_ext::OBJECT_BINDING_PATTERN => {
+                if let Some(pattern) = self.ctx.arena.get_binding_pattern(node) {
+                    for &elem_idx in &pattern.elements.nodes {
+                        self.collect_and_check_binding_element(elem_idx, seen);
+                    }
+                }
+            }
+            // Array Binding Pattern: [a, b]
+            k if k == syntax_kind_ext::ARRAY_BINDING_PATTERN => {
+                if let Some(pattern) = self.ctx.arena.get_binding_pattern(node) {
+                    for &elem_idx in &pattern.elements.nodes {
+                        self.collect_and_check_binding_element(elem_idx, seen);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn collect_and_check_binding_element(&mut self, elem_idx: NodeIndex, seen: &mut FxHashSet<String>) {
+        if elem_idx.is_none() {
+            return;
+        }
+        let Some(node) = self.ctx.arena.get(elem_idx) else {
+            return;
+        };
+
+        // Handle holes in array destructuring: [a, , b]
+        if node.kind == syntax_kind_ext::OMITTED_EXPRESSION {
+            return;
+        }
+
+        if let Some(elem) = self.ctx.arena.get_binding_element(node) {
+            // Recurse on the name (which can be an identifier or another pattern)
+            self.collect_and_check_parameter_names(elem.name, seen);
+        }
+    }
+
     /// Check a statement and produce type errors.
     fn check_statement(&mut self, stmt_idx: NodeIndex) {
         let Some(node) = self.ctx.arena.get(stmt_idx) else {
@@ -11607,6 +11690,9 @@ impl<'a> ThinCheckerState<'a> {
                     // Check for parameter properties (error 2369)
                     // Parameter properties are only allowed in constructors
                     self.check_parameter_properties(&func.parameters.nodes);
+
+                    // Check for duplicate parameter names (TS2300)
+                    self.check_duplicate_parameters(&func.parameters);
 
                     // Check return type annotation for parameter properties in function types
                     if !func.type_annotation.is_none() {
@@ -17125,6 +17211,9 @@ impl<'a> ThinCheckerState<'a> {
 
         self.cache_parameter_types(&method.parameters.nodes, None);
 
+        // Check for duplicate parameter names (TS2300)
+        self.check_duplicate_parameters(&method.parameters);
+
         // Check that parameter default values are assignable to declared types (TS2322)
         self.check_parameter_initializers(&method.parameters.nodes);
 
@@ -17266,6 +17355,9 @@ impl<'a> ThinCheckerState<'a> {
         // Constructors don't have explicit return types
 
         self.cache_parameter_types(&ctor.parameters.nodes, None);
+
+        // Check for duplicate parameter names (TS2300)
+        self.check_duplicate_parameters(&ctor.parameters);
 
         // Check that parameter default values are assignable to declared types (TS2322)
         self.check_parameter_initializers(&ctor.parameters.nodes);

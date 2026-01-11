@@ -17358,3 +17358,298 @@ function f1<T extends string | undefined>(y: { a: T }): string {
     eprintln!("[PROPERTY_ACCESS_TEST] Expected failure: {} TS2322 errors", ts2322_count);
     eprintln!("[PROPERTY_ACCESS_TEST] Issue: Property access narrowing not yet implemented");
 }
+
+// ============================================================================
+// TS2300: Duplicate Parameter Name Tests
+// ============================================================================
+
+#[test]
+fn test_duplicate_parameter_simple() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+function foo(a, b, a) {}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    assert!(
+        !checker.ctx.diagnostics.is_empty(),
+        "Expected TS2300 for duplicate parameters, got: {:?}",
+        checker.ctx.diagnostics
+    );
+    assert_eq!(
+        checker.ctx.diagnostics[0].code, diagnostic_codes::DUPLICATE_IDENTIFIER,
+        "Expected TS2300 (DUPLICATE_IDENTIFIER), got: {:?}",
+        checker.ctx.diagnostics
+    );
+    assert!(
+        checker.ctx.diagnostics[0].message_text.contains("'a'"),
+        "Expected error to mention 'a', got: {:?}",
+        checker.ctx.diagnostics[0].message_text
+    );
+}
+
+#[test]
+fn test_duplicate_parameter_object_destructuring() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+function foo({a, b, a}: {a: number, b: string}) {}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    assert!(
+        !checker.ctx.diagnostics.is_empty(),
+        "Expected TS2300 for duplicate parameters in destructuring, got: {:?}",
+        checker.ctx.diagnostics
+    );
+    assert_eq!(
+        checker.ctx.diagnostics[0].code, diagnostic_codes::DUPLICATE_IDENTIFIER,
+        "Expected TS2300, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_duplicate_parameter_array_destructuring() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+function foo([x, y, x]: [number, string, boolean]) {}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    assert!(
+        !checker.ctx.diagnostics.is_empty(),
+        "Expected TS2300 for duplicate parameters in array destructuring, got: {:?}",
+        checker.ctx.diagnostics
+    );
+    assert_eq!(
+        checker.ctx.diagnostics[0].code, diagnostic_codes::DUPLICATE_IDENTIFIER,
+        "Expected TS2300, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_duplicate_parameter_destructuring_and_param() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+function foo({a}, a: number) {}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    assert!(
+        !checker.ctx.diagnostics.is_empty(),
+        "Expected TS2300 for duplicate parameter (destructuring + param), got: {:?}",
+        checker.ctx.diagnostics
+    );
+    assert_eq!(
+        checker.ctx.diagnostics[0].code, diagnostic_codes::DUPLICATE_IDENTIFIER,
+        "Expected TS2300, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_duplicate_parameter_arrow_function() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+const foo = (a, a) => {};
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    assert!(
+        !checker.ctx.diagnostics.is_empty(),
+        "Expected TS2300 for duplicate parameters in arrow function, got: {:?}",
+        checker.ctx.diagnostics
+    );
+    assert_eq!(
+        checker.ctx.diagnostics[0].code, diagnostic_codes::DUPLICATE_IDENTIFIER,
+        "Expected TS2300, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_duplicate_parameter_method() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class C {
+    method(a, b, a) {}
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    assert!(
+        !checker.ctx.diagnostics.is_empty(),
+        "Expected TS2300 for duplicate parameters in method, got: {:?}",
+        checker.ctx.diagnostics
+    );
+    assert_eq!(
+        checker.ctx.diagnostics[0].code, diagnostic_codes::DUPLICATE_IDENTIFIER,
+        "Expected TS2300, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_duplicate_parameter_constructor() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class C {
+    constructor(x, x) {}
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    assert!(
+        !checker.ctx.diagnostics.is_empty(),
+        "Expected TS2300 for duplicate parameters in constructor, got: {:?}",
+        checker.ctx.diagnostics
+    );
+    assert_eq!(
+        checker.ctx.diagnostics[0].code, diagnostic_codes::DUPLICATE_IDENTIFIER,
+        "Expected TS2300, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_duplicate_parameter_function_expression() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+const foo = function(bar, bar) {};
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    assert!(
+        !checker.ctx.diagnostics.is_empty(),
+        "Expected TS2300 for duplicate parameters in function expression, got: {:?}",
+        checker.ctx.diagnostics
+    );
+    assert_eq!(
+        checker.ctx.diagnostics[0].code, diagnostic_codes::DUPLICATE_IDENTIFIER,
+        "Expected TS2300, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_no_duplicate_parameter_distinct() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+function foo(a, b, c) {}
+const bar = (x, y, z) => {};
+class C {
+    method(m, n) {}
+    constructor(p, q) {}
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let dup_count = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == diagnostic_codes::DUPLICATE_IDENTIFIER)
+        .count();
+    assert_eq!(
+        dup_count, 0,
+        "Expected no TS2300 for distinct parameters, got {}: {:?}",
+        dup_count, checker.ctx.diagnostics
+    );
+}
