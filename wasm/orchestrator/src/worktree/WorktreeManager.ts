@@ -5,7 +5,7 @@
  * them to work on different branches without interference.
  */
 
-import { existsSync, mkdirSync, copyFileSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, copyFileSync, readFileSync, writeFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { runCommand, runCommandStrict } from '../utils/index.js';
 import type { OrchestratorConfig, SquadName, WorktreeInfo, SquadConfig } from '../types.js';
@@ -47,9 +47,16 @@ export class WorktreeManager {
    */
   async fetch(): Promise<void> {
     if (!this.config.autoFetch) {
+      console.log('Skipping fetch (autoFetch disabled)');
       return;
     }
-    await runCommand('git fetch --prune origin', { cwd: this.config.rootDir });
+    console.log('Fetching from origin...');
+    const result = await runCommand('git fetch --prune origin', { cwd: this.config.rootDir });
+    if (result.exitCode === 0) {
+      console.log('Fetch complete');
+    } else {
+      console.warn(`Fetch failed: ${result.stderr || result.stdout}`);
+    }
   }
 
   /**
@@ -65,6 +72,7 @@ export class WorktreeManager {
     );
 
     if (localResult.exitCode === 0) {
+      console.log('Rust branch already exists');
       return; // Already exists
     }
 
@@ -75,9 +83,11 @@ export class WorktreeManager {
     );
 
     if (remoteResult.exitCode === 0) {
+      console.log('Creating rust branch from origin/rust...');
       // Create tracking branch from origin
       await runCommand('git branch --track rust origin/rust', { cwd: rootDir });
     } else {
+      console.log('Creating local rust branch...');
       // Create local rust branch
       await runCommand('git branch rust', { cwd: rootDir });
     }
@@ -171,15 +181,17 @@ export class WorktreeManager {
     fresh: boolean
   ): Promise<WorktreeInfo> {
     const { rootDir } = this.config;
+    const worktreeName = dir.split('/').pop() || dir;
 
     if (existsSync(dir)) {
       const isWt = await this.isWorktree(dir);
       if (!isWt) {
-        console.warn(`${dir} exists but is not a git worktree`);
+        console.warn(`  ⚠ ${worktreeName} exists but is not a git worktree`);
         return { path: dir, branch, exists: false };
       }
 
       if (fresh) {
+        console.log(`  ↻ Resetting ${worktreeName} to origin/rust...`);
         // Reset worktree to origin/rust
         await runCommand('git fetch origin', { cwd: dir });
         await runCommand('git reset --hard origin/rust', { cwd: dir });
@@ -187,24 +199,34 @@ export class WorktreeManager {
         await runCommand(`git checkout -B "${branch}" origin/rust`, {
           cwd: dir,
         });
+        console.log(`  ✓ ${worktreeName} reset complete`);
+      } else {
+        console.log(`  ✓ ${worktreeName} already exists`);
       }
 
       return { path: dir, branch, exists: true };
     }
 
     // Create new worktree
+    console.log(`  + Creating ${worktreeName}...`);
     const result = await runCommand(
       `git worktree add --force "${dir}" rust`,
       { cwd: rootDir }
     );
 
     if (result.exitCode !== 0) {
-      console.warn(`Could not create worktree: ${result.stderr}`);
+      console.error(`  ✗ Failed to create ${worktreeName}: ${result.stderr}`);
       return { path: dir, branch, exists: false };
     }
 
     // Create and checkout branch
-    await runCommand(`git checkout -B "${branch}" origin/rust`, { cwd: dir });
+    console.log(`  → Checking out branch ${branch}...`);
+    const checkoutResult = await runCommand(`git checkout -B "${branch}" origin/rust`, { cwd: dir });
+    if (checkoutResult.exitCode === 0) {
+      console.log(`  ✓ ${worktreeName} created successfully`);
+    } else {
+      console.warn(`  ⚠ ${worktreeName} created but branch checkout had issues: ${checkoutResult.stderr}`);
+    }
 
     return { path: dir, branch, exists: true };
   }
@@ -214,19 +236,47 @@ export class WorktreeManager {
    */
   async ensureAllWorktrees(fresh = false): Promise<Map<string, WorktreeInfo>> {
     const worktrees = new Map<string, WorktreeInfo>();
+    const startTime = Date.now();
 
-    // Create EM worktrees
+    // Build list of all worktrees to create
+    const worktreeTasks: Array<{ key: string; promise: Promise<WorktreeInfo> }> = [];
+
+    // Create EM worktrees in parallel
+    console.log('\nCreating EM worktrees...');
     for (const squad of this.config.squads) {
-      const info = await this.ensureEmWorktree(squad.name, fresh);
-      worktrees.set(`em-${squad.name}`, info);
+      worktreeTasks.push({
+        key: `em-${squad.name}`,
+        promise: this.ensureEmWorktree(squad.name, fresh),
+      });
     }
 
-    // Create worker worktrees
+    // Create worker worktrees in parallel
+    console.log('\nCreating worker worktrees...');
     for (const squad of this.config.squads) {
       for (const num of this.getWorkerNums(squad.name)) {
-        const info = await this.ensureWorkerWorktree(squad.name, num, fresh);
-        worktrees.set(`${squad.name}-${num}`, info);
+        worktreeTasks.push({
+          key: `${squad.name}-${num}`,
+          promise: this.ensureWorkerWorktree(squad.name, num, fresh),
+        });
       }
+    }
+
+    // Execute all worktree operations in parallel
+    const results = await Promise.all(worktreeTasks.map((task) => task.promise));
+
+    // Collect results
+    for (let i = 0; i < worktreeTasks.length; i++) {
+      worktrees.set(worktreeTasks[i]!.key, results[i]!);
+    }
+
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+    const successful = Array.from(worktrees.values()).filter((wt) => wt.exists).length;
+    const total = worktrees.size;
+
+    console.log(`\n✓ Worktree setup complete: ${successful}/${total} successful in ${elapsed}s`);
+
+    if (successful < total) {
+      console.warn(`⚠ ${total - successful} worktree(s) failed to create`);
     }
 
     return worktrees;
@@ -321,7 +371,31 @@ export class WorktreeManager {
   }
 
   private ensureWorktreeIgnores(worktreeDir: string, patterns: string[]): void {
-    const infoDir = join(worktreeDir, '.git', 'info');
+    // In a worktree, .git is a file, not a directory. We need to find the actual git dir.
+    const gitPath = join(worktreeDir, '.git');
+
+    let infoDir: string;
+    if (existsSync(gitPath)) {
+      const stats = statSync(gitPath);
+      if (stats.isFile()) {
+        // This is a worktree - .git is a file containing "gitdir: <path>"
+        const gitFileContent = readFileSync(gitPath, 'utf8').trim();
+        const match = gitFileContent.match(/^gitdir:\s*(.+)$/);
+        if (match && match[1]) {
+          infoDir = join(match[1], 'info');
+        } else {
+          console.warn(`Could not parse .git file in ${worktreeDir}`);
+          return;
+        }
+      } else {
+        // This is a regular git repo
+        infoDir = join(gitPath, 'info');
+      }
+    } else {
+      console.warn(`No .git found in ${worktreeDir}`);
+      return;
+    }
+
     mkdirSync(infoDir, { recursive: true });
     const excludePath = join(infoDir, 'exclude');
     let existing = '';
