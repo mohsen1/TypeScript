@@ -1,3 +1,126 @@
+# Worker 2 Plan
+
+## Mission
+Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transforms, cli, lsp).
+
+Status: Active
+Priority: 2
+
+## Current Assignment
+- Parser error recovery follow-ups for TS1005/TS1109/TS1068/TS1128 in arrow-function and expression suites.
+- Reproduce with `node wasm/differential-test/conformance-runner.mjs parser --max=200 -v` plus `parser/ecmascript5/ErrorRecovery/ArrowFunctions` and `parser/ecmascript5/Expressions`.
+- Trace parse paths in `wasm/src/thin_parser.rs` (arrow parsing, generic defaults, expression recovery) and add regression tests in `wasm/src/thin_parser_tests.rs`.
+- Report before/after delta and run `./wasm/test.sh thin_parser`.
+
+## Task Queue
+(empty - will receive new tasks from EM after completing current assignment)
+
+## Completed
+- [x] Parser recovery for TS1005/TS1109/TS1068/TS1128: generalized class member modifier lookahead so keywords like `public` can be member names, parse accessors with invalid type parameters/parameters/return types to emit TS1094/TS1054/TS1095 instead of TS1005/TS1068/TS1128, allow `async * get/set` to parse without class-member sync loss, and recover duplicate/invalid heritage clauses with TS1172/TS1173/TS1174/TS1175. Added thin_parser regressions for modifier keyword names, accessor invalid forms, and duplicate extends. Tests: `./wasm/test.sh thin_parser`.
+- [x] Reduced TS2304 false positives for nested namespaces/heritage literals/CommonJS globals: allow nested namespaces to see non-exported parent members, skip `extends null/undefined/true/false` in base constructor resolution, and whitelist `exports/module/require/__dirname/__filename` as global values. Updated nested namespace test to align with TSC and added regressions for `extends null` and `exports`. Tests: `./wasm/test.sh test_checker_nested_namespace_non_exported_not_visible`, `./wasm/test.sh test_class_extends_null_no_ts2304`, `./wasm/test.sh test_exports_global_no_ts2304`.
+- [x] Follow-up TS2304 scan for namespace/module augmentation/global ambient: rebuilt wasm (`./wasm/build-wasm.sh`), ran `node wasm/differential-test/find-ts2304.mjs --max=500 --samples=10` (samples: `classes/classDeclarations/classExtendingNull.ts`, `classes/classDeclarations/classHeritageSpecification/classExtendsItselfIndirectly2.ts`, `classes/members/privateNames/privateNameBadAssignment.ts`), and targeted conformance runs: `internalModules` (76 files, extra TS2304: 4), `ambient` (22 files, extra TS2304: 0), `moduleResolution` (51 files, extra TS2304: 5), `externalModules` (200 files, extra TS2304: 26).
+- [x] Fixed TS2304 false positives for global augmentation + namespace/module merging: parse `declare global` with GLOBAL_AUGMENTATION flag, bind global bodies in file scope, prepopulate module scopes with prior exports, and add regressions for global/namespace/module augmentation. Targeted tests: `./wasm/test.sh test_global_augmentation_binds_to_file_scope`, `./wasm/test.sh test_namespace_merging_resolves_prior_exports`, `./wasm/test.sh test_module_augmentation_merges_exports`.
+- [x] Ran `./scripts/ask-gemini.mjs` (key available). Repro attempts: `./wasm/build-wasm.sh` (timed out at 120s but pkg emitted), `node wasm/differential-test/conformance-runner.mjs es6/templates --max=1` (Exact Match, no crash), `node wasm/differential-test/process-pool-conformance.mjs es6/templates --max=1 --workers=1` (Exact Match, no crash), direct ThinParser harness on `TemplateExpression1.ts` (TS1005 + TS2304 only).
+- [x] Investigated `es6/templates/TemplateExpression1.ts` crash: could not reproduce in native or wasm; added `test_unterminated_template_expression_reports_missing_name` in `thin_checker_tests.rs` to assert TS1005 parser diagnostic + TS2304 checker output. Ran `./wasm/test.sh test_unterminated_template_expression_reports_missing_name` and `node wasm/differential-test/conformance-runner.mjs es6/templates --max=1` (0 crashes).
+- [x] Reduced TS2304 false positives: scoped mapped type parameters during missing-name checks, added DOM globals (HTMLElement/Element/Document/etc.) to builtin type/value allowlists, and recovered from invalid `accessor` modifiers in statement/type-member parsing. Added thin_checker regressions, rebuilt wasm, `find-ts2304.mjs --max=200 --samples=5` (0 false positives), conformance run `run-conformance.sh --max=200 --workers=10` (TS2304 missing: 6). `./wasm/test.sh thin_checker_tests` failed at pre-existing abstract class tests (TS2564 vs expected TS2511).
+- [x] Reduced TS2322 false positives: apply contextual typing for class property initializers, resolve Ref/index access types before assignability in var/property declarations, add thin_checker regressions for literal property init and class indexed access. `find-ts2322.mjs --max=500 --samples=5` now reports 0 false positives (previously hit derivedTypeDoesNotRequireExtendsClause + typeOfThisInStaticMembers12/13 + privateNamesAndIndexedAccess).
+- [x] Fixed parser extra errors TS1005/TS1109/TS1068/TS1128 (static name parsing, static blocks with modifiers, async function expression keyword names). Added regression tests in `thin_parser_tests.rs`; `./wasm/test.sh thin_parser` passed.
+- [x] Added ES5 template literal type parity tests (basic, union, Uppercase/Lowercase, Capitalize/Uncapitalize, inference, combined) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` blocked by pre-existing errors in `solver/evaluate_tests.rs` (TemplateLiteralSpan not in scope).
+- [x] Fixed TS2304 method type parameter resolution: push type params to scope before checking return type and parameter types in `check_method_declaration`; fixes "Cannot find name 'U'" for generic methods like `static fn<U>(id: U)`.
+- [x] Added ES5 const assertion parity tests (object, array, nested, with-type, function-return, combined) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (449 tests).
+- [x] Added ES5 satisfies expression parity tests (object-literal, array-literal, function-expr, as-const, class-context, combined) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (443 tests).
+- [x] Added ES5 type guard patterns parity tests (user-defined, typeof, instanceof, in-operator, assertion, combined) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (437 tests).
+- [x] Added ES5 union/intersection type patterns parity tests (basic-union, discriminated, intersection-basic, nullable, intersection-complex, combined) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (431 tests).
+- [x] Added ES5 tuple type patterns parity tests (basic, optional, rest, named, variadic, combined) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (425 tests).
+- [x] Added ES5 generic class patterns parity tests (single-param, multi-params, constraints, extends-generic, default-params, combined) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (419 tests).
+- [x] Added ES5 mixin patterns parity tests (basic-function, generics, composition, static-members, private-fields, combined-patterns) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (413 tests).
+- [x] Added ES5 abstract class patterns parity tests (abstract-methods, implemented-methods, static-members, inheritance-chain, generics, combined-patterns) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (407 tests).
+- [x] Added ES5 private class features parity tests (inheritance-chain, static-initialization-order, async-patterns, accessor-computed-values, conditional-expr, combined-generics) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (401 tests).
+- [x] Added ES5 class decorator patterns parity tests (class-private-fields, method-computed-name, accessor-pair, parameter-constructor, inheritance-override, combined-all) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (395 tests).
+- [x] Added ES5 Generator patterns parity tests (basic-yield, yield-star, conditional-return, throw, resource-management, combined) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (389 tests).
+- [x] Added ES5 Iterator patterns parity tests (Symbol.iterator, next, return, throw) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (383 tests).
+- [x] Added ES5 Promise patterns parity tests (all, race, allSettled, any) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (379 tests).
+- [x] Added ES5 WeakRef patterns parity tests (deref, FinalizationRegistry, weak-cache, async) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (375 tests).
+- [x] Added ES5 Proxy patterns parity tests (handler-traps, revocable, Reflect-integration, class-wrapper) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (371 tests).
+- [x] Added ES5 Symbol patterns parity tests (well-known, Symbol.for, Symbol.keyFor, computed-class) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (367 tests).
+- [x] Added ES5 BigInt patterns parity tests (literal, arithmetic, comparison, method-calls) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (363 tests).
+- [x] Added ES5 nullish coalescing patterns parity tests (complex-expressions, class-context, function-calls, nested-defaults) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (359 tests).
+- [x] Added ES5 optional chaining patterns parity tests (deep-nested, class-methods, generics, mixed-access) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (355 tests).
+- [x] Added ES5 spread/rest patterns parity tests (object-literal-methods, async-error-handling, custom-iterables, generic-signatures) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (351 tests).
+- [x] Added ES5 destructuring patterns parity tests (function-params-complex, mixed-patterns, computed-defaults, class-methods) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (347 tests).
+- [x] Added ES5 arrow function edge case parity tests (deeply-nested-this, class-field-context, rest-spread-complex, callback-chains) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (343 tests).
+- [x] Added ES5 class field patterns parity tests (public-initializers, decorated, computed-dynamic, inheritance-chain) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (339 tests).
+- [x] Added ES5 for-of/for-in patterns parity tests (for-in-typed, for-in-computed, custom-iterator, map-set-destruct) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (335 tests).
+- [x] Added ES5 async function patterns parity tests (arrow-destructuring, method-computed-this, generator-symbol-iterator, await-advanced) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (331 tests).
+- [x] Added ES5 generator method patterns parity tests (yield-conditional, yield-argument, delegation-nested, async-promise-all) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (327 tests).
+- [x] Added ES5 super call patterns parity tests (property-access, method-computed, async-method, in-arrow) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (323 tests).
+- [x] Added ES5 static block patterns parity tests (complex-init-order, interleaved, async-pattern) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (319 tests).
+- [x] Added ES5 private field patterns parity tests (instance-methods, static-complex, method-context, accessor-validation) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (316 tests).
+- [x] Added ES5 class accessor patterns parity tests (auto-accessor, computed-symbol, inherited-override) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (312 tests).
+- [x] Added ES5 template literal patterns parity tests (tagged-complex, spans-complex, deeply-nested, raw-strings) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (309 tests).
+- [x] Added ES5 module patterns parity tests (dynamic-import, top-level-await, import-meta) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (305 tests).
+- [x] Added ES5 async iteration patterns parity tests (for-await-generator, async-iterator-protocol, symbol-asyncIterator) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (302 tests).
+- [x] Added ES5 decorator patterns parity tests (class-chaining, method-descriptor, parameter-injection) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (299 tests).
+- [x] Added ES5 class inheritance patterns parity tests (extends-clause, super-calls, method-overrides, abstract-class) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (296 tests).
+- [x] Added ES5 import/export patterns parity tests (reexport, barrel-file, type-only-imports) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (292 tests).
+- [x] Added ES5 enum patterns parity tests (const-usage, reverse-mapping, string-values, computed-complex) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (289 tests).
+- [x] Added ES5 namespace patterns parity tests (merging, exports, deeply-nested) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (285 tests).
+- [x] Added ES5 computed property patterns parity tests (method-call, function-call, typed) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (282 tests).
+- [x] Added ES5 class expression patterns parity tests (return, argument, extends-computed, implements, array, iife) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (279 tests).
+- [x] Added ES5 private method patterns parity tests (async-method-complex, generator-method, accessor-complex) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (273 tests).
+- [x] Added ES5 class static block patterns parity tests (async, private-access, init-order, super) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (270 tests).
+- [x] Added ES5 for-await-of patterns parity tests (class-method, error-handling, nested-destructuring) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (266 tests).
+- [x] Added ES5 generator function patterns parity tests (typed-yields, delegation, async-await, class-method-this, try-finally, complex-return) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (263 tests).
+- [x] Added ES5 async/await complex patterns parity tests (try-finally, promise-all-destructure, iife, nested-arrows) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (257 tests).
+- [x] Added ES5 arrow function parameter pattern parity tests (typed-params-inference, defaults-complex, rest-tuple, generic, nested-destructuring, arrow-returning-arrow) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (253 tests).
+- [x] Added ES5 destructuring parity tests (object-typed, array-tuple, nested-deep, defaults-typed, rest-typed) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (247 tests).
+- [x] Added ES5 array spread parity tests (literal-typed, function-call, new-expression, mixed-complex) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (242 tests).
+- [x] Added ES5 object spread parity tests (typed, multiple, overrides, nested-deep, computed) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (238 tests).
+- [x] Added ES5 accessor parity tests (getter-inheritance, setter-validation, pair-caching, static, computed) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (233 tests).
+- [x] Added ES5 shorthand method parity tests (definitions, computed, async, generator) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (228 tests).
+- [x] Added ES5 computed property parity tests (template, binary, nested, conditional) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (224 tests).
+- [x] Added ES5 static field parity tests (computed, methods, inheritance, generic) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (220 tests).
+- [x] Added ES5 private method parity tests (this-binding, generic, derived, callback) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (216 tests).
+- [x] Added ES5 class decorator parity tests (constructor, static-members, metadata, inheritance) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (212 tests).
+- [x] Added ES5 async method parity tests (this-context, static, params, inheritance) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (216 tests).
+- [x] Added ES5 generator method parity tests (this-context, static, params, inheritance) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (212 tests).
+- [x] Added ES5 for-of loop parity tests (async, try-catch, labeled, arrow) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (208 tests).
+- [x] Added ES5 for-of loop parity tests (iterables, control-flow, generator, class-method) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (204 tests).
+- [x] Added ES5 destructuring assignment parity tests (computed, return, rename, loop) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (200 tests).
+- [x] Added ES5 spread parameter parity tests (method-call, typed-array, constructor, nested) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (196 tests).
+- [x] Added ES5 default parameter parity tests (class-method, arrow, expression, constructor) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (192 tests).
+- [x] Added ES5 rest parameter parity tests (nested, overload, tuple, callback) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (188 tests).
+- [x] Added ES5 rest parameter parity tests (generator, async, destructuring, constructor) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (184 tests).
+- [x] Added ES5 rest parameter parity tests (class-method, typed-array, arrow, with-defaults) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (180 tests).
+- [x] Added ES5 computed property parity tests (symbol, class-method, expression, accessor) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (176 tests).
+- [x] Added ES5 class static block parity tests (try-catch, loop-init, conditional, derived-class) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (172 tests).
+- [x] Added ES5 private field accessor parity tests (getter, setter, pair, static) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (168 tests).
+- [x] Added ES5 async super call parity tests (basic, with-args, static, with-await) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (164 tests).
+- [x] Added ES5 static initialization order parity tests (properties, blocks, interleaved, derived) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (160 tests).
+- [x] Added ES5 generator function parity tests (return-value, multiple-yields, try-catch, expression) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (156 tests).
+- [x] Added ES5 class expression parity tests (anonymous, named, static, accessor) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (152 tests).
+- [x] Added ES5 import/export parity tests (alias, default-function, interface, type-alias) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (148 tests).
+- [x] Added ES5 enum parity tests (explicit-values, const, computed, heterogeneous) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (144 tests).
+- [x] Added ES5 namespace parity tests (nested, with-class, with-interface, with-enum) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (140 tests).
+- [x] Added ES5 async generator parity tests (try-catch, static, multi-yield, yield-star) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (136 tests).
+- [x] Added ES5 parameter decorator parity tests (multiple, method, factory, multi-params) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (132 tests).
+- [x] Added ES5 accessor decorator parity tests (getter, setter, multiple, static) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (128 tests).
+- [x] Added ES5 property decorator parity tests (multiple, factory, static, initializer) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (124 tests).
+- [x] Added ES5 method decorator parity tests (multiple, factory, static, async) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (120 tests).
+- [x] Added ES5 class decorator parity tests (multiple, factory, generic, extends) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (116 tests).
+- [x] Added ES5 private class method parity tests (multi params, static, async, chain) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (112 tests).
+- [x] Added ES5 class static block parity tests (this ref, multiple, typed var, function call) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (108 tests).
+- [x] Added ES5 class getter/setter parity tests (getter typed, setter typed, pair, static) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (104 tests).
+- [x] Added ES5 arrow function parity tests (typed expression, block body, this capture, multi params) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (100 tests).
+- [x] Added ES5 exponentiation operator parity tests (type erasure, const/let, arrow) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (96 tests).
+- [x] Added ES5 logical assignment operator parity tests (||=, &&=, ??=, property) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (92 tests).
+- [x] Added ES5 for-of loop parity tests (array destruct, object destruct, nested, let) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (88 tests).
+- [x] Added ES5 template literal parity tests (multi-expr, tagged, call, nested) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (84 tests).
+- [x] Added ES5 nullish coalescing parity tests (call, assignment, chained, property) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (80 tests).
+- [x] Added ES5 optional chaining parity tests (method call, element access, with nullish, call) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (76 tests).
+- [x] Added ES5 destructuring parity tests (array, object, nested, defaults, rest) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (72 tests).
+- [x] Added ES5 spread operator parity tests (call spread, new spread, rest params, mixed array spread) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (67 tests).
+- [x] Added ES5 decorator parity tests (class, method, property, parameter) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (63 tests).
 - [x] Added ES5 async generator parity tests (type erasure, method, await+yield) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (59 tests).
 - [x] Added ES5 generator function parity tests (type erasure, method, yield type erasure) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (56 tests).
 - [x] Added ES5 private class field parity tests (instance field, static access, method, getter, setter) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (51 tests).

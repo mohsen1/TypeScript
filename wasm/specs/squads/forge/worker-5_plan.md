@@ -6,26 +6,21 @@ Execute tasks assigned by EM-Forge for the Forge squad (type system).
 Status: Active
 Priority: 1
 
-## Current Assignment (TS7010 - Return Path Analysis)
-Implement return-path analysis helpers for fallthrough detection.
+## Current Assignment (TS7010 - Return Path Analysis: try/finally + switch)
+Handle return-path analysis for try/finally and switch fallthrough cases.
 
 ### Steps
-- [x] Update return-path analysis helpers in `wasm/src/checker/control_flow.rs`
-- [x] Expose fallthrough helpers via `wasm/src/checker/statements.rs`
-- [x] Add regression coverage in `wasm/src/thin_checker_tests.rs`
-- [x] Ignore breaks inside nested loops/switches for loop fallthrough
-- [x] Add async/generator + expression-bodied arrow coverage
-- [x] Run focused test: `./wasm/test.sh test_ts7010_return_path_analysis`
+- [ ] Add tests for try/finally fallthrough and switch fallthrough in `wasm/src/thin_checker_tests.rs`.
+- [ ] Update `wasm/src/checker/control_flow.rs` to handle try/finally + switch fallthrough accurately.
+- [ ] Run focused tests: `./wasm/test.sh test_ts7010_return_path_analysis`.
 
 ### Results
 - Added return-path analysis helpers for blocks/if/loops/switch/try in `wasm/src/checker/control_flow.rs`.
 - `StatementChecker` now exposes `function_body_falls_through` and `statement_falls_through` wrappers.
-- Added `function_like_falls_through` to handle function-like nodes (including expression-bodied arrows).
 - Added `test_ts7010_return_path_analysis` in `wasm/src/thin_checker_tests.rs`.
 - `contains_break_statement` no longer treats breaks in nested loops/switches as exiting the current loop.
 - Extended `test_ts7010_return_path_analysis` with nested-switch break coverage.
-- Added `test_ts7010_return_path_async_generator_arrows` covering generator fallthrough and async/expression-bodied arrows.
-- Test: `./wasm/test.sh test_ts7010_return_path_async_generator_arrows` (PASS; existing warnings).
+- Test: `./wasm/test.sh test_ts7010_return_path_analysis` (PASS; existing warnings).
 
 ### Key Files
 - `wasm/src/checker/statements.rs`
@@ -443,7 +438,7 @@ type Guard = (x: any) => x is Guard;  // Guard references itself in predicate
 - [x] Updated non-distributive union object inference expectation (tests not run).
 
 ## Ready for Merge
-Yes
+No
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize solver correctness (inference/conditional/subtype) before new features.

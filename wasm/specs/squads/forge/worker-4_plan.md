@@ -7,30 +7,29 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-TS2322 async/generator return assignability.
+TS2322 contextual typing with union object literals.
 
 **Error Code:** TS2322 - "Type 'X' is not assignable to type 'Y'"
 
-**Impact:** async/generator return type diagnostics/conformance
+**Impact:** 310 conformance tests affected
 
 ### Steps
-1. **Add focused tests** in `wasm/src/solver/compat_tests.rs` for async/generator return assignability (Promise/Iterator with void/undefined).
-2. **Audit/fix assignability** in `wasm/src/solver/compat.rs` and/or `wasm/src/solver/subtype.rs`.
-3. **Run focused tests** with `./wasm/test.sh` and record delta.
+1. **Add tests** in `wasm/src/thin_checker_tests.rs` for union contextual typing with object literals.
+2. **Audit assignability** in `wasm/src/solver/compat.rs`/`wasm/src/thin_checker.rs` for contextual typing paths.
+3. **Implement fix** if union contextual typing emits wrong TS2322 vs TS2353.
+4. **Run focused tests** with `./wasm/test.sh` and record delta.
 
 ### Key Files
 - `wasm/src/solver/compat.rs`
-- `wasm/src/solver/subtype.rs`
-- `wasm/src/solver/compat_tests.rs`
-- `wasm/src/thin_checker_tests.rs` (if needed)
+- `wasm/src/thin_checker.rs`
+- `wasm/src/thin_checker_tests.rs`
 
 ### Success Criteria
-- Promise/Iterator return assignability matches TypeScript
+- TS2322 reduced for contextual typing with unions
 - No new TS2322 regressions
 
 ## Task Queue
-- Add compat coverage for async/generator return void/undefined cases.
-- Validate no regressions in existing assignability tests.
+- If time permits, add union contextual typing cases for array literals too.
 
 ## Completed
 
