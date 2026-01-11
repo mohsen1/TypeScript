@@ -7,12 +7,13 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- Awaiting next assignment from EM-Anvil.
+- Parser recovery: reduce TS1005/TS1068 false positives (PRIORITY 0)
 
 ## Task Queue
-(empty - will receive new tasks from EM after completing current assignment)
+- Continue parser recovery: identify and fix remaining TS1068 (24 occurrences) and TS1005 (42 occurrences) patterns
 
 ## Completed
+- [x] Parser error recovery for decorated static blocks + arrow function types (2026-01-11): Fixed TS1068 false positives by adding decorator parsing to `parse_class_member()` - now emits TS1206 "Decorators are not valid here" instead of TS1068 for `@decorator static {}` pattern. Restored `can_token_start_type()` helper (lost in sync) to emit TS1110 instead of TS1005 for missing arrow function parameter types. Conformance (1000 tests): Exact match improved from 29.2% to 31.2% (+2%). TS1068 extra errors reduced from 61 to 24 (-61%). TS1005 extra errors reduced from 44 to 42 (-5%). Tests: `./wasm/test.sh test_thin_parser_arrow_function_missing_param_type*` passed (2/2).
 - [x] Parser error recovery for arrow function missing param types: added `can_token_start_type()` helper to detect tokens that can't begin types (`)`, `}`, `,`, etc.), modified `parse_primary_type()` to emit TS1110 (Type expected) instead of TS1005 (identifier expected) for missing types. Added regression tests `test_thin_parser_arrow_function_missing_param_type` and `test_thin_parser_arrow_function_missing_param_type_paren`. Tests: `./wasm/test.sh thin_parser` (221 tests passed). Conformance: ArrowFunctions suite improved from 2/6 exact match (33.3%) to 4/6 exact match (66.7%). Fixed cases: `ArrowFunction1.ts` and `parserX_ArrowFunction1.ts` (`var v = (a: ) => {}`). Also restored missing `function_body_falls_through` and `statement_falls_through` functions in `control_flow.rs` to fix build error.
 - [x] Parser recovery gaps: treat `<...>` as type assertions in `.ts`, emit TS1109 for `new <T>Foo()`, report TS1164 for computed enum members, and recover missing default type params with TS1110. Added thin_parser regressions for enum computed names, `new <T>Foo()`, missing default type, and JSX-like `.ts` recovery. Tests: `./wasm/test.sh thin_parser`. Conformance: `conformance-runner.mjs parser --max=200 --verbose`, plus `parser/ecmascript5/{Expressions,ComputedPropertyNames,Generics}` (TS1109 now present for `parserTypeAssertionInObjectCreationExpression1.ts`; computed property names suite no extra errors).
 - [x] Parser recovery for TS1005/TS1109/TS1068/TS1128: generalized class member modifier lookahead so keywords like `public` can be member names, parse accessors with invalid type parameters/parameters/return types to emit TS1094/TS1054/TS1095 instead of TS1005/TS1068/TS1128, allow `async * get/set` to parse without class-member sync loss, and recover duplicate/invalid heritage clauses with TS1172/TS1173/TS1174/TS1175. Added thin_parser regressions for modifier keyword names, accessor invalid forms, and duplicate extends. Tests: `./wasm/test.sh thin_parser`.
