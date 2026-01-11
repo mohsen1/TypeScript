@@ -17276,3 +17276,46 @@ function f1<T extends string | undefined>(x: T): string {
         checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>()
     );
 }
+
+#[test]
+fn test_private_accessor_via_local_variable_no_error() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class A2 {
+    get #prop() { return ""; }
+    set #prop(param: string) { }
+
+    constructor() {
+        console.log(this.#prop);
+        let a: A2 = this;
+        a.#prop;
+        function foo() {
+            a.#prop;
+        }
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // TS2339 = "Property 'X' does not exist on type 'Y'"
+    let ts2339_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2339)
+        .collect();
+
+    assert!(
+        ts2339_errors.is_empty(),
+        "Expected no TS2339 error for private accessor via local variable, got errors: {:?}",
+        ts2339_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>()
+    );
+}

@@ -6924,7 +6924,22 @@ impl<'a> ThinCheckerState<'a> {
             return TypeId::ANY;
         }
 
-        if !self.is_assignable_to(object_type_for_check, declaring_type) {
+        // For private field access, check if the object type is compatible with the declaring type.
+        // Use both assignability AND class declaration comparison, since types might be
+        // structurally equivalent but have different TypeIds (e.g., after type narrowing).
+        let is_compatible = self.is_assignable_to(object_type_for_check, declaring_type)
+            || {
+                // Check if both types refer to the same class declaration
+                match (
+                    self.get_class_decl_from_type(object_type_for_check),
+                    self.get_class_decl_from_type(declaring_type),
+                ) {
+                    (Some(obj_class), Some(decl_class)) => obj_class == decl_class,
+                    _ => false,
+                }
+            };
+
+        if !is_compatible {
             let shadowed = symbols.iter().skip(1).any(|sym_id| {
                 self.private_member_declaring_type(*sym_id)
                     .map(|ty| self.is_assignable_to(object_type_for_check, ty))
