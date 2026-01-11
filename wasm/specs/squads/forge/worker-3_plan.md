@@ -7,24 +7,25 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-TS2339 missing errors: improve reporting + fix top missing pattern.
+TS2339 missing errors: extend control-flow narrowing for guard/switch cases.
 
 **Error Code:** TS2339 - "Property 'X' does not exist on type 'Y'"
 
 ### Steps
-1. Extend `find-ts2339.mjs` to report missing TS2339.
-2. Fix missing TS2339 pattern in checker (catch binding unknown).
-3. Add tests for catch binding TS2339.
-4. Run focused tests (`./wasm/test.sh thin_checker_tests`) and report delta.
+1. **Run a missing scan**: `node wasm/differential-test/find-ts2339.mjs --mode=missing --max=2000 --samples=20`.
+2. **Pick top missing pattern** (likely switch-discriminant or `in`/`instanceof`/`typeof` guard narrowing).
+3. **Implement flow updates** in `wasm/src/checker/control_flow.rs` to narrow types in the chosen pattern.
+4. **Add tests** in `wasm/src/checker/control_flow_tests.rs`.
+5. **Run focused tests** with `./wasm/test.sh control_flow_tests` and report delta.
 
 ### Key Files
 - `wasm/src/checker/control_flow.rs`
-- `wasm/src/thin_checker.rs`
-- `wasm/src/thin_checker_tests.rs`
+- `wasm/src/checker/control_flow_tests.rs`
+- `wasm/differential-test/find-ts2339.mjs`
 
 ### Success Criteria
-- TS2339 extra errors reduced for control-flow narrowing cases
-- No regressions in existing TS2339 tests
+- Missing TS2339 reduced for the selected control-flow pattern
+- No new TS2339 extras introduced
 
 ## Task Queue
 - (empty)

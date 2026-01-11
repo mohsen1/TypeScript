@@ -6,27 +6,29 @@ Execute tasks assigned by EM-Forge for the Forge squad (type system).
 Status: Active
 Priority: 1
 
-## Current Assignment (TS2695 - Comma Operator Side Effects)
-Implement TS2695 for comma operator expressions in statement position.
+## Current Assignment (TS7010 - Return Path Analysis)
+Implement TS7010 for missing return statements in functions with non-void return types.
 
-**Error Code:** TS2695 - "Left side of comma operator is unused and has no side effects."
+**Error Code:** TS7010 - "Function lacks ending return statement and return type does not include 'undefined'."
 
-**Impact:** 46 conformance tests affected (top missing).
+**Impact:** 179 conformance tests affected
 
 ### Steps
-1. [x] **Find expression-statement handling** in `wasm/src/thin_checker.rs` and detect comma operator expressions.
-2. [x] **Add TS2695 emission** when the left operand is side-effect free.
-3. [x] **Add tests** in `wasm/src/thin_checker_tests.rs` for `a, b;` and `1, b;` (error) vs `a(), b;` (no error).
-4. [x] **Run focused tests** with `./wasm/test.sh` and report delta.
+1. **Identify failing patterns** in conformance (functions with non-void return types and incomplete paths).
+2. **Update return-path analysis** in `wasm/src/checker/statements.rs` and/or `wasm/src/checker/control_flow.rs`.
+3. **Emit TS7010** only when the return type excludes `undefined`/`void`.
+4. **Add tests** in `wasm/src/thin_checker_tests.rs` for missing-return paths and `undefined` unions.
+5. **Run focused tests** with `./wasm/test.sh` and report delta.
 
-### Results
-- Added TS2695 diagnostics + side-effect-free checks (with indirect call exemption) in `thin_checker.rs`.
-- Added tests in `thin_checker_tests.rs`.
-- Test: `./wasm/test.sh test_ts2695_comma_operator_side_effects` (PASS; existing warnings).
-- Full test: `./wasm/test.sh` failed at `cli::driver_tests::compile_shorthand_methods` with TS2304 "Cannot find name 'a'/'b'" diagnostics.
+### Key Files
+- `wasm/src/checker/statements.rs`
+- `wasm/src/checker/control_flow.rs`
+- `wasm/src/thin_checker.rs`
+- `wasm/src/thin_checker_tests.rs`
 
-### Notes
-- Gemini run completed; guidance aligned with current implementation.
+### Success Criteria
+- Missing TS7010 reduced for non-void functions
+- No new TS7010 false positives
 
 ## Current Assignment (TS7010 - Implicit Any Return)
 - [x] Consulted Gemini to confirm TS7010 = implicit any return (not TS2366)

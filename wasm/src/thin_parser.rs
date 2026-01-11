@@ -3391,14 +3391,28 @@ impl ThinParserState {
         let start_pos = self.token_pos();
 
         // Skip module/namespace/global keyword
-        let _is_global = self.is_token(SyntaxKind::GlobalKeyword);
-        self.next_token();
-
-        // Parse name - can be identifier or string literal
-        let name = if self.is_token(SyntaxKind::StringLiteral) {
-            self.parse_string_literal()
+        let is_global = self.is_token(SyntaxKind::GlobalKeyword);
+        let name = if is_global {
+            let name_start = self.token_pos();
+            let name_end = self.token_end();
+            self.next_token();
+            self.arena.add_identifier(
+                SyntaxKind::Identifier as u16,
+                name_start,
+                name_end,
+                IdentifierData {
+                    escaped_text: "global".to_string(),
+                    original_text: None,
+                    type_arguments: None,
+                },
+            )
         } else {
-            self.parse_module_name()
+            self.next_token();
+            if self.is_token(SyntaxKind::StringLiteral) {
+                self.parse_string_literal()
+            } else {
+                self.parse_identifier()
+            }
         };
 
         // Parse body
@@ -3407,7 +3421,7 @@ impl ThinParserState {
         } else if self.is_token(SyntaxKind::DotToken) {
             // Nested module: module A.B.C { }
             self.next_token();
-            self.parse_module_declaration()
+            self.parse_nested_module_declaration(None)
         } else {
             NodeIndex::NONE
         };
@@ -3429,14 +3443,29 @@ impl ThinParserState {
     /// Parse declare module: declare module "name" {}
     fn parse_declare_module(&mut self, start_pos: u32, declare_modifier: NodeIndex) -> NodeIndex {
         // Skip module/namespace/global keyword
-        let _is_global = self.is_token(SyntaxKind::GlobalKeyword);
-        self.next_token();
-
-        // Parse name - can be identifier or string literal
-        let name = if self.is_token(SyntaxKind::StringLiteral) {
-            self.parse_string_literal()
+        let is_global = self.is_token(SyntaxKind::GlobalKeyword);
+        let modifiers = Some(self.make_node_list(vec![declare_modifier]));
+        let name = if is_global {
+            let name_start = self.token_pos();
+            let name_end = self.token_end();
+            self.next_token();
+            self.arena.add_identifier(
+                SyntaxKind::Identifier as u16,
+                name_start,
+                name_end,
+                IdentifierData {
+                    escaped_text: "global".to_string(),
+                    original_text: None,
+                    type_arguments: None,
+                },
+            )
         } else {
-            self.parse_module_name()
+            self.next_token();
+            if self.is_token(SyntaxKind::StringLiteral) {
+                self.parse_string_literal()
+            } else {
+                self.parse_identifier()
+            }
         };
 
         // Parse body
@@ -3445,7 +3474,7 @@ impl ThinParserState {
         } else if self.is_token(SyntaxKind::DotToken) {
             // Nested module: module A.B.C { }
             self.next_token();
-            self.parse_module_declaration()
+            self.parse_nested_module_declaration(modifiers.clone())
         } else {
             NodeIndex::NONE
         };
@@ -3457,7 +3486,39 @@ impl ThinParserState {
             start_pos,
             end_pos,
             crate::parser::thin_node::ModuleData {
-                modifiers: Some(self.make_node_list(vec![declare_modifier])),
+                modifiers,
+                name,
+                body,
+            },
+        )
+    }
+
+    fn parse_nested_module_declaration(&mut self, modifiers: Option<NodeList>) -> NodeIndex {
+        let start_pos = self.token_pos();
+
+        let name = if self.is_token(SyntaxKind::StringLiteral) {
+            self.parse_string_literal()
+        } else {
+            self.parse_identifier()
+        };
+
+        let body = if self.is_token(SyntaxKind::OpenBraceToken) {
+            self.parse_module_block()
+        } else if self.is_token(SyntaxKind::DotToken) {
+            self.next_token();
+            self.parse_nested_module_declaration(modifiers.clone())
+        } else {
+            NodeIndex::NONE
+        };
+
+        let end_pos = self.token_end();
+
+        self.arena.add_module(
+            syntax_kind_ext::MODULE_DECLARATION,
+            start_pos,
+            end_pos,
+            crate::parser::thin_node::ModuleData {
+                modifiers,
                 name,
                 body,
             },
@@ -4546,13 +4607,13 @@ impl ThinParserState {
             // Parse optional catch binding
             let variable_declaration = if self.is_token(SyntaxKind::OpenParenToken) {
                 self.next_token();
-                let param = if self.is_identifier_or_keyword() {
-                    self.parse_identifier_name()
-                } else {
+                let decl = if self.is_token(SyntaxKind::CloseParenToken) {
                     NodeIndex::NONE
+                } else {
+                    self.parse_variable_declaration()
                 };
                 self.parse_expected(SyntaxKind::CloseParenToken);
-                param
+                decl
             } else {
                 NodeIndex::NONE
             };
