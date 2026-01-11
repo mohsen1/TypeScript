@@ -5,9 +5,9 @@ Status: Active
 
 ## Current Assignment (2026-01-11)
 
-- Investigate TS2339 property access false positives (target: 292 extras).
-- Collect 3-5 samples via `node wasm/differential-test/find-ts2339.mjs --max=500 --samples=5` and record failing property access sites.
-- Trace property lookup in `wasm/src/thin_checker.rs` (narrowing, index signatures, interface merging, prototype chain) and implement a minimal fix.
+- Continue TS2339 property access fixes, prioritizing interface/index-signature cases in `interfaces` and `types` categories.
+- Run `node wasm/differential-test/find-ts2339.mjs --max=1000 --samples=5` to collect fresh samples (aim for interface/type-heavy cases).
+- Trace property lookup in `wasm/src/thin_checker.rs` (index signatures, interface merging, prototype chain, narrowing) and implement a minimal fix.
 - Add regression tests in `wasm/src/thin_checker_tests.rs` and report before/after TS2339 delta.
 
 ### Update (2026-01-11)

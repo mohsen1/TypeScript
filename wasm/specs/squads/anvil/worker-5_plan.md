@@ -7,10 +7,10 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- Reduce TS2355 false positives (return analysis) focusing on throw-only flows, never-returning calls, and unreachable code after return.
-- Collect 3-5 TS2355 samples (e.g., `node wasm/differential-test/find-ts2355.mjs --max=500 --samples=5`) and note failing patterns.
-- Update `wasm/src/thin_checker.rs` and/or `wasm/src/checker/control_flow.rs`; add regression tests in `wasm/src/thin_checker_tests.rs`.
-- Run `./wasm/test.sh thin_checker_tests` or targeted tests and report TS2355 delta.
+- Reduce TS2355 false positives for async `Promise<void>`/alias returns (remaining samples in async es5/es2017).
+- Use `node wasm/differential-test/find-ts2355.mjs --max=500 --samples=5` to confirm the current sample set.
+- Inspect `requires_return_value` / `return_type_for_implicit_return_check` for async functions in `wasm/src/thin_checker.rs` and control-flow fallthrough in `wasm/src/checker/control_flow.rs`.
+- Add regression tests in `wasm/src/thin_checker_tests.rs` and report before/after TS2355 delta.
 
 ## Task Queue
 - [x] Verify whether `types/mapped/recursiveMappedTypes.ts` still crashes; if so, capture stack and coordinate with Forge.

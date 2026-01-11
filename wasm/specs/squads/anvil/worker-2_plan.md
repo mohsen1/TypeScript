@@ -7,9 +7,9 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- Parser error recovery gaps: type assertions in tricky positions, generic default type params, JSX-like syntax in .ts, computed property names.
-- Reproduce with `node wasm/differential-test/conformance-runner.mjs parser --max=200 -v` (or narrow to failing parser suites).
-- Trace parse paths in `wasm/src/thin_parser.rs`/`wasm/src/parser/` and add regression tests in `wasm/src/thin_parser_tests.rs`.
+- Parser error recovery follow-ups for TS1005/TS1109/TS1068/TS1128 in arrow-function and expression suites.
+- Reproduce with `node wasm/differential-test/conformance-runner.mjs parser --max=200 -v` plus `parser/ecmascript5/ErrorRecovery/ArrowFunctions` and `parser/ecmascript5/Expressions`.
+- Trace parse paths in `wasm/src/thin_parser.rs` (arrow parsing, generic defaults, expression recovery) and add regression tests in `wasm/src/thin_parser_tests.rs`.
 - Report before/after delta and run `./wasm/test.sh thin_parser`.
 
 ## Task Queue

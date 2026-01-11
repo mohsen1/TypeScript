@@ -1,5 +1,13 @@
 # Anvil Worker 4 - Mapped Type Recursion Guard
 
+## Current Assignment (2026-01-11) - TS2769 Overload Matching (remaining cases)
+
+Status: Active
+
+- Collect remaining TS2769 samples (e.g., `node wasm/differential-test/conformance-runner.mjs types --max=500 -v | rg TS2769` or add a `find-ts2769.mjs` helper).
+- Focus on rest/optional parameter matching and generic inference in overload resolution (`wasm/src/thin_checker.rs`, `wasm/src/solver/operations.rs`).
+- Add regression tests in `wasm/src/thin_checker_tests.rs` and report before/after TS2769 delta.
+
 ## Current Assignment (2026-01-11) - Recursive Mapped Types Property Access Guard
 
 Status: Completed
@@ -32,7 +40,7 @@ Status: COMPLETED
 - Same error count: 3 → 5
 - `recursiveMappedTypes.ts` still missing TS2456/TS2313/TS2589/TS2502/TS2615; extra TS2322/TS2339/TS2304
 
-Ready for Merge: No (merged 2026-01-11)
+Ready for Merge: No
 
 ## Follow-up (2026-01-11) - Recursive Mapped Types Crash Verification
 

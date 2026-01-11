@@ -6,7 +6,10 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-- Reduce remaining TS2322 false positives, focusing on control-flow narrowing gaps (generic types, in-operator, optional chain) and globalThis readonly writes.
+- Reduce TS2304 false positives (scope resolution) with focus on internalModules/moduleResolution/externalModules.
+- Run `node wasm/differential-test/find-ts2304.mjs --max=1000 --samples=5` and collect 3-5 samples.
+- Trace name resolution in `wasm/src/thin_binder.rs` and `wasm/src/thin_checker.rs` (module exports, namespace merges, global augmentation).
+- Add regression tests in `wasm/src/thin_checker_tests.rs` and report before/after TS2304 delta.
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)
@@ -171,7 +174,7 @@ Priority: 1
 - [x] Fixed TS2304 false positives (Cannot find name): Added builtin global type handling for Promise, PromiseLike, Map, Set, Iterator, Generator, and 30+ other global types. Fixed type alias type parameter scoping, heritage clause resolution, type queries. Added find-ts2304.mjs differential test script. Added regression test. Key files: thin_checker.rs.
 
 ## Ready for Merge
-No (merged 2026-01-11)
+No
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize emitter fidelity (ES5 downleveling/source maps) before new features.
