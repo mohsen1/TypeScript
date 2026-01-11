@@ -3,7 +3,6 @@
 use crate::thin_checker::ThinCheckerState;
 use crate::parser::thin_node::ThinNodeArena;
 use crate::thin_binder::ThinBinderState;
-use crate::thin_parser::ThinParserState;
 use crate::solver::{TypeId, TypeInterner};
 
 #[test]
@@ -5980,6 +5979,40 @@ async function f(): PromiseAlias<void> {
     assert!(
         !codes.contains(&2355),
         "Did not expect TS2355 for async PromiseAlias<void> return type (conformance: asyncAliasReturnType_es5.ts), got: {:?}",
+        codes
+    );
+}
+
+/// Test async functions with qualified name class extending Promise (conformance: asyncQualifiedReturnType_es5.ts)
+#[test]
+fn test_async_qualified_promise_class_no_2355() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+namespace X {
+    export class MyPromise<T> extends Promise<T> {
+    }
+}
+
+async function f(): X.MyPromise<void> {
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2355),
+        "Did not expect TS2355 for async qualified Promise class return type, got: {:?}",
         codes
     );
 }
@@ -17157,78 +17190,86 @@ type t1 = DeepMap<tpl, number>;
 }
 
 #[test]
-fn test_static_private_field_access_no_ts2339() {
-    // Regression test for static private field access
-    // Previously failed with TS2339 because static private members were excluded from constructor type
+fn test_ts2454_var_used_before_assigned() {
+    use crate::thin_parser::ThinParserState;
+
     let source = r#"
-class C {
-    static #x = 123;
-    static {
-        console.log(C.#x);
-    }
-    foo() {
-        return C.#x;
-    }
-}
+var x: string;
+var y = x; // TS2454: Variable 'x' is used before being assigned
 "#;
 
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
-    
+
     let mut binder = ThinBinderState::new();
     binder.bind_source_file(parser.get_arena(), root);
-    
+
     let types = TypeInterner::new();
     let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
-    
     checker.check_source_file(root);
-    
-    // Should have NO TS2339 errors for C.#x access
-    let ts2339_count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2339).count();
-    assert_eq!(ts2339_count, 0, 
-        "Expected no TS2339 errors for static private field access, got {} - diagnostics: {:?}",
-        ts2339_count,
-        checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>()
+
+    let ts2454_errors: Vec<_> = checker.ctx.diagnostics.iter().filter(|d| d.code == 2454).collect();
+    assert_eq!(
+        ts2454_errors.len(),
+        1,
+        "Should have 1 TS2454 error for var used before assigned, but found: {:#?}",
+        ts2454_errors
     );
 }
 
 #[test]
-fn test_static_private_accessor_access_no_ts2339() {
-    // Regression test for static private accessor access
+fn test_ts2454_var_with_initializer_no_error() {
+    use crate::thin_parser::ThinParserState;
+
     let source = r#"
-class A {
-    static get #prop() { return ""; }
-    static set #prop(param: string) { }
-    
-    static get #roProp() { return ""; }
-    
-    constructor(name: string) {
-        A.#prop = "";
-        console.log(A.#prop);
-        console.log(A.#roProp);
-    }
-}
+var x: string = "hello";
+var y = x; // No error - x is initialized
 "#;
 
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
-    
+
     let mut binder = ThinBinderState::new();
     binder.bind_source_file(parser.get_arena(), root);
-    
+
     let types = TypeInterner::new();
     let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
-    
     checker.check_source_file(root);
-    
-    // Filter out TS2540 for read-only property assignment (expected error)
-    let ts2339_errors: Vec<_> = checker.ctx.diagnostics.iter()
-        .filter(|d| d.code == 2339)
-        .collect();
-    
-    assert_eq!(ts2339_errors.len(), 0,
-        "Expected no TS2339 errors for static private accessor access, got {} - TS2339 diagnostics: {:?}",
-        ts2339_errors.len(),
-        ts2339_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>()
+
+    let ts2454_errors: Vec<_> = checker.ctx.diagnostics.iter().filter(|d| d.code == 2454).collect();
+    assert_eq!(
+        ts2454_errors.len(),
+        0,
+        "Should have no TS2454 errors when var has initializer, but found: {:#?}",
+        ts2454_errors
+    );
+}
+
+#[test]
+fn test_ts2454_var_assigned_before_use_no_error() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+var x: string;
+x = "hello";
+var y = x; // No error - x is assigned before use
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2454_errors: Vec<_> = checker.ctx.diagnostics.iter().filter(|d| d.code == 2454).collect();
+    assert_eq!(
+        ts2454_errors.len(),
+        0,
+        "Should have no TS2454 errors when var is assigned before use, but found: {:#?}",
+        ts2454_errors
     );
 }

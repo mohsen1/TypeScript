@@ -4558,21 +4558,22 @@ impl<'a> ThinCheckerState<'a> {
             return false;
         };
 
+        // Check if this is a variable (either block-scoped or function-scoped)
         if (symbol.flags & symbol_flags::VARIABLE) == 0 {
             return false;
         }
-        if (symbol.flags & symbol_flags::BLOCK_SCOPED_VARIABLE) == 0 {
-            return false;
-        }
 
+        // Skip parameters - they are always assigned by the caller
         if self.symbol_is_parameter(sym_id) {
             return false;
         }
 
+        // Skip if has definite assignment assertion (x!: Type)
         if self.symbol_has_definite_assignment_assertion(sym_id) {
             return false;
         }
 
+        // Skip if this is a for-in/for-of loop variable (always assigned by the loop)
         if self.is_for_in_of_assignment_target(idx) {
             return false;
         }
