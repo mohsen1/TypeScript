@@ -6,21 +6,23 @@ Execute tasks assigned by EM-Forge for the Forge squad (type system).
 Status: Active
 Priority: 1
 
-## Current Assignment (TS7010 - Return Path Analysis: try/finally + switch)
+## Current Assignment (TS7010 - Return Path Analysis: try/finally + switch) - COMPLETE
 Handle return-path analysis for try/finally and switch fallthrough cases.
 
 ### Steps
-- [ ] Add tests for try/finally fallthrough and switch fallthrough in `wasm/src/thin_checker_tests.rs`.
-- [ ] Update `wasm/src/checker/control_flow.rs` to handle try/finally + switch fallthrough accurately.
-- [ ] Run focused tests: `./wasm/test.sh test_ts7010_return_path_analysis`.
+- [x] Add tests for try/finally fallthrough and switch fallthrough in `wasm/src/thin_checker_tests.rs`.
+- [x] Update `wasm/src/checker/control_flow.rs` to handle try/finally + switch fallthrough accurately.
+- [x] Run focused tests: `./wasm/test.sh test_ts7010_return_path_analysis`.
+- [x] Fix regression from origin/rust merge where nested breaks were incorrectly detected.
 
 ### Results
 - Added return-path analysis helpers for blocks/if/loops/switch/try in `wasm/src/checker/control_flow.rs`.
 - `StatementChecker` now exposes `function_body_falls_through` and `statement_falls_through` wrappers.
 - Added `test_ts7010_return_path_analysis` in `wasm/src/thin_checker_tests.rs`.
-- `contains_break_statement` no longer treats breaks in nested loops/switches as exiting the current loop.
 - Extended `test_ts7010_return_path_analysis` with nested-switch break coverage.
-- Test: `./wasm/test.sh test_ts7010_return_path_analysis` (PASS; existing warnings).
+- **Bug Fix (commit e8de0db427)**: Fixed `contains_break_statement` to not recurse into nested switch/loop structures. Breaks inside nested structures only break those structures, not the outer loop being analyzed.
+- Test: `./wasm/test.sh test_ts7010_return_path_analysis` (PASS ✅)
+- Test: `./wasm/test.sh test_missing_return_and_implicit_any_diagnostics` (PASS ✅)
 
 ### Key Files
 - `wasm/src/checker/statements.rs`
