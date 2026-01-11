@@ -13,6 +13,7 @@ Priority: 2
 (empty - will receive new tasks from EM after completing current assignment)
 
 ## Completed
+- [x] Reduced TS2304 false positives for nested namespaces/heritage literals/CommonJS globals: allow nested namespaces to see non-exported parent members, skip `extends null/undefined/true/false` in base constructor resolution, and whitelist `exports/module/require/__dirname/__filename` as global values. Updated nested namespace test to align with TSC and added regressions for `extends null` and `exports`. Tests: `./wasm/test.sh test_checker_nested_namespace_non_exported_not_visible`, `./wasm/test.sh test_class_extends_null_no_ts2304`, `./wasm/test.sh test_exports_global_no_ts2304`.
 - [x] Follow-up TS2304 scan for namespace/module augmentation/global ambient: rebuilt wasm (`./wasm/build-wasm.sh`), ran `node wasm/differential-test/find-ts2304.mjs --max=500 --samples=10` (samples: `classes/classDeclarations/classExtendingNull.ts`, `classes/classDeclarations/classHeritageSpecification/classExtendsItselfIndirectly2.ts`, `classes/members/privateNames/privateNameBadAssignment.ts`), and targeted conformance runs: `internalModules` (76 files, extra TS2304: 4), `ambient` (22 files, extra TS2304: 0), `moduleResolution` (51 files, extra TS2304: 5), `externalModules` (200 files, extra TS2304: 26).
 - [x] Fixed TS2304 false positives for global augmentation + namespace/module merging: parse `declare global` with GLOBAL_AUGMENTATION flag, bind global bodies in file scope, prepopulate module scopes with prior exports, and add regressions for global/namespace/module augmentation. Targeted tests: `./wasm/test.sh test_global_augmentation_binds_to_file_scope`, `./wasm/test.sh test_namespace_merging_resolves_prior_exports`, `./wasm/test.sh test_module_augmentation_merges_exports`.
 - [x] Ran `./scripts/ask-gemini.mjs` (key available). Repro attempts: `./wasm/build-wasm.sh` (timed out at 120s but pkg emitted), `node wasm/differential-test/conformance-runner.mjs es6/templates --max=1` (Exact Match, no crash), `node wasm/differential-test/process-pool-conformance.mjs es6/templates --max=1 --workers=1` (Exact Match, no crash), direct ThinParser harness on `TemplateExpression1.ts` (TS1005 + TS2304 only).
@@ -214,4 +215,5 @@ Yes (2026-01-11)
 ## Resume
 - TS2304 augmentation false positives addressed (global/namespace/module), with targeted regressions.
 - Latest scan shows extra TS2304 still present in internalModules (4), moduleResolution (5), externalModules (26); ambient had 0.
+- Nested namespace visibility + heritage literal + CommonJS globals fix landed with targeted tests.
 - Awaiting next assignment from EM-Anvil.
