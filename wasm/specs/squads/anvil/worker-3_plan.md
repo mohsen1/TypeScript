@@ -432,3 +432,50 @@ Ready for Merge: Yes
 1. Fix remaining private name errors (destructuring, assignment)
 2. Fix mixin property inheritance (11 errors)
 3. Add comprehensive regression tests
+
+### Mixin Investigation (2026-01-11 late PM)
+
+**Issue:** 11 TS2339 errors across 3 mixin test files
+- `mixinAbstractClasses.ts`: 3 errors
+- `mixinClassesAnnotated.ts`: 2 errors
+- `mixinClassesMembers.ts`: 6 errors
+
+**Error Pattern:**
+```typescript
+Property 'baseMethod' does not exist on type '{}'.
+```
+
+**Analysis:**
+The mixin pattern that fails:
+```typescript
+function Mixin<TBaseClass extends abstract new (...args: any) => any>(
+    baseClass: TBaseClass
+): TBaseClass & (abstract new (...args: any) => Mixin) {
+    abstract class MixinClass extends baseClass implements Mixin {
+        mixinMethod() {}
+    }
+    return MixinClass;
+}
+class Derived extends Mixin(ConcreteBase) {}  // Fails to inherit baseMethod
+```
+
+**Investigation Findings:**
+1. `get_class_instance_type_inner` (line 3634+) handles heritage clauses
+2. `resolve_heritage_symbol` returns None for call expressions (line 1277-1300)
+3. Falls back to `base_instance_type_from_expression` (line 3662)
+4. `instance_type_from_constructor_type` handles intersection types (line 5982+)
+5. For type parameters in intersections, it returns None (line 6026-6030)
+
+**Root Cause (Hypothesis):**
+When processing `TBaseClass & (abstract new (...args: any) => Mixin)`:
+- The type parameter `TBaseClass` has constraint `abstract new (...args: any) => any`
+- When getting instance type, type parameter resolution fails
+- Returns empty object type `{}` instead of merging base class properties
+- Properties from the concrete base class (e.g., `ConcreteBase`) are not included
+
+**Complexity:** This requires understanding how type parameters are instantiated in generic mixin return types. The issue is in the interaction between:
+- Type parameter resolution (`TypeKey::TypeParameter`)
+- Intersection type handling in `instance_type_from_constructor_type_inner`
+- Base class property merging through type parameters
+
+**Status:** Requires deeper investigation - complex type system interaction
