@@ -4,7 +4,6 @@ use crate::thin_checker::ThinCheckerState;
 use crate::thin_parser::ThinParserState;
 use crate::parser::thin_node::ThinNodeArena;
 use crate::thin_binder::ThinBinderState;
-use crate::thin_parser::ThinParserState;
 use crate::solver::{TypeId, TypeInterner};
 
 #[test]
@@ -17343,7 +17342,6 @@ fn test_static_private_field_access_no_ts2339() {
 
     // Regression test for static private field access
     // Previously failed with TS2339 because static private members were excluded from constructor type
-    use crate::thin_parser::ThinParserState;
 
     let source = r#"
 class C {
@@ -17381,7 +17379,6 @@ fn test_static_private_accessor_access_no_ts2339() {
     use crate::thin_parser::ThinParserState;
 
     // Regression test for static private accessor access
-    use crate::thin_parser::ThinParserState;
 
     let source = r#"
 class A {

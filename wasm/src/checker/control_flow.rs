@@ -179,17 +179,13 @@ impl<'a> FlowAnalyzer<'a> {
         }
 
         if visited.contains(&flow_id) {
-            // Cycle detected (e.g., loop back-edge). For definite assignment (intersection analysis),
-            // we assume the condition holds on the back-edge. If it doesn't hold on the entry path,
-            // the intersection will still fail.
-            return true;
+            return false;
         }
         visited.push(flow_id);
 
         let result = if let Some(flow) = self.binder.flow_nodes.get(flow_id) {
             if flow.has_any_flags(flow_flags::UNREACHABLE) {
-                // Unreachable code vacuously satisfies assignment
-                true
+                false
             } else if flow.has_any_flags(flow_flags::ASSIGNMENT) {
                 if self.assignment_targets_reference(flow.node, reference) {
                     true
@@ -215,20 +211,10 @@ impl<'a> FlowAnalyzer<'a> {
                     })
                 }
             } else if flow.has_any_flags(flow_flags::LOOP_LABEL) {
-                if flow.antecedent.is_empty() {
-                    false
+                if let Some(&ant) = flow.antecedent.first() {
+                    self.check_definite_assignment(reference, ant, visited, cache)
                 } else {
-                    // Check all reachable antecedents (including back-edges for loop analysis)
-                    // For loops, variables must be assigned on ALL paths that reach this point
-                    flow.antecedent.iter().all(|&ant| {
-                        // Skip unreachable branches - they satisfy the condition vacuously
-                        if let Some(ant_node) = self.binder.flow_nodes.get(ant) {
-                            if ant_node.has_any_flags(flow_flags::UNREACHABLE) {
-                                return true;
-                            }
-                        }
-                        self.check_definite_assignment(reference, ant, visited, cache)
-                    })
+                    false
                 }
             } else if flow.has_any_flags(flow_flags::CONDITION) {
                 if let Some(&ant) = flow.antecedent.first() {
