@@ -5,15 +5,21 @@ Status: Active
 
 ## Current Assignment (2026-01-11)
 
-- Investigate remaining TS2339 extras in `classes/classDeclarations/classExtendingClassLikeType.ts` (class-like constructors).
-- Trace property lookup/heritage typing in `wasm/src/thin_checker.rs` for class-like constructor types and overloads.
-- Add regression test; run `node wasm/differential-test/find-ts2339.mjs --max=500 --samples=5` and report delta.
+- Reduce TS2403 false positives (subsequent variable declarations).
+- Collect 3-5 failing samples via conformance output (search for TS2403); capture file + expected vs actual diagnostics.
+- Trace symbol/decl merging in `wasm/src/thin_checker.rs` and `wasm/src/solver/subtype.rs`; implement fix + regression tests.
+- Deliverables: sample list + root cause notes, regression test(s), and before/after TS2403 delta from a targeted conformance run.
 
 ### Update (2026-01-11)
 - Fix: use TypeEnvironment-backed assignability in call/new resolution, and resolve Application symbols (including type param constraints) to improve generic mixin inference (commit 5cf3894068).
 - Regression: `test_mixin_return_type_preserves_base_properties` in `wasm/src/thin_checker_tests.rs`.
 - Samples (pre-fix): `classes/mixinAbstractClasses.ts`, `classes/mixinClassesAnnotated.ts`, `classes/mixinClassesAnonymous.ts`, `classes/mixinClassesMembers.ts`, `controlFlow/assertionTypePredicates1.ts`.
 - TS2339 scan (post-fix): `node wasm/differential-test/find-ts2339.mjs --max=500 --samples=5` → 1 extra (`classes/classDeclarations/classExtendingClassLikeType.ts`, 6 errors).
+
+### Update (2026-01-11)
+- Fix: merge common properties/index signatures for union base instance types (overloaded class-like constructors) so `extends getBase()` preserves base members (commit 9b23466626).
+- Regression: `test_class_extends_class_like_constructor_properties` in `wasm/src/thin_checker_tests.rs`.
+- TS2339 scan: `node wasm/differential-test/find-ts2339.mjs --max=500 --samples=5` → 0 extra.
 
 ## Current Assignment (Crash triage: privateNamesInterfaceExtendingClass) - COMPLETED
 
