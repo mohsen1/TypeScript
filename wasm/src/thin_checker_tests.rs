@@ -17258,6 +17258,7 @@ function f1<T extends string | undefined>(x: T): string {
 
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
 
     let arena = parser.get_arena();
     let mut binder = ThinBinderState::new();
@@ -17274,5 +17275,59 @@ function f1<T extends string | undefined>(x: T): string {
         "Expected no TS2322 errors, got {} - diagnostics: {:?}",
         ts2322_count,
         checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn test_duplicate_constructor_no_ts2300() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class C {
+    constructor() {}
+    constructor(x: number) {}
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2300_count = checker
+        .ctx
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == diagnostic_codes::DUPLICATE_IDENTIFIER)
+        .count();
+
+    let ts2392_count = checker
+        .ctx
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == diagnostic_codes::MULTIPLE_CONSTRUCTOR_IMPLEMENTATIONS)
+        .count();
+
+    // Constructors should NOT report TS2300
+    assert_eq!(
+        ts2300_count,
+        0,
+        "Expected NO TS2300 for duplicate constructors, got: {:?}",
+        checker.ctx.diagnostics
+    );
+
+    // Should report TS2392 instead
+    assert_eq!(
+        ts2392_count,
+        2,
+        "Expected TS2392 for 2 duplicate constructors, got: {:?}",
+        checker.ctx.diagnostics
     );
 }

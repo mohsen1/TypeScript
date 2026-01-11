@@ -11378,6 +11378,7 @@ impl<'a> ThinCheckerState<'a> {
             syntax_kind_ext::ENUM_DECLARATION => Some(symbol_flags::REGULAR_ENUM),
             syntax_kind_ext::GET_ACCESSOR => Some(symbol_flags::GET_ACCESSOR),
             syntax_kind_ext::SET_ACCESSOR => Some(symbol_flags::SET_ACCESSOR),
+            syntax_kind_ext::CONSTRUCTOR => Some(symbol_flags::CONSTRUCTOR),
             _ => None,
         }
     }
@@ -11447,14 +11448,7 @@ impl<'a> ThinCheckerState<'a> {
             }
 
             // Skip constructors - they use TS2392 (multiple constructor implementations), not TS2300
-            let has_constructor = symbol.declarations.iter().any(|&decl_idx| {
-                if let Some(node) = self.ctx.arena.get(decl_idx) {
-                    node.kind == syntax_kind_ext::CONSTRUCTOR
-                } else {
-                    false
-                }
-            });
-            if has_constructor {
+            if symbol.escaped_name == "constructor" {
                 continue;
             }
 
