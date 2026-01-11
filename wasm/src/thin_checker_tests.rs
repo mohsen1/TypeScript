@@ -17806,6 +17806,54 @@ class C {
     constructor(name: string) {
         // Private accessor access in closure - should work
         const fn = () => {
+            this.#prop = "";
+            console.log(this.#prop);
+            console.log(this.#roProp);
+        };
+        fn();
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+
+    checker.check_source_file(root);
+
+    let ts2339_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2339)
+        .collect();
+
+    // All accesses should work - they're all from within the class
+    assert_eq!(ts2339_errors.len(), 0,
+        "Expected no TS2339 errors for private accessor access (including in closures), got {} - errors: {:?}",
+        ts2339_errors.len(),
+        ts2339_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn test_ts2339_static_private_accessor_access() {
+    use crate::thin_parser::ThinParserState;
+
+    // Test that static private accessors are accessible through the class name
+    let source = r#"
+class C {
+    static private get #prop(): string { return ""; }
+    static private set #prop(value: string) { }
+
+    static private get #roProp(): string { return ""; }
+
+    constructor(name: string) {
+        // Static private accessor access in closure - should work
+        const fn = () => {
             C.#prop = "";
             console.log(C.#prop);
             console.log(C.#roProp);
@@ -17833,7 +17881,7 @@ class C {
 
     // All accesses should work - they're all from within the class
     assert_eq!(ts2339_errors.len(), 0,
-        "Expected no TS2339 errors for private accessor access (including in closures), got {} - errors: {:?}",
+        "Expected no TS2339 errors for static private accessor access (including in closures), got {} - errors: {:?}",
         ts2339_errors.len(),
         ts2339_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>()
     );
