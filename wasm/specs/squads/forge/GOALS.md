@@ -159,13 +159,16 @@ bash run-conformance.sh --all --workers=14
 
 ---
 ## Squad Status
-- Last Update: 2026-01-11 (Director Loop)
+- Last Update: 2026-01-11 (URGENT Wake-up Call)
 - Conformance: **23.3% exact match** (up from 18.1%)
-- Workers Active: 5/5
-- **REASSIGNMENTS MADE** (2026-01-11):
-  - W1: Continue TS2454 (37 files still missing, complex control flow)
-  - W2: Triage 68 test failures + resume TS2322 (310 tests)
-  - W3: NEW → TS2322 type assignability (parallel with W2)
-  - W4: NEW → Resume TS2339 (142 tests, optional chaining focus)
-  - W5: NEW → TS2304 missing name (138 tests) + investigate crash regression
-- Blockers: W2 (68 unit test failures), W5 (crash regression 143→483)
+- Workers Active: 2/5 (W3, W4) - **W2, W5 IDLE**
+- **IDLE ALERT** (2026-01-11):
+  - ⚠️ W2: IDLE 192m - TS2322 assignment, 68 test failures blocking
+  - ⚠️ W5: IDLE 187m - TS2304 assignment, crash regression blocking
+- Active Wins:
+  - ✅ W3: TS2300 30% reduction (duplicate identifiers)
+  - ✅ W4: TS2348 complete (class member initializers)
+- Anvil Comparison:
+  - Anvil TS7006: 74% reduction (Forge should learn from this!)
+  - Anvil TS2339: Major fix for captured variables
+- **IMMEDIATE ACTION**: Sync with origin/squad/forge and start assigned tasks!
