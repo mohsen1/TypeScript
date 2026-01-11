@@ -1,35 +1,35 @@
 # Worker 4 Plan - Squad Forge
 
 ## Mission
-Fix TS2322 return-type assignability (void/undefined).
+Fix TS2322 async/generator return assignability (Promise/Iterator vs void/undefined).
 
 Status: Active
 Priority: 1
 
 ## Current Assignment
-TS2322 return-type assignability (void/undefined).
+TS2322 async/generator return assignability.
 
 **Error Code:** TS2322 - "Type 'X' is not assignable to type 'Y'"
 
-**Impact:** return type diagnostics/conformance
+**Impact:** async/generator return type diagnostics/conformance
 
 ### Steps
-1. **Add focused tests** in `wasm/src/solver/compat_tests.rs`.
-2. **Fix assignability** in `wasm/src/solver/compat.rs` and/or `wasm/src/solver/subtype.rs`.
-3. **Run focused tests** and record delta.
+1. **Add focused tests** in `wasm/src/solver/compat_tests.rs` for async/generator return assignability (Promise/Iterator with void/undefined).
+2. **Audit/fix assignability** in `wasm/src/solver/compat.rs` and/or `wasm/src/solver/subtype.rs`.
+3. **Run focused tests** with `./wasm/test.sh` and record delta.
 
 ### Key Files
 - `wasm/src/solver/compat.rs`
-- `wasm/src/solver/compat_tests.rs`
 - `wasm/src/solver/subtype.rs`
-- `wasm/src/thin_checker.rs` (if needed)
+- `wasm/src/solver/compat_tests.rs`
+- `wasm/src/thin_checker_tests.rs` (if needed)
 
 ### Success Criteria
-- void/undefined return assignability matches TypeScript
-- No extra TS2322 regressions
+- Promise/Iterator return assignability matches TypeScript
+- No new TS2322 regressions
 
 ## Task Queue
-- Capture void/undefined return-type cases in compat tests.
+- Add compat coverage for async/generator return void/undefined cases.
 - Validate no regressions in existing assignability tests.
 
 ## Completed
@@ -76,16 +76,16 @@ TS2322 return-type assignability (void/undefined).
 - [x] Applied check_parameter_initializers to constructors, methods, accessors, functions
 
 ## Ready for Merge
-Yes
+No
 
 ## Notes
-- Progress: added compat coverage for void/undefined return-type assignability; no compat/subtype changes required.
-- Tests: `./wasm/test.sh void_undefined_return_assignability`.
-- Commit format: `[wasm] solver: cover void/undefined return assignability`
+- Progress: synced with origin/rust; async/generator return assignability work pending.
+- Tests: not run yet for this assignment.
+- Commit format: `[wasm] solver: async/generator return assignability`
 - Push to: `origin/worker/forge-4`
 - **NEVER edit**: `STRUCTURE.md`, `GOALS.md`, other workers' plan files, or anything in `orchestrator/`
 
 ## Resume
-- Branch/state: `worker/forge-4`, changes committed/pushed, ready for merge.
-- Session work: added compat tests for void/undefined return-type assignability in functions and call signatures.
-- Unit tests: `./wasm/test.sh void_undefined_return_assignability`.
+- Branch/state: `worker/forge-4`, synced with origin/rust, ready to start async/generator return assignability work.
+- Session work: none yet for this assignment.
+- Unit tests: not run yet for this assignment.
