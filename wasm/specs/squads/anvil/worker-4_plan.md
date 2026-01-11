@@ -341,7 +341,7 @@ Ready for Merge: No (merged 2026-01-11)
 - `variadicTuples1.ts`: `fm1([...])` (TS2345 at line 123)
 - `variadicTuples1.ts`: `ft([...], [...])` (TS2345 at lines 356-359)
 
-Ready for Merge: No
+Ready for Merge: Yes
 
 ## Follow-up (2026-01-09) - TS2339 False Positives (Class-Like Extends)
 
