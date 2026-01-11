@@ -7,7 +7,7 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- Awaiting next assignment from EM-Anvil.
+- Awaiting next assignment from EM-Anvil (ask-gemini blocked: missing key).
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)

@@ -1,31 +1,34 @@
 # Worker 3 Plan - Squad Forge
 
 ## Mission
-Reduce TS2339 false positives via control flow narrowing.
+Reduce TS2339 missing errors by improving property access checks.
 
 Status: Active
 Priority: 1
 
 ## Current Assignment
-Extend control-flow narrowing for property access after `in`/`typeof`/`instanceof` guards.
+Reduce missing TS2339 diagnostics (TSC emits TS2339 but WASM does not).
 
 **Error Code:** TS2339 - "Property 'X' does not exist on type 'Y'"
 
-**Impact:** 142 conformance tests affected (control-flow narrowing cases)
+**Impact:** 142 conformance tests affected (missing errors)
 
 ### Steps
-1. **Guard narrowing:** confirm `in`/`typeof`/`instanceof` paths update flow types in `control_flow.rs`.
-2. **Reference matching:** ensure property chains (including `this`/`super`) are matched for narrowing.
-3. **Add tests** in `wasm/src/checker/control_flow_tests.rs` for `in`/`typeof` guards and property access.
-4. **Run focused tests** (`./wasm/test.sh control_flow_tests`) and report delta.
+1. **Extend scan tooling**: add a `--mode=missing` option to `wasm/differential-test/find-ts2339.mjs` (or create a `find-ts2339-missing.mjs`) to report cases where TSC has TS2339 but WASM does not.
+2. **Pick top missing pattern** (e.g., property access on unions with discriminants, optional chains after narrowing, or type-parameter constraints).
+3. **Implement the fix** in `thin_checker.rs` and/or `checker/control_flow.rs`.
+4. **Add tests** in `wasm/src/thin_checker_tests.rs` or `wasm/src/checker/control_flow_tests.rs`.
+5. **Run focused tests** (`./wasm/test.sh control_flow_tests` if flow touched) and report delta.
 
 ### Key Files
 - `wasm/src/checker/control_flow.rs`
 - `wasm/src/thin_checker.rs`
 - `wasm/src/thin_checker_tests.rs`
+- `wasm/src/checker/control_flow_tests.rs`
+- `wasm/differential-test/find-ts2339.mjs`
 
 ### Success Criteria
-- TS2339 extra errors reduced for control-flow narrowing cases
+- TS2339 missing errors reduced for the selected pattern
 - No regressions in existing TS2339 tests
 
 ## Task Queue
@@ -80,7 +83,7 @@ Extend control-flow narrowing for property access after `in`/`typeof`/`instanceo
 - Re-run conformance to confirm private names/control-flow narrowing improvements
 
 ## Ready for Merge
-Yes
+No
 
 ## Notes
 - Similar infrastructure to TS2564 (property init) - share patterns with Workers 1-2
