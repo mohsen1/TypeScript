@@ -5,33 +5,48 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 
 Status: Active
 Priority: 1
-## Current Assignment (2026-01-11 - TS7006 Implicit 'any' Parameter False Positives)
+## Current Assignment (2026-01-11 - TS2300 Duplicate Identifier False Positives)
 
-**Status:** IN PROGRESS - 74% reduction achieved (46 → 12)
+**Target:** Reduce TS2300 "Duplicate identifier" false positives (41 occurrences)
+
+**Status:** IN PROGRESS - Investigating patterns
+
+**Problem:** WASM incorrectly reports TS2300 when identifiers are NOT actually duplicates
+(e.g., interface merging, variable hoisting, module scope isolation)
+
+**Root Causes to Investigate:**
+1. Interface declaration merging conflicts
+2. Variable/function hoisting not handled correctly
+3. Module vs global scope duplicate detection
+4. Type alias vs value identifier conflicts
+
+**Approach:**
+1. Collect samples from conformance tests
+2. Analyze patterns in false positives
+3. Fix duplicate detection in `thin_binder.rs`
+4. Add regression tests
+5. Run conformance baseline before/after
+
+**Files:** `wasm/src/thin_binder.rs`, `wasm/src/thin_checker.rs`, `wasm/src/thin_checker_tests.rs`
+
+**Success Criteria:** Reduce TS2300 from 41 to <20
+
+## Previous Assignment - TS7006 (COMPLETED - Target Achieved)
+
+**Status:** Target achieved - reduced from 46 to 12 (74% reduction)
 
 **Completed Fixes:**
 1. ✅ Setter parameter type inference from getter return type (46 → 15)
 2. ✅ Destructured parameter elements with default values (15 → 12)
 
-**Remaining 12 patterns** (require deeper type resolution work):
-- **Decorator parameter handling (7+ files)** - PARSER BUG FOUND
-  - `wasm/src/thin_parser.rs:1547` - `parse_parameter()` doesn't handle decorators
-  - When parsing `constructor(@dec p: number)`, the parser doesn't skip `@dec`
-  - Tries to parse `@` as parameter name, resulting in empty name
-  - Fix requires: adding decorator parsing to `parse_parameter`, updating `ParameterData` struct
-  - **BLOCKER:** Complex parser change, beyond current scope
-
-- Contextual typing with tuple union function types: `(...args: ['A', number] | ['B', string]) => void`
+**Remaining 12 patterns** (mostly blocked by parser bug):
+- **Decorator parameter handling (7+ files)** - PARSER BUG (documented)
+- Contextual typing with tuple union function types
 - IIFE callback patterns
 - Instance member prototype assignment
 
-**Files Modified:** `wasm/src/thin_checker.rs`
-
-**Commits:**
-- b5f9502636: Fix TS7006 for setter parameters (67% reduction)
-- b55d30154b: Fix TS7006 for destructured parameters with default values (20% more)
-
-**Success Criteria:** Target <20 ✅ ACHIEVED (12 remaining)
+**Note:** Success criteria <20 ✅ ACHIEVED. Remaining patterns are complex and
+largely blocked by parser bugs. Moved to TS2300 for more immediate impact.
 
 ## Previous Assignment - TS2403 (COMPLETED)
 
