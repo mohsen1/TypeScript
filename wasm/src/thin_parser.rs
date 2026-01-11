@@ -3460,6 +3460,7 @@ impl ThinParserState {
         start_pos: u32,
         modifiers: Option<NodeList>,
     ) -> NodeIndex {
+        use crate::checker::types::diagnostics::diagnostic_codes;
         self.parse_expected(SyntaxKind::TypeKeyword);
 
         let name = self.parse_identifier();
@@ -3471,7 +3472,30 @@ impl ThinParserState {
             None
         };
 
-        self.parse_expected(SyntaxKind::EqualsToken);
+        // Parse expected equals token, but recover gracefully if missing
+        // If the next token can start a type (e.g., {, (, [), emit error and continue parsing
+        if !self.is_token(SyntaxKind::EqualsToken) {
+            // Emit TS1005 for missing equals token
+            self.error_token_expected("=");
+            // If the next token looks like a type, continue parsing anyway
+            if !self.can_token_start_type() {
+                // Can't recover, return early with a dummy type
+                let end_pos = self.token_end();
+                return self.arena.add_type_alias(
+                    syntax_kind_ext::TYPE_ALIAS_DECLARATION,
+                    start_pos,
+                    end_pos,
+                    crate::parser::thin_node::TypeAliasData {
+                        modifiers,
+                        name,
+                        type_parameters,
+                        type_node: NodeIndex::NONE,
+                    },
+                );
+            }
+        } else {
+            self.next_token(); // Consume the equals token
+        }
 
         let type_node = self.parse_type();
 
@@ -3528,13 +3552,22 @@ impl ThinParserState {
 
     /// Parse enum members
     fn parse_enum_members(&mut self) -> NodeList {
+        use crate::checker::types::diagnostics::diagnostic_codes;
         let mut members = Vec::new();
 
         while !self.is_token(SyntaxKind::CloseBraceToken) && !self.is_token(SyntaxKind::EndOfFileToken) {
             let start_pos = self.token_pos();
 
-            // Enum member names can be identifiers or string literals
-            let name = if self.is_token(SyntaxKind::StringLiteral) {
+            // Enum member names can be identifiers, string literals, or computed property names
+            // Computed property names ([x]) are not valid in enums but we recover gracefully
+            let name = if self.is_token(SyntaxKind::OpenBracketToken) {
+                // Handle computed property name - emit TS1164 and recover
+                self.parse_error_at_current_token(
+                    "Computed property names are not allowed in enums.",
+                    diagnostic_codes::COMPUTED_PROPERTY_NAME_IN_ENUM,
+                );
+                self.parse_property_name()
+            } else if self.is_token(SyntaxKind::StringLiteral) {
                 self.parse_string_literal()
             } else if self.is_token(SyntaxKind::PrivateIdentifier) {
                 self.parse_private_identifier()

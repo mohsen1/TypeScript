@@ -2989,3 +2989,85 @@ fn test_thin_parser_arrow_function_missing_param_type_paren() {
         parser.get_diagnostics()
     );
 }
+
+// Parser Recovery Tests for TS1164 (Computed Property Names in Enums) and TS1005 (Missing Equals)
+
+#[test]
+fn test_thin_parser_enum_computed_property_name() {
+    // Test: enum E { [x] = 1 }
+    // Should emit TS1164 (Computed property names are not allowed in enums), not TS1005
+    let source = "enum E { [x] = 1 }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    parser.parse_source_file();
+
+    let codes: Vec<u32> = parser.get_diagnostics().iter().map(|diag| diag.code).collect();
+    assert!(
+        codes.contains(&diagnostic_codes::COMPUTED_PROPERTY_NAME_IN_ENUM),
+        "Expected TS1164 for computed property name in enum: {:?}",
+        parser.get_diagnostics()
+    );
+    // Should not emit generic "identifier expected" TS1005
+    assert!(
+        !codes.contains(&diagnostic_codes::TOKEN_EXPECTED),
+        "Should not emit TS1005 for computed enum member, got: {:?}",
+        parser.get_diagnostics()
+    );
+    // Parser should recover and continue parsing
+    assert!(!parser.arena.nodes.is_empty(), "Parser should recover and build AST");
+}
+
+#[test]
+fn test_thin_parser_type_alias_missing_equals() {
+    // Test: type T { x: number }
+    // Should emit TS1005 ("=' expected") but recover and parse the type
+    let source = "type T { x: number }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    parser.parse_source_file();
+
+    let codes: Vec<u32> = parser.get_diagnostics().iter().map(|diag| diag.code).collect();
+    assert!(
+        codes.contains(&diagnostic_codes::TOKEN_EXPECTED),
+        "Expected TS1005 for missing equals token: {:?}",
+        parser.get_diagnostics()
+    );
+    // Parser should recover and build an AST node
+    assert!(!parser.arena.nodes.is_empty(), "Parser should recover and build AST");
+}
+
+#[test]
+fn test_thin_parser_type_alias_missing_equals_recovers_with_object_type() {
+    // Test: type T { x: number }
+    // The parser should recover by recognizing '{' as start of an object literal type
+    let source = "type T { x: number }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    parser.parse_source_file();
+
+    // Should emit TS1005 for missing '='
+    let diags = parser.get_diagnostics();
+    assert!(
+        diags.iter().any(|d| d.code == diagnostic_codes::TOKEN_EXPECTED),
+        "Expected TS1005 diagnostic: {:?}",
+        diags
+    );
+    // Parser should successfully build the AST despite the error
+    assert!(!parser.arena.nodes.is_empty(), "Parser should build AST with recovery");
+}
+
+#[test]
+fn test_thin_parser_function_keyword_in_class_recovers() {
+    // Test: class C { function foo() {} }
+    // The parser should recover and treat 'function' as a property name or emit a specific error
+    let source = "class C { function foo() {} }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    parser.parse_source_file();
+
+    // Parser should recover and build the class AST
+    assert!(!parser.arena.nodes.is_empty(), "Parser should recover and build class AST");
+    // Should not emit TS1068 (unexpected token in class) - should handle gracefully
+    let codes: Vec<u32> = parser.get_diagnostics().iter().map(|diag| diag.code).collect();
+    assert!(
+        !codes.contains(&diagnostic_codes::UNEXPECTED_TOKEN_CLASS_MEMBER),
+        "Should not emit TS1068 for function keyword in class, got: {:?}",
+        parser.get_diagnostics()
+    );
+}

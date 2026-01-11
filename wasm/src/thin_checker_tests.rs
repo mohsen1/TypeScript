@@ -1,6 +1,7 @@
 //! Tests for ThinChecker - Type checker using ThinNodeArena and Solver
 
 use crate::thin_checker::ThinCheckerState;
+use crate::thin_parser::ThinParserState;
 use crate::parser::thin_node::ThinNodeArena;
 use crate::thin_binder::ThinBinderState;
 use crate::solver::{TypeId, TypeInterner};
