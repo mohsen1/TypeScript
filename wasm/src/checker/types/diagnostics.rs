@@ -101,6 +101,7 @@ pub mod diagnostic_messages {
     pub const EXPECTED_ARGUMENTS: &str = "Expected {0} arguments, but got {1}.";
     pub const EXPECTED_AT_LEAST_ARGUMENTS: &str = "Expected at least {0} arguments, but got {1}.";
     pub const ARGUMENT_NOT_ASSIGNABLE: &str = "Argument of type '{0}' is not assignable to parameter of type '{1}'.";
+    pub const CANNOT_INVOKE_EXPRESSION_LACKING_CALL_SIGNATURE: &str = "Cannot invoke an expression whose type lacks a call signature. Type '{0}' has no compatible call signatures.";
     pub const CANNOT_INVOKE_EXPRESSION: &str = "This expression is not callable.";
     pub const NO_OVERLOAD_MATCHES: &str = "No overload matches this call.";
     pub const OVERLOAD_SIGNATURE: &str = "Overload {0} of {1}, '{2}', gave the following error.";
@@ -232,6 +233,7 @@ pub mod diagnostic_codes {
 
     // Function/call errors
     pub const ARGUMENT_NOT_ASSIGNABLE_TO_PARAMETER: u32 = 2345;
+    pub const CANNOT_INVOKE_EXPRESSION_WHOSE_TYPE_LACKS_CALL_SIGNATURE: u32 = 2348;
     pub const CANNOT_INVOKE_NON_FUNCTION: u32 = 2349;
     pub const CANNOT_INVOKE_POSSIBLY_UNDEFINED: u32 = 2722;
     pub const CANNOT_FIND_NAME_DID_YOU_MEAN: u32 = 2552;  // Cannot find name '{0}'. Did you mean '{1}'?

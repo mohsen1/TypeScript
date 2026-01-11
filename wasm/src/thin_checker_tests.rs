@@ -17276,3 +17276,67 @@ function f1<T extends string | undefined>(x: T): string {
         checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>()
     );
 }
+
+#[test]
+fn test_class_constructor_without_new_emits_ts2348() {
+    use crate::thin_parser::ThinParserState;
+
+    // Regression test for TS2348: calling class constructor without 'new'
+    // When a class constructor is called without 'new', should emit TS2348
+    // (Cannot invoke an expression whose type lacks a call signature)
+    // instead of TS2769 (No overload matches this call)
+    let code = r#"
+namespace Tools {
+    export class NullLogger { }
+}
+
+// Calling class constructor without 'new' - should emit TS2348
+var logger = Tools.NullLogger();
+
+// Another case with a class that has a constructor
+class MyClass {
+    constructor(x: string) { }
+}
+
+// Should also emit TS2348
+var instance = MyClass();
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2348_errors: Vec<_> = checker.ctx.diagnostics.iter().filter(|d| d.code == 2348).collect();
+    let ts2769_errors: Vec<_> = checker.ctx.diagnostics.iter().filter(|d| d.code == 2769).collect();
+
+    // Should have TS2348 errors
+    assert!(
+        ts2348_errors.len() >= 2,
+        "Should emit TS2348 for class constructor without new, got {} TS2348 errors: {:?}",
+        ts2348_errors.len(),
+        ts2348_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>()
+    );
+
+    // Should NOT have TS2769 errors
+    assert!(
+        ts2769_errors.is_empty(),
+        "Should not emit TS2769 for class constructor without new, got {} TS2769 errors: {:?}",
+        ts2769_errors.len(),
+        ts2769_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>()
+    );
+
+    // Verify the message contains helpful text
+    let first_error_msg = &ts2348_errors[0].message_text;
+    assert!(
+        first_error_msg.contains("lacks a call signature"),
+        "TS2348 message should mention 'lacks a call signature', got: {}",
+        first_error_msg
+    );
+}

@@ -5692,7 +5692,12 @@ impl<'a> ThinCheckerState<'a> {
             }
 
             CallResult::NotCallable { .. } => {
-                self.error_not_callable_at(callee_type, call.expression);
+                // Check if it's a class constructor called without 'new' (TS2348)
+                if self.is_class_constructor_type(callee_type) {
+                    self.error_class_constructor_without_new_at(callee_type, call.expression);
+                } else {
+                    self.error_not_callable_at(callee_type, call.expression);
+                }
                 TypeId::ERROR
             }
 
@@ -11098,6 +11103,51 @@ impl<'a> ThinCheckerState<'a> {
             let diag = builder.not_callable(type_id, loc.start, loc.length());
             self.ctx.diagnostics.push(diag.to_checker_diagnostic(&self.ctx.file_name));
         }
+    }
+
+    /// Check if a type is a class constructor (typeof Class).
+    /// Returns true for Callable types with only construct signatures (no call signatures).
+    fn is_class_constructor_type(&self, type_id: TypeId) -> bool {
+        use crate::solver::TypeKey;
+
+        let Some(type_key) = self.ctx.types.lookup(type_id) else {
+            return false;
+        };
+
+        // A class constructor is a Callable with construct signatures but no call signatures
+        if let TypeKey::Callable(shape_id) = type_key {
+            let shape = self.ctx.types.callable_shape(shape_id);
+            return !shape.construct_signatures.is_empty() && shape.call_signatures.is_empty();
+        }
+
+        false
+    }
+
+    /// Report TS2348: "Cannot invoke an expression whose type lacks a call signature"
+    /// This is specifically for class constructors called without 'new'.
+    pub fn error_class_constructor_without_new_at(&mut self, type_id: TypeId, idx: NodeIndex) {
+        use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
+        use crate::solver::TypeFormatter;
+
+        let Some(loc) = self.get_source_location(idx) else {
+            return;
+        };
+
+        let mut formatter = TypeFormatter::with_symbols(self.ctx.types, &self.ctx.binder.symbols);
+        let type_str = formatter.format(type_id);
+
+        let message = diagnostic_messages::CANNOT_INVOKE_EXPRESSION_LACKING_CALL_SIGNATURE
+            .replace("{0}", &type_str);
+
+        self.ctx.diagnostics.push(Diagnostic {
+            code: diagnostic_codes::CANNOT_INVOKE_EXPRESSION_WHOSE_TYPE_LACKS_CALL_SIGNATURE,
+            category: DiagnosticCategory::Error,
+            message_text: message,
+            file: self.ctx.file_name.clone(),
+            start: loc.start,
+            length: loc.length(),
+            related_information: Vec::new(),
+        });
     }
 
     /// Report an excess property error using solver diagnostics with source tracking.
