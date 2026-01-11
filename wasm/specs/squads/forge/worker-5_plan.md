@@ -6,26 +6,49 @@ Execute tasks assigned by EM-Forge for the Forge squad (type system).
 Status: Active
 Priority: 1
 
-## Current Assignment (TS7010 - Return Path Analysis: try/finally + switch)
-Handle return-path analysis for try/finally and switch fallthrough cases.
+## Current Assignment (🚨 CRITICAL - IDLE 202m!)
+TS2304 - Cannot find name errors.
+
+**Error Code:** TS2304 - "Cannot find name 'x'"
+
+**Impact:** 138 conformance tests affected
+**IDLE TIME:** 202 minutes ⚠️⚠️⚠️
+
+### 🚨 IMMEDIATE ACTION REQUIRED NOW:
+1. **Sync immediately:** `git fetch origin && git merge origin/squad/forge`
+2. **Investigate crash regression** (143→483, +237%) - this BLOCKS conformance!
+3. **Start TS2304 implementation** - identifier resolution focus
+
+### Anvil Comparison (Learn from their success!)
+Anvil squad is **CRUSHING IT**:
+- Anvil-1: TS7006 **74% reduction** (46→12)
+- Anvil-4: Woke up and completed TS2769!
+
+**Wake up and deliver similar wins!** Start TS2304 NOW!
 
 ### Steps
-- [ ] Add tests for try/finally fallthrough and switch fallthrough in `wasm/src/thin_checker_tests.rs`.
-- [ ] Update `wasm/src/checker/control_flow.rs` to handle try/finally + switch fallthrough accurately.
-- [ ] Run focused tests: `./wasm/test.sh test_ts7010_return_path_analysis`.
-
-### Results
-- Added return-path analysis helpers for blocks/if/loops/switch/try in `wasm/src/checker/control_flow.rs`.
-- `StatementChecker` now exposes `function_body_falls_through` and `statement_falls_through` wrappers.
-- Added `test_ts7010_return_path_analysis` in `wasm/src/thin_checker_tests.rs`.
-- `contains_break_statement` no longer treats breaks in nested loops/switches as exiting the current loop.
-- Extended `test_ts7010_return_path_analysis` with nested-switch break coverage.
-- Test: `./wasm/test.sh test_ts7010_return_path_analysis` (PASS; existing warnings).
+1. **Check identifier resolution** - when using an identifier, verify it's declared in scope
+2. **Handle scope chain** - check local scope, then parent scopes up to global
+3. **Handle type vs value names** - distinguish between type-only and value-only contexts
+4. **Handle globals** - don't report errors for known globals (Array, Object, etc.)
+5. **Add tests** in `wasm/src/thin_checker_tests.rs` for undeclared identifiers
+6. **Run focused tests** with `./wasm/test.sh` and record delta
 
 ### Key Files
-- `wasm/src/checker/statements.rs`
-- `wasm/src/checker/control_flow.rs`
+- `wasm/src/thin_checker.rs`
+- `wasm/src/checker/expressions.rs`
+- `wasm/src/thin_binder.rs`
 - `wasm/src/thin_checker_tests.rs`
+
+### Success Criteria
+- TS2304 emitted when using undeclared identifiers
+- Correct scope chain traversal
+- No errors for known globals
+- No new regressions
+
+### Priority Notes
+- ALSO INVESTIGATE: Crash regression from 143→483 (+237%) after squad/forge merge
+- Crash investigation may take priority if it blocks conformance testing
 
 ## Current Assignment (TS7010 - Implicit Any Return)
 - [x] Consulted Gemini to confirm TS7010 = implicit any return (not TS2366)

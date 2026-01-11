@@ -109,14 +109,18 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
         };
         match self.resolve_function_call(&func, arg_types) {
             CallResult::Success(ret) => ret,
-            _ => TypeId::ANY,
+            // Return ERROR instead of ANY to avoid silencing TS2322 errors
+            CallResult::ArgumentTypeMismatch { .. } => TypeId::ERROR,
+            _ => TypeId::ERROR,
         }
     }
 
     pub fn infer_generic_function(&mut self, func: &FunctionShape, arg_types: &[TypeId]) -> TypeId {
         match self.resolve_function_call(func, arg_types) {
             CallResult::Success(ret) => ret,
-            _ => TypeId::ANY,
+            // Return ERROR instead of ANY to avoid silencing TS2322 errors
+            CallResult::ArgumentTypeMismatch { .. } => TypeId::ERROR,
+            _ => TypeId::ERROR,
         }
     }
 
@@ -266,14 +270,24 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                     self.checker.is_assignable_to(source, target)
                 }) {
                     Ok(ty) => ty,
-                    Err(_) => return CallResult::Success(TypeId::ANY),
+                    Err(_) => {
+                        // Inference from constraints failed - try fallback options
+                        // Use ERROR as ultimate fallback to avoid returning Any (which silences TS2322)
+                        if let Some(default) = tp.default {
+                            instantiate_type(self.interner, default, &final_subst)
+                        } else if let Some(constraint) = tp.constraint {
+                            instantiate_type(self.interner, constraint, &final_subst)
+                        } else {
+                            TypeId::ERROR
+                        }
+                    }
                 }
             } else if let Some(default) = tp.default {
                 instantiate_type(self.interner, default, &final_subst)
             } else if let Some(constraint) = tp.constraint {
                 instantiate_type(self.interner, constraint, &final_subst)
             } else {
-                TypeId::UNKNOWN
+                TypeId::ERROR
             };
 
             final_subst.insert(tp.name, ty);
@@ -281,7 +295,13 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
             if let Some(constraint) = tp.constraint {
                 let constraint_ty = instantiate_type(self.interner, constraint, &final_subst);
                 if !self.checker.is_assignable_to(ty, constraint_ty) {
-                    return CallResult::Success(TypeId::ANY);
+                    // Inferred type doesn't satisfy constraint - report as type mismatch
+                    // This allows the checker to emit TS2322 errors instead of silently accepting Any/ERROR
+                    return CallResult::ArgumentTypeMismatch {
+                        index: 0, // Placeholder - indicates a constraint violation occurred
+                        expected: constraint_ty,
+                        actual: ty,
+                    };
                 }
             }
         }
@@ -359,7 +379,8 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
             return (required, Some(params.len()));
         };
 
-        match self.interner.lookup(rest_param.type_id) {
+        let rest_param_type = self.unwrap_readonly(rest_param.type_id);
+        match self.interner.lookup(rest_param_type) {
             Some(TypeKey::Tuple(elements)) => {
                 let elements = self.interner.tuple_list(elements);
                 let (rest_min, rest_max) = self.tuple_length_bounds(&elements);
@@ -388,13 +409,14 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
         let offset = arg_index - rest_start;
         let rest_arg_count = arg_count.saturating_sub(rest_start);
 
-        match self.interner.lookup(rest_param.type_id) {
+        let rest_param_type = self.unwrap_readonly(rest_param.type_id);
+        match self.interner.lookup(rest_param_type) {
             Some(TypeKey::Array(elem)) => Some(elem),
             Some(TypeKey::Tuple(elements)) => {
                 let elements = self.interner.tuple_list(elements);
                 self.tuple_rest_element_type(&elements, offset, rest_arg_count)
             }
-            _ => Some(rest_param.type_id),
+            _ => Some(rest_param_type),
         }
     }
 
@@ -481,6 +503,17 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
         }
     }
 
+    fn unwrap_readonly(&self, mut type_id: TypeId) -> TypeId {
+        loop {
+            match self.interner.lookup(type_id) {
+                Some(TypeKey::ReadonlyType(inner)) => {
+                    type_id = inner;
+                }
+                _ => return type_id,
+            }
+        }
+    }
+
     fn expand_tuple_rest(&self, type_id: TypeId) -> TupleRestExpansion {
         match self.interner.lookup(type_id) {
             Some(TypeKey::Array(elem)) => TupleRestExpansion {
@@ -522,9 +555,10 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
         let rest_param = params.last().filter(|param| param.rest)?;
         let rest_start = params.len().saturating_sub(1);
 
-        let target = match self.interner.lookup(rest_param.type_id) {
-            Some(TypeKey::TypeParameter(_)) if var_map.contains_key(&rest_param.type_id) => {
-                Some((rest_start, rest_param.type_id, 0))
+        let rest_param_type = self.unwrap_readonly(rest_param.type_id);
+        let target = match self.interner.lookup(rest_param_type) {
+            Some(TypeKey::TypeParameter(_)) if var_map.contains_key(&rest_param_type) => {
+                Some((rest_start, rest_param_type, 0))
             }
             Some(TypeKey::Tuple(elements)) => {
                 let elements = self.interner.tuple_list(elements);
@@ -1424,8 +1458,25 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
 
     /// Resolve a call to a callable type (with overloads).
     fn resolve_callable_call(&mut self, callable: &CallableShape, arg_types: &[TypeId]) -> CallResult {
+        if callable.call_signatures.len() == 1 {
+            let sig = &callable.call_signatures[0];
+            let func = FunctionShape {
+                params: sig.params.clone(),
+                this_type: sig.this_type,
+                return_type: sig.return_type,
+                type_params: sig.type_params.clone(),
+                type_predicate: sig.type_predicate.clone(),
+                is_constructor: false,
+            };
+            return self.resolve_function_call(&func, arg_types);
+        }
+
         // Try each call signature
         let mut failures = Vec::new();
+        let mut all_arg_count_mismatches = true;
+        let mut min_expected = usize::MAX;
+        let mut max_expected = 0;
+        let actual_count = arg_types.len();
 
         for sig in &callable.call_signatures {
             // Convert CallSignature to FunctionShape
@@ -1441,6 +1492,7 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
             match self.resolve_function_call(&func, arg_types) {
                 CallResult::Success(ret) => return CallResult::Success(ret),
                 CallResult::ArgumentTypeMismatch { index: _, expected, actual } => {
+                    all_arg_count_mismatches = false;
                     failures.push(
                         crate::solver::diagnostics::PendingDiagnosticBuilder::argument_not_assignable(
                             actual, expected
@@ -1449,14 +1501,27 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                 }
                 CallResult::ArgumentCountMismatch { expected_min, expected_max, actual } => {
                     let expected = expected_max.unwrap_or(expected_min);
+                    min_expected = min_expected.min(expected_min);
+                    max_expected = max_expected.max(expected);
                     failures.push(
                         crate::solver::diagnostics::PendingDiagnosticBuilder::argument_count_mismatch(
                             expected, actual
                         )
                     );
                 }
-                _ => {}
+                _ => {
+                    all_arg_count_mismatches = false;
+                }
             }
+        }
+
+        // If all signatures failed due to argument count mismatch, report TS2554 instead of TS2769
+        if all_arg_count_mismatches && !failures.is_empty() {
+            return CallResult::ArgumentCountMismatch {
+                expected_min: min_expected,
+                expected_max: if max_expected > min_expected { Some(max_expected) } else { None },
+                actual: actual_count,
+            };
         }
 
         // If we got here, no signature matched

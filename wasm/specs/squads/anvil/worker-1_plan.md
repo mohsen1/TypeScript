@@ -5,15 +5,33 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 
 Status: Active
 Priority: 1
-## Current Assignment (2026-01-11 - COMPLETED)
-- ✅ Fixed TS2304 for local variables in object literal methods
-- ✅ Added METHOD_DECLARATION binding in bind_node()
-- ✅ Added regression test and verified all binder tests pass
-- ✅ Pushed to worker/anvil-1
+## Current Assignment (2026-01-11 - TS7006 Implicit 'any' Parameter False Positives)
 
-Awaiting new assignment.
-- Trace name resolution in `wasm/src/thin_binder.rs` and `wasm/src/thin_checker.rs` (module exports, namespace merges, global augmentation).
-- Add regression tests in `wasm/src/thin_checker_tests.rs` and report before/after TS2304 delta.
+**Status:** IN PROGRESS - 74% reduction achieved (46 → 12)
+
+**Completed Fixes:**
+1. ✅ Setter parameter type inference from getter return type (46 → 15)
+2. ✅ Destructured parameter elements with default values (15 → 12)
+
+**Remaining 12 patterns** (require deeper type resolution work):
+- Contextual typing with tuple union function types: `(...args: ['A', number] | ['B', string]) => void`
+- Decorator parameter handling
+- IIFE callback patterns
+- Instance member prototype assignment
+
+**Files Modified:** `wasm/src/thin_checker.rs`
+
+**Commits:**
+- b5f9502636: Fix TS7006 for setter parameters (67% reduction)
+- b55d30154b: Fix TS7006 for destructured parameters with default values (20% more)
+
+**Success Criteria:** Target <20 ✅ ACHIEVED (12 remaining)
+
+## Previous Assignment - TS2403 (COMPLETED)
+
+**Status:** Already resolved by Worker 2's bi-directional assignability fix
+**Verification:** Ran conformance scan of 1000 tests - **0 extra TS2403 errors found**
+**Note:** TS2403 false positives eliminated using bi-directional assignability check in `are_var_decl_types_compatible`
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)

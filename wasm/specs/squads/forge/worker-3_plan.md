@@ -7,23 +7,37 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-Reduce remaining TS7006/TS7008 implicit-any diagnostics gaps.
+TS7010 - Async getters fix (ACTIVE - 12m ago)
 
-**Error Code:** TS7006/TS7008 - "Parameter/Member implicitly has 'any' type"
+**Error Code:** TS7010 - "Function lacks ending return statement..."
 
-### Steps
-1. **Run a scan** for remaining implicit-any cases (use conformance samples or grep existing tests).
-2. **Implement missing checks** in `wasm/src/thin_checker.rs` for any remaining contexts (call/construct signatures, type literals, etc).
-3. **Add tests** in `wasm/src/thin_checker_tests.rs` for the missing contexts.
-4. **Run focused tests** with `./wasm/test.sh` and report delta.
+**Latest Work:** Fixed TS7010 false positives for async getters
+**Commit:** `7ce366b417 [wasm] checker: Fix TS7010 false positives for async getters`
+
+### Previous Assignment (Completed)
+- TS2300 30% reduction (duplicate identifiers in constructors)
+- TS2339 improvements (captured variables, property access)
+
+### Next Steps
+1. Continue TS7010 work (test and verify async getter fix)
+2. Run conformance baseline to measure impact
+3. Consider next assignment after TS7010 validation
 
 ### Key Files
 - `wasm/src/thin_checker.rs`
+- `wasm/src/checker/expressions.rs`
+- `wasm/src/solver/subtype.rs`
 - `wasm/src/thin_checker_tests.rs`
 
 ### Success Criteria
-- TS7006/TS7008 missing errors reduced
-- No new implicit-any false positives
+- TS2322 emitted for incompatible assignments
+- Correct handling of structural typing, unions, generics
+- No new regressions
+
+### Focus Areas (split with W2)
+- Function return type assignability
+- Variable declaration assignability
+- Generic constraint checking
 
 ## Task Queue
 - (empty)
@@ -86,6 +100,7 @@ Reduce remaining TS7006/TS7008 implicit-any diagnostics gaps.
 - [x] Fixed TS7006 false positives for setter parameters with matching getters
 - [x] Fixed pre-existing compilation errors in `checker/statements.rs`
 - [x] Added tests for setter parameter implicit any behavior
+- [x] Analyzed remaining TS7006/TS7008 gaps - mostly malformed syntax test files and parser issues
 - TS7006 results (500 conformance tests):
   * Before: 23 extra (false positives), 7 missing
   * After: 3 extra (false positives), 7 missing
@@ -93,13 +108,17 @@ Reduce remaining TS7006/TS7008 implicit-any diagnostics gaps.
 - TS7008 results (500 conformance tests):
   * 9 extra (false positives) - mostly class static blocks and private names
   * 1 missing (not detected)
-- Remaining TS7006 gaps:
+- Remaining TS7006 gaps (not critical):
   * 3 extra: complex destructuring patterns with class expressions
-  * 7 missing: async function default parameters, class static blocks
+  * 7 missing: malformed async syntax test files (e.g., `async (a = await => await)`)
+- Remaining TS7008 gaps (parser issues):
+  * 9 extra: Parser accepts invalid class members (`var x` in class body) - should be parse errors
+  * 1 missing: malformed private name syntax (`#` standalone)
 - Tests: `./wasm/test.sh test_ts7006_setter`, `./wasm/test.sh test_implicit_any_parameters`
+- **Conclusion**: Core implicit any detection working correctly. Remaining gaps are edge cases with malformed syntax or parser issues.
 
 ## Ready for Merge
-Yes
+No
 
 ## Notes
 - Similar infrastructure to TS2564 (property init) - share patterns with Workers 1-2

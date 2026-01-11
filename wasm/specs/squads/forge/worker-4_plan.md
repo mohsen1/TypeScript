@@ -1,37 +1,38 @@
 # Worker 4 Plan - Squad Forge
 
 ## Mission
-Fix TS2322 async/generator return assignability (Promise/Iterator vs void/undefined).
+Improve TS2339 property access diagnostics.
 
 Status: Active
 Priority: 1
 
 ## Current Assignment
-TS2792 module resolution errors.
+TS2339 - Property does not exist errors (CONTINUED).
 
-**Error Code:** TS2792 - "Cannot find module 'x' or its corresponding type declarations"
+**Error Code:** TS2339 - "Property 'x' does not exist on type 'Y'"
 
-**Impact:** 204 conformance tests affected
+**Impact:** 142 conformance tests affected
 
 ### Steps
-1. **Track** which imports couldn't be resolved (in binder or checker)
-2. **Emit proper error code** - distinguish TS2792 vs TS2307
-3. **Handle** relative vs package imports correctly
-4. **Add tests** in `wasm/src/thin_checker_tests.rs` for module resolution failures
-5. **Run focused tests** with `./wasm/test.sh` and record delta
+1. **Resume TS2339 work** - continue property access checking improvements
+2. **Handle optional chaining** - `?.` should not emit TS2339 when optional
+3. **Handle union types** - property must exist on all union members
+4. **Handle index signatures** - string/number index types allow any property
+5. **Add tests** in `wasm/src/thin_checker_tests.rs` for property access patterns
+6. **Run focused tests** with `./wasm/test.sh` and record delta
 
 ### Key Files
 - `wasm/src/thin_checker.rs`
-- `wasm/src/thin_binder.rs`
+- `wasm/src/checker/expressions.rs`
 - `wasm/src/thin_checker_tests.rs`
 
 ### Success Criteria
-- TS2792 emitted for unresolved module imports
-- Correct distinction between TS2792 and TS2307
+- TS2339 emitted when accessing non-existent properties
+- Correct handling of unions, intersections, index signatures, optional chaining
 - No new regressions
 
 ## Task Queue
-- (empty)
+- Complete remaining TS2339 patterns (optional chaining, computed properties)
 
 ## Completed
 
@@ -82,7 +83,7 @@ TS2792 module resolution errors.
 - [x] Added 6 module resolution tests (TS2792 vs TS2307)
 
 ## Ready for Merge
-Yes
+No
 
 ## Notes
 - Progress: Completed TS2792 module resolution error handling
