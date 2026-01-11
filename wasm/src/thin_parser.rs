@@ -7275,7 +7275,8 @@ impl ThinParserState {
             | SyntaxKind::UnknownKeyword
             | SyntaxKind::ObjectKeyword
             | SyntaxKind::AwaitKeyword
-            | SyntaxKind::YieldKeyword => {
+            | SyntaxKind::YieldKeyword
+            | SyntaxKind::AssertsKeyword => {
                 // Parse keyword as identifier for type reference
                 self.parse_keyword_as_identifier()
             }
