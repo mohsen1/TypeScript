@@ -31,8 +31,8 @@ Fix TS2304 false positives caused by type-predicate parsing (asserts/`this is`) 
 
 ## Resume Notes
 - Branch: `worker/forge-2`.
-- Latest commit: `[wasm] parser: handle asserts type predicates`
-- Recent changes: Added contextual `asserts` detection for type predicate parsing in `parse_type`/`parse_return_type` and tests covering asserts return types + `this is` methods.
+- Latest commit: `[wasm] parser: treat asserts as type name keyword`
+- Recent changes: Allowed `asserts` to parse as a type name keyword when not used as a predicate, avoiding parse errors in non-predicate type positions.
 - Last tests: `./wasm/test.sh test_type_predicate_return_no_ts2304` (pass), `./wasm/test.sh test_type_predicate_this_return_no_ts2304` (pass)
 - **Latest TS2304 conformance scan results:** Not rerun after asserts parsing change (last run timed out at 200s; partial results still show heritage null/namespace cycles, catch/flow false positives, decorator/noTypesAndSymbols cases).
 - Conformance scan command: `cd wasm/differential-test && node find-ts2304.mjs --max=1000 --samples=30`
