@@ -7707,7 +7707,7 @@ impl<'a> ThinCheckerState<'a> {
             return TypeId::ANY;
         };
 
-        let (type_parameters, parameters, type_annotation, body, name_node, name_for_error) =
+        let (type_parameters, parameters, type_annotation, body, name_node, name_for_error, is_async) =
             if let Some(func) = self.ctx.arena.get_function(node) {
                 let name_node = if func.name.is_none() { None } else { Some(func.name) };
                 let name_for_error = if func.name.is_none() {
@@ -7722,6 +7722,7 @@ impl<'a> ThinCheckerState<'a> {
                     func.body,
                     name_node,
                     name_for_error,
+                    func.is_async,
                 )
             } else if let Some(method) = self.ctx.arena.get_method_decl(node) {
                 (
@@ -7731,6 +7732,7 @@ impl<'a> ThinCheckerState<'a> {
                     method.body,
                     Some(method.name),
                     self.property_name_for_error(method.name),
+                    self.has_async_modifier(&method.modifiers),
                 )
             } else {
                 return TypeId::ANY;
@@ -7862,6 +7864,7 @@ impl<'a> ThinCheckerState<'a> {
                     has_type_annotation,
                     has_contextual_return,
                     idx,
+                    is_async,
                 );
             }
 
@@ -11648,6 +11651,7 @@ impl<'a> ThinCheckerState<'a> {
                         // Check that parameter default values are assignable to declared types (TS2322)
                         self.check_parameter_initializers(&func.parameters.nodes);
 
+                        let is_async = func.is_async;
                         if !has_type_annotation {
                             return_type = self.infer_return_type_from_body(func.body, None);
                         }
@@ -11661,6 +11665,7 @@ impl<'a> ThinCheckerState<'a> {
                             has_type_annotation,
                             false,
                             stmt_idx,
+                            is_async,
                         );
 
                         self.push_return_type(return_type);
@@ -11668,7 +11673,6 @@ impl<'a> ThinCheckerState<'a> {
 
                         // Check for error 2355: function with return type must return a value
                         // Only check if there's an explicit return type annotation
-                        let is_async = func.is_async;
                         let is_generator = func.asterisk_token;
                         let check_return_type = self.return_type_for_implicit_return_check(
                             return_type,
@@ -17155,6 +17159,7 @@ impl<'a> ThinCheckerState<'a> {
                 return_type = self.infer_return_type_from_body(method.body, None);
             }
 
+            let is_async = self.has_async_modifier(&method.modifiers);
             let method_name = self.get_property_name(method.name);
             self.maybe_report_implicit_any_return(
                 method_name,
@@ -17163,12 +17168,12 @@ impl<'a> ThinCheckerState<'a> {
                 has_type_annotation,
                 false,
                 member_idx,
+                is_async,
             );
 
             self.push_return_type(return_type);
             self.check_statement(method.body);
 
-            let is_async = self.has_async_modifier(&method.modifiers);
             let is_generator = method.asterisk_token;
             let check_return_type =
                 self.return_type_for_implicit_return_check(return_type, is_async, is_generator);
@@ -17206,6 +17211,7 @@ impl<'a> ThinCheckerState<'a> {
         } else {
             // Abstract method or method overload signature
             // Report TS7010 for abstract methods without return type annotation
+            let is_async = self.has_async_modifier(&method.modifiers);
             let method_name = self.get_property_name(method.name);
             self.maybe_report_implicit_any_return(
                 method_name,
@@ -17214,6 +17220,7 @@ impl<'a> ThinCheckerState<'a> {
                 has_type_annotation,
                 false,
                 member_idx,
+                is_async,
             );
         }
 
@@ -17365,6 +17372,7 @@ impl<'a> ThinCheckerState<'a> {
                     has_type_annotation,
                     false,
                     member_idx,
+                    false, // getters cannot be async
                 );
             }
 
@@ -18110,10 +18118,19 @@ impl<'a> ThinCheckerState<'a> {
         has_type_annotation: bool,
         has_contextual_return: bool,
         fallback_node: NodeIndex,
+        is_async: bool,
     ) {
         use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages, format_message};
 
         if !self.ctx.no_implicit_any || has_type_annotation || has_contextual_return {
+            return;
+        }
+        // For async functions, Promise<any> is a valid return type, so don't report TS7010
+        // when the inferred type is 'any' or 'null | undefined'. This handles cases like:
+        //   async function f() { return null; } // infers Promise<any>
+        //   async function f() { return undefined; } // infers Promise<any>
+        //   async function f() { return anyValue; } // infers Promise<any>
+        if is_async && (return_type == TypeId::ANY || self.is_null_or_undefined_only(return_type)) {
             return;
         }
         if !self.should_report_implicit_any_return(return_type) {
