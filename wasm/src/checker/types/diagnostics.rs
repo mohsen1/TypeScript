@@ -141,6 +141,7 @@ pub mod diagnostic_messages {
     pub const SWITCH_NOT_EXHAUSTIVE: &str = "Switch is not exhaustive. Did you forget to handle '{0}'?";
     pub const FUNCTION_LACKS_ENDING_RETURN_STATEMENT: &str =
         "Function lacks ending return statement and return type does not include 'undefined'.";
+    pub const UNREACHABLE_CODE_DETECTED: &str = "Unreachable code detected.";
 
     // Generic/type parameter errors
     pub const TYPE_NOT_SATISFY_CONSTRAINT: &str = "Type '{0}' does not satisfy the constraint '{1}'.";

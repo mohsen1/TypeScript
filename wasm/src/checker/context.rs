@@ -138,6 +138,11 @@ pub struct CheckerContext<'a> {
     /// When false, parameters are checked bivariantly (legacy, unsound).
     pub strict_function_types: bool,
 
+    /// Whether strict property initialization checks are enabled (TS2564).
+    /// When true, class properties without initializers must be definitely assigned in the constructor.
+    /// This is enabled by strict mode in TypeScript.
+    pub strict_property_initialization: bool,
+
     // --- Caches ---
 
     /// Cached types for symbols.
@@ -269,6 +274,7 @@ impl<'a> CheckerContext<'a> {
             use_unknown_in_catch_variables: true,
             report_unresolved_imports: true,
             strict_function_types: true,  // Enable by default for modern TypeScript behavior
+            strict_property_initialization: true,  // Enable by default for strict mode behavior
             symbol_types: FxHashMap::default(),
             var_decl_types: FxHashMap::default(),
             node_types: FxHashMap::default(),
@@ -323,6 +329,7 @@ impl<'a> CheckerContext<'a> {
             use_unknown_in_catch_variables: true,
             report_unresolved_imports: true,
             strict_function_types: true,  // Enable by default for modern TypeScript behavior
+            strict_property_initialization: true,  // Enable by default for strict mode behavior
             symbol_types: cache.symbol_types,
             var_decl_types: FxHashMap::default(),
             node_types: cache.node_types,

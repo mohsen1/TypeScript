@@ -8039,6 +8039,41 @@ impl<'a> ThinCheckerState<'a> {
                 }
             }
 
+            // TS2366 (not all code paths return value) for function expressions and arrow functions
+            // Check if all code paths return a value when return type requires it
+            if !is_function_declaration && !body.is_none() {
+                let check_return_type = return_type;
+                let requires_return = self.requires_return_value(check_return_type);
+                let has_return = self.body_has_return_with_value(body);
+                let falls_through = self.function_body_falls_through(body);
+
+                if has_type_annotation && requires_return && falls_through {
+                    use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
+                    if !has_return {
+                        self.error_at_node(
+                            type_annotation,
+                            "A function whose declared type is neither 'undefined', 'void', nor 'any' must return a value.",
+                            diagnostic_codes::FUNCTION_LACKS_RETURN_TYPE,
+                        );
+                    } else {
+                        self.error_at_node(
+                            type_annotation,
+                            diagnostic_messages::FUNCTION_LACKS_ENDING_RETURN_STATEMENT,
+                            diagnostic_codes::NOT_ALL_CODE_PATHS_RETURN_VALUE,
+                        );
+                    }
+                } else if self.ctx.no_implicit_returns && has_return && falls_through {
+                    // TS7030: noImplicitReturns - not all code paths return a value
+                    use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
+                    let error_node = if let Some(nn) = name_node { nn } else { body };
+                    self.error_at_node(
+                        error_node,
+                        diagnostic_messages::NOT_ALL_CODE_PATHS_RETURN,
+                        diagnostic_codes::NOT_ALL_CODE_PATHS_RETURN,
+                    );
+                }
+            }
+
             self.push_return_type(return_type);
             self.check_statement(body);
             self.pop_return_type();
@@ -11985,6 +12020,8 @@ impl<'a> ThinCheckerState<'a> {
             }
             syntax_kind_ext::BLOCK => {
                 if let Some(block) = self.ctx.arena.get_block(node) {
+                    // Check for unreachable code before checking individual statements
+                    self.check_unreachable_code_in_block(&block.statements.nodes);
                     for &inner_stmt in &block.statements.nodes {
                         self.check_statement(inner_stmt);
                     }
@@ -13509,9 +13546,47 @@ impl<'a> ThinCheckerState<'a> {
             return;
         }
 
+        // Only check property initialization when strictPropertyInitialization is enabled
+        if !self.ctx.strict_property_initialization {
+            return;
+        }
+
         let mut properties = Vec::new();
         let mut tracked = FxHashSet::default();
+        let mut parameter_properties = FxHashSet::default();
 
+        // First pass: collect parameter properties from constructor
+        // Parameter properties are always definitely assigned
+        for &member_idx in &class.members.nodes {
+            let Some(node) = self.ctx.arena.get(member_idx) else {
+                continue;
+            };
+            if node.kind != syntax_kind_ext::CONSTRUCTOR {
+                continue;
+            }
+            let Some(ctor) = self.ctx.arena.get_constructor(node) else {
+                continue;
+            };
+
+            // Collect parameter properties from constructor parameters
+            for &param_idx in &ctor.parameters.nodes {
+                let Some(param_node) = self.ctx.arena.get(param_idx) else {
+                    continue;
+                };
+                let Some(param) = self.ctx.arena.get_parameter(param_node) else {
+                    continue;
+                };
+
+                // Parameter properties have modifiers (public/private/protected/readonly)
+                if param.modifiers.is_some() {
+                    if let Some(key) = self.property_key_from_name(param.name) {
+                        parameter_properties.insert(key.clone());
+                    }
+                }
+            }
+        }
+
+        // Second pass: collect class properties that need initialization
         for &member_idx in &class.members.nodes {
             let Some(node) = self.ctx.arena.get(member_idx) else {
                 continue;
@@ -13553,7 +13628,8 @@ impl<'a> ThinCheckerState<'a> {
         };
 
         for (key, name, name_node) in properties {
-            if assigned.contains(&key) {
+            // Property is assigned if it's in the assigned set OR it's a parameter property
+            if assigned.contains(&key) || parameter_properties.contains(&key) {
                 continue;
             }
             use crate::checker::types::diagnostics::format_message;
@@ -18638,6 +18714,78 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
         true
+    }
+
+    /// Check for unreachable code after return/throw statements in a block.
+    /// Emits TS7027 for any statements that come after a return or throw.
+    fn check_unreachable_code_in_block(&mut self, statements: &[NodeIndex]) {
+        use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
+
+        let mut unreachable = false;
+        for &stmt_idx in statements {
+            if unreachable {
+                // This statement is unreachable
+                self.error_at_node(
+                    stmt_idx,
+                    diagnostic_messages::UNREACHABLE_CODE_DETECTED,
+                    diagnostic_codes::UNREACHABLE_CODE_DETECTED,
+                );
+            } else {
+                // Check if this statement makes subsequent statements unreachable
+                let Some(node) = self.ctx.arena.get(stmt_idx) else {
+                    continue;
+                };
+                match node.kind {
+                    syntax_kind_ext::RETURN_STATEMENT | syntax_kind_ext::THROW_STATEMENT => {
+                        unreachable = true;
+                    }
+                    syntax_kind_ext::EXPRESSION_STATEMENT => {
+                        // Check if the expression is of type 'never' (e.g., throw(), assertNever())
+                        let Some(expr_stmt) = self.ctx.arena.get_expression_statement(node) else {
+                            continue;
+                        };
+                        let expr_type = self.get_type_of_node(expr_stmt.expression);
+                        if expr_type.is_never() {
+                            unreachable = true;
+                        }
+                    }
+                    syntax_kind_ext::VARIABLE_STATEMENT => {
+                        // Check if any variable has a 'never' initializer
+                        let Some(var_stmt) = self.ctx.arena.get_variable(node) else {
+                            continue;
+                        };
+                        for &decl_idx in &var_stmt.declarations.nodes {
+                            let Some(list_node) = self.ctx.arena.get(decl_idx) else {
+                                continue;
+                            };
+                            let Some(var_list) = self.ctx.arena.get_variable(list_node) else {
+                                continue;
+                            };
+                            for &list_decl_idx in &var_list.declarations.nodes {
+                                let Some(list_decl_node) = self.ctx.arena.get(list_decl_idx) else {
+                                    continue;
+                                };
+                                let Some(decl) = self.ctx.arena.get_variable_declaration(list_decl_node) else {
+                                    continue;
+                                };
+                                if decl.initializer.is_none() {
+                                    continue;
+                                }
+                                let init_type = self.get_type_of_node(decl.initializer);
+                                if init_type.is_never() {
+                                    unreachable = true;
+                                    break;
+                                }
+                            }
+                            if unreachable {
+                                break;
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
     }
 
     fn statement_falls_through(&mut self, stmt_idx: NodeIndex) -> bool {
