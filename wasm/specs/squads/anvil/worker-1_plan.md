@@ -3,14 +3,10 @@
 ## Mission
 Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transforms, cli, lsp).
 
-Status: Blocked (Gemini key required)
+Status: Active
 Priority: 1
 ## Current Assignment
-- Prereq: run `./scripts/ask-gemini.mjs "I need to reduce TS2304 false positives (namespace/module/global scope). What's the best approach?"` once the API key is available.
-- Reduce TS2304 false positives (Cannot find name), focusing on namespace sibling exports, module augmentation merging, and global ambient declarations.
-- Collect 3-5 failing samples via conformance or `node wasm/differential-test/find-ts2304.mjs`; trace scope resolution in `wasm/src/thin_binder.rs` and `wasm/src/thin_checker.rs`.
-- Implement fix + regression tests, then report delta from a targeted conformance run (TS2304 counts).
-- Deliverables: sample list + root cause notes, regression test(s), and a before/after conformance delta.
+- Awaiting next assignment from EM-Anvil.
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)
@@ -24,6 +20,7 @@ Priority: 1
 - Notify manager on status: `.notify/notify.sh ready|merge|blocked|task "..."` (after any significant work)
 
 ## Completed
+- [x] Reduced TS2304 false positives for namespaces/ambient/global: parse dotted namespaces as nested modules, bind `declare global` into current scope, resolve sibling namespace exports via module exports, and add parent links for type nodes. Added thin_checker_tests for namespace sibling export, type literal, type query alias, declare global, and ambient module import. Ran `./wasm/test.sh test_namespace_sibling_export_resolves`, `./wasm/test.sh test_namespace_type_query_resolves_alias`, `./wasm/test.sh test_declare_global_merges_into_global_scope`, `./wasm/test.sh test_ambient_module_declaration_resolves_import`.
 - [x] Fixed TS2304 scope-resolution false positives from missing parent links in ThinNodeArena (export decl/assignment, object/array literal elements, conditional expressions, binding patterns, property/shorthand assignments, spreads, type predicates, named tuple members, import attributes). Added thin_checker_tests for object-literal locals and ambient export default. Ran `./wasm/test.sh thin_checker_tests::test_object_literal_properties_resolve_locals` and `./wasm/test.sh thin_checker_tests::test_export_default_in_ambient_module_resolves_local`.
 - [x] Fixed await/async TS2304 false positives: emit TS2552 with Awaited suggestion for unresolved `await` type references, parse `async` class/enum as declarations with TS1042. Added thin_checker_tests for `await` type context and async class/enum parse errors. Ran `./wasm/test.sh thin_checker_tests::test_await_type_context_suggests_awaited` and `./wasm/test.sh thin_checker_tests::test_async_modifier_rejected_for_class_and_enum`.
 - [x] Added ES5 tests for dependency injection patterns (6 tests): basic constructor injection, property injection, factory pattern, singleton pattern, scoped injection, combined DI patterns. Ran `./wasm/test.sh class_es5_tests` (all 548 pass).
@@ -171,7 +168,7 @@ Priority: 1
 - [x] Fixed TS2304 false positives (Cannot find name): Added builtin global type handling for Promise, PromiseLike, Map, Set, Iterator, Generator, and 30+ other global types. Fixed type alias type parameter scoping, heritage clause resolution, type queries. Added find-ts2304.mjs differential test script. Added regression test. Key files: thin_checker.rs.
 
 ## Ready for Merge
-No (merged 2026-01-10)
+Yes (2026-01-11)
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize emitter fidelity (ES5 downleveling/source maps) before new features.
@@ -189,3 +186,4 @@ No (merged 2026-01-10)
 - Conformance after (max=500, process-pool): exact 86/487 (17.7%), same 103 (21.1%), missing 311, extra 255, missing TS2322 21, crashed 3, duration 42.6s, throughput 11.7 tests/sec (perf variance likely cache/noise).
 - TS2322 scan tool: `wasm/differential-test/find-ts2322.mjs` (exits immediately to avoid wasm finalizer crash).
 - TS2304 samples (post-fix, find-ts2304 --max=5000 --samples=10): tests/cases/conformance/async/es5/asyncInterface_es5.ts (async keyword), tests/cases/conformance/async/es5/asyncModule_es5.ts (async keyword), tests/cases/conformance/async/es6/asyncArrowFunction/asyncArrowFunctionCapturesArguments_es6.ts (arguments), tests/cases/conformance/async/es6/asyncInterface_es6.ts (async keyword), tests/cases/conformance/async/es6/asyncModule_es6.ts (async keyword), tests/cases/conformance/classes/classDeclarations/classAbstractKeyword/classAbstractManyKeywords.ts (default keyword), tests/cases/conformance/classes/classDeclarations/classAbstractKeyword/classAbstractWithInterface.ts (abstract keyword), tests/cases/conformance/classes/classDeclarations/classExtendingClassLikeType.ts (type params), tests/cases/conformance/classes/classDeclarations/classExtendingNonConstructor.ts (undefined/true/false/number), tests/cases/conformance/classes/classDeclarations/classExtendingNull.ts (null). Re-run confirmed same list (runtime ~1m).
+- TS2304 namespace/global/ambient delta: internalModules false positives from 10 → 6 (remaining samples: exportDeclarations/ModuleWithExportedAndNonExportedFunctions.ts (T/U), exportDeclarations/ModuleWithExportedAndNonExportedImportAlias.ts (Points), importDeclarations/circularImportAlias.ts (a, a.C), moduleBody/invalidModuleWithStatementsOfEveryKind.ts (public), moduleBody/invalidModuleWithVarStatements.ts (public/static), moduleDeclarations/nestedModules.ts (C)). moduleResolution now 5 false positives; `resolutionModeTripleSlash1-5.ts` fixed. Conformance run `bash wasm/differential-test/run-conformance.sh --max=200 --workers=10`: exact 27 (14.2%), same 37 (19.5%), missing 109, extra 127; most common extra TS2304 99.

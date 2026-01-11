@@ -310,6 +310,23 @@ impl<'a> ThinCheckerState<'a> {
                             return Some(sym_id);
                         }
                     }
+                    if scope.kind == ContainerKind::Module {
+                        if let Some(container_sym_id) = self.ctx.binder.get_node_symbol(scope.container_node) {
+                            if let Some(container_symbol) = self.ctx.binder.get_symbol(container_sym_id) {
+                                if let Some(exports) = container_symbol.exports.as_ref() {
+                                    if let Some(member_id) = exports.get(name) {
+                                        if let Some(member_symbol) = self.ctx.binder.get_symbol(member_id) {
+                                            if !Self::is_class_member_symbol(member_symbol.flags) {
+                                                return Some(member_id);
+                                            }
+                                        } else {
+                                            return Some(member_id);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                     let parent_id = scope.parent;
                     if scope.kind == ContainerKind::Module {
                         if let Some(parent_scope) = self.ctx.binder.scopes.get(parent_id.0 as usize) {

@@ -2545,6 +2545,26 @@ impl ThinBinderState {
 
     fn bind_module_declaration(&mut self, arena: &ThinNodeArena, node: &ThinNode, idx: NodeIndex) {
         if let Some(module) = arena.get_module(node) {
+            let is_global = arena.get(module.name)
+                .and_then(|name_node| {
+                    if let Some(ident) = arena.get_identifier(name_node) {
+                        return Some(ident.escaped_text == "global");
+                    }
+                    if name_node.kind == SyntaxKind::GlobalKeyword as u16 {
+                        return Some(true);
+                    }
+                    None
+                })
+                .unwrap_or(false);
+
+            if is_global {
+                if !module.body.is_none() {
+                    self.node_scope_ids.insert(module.body.0, self.current_scope_id);
+                    self.bind_node(arena, module.body);
+                }
+                return;
+            }
+
             if let Some(name_node) = arena.get(module.name) {
                 if name_node.kind == SyntaxKind::StringLiteral as u16
                     || name_node.kind == SyntaxKind::NoSubstitutionTemplateLiteral as u16
@@ -2565,7 +2585,21 @@ impl ThinBinderState {
                         .map(|lit| lit.text.clone())
                 });
             if let Some(name) = name {
-                let is_exported = self.has_export_modifier(arena, &module.modifiers);
+                let mut is_exported = self.has_export_modifier(arena, &module.modifiers);
+                if !is_exported {
+                    if let Some(ext) = arena.get_extended(idx) {
+                        let parent_idx = ext.parent;
+                        if let Some(parent_node) = arena.get(parent_idx) {
+                            if parent_node.kind == syntax_kind_ext::MODULE_DECLARATION {
+                                if let Some(parent_module) = arena.get_module(parent_node) {
+                                    if parent_module.body == idx {
+                                        is_exported = true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
                 let flags = symbol_flags::VALUE_MODULE | symbol_flags::NAMESPACE_MODULE;
                 self.declare_symbol(&name, flags, idx, is_exported);
             }
