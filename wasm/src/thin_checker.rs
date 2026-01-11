@@ -4516,9 +4516,11 @@ impl<'a> ThinCheckerState<'a> {
     fn is_narrowable_type(&self, type_id: TypeId) -> bool {
         use crate::solver::TypeKey;
 
-        // Check if it's a union type
-        if let Some(TypeKey::Union(_)) = self.ctx.types.lookup(type_id) {
-            return true;
+        // Check if it's a union type or a type parameter (which can be narrowed)
+        if let Some(key) = self.ctx.types.lookup(type_id) {
+            if matches!(key, TypeKey::Union(_) | TypeKey::TypeParameter(_) | TypeKey::Infer(_)) {
+                return true;
+            }
         }
 
         // Could also check for types that include null/undefined

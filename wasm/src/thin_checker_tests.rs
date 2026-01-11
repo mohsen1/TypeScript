@@ -14881,6 +14881,140 @@ if ((o = fn()).done) {
     );
 }
 
+#[test]
+fn test_destructuring_assignment_default_order_narrows() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let a: 0 | 1 = 0;
+let b: 0 | 1 | 9;
+[{ [(a = 1)]: b } = [9, a] as const] = [];
+const bb: 0 = b;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker =
+        ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&diagnostic_codes::TYPE_NOT_ASSIGNABLE_TO_TYPE),
+        "Unexpected TS2322 for destructuring assignment, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_in_operator_const_name_narrows_union() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+const a = "a";
+type A = { a: number };
+type B = { b: string };
+declare const c: A | B;
+if (a in c) {
+    const x: number = c[a];
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker =
+        ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&diagnostic_codes::TYPE_NOT_ASSIGNABLE_TO_TYPE),
+        "Unexpected TS2322 for in-operator narrowing, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_instanceof_type_param_narrows_to_intersection() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class C { prop: string = ""; }
+function f<T>(x: T) {
+    if (x instanceof C) {
+        const y: C = x;
+        x.prop;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker =
+        ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&diagnostic_codes::TYPE_NOT_ASSIGNABLE_TO_TYPE),
+        "Unexpected TS2322 for instanceof narrowing, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_optional_chain_discriminant_narrows_union() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+declare const o: { x: 1, y: string } | { x: 2, y: number } | undefined;
+if (o?.x === 1) {
+    const x: 1 = o.x;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker =
+        ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&diagnostic_codes::TYPE_NOT_ASSIGNABLE_TO_TYPE),
+        "Unexpected TS2322 for optional-chain discriminant narrowing, got: {:?}",
+        codes
+    );
+}
+
 // =============================================================================
 // TS2339 Inheritance Traversal Tests
 // =============================================================================
