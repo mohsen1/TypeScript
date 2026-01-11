@@ -159,13 +159,20 @@ bash run-conformance.sh --all --workers=14
 
 ---
 ## Squad Status
-- Last Update: 2026-01-11 (Director Loop)
+- Last Update: 2026-01-11 (Director Loop 10 - Keep Momentum!)
 - Conformance: **23.3% exact match** (up from 18.1%)
-- Workers Active: 5/5
-- **REASSIGNMENTS MADE** (2026-01-11):
-  - W1: Continue TS2454 (37 files still missing, complex control flow)
-  - W2: Triage 68 test failures + resume TS2322 (310 tests)
-  - W3: NEW → TS2322 type assignability (parallel with W2)
-  - W4: NEW → Resume TS2339 (142 tests, optional chaining focus)
-  - W5: NEW → TS2304 missing name (138 tests) + investigate crash regression
-- Blockers: W2 (68 unit test failures), W5 (crash regression 143→483)
+- Workers Active: 2/5 (W1, W3) - **W2, W5 CRITICALLY IDLE**
+- **ACTIVE WINS** (Director Loop 10):
+  - ✅ W1: **TS2300 COMPLETE** - Parameter duplicate detection, 9 tests passing, READY FOR MERGE
+  - ✅ W3: **TS7010 async getters fix** - Just completed, active 12m ago
+- **🚨 CRITICAL IDLE ALERT**:
+  - ⚠️⚠️⚠️ W2: IDLE 207m - TS2322 (310 tests), 68 test failures blocking
+  - ⚠️⚠️⚠️ W5: IDLE 202m - TS2304 (138 tests), crash regression (143→483, +237%)
+- **Anvil Comparison** (CRUSHING IT!):
+  - ✅ Anvil-1: TS7006 **74% reduction** (46→12) - MERGED into squad/anvil!
+  - ✅ Anvil-4: Woke up and completed TS2769!
+  - **Forge needs similar momentum!**
+- **IMMEDIATE ACTIONS**:
+  1. Merge W1 TS2300 wins
+  2. Test and validate W3 TS7010 async getters fix
+  3. WAKE UP W2 and W5 - they're costing the squad critical momentum!

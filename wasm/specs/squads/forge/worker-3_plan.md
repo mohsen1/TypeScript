@@ -7,19 +7,21 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-TS2322 - Type is not assignable errors.
+TS7010 - Async getters fix (ACTIVE - 12m ago)
 
-**Error Code:** TS2322 - "Type 'X' is not assignable to type 'Y'"
+**Error Code:** TS7010 - "Function lacks ending return statement..."
 
-**Impact:** 310 conformance tests affected
+**Latest Work:** Fixed TS7010 false positives for async getters
+**Commit:** `7ce366b417 [wasm] checker: Fix TS7010 false positives for async getters`
 
-### Steps
-1. **Check type assignability** - when assigning/returning values, verify type compatibility
-2. **Handle structural typing** - objects must have all required properties with compatible types
-3. **Handle unions/intersections** - check assignability rules for complex types
-4. **Handle generics** - verify type arguments satisfy constraints
-5. **Add tests** in `wasm/src/thin_checker_tests.rs` for assignability checks
-6. **Run focused tests** with `./wasm/test.sh` and record delta
+### Previous Assignment (Completed)
+- TS2300 30% reduction (duplicate identifiers in constructors)
+- TS2339 improvements (captured variables, property access)
+
+### Next Steps
+1. Continue TS7010 work (test and verify async getter fix)
+2. Run conformance baseline to measure impact
+3. Consider next assignment after TS7010 validation
 
 ### Key Files
 - `wasm/src/thin_checker.rs`

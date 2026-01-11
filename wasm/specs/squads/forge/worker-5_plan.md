@@ -6,12 +6,25 @@ Execute tasks assigned by EM-Forge for the Forge squad (type system).
 Status: Active
 Priority: 1
 
-## Current Assignment
+## Current Assignment (🚨 CRITICAL - IDLE 202m!)
 TS2304 - Cannot find name errors.
 
 **Error Code:** TS2304 - "Cannot find name 'x'"
 
 **Impact:** 138 conformance tests affected
+**IDLE TIME:** 202 minutes ⚠️⚠️⚠️
+
+### 🚨 IMMEDIATE ACTION REQUIRED NOW:
+1. **Sync immediately:** `git fetch origin && git merge origin/squad/forge`
+2. **Investigate crash regression** (143→483, +237%) - this BLOCKS conformance!
+3. **Start TS2304 implementation** - identifier resolution focus
+
+### Anvil Comparison (Learn from their success!)
+Anvil squad is **CRUSHING IT**:
+- Anvil-1: TS7006 **74% reduction** (46→12)
+- Anvil-4: Woke up and completed TS2769!
+
+**Wake up and deliver similar wins!** Start TS2304 NOW!
 
 ### Steps
 1. **Check identifier resolution** - when using an identifier, verify it's declared in scope
