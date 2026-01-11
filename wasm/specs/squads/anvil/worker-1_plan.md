@@ -5,15 +5,27 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 
 Status: Active
 Priority: 1
-## Current Assignment (2026-01-11 - COMPLETED)
-- ✅ Fixed TS2304 for local variables in object literal methods
-- ✅ Added METHOD_DECLARATION binding in bind_node()
-- ✅ Added regression test and verified all binder tests pass
-- ✅ Pushed to worker/anvil-1
+## Current Assignment (2026-01-11 - NEW: TS2403 False Positives)
+**Target:** Reduce TS2403 "Subsequent variable declarations must have the same type" false positives (96 occurrences)
 
-Awaiting new assignment.
-- Trace name resolution in `wasm/src/thin_binder.rs` and `wasm/src/thin_checker.rs` (module exports, namespace merges, global augmentation).
-- Add regression tests in `wasm/src/thin_checker_tests.rs` and report before/after TS2304 delta.
+**Problem:** WASM incorrectly reports TS2403 when subsequent variable declarations are actually compatible.
+
+**Root Causes to Investigate:**
+1. Type widening between declarations not handled correctly
+2. Declaration merging across scopes fails
+3. Const/let redeclaration validation too strict
+4. Module/namespace variable merging issues
+
+**Approach:**
+1. Run `node wasm/differential-test/conformance-runner.mjs --find-extra-error=TS2403 --max=1000 --samples=10` to collect samples
+2. Analyze patterns in false positives
+3. Fix variable declaration merging in `thin_binder.rs` and/or type compatibility in `thin_checker.rs`
+4. Add regression tests for each pattern fixed
+5. Run conformance baseline before/after to verify reduction
+
+**Files:** `wasm/src/thin_binder.rs`, `wasm/src/thin_checker.rs`, `wasm/src/thin_checker_tests.rs`
+
+**Success Criteria:** Reduce TS2403 from 96 to <50 with no regressions in other error codes
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)
