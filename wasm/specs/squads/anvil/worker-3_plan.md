@@ -1,13 +1,14 @@
 # Anvil Worker 3 - TS2339 Property Resolution (Inherited Properties)
 
-Ready for Merge: Yes
+Ready for Merge: No (merged 2026-01-11)
 Status: Active
 
 ## Current Assignment (2026-01-11)
 
-- Investigate remaining TS2339 extras in `classes/classDeclarations/classExtendingClassLikeType.ts` (class-like constructors).
-- Trace property lookup/heritage typing in `wasm/src/thin_checker.rs` for class-like constructor types and overloads.
-- Add regression test; run `node wasm/differential-test/find-ts2339.mjs --max=500 --samples=5` and report delta.
+- Reduce TS2403 false positives (subsequent variable declarations).
+- Collect 3-5 failing samples via conformance output (search for TS2403); capture file + expected vs actual diagnostics.
+- Trace symbol/decl merging in `wasm/src/thin_checker.rs` and `wasm/src/solver/subtype.rs`; implement fix + regression tests.
+- Deliverables: sample list + root cause notes, regression test(s), and before/after TS2403 delta from a targeted conformance run.
 
 ### Update (2026-01-11)
 - Fix: use TypeEnvironment-backed assignability in call/new resolution, and resolve Application symbols (including type param constraints) to improve generic mixin inference (commit 5cf3894068).

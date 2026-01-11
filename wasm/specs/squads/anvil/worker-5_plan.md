@@ -3,11 +3,16 @@
 ## Mission
 Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transforms, cli, lsp).
 
-Status: Awaiting Assignment (TS2355 scan + recursiveMappedTypes check complete)
+Status: Active
 Priority: 5
 
 ## Current Assignment
-- Awaiting new assignment from EM.
+- Investigate remaining TS2355 extras in:
+  - `types/asyncGenerators/types.asyncGenerators.es2018.1.ts`
+  - `types/asyncGenerators/types.asyncGenerators.es2018.2.ts`
+  - `types/contextualTypes/asyncFunctions/contextuallyTypeAsyncFunctionReturnType.ts`
+- Reproduce via targeted conformance runs; trace return analysis in `wasm/src/thin_checker.rs` and `wasm/src/checker/control_flow.rs`.
+- Implement fix + regression tests; report before/after TS2355 delta.
 
 ## Task Queue
 - [x] Verify whether `types/mapped/recursiveMappedTypes.ts` still crashes; if so, capture stack and coordinate with Forge.
@@ -190,7 +195,7 @@ Priority: 5
 - [x] Added async computed object literal source-map coverage in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (PASS).
 
 ## Ready for Merge
-Yes
+No (merged 2026-01-11)
 
 ## Resume Notes
 - Branch: `worker/anvil-5`
