@@ -154,7 +154,12 @@ impl<'a> FlowAnalyzer<'a> {
         }
 
         if flow.has_any_flags(flow_flags::START) {
-            // Reached start of flow - return initial type
+            // For closures with captured enclosing flow, continue to antecedent
+            // This preserves narrowing from outer scope for const/let variables
+            if let Some(&ant) = flow.antecedent.first() {
+                return self.check_flow(reference, type_id, ant, visited);
+            }
+            // Reached start of flow with no antecedent - return initial type
             return type_id;
         }
 
@@ -179,13 +184,17 @@ impl<'a> FlowAnalyzer<'a> {
         }
 
         if visited.contains(&flow_id) {
-            return false;
+            // Cycle detected (e.g., loop back-edge). For definite assignment (intersection analysis),
+            // we assume the condition holds on the back-edge. If it doesn't hold on the entry path,
+            // the intersection will still fail.
+            return true;
         }
         visited.push(flow_id);
 
         let result = if let Some(flow) = self.binder.flow_nodes.get(flow_id) {
             if flow.has_any_flags(flow_flags::UNREACHABLE) {
-                false
+                // Unreachable code vacuously satisfies assignment
+                true
             } else if flow.has_any_flags(flow_flags::ASSIGNMENT) {
                 if self.assignment_targets_reference(flow.node, reference) {
                     true
@@ -198,15 +207,33 @@ impl<'a> FlowAnalyzer<'a> {
                 if flow.antecedent.is_empty() {
                     false
                 } else {
+                    // Check all reachable antecedents (skip unreachable paths like return/throw)
                     flow.antecedent.iter().all(|&ant| {
+                        // Skip unreachable branches - they satisfy the condition vacuously
+                        // since execution never reaches the merge point from that path
+                        if let Some(ant_node) = self.binder.flow_nodes.get(ant) {
+                            if ant_node.has_any_flags(flow_flags::UNREACHABLE) {
+                                return true;
+                            }
+                        }
                         self.check_definite_assignment(reference, ant, visited, cache)
                     })
                 }
             } else if flow.has_any_flags(flow_flags::LOOP_LABEL) {
-                if let Some(&ant) = flow.antecedent.first() {
-                    self.check_definite_assignment(reference, ant, visited, cache)
-                } else {
+                if flow.antecedent.is_empty() {
                     false
+                } else {
+                    // Check all reachable antecedents (including back-edges for loop analysis)
+                    // For loops, variables must be assigned on ALL paths that reach this point
+                    flow.antecedent.iter().all(|&ant| {
+                        // Skip unreachable branches - they satisfy the condition vacuously
+                        if let Some(ant_node) = self.binder.flow_nodes.get(ant) {
+                            if ant_node.has_any_flags(flow_flags::UNREACHABLE) {
+                                return true;
+                            }
+                        }
+                        self.check_definite_assignment(reference, ant, visited, cache)
+                    })
                 }
             } else if flow.has_any_flags(flow_flags::CONDITION) {
                 if let Some(&ant) = flow.antecedent.first() {
@@ -218,7 +245,15 @@ impl<'a> FlowAnalyzer<'a> {
                 if flow.antecedent.is_empty() {
                     false
                 } else {
+                    // Check all reachable antecedents (skip unreachable paths like return/throw/break)
                     flow.antecedent.iter().all(|&ant| {
+                        // Skip unreachable branches - they satisfy the condition vacuously
+                        // since execution never reaches the merge point from that path
+                        if let Some(ant_node) = self.binder.flow_nodes.get(ant) {
+                            if ant_node.has_any_flags(flow_flags::UNREACHABLE) {
+                                return true;
+                            }
+                        }
                         self.check_definite_assignment(reference, ant, visited, cache)
                     })
                 }
