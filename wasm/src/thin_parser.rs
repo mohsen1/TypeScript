@@ -6839,8 +6839,40 @@ impl ThinParserState {
     // Parse Methods - Types (minimal implementation)
     // =========================================================================
 
+    fn is_asserts_keyword(&self) -> bool {
+        self.is_token(SyntaxKind::AssertsKeyword)
+            || (self.is_token(SyntaxKind::Identifier)
+                && self.scanner.get_token_value_ref() == "asserts")
+    }
+
+    fn is_asserts_type_predicate_start(&mut self) -> bool {
+        if !self.is_asserts_keyword() {
+            return false;
+        }
+
+        let snapshot = self.scanner.save_state();
+        let current = self.current_token;
+        self.next_token();
+        let is_param = self.is_identifier_or_keyword() || self.is_token(SyntaxKind::ThisKeyword);
+        self.scanner.restore_state(snapshot);
+        self.current_token = current;
+        is_param
+    }
+
+    fn consume_asserts_keyword(&mut self) {
+        if self.is_asserts_keyword() {
+            self.next_token();
+        } else {
+            self.parse_expected(SyntaxKind::AssertsKeyword);
+        }
+    }
+
     /// Parse a type (handles keywords, type references, unions, intersections, conditionals)
     fn parse_type(&mut self) -> NodeIndex {
+        if self.is_asserts_type_predicate_start() {
+            return self.parse_asserts_type_predicate();
+        }
+
         // Allow type predicate parsing in type positions to avoid cascading errors.
         if self.is_identifier_or_keyword() || self.is_token(SyntaxKind::ThisKeyword) {
             let snapshot = self.scanner.save_state();
@@ -6876,15 +6908,15 @@ impl ThinParserState {
             }
         }
 
-        if self.is_token(SyntaxKind::AssertsKeyword) {
-            return self.parse_asserts_type_predicate();
-        }
-
         self.parse_conditional_type()
     }
 
     /// Parse return type, which may be a type predicate (x is T) or a regular type
     fn parse_return_type(&mut self) -> NodeIndex {
+        if self.is_asserts_type_predicate_start() {
+            return self.parse_asserts_type_predicate();
+        }
+
         // Check if this is a type predicate: identifier 'is' Type
         // We need to look ahead to see if there's an identifier followed by 'is'
         if self.is_identifier_or_keyword() || self.is_token(SyntaxKind::ThisKeyword) {
@@ -6922,11 +6954,6 @@ impl ThinParserState {
             }
         }
 
-        // Check for 'asserts' type predicate: asserts x is T
-        if self.is_token(SyntaxKind::AssertsKeyword) {
-            return self.parse_asserts_type_predicate();
-        }
-
         self.parse_type()
     }
 
@@ -6944,7 +6971,7 @@ impl ThinParserState {
     /// Parse 'asserts' type predicate: asserts x or asserts x is T
     fn parse_asserts_type_predicate(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
-        self.parse_expected(SyntaxKind::AssertsKeyword);
+        self.consume_asserts_keyword();
 
         let parameter_name = self.parse_type_predicate_parameter_name();
 
