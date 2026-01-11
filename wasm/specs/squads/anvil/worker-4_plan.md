@@ -1,14 +1,12 @@
 # Anvil Worker 4 - Mapped Type Recursion Guard
 
-## Current Assignment (2026-01-10)
+## Current Assignment (2026-01-11)
 
 Status: Active
 
-- Prereq: run `./scripts/ask-gemini.mjs "I need to reduce TS2769 overload matching false positives (variadic tuples). What's the best approach?"` once the API key is available.
-- Reduce TS2769 overload matching false positives.
-- Start with `variadicTuples1.ts` plus two more samples; trace call resolution in `wasm/src/thin_checker.rs` and `wasm/src/solver/`.
-- Implement fix + regression test, then report delta from a targeted conformance run.
-- Deliverables: sample list + root cause notes, regression test(s), and conformance delta for types/tuple.
+- Verify whether `types/mapped/recursiveMappedTypes.ts` still crashes; run targeted conformance and capture stack/logs if it does.
+- If crashing, trace recursion in `wasm/src/thin_checker.rs`/`wasm/src/solver/evaluate.rs`, implement fix + regression.
+- If not crashing, document repro commands and note current conformance delta.
 
 ## Operation Conformance Assignment
 
@@ -248,7 +246,7 @@ Ready for Merge: No (merged 2026-01-10)
 - `wasm/src/solver/subtype.rs`
 - `wasm/src/thin_checker_tests.rs`
 
-Ready for Merge: Yes
+Ready for Merge: No (merged 2026-01-11)
 
 ## Follow-up (2026-01-09) - TS2339 False Positives (Class-Like Extends)
 
