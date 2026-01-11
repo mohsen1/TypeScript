@@ -7,7 +7,10 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- Awaiting next assignment from EM-Anvil.
+- Fix parser bugs causing TS1005/TS1109/TS1068/TS1128 false positives.
+- Reproduce with conformance samples (parser/ templates/ generic params, JSX-like tokens in .ts).
+- Trace parse paths in `wasm/src/parser/` and implement minimal fixes + regression tests in `thin_parser_tests.rs`.
+- Report before/after delta via targeted conformance run.
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)
@@ -199,7 +202,7 @@ Priority: 2
 - [x] Further fixed TS2403 false positives: changed from TypeId equality to bi-directional assignability check. TypeScript's "same type" semantics requires mutual assignability, not identical TypeIds. Fixes patterns like `var e = E1; var e: typeof E1;` (enum/typeof) and `var n = 42; var n: number;` (inferred vs annotated). Also fixed compilation error in solver/subtype.rs (s_sym referenced but undefined). Added regression tests for enum typeof and inferred vs annotated patterns. Quick conformance (200 files): TS2403 removed from top 10 extra errors list; appears only as 7 missing errors (legitimate cases where TSC emits but we don't).
 
 ## Ready for Merge
-Yes (2026-01-11)
+No (merged 2026-01-11)
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize emitter fidelity (ES5 downleveling/source maps) before new features.
