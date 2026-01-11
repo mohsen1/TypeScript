@@ -16,7 +16,8 @@ Priority: 5
    - Example: `if (x) { return x; }` where `x: T` and `T extends string | undefined`
    - Fix: Enhanced intersection source handling in `src/solver/subtype.rs` to narrow type parameter constraints by other intersection members
    - Test: `test_generic_control_flow_narrowing` (PASS)
-   - Commit: Pending
+   - Commit: `6d74b064e2` (merged to squad/anvil)
+   - Documentation: `9c52749147`
 
 ### Remaining Issues (6 false positives)
 1. **Property access narrowing** (controlFlowGenericTypes.ts - 2 cases)
