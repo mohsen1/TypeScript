@@ -1,6 +1,3 @@
-# Worker 3 Plan - Squad Forge
-
-## Mission
 Reduce TS2339 false positives via control flow narrowing.
 
 Status: Active
@@ -14,9 +11,10 @@ TS2339 missing errors: private-name access and static computed member cases.
 ### Steps
 1. **Run a missing scan**: `node wasm/differential-test/find-ts2339.mjs --mode=missing --max=2000 --samples=20`.
 2. **Target missing patterns** from the scan (private-name access + static computed `this.c`).
-3. **Fix property access** in `wasm/src/thin_checker.rs` for private names and computed static members.
-4. **Add tests** in `wasm/src/thin_checker_tests.rs`.
-5. **Run focused tests** with `./wasm/test.sh` and report delta.
+3. **Fix private-name access** in `wasm/src/thin_checker.rs` (property access + `in` operator).
+4. **Fix class expression computed names** in `wasm/src/thin_checker.rs`.
+5. **Add tests** in `wasm/src/thin_checker_tests.rs`.
+6. **Run focused tests** with `./wasm/test.sh thin_checker_tests` and report delta.
 
 ### Key Files
 - `wasm/src/thin_checker.rs`
@@ -74,6 +72,8 @@ TS2339 missing errors: private-name access and static computed member cases.
 - [x] Assertion predicate calls create flow nodes and narrow asserted targets; added test
 - [x] Added missing TS2339 mode to `find-ts2339.mjs`
 - [x] Catch clause variables default to `unknown` for narrowing; added TS2339 test
+- [x] Enforce private identifier access by scope + receiver type (incl. `in` operator)
+- [x] Check class expressions for computed `this` in member names; added tests
 
 ### Remaining TS2339 False Positives (pending re-run)
 - Mixin classes: mixin type inference issues (intersection handling added in new expressions, unit tests pass, conformance tests need more investigation)
@@ -81,7 +81,7 @@ TS2339 missing errors: private-name access and static computed member cases.
 - Re-run conformance to confirm private names/control-flow narrowing improvements
 
 ## Ready for Merge
-No
+Yes
 
 ## Notes
 - Similar infrastructure to TS2564 (property init) - share patterns with Workers 1-2
@@ -97,3 +97,4 @@ No
 - Tests: `./wasm/test.sh control_flow_tests`, `./wasm/test.sh test_ts2339_`
 - `./scripts/ask-gemini.mjs` blocked: missing `GCP_VERTEX_EXPRESS_API_KEY`
 - `./wasm/test.sh thin_checker_tests` fails with existing abstract class tests (2511 vs 2564)
+- Latest run: `test_abstract_class_through_type_alias_2511` + `test_abstract_class_union_type_2511` expect 2511 but got 2564 (pre-existing)
