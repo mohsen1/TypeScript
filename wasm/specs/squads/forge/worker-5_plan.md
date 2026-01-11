@@ -23,9 +23,10 @@ Implement TS2695 for comma operator expressions in statement position.
 - Added TS2695 diagnostics + side-effect-free checks (with indirect call exemption) in `thin_checker.rs`.
 - Added tests in `thin_checker_tests.rs`.
 - Test: `./wasm/test.sh test_ts2695_comma_operator_side_effects` (PASS; existing warnings).
+- Full test: `./wasm/test.sh` failed at `cli::driver_tests::compile_shorthand_methods` with TS2304 "Cannot find name 'a'/'b'" diagnostics.
 
 ### Notes
-- Gemini script blocked: missing `GCP_VERTEX_EXPRESS_API_KEY`.
+- Gemini run completed; guidance aligned with current implementation.
 
 ## Current Assignment (TS7010 - Implicit Any Return)
 - [x] Consulted Gemini to confirm TS7010 = implicit any return (not TS2366)
