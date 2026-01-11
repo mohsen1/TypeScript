@@ -2444,6 +2444,206 @@ impl<'a> FlowAnalyzer<'a> {
     }
 }
 
+// ============================================================================
+// Return-path analysis helpers (used for implicit return diagnostics).
+// ============================================================================
+
+pub(crate) fn function_body_falls_through(arena: &ThinNodeArena, body_idx: NodeIndex) -> bool {
+    let Some(body_node) = arena.get(body_idx) else {
+        return true;
+    };
+
+    if body_node.kind == syntax_kind_ext::BLOCK {
+        if let Some(block) = arena.get_block(body_node) {
+            return block_falls_through(arena, &block.statements.nodes);
+        }
+    }
+
+    false
+}
+
+pub(crate) fn statement_falls_through(arena: &ThinNodeArena, stmt_idx: NodeIndex) -> bool {
+    let Some(node) = arena.get(stmt_idx) else {
+        return true;
+    };
+
+    match node.kind {
+        k if k == syntax_kind_ext::RETURN_STATEMENT || k == syntax_kind_ext::THROW_STATEMENT => false,
+        k if k == syntax_kind_ext::BLOCK => arena
+            .get_block(node)
+            .map(|block| block_falls_through(arena, &block.statements.nodes))
+            .unwrap_or(true),
+        k if k == syntax_kind_ext::IF_STATEMENT => {
+            let Some(if_data) = arena.get_if_statement(node) else {
+                return true;
+            };
+            let then_falls = statement_falls_through(arena, if_data.then_statement);
+            if if_data.else_statement.is_none() {
+                return true;
+            }
+            let else_falls = statement_falls_through(arena, if_data.else_statement);
+            then_falls || else_falls
+        }
+        k if k == syntax_kind_ext::SWITCH_STATEMENT => switch_falls_through(arena, stmt_idx),
+        k if k == syntax_kind_ext::TRY_STATEMENT => try_falls_through(arena, stmt_idx),
+        k if k == syntax_kind_ext::WHILE_STATEMENT
+            || k == syntax_kind_ext::DO_STATEMENT
+            || k == syntax_kind_ext::FOR_STATEMENT =>
+        {
+            loop_falls_through(arena, node)
+        }
+        k if k == syntax_kind_ext::FOR_IN_STATEMENT || k == syntax_kind_ext::FOR_OF_STATEMENT => true,
+        k if k == syntax_kind_ext::LABELED_STATEMENT => arena
+            .get_labeled_statement(node)
+            .map(|labeled| statement_falls_through(arena, labeled.statement))
+            .unwrap_or(true),
+        _ => true,
+    }
+}
+
+fn block_falls_through(arena: &ThinNodeArena, statements: &[NodeIndex]) -> bool {
+    for &stmt_idx in statements {
+        if !statement_falls_through(arena, stmt_idx) {
+            return false;
+        }
+    }
+    true
+}
+
+fn switch_falls_through(arena: &ThinNodeArena, switch_idx: NodeIndex) -> bool {
+    let Some(node) = arena.get(switch_idx) else {
+        return true;
+    };
+    let Some(switch_data) = arena.get_switch(node) else {
+        return true;
+    };
+    let Some(case_block_node) = arena.get(switch_data.case_block) else {
+        return true;
+    };
+    let Some(case_block) = arena.get_block(case_block_node) else {
+        return true;
+    };
+
+    let mut has_default = false;
+    for &clause_idx in &case_block.statements.nodes {
+        let Some(clause_node) = arena.get(clause_idx) else {
+            continue;
+        };
+        if clause_node.kind == syntax_kind_ext::DEFAULT_CLAUSE {
+            has_default = true;
+        }
+        let Some(clause) = arena.get_case_clause(clause_node) else {
+            continue;
+        };
+        if block_falls_through(arena, &clause.statements.nodes) {
+            return true;
+        }
+    }
+
+    !has_default
+}
+
+fn try_falls_through(arena: &ThinNodeArena, try_idx: NodeIndex) -> bool {
+    let Some(node) = arena.get(try_idx) else {
+        return true;
+    };
+    let Some(try_data) = arena.get_try(node) else {
+        return true;
+    };
+
+    let try_falls = statement_falls_through(arena, try_data.try_block);
+    let catch_falls = if !try_data.catch_clause.is_none() {
+        statement_falls_through(arena, try_data.catch_clause)
+    } else {
+        false
+    };
+
+    if !try_data.finally_block.is_none() {
+        let finally_falls = statement_falls_through(arena, try_data.finally_block);
+        if !finally_falls {
+            return false;
+        }
+    }
+
+    try_falls || catch_falls
+}
+
+fn loop_falls_through(arena: &ThinNodeArena, node: &crate::parser::thin_node::ThinNode) -> bool {
+    let Some(loop_data) = arena.get_loop(node) else {
+        return true;
+    };
+
+    let condition_always_true = if loop_data.condition.is_none() {
+        true
+    } else {
+        is_true_condition(arena, loop_data.condition)
+    };
+
+    if condition_always_true && !contains_break_statement(arena, loop_data.statement) {
+        return false;
+    }
+
+    true
+}
+
+fn is_true_condition(arena: &ThinNodeArena, condition_idx: NodeIndex) -> bool {
+    let Some(node) = arena.get(condition_idx) else {
+        return false;
+    };
+    node.kind == SyntaxKind::TrueKeyword as u16
+}
+
+fn contains_break_statement(arena: &ThinNodeArena, stmt_idx: NodeIndex) -> bool {
+    let Some(node) = arena.get(stmt_idx) else {
+        return false;
+    };
+
+    match node.kind {
+        k if k == syntax_kind_ext::BREAK_STATEMENT => true,
+        k if k == syntax_kind_ext::BLOCK => arena
+            .get_block(node)
+            .map(|block| {
+                block
+                    .statements
+                    .nodes
+                    .iter()
+                    .any(|&stmt| contains_break_statement(arena, stmt))
+            })
+            .unwrap_or(false),
+        k if k == syntax_kind_ext::IF_STATEMENT => arena
+            .get_if_statement(node)
+            .map(|if_data| {
+                contains_break_statement(arena, if_data.then_statement)
+                    || (!if_data.else_statement.is_none()
+                        && contains_break_statement(arena, if_data.else_statement))
+            })
+            .unwrap_or(false),
+        k if k == syntax_kind_ext::SWITCH_STATEMENT => false,
+        k if k == syntax_kind_ext::TRY_STATEMENT => arena
+            .get_try(node)
+            .map(|try_data| {
+                contains_break_statement(arena, try_data.try_block)
+                    || (!try_data.catch_clause.is_none()
+                        && contains_break_statement(arena, try_data.catch_clause))
+                    || (!try_data.finally_block.is_none()
+                        && contains_break_statement(arena, try_data.finally_block))
+            })
+            .unwrap_or(false),
+        k if k == syntax_kind_ext::WHILE_STATEMENT
+            || k == syntax_kind_ext::DO_STATEMENT
+            || k == syntax_kind_ext::FOR_STATEMENT =>
+        {
+            false
+        }
+        k if k == syntax_kind_ext::FOR_IN_STATEMENT || k == syntax_kind_ext::FOR_OF_STATEMENT => false,
+        k if k == syntax_kind_ext::LABELED_STATEMENT => arena
+            .get_labeled_statement(node)
+            .map(|labeled| contains_break_statement(arena, labeled.statement))
+            .unwrap_or(false),
+        _ => false,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -5579,6 +5579,91 @@ function createClass() {
         checker.ctx.diagnostics.iter().map(|d| d.code).collect::<Vec<_>>());
 }
 
+#[test]
+fn test_ts7010_return_path_analysis() {
+    use crate::checker::{CheckerContext, StatementChecker};
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+function allReturn(flag: boolean) {
+    if (flag) {
+        return 1;
+    } else {
+        return 2;
+    }
+}
+
+function missingReturn(flag: boolean) {
+    if (flag) {
+        return 1;
+    }
+}
+
+function throwOnly() {
+    throw new Error("boom");
+}
+
+function infiniteLoop() {
+    while (true) {}
+}
+
+function loopWithBreak() {
+    while (true) { break; }
+}
+
+function loopWithNestedSwitchBreak(flag: boolean) {
+    while (true) {
+        switch (flag) {
+            case true:
+                break;
+        }
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut ctx = CheckerContext::new(
+        parser.get_arena(),
+        &binder,
+        &types,
+        "test.ts".to_string(),
+    );
+
+    let arena = parser.get_arena();
+    let root_node = arena.get(root).expect("root node");
+    let source_file = arena.get_source_file(root_node).expect("source file");
+
+    let checker = StatementChecker::new(&mut ctx);
+
+    let body_at = |index: usize| {
+        let stmt_idx = *source_file
+            .statements
+            .nodes
+            .get(index)
+            .expect("statement index");
+        let stmt_node = arena.get(stmt_idx).expect("statement node");
+        let func = arena.get_function(stmt_node).expect("function data");
+        func.body
+    };
+
+    assert!(!checker.function_body_falls_through(body_at(0)), "allReturn should not fall through");
+    assert!(checker.function_body_falls_through(body_at(1)), "missingReturn should fall through");
+    assert!(!checker.function_body_falls_through(body_at(2)), "throwOnly should not fall through");
+    assert!(!checker.function_body_falls_through(body_at(3)), "infiniteLoop should not fall through");
+    assert!(checker.function_body_falls_through(body_at(4)), "loopWithBreak should fall through");
+    assert!(
+        !checker.function_body_falls_through(body_at(5)),
+        "loopWithNestedSwitchBreak should not fall through"
+    );
+}
+
 /// Test that functions that only throw don't trigger TS2355.
 /// TS2355: "A function whose declared type is neither 'void' nor 'any' must return a value"
 /// This should NOT fire for functions that only throw since throwing is a valid exit.
