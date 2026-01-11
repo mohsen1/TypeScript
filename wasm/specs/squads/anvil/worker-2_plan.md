@@ -7,10 +7,9 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- Fix crash in `es6/templates/TemplateExpression1.ts` ("unreachable").
-- Reproduce via conformance runner or direct harness; trace template literal handling in `wasm/src/thin_checker.rs` and related template/type evaluation paths.
-- Add regression test and confirm crash is eliminated (or document if already fixed upstream).
-- Deliverables: crash repro notes + failing stack path, regression test, and conformance delta showing crash removed.
+- Reduce TS2304 false positives (namespace sibling exports, module augmentation merging, global ambient declarations).
+- Collect 3-5 failing samples via conformance or `node wasm/differential-test/find-ts2304.mjs`; trace scope resolution in `wasm/src/thin_binder.rs` and `wasm/src/thin_checker.rs`.
+- Implement fix + regression tests; report before/after TS2304 delta from a targeted conformance run.
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)
@@ -201,7 +200,7 @@ Priority: 2
 - [x] Further fixed TS2403 false positives: changed from TypeId equality to bi-directional assignability check. TypeScript's "same type" semantics requires mutual assignability, not identical TypeIds. Fixes patterns like `var e = E1; var e: typeof E1;` (enum/typeof) and `var n = 42; var n: number;` (inferred vs annotated). Also fixed compilation error in solver/subtype.rs (s_sym referenced but undefined). Added regression tests for enum typeof and inferred vs annotated patterns. Quick conformance (200 files): TS2403 removed from top 10 extra errors list; appears only as 7 missing errors (legitimate cases where TSC emits but we don't).
 
 ## Ready for Merge
-Yes
+No (merged 2026-01-11)
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize emitter fidelity (ES5 downleveling/source maps) before new features.

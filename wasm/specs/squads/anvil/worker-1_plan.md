@@ -6,7 +6,10 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-- Awaiting next assignment from EM-Anvil.
+- Reduce TS2322 false positives ("Type is not assignable").
+- Collect 3-5 failing samples via conformance output or `node wasm/differential-test/find-ts2322.mjs`; focus on cases with contextual typing or type queries.
+- Trace assignability paths in `wasm/src/thin_checker.rs` and `wasm/src/solver/subtype.rs`; implement fix + regression tests.
+- Deliverables: sample list + root cause notes, regression test(s), and before/after TS2322 delta from a targeted conformance run.
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)
@@ -168,7 +171,7 @@ Priority: 1
 - [x] Fixed TS2304 false positives (Cannot find name): Added builtin global type handling for Promise, PromiseLike, Map, Set, Iterator, Generator, and 30+ other global types. Fixed type alias type parameter scoping, heritage clause resolution, type queries. Added find-ts2304.mjs differential test script. Added regression test. Key files: thin_checker.rs.
 
 ## Ready for Merge
-Yes (2026-01-11)
+No (merged 2026-01-11)
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize emitter fidelity (ES5 downleveling/source maps) before new features.
