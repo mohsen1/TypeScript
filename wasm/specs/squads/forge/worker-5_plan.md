@@ -24,6 +24,7 @@ Implement TS2695 for comma operator expressions in statement position.
 - Added tests in `thin_checker_tests.rs`.
 - Test: `./wasm/test.sh test_ts2695_comma_operator_side_effects` (PASS; existing warnings).
 - Full test: `./wasm/test.sh` failed at `cli::driver_tests::compile_shorthand_methods` with TS2304 "Cannot find name 'a'/'b'" diagnostics.
+- Re-validated after sync: `./wasm/test.sh test_ts2695_comma_operator_side_effects` (PASS; existing warnings).
 
 ### Notes
 - Gemini run completed; guidance aligned with current implementation.
