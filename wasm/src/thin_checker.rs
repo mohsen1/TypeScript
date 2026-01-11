@@ -10188,94 +10188,165 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
-    /// Check for duplicate identifiers in the current file scope (TS2300).
-    /// This checks all symbols in file_locals and reports errors when symbols
-    /// have multiple declarations that can't be merged.
+    fn resolve_duplicate_decl_node(&self, decl_idx: NodeIndex) -> Option<NodeIndex> {
+        let mut current = decl_idx;
+        for _ in 0..8 {
+            let node = self.ctx.arena.get(current)?;
+            match node.kind {
+                syntax_kind_ext::VARIABLE_DECLARATION
+                | syntax_kind_ext::FUNCTION_DECLARATION
+                | syntax_kind_ext::CLASS_DECLARATION
+                | syntax_kind_ext::INTERFACE_DECLARATION
+                | syntax_kind_ext::TYPE_ALIAS_DECLARATION
+                | syntax_kind_ext::ENUM_DECLARATION => {
+                    return Some(current);
+                }
+                _ => {}
+            }
+
+            let parent = self
+                .ctx
+                .arena
+                .get_extended(current)
+                .map(|ext| ext.parent)?;
+            if parent.is_none() {
+                return None;
+            }
+            current = parent;
+        }
+        None
+    }
+
+    fn declaration_symbol_flags(&self, decl_idx: NodeIndex) -> Option<u32> {
+        use crate::parser::node_flags;
+
+        let decl_idx = self.resolve_duplicate_decl_node(decl_idx)?;
+        let node = self.ctx.arena.get(decl_idx)?;
+
+        match node.kind {
+            syntax_kind_ext::VARIABLE_DECLARATION => {
+                let mut decl_flags = node.flags as u32;
+                if (decl_flags & (node_flags::LET | node_flags::CONST)) == 0 {
+                    if let Some(parent) = self.ctx.arena.get_extended(decl_idx).map(|ext| ext.parent) {
+                        if let Some(parent_node) = self.ctx.arena.get(parent) {
+                            if parent_node.kind == syntax_kind_ext::VARIABLE_DECLARATION_LIST {
+                                decl_flags |= parent_node.flags as u32;
+                            }
+                        }
+                    }
+                }
+                if (decl_flags & (node_flags::LET | node_flags::CONST)) != 0 {
+                    Some(symbol_flags::BLOCK_SCOPED_VARIABLE)
+                } else {
+                    Some(symbol_flags::FUNCTION_SCOPED_VARIABLE)
+                }
+            }
+            syntax_kind_ext::FUNCTION_DECLARATION => Some(symbol_flags::FUNCTION),
+            syntax_kind_ext::CLASS_DECLARATION => Some(symbol_flags::CLASS),
+            syntax_kind_ext::INTERFACE_DECLARATION => Some(symbol_flags::INTERFACE),
+            syntax_kind_ext::TYPE_ALIAS_DECLARATION => Some(symbol_flags::TYPE_ALIAS),
+            syntax_kind_ext::ENUM_DECLARATION => Some(symbol_flags::REGULAR_ENUM),
+            _ => None,
+        }
+    }
+
+    fn excluded_symbol_flags(flags: u32) -> u32 {
+        if (flags & symbol_flags::FUNCTION_SCOPED_VARIABLE) != 0 {
+            return symbol_flags::FUNCTION_SCOPED_VARIABLE_EXCLUDES;
+        }
+        if (flags & symbol_flags::BLOCK_SCOPED_VARIABLE) != 0 {
+            return symbol_flags::BLOCK_SCOPED_VARIABLE_EXCLUDES;
+        }
+        if (flags & symbol_flags::FUNCTION) != 0 {
+            return symbol_flags::FUNCTION_EXCLUDES;
+        }
+        if (flags & symbol_flags::CLASS) != 0 {
+            return symbol_flags::CLASS_EXCLUDES;
+        }
+        if (flags & symbol_flags::INTERFACE) != 0 {
+            return symbol_flags::INTERFACE_EXCLUDES;
+        }
+        if (flags & symbol_flags::TYPE_ALIAS) != 0 {
+            return symbol_flags::TYPE_ALIAS_EXCLUDES;
+        }
+        if (flags & symbol_flags::REGULAR_ENUM) != 0 {
+            return symbol_flags::REGULAR_ENUM_EXCLUDES;
+        }
+        symbol_flags::NONE
+    }
+
+    fn declarations_conflict(flags_a: u32, flags_b: u32) -> bool {
+        let excludes_a = Self::excluded_symbol_flags(flags_a);
+        let excludes_b = Self::excluded_symbol_flags(flags_b);
+        (flags_a & excludes_b) != 0 || (flags_b & excludes_a) != 0
+    }
+
+    /// Check for duplicate identifiers in the current scope set (TS2300).
+    /// Uses persistent scopes when available, falling back to file_locals.
     fn check_duplicate_identifiers(&mut self) {
         use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages, format_message};
-        use crate::binder::symbol_flags;
 
-        // Collect symbols to check - we need to clone the keys to avoid borrowing issues
-        let symbol_ids: Vec<_> = self.ctx.binder.file_locals.iter()
-            .map(|(_, &id)| id)
-            .collect();
+        let mut symbol_ids = FxHashSet::default();
+        if !self.ctx.binder.scopes.is_empty() {
+            for scope in &self.ctx.binder.scopes {
+                for (_, &id) in scope.table.iter() {
+                    symbol_ids.insert(id);
+                }
+            }
+        } else {
+            for (_, &id) in self.ctx.binder.file_locals.iter() {
+                symbol_ids.insert(id);
+            }
+        }
 
         for sym_id in symbol_ids {
             let Some(symbol) = self.ctx.binder.get_symbol(sym_id) else {
                 continue;
             };
 
-            // Skip if only one declaration
             if symbol.declarations.len() <= 1 {
                 continue;
             }
 
-            let name = symbol.escaped_name.clone();
-            let declarations = symbol.declarations.clone();
-            let flags = symbol.flags;
+            let mut declarations = Vec::new();
+            for &decl_idx in &symbol.declarations {
+                if let Some(flags) = self.declaration_symbol_flags(decl_idx) {
+                    declarations.push((decl_idx, flags));
+                }
+            }
 
-            // Check if any declarations conflict based on symbol flags
-            // Block-scoped variables (let/const) can never be duplicated
-            let is_block_scoped = (flags & symbol_flags::BLOCK_SCOPED_VARIABLE) != 0;
+            if declarations.len() <= 1 {
+                continue;
+            }
 
-            // Count declaration types
-            let mut function_count = 0;
-            let mut _interface_count = 0;  // Interfaces can merge, so we don't report duplicates
-            let mut class_count = 0;
-            let mut type_alias_count = 0;
-            let mut enum_count = 0;
-            let mut var_count = 0;
-
-            for &decl_idx in &declarations {
-                if let Some(decl_node) = self.ctx.arena.get(decl_idx) {
-                    match decl_node.kind {
-                        syntax_kind_ext::VARIABLE_DECLARATION => {
-                            var_count += 1;
-                        }
-                        syntax_kind_ext::FUNCTION_DECLARATION => {
-                            function_count += 1;
-                        }
-                        syntax_kind_ext::CLASS_DECLARATION => {
-                            class_count += 1;
-                        }
-                        syntax_kind_ext::INTERFACE_DECLARATION => {
-                            _interface_count += 1;
-                        }
-                        syntax_kind_ext::TYPE_ALIAS_DECLARATION => {
-                            type_alias_count += 1;
-                        }
-                        syntax_kind_ext::ENUM_DECLARATION => {
-                            enum_count += 1;
-                        }
-                        _ => {}
+            let mut conflicts = FxHashSet::default();
+            for i in 0..declarations.len() {
+                for j in (i + 1)..declarations.len() {
+                    let (decl_idx, decl_flags) = declarations[i];
+                    let (other_idx, other_flags) = declarations[j];
+                    if Self::declarations_conflict(decl_flags, other_flags) {
+                        conflicts.insert(decl_idx);
+                        conflicts.insert(other_idx);
                     }
                 }
             }
 
-            // Determine if we should report duplicates
-            let should_report =
-                // Block-scoped variables (let/const) can never be duplicated
-                (is_block_scoped && declarations.len() > 1) ||
-                // Multiple type aliases are duplicates
-                type_alias_count > 1 ||
-                // Type alias with anything else is a duplicate
-                (type_alias_count >= 1 && declarations.len() > type_alias_count) ||
-                // Multiple classes are duplicates
-                class_count > 1 ||
-                // Class with function is a duplicate
-                (class_count >= 1 && function_count >= 1) ||
-                // Class with variable is a duplicate
-                (class_count >= 1 && var_count >= 1) ||
-                // Multiple variables (var) with different initialization aren't duplicates,
-                // but let/const with anything else is
-                (is_block_scoped && (function_count + class_count + enum_count) >= 1);
+            if conflicts.is_empty() {
+                continue;
+            }
 
-            if should_report {
-                let message = format_message(diagnostic_messages::DUPLICATE_IDENTIFIER, &[&name]);
+            let has_non_block_scoped = declarations.iter().any(|(decl_idx, flags)| {
+                conflicts.contains(decl_idx) && (flags & symbol_flags::BLOCK_SCOPED_VARIABLE) == 0
+            });
+            if !has_non_block_scoped {
+                // Skip pure block-scoped duplicates (TS2451), handled elsewhere.
+                continue;
+            }
 
-                // Report on all declarations except the first one
-                for &decl_idx in declarations.iter().skip(1) {
-                    // Get the name node for better error location
+            let name = symbol.escaped_name.clone();
+            let message = format_message(diagnostic_messages::DUPLICATE_IDENTIFIER, &[&name]);
+            for (decl_idx, _) in declarations {
+                if conflicts.contains(&decl_idx) {
                     let error_node = self.get_declaration_name_node(decl_idx).unwrap_or(decl_idx);
                     self.error_at_node(error_node, &message, diagnostic_codes::DUPLICATE_IDENTIFIER);
                 }
