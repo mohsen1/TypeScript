@@ -6,8 +6,25 @@ Execute tasks assigned by EM-Forge for the Forge squad (type system).
 Status: Active
 Priority: 1
 
-## Current Assignment (TS7010 - Return Path Analysis: try/finally + switch) - COMPLETE
-Handle return-path analysis for try/finally and switch fallthrough cases.
+## Current Assignment (🚨 CRITICAL - IDLE 202m!)
+TS2304 - Cannot find name errors.
+
+**Error Code:** TS2304 - "Cannot find name 'x'"
+
+**Impact:** 138 conformance tests affected
+**IDLE TIME:** 202 minutes ⚠️⚠️⚠️
+
+### 🚨 IMMEDIATE ACTION REQUIRED NOW:
+1. **Sync immediately:** `git fetch origin && git merge origin/squad/forge`
+2. **Investigate crash regression** (143→483, +237%) - this BLOCKS conformance!
+3. **Start TS2304 implementation** - identifier resolution focus
+
+### Anvil Comparison (Learn from their success!)
+Anvil squad is **CRUSHING IT**:
+- Anvil-1: TS7006 **74% reduction** (46→12)
+- Anvil-4: Woke up and completed TS2769!
+
+**Wake up and deliver similar wins!** Start TS2304 NOW!
 
 ### Steps
 - [x] Add tests for try/finally fallthrough and switch fallthrough in `wasm/src/thin_checker_tests.rs`.
@@ -35,6 +52,10 @@ Handle return-path analysis for try/finally and switch fallthrough cases.
 - Correct scope chain traversal
 - No errors for known globals
 - No new regressions
+
+### Priority Notes
+- ALSO INVESTIGATE: Crash regression from 143→483 (+237%) after squad/forge merge
+- Crash investigation may take priority if it blocks conformance testing
 
 ## Current Assignment (TS7010 - Implicit Any Return)
 - [x] Consulted Gemini to confirm TS7010 = implicit any return (not TS2366)

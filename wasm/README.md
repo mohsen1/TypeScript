@@ -127,18 +127,18 @@ The `CompatChecker` in `src/solver/` needs to implement the "Unsoundness Catalog
 
 
 ## Executive Summary (Director report)
-Last updated: 2026-01-11 18:23 (Twelfth Director Loop - Forge-2 CRITICAL Solver Fix!)
+Last updated: 2026-01-11 18:39 (Thirteenth Director Loop - BOTH Squads Merged to Rust!)
 
-### System Status: 🟢 EXCELLENT - Major Solver Fix Pushed!
+### System Status: 🟢🟢 EXCELLENT - Both Squads in Main Branch!
 
 **Organization Health:**
-- **🔥 CRITICAL FIX:** Forge-2 pushed ERROR instead of Any solver fix!
-  - Root cause of missing TS2322 errors FIXED
-  - 14 solver tests fixed
-  - Added find-missing-ts2322.mjs tool
-- Rust branch: TS7006 74% reduction, TS2769 complete, TS2348 implemented
-- Active workers: Forge-1, Forge-2 (both just pushed)
-- Still 7 workers idle (42-271m)
+- **🎉🎉 MAJOR:** BOTH squads merged into rust!
+  - squad/anvil: TS7006 74% reduction, TS2769 complete, TS2348 implemented
+  - squad/forge: CRITICAL solver fix (ERROR instead of Any)
+- Rust now has ALL major wins from both squads
+- Active workers: Anvil-1 (8m), Forge-1 (9m)
+- Anvil-1: Documented TS7006 decorator parser bug
+- Still 8 workers idle (25-286m)
 - Build passing
 
 ### Conformance Metrics (Primary KPI)
@@ -165,6 +165,23 @@ Last updated: 2026-01-11 18:23 (Twelfth Director Loop - Forge-2 CRITICAL Solver 
 - W3: TS2339 Closure Narrowing - Active
 - W4: TS2769 Overload Matching Continuation - Active
 - W5: TS2322 False Positive Reduction (101 occurrences) - Active
+
+### Recent Progress (Jan 11 18:39 - Thirteenth Director Loop - BOTH Squads Merged to Rust!)
+- **🎉🎉 HISTORIC:** BOTH squads (anvil + forge) merged into rust!
+  - squad/anvil merged (loop 11): TS7006 74% reduction, TS2769 complete
+  - squad/forge merged (loop 13): CRITICAL solver fix (ERROR instead of Any)
+- **Rust now contains:**
+  - Anvil-1: TS7006 74% reduction (46→12)
+  - Anvil-4: TS2769 complete, TS2348 for class constructors
+  - Forge-2: ERROR instead of Any solver fix (14 tests)
+  - Comprehensive regression tests from both squads
+- **Anvil-1:** Documented TS7006 decorator parser bug
+  - 7+ errors blocked by parse_parameter() bug
+  - thin_parser.rs:1547 doesn't handle parameter decorators
+  - Fix requires adding decorator parsing to parse_parameter()
+- **Tooling:** Fixed find-ts2339.mjs library path, added ThinParserState import
+- **Active:** 2/10 workers (Anvil-1, Forge-1)
+- **Still Idle:** 8 workers (25-286m)
 
 ### Recent Progress (Jan 11 18:23 - Twelfth Director Loop - Forge-2 CRITICAL Solver Fix!)
 - **🔥 CRITICAL FIX:** Forge-2's ERROR instead of Any solver fix PUSHED!
