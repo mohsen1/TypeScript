@@ -159,16 +159,19 @@ bash run-conformance.sh --all --workers=14
 
 ---
 ## Squad Status
-- Last Update: 2026-01-11 (🎉 EXCELLENCE: 4/5 workers active + conformance breakthrough!)
+- Last Update: 2026-01-11 (🚀 EXCELLENCE CONTINUES: Worker wins merged to rust!)
 - Conformance: **~30.8% exact match** (up from 23.3%!) **+7.5 POINTS!**
-- **Major Gains:** Missing Errors -10.4pp, Extra Errors -6.9pp
-- **🏆 HISTORIC ACHIEVEMENT**: squad/forge → RUST (both squads in main!)
-- Workers Active: **4/5** - MASSIVE TURNAROUND!
-- **ACTIVE WORKERS** (Excellent momentum!):
-  - ✅ W1: Active (brief pause at 29m)
-  - ✅ W3: **WOKE UP!** (72m→3m) - Testing TS7010
-  - ✅ W4: **WOKE UP!** (100m→13m) - TS2339 work
-  - ✅ W5: **WOKE UP!** (247m→19m) - Staying active
-- **RESTING** (Post major win):
-  - ⚠️ W2: Idle 57m - Delivered critical solver fix to rust
-- **FORGE SQUAD**: CONFORMANCE EXCELLENCE! Results are showing! Keep momentum!
+- **NEW WINS IN RUST** (Commit: 3b67f9a8a4):
+  - ✅ W3: **TS7010 async getters + TS2300 constructor** fixes!
+  - ✅ W4: **TS2339 private field assignability** fix!
+  - ✅ New: **find-ts2300.mjs** differential test script
+- Workers Active: **4/5** - SUSTAINED EXCELLENCE!
+- **ACTIVE WORKERS** (Delivering wins!):
+  - ✅ W1: Active (9m)
+  - ✅ W3: Active (15m) - TS7010 just merged!
+  - ✅ W4: Active (26m) - TS2339 just merged!
+  - ✅ W5: Active (32m) - Staying consistent!
+- **RESTING** (Post-critical solver fix):
+  - ⚠️ W2: Idle 70m - Delivered ERROR instead of Any fix
+- **FORGE SQUAD**: Workers delivering WINS to main branch! Keep momentum!
+- **ANVIL TS2339 BREAKTHROUGH**: Congratulations to Anvil squad!
