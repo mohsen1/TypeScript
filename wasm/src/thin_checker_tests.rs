@@ -17473,3 +17473,209 @@ function nested({ x, inner: { x } }: { x: number, inner: { x: string } }) {
         checker.ctx.diagnostics
     );
 }
+
+// ========================================
+// Module Resolution Errors (TS2792 vs TS2307)
+// ========================================
+// Tests for distinguishing between package imports (TS2792) and relative imports (TS2307)
+
+#[test]
+fn test_module_resolution_package_import_unresolved() {
+    use crate::thin_parser::ThinParserState;
+    use crate::checker::types::diagnostics::diagnostic_codes;
+
+    // Package import (bare specifier) that's not resolved should emit TS2792
+    let source = r#"
+import { foo } from "some-package";
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.ctx.report_unresolved_imports = true; // Enable import checking
+    checker.check_source_file(root);
+
+    eprintln!("[PKG_UNRESOLVED] All diagnostics: {:?}", checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>());
+
+    let ts2792_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == diagnostic_codes::CANNOT_FIND_MODULE)
+        .collect();
+
+    // Should emit TS2792 for unresolved package import
+    assert!(!ts2792_errors.is_empty(), "Expected TS2792 error for unresolved package import, got: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| d.code).collect::<Vec<_>>());
+}
+
+#[test]
+fn test_module_resolution_relative_import_unresolved() {
+    use crate::thin_parser::ThinParserState;
+    use crate::checker::types::diagnostics::diagnostic_codes;
+
+    // Relative import that's not resolved should emit TS2307
+    let source = r#"
+import { foo } from "./some-file";
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.ctx.report_unresolved_imports = true; // Enable import checking
+    checker.check_source_file(root);
+
+    eprintln!("[REL_UNRESOLVED] All diagnostics: {:?}", checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>());
+
+    let ts2307_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == diagnostic_codes::MODULE_NOT_FOUND)
+        .collect();
+
+    // Should emit TS2307 for unresolved relative import
+    assert!(!ts2307_errors.is_empty(), "Expected TS2307 error for unresolved relative import, got: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| d.code).collect::<Vec<_>>());
+}
+
+#[test]
+fn test_module_resolution_parent_relative_import() {
+    use crate::thin_parser::ThinParserState;
+    use crate::checker::types::diagnostics::diagnostic_codes;
+
+    // Parent relative import (../) should emit TS2307
+    let source = r#"
+import { bar } from "../parent-file";
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.ctx.report_unresolved_imports = true;
+    checker.check_source_file(root);
+
+    eprintln!("[PARENT_REL] All diagnostics: {:?}", checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>());
+
+    let ts2307_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == diagnostic_codes::MODULE_NOT_FOUND)
+        .collect();
+
+    // Should emit TS2307 for parent relative import
+    assert!(!ts2307_errors.is_empty(), "Expected TS2307 error for parent relative import, got: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| d.code).collect::<Vec<_>>());
+}
+
+#[test]
+fn test_module_resolution_scoped_package() {
+    use crate::thin_parser::ThinParserState;
+    use crate::checker::types::diagnostics::diagnostic_codes;
+
+    // Scoped package (@types/node) should emit TS2792
+    let source = r#"
+import { EventEmitter } from "@types/node";
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.ctx.report_unresolved_imports = true;
+    checker.check_source_file(root);
+
+    eprintln!("[SCOPED_PKG] All diagnostics: {:?}", checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>());
+
+    let ts2792_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == diagnostic_codes::CANNOT_FIND_MODULE)
+        .collect();
+
+    // Should emit TS2792 for unresolved scoped package
+    assert!(!ts2792_errors.is_empty(), "Expected TS2792 error for unresolved scoped package, got: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| d.code).collect::<Vec<_>>());
+}
+
+#[test]
+fn test_module_resolution_absolute_path() {
+    use crate::thin_parser::ThinParserState;
+    use crate::checker::types::diagnostics::diagnostic_codes;
+
+    // Absolute path import should emit TS2307
+    let source = r#"
+import { baz } from "/absolute/path/to/file";
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.ctx.report_unresolved_imports = true;
+    checker.check_source_file(root);
+
+    eprintln!("[ABS_PATH] All diagnostics: {:?}", checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>());
+
+    let ts2307_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == diagnostic_codes::MODULE_NOT_FOUND)
+        .collect();
+
+    // Should emit TS2307 for absolute path import
+    assert!(!ts2307_errors.is_empty(), "Expected TS2307 error for absolute path import, got: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| d.code).collect::<Vec<_>>());
+}
+
+#[test]
+fn test_module_resolution_ambient_module_no_error() {
+    use crate::thin_parser::ThinParserState;
+
+    // Import from ambient module declaration should not emit error
+    let source = r#"
+declare module "my-module" {
+    export const value: number;
+}
+
+import { value } from "my-module";
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.ctx.report_unresolved_imports = true;
+    checker.check_source_file(root);
+
+    eprintln!("[AMBIENT_OK] All diagnostics: {:?}", checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>());
+
+    // Should have no TS2792 or TS2307 errors
+    let module_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2792 || d.code == 2307)
+        .collect();
+
+    assert!(module_errors.is_empty(), "Expected no module resolution errors for ambient module, got: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>());
+}
