@@ -662,10 +662,21 @@ impl<'a> ThinCheckerState<'a> {
 
                 if has_type_args {
                     let is_builtin_array = name == "Array" || name == "ReadonlyArray";
-                    if !is_builtin_array
-                        && self.lookup_type_parameter(name).is_none()
-                        && self.resolve_identifier_symbol(type_name_idx).is_none()
-                    {
+                    let type_param = self.lookup_type_parameter(name);
+                    let sym_id = self.resolve_identifier_symbol(type_name_idx);
+                    if !is_builtin_array && type_param.is_none() && sym_id.is_none() {
+                        if self.is_known_global_type_name(name) {
+                            if let Some(args) = &type_ref.type_arguments {
+                                for &arg_idx in &args.nodes {
+                                    let _ = self.get_type_from_type_node(arg_idx);
+                                }
+                            }
+                            return TypeId::UNKNOWN;
+                        }
+                        if name == "await" {
+                            self.error_cannot_find_name_did_you_mean_at(name, "Awaited", type_name_idx);
+                            return TypeId::ERROR;
+                        }
                         self.error_cannot_find_name_at(name, type_name_idx);
                         return TypeId::ERROR;
                     }
@@ -756,6 +767,13 @@ impl<'a> ThinCheckerState<'a> {
 
                 if let Some(type_id) = self.resolve_named_type_reference(name, type_name_idx) {
                     return type_id;
+                }
+                if name == "await" {
+                    self.error_cannot_find_name_did_you_mean_at(name, "Awaited", type_name_idx);
+                    return TypeId::ERROR;
+                }
+                if self.is_known_global_type_name(name) {
+                    return TypeId::UNKNOWN;
                 }
                 self.error_cannot_find_name_at(name, type_name_idx);
                 return TypeId::ERROR;
@@ -1714,6 +1732,9 @@ impl<'a> ThinCheckerState<'a> {
             return TypeId::ERROR;
         } else if let Some(name) = name_text {
             if is_identifier {
+                if self.is_known_global_value_name(&name) {
+                    return TypeId::ANY;
+                }
                 self.error_cannot_find_name_at(&name, type_query.expr_name);
                 return TypeId::ERROR;
             }
@@ -1880,6 +1901,18 @@ impl<'a> ThinCheckerState<'a> {
                     }
 
                     if !is_builtin_array && type_param.is_none() && sym_id.is_none() {
+                        if self.is_known_global_type_name(name) {
+                            if let Some(args) = &type_ref.type_arguments {
+                                for &arg_idx in &args.nodes {
+                                    let _ = self.get_type_from_type_node_in_type_literal(arg_idx);
+                                }
+                            }
+                            return TypeId::UNKNOWN;
+                        }
+                        if name == "await" {
+                            self.error_cannot_find_name_did_you_mean_at(name, "Awaited", type_name_idx);
+                            return TypeId::ERROR;
+                        }
                         self.error_cannot_find_name_at(name, type_name_idx);
                         return TypeId::ERROR;
                     }
@@ -1959,6 +1992,13 @@ impl<'a> ThinCheckerState<'a> {
                     return self.ctx.types.intern(TypeKey::Ref(SymbolRef(sym_id.0)));
                 }
 
+                if name == "await" {
+                    self.error_cannot_find_name_did_you_mean_at(name, "Awaited", type_name_idx);
+                    return TypeId::ERROR;
+                }
+                if self.is_known_global_type_name(name) {
+                    return TypeId::UNKNOWN;
+                }
                 self.error_cannot_find_name_at(name, type_name_idx);
                 return TypeId::ERROR;
             }
@@ -10136,6 +10176,32 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    /// Report error 2552: Cannot find name 'X'. Did you mean 'Y'?
+    pub fn error_cannot_find_name_did_you_mean_at(
+        &mut self,
+        name: &str,
+        suggestion: &str,
+        idx: NodeIndex,
+    ) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+
+        if let Some(loc) = self.get_source_location(idx) {
+            let message = format!(
+                "Cannot find name '{}'. Did you mean '{}'?",
+                name, suggestion
+            );
+            self.ctx.diagnostics.push(Diagnostic {
+                code: diagnostic_codes::CANNOT_FIND_NAME_DID_YOU_MEAN,
+                category: DiagnosticCategory::Error,
+                message_text: message,
+                file: self.ctx.file_name.clone(),
+                start: loc.start,
+                length: loc.length(),
+                related_information: Vec::new(),
+            });
+        }
+    }
+
     /// Report error 2662: Cannot find name 'X'. Did you mean the static member 'C.X'?
     pub fn error_cannot_find_name_static_member_at(
         &mut self,
@@ -10245,7 +10311,7 @@ impl<'a> ThinCheckerState<'a> {
         matches!(
             name,
             "console" | "Math" | "JSON" | "Object" | "Array" | "String"
-                | "Number" | "Boolean" | "Date" | "RegExp" | "Error" | "Promise"
+                | "Number" | "Boolean" | "Function" | "Date" | "RegExp" | "Error" | "Promise"
                 | "Map" | "Set" | "WeakMap" | "WeakSet" | "WeakRef" | "Proxy"
                 | "Reflect" | "globalThis" | "window" | "document"
                 | "FinalizationRegistry" | "BigInt" | "ArrayBuffer" | "SharedArrayBuffer"
@@ -10260,6 +10326,22 @@ impl<'a> ThinCheckerState<'a> {
                 | "fetch" | "setTimeout" | "setInterval" | "clearTimeout" | "clearInterval"
                 | "queueMicrotask" | "structuredClone" | "atob" | "btoa"
                 | "performance" | "crypto" | "navigator" | "location" | "history"
+        )
+    }
+
+    fn is_known_global_type_name(&self, name: &str) -> bool {
+        matches!(
+            name,
+            "Object" | "String" | "Number" | "Boolean" | "Symbol" | "Function"
+                | "Promise" | "PromiseLike" | "PromiseConstructor" | "PromiseConstructorLike" | "Awaited"
+                | "Array" | "ReadonlyArray" | "ArrayLike"
+                | "Map" | "Set" | "WeakMap" | "WeakSet" | "WeakRef" | "Date" | "RegExp" | "RegExpExecArray"
+                | "Partial" | "Required" | "Readonly" | "Record" | "Pick" | "Omit"
+                | "Iterator" | "Iterable" | "AsyncIterator" | "AsyncIterable"
+                | "Generator" | "AsyncGenerator"
+                | "NonNullable" | "Extract" | "ThisType" | "PropertyKey" | "PropertyDescriptor"
+                | "Element" | "HTMLElement" | "Document" | "Window" | "Event" | "NodeList" | "NodeListOf"
+                | "Error" | "TypeError" | "RangeError" | "EvalError" | "URIError" | "ReferenceError" | "SyntaxError"
         )
     }
 
@@ -11989,6 +12071,7 @@ impl<'a> ThinCheckerState<'a> {
     /// Emits TS2304 when a referenced name cannot be resolved.
     fn check_heritage_clauses_for_unresolved_names(&mut self, heritage_clauses: &Option<crate::parser::NodeList>) {
         use crate::parser::syntax_kind_ext::HERITAGE_CLAUSE;
+        use crate::scanner::SyntaxKind;
 
         let Some(clauses) = heritage_clauses else {
             return;
@@ -12022,8 +12105,28 @@ impl<'a> ThinCheckerState<'a> {
 
                 // Try to resolve the heritage symbol
                 if self.resolve_heritage_symbol(expr_idx).is_none() {
+                    if let Some(expr_node) = self.ctx.arena.get(expr_idx) {
+                        match expr_node.kind {
+                            k if k == SyntaxKind::NullKeyword as u16
+                                || k == SyntaxKind::UndefinedKeyword as u16
+                                || k == SyntaxKind::TrueKeyword as u16
+                                || k == SyntaxKind::FalseKeyword as u16
+                                || k == SyntaxKind::VoidKeyword as u16
+                                || k == SyntaxKind::NumericLiteral as u16
+                                || k == SyntaxKind::StringLiteral as u16 => {
+                                continue;
+                            }
+                            _ => {}
+                        }
+                    }
                     // Get the name for the error message
                     if let Some(name) = self.heritage_name_text(expr_idx) {
+                        if matches!(name.as_str(), "undefined" | "null" | "true" | "false" | "void" | "0") {
+                            continue;
+                        }
+                        if self.is_known_global_type_name(&name) {
+                            continue;
+                        }
                         self.error_cannot_find_name_at(&name, expr_idx);
                     }
                 }
@@ -13914,6 +14017,7 @@ impl<'a> ThinCheckerState<'a> {
             }
             k if k == syntax_kind_ext::FUNCTION_TYPE || k == syntax_kind_ext::CONSTRUCTOR_TYPE => {
                 if let Some(func_type) = self.ctx.arena.get_function_type(node) {
+                    let updates = self.push_missing_name_type_parameters(&func_type.type_parameters);
                     self.check_type_parameters_for_missing_names(&func_type.type_parameters);
                     for &param_idx in &func_type.parameters.nodes {
                         self.check_parameter_type_for_missing_names(param_idx);
@@ -13921,6 +14025,7 @@ impl<'a> ThinCheckerState<'a> {
                     if !func_type.type_annotation.is_none() {
                         self.check_type_for_missing_names(func_type.type_annotation);
                     }
+                    self.pop_type_parameters(updates);
                 }
             }
             k if k == syntax_kind_ext::ARRAY_TYPE => {
@@ -14050,6 +14155,44 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    fn push_missing_name_type_parameters(
+        &mut self,
+        type_parameters: &Option<crate::parser::NodeList>,
+    ) -> Vec<(String, Option<TypeId>)> {
+        use crate::solver::{TypeKey, TypeParamInfo};
+
+        let Some(list) = type_parameters else {
+            return Vec::new();
+        };
+
+        let mut updates = Vec::new();
+        for &param_idx in &list.nodes {
+            let Some(param_node) = self.ctx.arena.get(param_idx) else {
+                continue;
+            };
+            let Some(param) = self.ctx.arena.get_type_parameter(param_node) else {
+                continue;
+            };
+            let Some(name_node) = self.ctx.arena.get(param.name) else {
+                continue;
+            };
+            let Some(ident) = self.ctx.arena.get_identifier(name_node) else {
+                continue;
+            };
+            let name = ident.escaped_text.clone();
+            let atom = self.ctx.types.intern_string(&name);
+            let type_id = self.ctx.types.intern(TypeKey::TypeParameter(TypeParamInfo {
+                name: atom,
+                constraint: None,
+                default: None,
+            }));
+            let previous = self.ctx.type_parameter_scope.insert(name.clone(), type_id);
+            updates.push((name, previous));
+        }
+
+        updates
+    }
+
     fn check_type_parameter_node_for_missing_names(&mut self, param_idx: NodeIndex) {
         let Some(param_node) = self.ctx.arena.get(param_idx) else {
             return;
@@ -14096,6 +14239,7 @@ impl<'a> ThinCheckerState<'a> {
         };
 
         if let Some(sig) = self.ctx.arena.get_signature(member_node) {
+            let updates = self.push_missing_name_type_parameters(&sig.type_parameters);
             self.check_type_parameters_for_missing_names(&sig.type_parameters);
             if let Some(ref params) = sig.parameters {
                 for &param_idx in &params.nodes {
@@ -14105,6 +14249,7 @@ impl<'a> ThinCheckerState<'a> {
             if !sig.type_annotation.is_none() {
                 self.check_type_for_missing_names(sig.type_annotation);
             }
+            self.pop_type_parameters(updates);
             return;
         }
 
