@@ -2951,6 +2951,79 @@ impl<'a> FlowAnalyzer<'a> {
     }
 }
 
+/// Check if a function body can fall through to the end without returning.
+/// Returns true if execution can reach the end of the function body.
+pub fn function_body_falls_through(arena: &ThinNodeArena, body_idx: NodeIndex) -> bool {
+    if body_idx.is_none() {
+        return true;
+    }
+
+    statement_falls_through(arena, body_idx)
+}
+
+/// Check if a statement can fall through to the next statement.
+/// Returns true if execution can continue after this statement.
+pub fn statement_falls_through(arena: &ThinNodeArena, stmt_idx: NodeIndex) -> bool {
+    let Some(node) = arena.get(stmt_idx) else {
+        return true;
+    };
+
+    match node.kind {
+        // These statements never fall through
+        k if k == syntax_kind_ext::RETURN_STATEMENT => false,
+        k if k == syntax_kind_ext::THROW_STATEMENT => false,
+        k if k == syntax_kind_ext::BREAK_STATEMENT => false,
+        k if k == syntax_kind_ext::CONTINUE_STATEMENT => false,
+
+        // Block statement - check if last statement falls through
+        k if k == syntax_kind_ext::BLOCK => {
+            let Some(block) = arena.get_block(node) else {
+                return true;
+            };
+            if block.statements.nodes.is_empty() {
+                return true;
+            }
+            let last = *block.statements.nodes.last().unwrap();
+            statement_falls_through(arena, last)
+        }
+
+        // If statement - falls through if either branch can fall through
+        k if k == syntax_kind_ext::IF_STATEMENT => {
+            let Some(if_stmt) = arena.get_if_statement(node) else {
+                return true;
+            };
+
+            // If there's no else clause, the if can be skipped entirely
+            if if_stmt.else_statement.is_none() {
+                return true;
+            }
+
+            // Both branches must not fall through for the if to not fall through
+            let then_falls = statement_falls_through(arena, if_stmt.then_statement);
+            let else_falls = statement_falls_through(arena, if_stmt.else_statement);
+            then_falls || else_falls
+        }
+
+        // Switch statement - conservatively assume can fall through
+        // TODO: Implement proper switch case analysis when data structures are available
+        k if k == syntax_kind_ext::SWITCH_STATEMENT => true,
+
+        // Try statement - conservatively assume can fall through
+        // TODO: Implement proper try/catch/finally analysis when data structures are available
+        k if k == syntax_kind_ext::TRY_STATEMENT => true,
+
+        // For/while loops - conservatively assume they can be skipped
+        k if k == syntax_kind_ext::FOR_STATEMENT => true,
+        k if k == syntax_kind_ext::FOR_IN_STATEMENT => true,
+        k if k == syntax_kind_ext::FOR_OF_STATEMENT => true,
+        k if k == syntax_kind_ext::WHILE_STATEMENT => true,
+        k if k == syntax_kind_ext::DO_STATEMENT => true,
+
+        // All other statements fall through
+        _ => true,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
