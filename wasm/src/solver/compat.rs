@@ -264,6 +264,10 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
         self.source_lacks_union_common_property(source, members.as_ref())
     }
 
+    pub fn is_weak_union_violation(&self, source: TypeId, target: TypeId) -> bool {
+        self.violates_weak_union(source, target)
+    }
+
     fn violates_weak_type_with_target_props(
         &self,
         source: TypeId,

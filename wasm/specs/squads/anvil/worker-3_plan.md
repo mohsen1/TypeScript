@@ -1,14 +1,21 @@
 # Anvil Worker 3 - TS2339 Property Resolution (Inherited Properties)
 
-Ready for Merge: No (merged 2026-01-11)
+Ready for Merge: No
 Status: Active
 
 ## Current Assignment (2026-01-11)
 
-- Reduce TS2403 false positives (subsequent variable declarations).
-- Collect 3-5 failing samples via conformance output (search for TS2403); capture file + expected vs actual diagnostics.
-- Trace symbol/decl merging in `wasm/src/thin_checker.rs` and `wasm/src/solver/subtype.rs`; implement fix + regression tests.
-- Deliverables: sample list + root cause notes, regression test(s), and before/after TS2403 delta from a targeted conformance run.
+- Investigate TS2339 property access false positives (target: 292 extras).
+- Collect 3-5 samples via `node wasm/differential-test/find-ts2339.mjs --max=500 --samples=5` and record failing property access sites.
+- Trace property lookup in `wasm/src/thin_checker.rs` (narrowing, index signatures, interface merging, prototype chain) and implement a minimal fix.
+- Add regression tests in `wasm/src/thin_checker_tests.rs` and report before/after TS2339 delta.
+
+### Update (2026-01-11)
+- Samples (pre-fix): `enums/enumBasics.ts`, `es6/spread/arrayLiteralSpread.ts`, `es6/spread/arrayLiteralSpreadES5iterable.ts`, `es6/templates/taggedTemplateStringsWithOverloadResolution3.ts`, `es6/templates/taggedTemplateStringsWithOverloadResolution3_ES6.ts`.
+- Fix: treat variable redeclaration types as compatible when bidirectionally assignable; refine stored var type to avoid widening; expand enum value types to enum object shapes before comparison (commit 75316ba46e).
+- Regression tests: `test_variable_redeclaration_enum_object_literal_no_2403`, `test_variable_redeclaration_array_spread_no_2403` in `wasm/src/thin_checker_tests.rs`.
+- TS2403 delta scan: `node wasm/differential-test/find-ts2403.mjs --max=500 --samples=5` → 0 extra.
+ - TS2403 expanded scan: `node wasm/differential-test/find-ts2403.mjs --max=2000 --samples=30` → 0 extra.
 
 ### Update (2026-01-11)
 - Fix: use TypeEnvironment-backed assignability in call/new resolution, and resolve Application symbols (including type param constraints) to improve generic mixin inference (commit 5cf3894068).

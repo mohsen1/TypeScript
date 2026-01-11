@@ -211,6 +211,95 @@ fn test_thin_parser_static_keyword_member_name() {
 }
 
 #[test]
+fn test_thin_parser_modifier_keyword_as_member_name() {
+    let source = "class C { static public() {} }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    parser.parse_source_file();
+
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Unexpected diagnostics: {:?}",
+        parser.get_diagnostics()
+    );
+}
+
+#[test]
+fn test_thin_parser_get_accessor_type_parameters_report_ts1094() {
+    let source = "class C { get foo<T>() { return 1; } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    parser.parse_source_file();
+
+    let codes: Vec<u32> = parser.get_diagnostics().iter().map(|diag| diag.code).collect();
+    assert!(
+        codes.contains(&diagnostic_codes::ACCESSOR_CANNOT_HAVE_TYPE_PARAMETERS),
+        "Expected TS1094 diagnostics: {:?}",
+        parser.get_diagnostics()
+    );
+    assert!(
+        !codes.contains(&diagnostic_codes::TOKEN_EXPECTED),
+        "Unexpected TS1005 diagnostics: {:?}",
+        parser.get_diagnostics()
+    );
+}
+
+#[test]
+fn test_thin_parser_set_accessor_return_type_report_ts1095() {
+    let source = "class C { set foo(value: number): number { } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    parser.parse_source_file();
+
+    let codes: Vec<u32> = parser.get_diagnostics().iter().map(|diag| diag.code).collect();
+    assert!(
+        codes.contains(&diagnostic_codes::SETTER_CANNOT_HAVE_RETURN_TYPE),
+        "Expected TS1095 diagnostics: {:?}",
+        parser.get_diagnostics()
+    );
+    assert!(
+        !codes.contains(&diagnostic_codes::TOKEN_EXPECTED),
+        "Unexpected TS1005 diagnostics: {:?}",
+        parser.get_diagnostics()
+    );
+}
+
+#[test]
+fn test_thin_parser_object_get_accessor_parameters_report_ts1054() {
+    let source = "var v = { get foo(v: number) { } };";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    parser.parse_source_file();
+
+    let codes: Vec<u32> = parser.get_diagnostics().iter().map(|diag| diag.code).collect();
+    assert!(
+        codes.contains(&diagnostic_codes::GETTER_MUST_NOT_HAVE_PARAMETERS),
+        "Expected TS1054 diagnostics: {:?}",
+        parser.get_diagnostics()
+    );
+    assert!(
+        !codes.contains(&diagnostic_codes::TOKEN_EXPECTED),
+        "Unexpected TS1005 diagnostics: {:?}",
+        parser.get_diagnostics()
+    );
+}
+
+#[test]
+fn test_thin_parser_duplicate_extends_reports_ts1172() {
+    let source = "class C extends A extends B {}";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    parser.parse_source_file();
+
+    let codes: Vec<u32> = parser.get_diagnostics().iter().map(|diag| diag.code).collect();
+    assert!(
+        codes.contains(&diagnostic_codes::EXTENDS_CLAUSE_ALREADY_SEEN),
+        "Expected TS1172 diagnostics: {:?}",
+        parser.get_diagnostics()
+    );
+    assert!(
+        !codes.contains(&diagnostic_codes::TOKEN_EXPECTED),
+        "Unexpected TS1005 diagnostics: {:?}",
+        parser.get_diagnostics()
+    );
+}
+
+#[test]
 fn test_thin_parser_async_function_expression_keyword_name() {
     let source = "var v = async function await(): Promise<void> { }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());

@@ -32,7 +32,7 @@ Reduce missing TS2792 diagnostics for unresolved module imports.
 - No increase in extra TS2792 errors
 
 ## Task Queue
-- After TS2792 fix, re-run the scan with a larger sample to confirm deltas.
+- None.
 
 ## Completed
 - TS2454 implementation merged into squad/forge.
@@ -59,9 +59,13 @@ Reduce missing TS2792 diagnostics for unresolved module imports.
 - Implemented TS2300 duplicate identifier detection using declaration conflict rules; added tests for var/function, var/let, type alias conflicts, and type alias + function allowed. Ran `./wasm/test.sh duplicate_identifier` and `./wasm/test.sh type_alias_with_function_no_duplicate_2300`.
 - Re-synced with `origin/rust` and reran `./wasm/test.sh duplicate_identifier` (passed).
 - Re-synced with `origin/rust` and reran `./wasm/test.sh duplicate_identifier` after API key setup (passed).
+- Added `find-ts2792.mjs` scan (virtual FS + directive parsing) and verified no mismatches in first 500 tests.
+- Updated binder to avoid recording ambient module declarations in external modules; driver now suppresses checker import diagnostics in multi-file mode.
+- Added TS2792 tests for module augmentation resolution and declared module recording; ran `./wasm/test.sh ts2792` and `./wasm/test.sh declared_module_recorded_in_script`.
+- Re-ran `find-ts2792.mjs --max=1000 --samples=30`: 0 missing, 0 extra, 0 mismatched.
 
 ## Ready for Merge
-No
+Yes
 
 ## Notes
 - Run `./wasm/test.sh` before pushing
