@@ -7,25 +7,29 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-Emit TS2300 for duplicate identifiers in parameter lists (including destructured parameters).
+Enhance TS2454 definite assignment coverage from 93-95% to 100%.
 
-**Error Code:** TS2300 - "Duplicate identifier '{0}'."
+**Error Code:** TS2454 - "Variable '{0}' is used before being assigned"
 
-**Impact:** 105 conformance tests affected
+**Impact:** ~30-40 remaining cases out of 573 total tests
 
 ### Steps
-1. **Inspect parameter checking** in `wasm/src/thin_checker.rs` for where to add duplicate-name detection.
-2. **Detect duplicates** across parameter lists and within destructured parameters.
-3. **Add tests** in `wasm/src/thin_checker_tests.rs` for duplicate parameters and destructured duplicates.
-4. **Run focused tests** with `./wasm/test.sh duplicate_identifier` and report delta.
+1. **Run differential tests** with find-ts2454.mjs on full conformance suite
+2. **Analyze missing cases** - identify patterns not yet covered (complex destructuring, nested conditionals, etc)
+3. **Enhance control flow analysis** in control_flow.rs for missing patterns
+4. **Add tests** for newly covered cases in thin_checker_tests.rs
+5. **Verify no regressions** with full test suite
 
 ### Key Files
+- `wasm/src/checker/control_flow.rs`
 - `wasm/src/thin_checker.rs`
 - `wasm/src/thin_checker_tests.rs`
+- `wasm/differential-test/find-ts2454.mjs`
 
 ### Success Criteria
-- TS2300 emitted for duplicate parameter names
-- No false positives for distinct parameters
+- TS2454 coverage reaches 98%+ (missing count < 12 out of 573)
+- No new false positives
+- All existing tests still pass
 
 ## Task Queue
 - Extend to function overload lists if needed.
@@ -62,7 +66,7 @@ Emit TS2300 for duplicate identifiers in parameter lists (including destructured
 - **TS2300 parameter duplicate detection complete**: Implemented `check_duplicate_parameters()` and `collect_parameter_names()` to detect duplicate parameter names in function/method/constructor/accessor parameter lists. Handles simple parameters (a, b, a), object destructuring ({ a, b, a }), array destructuring ([x, y, x]), and nested patterns. Added 9 comprehensive tests covering all scenarios. All tests passing: `./wasm/test.sh duplicate_parameter` (9/9 passed), `./wasm/test.sh duplicate_identifier` (3/3 passed). Pushed to `origin/worker/forge-1`.
 
 ## Ready for Merge
-Yes
+No
 
 ## Notes
 - Run `./wasm/test.sh` before pushing
