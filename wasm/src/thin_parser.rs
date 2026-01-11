@@ -4607,13 +4607,13 @@ impl ThinParserState {
             // Parse optional catch binding
             let variable_declaration = if self.is_token(SyntaxKind::OpenParenToken) {
                 self.next_token();
-                let param = if self.is_identifier_or_keyword() {
-                    self.parse_identifier_name()
-                } else {
+                let decl = if self.is_token(SyntaxKind::CloseParenToken) {
                     NodeIndex::NONE
+                } else {
+                    self.parse_variable_declaration()
                 };
                 self.parse_expected(SyntaxKind::CloseParenToken);
-                param
+                decl
             } else {
                 NodeIndex::NONE
             };

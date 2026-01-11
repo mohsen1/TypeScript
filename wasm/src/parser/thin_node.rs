@@ -2018,12 +2018,19 @@ impl ThinNodeArena {
 
     /// Add a catch clause node
     pub fn add_catch_clause(&mut self, kind: u16, pos: u32, end: u32, data: CatchClauseData) -> NodeIndex {
+        let variable_declaration = data.variable_declaration;
+        let block = data.block;
         let data_index = self.catch_clauses.len() as u32;
         self.catch_clauses.push(data);
         let index = self.nodes.len() as u32;
         self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
-        NodeIndex(index)
+
+        let parent = NodeIndex(index);
+        self.set_parent(variable_declaration, parent);
+        self.set_parent(block, parent);
+
+        parent
     }
 
     /// Add a labeled statement node
