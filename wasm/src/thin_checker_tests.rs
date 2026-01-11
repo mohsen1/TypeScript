@@ -18172,3 +18172,227 @@ mixed(42, 99, 100);
         first_error_msg
     );
 }
+
+#[test]
+fn test_ts2366_arrow_function_missing_return() {
+    use crate::thin_parser::ThinParserState;
+
+    // Test error 2366 for arrow functions with explicit return type
+    let source = r#"
+// Arrow function with number return type that can fall through
+const missingReturn = (): number => {
+    if (Math.random() > 0.5) {
+        return 1;
+    }
+};
+
+// Arrow function that returns on all paths - no error
+const allPathsReturn = (flag: boolean): number => {
+    if (flag) {
+        return 1;
+    }
+    return 2;
+};
+
+// Arrow function with void return - no error
+const voidReturn = (): void => {
+    console.log("ok");
+};
+
+// Arrow function without return type annotation - no error
+const noAnnotation = () => {
+    return 1;
+};
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+
+    // Should have exactly 1 error: 2366 for missingReturn
+    assert_eq!(codes.iter().filter(|&&c| c == 2366).count(), 1,
+        "Expected 1 TS2366 error for arrow function missing return, got: {:?}", codes);
+}
+
+#[test]
+fn test_ts2366_function_expression_missing_return() {
+    use crate::thin_parser::ThinParserState;
+
+    // Test error 2366 for function expressions with explicit return type
+    let source = r#"
+// Function expression with string return type that can fall through
+const missingReturn = function(): string {
+    if (Math.random() > 0.5) {
+        return "yes";
+    }
+};
+
+// Function expression that returns on all paths - no error
+const allPathsReturn = function(flag: boolean): string {
+    if (flag) {
+        return "yes";
+    }
+    return "no";
+};
+
+// Function expression without return type annotation - no error
+const noAnnotation = function() {
+    return 1;
+};
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+
+    // Should have exactly 1 error: 2366 for missingReturn
+    assert_eq!(codes.iter().filter(|&&c| c == 2366).count(), 1,
+        "Expected 1 TS2366 error for function expression missing return, got: {:?}", codes);
+}
+
+#[test]
+fn test_ts2366_nested_arrow_functions() {
+    use crate::thin_parser::ThinParserState;
+
+    // Test error 2366 for nested arrow functions
+    let source = r#"
+function outer(): (x: number) => string {
+    // Inner arrow function with return type that can fall through
+    return (x: number): string => {
+        if (x > 0) {
+            return "positive";
+        }
+    };
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+
+    // Should have exactly 1 error: 2366 for inner arrow function
+    assert_eq!(codes.iter().filter(|&&c| c == 2366).count(), 1,
+        "Expected 1 TS2366 error for nested arrow function missing return, got: {:?}", codes);
+}
+
+#[test]
+fn test_ts2366_arrow_function_switch_statement() {
+    use crate::thin_parser::ThinParserState;
+
+    // Test error 2366 for arrow functions with switch statements
+    let source = r#"
+// Arrow function with switch missing default case
+const switchNoDefault = (value: number): string => {
+    switch (value) {
+        case 1:
+            return "one";
+        case 2:
+            return "two";
+    }
+};
+
+// Arrow function with switch and default - no error
+const switchWithDefault = (value: number): string => {
+    switch (value) {
+        case 1:
+            return "one";
+        default:
+            return "other";
+    }
+};
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+
+    // Should have exactly 1 error: 2366 for switchNoDefault
+    assert_eq!(codes.iter().filter(|&&c| c == 2366).count(), 1,
+        "Expected 1 TS2366 error for arrow function with switch missing default, got: {:?}", codes);
+}
+
+#[test]
+fn test_ts2366_arrow_function_try_catch() {
+    use crate::thin_parser::ThinParserState;
+
+    // Test error 2366 for arrow functions with try/catch
+    let source = r#"
+// Arrow function with try/catch - both branches can fall through
+const tryCatchFallthrough = (): number => {
+    try {
+        if (Math.random() > 0.5) {
+            return 1;
+        }
+    } catch (e) {
+        console.log(e);
+    }
+};
+
+// Arrow function with try/catch/finally - finally doesn't return but catch can fall through
+const tryFinallyFallthrough = (): number => {
+    try {
+        if (Math.random() > 0.5) {
+            return 1;
+        }
+    } catch (e) {
+        console.log(e);
+    } finally {
+        console.log("cleanup");
+    }
+};
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+
+    // Should have 2 errors: 2366 for both functions
+    assert_eq!(codes.iter().filter(|&&c| c == 2366).count(), 2,
+        "Expected 2 TS2366 errors for arrow functions with try/catch fallthrough, got: {:?}", codes);
+}
+
