@@ -2612,30 +2612,7 @@ fn contains_break_statement(arena: &ThinNodeArena, stmt_idx: NodeIndex) -> bool 
                         && contains_break_statement(arena, if_data.else_statement))
             })
             .unwrap_or(false),
-        k if k == syntax_kind_ext::SWITCH_STATEMENT => {
-            let Some(switch_data) = arena.get_switch(node) else {
-                return false;
-            };
-            let Some(case_block_node) = arena.get(switch_data.case_block) else {
-                return false;
-            };
-            let Some(case_block) = arena.get_block(case_block_node) else {
-                return false;
-            };
-            case_block.statements.nodes.iter().any(|&clause_idx| {
-                let Some(clause_node) = arena.get(clause_idx) else {
-                    return false;
-                };
-                let Some(clause) = arena.get_case_clause(clause_node) else {
-                    return false;
-                };
-                clause
-                    .statements
-                    .nodes
-                    .iter()
-                    .any(|&stmt| contains_break_statement(arena, stmt))
-            })
-        }
+        k if k == syntax_kind_ext::SWITCH_STATEMENT => false,
         k if k == syntax_kind_ext::TRY_STATEMENT => arena
             .get_try(node)
             .map(|try_data| {
@@ -2650,15 +2627,9 @@ fn contains_break_statement(arena: &ThinNodeArena, stmt_idx: NodeIndex) -> bool 
             || k == syntax_kind_ext::DO_STATEMENT
             || k == syntax_kind_ext::FOR_STATEMENT =>
         {
-            arena
-                .get_loop(node)
-                .map(|loop_data| contains_break_statement(arena, loop_data.statement))
-                .unwrap_or(false)
+            false
         }
-        k if k == syntax_kind_ext::FOR_IN_STATEMENT || k == syntax_kind_ext::FOR_OF_STATEMENT => arena
-            .get_for_in_of(node)
-            .map(|loop_data| contains_break_statement(arena, loop_data.statement))
-            .unwrap_or(false),
+        k if k == syntax_kind_ext::FOR_IN_STATEMENT || k == syntax_kind_ext::FOR_OF_STATEMENT => false,
         k if k == syntax_kind_ext::LABELED_STATEMENT => arena
             .get_labeled_statement(node)
             .map(|labeled| contains_break_statement(arena, labeled.statement))

@@ -13,12 +13,15 @@ Implement return-path analysis helpers for fallthrough detection.
 - [x] Update return-path analysis helpers in `wasm/src/checker/control_flow.rs`
 - [x] Expose fallthrough helpers via `wasm/src/checker/statements.rs`
 - [x] Add regression coverage in `wasm/src/thin_checker_tests.rs`
+- [x] Ignore breaks inside nested loops/switches for loop fallthrough
 - [x] Run focused test: `./wasm/test.sh test_ts7010_return_path_analysis`
 
 ### Results
 - Added return-path analysis helpers for blocks/if/loops/switch/try in `wasm/src/checker/control_flow.rs`.
 - `StatementChecker` now exposes `function_body_falls_through` and `statement_falls_through` wrappers.
 - Added `test_ts7010_return_path_analysis` in `wasm/src/thin_checker_tests.rs`.
+- `contains_break_statement` no longer treats breaks in nested loops/switches as exiting the current loop.
+- Extended `test_ts7010_return_path_analysis` with nested-switch break coverage.
 - Test: `./wasm/test.sh test_ts7010_return_path_analysis` (PASS; existing warnings).
 
 ### Key Files

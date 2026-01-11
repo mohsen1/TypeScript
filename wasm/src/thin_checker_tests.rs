@@ -5300,6 +5300,15 @@ function infiniteLoop() {
 function loopWithBreak() {
     while (true) { break; }
 }
+
+function loopWithNestedSwitchBreak(flag: boolean) {
+    while (true) {
+        switch (flag) {
+            case true:
+                break;
+        }
+    }
+}
 "#;
 
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -5339,6 +5348,10 @@ function loopWithBreak() {
     assert!(!checker.function_body_falls_through(body_at(2)), "throwOnly should not fall through");
     assert!(!checker.function_body_falls_through(body_at(3)), "infiniteLoop should not fall through");
     assert!(checker.function_body_falls_through(body_at(4)), "loopWithBreak should fall through");
+    assert!(
+        !checker.function_body_falls_through(body_at(5)),
+        "loopWithNestedSwitchBreak should not fall through"
+    );
 }
 
 /// Test that functions that only throw don't trigger TS2355.
