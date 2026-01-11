@@ -349,6 +349,47 @@ impl<'a> ThinCheckerState<'a> {
         None
     }
 
+    fn resolve_identifier_symbol_allow_unexported(&self, idx: NodeIndex) -> Option<SymbolId> {
+        let node = self.ctx.arena.get(idx)?;
+        let name = self.ctx.arena.get_identifier(node)?.escaped_text.as_str();
+
+        let mut scope_id = self.find_enclosing_scope(idx)?;
+        while !scope_id.is_none() {
+            if let Some(scope) = self.ctx.binder.scopes.get(scope_id.0 as usize) {
+                if let Some(sym_id) = scope.table.get(name) {
+                    if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
+                        if !Self::is_class_member_symbol(symbol.flags) {
+                            return Some(sym_id);
+                        }
+                    } else {
+                        return Some(sym_id);
+                    }
+                }
+                if scope.kind == ContainerKind::Module {
+                    if let Some(container_sym_id) = self.ctx.binder.get_node_symbol(scope.container_node) {
+                        if let Some(container_symbol) = self.ctx.binder.get_symbol(container_sym_id) {
+                            if let Some(exports) = container_symbol.exports.as_ref() {
+                                if let Some(member_id) = exports.get(name) {
+                                    if let Some(member_symbol) = self.ctx.binder.get_symbol(member_id) {
+                                        if !Self::is_class_member_symbol(member_symbol.flags) {
+                                            return Some(member_id);
+                                        }
+                                    } else {
+                                        return Some(member_id);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                scope_id = scope.parent;
+            } else {
+                break;
+            }
+        }
+        None
+    }
+
     fn resolve_private_identifier_symbols(&self, idx: NodeIndex) -> (Vec<SymbolId>, bool) {
         let node = match self.ctx.arena.get(idx) {
             Some(node) => node,
@@ -1299,6 +1340,72 @@ impl<'a> ThinCheckerState<'a> {
         None
     }
 
+    fn resolve_heritage_symbol_allow_unexported(&self, idx: NodeIndex) -> Option<SymbolId> {
+        let node = self.ctx.arena.get(idx)?;
+
+        if node.kind == SyntaxKind::Identifier as u16 {
+            return self.resolve_identifier_symbol_allow_unexported(idx);
+        }
+
+        if node.kind == syntax_kind_ext::QUALIFIED_NAME {
+            let qn = self.ctx.arena.get_qualified_name(node)?;
+            let left_sym = self.resolve_heritage_symbol_allow_unexported(qn.left)?;
+            let right_name = self.ctx.arena.get(qn.right)
+                .and_then(|node| self.ctx.arena.get_identifier(node))
+                .map(|ident| ident.escaped_text.clone())?;
+            let left_symbol = self.ctx.binder.get_symbol(left_sym)?;
+            let exports = left_symbol.exports.as_ref()?;
+            return exports.get(&right_name);
+        }
+
+        if node.kind == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION {
+            let access = self.ctx.arena.get_access_expr(node)?;
+            let left_sym = self.resolve_heritage_symbol_allow_unexported(access.expression)?;
+            let name = self.ctx.arena.get(access.name_or_argument)
+                .and_then(|name_node| self.ctx.arena.get_identifier(name_node))
+                .map(|ident| ident.escaped_text.clone())?;
+            let left_symbol = self.ctx.binder.get_symbol(left_sym)?;
+            let exports = left_symbol.exports.as_ref()?;
+            return exports.get(&name);
+        }
+
+        None
+    }
+
+    fn heritage_left_resolves(&self, idx: NodeIndex, allow_unexported: bool) -> bool {
+        use crate::parser::syntax_kind_ext;
+        use crate::scanner::SyntaxKind;
+
+        let Some(node) = self.ctx.arena.get(idx) else {
+            return false;
+        };
+
+        match node.kind {
+            k if k == SyntaxKind::Identifier as u16 => {
+                if allow_unexported {
+                    self.resolve_identifier_symbol_allow_unexported(idx).is_some()
+                } else {
+                    self.resolve_identifier_symbol(idx).is_some()
+                }
+            }
+            syntax_kind_ext::QUALIFIED_NAME => {
+                let qn = match self.ctx.arena.get_qualified_name(node) {
+                    Some(qn) => qn,
+                    None => return false,
+                };
+                self.heritage_left_resolves(qn.left, allow_unexported)
+            }
+            syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION => {
+                let access = match self.ctx.arena.get_access_expr(node) {
+                    Some(access) => access,
+                    None => return false,
+                };
+                self.heritage_left_resolves(access.expression, allow_unexported)
+            }
+            _ => false,
+        }
+    }
+
     fn heritage_name_text(&self, idx: NodeIndex) -> Option<String> {
         let node = self.ctx.arena.get(idx)?;
 
@@ -1463,7 +1570,11 @@ impl<'a> ThinCheckerState<'a> {
                 return None;
             }
         }
-        let expr_type = self.get_type_of_node(expr_idx);
+        let expr_type = if let Some(sym_id) = self.resolve_heritage_symbol_allow_unexported(expr_idx) {
+            self.get_type_of_symbol(sym_id)
+        } else {
+            self.get_type_of_node(expr_idx)
+        };
         let ctor_types = self.constructor_types_from_type(expr_type);
         if ctor_types.is_empty() {
             return None;
@@ -12856,7 +12967,11 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Check heritage clauses (extends/implements) for unresolved names.
     /// Emits TS2304 when a referenced name cannot be resolved.
-    fn check_heritage_clauses_for_unresolved_names(&mut self, heritage_clauses: &Option<crate::parser::NodeList>) {
+    fn check_heritage_clauses_for_unresolved_names(
+        &mut self,
+        heritage_clauses: &Option<crate::parser::NodeList>,
+        allow_unexported_in_extends: bool,
+    ) {
         use crate::parser::syntax_kind_ext::HERITAGE_CLAUSE;
         use crate::scanner::SyntaxKind;
 
@@ -12892,6 +13007,11 @@ impl<'a> ThinCheckerState<'a> {
 
                 // Try to resolve the heritage symbol
                 if self.resolve_heritage_symbol(expr_idx).is_none() {
+                    let allow_unexported = allow_unexported_in_extends
+                        && heritage.token == SyntaxKind::ExtendsKeyword as u16;
+                    if self.heritage_left_resolves(expr_idx, allow_unexported) {
+                        continue;
+                    }
                     if let Some(expr_node) = self.ctx.arena.get(expr_idx) {
                         match expr_node.kind {
                             k if k == SyntaxKind::NullKeyword as u16
@@ -12900,7 +13020,10 @@ impl<'a> ThinCheckerState<'a> {
                                 || k == SyntaxKind::FalseKeyword as u16
                                 || k == SyntaxKind::VoidKeyword as u16
                                 || k == SyntaxKind::NumericLiteral as u16
-                                || k == SyntaxKind::StringLiteral as u16 => {
+                                || k == SyntaxKind::BigIntLiteral as u16
+                                || k == SyntaxKind::StringLiteral as u16
+                                || k == SyntaxKind::NoSubstitutionTemplateLiteral as u16
+                                || k == SyntaxKind::RegularExpressionLiteral as u16 => {
                                 continue;
                             }
                             _ => {}
@@ -13029,7 +13152,7 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         // Check heritage clauses for unresolved names (TS2304)
-        self.check_heritage_clauses_for_unresolved_names(&class.heritage_clauses);
+        self.check_heritage_clauses_for_unresolved_names(&class.heritage_clauses, true);
 
         let (_type_params, type_param_updates) = self.push_type_parameters(&class.type_parameters);
 
@@ -14287,7 +14410,7 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         // Check heritage clauses for unresolved names (TS2304)
-        self.check_heritage_clauses_for_unresolved_names(&iface.heritage_clauses);
+        self.check_heritage_clauses_for_unresolved_names(&iface.heritage_clauses, false);
 
         let (_type_params, type_param_updates) = self.push_type_parameters(&iface.type_parameters);
 
