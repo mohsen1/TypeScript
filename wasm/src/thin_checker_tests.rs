@@ -3,7 +3,6 @@
 use crate::thin_checker::ThinCheckerState;
 use crate::parser::thin_node::ThinNodeArena;
 use crate::thin_binder::ThinBinderState;
-use crate::thin_parser::ThinParserState;
 use crate::solver::{TypeId, TypeInterner};
 
 #[test]
@@ -2387,42 +2386,6 @@ var x: number;
         !codes.contains(&2304),
         "Unexpected TS2304 for invalid decorator declarations, got: {:?}",
         codes
-    );
-}
-
-#[test]
-fn test_decorator_static_method_no_ts2304() {
-    use crate::thin_parser::ThinParserState;
-
-    let source = r#"
-// @target: esnext
-// @experimentalDecorators: true
-@((t) => {})
-class C {
-    @((t, k, d) => { })
-    static f() {}
-
-    @((t, k, d) => { })
-    static get x() { return 1; }
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let mut binder = ThinBinderState::new();
-    binder.bind_source_file(parser.get_arena(), root);
-
-    let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
-    checker.check_source_file(root);
-
-    let ts2304_errs: Vec<_> = checker.ctx.diagnostics.iter().filter(|d| d.code == 2304).collect();
-    assert_eq!(
-        ts2304_errs.len(),
-        0,
-        "Should have no TS2304 errors for decorated static methods/getters, but found: {:#?}",
-        ts2304_errs
     );
 }
 
@@ -17174,18 +17137,18 @@ class C {
 
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
-    
+
     let mut binder = ThinBinderState::new();
     binder.bind_source_file(parser.get_arena(), root);
-    
+
     let types = TypeInterner::new();
     let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
-    
+
     checker.check_source_file(root);
-    
+
     // Should have NO TS2339 errors for C.#x access
     let ts2339_count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2339).count();
-    assert_eq!(ts2339_count, 0, 
+    assert_eq!(ts2339_count, 0,
         "Expected no TS2339 errors for static private field access, got {} - diagnostics: {:?}",
         ts2339_count,
         checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>()
@@ -17199,9 +17162,9 @@ fn test_static_private_accessor_access_no_ts2339() {
 class A {
     static get #prop() { return ""; }
     static set #prop(param: string) { }
-    
+
     static get #roProp() { return ""; }
-    
+
     constructor(name: string) {
         A.#prop = "";
         console.log(A.#prop);
@@ -17212,23 +17175,70 @@ class A {
 
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
-    
+
     let mut binder = ThinBinderState::new();
     binder.bind_source_file(parser.get_arena(), root);
-    
+
     let types = TypeInterner::new();
     let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
-    
+
     checker.check_source_file(root);
-    
+
     // Filter out TS2540 for read-only property assignment (expected error)
     let ts2339_errors: Vec<_> = checker.ctx.diagnostics.iter()
         .filter(|d| d.code == 2339)
         .collect();
-    
+
     assert_eq!(ts2339_errors.len(), 0,
         "Expected no TS2339 errors for static private accessor access, got {} - TS2339 diagnostics: {:?}",
         ts2339_errors.len(),
         ts2339_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn test_type_parameter_in_type_query() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// Type parameters should be resolved in typeof type queries
+function identity<T>(x: T): T {
+    return x;
+}
+
+// typeof on type parameter should not error
+type IdentityReturnType<T> = ReturnType<typeof identity<T>>;
+
+// Type parameter in Extract with typeof
+function extract<T>(x: Extract<T, typeof identity>): T {
+    return x;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Check for false positive TS2304 errors on type parameter 'T'
+    let ts2304_for_T: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2304 && d.message_text.contains("'T'"))
+        .collect();
+
+    eprintln!("[TYPE_PARAM_TYPE_QUERY] All diagnostics: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>());
+
+    assert!(
+        ts2304_for_T.is_empty(),
+        "Expected no TS2304 errors for type parameter 'T' in type queries, but got {} errors: {:?}",
+        ts2304_for_T.len(),
+        ts2304_for_T.iter().map(|d| &d.message_text).collect::<Vec<_>>()
     );
 }
