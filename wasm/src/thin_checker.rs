@@ -10915,20 +10915,22 @@ impl<'a> ThinCheckerState<'a> {
                         let has_return = self.body_has_return_with_value(func.body);
                         let falls_through = self.function_body_falls_through(func.body);
 
-                        if has_type_annotation && requires_return && !has_return {
-                            use crate::checker::types::diagnostics::diagnostic_codes;
-                            self.error_at_node(
-                                func.type_annotation,
-                                "A function whose declared type is neither 'undefined', 'void', nor 'any' must return a value.",
-                                diagnostic_codes::FUNCTION_LACKS_RETURN_TYPE,
-                            );
-                        } else if has_type_annotation && requires_return && falls_through {
-                            use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
-                            self.error_at_node(
-                                func.type_annotation,
-                                diagnostic_messages::FUNCTION_LACKS_ENDING_RETURN_STATEMENT,
-                                diagnostic_codes::NOT_ALL_CODE_PATHS_RETURN_VALUE,
-                            );
+                        if has_type_annotation && requires_return && falls_through {
+                            if !has_return {
+                                use crate::checker::types::diagnostics::diagnostic_codes;
+                                self.error_at_node(
+                                    func.type_annotation,
+                                    "A function whose declared type is neither 'undefined', 'void', nor 'any' must return a value.",
+                                    diagnostic_codes::FUNCTION_LACKS_RETURN_TYPE,
+                                );
+                            } else {
+                                use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
+                                self.error_at_node(
+                                    func.type_annotation,
+                                    diagnostic_messages::FUNCTION_LACKS_ENDING_RETURN_STATEMENT,
+                                    diagnostic_codes::NOT_ALL_CODE_PATHS_RETURN_VALUE,
+                                );
+                            }
                         } else if self.ctx.no_implicit_returns && has_return && falls_through {
                             // TS7030: noImplicitReturns - not all code paths return a value
                             use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
@@ -16171,19 +16173,21 @@ impl<'a> ThinCheckerState<'a> {
             let has_return = self.body_has_return_with_value(method.body);
             let falls_through = self.function_body_falls_through(method.body);
 
-            if has_type_annotation && requires_return && !has_return {
-                self.error_at_node(
-                    method.type_annotation,
-                    "A function whose declared type is neither 'undefined', 'void', nor 'any' must return a value.",
-                    diagnostic_codes::FUNCTION_LACKS_RETURN_TYPE,
-                );
-            } else if has_type_annotation && requires_return && falls_through {
-                use crate::checker::types::diagnostics::diagnostic_messages;
-                self.error_at_node(
-                    method.type_annotation,
-                    diagnostic_messages::FUNCTION_LACKS_ENDING_RETURN_STATEMENT,
-                    diagnostic_codes::NOT_ALL_CODE_PATHS_RETURN_VALUE,
-                );
+            if has_type_annotation && requires_return && falls_through {
+                if !has_return {
+                    self.error_at_node(
+                        method.type_annotation,
+                        "A function whose declared type is neither 'undefined', 'void', nor 'any' must return a value.",
+                        diagnostic_codes::FUNCTION_LACKS_RETURN_TYPE,
+                    );
+                } else {
+                    use crate::checker::types::diagnostics::diagnostic_messages;
+                    self.error_at_node(
+                        method.type_annotation,
+                        diagnostic_messages::FUNCTION_LACKS_ENDING_RETURN_STATEMENT,
+                        diagnostic_codes::NOT_ALL_CODE_PATHS_RETURN_VALUE,
+                    );
+                }
             } else if self.ctx.no_implicit_returns && has_return && falls_through {
                 // TS7030: noImplicitReturns - not all code paths return a value
                 use crate::checker::types::diagnostics::diagnostic_messages;
@@ -16363,19 +16367,21 @@ impl<'a> ThinCheckerState<'a> {
                 let requires_return = self.requires_return_value(return_type);
                 let has_return = self.body_has_return_with_value(accessor.body);
                 let falls_through = self.function_body_falls_through(accessor.body);
-                if has_type_annotation && requires_return && !has_return {
-                    self.error_at_node(
-                        accessor.type_annotation,
-                        "A function whose declared type is neither 'undefined', 'void', nor 'any' must return a value.",
-                        diagnostic_codes::FUNCTION_LACKS_RETURN_TYPE,
-                    );
-                } else if has_type_annotation && requires_return && falls_through {
-                    use crate::checker::types::diagnostics::diagnostic_messages;
-                    self.error_at_node(
-                        accessor.type_annotation,
-                        diagnostic_messages::FUNCTION_LACKS_ENDING_RETURN_STATEMENT,
-                        diagnostic_codes::NOT_ALL_CODE_PATHS_RETURN_VALUE,
-                    );
+                if has_type_annotation && requires_return && falls_through {
+                    if !has_return {
+                        self.error_at_node(
+                            accessor.type_annotation,
+                            "A function whose declared type is neither 'undefined', 'void', nor 'any' must return a value.",
+                            diagnostic_codes::FUNCTION_LACKS_RETURN_TYPE,
+                        );
+                    } else {
+                        use crate::checker::types::diagnostics::diagnostic_messages;
+                        self.error_at_node(
+                            accessor.type_annotation,
+                            diagnostic_messages::FUNCTION_LACKS_ENDING_RETURN_STATEMENT,
+                            diagnostic_codes::NOT_ALL_CODE_PATHS_RETURN_VALUE,
+                        );
+                    }
                 } else if self.ctx.no_implicit_returns && has_return && falls_through {
                     // TS7030: noImplicitReturns - not all code paths return a value
                     use crate::checker::types::diagnostics::diagnostic_messages;
@@ -16845,7 +16851,7 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
-    fn function_body_falls_through(&self, body_idx: NodeIndex) -> bool {
+    fn function_body_falls_through(&mut self, body_idx: NodeIndex) -> bool {
         let Some(body_node) = self.ctx.arena.get(body_idx) else {
             return true;
         };
@@ -16857,7 +16863,7 @@ impl<'a> ThinCheckerState<'a> {
         false
     }
 
-    fn block_falls_through(&self, statements: &[NodeIndex]) -> bool {
+    fn block_falls_through(&mut self, statements: &[NodeIndex]) -> bool {
         for &stmt_idx in statements {
             if !self.statement_falls_through(stmt_idx) {
                 return false;
@@ -16866,7 +16872,7 @@ impl<'a> ThinCheckerState<'a> {
         true
     }
 
-    fn statement_falls_through(&self, stmt_idx: NodeIndex) -> bool {
+    fn statement_falls_through(&mut self, stmt_idx: NodeIndex) -> bool {
         let Some(node) = self.ctx.arena.get(stmt_idx) else {
             return true;
         };
@@ -16879,6 +16885,42 @@ impl<'a> ThinCheckerState<'a> {
                 .get_block(node)
                 .map(|block| self.block_falls_through(&block.statements.nodes))
                 .unwrap_or(true),
+            syntax_kind_ext::EXPRESSION_STATEMENT => {
+                let Some(expr_stmt) = self.ctx.arena.get_expression_statement(node) else {
+                    return true;
+                };
+                let expr_type = self.get_type_of_node(expr_stmt.expression);
+                !expr_type.is_never()
+            }
+            syntax_kind_ext::VARIABLE_STATEMENT => {
+                let Some(var_stmt) = self.ctx.arena.get_variable(node) else {
+                    return true;
+                };
+                for &decl_idx in &var_stmt.declarations.nodes {
+                    let Some(list_node) = self.ctx.arena.get(decl_idx) else {
+                        continue;
+                    };
+                    let Some(var_list) = self.ctx.arena.get_variable(list_node) else {
+                        continue;
+                    };
+                    for &list_decl_idx in &var_list.declarations.nodes {
+                        let Some(list_decl_node) = self.ctx.arena.get(list_decl_idx) else {
+                            continue;
+                        };
+                        let Some(decl) = self.ctx.arena.get_variable_declaration(list_decl_node) else {
+                            continue;
+                        };
+                        if decl.initializer.is_none() {
+                            continue;
+                        }
+                        let init_type = self.get_type_of_node(decl.initializer);
+                        if init_type.is_never() {
+                            return false;
+                        }
+                    }
+                }
+                true
+            }
             syntax_kind_ext::IF_STATEMENT => {
                 let Some(if_data) = self.ctx.arena.get_if_statement(node) else {
                     return true;
@@ -16906,7 +16948,7 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
-    fn switch_falls_through(&self, switch_idx: NodeIndex) -> bool {
+    fn switch_falls_through(&mut self, switch_idx: NodeIndex) -> bool {
         let Some(node) = self.ctx.arena.get(switch_idx) else {
             return true;
         };
@@ -16939,7 +16981,7 @@ impl<'a> ThinCheckerState<'a> {
         !has_default
     }
 
-    fn try_falls_through(&self, try_idx: NodeIndex) -> bool {
+    fn try_falls_through(&mut self, try_idx: NodeIndex) -> bool {
         let Some(node) = self.ctx.arena.get(try_idx) else {
             return true;
         };
@@ -16964,7 +17006,7 @@ impl<'a> ThinCheckerState<'a> {
         try_falls || catch_falls
     }
 
-    fn loop_falls_through(&self, node: &crate::parser::thin_node::ThinNode) -> bool {
+    fn loop_falls_through(&mut self, node: &crate::parser::thin_node::ThinNode) -> bool {
         let Some(loop_data) = self.ctx.arena.get_loop(node) else {
             return true;
         };
