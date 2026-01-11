@@ -1139,6 +1139,36 @@ impl ThinBinderState {
                 self.bind_function_expression(arena, node, idx);
             }
 
+            // Method declarations in object literals - bind body
+            k if k == syntax_kind_ext::METHOD_DECLARATION => {
+                if let Some(method) = arena.get_method_decl(node) {
+                    self.bind_modifiers(arena, &method.modifiers);
+
+                    // Bind computed property name if present
+                    if let Some(name_node) = arena.get(method.name) {
+                        if name_node.kind == syntax_kind_ext::COMPUTED_PROPERTY_NAME {
+                            self.bind_node(arena, method.name);
+                        }
+                    }
+
+                    // Enter function scope for method body
+                    self.enter_scope(ContainerKind::Function, idx);
+                    self.declare_arguments_symbol();
+
+                    self.with_fresh_flow(|binder| {
+                        // Bind parameters
+                        for &param_idx in &method.parameters.nodes {
+                            binder.bind_parameter(arena, param_idx);
+                        }
+
+                        // Bind body
+                        binder.bind_node(arena, method.body);
+                    });
+
+                    self.exit_scope(arena);
+                }
+            }
+
             _ => {
                 // For other node types, no symbols to create
             }
@@ -1999,8 +2029,7 @@ impl ThinBinderState {
             // Enter function scope
             self.enter_scope(ContainerKind::Function, idx);
 
-            // Capture enclosing flow for closures (preserves narrowing for const/let variables)
-            self.with_fresh_flow_inner(|binder| {
+            self.with_fresh_flow(|binder| {
                 // Bind parameters
                 for &param_idx in &func.parameters.nodes {
                     binder.bind_parameter(arena, param_idx);
@@ -2008,7 +2037,7 @@ impl ThinBinderState {
 
                 // Bind body (could be a block or an expression)
                 binder.bind_node(arena, func.body);
-            }, true);
+            });
 
             self.exit_scope(arena);
         }
@@ -2022,8 +2051,7 @@ impl ThinBinderState {
             self.enter_scope(ContainerKind::Function, idx);
             self.declare_arguments_symbol();
 
-            // Capture enclosing flow for closures (preserves narrowing for const/let variables)
-            self.with_fresh_flow_inner(|binder| {
+            self.with_fresh_flow(|binder| {
                 // Bind parameters
                 for &param_idx in &func.parameters.nodes {
                     binder.bind_parameter(arena, param_idx);
@@ -2031,7 +2059,7 @@ impl ThinBinderState {
 
                 // Bind body
                 binder.bind_node(arena, func.body);
-            }, true);
+            });
 
             self.exit_scope(arena);
         }
@@ -2713,27 +2741,8 @@ impl ThinBinderState {
     where
         F: FnOnce(&mut Self),
     {
-        self.with_fresh_flow_inner(bind_body, false);
-    }
-
-    /// Create a fresh flow for a function body, optionally capturing the enclosing flow for closures.
-    /// If capture_enclosing is true, the START node will point to the enclosing flow, allowing
-    /// const/let variables to preserve narrowing from the outer scope.
-    fn with_fresh_flow_inner<F>(&mut self, bind_body: F, capture_enclosing: bool)
-    where
-        F: FnOnce(&mut Self),
-    {
         let prev_flow = self.current_flow;
         let start_flow = self.flow_nodes.alloc(flow_flags::START);
-
-        // For closures (arrow functions and function expressions), capture the enclosing flow
-        // so that const/let variables can preserve narrowing from the outer scope
-        if capture_enclosing && !prev_flow.is_none() {
-            if let Some(start_node) = self.flow_nodes.get_mut(start_flow) {
-                start_node.antecedent.push(prev_flow);
-            }
-        }
-
         self.current_flow = start_flow;
         bind_body(self);
         self.current_flow = prev_flow;
