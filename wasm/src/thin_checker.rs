@@ -17252,7 +17252,8 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
 
-        // Constructors don't have explicit return types
+        // Constructors don't have explicit return types, but they implicitly return the class instance type
+        // Get the class instance type to validate constructor return expressions (TS2322)
 
         self.cache_parameter_types(&ctor.parameters.nodes, None);
 
@@ -17266,7 +17267,22 @@ impl<'a> ThinCheckerState<'a> {
 
         // Check constructor body
         if !ctor.body.is_none() {
+            // Get class instance type for constructor return expression validation
+            let instance_type = if let Some(ref class_info) = self.ctx.enclosing_class {
+                let class_node = self.ctx.arena.get(class_info.class_idx);
+                if let Some(class) = class_node.and_then(|n| self.ctx.arena.get_class(n)) {
+                    self.get_class_instance_type(class_info.class_idx, class)
+                } else {
+                    TypeId::ANY
+                }
+            } else {
+                TypeId::ANY
+            };
+
+            // Set expected return type to class instance type
+            self.push_return_type(instance_type);
             self.check_statement(ctor.body);
+            self.pop_return_type();
         }
 
         // Reset in_constructor flag
