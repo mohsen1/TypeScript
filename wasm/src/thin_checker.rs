@@ -4973,16 +4973,18 @@ impl<'a> ThinCheckerState<'a> {
                 continue;
             };
 
+            let left_idx = binary.left;
+            let right_idx = binary.right;
             let op_kind = binary.operator_token;
 
             if !visited {
                 if self.is_assignment_operator(op_kind) {
                     let assign_type = if op_kind == SyntaxKind::EqualsToken as u16 {
-                        self.check_assignment_expression(binary.left, binary.right, node_idx)
+                        self.check_assignment_expression(left_idx, right_idx, node_idx)
                     } else {
                         self.check_compound_assignment_expression(
-                            binary.left,
-                            binary.right,
+                            left_idx,
+                            right_idx,
                             op_kind,
                             node_idx,
                         )
@@ -4992,13 +4994,25 @@ impl<'a> ThinCheckerState<'a> {
                 }
 
                 stack.push((node_idx, true));
-                stack.push((binary.right, false));
-                stack.push((binary.left, false));
+                stack.push((right_idx, false));
+                stack.push((left_idx, false));
                 continue;
             }
 
             let right_type = type_stack.pop().unwrap_or(TypeId::ANY);
             let left_type = type_stack.pop().unwrap_or(TypeId::ANY);
+            if op_kind == SyntaxKind::CommaToken as u16 {
+                if self.is_side_effect_free(left_idx) && !self.is_indirect_call(node_idx, left_idx, right_idx) {
+                    use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
+                    self.error_at_node(
+                        left_idx,
+                        diagnostic_messages::LEFT_SIDE_OF_COMMA_OPERATOR_IS_UNUSED_AND_HAS_NO_SIDE_EFFECTS,
+                        diagnostic_codes::LEFT_SIDE_OF_COMMA_OPERATOR_IS_UNUSED_AND_HAS_NO_SIDE_EFFECTS,
+                    );
+                }
+                type_stack.push(right_type);
+                continue;
+            }
             let op_str = match op_kind {
                 k if k == SyntaxKind::PlusToken as u16 => "+",
                 k if k == SyntaxKind::MinusToken as u16 => "-",
@@ -12622,6 +12636,176 @@ impl<'a> ThinCheckerState<'a> {
                 || k == SyntaxKind::QuestionQuestionEqualsToken as u16
                 || k == SyntaxKind::CaretEqualsToken as u16
         )
+    }
+
+    fn skip_parenthesized_expression(&self, mut expr_idx: NodeIndex) -> NodeIndex {
+        while let Some(node) = self.ctx.arena.get(expr_idx) {
+            if node.kind != syntax_kind_ext::PARENTHESIZED_EXPRESSION {
+                break;
+            }
+            let Some(paren) = self.ctx.arena.get_parenthesized(node) else {
+                break;
+            };
+            expr_idx = paren.expression;
+        }
+        expr_idx
+    }
+
+    fn is_side_effect_free(&self, expr_idx: NodeIndex) -> bool {
+        use crate::scanner::SyntaxKind;
+
+        let expr_idx = self.skip_parenthesized_expression(expr_idx);
+        let Some(node) = self.ctx.arena.get(expr_idx) else {
+            return false;
+        };
+
+        match node.kind {
+            k if k == SyntaxKind::Identifier as u16
+                || k == SyntaxKind::StringLiteral as u16
+                || k == SyntaxKind::RegularExpressionLiteral as u16
+                || k == SyntaxKind::NoSubstitutionTemplateLiteral as u16
+                || k == SyntaxKind::NumericLiteral as u16
+                || k == SyntaxKind::BigIntLiteral as u16
+                || k == SyntaxKind::TrueKeyword as u16
+                || k == SyntaxKind::FalseKeyword as u16
+                || k == SyntaxKind::NullKeyword as u16
+                || k == SyntaxKind::UndefinedKeyword as u16 => true,
+            k if k == syntax_kind_ext::TAGGED_TEMPLATE_EXPRESSION
+                || k == syntax_kind_ext::TEMPLATE_EXPRESSION
+                || k == syntax_kind_ext::FUNCTION_EXPRESSION
+                || k == syntax_kind_ext::CLASS_EXPRESSION
+                || k == syntax_kind_ext::ARROW_FUNCTION
+                || k == syntax_kind_ext::ARRAY_LITERAL_EXPRESSION
+                || k == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION
+                || k == syntax_kind_ext::TYPE_OF_EXPRESSION
+                || k == syntax_kind_ext::NON_NULL_EXPRESSION
+                || k == syntax_kind_ext::JSX_SELF_CLOSING_ELEMENT
+                || k == syntax_kind_ext::JSX_ELEMENT => true,
+            k if k == syntax_kind_ext::CONDITIONAL_EXPRESSION => {
+                let Some(cond) = self.ctx.arena.get_conditional_expr(node) else {
+                    return false;
+                };
+                self.is_side_effect_free(cond.when_true) && self.is_side_effect_free(cond.when_false)
+            }
+            k if k == syntax_kind_ext::BINARY_EXPRESSION => {
+                let Some(bin) = self.ctx.arena.get_binary_expr(node) else {
+                    return false;
+                };
+                if self.is_assignment_operator(bin.operator_token) {
+                    return false;
+                }
+                self.is_side_effect_free(bin.left) && self.is_side_effect_free(bin.right)
+            }
+            k if k == syntax_kind_ext::PREFIX_UNARY_EXPRESSION || k == syntax_kind_ext::POSTFIX_UNARY_EXPRESSION => {
+                let Some(unary) = self.ctx.arena.get_unary_expr(node) else {
+                    return false;
+                };
+                matches!(
+                    unary.operator,
+                    k if k == SyntaxKind::ExclamationToken as u16
+                        || k == SyntaxKind::PlusToken as u16
+                        || k == SyntaxKind::MinusToken as u16
+                        || k == SyntaxKind::TildeToken as u16
+                        || k == SyntaxKind::TypeOfKeyword as u16
+                )
+            }
+            _ => false,
+        }
+    }
+
+    fn is_numeric_literal_zero(&self, expr_idx: NodeIndex) -> bool {
+        use crate::scanner::SyntaxKind;
+
+        let Some(node) = self.ctx.arena.get(expr_idx) else {
+            return false;
+        };
+        if node.kind != SyntaxKind::NumericLiteral as u16 {
+            return false;
+        }
+        let Some(lit) = self.ctx.arena.get_literal(node) else {
+            return false;
+        };
+        lit.text == "0"
+    }
+
+    fn is_access_expression(&self, expr_idx: NodeIndex) -> bool {
+        let Some(node) = self.ctx.arena.get(expr_idx) else {
+            return false;
+        };
+        matches!(
+            node.kind,
+            k if k == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION
+                || k == syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION
+        )
+    }
+
+    fn is_indirect_call(&self, comma_idx: NodeIndex, left: NodeIndex, right: NodeIndex) -> bool {
+        use crate::scanner::SyntaxKind;
+
+        let parent = self
+            .ctx
+            .arena
+            .get_extended(comma_idx)
+            .map(|ext| ext.parent)
+            .unwrap_or(NodeIndex::NONE);
+        if parent.is_none() {
+            return false;
+        }
+        let Some(parent_node) = self.ctx.arena.get(parent) else {
+            return false;
+        };
+        if parent_node.kind != syntax_kind_ext::PARENTHESIZED_EXPRESSION {
+            return false;
+        }
+        if !self.is_numeric_literal_zero(left) {
+            return false;
+        }
+
+        let grand_parent = self
+            .ctx
+            .arena
+            .get_extended(parent)
+            .map(|ext| ext.parent)
+            .unwrap_or(NodeIndex::NONE);
+        if grand_parent.is_none() {
+            return false;
+        }
+        let Some(grand_node) = self.ctx.arena.get(grand_parent) else {
+            return false;
+        };
+
+        let is_indirect_target = if grand_node.kind == syntax_kind_ext::CALL_EXPRESSION {
+            if let Some(call) = self.ctx.arena.get_call_expr(grand_node) {
+                call.expression == parent
+            } else {
+                false
+            }
+        } else if grand_node.kind == syntax_kind_ext::TAGGED_TEMPLATE_EXPRESSION {
+            if let Some(tagged) = self.ctx.arena.get_tagged_template(grand_node) {
+                tagged.tag == parent
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+        if !is_indirect_target {
+            return false;
+        }
+
+        if self.is_access_expression(right) {
+            return true;
+        }
+        let Some(right_node) = self.ctx.arena.get(right) else {
+            return false;
+        };
+        if right_node.kind != SyntaxKind::Identifier as u16 {
+            return false;
+        }
+        let Some(ident) = self.ctx.arena.get_identifier(right_node) else {
+            return false;
+        };
+        ident.escaped_text == "eval"
     }
 
     fn combine_flow_sets(
