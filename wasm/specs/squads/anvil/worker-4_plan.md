@@ -2,6 +2,7 @@
 
 ## Current Assignment (2026-01-10)
 
+- Prereq: run `./scripts/ask-gemini.mjs "I need to reduce TS2769 overload matching false positives (variadic tuples). What's the best approach?"` once the API key is available.
 - Reduce TS2769 overload matching false positives.
 - Start with `variadicTuples1.ts` plus two more samples; trace call resolution in `wasm/src/thin_checker.rs` and `wasm/src/solver/`.
 - Implement fix + regression test, then report delta from a targeted conformance run.

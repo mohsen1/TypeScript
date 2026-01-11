@@ -6,9 +6,10 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-- Reduce TS2304 false positives (Cannot find name).
+- Prereq: run `./scripts/ask-gemini.mjs "I need to reduce TS2304 false positives (namespace/module/global scope). What's the best approach?"` once the API key is available.
+- Reduce TS2304 false positives (Cannot find name), focusing on namespace sibling exports, module augmentation merging, and global ambient declarations.
 - Collect 3-5 failing samples via conformance or `node wasm/differential-test/find-ts2304.mjs`; trace scope resolution in `wasm/src/thin_binder.rs` and `wasm/src/thin_checker.rs`.
-- Implement fix + regression tests, then report delta from a targeted conformance run.
+- Implement fix + regression tests, then report delta from a targeted conformance run (TS2304 counts).
 - Deliverables: sample list + root cause notes, regression test(s), and a before/after conformance delta.
 
 ## Task Queue
