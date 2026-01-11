@@ -7,25 +7,27 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-Improve TS2322 assignability by tightening return-type compatibility and void/undefined handling.
+Improve TS2322 assignability for object literals (excess properties + optionality).
 
 **Error Code:** TS2322 - "Type 'X' is not assignable to type 'Y'"
 
 **Impact:** 310 conformance tests affected
 
 ### Steps
-1. **Audit return compatibility** in `wasm/src/solver/compat.rs` and `wasm/src/solver/subtype.rs`.
-2. **Add focused tests** in `wasm/src/solver/compat_tests.rs` for void/undefined return assignability.
+1. **Add focused tests** in `wasm/src/solver/compat_tests.rs` and/or `wasm/src/thin_checker_tests.rs` for object literal excess property and optionality mismatches.
+2. **Audit object literal assignability** in `wasm/src/solver/compat.rs` (and any assignability helpers) to ensure excess property checks fire in strict contexts.
 3. **Implement fixes** for any mismatches and rerun the new tests.
-4. **Run a focused TS2322 pass** (targeted tests) and record delta.
+4. **Run focused tests** with `./wasm/test.sh` and report delta.
 
 ### Key Files
+- `wasm/src/solver/compat.rs`
+- `wasm/src/solver/compat_tests.rs`
 - `wasm/src/thin_checker.rs`
-- `wasm/src/checker/types/assignability.rs` (if present)
 - `wasm/src/thin_checker_tests.rs`
+- `wasm/src/checker/types/assignability.rs` (if present)
 
 ### Success Criteria
-- TS2322 missing errors reduced
+- TS2322 missing errors reduced for object literal assignability
 - Extra errors do not increase (no regressions)
 
 ## Task Queue
@@ -77,7 +79,7 @@ Improve TS2322 assignability by tightening return-type compatibility and void/un
 - [x] Applied check_parameter_initializers to constructors, methods, accessors, functions
 
 ## Ready for Merge
-Yes
+No
 
 ## Notes
 - Progress: fixed mapped type param scope in missing-name checks; relaxed recursive generic type alias resolution to avoid TS2456 for DeepReadonly/DeepPartial; added mapped type param scope regression test; added TS2322 tests for union mismatch and intersection literal assignment; added TS2322 compound assignment checks (+=, &&=, ??=) to use assigned type for diagnostics; added binding element default value TS2322 checks for destructuring patterns; fixed pre-existing compilation error in cli/driver.rs.
