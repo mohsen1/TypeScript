@@ -15548,6 +15548,37 @@ declare var x: Circular<tup>;
     // The recursion guard should prevent infinite loops
     assert!(checker.ctx.diagnostics.len() >= 0, "Checker should complete");
 }
+
+#[test]
+fn test_recursive_mapped_property_access_no_crash() {
+    use crate::thin_parser::ThinParserState;
+
+    // Regression test for recursive mapped type property access
+    let code = r#"
+type Transform<T> = { [K in keyof T]: Transform<T[K]> };
+
+interface Product {
+    users: string[];
+}
+
+declare var product: Transform<Product>;
+product.users;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+
+    // Should complete without crashing or hanging
+    checker.check_source_file(root);
+
+    assert!(checker.ctx.diagnostics.len() >= 0, "Checker should complete");
+}
 #[test]
 fn test_object_destructuring_assignability() {
     use crate::thin_parser::ThinParserState;
