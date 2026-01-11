@@ -16938,3 +16938,65 @@ let { x = "hello" }: { x?: number } = {};
     assert!(!ts2322_errors.is_empty(), "Expected TS2322 error for binding element default value 'hello' (string) not assignable to number, got: {:?}",
         checker.ctx.diagnostics.iter().map(|d| d.code).collect::<Vec<_>>());
 }
+
+#[test]
+fn test_ts7006_setter_with_matching_getter_no_error() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// @noImplicitAny: true
+class C {
+    private get y() { return "string"; }
+    private set y(x) { }  // Should NOT report TS7006 - type inferred from getter
+    
+    static get z() { return 42; }
+    static set z(value) { }  // Should NOT report TS7006 - type inferred from static getter
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts7006_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 7006)
+        .collect();
+    
+    assert_eq!(ts7006_errors.len(), 0, "Expected no TS7006 errors for setter parameters with matching getters, got: {:?}", ts7006_errors);
+}
+
+#[test]
+fn test_ts7006_setter_without_getter_reports_error() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// @noImplicitAny: true
+class C {
+    private set y(x) { }  // Should report TS7006 - no matching getter
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts7006_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 7006)
+        .collect();
+    
+    assert_eq!(ts7006_errors.len(), 1, "Expected one TS7006 error for setter parameter without getter, got: {:?}", ts7006_errors);
+}
