@@ -5,27 +5,34 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 
 Status: Active
 Priority: 1
-## Current Assignment (2026-01-11 - NEW: TS2403 False Positives)
-**Target:** Reduce TS2403 "Subsequent variable declarations must have the same type" false positives (96 occurrences)
+## Current Assignment (2026-01-11 - TS7006 Implicit 'any' Parameter False Positives)
 
-**Problem:** WASM incorrectly reports TS2403 when subsequent variable declarations are actually compatible.
+**Target:** Reduce TS7006 "Parameter '{}' implicitly has an 'any' type" false positives (46 occurrences)
+
+**Problem:** WASM incorrectly reports TS7006 when parameter types are inferable from context or when noImplicitAny is not set.
 
 **Root Causes to Investigate:**
-1. Type widening between declarations not handled correctly
-2. Declaration merging across scopes fails
-3. Const/let redeclaration validation too strict
-4. Module/namespace variable merging issues
+1. Contextual typing not propagated to parameters
+2. Default value types not used for inference
+3. Destructured parameter patterns not handled
+4. Generic function type parameter inference failures
 
 **Approach:**
-1. Run `node wasm/differential-test/conformance-runner.mjs --find-extra-error=TS2403 --max=1000 --samples=10` to collect samples
+1. Collect samples with `node wasm/differential-test/conformance-runner.mjs --find-extra-error=TS7006 --max=1000 --samples=10`
 2. Analyze patterns in false positives
-3. Fix variable declaration merging in `thin_binder.rs` and/or type compatibility in `thin_checker.rs`
+3. Fix parameter type inference in `thin_checker.rs`
 4. Add regression tests for each pattern fixed
 5. Run conformance baseline before/after to verify reduction
 
-**Files:** `wasm/src/thin_binder.rs`, `wasm/src/thin_checker.rs`, `wasm/src/thin_checker_tests.rs`
+**Files:** `wasm/src/thin_checker.rs`, `wasm/src/thin_checker_tests.rs`
 
-**Success Criteria:** Reduce TS2403 from 96 to <50 with no regressions in other error codes
+**Success Criteria:** Reduce TS7006 from 46 to <20 with no regressions
+
+## Previous Assignment - TS2403 (COMPLETED)
+
+**Status:** Already resolved by Worker 2's bi-directional assignability fix
+**Verification:** Ran conformance scan of 1000 tests - **0 extra TS2403 errors found**
+**Note:** TS2403 false positives eliminated using bi-directional assignability check in `are_var_decl_types_compatible`
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)

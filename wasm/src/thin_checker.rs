@@ -17276,7 +17276,10 @@ impl<'a> ThinCheckerState<'a> {
         for &param_idx in &accessor.parameters.nodes {
             if let Some(param_node) = self.ctx.arena.get(param_idx) {
                 if let Some(param) = self.ctx.arena.get_parameter(param_node) {
-                    self.maybe_report_implicit_any_parameter(param, false);
+                    // For setters, skip implicit 'any' parameter check - the parameter type
+                    // is inferred from the corresponding getter's return type
+                    let is_setter_param = !is_getter;
+                    self.maybe_report_implicit_any_parameter(param, is_setter_param);
                 }
             }
         }
