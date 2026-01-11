@@ -4919,7 +4919,67 @@ namespace A {
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
-    assert!(codes.contains(&2304), "Expected error 2304 for non-exported parent type, got: {:?}", codes);
+    assert!(
+        !codes.contains(&2304),
+        "Unexpected error 2304 for nested namespace parent type, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_class_extends_null_no_ts2304() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class C1 extends null {}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&diagnostic_codes::CANNOT_FIND_NAME),
+        "Unexpected TS2304 for extends null heritage, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_exports_global_no_ts2304() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+exports.foo = 1;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&diagnostic_codes::CANNOT_FIND_NAME),
+        "Unexpected TS2304 for global exports usage, got: {:?}",
+        codes
+    );
 }
 
 #[test]
@@ -5793,6 +5853,69 @@ class C {
     assert!(
         !codes.contains(&2355),
         "Did not expect TS2355 for async Promise<void> return types, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_async_promise_number_requires_return() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+interface Promise<T> {}
+
+async function f(): Promise<number> { }
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        codes.contains(&2355),
+        "Expected TS2355 for async Promise<number> return type, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_async_generator_no_2355() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+interface AsyncIterator<T, TReturn = any, TNext = unknown> {}
+interface AsyncIterable<T> {}
+interface AsyncIterableIterator<T> extends AsyncIterator<T> {}
+
+async function* g1(): AsyncIterableIterator<number> { yield 1; }
+async function* g2(): AsyncIterator<number> { yield 1; }
+async function* g3(): AsyncIterable<number> { yield 1; }
+async function* g4(): {} { yield 1; }
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2355),
+        "Did not expect TS2355 for async generator return types, got: {:?}",
         codes
     );
 }
@@ -7736,6 +7859,74 @@ var e: typeof E;
 
     assert_eq!(error_2403_count, 0,
         "Expected no error 2403 for enum typeof redeclaration, got: {:?}", codes);
+}
+
+#[test]
+fn test_variable_redeclaration_enum_object_literal_no_2403() {
+    use crate::thin_parser::ThinParserState;
+
+    // Ensure enum value redeclaration with structural type does not trigger TS2403.
+    let source = r#"
+enum E1 {
+    A,
+    B,
+    C
+}
+
+var e = E1;
+var e: {
+    readonly A: number;
+    readonly B: number;
+    readonly C: number;
+    readonly [n: number]: string;
+};
+var e: typeof E1;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let error_2403_count = codes.iter().filter(|&&c| c == 2403).count();
+
+    assert_eq!(error_2403_count, 0,
+        "Expected no error 2403 for enum object redeclaration, got: {:?}", codes);
+}
+
+#[test]
+fn test_variable_redeclaration_array_spread_no_2403() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+function f1() {
+    var a = [1, 2, 3];
+    var b = ["hello", ...a, true];
+    var b: (string | number | boolean)[];
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let error_2403_count = codes.iter().filter(|&&c| c == 2403).count();
+
+    assert_eq!(error_2403_count, 0,
+        "Expected no error 2403 for array spread redeclaration, got: {:?}", codes);
 }
 
 #[test]

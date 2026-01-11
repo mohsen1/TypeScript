@@ -1983,52 +1983,94 @@ impl ThinParserState {
     /// Parse heritage clauses (extends, implements)
     fn parse_heritage_clauses(&mut self) -> Option<NodeList> {
         let mut clauses = Vec::new();
+        let mut seen_extends = false;
+        let mut seen_implements = false;
 
-        // Parse extends clause
-        if self.is_token(SyntaxKind::ExtendsKeyword) {
-            let start_pos = self.token_pos();
-            self.next_token();
-            let type_ref = self.parse_heritage_type_reference();
-            let end_pos = self.token_end();
-
-            // Create heritage clause node
-            let clause = self.arena.add_heritage(
-                syntax_kind_ext::HERITAGE_CLAUSE,
-                start_pos,
-                end_pos,
-                crate::parser::thin_node::HeritageData {
-                    token: SyntaxKind::ExtendsKeyword as u16,
-                    types: self.make_node_list(vec![type_ref]),
-                },
-            );
-            clauses.push(clause);
-        }
-
-        // Parse implements clause
-        if self.is_token(SyntaxKind::ImplementsKeyword) {
-            let start_pos = self.token_pos();
-            self.next_token();
-
-            let mut types = Vec::new();
-            loop {
-                let type_ref = self.parse_heritage_type_reference();
-                types.push(type_ref);
-                if !self.parse_optional(SyntaxKind::CommaToken) {
-                    break;
+        loop {
+            if self.is_token(SyntaxKind::ExtendsKeyword) {
+                use crate::checker::types::diagnostics::diagnostic_codes;
+                let start_pos = self.token_pos();
+                if seen_extends {
+                    self.parse_error_at_current_token(
+                        "extends clause already seen.",
+                        diagnostic_codes::EXTENDS_CLAUSE_ALREADY_SEEN,
+                    );
                 }
+                if seen_implements {
+                    self.parse_error_at_current_token(
+                        "extends clause must precede implements clause.",
+                        diagnostic_codes::EXTENDS_CLAUSE_MUST_PRECEDE_IMPLEMENTS_CLAUSE,
+                    );
+                }
+                let should_add = !seen_extends;
+                seen_extends = true;
+                self.next_token();
+                let type_ref = self.parse_heritage_type_reference();
+
+                while self.is_token(SyntaxKind::CommaToken) {
+                    self.parse_error_at_current_token(
+                        "Classes can only extend a single class.",
+                        diagnostic_codes::CLASSES_CAN_ONLY_EXTEND_A_SINGLE_CLASS,
+                    );
+                    self.next_token();
+                    let _ = self.parse_heritage_type_reference();
+                }
+
+                let end_pos = self.token_end();
+                if should_add {
+                    let clause = self.arena.add_heritage(
+                        syntax_kind_ext::HERITAGE_CLAUSE,
+                        start_pos,
+                        end_pos,
+                        crate::parser::thin_node::HeritageData {
+                            token: SyntaxKind::ExtendsKeyword as u16,
+                            types: self.make_node_list(vec![type_ref]),
+                        },
+                    );
+                    clauses.push(clause);
+                }
+                continue;
             }
 
-            let end_pos = self.token_end();
-            let clause = self.arena.add_heritage(
-                syntax_kind_ext::HERITAGE_CLAUSE,
-                start_pos,
-                end_pos,
-                crate::parser::thin_node::HeritageData {
-                    token: SyntaxKind::ImplementsKeyword as u16,
-                    types: self.make_node_list(types),
-                },
-            );
-            clauses.push(clause);
+            if self.is_token(SyntaxKind::ImplementsKeyword) {
+                use crate::checker::types::diagnostics::diagnostic_codes;
+                let start_pos = self.token_pos();
+                if seen_implements {
+                    self.parse_error_at_current_token(
+                        "implements clause already seen.",
+                        diagnostic_codes::IMPLEMENTS_CLAUSE_ALREADY_SEEN,
+                    );
+                }
+                let should_add = !seen_implements;
+                seen_implements = true;
+                self.next_token();
+
+                let mut types = Vec::new();
+                loop {
+                    let type_ref = self.parse_heritage_type_reference();
+                    types.push(type_ref);
+                    if !self.parse_optional(SyntaxKind::CommaToken) {
+                        break;
+                    }
+                }
+
+                let end_pos = self.token_end();
+                if should_add {
+                    let clause = self.arena.add_heritage(
+                        syntax_kind_ext::HERITAGE_CLAUSE,
+                        start_pos,
+                        end_pos,
+                        crate::parser::thin_node::HeritageData {
+                            token: SyntaxKind::ImplementsKeyword as u16,
+                            types: self.make_node_list(types),
+                        },
+                    );
+                    clauses.push(clause);
+                }
+                continue;
+            }
+
+            break;
         }
 
         if clauses.is_empty() {
@@ -2274,11 +2316,25 @@ impl ThinParserState {
     }
 
     fn should_stop_class_member_modifier(&mut self) -> bool {
-        if !self.is_token(SyntaxKind::StaticKeyword) {
+        if !matches!(
+            self.token(),
+            SyntaxKind::StaticKeyword
+                | SyntaxKind::PublicKeyword
+                | SyntaxKind::PrivateKeyword
+                | SyntaxKind::ProtectedKeyword
+                | SyntaxKind::ReadonlyKeyword
+                | SyntaxKind::AbstractKeyword
+                | SyntaxKind::OverrideKeyword
+                | SyntaxKind::AsyncKeyword
+                | SyntaxKind::DeclareKeyword
+                | SyntaxKind::AccessorKeyword
+                | SyntaxKind::ConstKeyword
+                | SyntaxKind::ExportKeyword
+        ) {
             return false;
         }
 
-        if self.look_ahead_is_static_block() {
+        if self.is_token(SyntaxKind::StaticKeyword) && self.look_ahead_is_static_block() {
             return true;
         }
 
@@ -2336,7 +2392,28 @@ impl ThinParserState {
 
         let name = self.parse_property_name();
 
+        let type_parameters = if self.is_token(SyntaxKind::LessThanToken) {
+            use crate::checker::types::diagnostics::diagnostic_codes;
+            self.parse_error_at_current_token(
+                "An accessor cannot have type parameters.",
+                diagnostic_codes::ACCESSOR_CANNOT_HAVE_TYPE_PARAMETERS,
+            );
+            Some(self.parse_type_parameters())
+        } else {
+            None
+        };
+
         self.parse_expected(SyntaxKind::OpenParenToken);
+        let parameters = if self.is_token(SyntaxKind::CloseParenToken) {
+            self.make_node_list(vec![])
+        } else {
+            use crate::checker::types::diagnostics::diagnostic_codes;
+            self.parse_error_at_current_token(
+                "A 'get' accessor cannot have parameters.",
+                diagnostic_codes::GETTER_MUST_NOT_HAVE_PARAMETERS,
+            );
+            self.parse_parameter_list()
+        };
         self.parse_expected(SyntaxKind::CloseParenToken);
 
         // Optional return type (supports type predicates)
@@ -2362,8 +2439,8 @@ impl ThinParserState {
             crate::parser::thin_node::AccessorData {
                 modifiers,
                 name,
-                type_parameters: None,
-                parameters: self.make_node_list(vec![]),
+                type_parameters,
+                parameters,
                 type_annotation,
                 body,
             },
@@ -2376,9 +2453,41 @@ impl ThinParserState {
 
         let name = self.parse_property_name();
 
+        let type_parameters = if self.is_token(SyntaxKind::LessThanToken) {
+            use crate::checker::types::diagnostics::diagnostic_codes;
+            self.parse_error_at_current_token(
+                "An accessor cannot have type parameters.",
+                diagnostic_codes::ACCESSOR_CANNOT_HAVE_TYPE_PARAMETERS,
+            );
+            Some(self.parse_type_parameters())
+        } else {
+            None
+        };
+
         self.parse_expected(SyntaxKind::OpenParenToken);
-        let parameters = self.parse_parameter_list();
+        let parameters = if self.is_token(SyntaxKind::CloseParenToken) {
+            self.make_node_list(vec![])
+        } else {
+            self.parse_parameter_list()
+        };
         self.parse_expected(SyntaxKind::CloseParenToken);
+
+        if parameters.len() != 1 {
+            use crate::checker::types::diagnostics::diagnostic_codes;
+            self.parse_error_at_current_token(
+                "A 'set' accessor must have exactly one parameter.",
+                diagnostic_codes::SETTER_MUST_HAVE_EXACTLY_ONE_PARAMETER,
+            );
+        }
+
+        if self.parse_optional(SyntaxKind::ColonToken) {
+            use crate::checker::types::diagnostics::diagnostic_codes;
+            self.parse_error_at_current_token(
+                "A 'set' accessor cannot have a return type annotation.",
+                diagnostic_codes::SETTER_CANNOT_HAVE_RETURN_TYPE,
+            );
+            let _ = self.parse_type();
+        }
 
         // Parse body (may be empty for ambient declarations)
         let body = if self.is_token(SyntaxKind::OpenBraceToken) {
@@ -2396,7 +2505,7 @@ impl ThinParserState {
             crate::parser::thin_node::AccessorData {
                 modifiers,
                 name,
-                type_parameters: None,
+                type_parameters,
                 parameters,
                 type_annotation: NodeIndex::NONE,
                 body,
@@ -2459,6 +2568,9 @@ impl ThinParserState {
             return self.parse_constructor_with_modifiers(modifiers);
         }
 
+        // Handle generator methods: *foo() or async *#bar()
+        let asterisk_token = self.parse_optional(SyntaxKind::AsteriskToken);
+
         // Handle get accessor: get foo() { }
         if self.is_token(SyntaxKind::GetKeyword) && self.look_ahead_is_accessor() {
             return self.parse_get_accessor_with_modifiers(modifiers, start_pos);
@@ -2473,9 +2585,6 @@ impl ThinParserState {
         if self.is_token(SyntaxKind::OpenBracketToken) && self.look_ahead_is_index_signature() {
             return self.parse_index_signature_with_modifiers(modifiers, start_pos);
         }
-
-        // Handle generator methods: *foo() or async *#bar()
-        let asterisk_token = self.parse_optional(SyntaxKind::AsteriskToken);
 
         // Handle methods and properties
         // For now, just parse name and check for ( for methods
@@ -2706,7 +2815,28 @@ impl ThinParserState {
 
         let name = self.parse_property_name();
 
+        let type_parameters = if self.is_token(SyntaxKind::LessThanToken) {
+            use crate::checker::types::diagnostics::diagnostic_codes;
+            self.parse_error_at_current_token(
+                "An accessor cannot have type parameters.",
+                diagnostic_codes::ACCESSOR_CANNOT_HAVE_TYPE_PARAMETERS,
+            );
+            Some(self.parse_type_parameters())
+        } else {
+            None
+        };
+
         self.parse_expected(SyntaxKind::OpenParenToken);
+        let parameters = if self.is_token(SyntaxKind::CloseParenToken) {
+            self.make_node_list(vec![])
+        } else {
+            use crate::checker::types::diagnostics::diagnostic_codes;
+            self.parse_error_at_current_token(
+                "A 'get' accessor cannot have parameters.",
+                diagnostic_codes::GETTER_MUST_NOT_HAVE_PARAMETERS,
+            );
+            self.parse_parameter_list()
+        };
         self.parse_expected(SyntaxKind::CloseParenToken);
 
         // Optional return type (supports type predicates)
@@ -2732,8 +2862,8 @@ impl ThinParserState {
             crate::parser::thin_node::AccessorData {
                 modifiers: None,
                 name,
-                type_parameters: None,
-                parameters: self.make_node_list(vec![]),
+                type_parameters,
+                parameters,
                 type_annotation,
                 body,
             },
@@ -2747,9 +2877,41 @@ impl ThinParserState {
 
         let name = self.parse_property_name();
 
+        let type_parameters = if self.is_token(SyntaxKind::LessThanToken) {
+            use crate::checker::types::diagnostics::diagnostic_codes;
+            self.parse_error_at_current_token(
+                "An accessor cannot have type parameters.",
+                diagnostic_codes::ACCESSOR_CANNOT_HAVE_TYPE_PARAMETERS,
+            );
+            Some(self.parse_type_parameters())
+        } else {
+            None
+        };
+
         self.parse_expected(SyntaxKind::OpenParenToken);
-        let parameters = self.parse_parameter_list();
+        let parameters = if self.is_token(SyntaxKind::CloseParenToken) {
+            self.make_node_list(vec![])
+        } else {
+            self.parse_parameter_list()
+        };
         self.parse_expected(SyntaxKind::CloseParenToken);
+
+        if parameters.len() != 1 {
+            use crate::checker::types::diagnostics::diagnostic_codes;
+            self.parse_error_at_current_token(
+                "A 'set' accessor must have exactly one parameter.",
+                diagnostic_codes::SETTER_MUST_HAVE_EXACTLY_ONE_PARAMETER,
+            );
+        }
+
+        if self.parse_optional(SyntaxKind::ColonToken) {
+            use crate::checker::types::diagnostics::diagnostic_codes;
+            self.parse_error_at_current_token(
+                "A 'set' accessor cannot have a return type annotation.",
+                diagnostic_codes::SETTER_CANNOT_HAVE_RETURN_TYPE,
+            );
+            let _ = self.parse_type();
+        }
 
         // Parse body (may be empty for ambient declarations)
         let body = if self.is_token(SyntaxKind::OpenBraceToken) {
@@ -2767,7 +2929,7 @@ impl ThinParserState {
             crate::parser::thin_node::AccessorData {
                 modifiers: None,
                 name,
-                type_parameters: None,
+                type_parameters,
                 parameters,
                 type_annotation: NodeIndex::NONE,
                 body,
@@ -6577,7 +6739,28 @@ impl ThinParserState {
         self.next_token(); // consume 'get'
         let name = self.parse_property_name();
 
+        let type_parameters = if self.is_token(SyntaxKind::LessThanToken) {
+            use crate::checker::types::diagnostics::diagnostic_codes;
+            self.parse_error_at_current_token(
+                "An accessor cannot have type parameters.",
+                diagnostic_codes::ACCESSOR_CANNOT_HAVE_TYPE_PARAMETERS,
+            );
+            Some(self.parse_type_parameters())
+        } else {
+            None
+        };
+
         self.parse_expected(SyntaxKind::OpenParenToken);
+        let parameters = if self.is_token(SyntaxKind::CloseParenToken) {
+            self.make_node_list(vec![])
+        } else {
+            use crate::checker::types::diagnostics::diagnostic_codes;
+            self.parse_error_at_current_token(
+                "A 'get' accessor cannot have parameters.",
+                diagnostic_codes::GETTER_MUST_NOT_HAVE_PARAMETERS,
+            );
+            self.parse_parameter_list()
+        };
         // Save end of ) for error reporting - get it BEFORE consuming the token
         let close_paren_end = self.token_end();
         self.parse_expected(SyntaxKind::CloseParenToken);
@@ -6607,8 +6790,8 @@ impl ThinParserState {
             crate::parser::thin_node::AccessorData {
                 modifiers: None,
                 name,
-                type_parameters: None,
-                parameters: self.make_node_list(vec![]),
+                type_parameters,
+                parameters,
                 type_annotation,
                 body,
             },
@@ -6620,11 +6803,43 @@ impl ThinParserState {
         self.next_token(); // consume 'set'
         let name = self.parse_property_name();
 
+        let type_parameters = if self.is_token(SyntaxKind::LessThanToken) {
+            use crate::checker::types::diagnostics::diagnostic_codes;
+            self.parse_error_at_current_token(
+                "An accessor cannot have type parameters.",
+                diagnostic_codes::ACCESSOR_CANNOT_HAVE_TYPE_PARAMETERS,
+            );
+            Some(self.parse_type_parameters())
+        } else {
+            None
+        };
+
         self.parse_expected(SyntaxKind::OpenParenToken);
-        let parameters = self.parse_parameter_list();
+        let parameters = if self.is_token(SyntaxKind::CloseParenToken) {
+            self.make_node_list(vec![])
+        } else {
+            self.parse_parameter_list()
+        };
         // Save end of ) for error reporting - get it BEFORE consuming the token
         let close_paren_end = self.token_end();
         self.parse_expected(SyntaxKind::CloseParenToken);
+
+        if parameters.len() != 1 {
+            use crate::checker::types::diagnostics::diagnostic_codes;
+            self.parse_error_at_current_token(
+                "A 'set' accessor must have exactly one parameter.",
+                diagnostic_codes::SETTER_MUST_HAVE_EXACTLY_ONE_PARAMETER,
+            );
+        }
+
+        if self.parse_optional(SyntaxKind::ColonToken) {
+            use crate::checker::types::diagnostics::diagnostic_codes;
+            self.parse_error_at_current_token(
+                "A 'set' accessor cannot have a return type annotation.",
+                diagnostic_codes::SETTER_CANNOT_HAVE_RETURN_TYPE,
+            );
+            let _ = self.parse_type();
+        }
 
         // Parse body if present. Missing body is reported in grammar check, not here.
         let body = if self.is_token(SyntaxKind::OpenBraceToken) {
@@ -6642,7 +6857,7 @@ impl ThinParserState {
             crate::parser::thin_node::AccessorData {
                 modifiers: None,
                 name,
-                type_parameters: None,
+                type_parameters,
                 parameters,
                 type_annotation: NodeIndex::NONE,
                 body,

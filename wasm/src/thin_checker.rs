@@ -294,7 +294,7 @@ impl<'a> ThinCheckerState<'a> {
         let name = self.ctx.arena.get_identifier(node)?.escaped_text.as_str();
 
         if let Some(mut scope_id) = self.find_enclosing_scope(idx) {
-            let mut require_export = false;
+            let require_export = false;
             while !scope_id.is_none() {
                 if let Some(scope) = self.ctx.binder.scopes.get(scope_id.0 as usize) {
                     if let Some(sym_id) = scope.table.get(name) {
@@ -328,13 +328,7 @@ impl<'a> ThinCheckerState<'a> {
                         }
                     }
                     let parent_id = scope.parent;
-                    if scope.kind == ContainerKind::Module {
-                        if let Some(parent_scope) = self.ctx.binder.scopes.get(parent_id.0 as usize) {
-                            require_export = parent_scope.kind == ContainerKind::Module;
-                        } else {
-                            require_export = false;
-                        }
-                    }
+                    // Nested namespaces can reference non-exported parent members (TSC behavior).
                     scope_id = parent_id;
                 } else {
                     break;
@@ -1344,6 +1338,11 @@ impl<'a> ThinCheckerState<'a> {
     }
 
     fn base_constructor_type_from_expression(&mut self, expr_idx: NodeIndex) -> Option<TypeId> {
+        if let Some(name) = self.heritage_name_text(expr_idx) {
+            if matches!(name.as_str(), "null" | "undefined" | "true" | "false" | "void" | "0") {
+                return None;
+            }
+        }
         let expr_type = self.get_type_of_node(expr_idx);
         let ctor_types = self.constructor_types_from_type(expr_type);
         if ctor_types.is_empty() {
@@ -8168,6 +8167,84 @@ impl<'a> ThinCheckerState<'a> {
         Some(SymbolId(sym_id))
     }
 
+    fn enum_symbol_from_value_type(&self, type_id: TypeId) -> Option<SymbolId> {
+        use crate::solver::{SymbolRef, TypeKey};
+
+        let sym_id = match self.ctx.types.lookup(type_id) {
+            Some(TypeKey::Ref(SymbolRef(sym_id))) => sym_id,
+            Some(TypeKey::TypeQuery(SymbolRef(sym_id))) => sym_id,
+            _ => return None,
+        };
+
+        let symbol = self.ctx.binder.get_symbol(SymbolId(sym_id))?;
+        if symbol.flags & symbol_flags::ENUM == 0 {
+            return None;
+        }
+        Some(SymbolId(sym_id))
+    }
+
+    fn enum_object_type(&mut self, sym_id: SymbolId) -> Option<TypeId> {
+        use crate::solver::{IndexSignature, ObjectShape, PropertyInfo};
+        use rustc_hash::FxHashMap;
+
+        let symbol = self.ctx.binder.get_symbol(sym_id)?;
+        if symbol.flags & symbol_flags::ENUM == 0 {
+            return None;
+        }
+
+        let member_type = match self.enum_kind(sym_id) {
+            Some(EnumKind::String) => TypeId::STRING,
+            Some(EnumKind::Numeric) => TypeId::NUMBER,
+            None => TypeId::ANY,
+        };
+
+        let mut props: FxHashMap<Atom, PropertyInfo> = FxHashMap::default();
+        for &decl_idx in &symbol.declarations {
+            let Some(node) = self.ctx.arena.get(decl_idx) else {
+                continue;
+            };
+            let Some(enum_decl) = self.ctx.arena.get_enum(node) else {
+                continue;
+            };
+            for &member_idx in &enum_decl.members.nodes {
+                let Some(member_node) = self.ctx.arena.get(member_idx) else {
+                    continue;
+                };
+                let Some(member) = self.ctx.arena.get_enum_member(member_node) else {
+                    continue;
+                };
+                let Some(name) = self.get_property_name(member.name) else {
+                    continue;
+                };
+                let name_atom = self.ctx.types.intern_string(&name);
+                props.entry(name_atom).or_insert(PropertyInfo {
+                    name: name_atom,
+                    type_id: member_type,
+                    write_type: member_type,
+                    optional: false,
+                    readonly: true,
+                    is_method: false,
+                });
+            }
+        }
+
+        let properties: Vec<PropertyInfo> = props.into_values().collect();
+        if self.enum_kind(sym_id) == Some(EnumKind::Numeric) {
+            let number_index = Some(IndexSignature {
+                key_type: TypeId::NUMBER,
+                value_type: TypeId::STRING,
+                readonly: true,
+            });
+            return Some(self.ctx.types.object_with_index(ObjectShape {
+                properties,
+                string_index: None,
+                number_index,
+            }));
+        }
+
+        Some(self.ctx.types.object(properties))
+    }
+
     fn enum_kind(&self, sym_id: SymbolId) -> Option<EnumKind> {
         let symbol = self.ctx.binder.get_symbol(sym_id)?;
         if symbol.flags & symbol_flags::ENUM == 0 {
@@ -8875,6 +8952,37 @@ impl<'a> ThinCheckerState<'a> {
     /// O(1) operation - just compare TypeId values (structural interning).
     pub fn are_types_identical(&self, type1: TypeId, type2: TypeId) -> bool {
         type1 == type2
+    }
+
+    fn are_var_decl_types_compatible(&mut self, prev_type: TypeId, current_type: TypeId) -> bool {
+        let prev_type = self
+            .enum_symbol_from_value_type(prev_type)
+            .and_then(|sym_id| self.enum_object_type(sym_id))
+            .unwrap_or(prev_type);
+        let current_type = self
+            .enum_symbol_from_value_type(current_type)
+            .and_then(|sym_id| self.enum_object_type(sym_id))
+            .unwrap_or(current_type);
+
+        if prev_type == current_type {
+            return true;
+        }
+        if matches!(prev_type, TypeId::ERROR) || matches!(current_type, TypeId::ERROR) {
+            return true;
+        }
+        self.ensure_application_symbols_resolved(prev_type);
+        self.ensure_application_symbols_resolved(current_type);
+        self.is_assignable_to(prev_type, current_type)
+            && self.is_assignable_to(current_type, prev_type)
+    }
+
+    fn refine_var_decl_type(&self, prev_type: TypeId, current_type: TypeId) -> TypeId {
+        if matches!(prev_type, TypeId::ANY | TypeId::ERROR)
+            && !matches!(current_type, TypeId::ANY | TypeId::ERROR)
+        {
+            return current_type;
+        }
+        prev_type
     }
 
     /// Check if a type is assignable to a union of types.
@@ -10640,6 +10748,7 @@ impl<'a> ThinCheckerState<'a> {
                 | "Number" | "Boolean" | "Function" | "Date" | "RegExp" | "Error" | "Promise"
                 | "Map" | "Set" | "WeakMap" | "WeakSet" | "WeakRef" | "Proxy"
                 | "Reflect" | "globalThis" | "window" | "document"
+                | "exports" | "module" | "require" | "__dirname" | "__filename"
                 | "FinalizationRegistry" | "BigInt" | "ArrayBuffer" | "SharedArrayBuffer"
                 | "DataView" | "Int8Array" | "Uint8Array" | "Uint8ClampedArray"
                 | "Int16Array" | "Uint16Array" | "Int32Array" | "Uint32Array"
@@ -11330,7 +11439,14 @@ impl<'a> ThinCheckerState<'a> {
 
                         // Check for error 2355: function with return type must return a value
                         // Only check if there's an explicit return type annotation
-                        let requires_return = self.requires_return_value(return_type);
+                        let is_async = func.is_async;
+                        let is_generator = func.asterisk_token;
+                        let check_return_type = self.return_type_for_implicit_return_check(
+                            return_type,
+                            is_async,
+                            is_generator,
+                        );
+                        let requires_return = self.requires_return_value(check_return_type);
                         let has_return = self.body_has_return_with_value(func.body);
                         let falls_through = self.function_body_falls_through(func.body);
 
@@ -11644,8 +11760,18 @@ impl<'a> ThinCheckerState<'a> {
             // let/const duplicates are caught earlier by the binder (TS2451).
             if let Some(prev_type) = self.ctx.var_decl_types.get(&sym_id).copied() {
                 if let Some(ref name) = var_name {
-                    if !self.are_types_identical(final_type, prev_type) {
-                        self.error_subsequent_variable_declaration(name, prev_type, final_type, decl_idx);
+                    if !self.are_var_decl_types_compatible(prev_type, final_type) {
+                        self.error_subsequent_variable_declaration(
+                            name,
+                            prev_type,
+                            final_type,
+                            decl_idx,
+                        );
+                    } else {
+                        let refined = self.refine_var_decl_type(prev_type, final_type);
+                        if refined != prev_type {
+                            self.ctx.var_decl_types.insert(sym_id, refined);
+                        }
                     }
                 }
             } else {
@@ -13911,6 +14037,21 @@ impl<'a> ThinCheckerState<'a> {
             for &mod_idx in &mods.nodes {
                 if let Some(mod_node) = self.ctx.arena.get(mod_idx) {
                     if mod_node.kind == SyntaxKind::DeclareKeyword as u16 {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    /// Check if a node has the `async` modifier.
+    fn has_async_modifier(&self, modifiers: &Option<crate::parser::NodeList>) -> bool {
+        use crate::scanner::SyntaxKind;
+        if let Some(mods) = modifiers {
+            for &mod_idx in &mods.nodes {
+                if let Some(mod_node) = self.ctx.arena.get(mod_idx) {
+                    if mod_node.kind == SyntaxKind::AsyncKeyword as u16 {
                         return true;
                     }
                 }
@@ -16774,7 +16915,11 @@ impl<'a> ThinCheckerState<'a> {
             self.push_return_type(return_type);
             self.check_statement(method.body);
 
-            let requires_return = self.requires_return_value(return_type);
+            let is_async = self.has_async_modifier(&method.modifiers);
+            let is_generator = method.asterisk_token;
+            let check_return_type =
+                self.return_type_for_implicit_return_check(return_type, is_async, is_generator);
+            let requires_return = self.requires_return_value(check_return_type);
             let has_return = self.body_has_return_with_value(method.body);
             let falls_through = self.function_body_falls_through(method.body);
 
@@ -17047,6 +17192,7 @@ impl<'a> ThinCheckerState<'a> {
             || return_type == TypeId::ANY
             || return_type == TypeId::NEVER
             || return_type == TypeId::UNKNOWN
+            || return_type == TypeId::ERROR
         {
             return false;
         }
@@ -17062,6 +17208,152 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         true
+    }
+
+    fn return_type_for_implicit_return_check(
+        &mut self,
+        return_type: TypeId,
+        is_async: bool,
+        is_generator: bool,
+    ) -> TypeId {
+        if is_generator {
+            return TypeId::ANY;
+        }
+
+        if is_async {
+            if let Some(inner) = self.promise_like_return_type_argument(return_type) {
+                return inner;
+            }
+        }
+
+        return_type
+    }
+
+    fn promise_like_return_type_argument(&mut self, return_type: TypeId) -> Option<TypeId> {
+        use crate::solver::TypeKey;
+
+        if let Some(TypeKey::Application(app_id)) = self.ctx.types.lookup(return_type) {
+            let app = self.ctx.types.type_application(app_id);
+            return self.promise_like_type_argument_from_base(app.base, &app.args, &mut Vec::new());
+        }
+
+        if self.type_ref_is_promise_like(return_type) {
+            return Some(TypeId::ANY);
+        }
+
+        None
+    }
+
+    fn type_ref_is_promise_like(&self, type_id: TypeId) -> bool {
+        use crate::solver::{TypeKey, SymbolRef};
+
+        let Some(TypeKey::Ref(SymbolRef(sym_id))) = self.ctx.types.lookup(type_id) else {
+            return false;
+        };
+        let Some(symbol) = self.ctx.binder.get_symbol(SymbolId(sym_id)) else {
+            return false;
+        };
+        self.is_promise_like_name(symbol.escaped_name.as_str())
+    }
+
+    fn promise_like_type_argument_from_base(
+        &mut self,
+        base: TypeId,
+        args: &[TypeId],
+        visited_aliases: &mut Vec<SymbolId>,
+    ) -> Option<TypeId> {
+        use crate::solver::{TypeKey, SymbolRef};
+
+        let Some(TypeKey::Ref(SymbolRef(sym_id))) = self.ctx.types.lookup(base) else {
+            return None;
+        };
+        let sym_id = SymbolId(sym_id);
+        let symbol = self.ctx.binder.get_symbol(sym_id)?;
+        let name = symbol.escaped_name.as_str();
+
+        if self.is_promise_like_name(name) {
+            return Some(args.first().copied().unwrap_or(TypeId::ANY));
+        }
+
+        if symbol.flags & symbol_flags::TYPE_ALIAS != 0 {
+            return self.promise_like_type_argument_from_alias(sym_id, args, visited_aliases);
+        }
+
+        None
+    }
+
+    fn promise_like_type_argument_from_alias(
+        &mut self,
+        sym_id: SymbolId,
+        args: &[TypeId],
+        visited_aliases: &mut Vec<SymbolId>,
+    ) -> Option<TypeId> {
+        use crate::solver::TypeKey;
+
+        if visited_aliases.iter().any(|&seen| seen == sym_id) {
+            return None;
+        }
+        visited_aliases.push(sym_id);
+
+        let symbol = self.ctx.binder.get_symbol(sym_id)?;
+        let decl_idx = if !symbol.value_declaration.is_none() {
+            symbol.value_declaration
+        } else {
+            symbol.declarations.first().copied().unwrap_or(NodeIndex::NONE)
+        };
+        if decl_idx.is_none() {
+            return None;
+        }
+
+        let node = self.ctx.arena.get(decl_idx)?;
+        let type_alias = self.ctx.arena.get_type_alias(node)?;
+
+        let mut bindings = Vec::new();
+        if let Some(params) = &type_alias.type_parameters {
+            if params.nodes.len() != args.len() {
+                return None;
+            }
+            for (&param_idx, &arg) in params.nodes.iter().zip(args.iter()) {
+                let param_node = self.ctx.arena.get(param_idx)?;
+                let param = self.ctx.arena.get_type_parameter(param_node)?;
+                let name_node = self.ctx.arena.get(param.name)?;
+                let ident = self.ctx.arena.get_identifier(name_node)?;
+                bindings.push((self.ctx.types.intern_string(&ident.escaped_text), arg));
+            }
+        } else if !args.is_empty() {
+            return None;
+        }
+
+        let lowered = self.lower_type_with_bindings(type_alias.type_node, bindings);
+        if let Some(TypeKey::Application(app_id)) = self.ctx.types.lookup(lowered) {
+            let app = self.ctx.types.type_application(app_id);
+            return self.promise_like_type_argument_from_base(app.base, &app.args, visited_aliases);
+        }
+
+        None
+    }
+
+    fn lower_type_with_bindings(
+        &self,
+        type_node: NodeIndex,
+        bindings: Vec<(crate::interner::Atom, TypeId)>,
+    ) -> TypeId {
+        use crate::solver::TypeLowering;
+
+        let type_resolver = |node_idx: NodeIndex| self.resolve_type_symbol_for_lowering(node_idx);
+        let value_resolver = |node_idx: NodeIndex| self.resolve_value_symbol_for_lowering(node_idx);
+        let lowering = TypeLowering::with_resolvers(
+            self.ctx.arena,
+            self.ctx.types,
+            &type_resolver,
+            &value_resolver,
+        )
+        .with_type_param_bindings(bindings);
+        lowering.lower_type(type_node)
+    }
+
+    fn is_promise_like_name(&self, name: &str) -> bool {
+        matches!(name, "Promise" | "PromiseLike")
     }
 
     fn is_null_or_undefined_only(&self, return_type: TypeId) -> bool {
