@@ -16583,6 +16583,28 @@ impl<'a> ThinCheckerState<'a> {
             return;
         }
 
+        // Check if parameter name is a binding pattern with default values
+        // For destructured parameters like ({ x = 1 }) => {}, binding elements have default values
+        if let Some(name_node) = self.ctx.arena.get(param.name) {
+            if name_node.kind == syntax_kind_ext::OBJECT_BINDING_PATTERN
+                || name_node.kind == syntax_kind_ext::ARRAY_BINDING_PATTERN
+            {
+                // Check if any binding element has an initializer (default value)
+                if let Some(pattern) = self.ctx.arena.get_binding_pattern(name_node) {
+                    for &element_idx in &pattern.elements.nodes {
+                        if let Some(element_node) = self.ctx.arena.get(element_idx) {
+                            if let Some(element) = self.ctx.arena.get_binding_element(element_node) {
+                                if !element.initializer.is_none() {
+                                    // Binding element has default value, type can be inferred
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         let param_name = self.parameter_name_for_error(param.name);
         let message = format_message(diagnostic_messages::PARAMETER_IMPLICIT_ANY, &[&param_name, "any"]);
         self.error_at_node(param.name, &message, diagnostic_codes::IMPLICIT_ANY_PARAMETER);
@@ -17276,7 +17298,10 @@ impl<'a> ThinCheckerState<'a> {
         for &param_idx in &accessor.parameters.nodes {
             if let Some(param_node) = self.ctx.arena.get(param_idx) {
                 if let Some(param) = self.ctx.arena.get_parameter(param_node) {
-                    self.maybe_report_implicit_any_parameter(param, false);
+                    // For setters, skip implicit 'any' parameter check - the parameter type
+                    // is inferred from the corresponding getter's return type
+                    let is_setter_param = !is_getter;
+                    self.maybe_report_implicit_any_parameter(param, is_setter_param);
                 }
             }
         }
