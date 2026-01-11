@@ -124,6 +124,7 @@ pub mod diagnostic_messages {
 
     // Interface errors
     pub const INTERFACE_INCORRECTLY_EXTENDS: &str = "Interface '{0}' incorrectly extends interface '{1}'.";
+    pub const TYPE_ALIAS_CIRCULARLY_REFERENCES_ITSELF: &str = "Type alias '{0}' circularly references itself.";
 
     // Enum errors
     pub const ENUM_MEMBER_MUST_HAVE_INITIALIZER: &str = "Enum member must have initializer.";
