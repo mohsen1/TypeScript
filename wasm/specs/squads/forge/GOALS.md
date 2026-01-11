@@ -185,27 +185,27 @@ bash run-conformance.sh --all --workers=14
 
 ---
 ## Squad Status
-- Last EM Update: 2026-01-11 (W1 merged: 2 commits)
+- Last EM Update: 2026-01-11 (🚨 CRISIS RESPONSE ACTIVE)
 - Conformance: **30.8% exact match** (+7.5pp from 23.3%)
 - Build: Passing
-- Workers: W1 reassigned, all 5 active
-- Recent: W1(2) → squad/forge → origin
+- **Crashes**: 478 panics (CRITICAL REGRESSION - 10% test suite broken) 🚨
+- Workers: Crisis reassignments executed, all 5 active
 
-### Worker Assignments (UPDATED: Crisis Response)
+### Worker Assignments (🚨 CRISIS RESPONSE)
 
 | Worker | Priority | Assignment | Status |
 |--------|----------|------------|--------|
-| W1 | HIGH | TS2454: Definite Assignment (CFG) | Active |
-| W2 | HIGH | TS2564: Property Initialization | Active |
-| W3 | P1 | TS2322: Solver Strictness (reduce `any` fallback) | **REEVALUATE** - currently on TS7006 |
-| W4 | P1 | TS2792: Module Resolution (fix `any` in imports) | Active - correctly assigned |
-| W5 | **P0** 🔥 | **CRASH INVESTIGATION** (478 panics) | **STOP TS7010 - SWITCH TO CRASHES** |
+| W5 | **P0** 🔥 | **CRASH INVESTIGATION** (478→0 panics) | **ASSIGNED - Fix crashes NOW!** |
+| W3 | **P1** | **TS2322** Solver Strictness (149 missing) | **REASSIGNED - Stop TS7006** |
+| W4 | P1 | TS2792 Module Resolution | Active - correctly assigned |
+| W1 | HIGH | TS2454 Definite Assignment | Continue current work |
+| W2 | HIGH | TS2564 Property Initialization | Continue current work |
 
 **PRIORITY ORDER:**
-1. **W5** - Fix crashes immediately (10% test suite broken)
-2. **W4** - Module resolution (reduces permissiveness)
-3. **W3** - Switch to TS2322 (solver strictness)
-4. **W1/W2** - Continue on control flow (important but not urgent)
+1. **W5** 🚨 - Fix crashes immediately (10% test suite broken)
+2. **W3** - TS2322 solver strictness (reduce permissiveness)
+3. **W4** - Module resolution (fix `any` in imports)
+4. **W1/W2** - Continue control flow (important but not urgent)
 
 ### Before Starting Any Task
 **IMPORTANT:** Workers must consult Gemini before starting work:
