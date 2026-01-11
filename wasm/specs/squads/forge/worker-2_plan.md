@@ -7,28 +7,26 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-Fix TS2304 false positives caused by type-predicate parsing in parameter types.
+Reduce remaining TS2304 false positives in heritage/decorator/noTypesAndSymbols cases.
 
 **Error Code:** TS2304 - "Cannot find name 'X'."
 
-**Impact:** 138 conformance tests affected
+**Impact:** Remaining TS2304 false positives after predicate + exports fixes.
 
 ### Steps
-1. **Reproduce** with `tests/cases/conformance/controlFlow/assertionTypePredicates1.ts` (look for parse + TS2304 noise).
-2. **Parse type predicates** in parameter types: `x is T`, `asserts x is T`, and `asserts this is T`.
-3. **Lower type predicates** in `solver/lower.rs` so they become proper type nodes (avoid parse-error cascades).
-4. **Add tests** in `wasm/src/thin_checker_tests.rs` covering assertion predicates and missing-name behavior.
-5. **Run focused tests** with `./wasm/test.sh` and report delta.
+1. **Re-run scan**: `cd wasm/differential-test && node find-ts2304.mjs --max=1000 --samples=30` (after `./wasm/build-wasm.sh`).
+2. **Pick top remaining pattern** (heritage null/namespace cycles or decorator/noTypesAndSymbols).
+3. **Implement fix** in `thin_checker.rs`/`thin_parser.rs` and add a focused regression test.
+4. **Run focused tests** with `./wasm/test.sh` and report delta.
 
 ### Key Files
+- `wasm/src/thin_checker.rs`
 - `wasm/src/thin_parser.rs`
-- `wasm/src/parser/thin_node.rs`
-- `wasm/src/solver/lower.rs`
 - `wasm/src/thin_checker_tests.rs`
 
 ### Success Criteria
-- TS2304 false positives reduced for assertion/type predicate cases
-- No new parse errors for predicate syntax
+- TS2304 false positives reduced for selected remaining pattern
+- No new regressions in existing TS2304 tests
 
 ## Resume Notes
 - Branch: `worker/forge-2`.
@@ -41,8 +39,7 @@ Fix TS2304 false positives caused by type-predicate parsing in parameter types.
 
 ## Task Queue
 - Investigate remaining TS2304 in heritage cycles and invalid heritage literals (null/undefined).
-- Fix TS2304 for type predicate parsing (`asserts`/`is`) if parser is mis-tokenizing.
-- Review TS2304 in private name + decorator/noTypesAndSymbols cases.
+- Review TS2304 in decorator/noTypesAndSymbols cases.
 
 ## Completed
 - Implemented property access on constrained type parameters in checker and solver.

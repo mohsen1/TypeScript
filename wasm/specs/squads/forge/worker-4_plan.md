@@ -1,37 +1,36 @@
 # Worker 4 Plan - Squad Forge
 
 ## Mission
-Implement TS2322 improvements (type not assignable) for conformance.
+Fix TS2322 return-type assignability (void/undefined).
 
 Status: Active
 Priority: 1
 
 ## Current Assignment
-TS2300 duplicate identifier in class accessor get/set pairs (compile_class_accessors).
+TS2322 return-type assignability (void/undefined).
 
-**Error Code:** TS2300 - "Duplicate identifier 'X'"
+**Error Code:** TS2322 - "Type 'X' is not assignable to type 'Y'"
 
-**Impact:** `cli::driver_tests::compile_class_accessors` failing
+**Impact:** return type diagnostics/conformance
 
 ### Steps
-1. **Add focused tests** in `wasm/src/thin_checker_tests.rs` for accessor pairs vs duplicate getters.
-2. **Fix duplicate identifier handling** for accessors in `wasm/src/thin_checker.rs`.
-3. **Run focused tests** and re-check `compile_class_accessors`.
+1. **Add focused tests** in `wasm/src/solver/compat_tests.rs`.
+2. **Fix assignability** in `wasm/src/solver/compat.rs` and/or `wasm/src/solver/subtype.rs`.
+3. **Run focused tests** and record delta.
 
 ### Key Files
 - `wasm/src/solver/compat.rs`
 - `wasm/src/solver/compat_tests.rs`
-- `wasm/src/thin_checker.rs`
-- `wasm/src/thin_checker_tests.rs`
-- `wasm/src/checker/types/assignability.rs` (if present)
+- `wasm/src/solver/subtype.rs`
+- `wasm/src/thin_checker.rs` (if needed)
 
 ### Success Criteria
-- No TS2300 for getter/setter pairs
-- `cli::driver_tests::compile_class_accessors` passes
+- void/undefined return assignability matches TypeScript
+- No extra TS2322 regressions
 
 ## Task Queue
-- Verify getter/setter pairs don't report TS2300.
-- Ensure duplicate getters still report TS2300.
+- Capture void/undefined return-type cases in compat tests.
+- Validate no regressions in existing assignability tests.
 
 ## Completed
 
@@ -77,7 +76,7 @@ TS2300 duplicate identifier in class accessor get/set pairs (compile_class_acces
 - [x] Applied check_parameter_initializers to constructors, methods, accessors, functions
 
 ## Ready for Merge
-Yes
+No
 
 ## Notes
 - Progress: duplicate identifier logic now treats accessors with GET/SET excludes; added class accessor pair/duplicate getter tests.
