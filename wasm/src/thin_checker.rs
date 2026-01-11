@@ -8762,8 +8762,15 @@ impl<'a> ThinCheckerState<'a> {
             return type_id;
         }
 
+        if *self.ctx.instantiation_depth.borrow() >= MAX_INSTANTIATION_DEPTH {
+            self.ctx.mapped_eval_set.remove(&type_id);
+            return type_id;
+        }
+        *self.ctx.instantiation_depth.borrow_mut() += 1;
+
         let result = self.evaluate_mapped_type_with_resolution_inner(type_id, mapped_id);
 
+        *self.ctx.instantiation_depth.borrow_mut() -= 1;
         self.ctx.mapped_eval_set.remove(&type_id);
         self.ctx.mapped_eval_cache.insert(type_id, result);
         result
