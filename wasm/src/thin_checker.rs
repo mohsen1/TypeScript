@@ -29,6 +29,7 @@ use crate::checker::types::diagnostics::{
 use crate::checker::{CheckerContext, EnclosingClassInfo, FlowAnalyzer};
 use crate::interner::Atom;
 use rustc_hash::FxHashSet;
+use std::cell::RefCell;
 
 // =============================================================================
 // ThinCheckerState
@@ -45,6 +46,16 @@ use rustc_hash::FxHashSet;
 pub struct ThinCheckerState<'a> {
     /// Shared checker context containing all state.
     pub ctx: CheckerContext<'a>,
+}
+
+struct InstantiationDepthGuard<'a> {
+    depth: &'a RefCell<u32>,
+}
+
+impl<'a> Drop for InstantiationDepthGuard<'a> {
+    fn drop(&mut self) {
+        *self.depth.borrow_mut() -= 1;
+    }
 }
 
 /// Maximum depth for recursive type instantiation.
@@ -6509,6 +6520,11 @@ impl<'a> ThinCheckerState<'a> {
             return TypeId::ANY;
         };
 
+        let _depth_guard = match self.enter_instantiation_depth_guard() {
+            Some(guard) => guard,
+            None => return TypeId::ANY,
+        };
+
         // Get the property name first (needed for abstract property check regardless of object type)
         let Some(name_node) = self.ctx.arena.get(access.name_or_argument) else {
             return TypeId::ANY;
@@ -8696,6 +8712,14 @@ impl<'a> ThinCheckerState<'a> {
         self.ctx.application_eval_set.remove(&type_id);
         self.ctx.application_eval_cache.insert(type_id, result);
         result
+    }
+
+    fn enter_instantiation_depth_guard(&self) -> Option<InstantiationDepthGuard<'_>> {
+        if *self.ctx.instantiation_depth.borrow() >= MAX_INSTANTIATION_DEPTH {
+            return None;
+        }
+        *self.ctx.instantiation_depth.borrow_mut() += 1;
+        Some(InstantiationDepthGuard { depth: &self.ctx.instantiation_depth })
     }
 
     fn evaluate_application_type_inner(&mut self, type_id: TypeId) -> TypeId {
