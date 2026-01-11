@@ -5,13 +5,33 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 
 Status: Active
 Priority: 1
-## Current Assignment (2026-01-11 - COMPLETED)
-- ✅ Fixed TS2304 for local variables in object literal methods
-- ✅ Added METHOD_DECLARATION binding in bind_node()
-- ✅ Added regression test and verified all binder tests pass
-- ✅ Pushed to worker/anvil-1
+## Current Assignment (2026-01-11 - NEW: TS2304 Namespace/Module Merging)
+**Target:** Reduce TS2304 false positives in namespace/module contexts
 
-Awaiting new assignment.
+**Previous Work COMPLETED & MERGED:** Type parameter scope resolution (10 TS2304 false positives remaining)
+
+**Focus Areas:**
+1. Namespace members not finding sibling exports (6 files in internalModules)
+2. Module augmentation not merging correctly
+3. Export declarations in nested namespaces
+4. Global ambient declarations scope issues
+
+**Approach:**
+1. Run `node wasm/differential-test/conformance-runner.mjs internalModules --max=200 -v` to collect namespace samples
+2. Analyze the 6 remaining TS2304 false positives in internalModules
+3. Fix namespace/module export merging in `thin_binder.rs`
+4. Add regression tests for each pattern
+5. Verify with conformance baseline
+
+**Files:** `wasm/src/thin_binder.rs`, `wasm/src/thin_checker.rs`, `wasm/src/thin_checker_tests.rs`
+
+**Success Criteria:** Reduce internalModules TS2304 from 6 to <3 with no regressions
+
+## Completed - TS2304 Type Parameter Scope (MERGED)
+- ✅ Fixed TS2304 for local variables in object literal methods
+- ✅ Fixed TS2304 type parameter scope resolution
+- ✅ Differential test: 10 TS2304 false positives remaining (down from 759)
+- ✅ Categorized remaining: parser syntax (3), scope edge cases (7)
 - Trace name resolution in `wasm/src/thin_binder.rs` and `wasm/src/thin_checker.rs` (module exports, namespace merges, global augmentation).
 - Add regression tests in `wasm/src/thin_checker_tests.rs` and report before/after TS2304 delta.
 

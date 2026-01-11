@@ -17132,6 +17132,7 @@ function identity<T>(x: T): T {
 
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
 
     let mut binder = ThinBinderState::new();
     binder.bind_source_file(parser.get_arena(), root);
@@ -17144,6 +17145,44 @@ function identity<T>(x: T): T {
     assert!(
         !codes.contains(&2304),
         "Should not report TS2304 for type parameter T in function body, got diagnostics: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn test_type_parameter_in_type_query() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// Type parameters should be resolved in typeof type queries
+function identity<T>(x: T): T {
+    return x;
+}
+
+// typeof on type parameter should not error
+type IdentityReturnType<T> = ReturnType<typeof identity<T>>;
+
+// Type parameter in Extract with typeof
+function extract<T>(x: Extract<T, typeof identity>): T {
+    return x;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2304),
+        "Should not report TS2304 for type parameter T in type query, got diagnostics: {:?}",
         checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>()
     );
 }
@@ -17219,5 +17258,20 @@ function g1<T extends Box<T> | undefined>(x: T) {
         !codes.contains(&2304),
         "Should not report TS2304 for self-referential type constraint T extends Box<T>. Found errors: {:?}",
         ts2304_errors
+=======
+    // Check for false positive TS2304 errors on type parameter 'T'
+    let ts2304_for_T: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2304 && d.message_text.contains("'T'"))
+        .collect();
+
+    eprintln!("[TYPE_PARAM_TYPE_QUERY] All diagnostics: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>());
+
+    assert!(
+        ts2304_for_T.is_empty(),
+        "Expected no TS2304 errors for type parameter 'T' in type queries, but got {} errors: {:?}",
+        ts2304_for_T.len(),
+        ts2304_for_T.iter().map(|d| &d.message_text).collect::<Vec<_>>()
+>>>>>>> origin/rust
     );
 }

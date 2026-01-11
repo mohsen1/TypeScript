@@ -25,9 +25,16 @@ Handle return-path analysis for try/finally and switch fallthrough cases.
 - Test: `./wasm/test.sh test_missing_return_and_implicit_any_diagnostics` (PASS ✅)
 
 ### Key Files
-- `wasm/src/checker/statements.rs`
-- `wasm/src/checker/control_flow.rs`
+- `wasm/src/thin_checker.rs`
+- `wasm/src/checker/expressions.rs`
+- `wasm/src/thin_binder.rs`
 - `wasm/src/thin_checker_tests.rs`
+
+### Success Criteria
+- TS2304 emitted when using undeclared identifiers
+- Correct scope chain traversal
+- No errors for known globals
+- No new regressions
 
 ## Current Assignment (TS7010 - Implicit Any Return)
 - [x] Consulted Gemini to confirm TS7010 = implicit any return (not TS2366)

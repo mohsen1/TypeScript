@@ -394,13 +394,19 @@ impl<'a> FlowAnalyzer<'a> {
         let targets_reference = self.assignment_targets_reference_node(flow.node, reference);
 
         if targets_reference {
-            if let Some(assigned_type) = self.get_assigned_type(flow.node, reference) {
-                return assigned_type;
+            // Check if this is a direct assignment (x = value) vs destructuring ([x] = ...)
+            if self.is_direct_assignment_to_reference(flow.node, reference) {
+                // Direct assignment: narrow to the assigned type
+                if let Some(assigned_type) = self.get_assigned_type(flow.node, reference) {
+                    return assigned_type;
+                }
             }
+            // Destructuring or other complex assignment: clear narrowing
             return type_id;
         }
 
         if self.assignment_affects_reference_node(flow.node, reference) {
+            // Assignment affects the reference - clear narrowing
             return type_id;
         }
 
@@ -409,6 +415,43 @@ impl<'a> FlowAnalyzer<'a> {
         } else {
             type_id
         }
+    }
+
+    /// Check if this is a direct assignment to a reference (e.g., `x = value`)
+    /// as opposed to a destructuring assignment (e.g., `[x] = [value]`)
+    fn is_direct_assignment_to_reference(&self, assignment_node: NodeIndex, target: NodeIndex) -> bool {
+        let Some(node) = self.arena.get(assignment_node) else {
+            return false;
+        };
+
+        // Check if it's a binary expression (x = value)
+        if node.kind == syntax_kind_ext::BINARY_EXPRESSION {
+            if let Some(bin) = self.arena.get_binary_expr(node) {
+                if self.is_assignment_operator(bin.operator_token) {
+                    // Check if the left side is directly the target (not a destructuring pattern)
+                    let left = self.skip_parenthesized(bin.left);
+                    let target = self.skip_parenthesized(target);
+                    return self.is_matching_reference(left, target);
+                }
+            }
+        }
+
+        // Increment/decrement operators (x++, --x) are also direct assignments
+        if node.kind == syntax_kind_ext::PREFIX_UNARY_EXPRESSION
+            || node.kind == syntax_kind_ext::POSTFIX_UNARY_EXPRESSION
+        {
+            if let Some(unary) = self.arena.get_unary_expr(node) {
+                if unary.operator == SyntaxKind::PlusPlusToken as u16
+                    || unary.operator == SyntaxKind::MinusMinusToken as u16
+                {
+                    let operand = self.skip_parenthesized(unary.operand);
+                    let target = self.skip_parenthesized(target);
+                    return self.is_matching_reference(operand, target);
+                }
+            }
+        }
+
+        false
     }
 
     fn get_assigned_type(&self, assignment_node: NodeIndex, target: NodeIndex) -> Option<TypeId> {
