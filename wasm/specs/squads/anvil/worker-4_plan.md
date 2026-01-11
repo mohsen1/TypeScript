@@ -91,7 +91,56 @@ Fix TS2769 false positives for overloaded constructors/functions when all overlo
 - `cargo test test_overloaded_constructor_arg_count_mismatch_ts2554_not_ts2769` (PASS)
 - `node wasm/differential-test/find-ts2769.mjs --max=1000` (0 extra TS2769 errors)
 
-Ready for Merge: Yes
+Ready for Merge: Yes (MERGED)
+
+## Current Assignment (2026-01-11) - TS2769 Continued: Remaining Edge Cases
+
+Status: IN PROGRESS
+
+### Mission
+Investigate and fix remaining TS2769 false positives found in extended conformance testing (3000 tests).
+
+### Findings
+
+Expanded conformance scan (3000 tests) found **2 remaining TS2769 false positives**:
+
+#### Case 1: Forgotten `new` keyword (TS2348)
+**File**: `expressions/functionCalls/forgottenNew.ts`
+- **Pattern**: Calling class constructor without `new` keyword
+- **Code**: `var logger = Tools.NullLogger();`
+- **TSC emits**: TS2348 ("Value of type 'typeof NullLogger' is not callable. Did you mean to include 'new'?")
+- **WASM emits**: TS2769 (No overload matches this call)
+- **Root Cause**: No detection for TypeQuery (typeof Class) being called without `new`
+- **Fix Needed**: Detect TypeQuery types with CLASS symbol flags in NotCallable handling
+
+#### Case 2: Complex spread arguments with overloads
+**File**: `expressions/functionCalls/callWithSpread4.ts`
+- **Pattern**: Multiple spread arguments (`...arr1, ...arr2`) in overloaded function calls
+- **Code**: `pli(reads, ...gun, tr, fun, ...gz, writes);`
+- **TSC emits**: TS2556 (type argument count mismatch)
+- **WASM emits**: TS2769 + TS2554
+- **Root Cause**: Complex spread handling may not match overload signatures correctly
+- **Fix Needed**: Investigate spread argument expansion in overload resolution
+
+### Checklist
+
+- [x] Run extended conformance scan (3000 tests)
+- [x] Identify remaining TS2769 patterns
+- [x] Analyze forgottenNew.ts - class constructor without new
+- [x] Analyze callWithSpread4.ts - spread with overloads
+- [ ] Implement TS2348 diagnostic and detection
+- [ ] Implement fix for spread argument overload matching
+- [ ] Add regression tests
+- [ ] Verify conformance improvement
+
+### Impact
+
+- Baseline: 0/1000 files with extra TS2769 (after arg count fix)
+- Extended: 2/3000 files with extra TS2769 (0.067%)
+- Primary issue: TS2348 not implemented
+- Secondary issue: Complex spread argument handling
+
+Ready for Merge: No
 
 ## Current Assignment (2026-01-11) - Recursive Mapped Types Property Access Guard
 
