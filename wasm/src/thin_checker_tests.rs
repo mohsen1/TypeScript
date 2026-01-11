@@ -15080,6 +15080,62 @@ aFn(), b;
 }
 
 #[test]
+fn test_ts2695_comma_operator_edge_cases() {
+    use crate::thin_parser::ThinParserState;
+    use crate::checker::types::diagnostics::diagnostic_codes;
+
+    let source = r#"
+declare function eval(input: string): any;
+let a = 1;
+let b = 2;
+const obj = { method() {} };
+
+a + b, b;
+!a, b;
+a ? b : 3, b;
+a!, b;
+typeof a, b;
+`template`, b;
+
+void a, b;
+(a as any), b;
+(0, eval)("1");
+(0, obj.method)();
+(0, obj["method"])();
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2695_errors: Vec<_> = checker
+        .ctx
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == diagnostic_codes::LEFT_SIDE_OF_COMMA_OPERATOR_IS_UNUSED_AND_HAS_NO_SIDE_EFFECTS)
+        .collect();
+
+    assert_eq!(
+        ts2695_errors.len(),
+        6,
+        "Expected six TS2695 errors, got: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| d.code).collect::<Vec<_>>()
+    );
+    assert!(
+        checker.ctx.diagnostics.iter().all(|d| d.code == diagnostic_codes::LEFT_SIDE_OF_COMMA_OPERATOR_IS_UNUSED_AND_HAS_NO_SIDE_EFFECTS),
+        "Expected only TS2695 diagnostics, got: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>()
+    );
+}
+
+#[test]
 fn test_variadic_tuple_rest_param_no_ts2769() {
     use crate::thin_parser::ThinParserState;
 
