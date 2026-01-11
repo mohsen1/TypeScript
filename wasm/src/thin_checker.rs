@@ -13316,6 +13316,11 @@ impl<'a> ThinCheckerState<'a> {
             return;
         }
 
+        // Only check property initialization when strictPropertyInitialization is enabled
+        if !self.ctx.strict_property_initialization {
+            return;
+        }
+
         let mut properties = Vec::new();
         let mut tracked = FxHashSet::default();
 
