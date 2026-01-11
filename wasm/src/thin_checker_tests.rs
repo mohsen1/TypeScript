@@ -17789,34 +17789,10 @@ function test2(obj: A | B) {
     // Should have 2 TS2339 errors: one for obj.c, one for obj.a
     assert_eq!(ts2339_errors.len(), 2,
         "Expected 2 TS2339 errors for union property access, got {}: {:?}",
-=======
-    
-    let mut binder = ThinBinderState::new();
-    binder.bind_source_file(parser.get_arena(), root);
-    
-    let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
-    
-    checker.check_source_file(root);
-    
-    let ts2339_errors: Vec<_> = checker.ctx.diagnostics.iter()
-        .filter(|d| d.code == 2339)
-        .collect();
-    
-    eprintln!("TS2339 errors found: {}", ts2339_errors.len());
-    for err in &ts2339_errors {
-        eprintln!("  - {}", err.message_text);
-    }
-    
-    // All accesses should work - they're all from within the class
-    assert_eq!(ts2339_errors.len(), 0,
-        "Expected no TS2339 errors for private accessor access (including in closures), got {} - errors: {:?}",
->>>>>>> origin/worker/anvil-3
         ts2339_errors.len(),
         ts2339_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>()
     );
 }
-<<<<<<< HEAD
 
 #[test]
 fn test_ts2339_union_shared_property_no_error() {
