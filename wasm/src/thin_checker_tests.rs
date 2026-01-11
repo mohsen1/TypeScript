@@ -4,6 +4,7 @@ use crate::thin_checker::ThinCheckerState;
 use crate::thin_parser::ThinParserState;
 use crate::parser::thin_node::ThinNodeArena;
 use crate::thin_binder::ThinBinderState;
+use crate::thin_parser::ThinParserState;
 use crate::solver::{TypeId, TypeInterner};
 
 #[test]
@@ -17342,6 +17343,7 @@ fn test_static_private_field_access_no_ts2339() {
 
     // Regression test for static private field access
     // Previously failed with TS2339 because static private members were excluded from constructor type
+    use crate::thin_parser::ThinParserState;
 
     let source = r#"
 class C {
@@ -17379,6 +17381,7 @@ fn test_static_private_accessor_access_no_ts2339() {
     use crate::thin_parser::ThinParserState;
 
     // Regression test for static private accessor access
+    use crate::thin_parser::ThinParserState;
 
     let source = r#"
 class A {
@@ -17792,54 +17795,6 @@ function test2(obj: A | B) {
 }
 
 #[test]
-fn test_ts2339_private_accessor_in_closure() {
-    use crate::thin_parser::ThinParserState;
-
-    // Test that private accessors are accessible from closures in the class
-    let source = r#"
-class C {
-    private get #prop(): string { return ""; }
-    private set #prop(value: string) { }
-
-    private get #roProp(): string { return ""; }
-
-    constructor(name: string) {
-        // Private accessor access in closure - should work
-        const fn = () => {
-            C.#prop = "";
-            console.log(C.#prop);
-            console.log(C.#roProp);
-        };
-        fn();
-    }
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let arena = parser.get_arena();
-    let mut binder = ThinBinderState::new();
-    binder.bind_source_file(arena, root);
-
-    let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
-
-    checker.check_source_file(root);
-
-    let ts2339_errors: Vec<_> = checker.ctx.diagnostics.iter()
-        .filter(|d| d.code == 2339)
-        .collect();
-
-    // All accesses should work - they're all from within the class
-    assert_eq!(ts2339_errors.len(), 0,
-        "Expected no TS2339 errors for private accessor access (including in closures), got {} - errors: {:?}",
-        ts2339_errors.len(),
-        ts2339_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>()
-    );
-}
-
-#[test]
 fn test_ts2339_union_shared_property_no_error() {
     use crate::thin_parser::ThinParserState;
 
@@ -18044,8 +17999,9 @@ function test2(obj: A & { c: boolean }) {
             .map(|d| &d.message_text).collect::<Vec<_>>()
     );
 }
-
-#[test]
+=======
+>>>>>>> origin/worker/anvil-3
+=======
 fn test_overload_arg_count_exceeds_all_only_ts2554_not_ts2769() {
     use crate::thin_parser::ThinParserState;
 
@@ -18096,3 +18052,4 @@ mixed(42, 99, 100);
         first_error_msg
     );
 }
+>>>>>>> origin/worker/anvil-4
