@@ -1,12 +1,52 @@
 # Anvil Worker 4 - Mapped Type Recursion Guard
 
-## Current Assignment (2026-01-11)
+## Current Assignment (2026-01-11) - Recursive Mapped Types Crash Verification
 
-Status: Active
+Status: Completed
 
-- Verify whether `types/mapped/recursiveMappedTypes.ts` still crashes; run targeted conformance and capture stack/logs if it does.
-- If crashing, trace recursion in `wasm/src/thin_checker.rs`/`wasm/src/solver/evaluate.rs`, implement fix + regression.
-- If not crashing, document repro commands and note current conformance delta.
+- [x] Run `node wasm/differential-test/conformance-runner.mjs types/mapped --max=200 -v`.
+- [x] Capture crash stack for `recursiveMappedTypes.ts` and `mappedTypes2.ts`.
+- [x] Isolate minimal repro (recursive mapped type + property access).
+- Queue: TS2769 variadic tuple false positives (see follow-up sections).
+
+## Follow-up (2026-01-11) - Recursive Mapped Types Unreachable Crash
+
+Status: COMPLETED (verification only)
+
+### Conformance
+
+- `node wasm/differential-test/conformance-runner.mjs types/mapped --max=200 -v`
+- Crashed: `types/mapped/mappedTypes2.ts`, `types/mapped/recursiveMappedTypes.ts` (unreachable)
+
+### Crash Stack (Node + wasm)
+
+```
+RuntimeError: unreachable
+    at wasm://wasm/0082356e:wasm-function[1689]:0x1ede7e
+    at wasm://wasm/0082356e:wasm-function[1565]:0x1ec242
+    at wasm://wasm/0082356e:wasm-function[156]:0xd194f
+    at wasm://wasm/0082356e:wasm-function[1284]:0x1d0bc2
+    at wasm://wasm/0082356e:wasm-function[179]:0xdef74
+    at wasm://wasm/0082356e:wasm-function[289]:0x12db93
+    at wasm://wasm/0082356e:wasm-function[179]:0xdde3f
+```
+
+### Minimal Repro (crashes)
+
+```
+type Transform<T> = { [K in keyof T]: Transform<T[K]> };
+interface Product { users: string[]; }
+declare var product: Transform<Product>;
+product.users;
+```
+
+### Notes / Proposed Fix Direction
+
+- Crash only triggers on property access of recursive mapped types; declaring the type without property access is ok.
+- Likely in property access evaluation of mapped types (`wasm/src/solver/operations.rs` `PropertyAccessEvaluator` + `evaluate_type`).
+- Proposed direction: add a recursion guard in property access evaluation (for `TypeKey::Mapped`/`TypeKey::Application`) and/or short-circuit recursive mapped property access to `TypeId::ANY`/`TypeId::ERROR` to avoid panic until full recursive mapped semantics are implemented.
+
+Ready for Merge: Yes (plan update only; no code changes)
 
 ## Operation Conformance Assignment
 
