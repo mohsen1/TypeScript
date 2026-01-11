@@ -5425,6 +5425,15 @@ function usesFail(): number {
 function fallsThrough(): number {
     console.log("oops");
 }
+
+// Never-returning initializer should also avoid 2355
+function usesFailInInit(): number {
+    const value = fail("boom");
+}
+
+function usesFailInList(): number {
+    const a = 1, b = fail("boom");
+}
 "#;
 
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -5441,15 +5450,13 @@ function fallsThrough(): number {
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
     let count = |code| codes.iter().filter(|&&c| c == code).count();
 
-    // KNOWN LIMITATION: Currently usesFail() also gets 2355 because we don't
-    // track that fail() returns never. When this is fixed, change to assert_eq!(count(2355), 1).
-    // For now we just document the current behavior.
     let actual_2355_count = count(2355);
-    eprintln!("=== Never-Returning Call Test ===");
-    eprintln!("TS2355 errors: {} (expected 1 after full fix, currently may be 2)", actual_2355_count);
-
-    // At minimum, fallsThrough should get 2355
-    assert!(actual_2355_count >= 1, "Expected at least one 2355 error for fallsThrough()");
+    assert_eq!(
+        actual_2355_count,
+        1,
+        "Expected only fallsThrough() to get TS2355, got: {:?}",
+        codes
+    );
 }
 
 #[test]
