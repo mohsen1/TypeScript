@@ -17175,15 +17175,24 @@ impl<'a> ThinCheckerState<'a> {
                 return_type = self.infer_return_type_from_body(method.body, None);
             }
 
-            let method_name = self.get_property_name(method.name);
-            self.maybe_report_implicit_any_return(
-                method_name,
-                Some(method.name),
-                return_type,
-                has_type_annotation,
-                false,
-                member_idx,
-            );
+            // TS7011 (implicit any return) is only emitted for ambient methods,
+            // matching TypeScript's behavior
+            let is_ambient_class = self.ctx.enclosing_class.as_ref()
+                .map(|c| c.is_declared)
+                .unwrap_or(false);
+            let is_ambient_file = self.ctx.file_name.ends_with(".d.ts");
+
+            if is_ambient_class || is_ambient_file {
+                let method_name = self.get_property_name(method.name);
+                self.maybe_report_implicit_any_return(
+                    method_name,
+                    Some(method.name),
+                    return_type,
+                    has_type_annotation,
+                    false,
+                    member_idx,
+                );
+            }
 
             self.push_return_type(return_type);
             self.check_statement(method.body);
