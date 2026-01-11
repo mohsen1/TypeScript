@@ -4753,7 +4753,7 @@ impl<'a> ThinCheckerState<'a> {
     fn is_definitely_assigned_at(&self, idx: NodeIndex) -> bool {
         let flow_node = match self.ctx.binder.get_node_flow(idx) {
             Some(flow) => flow,
-            None => return true,
+            None => return false,  // No flow info means variable is not definitely assigned
         };
         let analyzer = FlowAnalyzer::new(self.ctx.arena, self.ctx.binder, self.ctx.types);
         analyzer.is_definitely_assigned(idx, flow_node)
