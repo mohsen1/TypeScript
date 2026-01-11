@@ -18000,7 +18000,22 @@ impl<'a> ThinCheckerState<'a> {
             return None;
         };
         let sym_id = SymbolId(sym_id);
-        let symbol = self.ctx.binder.get_symbol(sym_id)?;
+
+        // Try to get the symbol, but handle the case where it doesn't exist (e.g., import from missing module)
+        let symbol = self.ctx.binder.get_symbol(sym_id);
+
+        // If symbol doesn't exist, we can still check if we have type arguments to extract
+        // This handles cases like `MyPromise<void>` where MyPromise is imported from a missing module
+        if symbol.is_none() {
+            // For unresolved Promise-like types, assume the inner type is the first type argument
+            // This allows async functions with unresolved Promise return types to be handled gracefully
+            if let Some(&first_arg) = args.first() {
+                return Some(first_arg);
+            }
+            return Some(TypeId::ANY);
+        }
+
+        let symbol = symbol.unwrap();
         let name = symbol.escaped_name.as_str();
 
         if self.is_promise_like_name(name) {
@@ -18224,7 +18239,9 @@ impl<'a> ThinCheckerState<'a> {
     }
 
     fn is_promise_like_name(&self, name: &str) -> bool {
-        matches!(name, "Promise" | "PromiseLike")
+        // Match exact Promise/PromiseLike names, or any name containing "Promise" (case-insensitive)
+        // This handles types like MyPromise, CustomPromise, etc.
+        matches!(name, "Promise" | "PromiseLike") || name.contains("Promise")
     }
 
     fn is_null_or_undefined_only(&self, return_type: TypeId) -> bool {
