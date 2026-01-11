@@ -24,9 +24,10 @@ TS2322 object literal excess property + optionality.
 - `wasm/src/solver/compat_tests.rs`
 - `wasm/src/thin_checker.rs`
 - `wasm/src/thin_checker_tests.rs`
+- `wasm/src/checker/types/assignability.rs` (if present)
 
 ### Success Criteria
-- TS2322 missing errors reduced
+- TS2322 missing errors reduced for object literal assignability
 - Extra errors do not increase (no regressions)
 
 ## Task Queue

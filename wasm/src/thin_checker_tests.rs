@@ -910,6 +910,149 @@ function bar() {}
 }
 
 #[test]
+fn test_duplicate_identifier_var_function_2300() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+var foo = 1;
+function foo() {}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let duplicate_count = checker
+        .ctx
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == diagnostic_codes::DUPLICATE_IDENTIFIER)
+        .count();
+    assert_eq!(
+        duplicate_count,
+        2,
+        "Expected TS2300 for var/function duplicates, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_duplicate_identifier_var_let_2300() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+var foo = 1;
+let foo = 2;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let duplicate_count = checker
+        .ctx
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == diagnostic_codes::DUPLICATE_IDENTIFIER)
+        .count();
+    assert_eq!(
+        duplicate_count,
+        2,
+        "Expected TS2300 for var/let duplicates, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_duplicate_identifier_type_alias_2300() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type Foo = { x: number };
+type Foo = { y: number };
+
+type Bar = { x: number };
+interface Bar { y: number; }
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let duplicate_count = checker
+        .ctx
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == diagnostic_codes::DUPLICATE_IDENTIFIER)
+        .count();
+    assert_eq!(
+        duplicate_count,
+        4,
+        "Expected TS2300 for type alias conflicts, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_type_alias_with_function_no_duplicate_2300() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type Foo = { x: number };
+function Foo() {}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let duplicate_count = checker
+        .ctx
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == diagnostic_codes::DUPLICATE_IDENTIFIER)
+        .count();
+    assert_eq!(
+        duplicate_count,
+        0,
+        "Did not expect TS2300 for type alias + function, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
 fn test_overload_call_reports_no_overload_matches() {
     use crate::checker::types::diagnostics::diagnostic_codes;
     use crate::thin_parser::ThinParserState;
@@ -3259,6 +3402,38 @@ obj.foo;
     assert_eq!(
         count, 1,
         "Expected one 2339 after narrowing unknown to object, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_ts2339_catch_binding_unknown() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// @strict: true
+function f() {
+    try {
+    } catch ({ x }) {
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2339).count();
+    assert_eq!(
+        count, 1,
+        "Expected one 2339 for catch destructuring from unknown, got: {:?}",
         checker.ctx.diagnostics
     );
 }
@@ -13997,6 +14172,43 @@ type AbstractConstructor<T> = abstract new (...args: any[]) => T;
 }
 
 #[test]
+fn test_unterminated_template_expression_reports_missing_name() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = "var v = `foo ${ a ";
+
+    let mut parser = ThinParserState::new("TemplateExpression1.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let parse_codes: Vec<u32> = parser.get_diagnostics().iter().map(|d| d.code).collect();
+    assert!(
+        parse_codes.contains(&diagnostic_codes::TOKEN_EXPECTED),
+        "Expected TS1005 for unterminated template expression, got: {:?}",
+        parse_codes
+    );
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(
+        parser.get_arena(),
+        &binder,
+        &types,
+        "TemplateExpression1.ts".to_string(),
+    );
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        codes.contains(&diagnostic_codes::CANNOT_FIND_NAME),
+        "Expected TS2304 for missing name in template expression, got: {:?}",
+        codes
+    );
+}
+
+#[test]
 fn test_circular_type_alias_ts2456() {
     use crate::thin_parser::ThinParserState;
     use crate::checker::types::diagnostics::diagnostic_codes;
@@ -14655,6 +14867,46 @@ class Example {
 
     assert_eq!(ts7030_errors.len(), 1, "Expected one TS7030 error for getter, got: {:?}",
         checker.ctx.diagnostics.iter().map(|d| d.code).collect::<Vec<_>>());
+}
+
+#[test]
+fn test_ts2695_comma_operator_side_effects() {
+    use crate::thin_parser::ThinParserState;
+    use crate::checker::types::diagnostics::diagnostic_codes;
+
+    let source = r#"
+let a = 1;
+let b = 2;
+a, b;
+1, b;
+function aFn() {}
+aFn(), b;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2695_errors: Vec<_> = checker
+        .ctx
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == diagnostic_codes::LEFT_SIDE_OF_COMMA_OPERATOR_IS_UNUSED_AND_HAS_NO_SIDE_EFFECTS)
+        .collect();
+
+    assert_eq!(
+        ts2695_errors.len(),
+        2,
+        "Expected two TS2695 errors, got: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| d.code).collect::<Vec<_>>()
+    );
 }
 
 #[test]

@@ -7,17 +7,15 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-Extend control-flow narrowing for property access after `in`/`typeof`/`instanceof` guards.
+TS2339 missing errors: improve reporting + fix top missing pattern.
 
 **Error Code:** TS2339 - "Property 'X' does not exist on type 'Y'"
 
-**Impact:** 142 conformance tests affected (control-flow narrowing cases)
-
 ### Steps
-1. **Guard narrowing:** confirm `in`/`typeof`/`instanceof` paths update flow types in `control_flow.rs`.
-2. **Reference matching:** ensure property chains (including `this`/`super`) are matched for narrowing.
-3. **Add tests** in `wasm/src/checker/control_flow_tests.rs` for `in`/`typeof` guards and property access.
-4. **Run focused tests** (`./wasm/test.sh control_flow_tests`) and report delta.
+1. Extend `find-ts2339.mjs` to report missing TS2339.
+2. Fix missing TS2339 pattern in checker (catch binding unknown).
+3. Add tests for catch binding TS2339.
+4. Run focused tests (`./wasm/test.sh thin_checker_tests`) and report delta.
 
 ### Key Files
 - `wasm/src/checker/control_flow.rs`
@@ -73,6 +71,8 @@ Extend control-flow narrowing for property access after `in`/`typeof`/`instanceo
 - [x] Loop label flow unions entry/back-edge types; added regression test
 - [x] Const-aliased condition narrowing uses initializer for flow analysis; added test
 - [x] Assertion predicate calls create flow nodes and narrow asserted targets; added test
+- [x] Added missing TS2339 mode to `find-ts2339.mjs`
+- [x] Catch clause variables default to `unknown` for narrowing; added TS2339 test
 
 ### Remaining TS2339 False Positives (pending re-run)
 - Mixin classes: mixin type inference issues (intersection handling added in new expressions, unit tests pass, conformance tests need more investigation)
@@ -80,7 +80,7 @@ Extend control-flow narrowing for property access after `in`/`typeof`/`instanceo
 - Re-run conformance to confirm private names/control-flow narrowing improvements
 
 ## Ready for Merge
-Yes
+No
 
 ## Notes
 - Similar infrastructure to TS2564 (property init) - share patterns with Workers 1-2
@@ -94,3 +94,5 @@ Yes
 - Remaining TS2339 issues pending re-run; likely mixins + assertion predicates
 - `get_type_from_type_operator` added for proper keyof/readonly/unique handling
 - Tests: `./wasm/test.sh control_flow_tests`, `./wasm/test.sh test_ts2339_`
+- `./scripts/ask-gemini.mjs` blocked: missing `GCP_VERTEX_EXPRESS_API_KEY`
+- `./wasm/test.sh thin_checker_tests` fails with existing abstract class tests (2511 vs 2564)

@@ -1,6 +1,15 @@
 # Anvil Worker 3 - TS2339 Property Resolution (Inherited Properties)
 
 Ready for Merge: No (merged)
+Status: Active
+
+## Current Assignment (2026-01-11)
+
+- Prereq: run `./scripts/ask-gemini.mjs "I need to reduce TS2339 false positives (property lookup/inheritance). What's the best approach?"` once the API key is available.
+- Reduce TS2339 false positives (property access on inherited/prototype chain, mixins, and interface merges).
+- Collect 3-5 failing samples from conformance output; capture the failing expression + expected property resolution.
+- Trace property lookup in `wasm/src/thin_checker.rs` (class instance types, interface heritage, index signatures, and union/intersection property merges).
+- Implement fix + regression tests; run a targeted TS2339 scan and report the delta.
 
 ## Current Assignment (Crash triage: privateNamesInterfaceExtendingClass) - COMPLETED
 

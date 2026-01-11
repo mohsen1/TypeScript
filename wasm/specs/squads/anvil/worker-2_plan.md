@@ -7,15 +7,17 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
+- Prereq: run `./scripts/ask-gemini.mjs "I need to fix the crash in es6/templates/TemplateExpression1.ts. What's the best approach?"` once the API key is available.
 - Fix crash in `es6/templates/TemplateExpression1.ts` ("unreachable").
 - Reproduce via conformance runner or direct harness; trace template literal handling in `wasm/src/thin_checker.rs` and related template/type evaluation paths.
-- Add regression test and confirm crash is eliminated.
+- Add regression test and confirm crash is eliminated (or document if already fixed upstream).
 - Deliverables: crash repro notes + failing stack path, regression test, and conformance delta showing crash removed.
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)
 
 ## Completed
+- [x] Investigated `es6/templates/TemplateExpression1.ts` crash: could not reproduce in native or wasm; added `test_unterminated_template_expression_reports_missing_name` in `thin_checker_tests.rs` to assert TS1005 parser diagnostic + TS2304 checker output. Ran `./wasm/test.sh test_unterminated_template_expression_reports_missing_name` and `node wasm/differential-test/conformance-runner.mjs es6/templates --max=1` (0 crashes).
 - [x] Reduced TS2304 false positives: scoped mapped type parameters during missing-name checks, added DOM globals (HTMLElement/Element/Document/etc.) to builtin type/value allowlists, and recovered from invalid `accessor` modifiers in statement/type-member parsing. Added thin_checker regressions, rebuilt wasm, `find-ts2304.mjs --max=200 --samples=5` (0 false positives), conformance run `run-conformance.sh --max=200 --workers=10` (TS2304 missing: 6). `./wasm/test.sh thin_checker_tests` failed at pre-existing abstract class tests (TS2564 vs expected TS2511).
 - [x] Reduced TS2322 false positives: apply contextual typing for class property initializers, resolve Ref/index access types before assignability in var/property declarations, add thin_checker regressions for literal property init and class indexed access. `find-ts2322.mjs --max=500 --samples=5` now reports 0 false positives (previously hit derivedTypeDoesNotRequireExtendsClause + typeOfThisInStaticMembers12/13 + privateNamesAndIndexedAccess).
 - [x] Fixed parser extra errors TS1005/TS1109/TS1068/TS1128 (static name parsing, static blocks with modifiers, async function expression keyword names). Added regression tests in `thin_parser_tests.rs`; `./wasm/test.sh thin_parser` passed.
@@ -199,7 +201,7 @@ Priority: 2
 - [x] Further fixed TS2403 false positives: changed from TypeId equality to bi-directional assignability check. TypeScript's "same type" semantics requires mutual assignability, not identical TypeIds. Fixes patterns like `var e = E1; var e: typeof E1;` (enum/typeof) and `var n = 42; var n: number;` (inferred vs annotated). Also fixed compilation error in solver/subtype.rs (s_sym referenced but undefined). Added regression tests for enum typeof and inferred vs annotated patterns. Quick conformance (200 files): TS2403 removed from top 10 extra errors list; appears only as 7 missing errors (legitimate cases where TSC emits but we don't).
 
 ## Ready for Merge
-No (merged 2026-01-10)
+No (merged 2026-01-11)
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize emitter fidelity (ES5 downleveling/source maps) before new features.
