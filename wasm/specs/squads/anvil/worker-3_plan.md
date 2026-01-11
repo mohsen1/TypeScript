@@ -1,6 +1,6 @@
 # Anvil Worker 3 - TS2339 Property Resolution (Inherited Properties)
 
-Ready for Merge: No (merged 2026-01-11)
+Ready for Merge: Yes
 Status: Active
 
 ## Current Assignment (2026-01-11)
@@ -14,6 +14,11 @@ Status: Active
 - Regression: `test_mixin_return_type_preserves_base_properties` in `wasm/src/thin_checker_tests.rs`.
 - Samples (pre-fix): `classes/mixinAbstractClasses.ts`, `classes/mixinClassesAnnotated.ts`, `classes/mixinClassesAnonymous.ts`, `classes/mixinClassesMembers.ts`, `controlFlow/assertionTypePredicates1.ts`.
 - TS2339 scan (post-fix): `node wasm/differential-test/find-ts2339.mjs --max=500 --samples=5` → 1 extra (`classes/classDeclarations/classExtendingClassLikeType.ts`, 6 errors).
+
+### Update (2026-01-11)
+- Fix: merge common properties/index signatures for union base instance types (overloaded class-like constructors) so `extends getBase()` preserves base members (commit 9b23466626).
+- Regression: `test_class_extends_class_like_constructor_properties` in `wasm/src/thin_checker_tests.rs`.
+- TS2339 scan: `node wasm/differential-test/find-ts2339.mjs --max=500 --samples=5` → 0 extra.
 
 ## Current Assignment (Crash triage: privateNamesInterfaceExtendingClass) - COMPLETED
 
