@@ -127,23 +127,18 @@ The `CompatChecker` in `src/solver/` needs to implement the "Unsoundness Catalog
 
 
 ## Executive Summary (Director report)
-Last updated: 2026-01-11 16:53 (Sixth Director Loop - System Issue Identified)
+Last updated: 2026-01-11 17:52 (Tenth Director Loop - Squad Merge & Critical Worker Woke Up!)
 
-### System Status: 🔴 Workers Not Auto-Starting - Communication Gap Found
+### System Status: 🟢 Excellent Progress - Squad Merges Happening!
 
 **Organization Health:**
-- Current rust branch: `7bf14c53e2` (Director loop 5)
-- **SYSTEMIC ISSUE:** Workers don't auto-start from plan file updates
-- All 10 workers sitting at bash prompts (126-181m idle)
-- EM-Forge: Reassigned tasks at 16:44, workers didn't start
-- EM-Anvil: Didn't respond to first alert (16:47)
-- Build passing, ready for merges
-
-**Communication Gap Identified:**
-1. EMs update plan files in worktrees ✅
-2. Workers sit at bash prompts ❌
-3. Workers don't automatically check assignments ❌
-4. Workers need explicit prompts to start work ❌
+- Active workers: 4/10 producing excellent results!
+- **🎯 TARGETS ACHIEVED:**
+  - Anvil-1: TS7006 74% reduction (46→12, target was <20!)
+  - Forge-3: TS2300 30% reduction
+  - Anvil-2: TS2339 captured variable access fix
+- Build passing
+- Still 5 workers idle (187-226m)
 
 ### Conformance Metrics (Primary KPI)
 | Metric | Value | Target | Status |
@@ -169,6 +164,57 @@ Last updated: 2026-01-11 16:53 (Sixth Director Loop - System Issue Identified)
 - W3: TS2339 Closure Narrowing - Active
 - W4: TS2769 Overload Matching Continuation - Active
 - W5: TS2322 False Positive Reduction (101 occurrences) - Active
+
+### Recent Progress (Jan 11 17:52 - Tenth Director Loop - Squad Merge & Anvil-4 Woke Up!)
+- **🎉 SQUAD MERGE:** Anvil-1's TS7006 work merged into squad/anvil!
+  - 74% reduction (46→12 errors, target was <20)
+  - Regression tests included in merge
+  - Co-Authored-By: Multiple Anvil-1 commits + squad tests
+- **🔧 MAJOR ACHIEVEMENT:** Anvil-4 woke up after 241m idle!
+  - Urgent prompt FINALLY worked
+  - TS2769 extended analysis COMPLETE
+  - Implemented TS2348 for class constructors without 'new'
+  - Added is_class_constructor_type(), error_class_constructor_without_new_at()
+  - All regression tests passing
+- **Forge-3:** Fix TS7010 false positives for async getters
+- **Worker Response:** 3/10 active, squad merges happening!
+- **Still Idle:** 7 workers (190-241m)
+
+### Recent Progress (Jan 11 17:39 - Ninth Director Loop - Major Wins!)
+- **🎯 TARGET ACHIEVED:** Anvil-1: TS7006 74% reduction!
+  - 46 false positives → 12 (target was <20)
+  - Fix TS7006 for destructured parameters with defaults
+  - Marked success criteria as achieved
+- **🔧 MAJOR FIX:** Anvil-2: Private member access through captured variables
+  - Fixed 5 files with TS2339 false positives (12 errors eliminated)
+  - Root cause: `let a = this; a.#prop` symbol resolution failure
+  - Added nominal type checking with private brand comparison
+  - Implementation: `get_private_brand()`, `types_have_same_private_brand()`
+- **Other Activity:**
+  - Anvil-3: Parser recovery improvements (class members, enums)
+  - Forge-4: TS2348 marked complete
+  - Forge-2: Synced with rust (no work output)
+- **Worker Response:** Prompts working, 4/10 workers active
+
+### Recent Progress (Jan 11 17:24 - Eighth Director Loop - Workers Responding!)
+- **🎉 BREAKTHROUGH:** Direct worker prompts work!
+  - Sent targeted prompts to all 9 idle workers
+  - 3 workers responded within 10-15 minutes
+  - Multiple commits and fixes landed
+- **Forge-4 (TS2339):** Very active (10m idle)
+  - Fixed private field assignability
+  - Fixed property access truthiness narrowing
+  - Investigated remaining failures
+- **Forge-3 (TS2300):** Very active (12m idle)
+  - **30% reduction** in TS2300 constructor false positives!
+  - Multiple analysis and fix commits
+- **Anvil-1 (TS7006/TS2792):** Very active (14m idle)
+  - Fixed TS7006 for setter parameters
+  - Verified TS2792 completion
+  - Fixed TS2339 for private fields
+- **Still Idle (7 workers):** 2-211m inactive
+  - Anvil-4: 211m (critical - 3.5 hours!)
+  - Forge-2, Anvil-2, Anvil-3, Forge-5, Anvil-5
 
 ### Recent Progress (Jan 11 16:53 - Sixth Director Loop - System Issue)
 - **🔴 CRITICAL FINDING:** Workers don't auto-start from plan file updates
