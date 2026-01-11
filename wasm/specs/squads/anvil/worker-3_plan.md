@@ -1,14 +1,14 @@
 # Anvil Worker 3 - TS2339 Property Resolution (Inherited Properties)
 
-Ready for Merge: Yes
+Ready for Merge: No
 Status: Active
 
 ## Current Assignment (2026-01-11)
 
-- Expand TS2403 scan to larger sample set (e.g., `find-ts2403.mjs --max=2000 --samples=5`) and collect remaining extras.
-- Focus on `enums/enumBasics.ts` and `es6/templates/taggedTemplateStringsWithOverloadResolution3*.ts` if still present.
-- Implement fixes in `wasm/src/thin_checker.rs`/`wasm/src/solver/subtype.rs` and add regression tests.
-- Report before/after TS2403 delta from the expanded scan.
+- Investigate TS2339 property access false positives (target: 292 extras).
+- Collect 3-5 samples via `node wasm/differential-test/find-ts2339.mjs --max=500 --samples=5` and record failing property access sites.
+- Trace property lookup in `wasm/src/thin_checker.rs` (narrowing, index signatures, interface merging, prototype chain) and implement a minimal fix.
+- Add regression tests in `wasm/src/thin_checker_tests.rs` and report before/after TS2339 delta.
 
 ### Update (2026-01-11)
 - Samples (pre-fix): `enums/enumBasics.ts`, `es6/spread/arrayLiteralSpread.ts`, `es6/spread/arrayLiteralSpreadES5iterable.ts`, `es6/templates/taggedTemplateStringsWithOverloadResolution3.ts`, `es6/templates/taggedTemplateStringsWithOverloadResolution3_ES6.ts`.
