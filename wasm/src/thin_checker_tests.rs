@@ -5983,6 +5983,40 @@ async function f(): PromiseAlias<void> {
     );
 }
 
+/// Test async functions with qualified name class extending Promise (conformance: asyncQualifiedReturnType_es5.ts)
+#[test]
+fn test_async_qualified_promise_class_no_2355() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+namespace X {
+    export class MyPromise<T> extends Promise<T> {
+    }
+}
+
+async function f(): X.MyPromise<void> {
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2355),
+        "Did not expect TS2355 for async qualified Promise class return type, got: {:?}",
+        codes
+    );
+}
+
 /// Test that calling a never-returning function doesn't trigger TS2355
 /// This is a known limitation - calls to functions returning `never` should
 /// terminate control flow but aren't currently detected.
