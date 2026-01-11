@@ -52,9 +52,11 @@ Implement TS2300 "Duplicate identifier" diagnostics for basic redeclaration case
 - Implemented TS2792 module resolution split (2307 for relative, 2792 for package) and ambient module tracking; added missing import tests. `./wasm/test.sh` failed at `cli::driver_tests::compile_generic_utility_library_type_utilities`.
 - Fixed multi-file module resolution diagnostics by moving unresolved import errors to the CLI driver and suppressing checker import diagnostics in multi-file mode.
 - Fixed object spread type checking by wiring parent pointers for literal/unary nodes and merging spread properties into object literal types; `./wasm/test.sh cli::driver_tests::compile_object_spread` passing.
+- Implemented TS2300 duplicate identifier detection using declaration conflict rules; added tests for var/function, var/let, type alias conflicts, and type alias + function allowed. Ran `./wasm/test.sh duplicate_identifier` and `./wasm/test.sh type_alias_with_function_no_duplicate_2300`.
+- Re-synced with `origin/rust` and reran `./wasm/test.sh duplicate_identifier` (passed).
 
 ## Ready for Merge
-No
+Yes
 
 ## Notes
 - Run `./wasm/test.sh` before pushing
