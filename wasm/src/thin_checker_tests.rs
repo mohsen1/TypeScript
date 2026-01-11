@@ -5977,6 +5977,74 @@ function usesFailInList(): number {
     );
 }
 
+/// Test that try/catch blocks that always return or throw don't trigger TS2355.
+#[test]
+fn test_try_catch_no_2355() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+function fail(): never {
+    throw "boom";
+}
+
+function tryCatchReturn(): number {
+    try {
+        return 1;
+    } catch (e) {
+        return 2;
+    }
+}
+
+function tryCatchThrow(): number {
+    try {
+        throw "boom";
+    } catch (e) {
+        throw "boom";
+    }
+}
+
+function tryCatchNever(): number {
+    try {
+        fail();
+    } catch (e) {
+        return 1;
+    }
+}
+
+function tryCatchFallsThrough(): number {
+    try {
+        return 1;
+    } catch (e) {
+        console.log(e);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let count = |code| codes.iter().filter(|&&c| c == code).count();
+
+    let count_2355 = count(2355);
+    let count_2366 = count(2366);
+    assert_eq!(count_2355, 0, "Did not expect TS2355, got: {:?}", codes);
+    assert_eq!(
+        count_2366,
+        1,
+        "Expected only tryCatchFallsThrough() to get TS2366, got: {:?}",
+        codes
+    );
+}
+
 #[test]
 fn test_no_implicit_any_false_suppresses_diagnostics() {
     use crate::thin_parser::ThinParserState;

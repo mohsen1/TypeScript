@@ -18023,6 +18023,12 @@ impl<'a> ThinCheckerState<'a> {
             }
             syntax_kind_ext::SWITCH_STATEMENT => self.switch_falls_through(stmt_idx),
             syntax_kind_ext::TRY_STATEMENT => self.try_falls_through(stmt_idx),
+            syntax_kind_ext::CATCH_CLAUSE => self
+                .ctx
+                .arena
+                .get_catch_clause(node)
+                .map(|catch_data| self.statement_falls_through(catch_data.block))
+                .unwrap_or(true),
             syntax_kind_ext::WHILE_STATEMENT | syntax_kind_ext::DO_STATEMENT | syntax_kind_ext::FOR_STATEMENT => {
                 self.loop_falls_through(node)
             }
