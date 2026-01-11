@@ -452,3 +452,83 @@ No
 - Push to: `origin/worker/forge-5`
 - **NEVER edit**: `DIRECTOR_AGENT.md`, `SQUAD_LEAD_AGENT.md`, `MANAGER_AGENT.md`, `AGENTS.md`, `start_*.sh`
 - Tests: `./wasm/test.sh test_check_redux_lodash_style_generics`, `./wasm/test.sh` (fails at `compile_generic_utility_library_type_utilities` + `compile_generic_utility_library_with_constraints`).
+
+## Current Assignment (TS2304 - Cannot Find Name Errors)
+Investigate and fix identifier resolution to eliminate false TS2304 errors.
+
+### Investigation Results (2026-01-11)
+
+#### ✅ Core Functionality Working
+- Basic identifier resolution: **IMPLEMENTED** ✅
+  - Value identifiers (`thin_checker.rs:4450`)
+  - Type references (`thin_checker.rs:707`)
+  - Error reporting (`thin_checker.rs:10794`)
+
+- All existing unit tests: **PASSING** ✅
+  - `test_missing_identifier_emits_2304`
+  - `test_missing_type_reference_emits_2304`
+  - `test_missing_type_reference_in_function_type_emits_2304`
+  - `test_type_parameter_in_function_body_no_ts2304` (newly added)
+  - `test_constrained_type_parameter_in_types_no_ts2304` (newly added)
+
+- Basic conformance scan: **NO FALSE POSITIVES** ✅
+  - Scanned 500+ conformance test files
+  - Result: 0 false positives found in basic scan
+
+#### 🔍 Deep Scan Results (1000 files)
+Found 4 files with false positive TS2304 errors:
+
+1. **Private Names** - `privateNamesAndIndexedAccess.ts`
+   - Error: "Cannot find name '#bar'"
+   - Pattern: `C[#bar]` (private field indexed access)
+   - Priority: LOW (edge case syntax)
+
+2. **Constructor Parameters** - `initializerReferencingConstructorParameters.ts`
+   - Error: "Cannot find name 'x'" (4× in initializers)
+   - Pattern: `a = x; b: typeof x;` where x is constructor parameter
+   - Priority: **VERIFY** (may be correct - parameters shouldn't be in initializer scope)
+
+3. **Auto Accessors** - `staticAutoAccessorsWithDecorators.ts`
+   - Errors: "Cannot find name 'static'", "accessor", "x"
+   - Pattern: `static accessor x = 1;`
+   - Priority: MEDIUM (parser issue with accessor syntax)
+
+4. **Control Flow Generics** - `controlFlowGenericTypes.ts`
+   - Error: "Cannot find name 'T'" (4×)
+   - Pattern: `function f1<T extends string | undefined>(x: T, y: { a: T }, z: [T])`
+   - Priority: **CRITICAL** ⚠️
+
+#### ⚠️ Critical Discrepancy
+
+**Unit Test**: Constrained type parameters resolve correctly ✅
+**Conformance**: Same pattern reports TS2304 errors ❌
+
+Test case:
+```typescript
+function f1<T extends string | undefined>(x: T, y: { a: T }, z: [T]): string {
+    return "hello";
+}
+```
+
+- Unit test `test_constrained_type_parameter_in_types_no_ts2304`: **PASSING**
+- Conformance test `controlFlowGenericTypes.ts`: **4× TS2304 errors**
+
+**Hypothesis**: The discrepancy suggests:
+1. Conformance script may call WASM differently than unit tests
+2. Multi-file compilation context might affect resolution
+3. Specific compiler flags in conformance tests (@strict) might trigger edge case
+
+### Next Steps
+- [ ] Investigate why identical code passes in unit tests but fails in conformance
+- [ ] Check if WasmProgram API behaves differently than ThinParser
+- [ ] Review how find-ts2304.mjs script invokes WASM checker
+- [ ] Add debug logging to trace type parameter resolution in conformance context
+
+### Files Modified
+- `wasm/src/thin_checker_tests.rs:16867-16897` (test_type_parameter_in_function_body_no_ts2304)
+- `wasm/src/thin_checker_tests.rs:16898-16930` (test_constrained_type_parameter_in_types_no_ts2304)
+
+### Commits
+- `0d31b41c3a` - Add test for type parameter TS2304 resolution
+- `ac1d0138f8` - Add test for constrained type parameters
+
