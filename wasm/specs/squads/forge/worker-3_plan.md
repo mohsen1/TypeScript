@@ -1,32 +1,29 @@
 # Worker 3 Plan - Squad Forge
 
 ## Mission
-Reduce TS2339 false positives via control flow narrowing.
+Implement implicit-any diagnostics (TS7006/TS7008).
 
 Status: Active
 Priority: 1
 
 ## Current Assignment
-TS2339 missing errors: private-name access and static computed member cases.
+Reduce remaining TS7006/TS7008 implicit-any diagnostics gaps.
 
-**Error Code:** TS2339 - "Property 'X' does not exist on type 'Y'"
+**Error Code:** TS7006/TS7008 - "Parameter/Member implicitly has 'any' type"
 
 ### Steps
-1. **Run a missing scan**: `node wasm/differential-test/find-ts2339.mjs --mode=missing --max=2000 --samples=20`.
-2. **Target missing patterns** from the scan (private-name access + static computed `this.c`).
-3. **Fix private-name access** in `wasm/src/thin_checker.rs` (property access + `in` operator).
-4. **Fix class expression computed names** in `wasm/src/thin_checker.rs`.
-5. **Add tests** in `wasm/src/thin_checker_tests.rs`.
-6. **Run focused tests** with `./wasm/test.sh thin_checker_tests` and report delta.
+1. **Run a scan** for remaining implicit-any cases (use conformance samples or grep existing tests).
+2. **Implement missing checks** in `wasm/src/thin_checker.rs` for any remaining contexts (call/construct signatures, type literals, etc).
+3. **Add tests** in `wasm/src/thin_checker_tests.rs` for the missing contexts.
+4. **Run focused tests** with `./wasm/test.sh` and report delta.
 
 ### Key Files
 - `wasm/src/thin_checker.rs`
 - `wasm/src/thin_checker_tests.rs`
-- `wasm/differential-test/find-ts2339.mjs`
 
 ### Success Criteria
-- Missing TS2339 reduced for private-name/computed-member patterns
-- No new TS2339 extras introduced
+- TS7006/TS7008 missing errors reduced
+- No new implicit-any false positives
 
 ## Task Queue
 - (empty)
@@ -84,7 +81,7 @@ TS2339 missing errors: private-name access and static computed member cases.
 - Re-run conformance to confirm private names/control-flow narrowing improvements
 
 ## Ready for Merge
-Yes
+No
 
 ## Notes
 - Similar infrastructure to TS2564 (property init) - share patterns with Workers 1-2
