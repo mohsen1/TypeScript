@@ -18588,30 +18588,8 @@ impl<'a> ThinCheckerState<'a> {
                             && self.contains_break_statement(if_data.else_statement))
                 })
                 .unwrap_or(false),
-            syntax_kind_ext::SWITCH_STATEMENT => {
-                let Some(switch_data) = self.ctx.arena.get_switch(node) else {
-                    return false;
-                };
-                let Some(case_block_node) = self.ctx.arena.get(switch_data.case_block) else {
-                    return false;
-                };
-                let Some(case_block) = self.ctx.arena.get_block(case_block_node) else {
-                    return false;
-                };
-                case_block.statements.nodes.iter().any(|&clause_idx| {
-                    let Some(clause_node) = self.ctx.arena.get(clause_idx) else {
-                        return false;
-                    };
-                    let Some(clause) = self.ctx.arena.get_case_clause(clause_node) else {
-                        return false;
-                    };
-                    clause
-                        .statements
-                        .nodes
-                        .iter()
-                        .any(|&stmt| self.contains_break_statement(stmt))
-                })
-            }
+            // Don't recurse into switch statements - breaks inside target the switch, not outer loop
+            syntax_kind_ext::SWITCH_STATEMENT => false,
             syntax_kind_ext::TRY_STATEMENT => self
                 .ctx
                 .arena
@@ -18624,20 +18602,12 @@ impl<'a> ThinCheckerState<'a> {
                             && self.contains_break_statement(try_data.finally_block))
                 })
                 .unwrap_or(false),
+            // Don't recurse into nested loops - breaks inside target the nested loop, not outer loop
             syntax_kind_ext::WHILE_STATEMENT
             | syntax_kind_ext::DO_STATEMENT
-            | syntax_kind_ext::FOR_STATEMENT => self
-                .ctx
-                .arena
-                .get_loop(node)
-                .map(|loop_data| self.contains_break_statement(loop_data.statement))
-                .unwrap_or(false),
-            syntax_kind_ext::FOR_IN_STATEMENT | syntax_kind_ext::FOR_OF_STATEMENT => self
-                .ctx
-                .arena
-                .get_for_in_of(node)
-                .map(|loop_data| self.contains_break_statement(loop_data.statement))
-                .unwrap_or(false),
+            | syntax_kind_ext::FOR_STATEMENT
+            | syntax_kind_ext::FOR_IN_STATEMENT
+            | syntax_kind_ext::FOR_OF_STATEMENT => false,
             syntax_kind_ext::LABELED_STATEMENT => self
                 .ctx
                 .arena
