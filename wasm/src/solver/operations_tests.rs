@@ -3,6 +3,7 @@
 use super::*;
 use crate::solver::intern::TypeInterner;
 use crate::solver::CompatChecker;
+use crate::solver::types::TypeKey;
 
 #[test]
 fn test_call_simple_function() {
@@ -5537,4 +5538,47 @@ fn test_variadic_empty_args_uses_constraint() {
     );
     // With no inference candidates, should fall back to constraint
     assert_eq!(result, TypeId::UNKNOWN);
+}
+
+/// Test that array_element_type returns ERROR instead of ANY for non-array/tuple types
+/// This is important for TS2322 type checking - returning ANY would incorrectly silence
+/// type errors, while ERROR properly propagates the failure.
+#[test]
+fn test_array_element_type_non_array_returns_error() {
+    let interner = TypeInterner::new();
+
+    // Create a property access evaluator (needed to call array_element_type)
+    let mut evaluator = PropertyAccessEvaluator::new(&interner);
+
+    // Try to get element type of a non-array type (e.g., a number)
+    let number_type = TypeId::NUMBER;
+    let result = evaluator.array_element_type(number_type);
+
+    // Should return ERROR instead of ANY
+    assert_eq!(result, TypeId::ERROR,
+        "array_element_type should return ERROR for non-array/tuple types, not ANY");
+
+    // Also test with object type
+    let object_type = interner.object(vec![]);
+    let result = evaluator.array_element_type(object_type);
+    assert_eq!(result, TypeId::ERROR,
+        "array_element_type should return ERROR for object types, not ANY");
+
+    // Verify that actual arrays still work
+    let string_array = interner.array(TypeId::STRING);
+    let result = evaluator.array_element_type(string_array);
+    assert_eq!(result, TypeId::STRING,
+        "array_element_type should still return element type for arrays");
+
+    // Verify that tuples still work
+    let tuple_elements = vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ];
+    let tuple = interner.tuple(tuple_elements);
+    let result = evaluator.array_element_type(tuple);
+    // Should be union of string | number
+    assert!(result == TypeId::STRING || result == TypeId::NUMBER ||
+            matches!(interner.lookup(result), Some(TypeKey::Union(_))),
+        "array_element_type should return union of tuple element types");
 }
