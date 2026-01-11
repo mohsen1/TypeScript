@@ -30,6 +30,8 @@ pub struct ThinBinderState {
     pub file_locals: SymbolTable,
     /// Ambient module declarations by specifier (e.g. "pkg", "./types")
     pub declared_modules: FxHashSet<String>,
+    /// Whether the current source file is an external module (has top-level import/export).
+    is_external_module: bool,
     /// Flow nodes for control flow analysis
     pub flow_nodes: FlowNodeArena,
     /// Current flow node
@@ -76,6 +78,7 @@ impl ThinBinderState {
             scope_stack: Vec::new(),
             file_locals: SymbolTable::new(),
             declared_modules: FxHashSet::default(),
+            is_external_module: false,
             flow_nodes,
             current_flow: FlowNodeId::NONE,
             unreachable_flow,
@@ -100,6 +103,7 @@ impl ThinBinderState {
         self.scope_stack.clear();
         self.file_locals.clear();
         self.declared_modules.clear();
+        self.is_external_module = false;
         self.flow_nodes.clear();
         self.unreachable_flow = self.flow_nodes.alloc(flow_flags::UNREACHABLE);
         self.current_flow = FlowNodeId::NONE;
@@ -135,6 +139,7 @@ impl ThinBinderState {
             scope_stack: Vec::new(),
             file_locals,
             declared_modules: FxHashSet::default(),
+            is_external_module: false,
             flow_nodes,
             current_flow: FlowNodeId::NONE,
             unreachable_flow,
@@ -170,6 +175,7 @@ impl ThinBinderState {
             scope_stack: Vec::new(),
             file_locals,
             declared_modules: FxHashSet::default(),
+            is_external_module: false,
             flow_nodes,
             current_flow: FlowNodeId::NONE,
             unreachable_flow,
@@ -333,6 +339,38 @@ impl ThinBinderState {
         }
     }
 
+    fn source_file_is_external_module(&self, arena: &ThinNodeArena, root: NodeIndex) -> bool {
+        let Some(node) = arena.get(root) else {
+            return false;
+        };
+        let Some(source) = arena.get_source_file(node) else {
+            return false;
+        };
+
+        for &stmt_idx in &source.statements.nodes {
+            if stmt_idx.is_none() {
+                continue;
+            }
+            let Some(stmt) = arena.get(stmt_idx) else {
+                continue;
+            };
+            match stmt.kind {
+                syntax_kind_ext::IMPORT_DECLARATION
+                | syntax_kind_ext::IMPORT_EQUALS_DECLARATION
+                | syntax_kind_ext::EXPORT_DECLARATION
+                | syntax_kind_ext::EXPORT_ASSIGNMENT => {
+                    return true;
+                }
+                _ => {}
+            }
+            if self.is_node_exported(arena, stmt_idx) {
+                return true;
+            }
+        }
+
+        false
+    }
+
     /// Bind a source file using ThinNodeArena.
     pub fn bind_source_file(&mut self, arena: &ThinNodeArena, root: NodeIndex) {
         // Initialize scope chain with source file scope (legacy)
@@ -353,6 +391,7 @@ impl ThinBinderState {
         // Create START flow node for the file
         let start_flow = self.flow_nodes.alloc(flow_flags::START);
         self.current_flow = start_flow;
+        self.is_external_module = self.source_file_is_external_module(arena, root);
 
         if let Some(node) = arena.get(root) {
             if let Some(sf) = arena.get_source_file(node) {
@@ -397,6 +436,8 @@ impl ThinBinderState {
         if self.scopes.is_empty() {
             return false;
         }
+
+        self.is_external_module = self.source_file_is_external_module(arena, root);
 
         self.prune_incremental_maps(arena, reparse_start);
 
@@ -2572,7 +2613,7 @@ impl ThinBinderState {
                     || name_node.kind == SyntaxKind::NoSubstitutionTemplateLiteral as u16
                 {
                     if let Some(lit) = arena.get_literal(name_node) {
-                        if !lit.text.is_empty() {
+                        if !lit.text.is_empty() && !self.is_external_module {
                             self.declared_modules.insert(lit.text.clone());
                         }
                     }

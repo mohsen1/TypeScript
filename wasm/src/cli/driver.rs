@@ -2265,6 +2265,7 @@ fn collect_diagnostics(
                 file.file_name.clone(),
             )
         };
+        checker.ctx.report_unresolved_imports = false;
         let module_specifiers = collect_module_specifiers(&file.arena, file.source_file);
         let mut resolved_modules = HashSet::new();
         for (specifier, _) in &module_specifiers {
