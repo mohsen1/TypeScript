@@ -2612,8 +2612,10 @@ impl ThinBinderState {
                 if name_node.kind == SyntaxKind::StringLiteral as u16
                     || name_node.kind == SyntaxKind::NoSubstitutionTemplateLiteral as u16
                 {
+                    // Ambient module declaration with string literal name
+                    // These should always be tracked, regardless of whether the file is an external module
                     if let Some(lit) = arena.get_literal(name_node) {
-                        if !lit.text.is_empty() && !self.is_external_module {
+                        if !lit.text.is_empty() {
                             self.declared_modules.insert(lit.text.clone());
                         }
                     }
