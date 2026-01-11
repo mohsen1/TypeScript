@@ -6,7 +6,7 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-- Complete: TS2322 false positives reduction (assignability + control-flow narrowing). Awaiting next assignment.
+- Reduce remaining TS2322 false positives, focusing on control-flow narrowing gaps (generic types, in-operator, optional chain) and globalThis readonly writes.
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)
@@ -20,6 +20,7 @@ Priority: 1
 - Notify manager on status: `.notify/notify.sh ready|merge|blocked|task "..."` (after any significant work)
 
 ## Completed
+- [x] Improved flow narrowing for TS2322: added destructuring assignment RHS matching, optional-chain truthiness narrowing, in-operator literal/key resolution, discriminant narrowing for type params + optional chains, instanceof narrowing to instance types, and enabled flow narrowing for type params. Added 4 thin_checker tests (destructuring assignment, in-operator const, instanceof type param, optional chain discriminant). Ran targeted `./wasm/test.sh` for new tests and `./wasm/build-wasm.sh`.
 - [x] Reduced TS2322 false positives: instantiated constructor signatures for extends expressions with type args, evaluated index access/mapped/conditional types in assignability, honored contextual array element types, ignored static private members in constructor assignability, and improved control-flow narrowing for assignment expressions/property access. Added 5 thin_checker tests and ran targeted `./wasm/test.sh` (see Notes for sample delta).
 - [x] Investigated TemplateExpression1 crash repro: ran custom harness to parse/check `tests/cases/conformance/es6/templates/TemplateExpression1.ts` (no crash; parser TS1005, checker TS2304). Ran `node wasm/differential-test/process-pool-conformance.mjs es6/templates --max=200 --workers=4` (178 tests, 0 crashed). Logged findings in Notes.
 - [x] Reduced TS2304 false positives for namespaces/ambient/global: parse dotted namespaces as nested modules, bind `declare global` into current scope, resolve sibling namespace exports via module exports, and add parent links for type nodes. Added thin_checker_tests for namespace sibling export, type literal, type query alias, declare global, and ambient module import. Ran `./wasm/test.sh test_namespace_sibling_export_resolves`, `./wasm/test.sh test_namespace_type_query_resolves_alias`, `./wasm/test.sh test_declare_global_merges_into_global_scope`, `./wasm/test.sh test_ambient_module_declaration_resolves_import`.
@@ -185,6 +186,7 @@ Yes
 - TS2322 sample set (pre-fix, 8): async/es2017/await_incorrectThisType.ts; classes/classDeclarations/classHeritageSpecification/derivedTypeDoesNotRequireExtendsClause.ts; classes/members/inheritanceAndOverriding/derivedClassOverridesProtectedMembers.ts; derivedClassOverridesProtectedMembers2.ts; derivedClassOverridesProtectedMembers3.ts; derivedClassOverridesPublicMembers.ts; classes/members/instanceAndStaticMembers/typeOfThisInStaticMembers12.ts; typeOfThisInStaticMembers13.ts.
 - TS2322 remaining (post-fix, 4): async/es2017/await_incorrectThisType.ts; classes/classDeclarations/classHeritageSpecification/derivedTypeDoesNotRequireExtendsClause.ts; classes/members/instanceAndStaticMembers/typeOfThisInStaticMembers12.ts; typeOfThisInStaticMembers13.ts.
 - TS2322 samples (find-ts2322 --max=1000 --samples=5): pre-fix: classes/classDeclarations/classExtendingClassLikeType.ts; classes/classDeclarations/classHeritageSpecification/derivedTypeDoesNotRequireExtendsClause.ts; classes/members/privateNames/privateNamesAndIndexedAccess.ts; classes/members/privateNames/privateNamesAndStaticFields.ts; controlFlow/controlFlowAssignmentExpression.ts. Post-fix: controlFlow/controlFlowAssignmentPatternOrder.ts; controlFlow/controlFlowGenericTypes.ts; controlFlow/controlFlowInOperator.ts; controlFlow/controlFlowOptionalChain.ts; controlFlow/typeGuardsTypeParameters.ts.
+- TS2322 samples (find-ts2322 --max=1000 --samples=5) after flow updates: controlFlow/controlFlowGenericTypes.ts; controlFlow/controlFlowInOperator.ts; controlFlow/controlFlowOptionalChain.ts; es2019/globalThisReadonlyProperties.ts. (AssignmentPatternOrder + typeGuardsTypeParameters no longer sampled.)
 - Conformance before (max=500, process-pool): exact 88/487 (18.1%), same 104 (21.4%), missing 309, extra 255, missing TS2322 19, crashed 3, duration 11.9s, throughput 41.9 tests/sec.
 - Conformance after (max=500, process-pool): exact 86/487 (17.7%), same 103 (21.1%), missing 311, extra 255, missing TS2322 21, crashed 3, duration 42.6s, throughput 11.7 tests/sec (perf variance likely cache/noise).
 - TS2322 scan tool: `wasm/differential-test/find-ts2322.mjs` (exits immediately to avoid wasm finalizer crash).
