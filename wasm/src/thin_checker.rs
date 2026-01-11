@@ -4840,7 +4840,9 @@ impl<'a> ThinCheckerState<'a> {
                     right_idx,
                 );
             } else if !self.is_assignable_to(right_type, left_type) {
-                self.error_type_not_assignable_with_reason_at(right_type, left_type, right_idx);
+                if !self.should_skip_weak_union_error(right_type, left_type, right_idx) {
+                    self.error_type_not_assignable_with_reason_at(right_type, left_type, right_idx);
+                }
             }
 
             if left_type != TypeId::UNKNOWN {
@@ -4906,7 +4908,9 @@ impl<'a> ThinCheckerState<'a> {
                     right_idx,
                 );
             } else if !self.is_assignable_to(assigned_type, left_type) {
-                self.error_type_not_assignable_with_reason_at(assigned_type, left_type, right_idx);
+                if !self.should_skip_weak_union_error(right_type, left_type, right_idx) {
+                    self.error_type_not_assignable_with_reason_at(assigned_type, left_type, right_idx);
+                }
             }
 
             if left_type != TypeId::UNKNOWN {
@@ -5189,10 +5193,11 @@ impl<'a> ThinCheckerState<'a> {
 
         // Create contextual context from callee type
         let ctx_helper = ContextualTypeContext::with_expected(self.ctx.types, callee_type);
+        let check_excess_properties = overload_signatures.is_none();
         let arg_types = self.collect_call_argument_types_with_context(
             args,
             |i, arg_count| ctx_helper.get_parameter_type_for_call(i, arg_count),
-            overload_signatures.is_none(),
+            check_excess_properties,
         );
 
         // Use CallEvaluator to resolve the call
@@ -5227,7 +5232,12 @@ impl<'a> ThinCheckerState<'a> {
             CallResult::ArgumentTypeMismatch { index, expected, actual } => {
                 // Report error at the specific argument
                 if index < args.len() {
-                    self.error_argument_not_assignable_at(actual, expected, args[index]);
+                    let arg_idx = args[index];
+                    if !(check_excess_properties
+                        && self.should_skip_weak_union_error(actual, expected, arg_idx))
+                    {
+                        self.error_argument_not_assignable_at(actual, expected, arg_idx);
+                    }
                 }
                 TypeId::ERROR
             }
@@ -5782,10 +5792,11 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         let ctx_helper = ContextualTypeContext::with_expected(self.ctx.types, construct_type);
+        let check_excess_properties = overload_signatures.is_none();
         let arg_types = self.collect_call_argument_types_with_context(
             args,
             |i, arg_count| ctx_helper.get_parameter_type_for_call(i, arg_count),
-            overload_signatures.is_none(),
+            check_excess_properties,
         );
 
         let mut checker = CompatChecker::new(self.ctx.types);
@@ -5805,7 +5816,12 @@ impl<'a> ThinCheckerState<'a> {
             }
             CallResult::ArgumentTypeMismatch { index, expected, actual } => {
                 if index < args.len() {
-                    self.error_argument_not_assignable_at(actual, expected, args[index]);
+                    let arg_idx = args[index];
+                    if !(check_excess_properties
+                        && self.should_skip_weak_union_error(actual, expected, arg_idx))
+                    {
+                        self.error_argument_not_assignable_at(actual, expected, arg_idx);
+                    }
                 }
                 TypeId::ERROR
             }
@@ -8137,6 +8153,26 @@ impl<'a> ThinCheckerState<'a> {
 
         let mut checker = CompatChecker::with_resolver(self.ctx.types, env);
         checker.is_assignable(source, target)
+    }
+
+    fn should_skip_weak_union_error(
+        &self,
+        source: TypeId,
+        target: TypeId,
+        source_idx: NodeIndex,
+    ) -> bool {
+        use crate::solver::CompatChecker;
+
+        let Some(node) = self.ctx.arena.get(source_idx) else {
+            return false;
+        };
+        if node.kind != syntax_kind_ext::OBJECT_LITERAL_EXPRESSION {
+            return false;
+        }
+
+        let env = self.ctx.type_env.borrow();
+        let checker = CompatChecker::with_resolver(self.ctx.types, &*env);
+        checker.is_weak_union_violation(source, target)
     }
 
     /// Check if `source` type is a subtype of `target` type.
@@ -10807,11 +10843,17 @@ impl<'a> ThinCheckerState<'a> {
                                 var_decl.initializer,
                             );
                         } else if !checker.is_assignable_to(init_type, declared_type) {
-                            checker.error_type_not_assignable_with_reason_at(
+                            if !checker.should_skip_weak_union_error(
                                 init_type,
                                 declared_type,
                                 var_decl.initializer,
-                            );
+                            ) {
+                                checker.error_type_not_assignable_with_reason_at(
+                                    init_type,
+                                    declared_type,
+                                    var_decl.initializer,
+                                );
+                            }
                         }
 
                         // For object literals, also check for excess properties
@@ -11598,7 +11640,9 @@ impl<'a> ThinCheckerState<'a> {
             } else {
                 stmt_idx
             };
-            self.error_type_not_assignable_with_reason_at(return_type, expected_type, error_node);
+            if !self.should_skip_weak_union_error(return_type, expected_type, error_node) {
+                self.error_type_not_assignable_with_reason_at(return_type, expected_type, error_node);
+            }
         }
 
         if expected_type != TypeId::ANY && expected_type != TypeId::UNKNOWN && !return_data.expression.is_none() {

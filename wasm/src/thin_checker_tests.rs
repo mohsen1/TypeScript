@@ -12520,6 +12520,97 @@ const u: U = { a: 1, c: 2 };
 }
 
 #[test]
+fn test_union_optional_object_literal_no_common_property() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type U = { a?: number } | { b?: number };
+const u: U = { c: 1 };
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let excess_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2353)
+        .collect();
+
+    if excess_errors.is_empty() {
+        eprintln!("=== Union Optional No Common Property Diagnostics ===");
+        for diag in &checker.ctx.diagnostics {
+            eprintln!("[{}] code={} {}", diag.start, diag.code, diag.message_text);
+        }
+    }
+
+    assert_eq!(
+        excess_errors.len(), 1,
+        "Expected excess property error for union optional object literal with no overlap: {:?}",
+        checker.ctx.diagnostics
+    );
+
+    let ts2322_count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2322).count();
+    assert_eq!(
+        ts2322_count, 0,
+        "Did not expect TS2322 for union optional no-common property, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_union_optional_call_argument_excess_property() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type U = { a?: number } | { b?: number };
+function f(value: U) {}
+f({ c: 1 });
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let excess_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2353)
+        .collect();
+
+    if excess_errors.is_empty() {
+        eprintln!("=== Union Optional Call Argument Diagnostics ===");
+        for diag in &checker.ctx.diagnostics {
+            eprintln!("[{}] code={} {}", diag.start, diag.code, diag.message_text);
+        }
+    }
+
+    assert_eq!(
+        excess_errors.len(), 1,
+        "Expected excess property error for union optional call argument, got: {:?}",
+        checker.ctx.diagnostics
+    );
+
+    let ts2322_count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2322).count();
+    assert_eq!(
+        ts2322_count, 0,
+        "Did not expect TS2322 for union optional call argument, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
 fn test_union_optional_variable_assignment_no_common_properties() {
     use crate::thin_parser::ThinParserState;
 
