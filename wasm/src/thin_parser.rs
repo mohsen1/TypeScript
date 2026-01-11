@@ -218,6 +218,7 @@ impl ThinParserState {
             | SyntaxKind::ColonToken          // :
             | SyntaxKind::EqualsToken         // =
             | SyntaxKind::EqualsGreaterThanToken  // =>
+            | SyntaxKind::GreaterThanToken    // > (e.g., missing type in generic default: T = >)
             | SyntaxKind::BarToken            // | (when at start, not a union)
             | SyntaxKind::AmpersandToken      // & (when at start, not an intersection)
             | SyntaxKind::QuestionToken       // ?
@@ -2665,6 +2666,18 @@ impl ThinParserState {
             return self.parse_index_signature_with_modifiers(modifiers, start_pos);
         }
 
+        // Recovery: Handle 'function' keyword in class members
+        // Note: 'var', 'let', 'const' are allowed as property/method names (e.g., `var() {}`)
+        // But 'function' is always invalid as a class member keyword
+        if self.is_token(SyntaxKind::FunctionKeyword) {
+            self.parse_error_at_current_token(
+                "A class member cannot have the 'function' keyword.",
+                diagnostic_codes::UNEXPECTED_TOKEN_CLASS_MEMBER,
+            );
+            // Consume 'function' and continue parsing as method
+            self.next_token();
+        }
+
         // Handle methods and properties
         // For now, just parse name and check for ( for methods
         // Note: Many reserved keywords can be used as property names (const, class, etc.)
@@ -2820,12 +2833,24 @@ impl ThinParserState {
         // Skip 'get' or 'set'
         self.next_token();
 
-        // Check for property name (identifier, private identifier, string, number, or computed)
-        let has_name = self.is_property_name();
+        // Check the token AFTER 'get' or 'set' to determine what we have:
+        // - `:`, `=`, `;`, `}`, `?` → property named 'get'/'set' (e.g., `get: number`)
+        // - `(` → method named 'get'/'set' (e.g., `get() {}`)
+        // - identifier/string/etc → accessor (e.g., `get foo() {}`)
+        let next_token = self.token();
+        let is_accessor = !matches!(
+            next_token,
+            SyntaxKind::ColonToken          // `get: number` - property
+                | SyntaxKind::EqualsToken     // `get = 1` - property
+                | SyntaxKind::SemicolonToken  // `get;` - property
+                | SyntaxKind::CloseBraceToken // `get }` - property
+                | SyntaxKind::OpenParenToken  // `get()` - method
+                | SyntaxKind::QuestionToken   // `get?` - property
+        ) && self.is_property_name(); // Also ensure there's a valid property name
 
         self.scanner.restore_state(snapshot);
         self.current_token = current;
-        has_name
+        is_accessor
     }
 
     /// Look ahead to see if we have a static block: static { ... }
@@ -3571,13 +3596,32 @@ impl ThinParserState {
 
     /// Parse enum members
     fn parse_enum_members(&mut self) -> NodeList {
+        use crate::checker::types::diagnostics::diagnostic_codes;
         let mut members = Vec::new();
 
         while !self.is_token(SyntaxKind::CloseBraceToken) && !self.is_token(SyntaxKind::EndOfFileToken) {
             let start_pos = self.token_pos();
 
-            // Enum member names can be identifiers or string literals
-            let name = if self.is_token(SyntaxKind::StringLiteral) {
+            // Handle computed property names in enum members: [expr]
+            let name = if self.is_token(SyntaxKind::OpenBracketToken) {
+                // Emit TS1164: Computed property names are not allowed in enum members
+                self.parse_error_at_current_token(
+                    "Computed property names are not allowed in enum members.",
+                    diagnostic_codes::COMPUTED_PROPERTY_NAME_IN_ENUM,
+                );
+                // Parse as computed property name anyway for recovery
+                let name_start = self.token_pos();
+                self.next_token(); // consume [
+                let expression = self.parse_expression();
+                self.parse_expected(SyntaxKind::CloseBracketToken);
+                let name_end = self.token_end();
+                self.arena.add_computed_property(
+                    syntax_kind_ext::COMPUTED_PROPERTY_NAME,
+                    name_start,
+                    name_end,
+                   crate::parser::thin_node::ComputedPropertyData { expression },
+                )
+            } else if self.is_token(SyntaxKind::StringLiteral) {
                 self.parse_string_literal()
             } else if self.is_token(SyntaxKind::PrivateIdentifier) {
                 self.parse_private_identifier()
