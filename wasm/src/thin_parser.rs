@@ -202,6 +202,31 @@ impl ThinParserState {
         }
     }
 
+    /// Check if current token can possibly start a type annotation
+    /// Used to emit TS1110 (Type expected) instead of TS1005 (identifier expected)
+    /// when a type is expected but we encounter a token that can't start a type
+    #[inline]
+    fn can_token_start_type(&self) -> bool {
+        match self.current_token {
+            // Tokens that definitely cannot start a type
+            SyntaxKind::CloseParenToken       // )
+            | SyntaxKind::CloseBraceToken     // }
+            | SyntaxKind::CloseBracketToken   // ]
+            | SyntaxKind::CommaToken          // ,
+            | SyntaxKind::SemicolonToken      // ;
+            | SyntaxKind::ColonToken          // :
+            | SyntaxKind::EqualsToken         // =
+            | SyntaxKind::EqualsGreaterThanToken  // =>
+            | SyntaxKind::BarToken            // | (when at start, not a union)
+            | SyntaxKind::AmpersandToken      // & (when at start, not an intersection)
+            | SyntaxKind::QuestionToken       // ?
+            | SyntaxKind::EndOfFileToken => false,
+            // Everything else could potentially start a type
+            // (identifiers, keywords, literals, type operators, etc.)
+            _ => true
+        }
+    }
+
     /// Check if we're inside an async function/method/arrow
     #[inline]
     fn in_async_context(&self) -> bool {
@@ -7551,6 +7576,24 @@ impl ThinParserState {
             || self.is_token(SyntaxKind::TemplateHead)
         {
             return self.parse_template_literal_type();
+        }
+
+        // Check if current token can possibly start a type
+        // If not, emit TS1110 (Type expected) instead of falling through to parse_identifier
+        // which would emit TS1005 (identifier expected)
+        if !self.can_token_start_type() {
+            self.error_type_expected();
+            // Return a synthetic identifier node to allow parsing to continue
+            return self.arena.add_identifier(
+                SyntaxKind::Identifier as u16,
+                start_pos,
+                self.token_pos(),
+                crate::parser::thin_node::IdentifierData {
+                    escaped_text: String::new(),
+                    original_text: None,
+                    type_arguments: None,
+                },
+            );
         }
 
         // Check for type keywords (string, number, boolean, etc.)

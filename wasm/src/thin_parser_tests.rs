@@ -2949,3 +2949,43 @@ fn test_thin_parser_await_type_in_async_context() {
     assert!(parser.get_diagnostics().is_empty(),
         "'await' as type in async context should not error: {:?}", parser.get_diagnostics());
 }
+
+// Error Recovery Tests for TS1005/TS1109/TS1068/TS1128 (ArrowFunctions + Expressions)
+
+#[test]
+fn test_thin_parser_arrow_function_missing_param_type() {
+    // ArrowFunction1.ts: var v = (a: ) => {};
+    // Should emit TS1110 (Type expected), not TS1005
+    let source = "var v = (a: ) => {};";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    parser.parse_source_file();
+
+    let codes: Vec<u32> = parser.get_diagnostics().iter().map(|diag| diag.code).collect();
+    assert!(
+        codes.contains(&diagnostic_codes::TYPE_EXPECTED),
+        "Expected TS1110 for missing parameter type: {:?}",
+        parser.get_diagnostics()
+    );
+    // Should not emit generic "identifier expected" TS1005
+    assert!(
+        !codes.contains(&diagnostic_codes::TOKEN_EXPECTED),
+        "Should not emit TS1005 for missing type, got: {:?}",
+        parser.get_diagnostics()
+    );
+}
+
+#[test]
+fn test_thin_parser_arrow_function_missing_param_type_paren() {
+    // parserX_ArrowFunction1.ts: var v = (a: ) => {};
+    // Similar to above, ensure we emit TS1110
+    let source = "var v = (a: ) => { };";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    parser.parse_source_file();
+
+    let codes: Vec<u32> = parser.get_diagnostics().iter().map(|diag| diag.code).collect();
+    assert!(
+        codes.contains(&diagnostic_codes::TYPE_EXPECTED),
+        "Expected TS1110 for missing parameter type: {:?}",
+        parser.get_diagnostics()
+    );
+}
