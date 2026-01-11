@@ -1,38 +1,34 @@
 # Worker 1 Plan - Squad Forge
 
 ## Mission
-Improve module resolution diagnostics (TS2792).
+Reduce TS2300 duplicate identifier false positives.
 
 Status: Active
 Priority: 1
 
 ## Current Assignment
-Reduce missing TS2792 diagnostics for unresolved module imports.
+Emit TS2300 for duplicate names in binding patterns/destructuring.
 
-**Error Code:** TS2792 - "Cannot find module 'X' or its corresponding type declarations."
+**Error Code:** TS2300 - "Duplicate identifier '{0}'."
 
-**Impact:** 204 conformance tests affected
+**Impact:** 105 conformance tests affected
 
 ### Steps
-1. **Create a scan script** `wasm/differential-test/find-ts2792.mjs` (copy `find-ts2339.mjs` pattern) to report missing TS2792.
-2. **Run a scan**: `cd wasm/differential-test && node find-ts2792.mjs --max=1000 --samples=30`.
-3. **Pick the top missing pattern** (package imports vs relative, ambient module resolution, or multi-file diagnostics).
-4. **Implement the fix** in `wasm/src/thin_binder.rs` and/or `wasm/src/cli/driver.rs`.
-5. **Add tests** in `wasm/src/cli/driver_tests.rs` or `wasm/src/thin_checker_tests.rs`.
-6. **Run focused tests** with `./wasm/test.sh` and report delta.
+1. **Review binding pattern checks** in `wasm/src/thin_checker.rs` (look for `check_binding_pattern`).
+2. **Detect duplicate bound names** within the same pattern (object/array, nested).
+3. **Add tests** in `wasm/src/thin_checker_tests.rs` for `{ a, a }`, `{ a: { b }, b }`, `[a, a]`, and parameter destructuring.
+4. **Run focused tests** with `./wasm/test.sh duplicate_identifier` and report delta.
 
 ### Key Files
-- `wasm/src/thin_binder.rs`
-- `wasm/src/cli/driver.rs`
-- `wasm/src/cli/driver_tests.rs`
-- `wasm/differential-test/find-ts2792.mjs`
+- `wasm/src/thin_checker.rs`
+- `wasm/src/thin_checker_tests.rs`
 
 ### Success Criteria
-- Missing TS2792 diagnostics reduced for the selected pattern
-- No increase in extra TS2792 errors
+- TS2300 emitted for duplicate binding names
+- No false positives for distinct bindings
 
 ## Task Queue
-- After TS2792 fix, re-run the scan with a larger sample to confirm deltas.
+- Extend to parameter lists if destructuring logic isn’t shared.
 
 ## Completed
 - TS2454 implementation merged into squad/forge.

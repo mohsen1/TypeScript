@@ -7,24 +7,23 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-TS2339 missing errors: private-name access and static computed member cases.
+TS2339 missing errors: static index signatures on constructors/classes.
 
 **Error Code:** TS2339 - "Property 'X' does not exist on type 'Y'"
 
 ### Steps
-1. **Run a missing scan**: `node wasm/differential-test/find-ts2339.mjs --mode=missing --max=2000 --samples=20`.
-2. **Target missing patterns** from the scan (private-name access + static computed `this.c`).
-3. **Fix property access** in `wasm/src/thin_checker.rs` for private names and computed static members.
-4. **Add tests** in `wasm/src/thin_checker_tests.rs`.
-5. **Run focused tests** with `./wasm/test.sh` and report delta.
+1. **Add regression tests** in `wasm/src/thin_checker_tests.rs` for static index signature access on classes/constructors.
+2. **Ensure property access** on callable/constructor types uses `CallableShape` string/number index signatures.
+3. **Update access logic** in `wasm/src/thin_checker.rs` if index signatures are ignored for callable types.
+4. **Run focused tests** with `./wasm/test.sh` and report delta.
 
 ### Key Files
 - `wasm/src/thin_checker.rs`
+- `wasm/src/solver/types.rs` (CallableShape index signatures)
 - `wasm/src/thin_checker_tests.rs`
-- `wasm/differential-test/find-ts2339.mjs`
 
 ### Success Criteria
-- Missing TS2339 reduced for private-name/computed-member patterns
+- TS2339 reduced for static index signature access
 - No new TS2339 extras introduced
 
 ## Task Queue

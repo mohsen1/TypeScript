@@ -7,26 +7,27 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-Reduce remaining TS2304 false positives in heritage/decorator/noTypesAndSymbols cases.
+Fix TS2304 false positives in heritage namespace cycles and invalid heritage literals.
 
 **Error Code:** TS2304 - "Cannot find name 'X'."
 
-**Impact:** Remaining TS2304 false positives after predicate + exports fixes.
+**Impact:** 138 conformance tests affected
 
 ### Steps
-1. **Re-run scan**: `cd wasm/differential-test && node find-ts2304.mjs --max=1000 --samples=30` (after `./wasm/build-wasm.sh`).
-2. **Pick top remaining pattern** (heritage null/namespace cycles or decorator/noTypesAndSymbols).
-3. **Implement fix** in `thin_checker.rs`/`thin_parser.rs` and add a focused regression test.
-4. **Run focused tests** with `./wasm/test.sh` and report delta.
+1. **Rebuild + scan**: `./wasm/build-wasm.sh` then `node wasm/differential-test/find-ts2304.mjs --max=1000 --samples=30`.
+2. **Collect top heritage cases** (namespace cycles or `extends null/undefined`).
+3. **Implement fix** in `wasm/src/thin_parser.rs` and/or `wasm/src/thin_checker.rs` to avoid spurious TS2304.
+4. **Add tests** in `wasm/src/thin_checker_tests.rs` for heritage edge cases.
+5. **Run focused tests** with `./wasm/test.sh` and report delta.
 
 ### Key Files
-- `wasm/src/thin_checker.rs`
 - `wasm/src/thin_parser.rs`
+- `wasm/src/thin_checker.rs`
 - `wasm/src/thin_checker_tests.rs`
 
 ### Success Criteria
-- TS2304 false positives reduced for selected remaining pattern
-- No new regressions in existing TS2304 tests
+- TS2304 false positives reduced for heritage namespace/literal cases
+- No new TS2304 regressions
 
 ## Resume Notes
 - Branch: `worker/forge-2`.

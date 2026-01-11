@@ -6,18 +6,18 @@ Execute tasks assigned by EM-Forge for the Forge squad (type system).
 Status: Active
 Priority: 1
 
-## Current Assignment (TS7010 - Return Path Analysis)
-Implement TS7010 for missing return statements in functions with non-void return types.
+## Current Assignment (TS7010 - Return Path Analysis: async/generator + arrow bodies)
+Extend TS7010 to cover async/generator functions and expression-bodied arrows.
 
 **Error Code:** TS7010 - "Function lacks ending return statement and return type does not include 'undefined'."
 
 **Impact:** 179 conformance tests affected
 
 ### Steps
-1. **Identify failing patterns** in conformance (functions with non-void return types and incomplete paths).
-2. **Update return-path analysis** in `wasm/src/checker/statements.rs` and/or `wasm/src/checker/control_flow.rs`.
-3. **Emit TS7010** only when the return type excludes `undefined`/`void`.
-4. **Add tests** in `wasm/src/thin_checker_tests.rs` for missing-return paths and `undefined` unions.
+1. **Identify failing patterns** in conformance for async/generator/arrow bodies.
+2. **Update return-path analysis** in `wasm/src/checker/statements.rs` and/or `wasm/src/checker/control_flow.rs` to treat expression-bodied arrows as returning a value.
+3. **Handle async/generator return types** (Promise/Iterator) when deciding if `undefined` is allowed.
+4. **Add tests** in `wasm/src/thin_checker_tests.rs` for async/generator + arrow expression bodies.
 5. **Run focused tests** with `./wasm/test.sh` and report delta.
 
 ### Key Files

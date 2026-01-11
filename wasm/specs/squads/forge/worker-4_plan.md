@@ -7,16 +7,16 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-Improve TS2322 return-type assignability (void/undefined compatibility).
+TS2322 assignability for async/generator return types (Promise/Iterator vs void/undefined).
 
 **Error Code:** TS2322 - "Type 'X' is not assignable to type 'Y'"
 
 **Impact:** 310 conformance tests affected
 
 ### Steps
-1. **Add tests** in `wasm/src/solver/compat_tests.rs` for call/construct signature return compatibility with `void`/`undefined`.
-2. **Audit compat logic** in `wasm/src/solver/compat.rs` and `wasm/src/solver/subtype.rs` for return assignability.
-3. **Implement fix** for any mismatches found (void/undefined compatibility should match TS).
+1. **Add tests** in `wasm/src/solver/compat_tests.rs` for async/generator return compatibility with void/undefined.
+2. **Audit compat logic** in `wasm/src/solver/compat.rs` (and `subtype.rs`) for return assignability of Promise/Iterator.
+3. **Implement fix** if tests fail (align with TS return compatibility rules).
 4. **Run focused tests** with `./wasm/test.sh` and report delta.
 
 ### Key Files
@@ -26,11 +26,11 @@ Improve TS2322 return-type assignability (void/undefined compatibility).
 - `wasm/src/thin_checker_tests.rs`
 
 ### Success Criteria
-- TS2322 missing errors reduced for return-type assignability
+- TS2322 reduced for async/generator return assignability
 - No new TS2322 regressions
 
 ## Task Queue
-- Add TS2322 regression tests for contextual typing with unions if time permits.
+- If time permits, add union contextual typing cases for async returns.
 
 ## Completed
 
