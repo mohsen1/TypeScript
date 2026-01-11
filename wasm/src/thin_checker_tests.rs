@@ -16938,3 +16938,220 @@ let { x = "hello" }: { x?: number } = {};
     assert!(!ts2322_errors.is_empty(), "Expected TS2322 error for binding element default value 'hello' (string) not assignable to number, got: {:?}",
         checker.ctx.diagnostics.iter().map(|d| d.code).collect::<Vec<_>>());
 }
+
+// ========================================
+// Union Contextual Typing with Object Literals
+// ========================================
+// Tests for TS2322 vs TS2353 handling when object literals are assigned to union types
+
+#[test]
+fn test_union_object_literal_excess_property() {
+    use crate::thin_parser::ThinParserState;
+
+    // Should emit TS2353 (excess property 'z'), NOT TS2322
+    // The object literal { x: 1, z: 2 } matches member A (has property x: number)
+    // but has excess property 'z' which should be a freshness violation
+    let source = r#"
+type A = { x: number };
+type B = { y: number };
+type U = A | B;
+const u: U = { x: 1, z: 2 };
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    eprintln!("[UNION_EXCESS] All diagnostics: {:?}", checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>());
+
+    let ts2353_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2353)
+        .collect();
+
+    let ts2322_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2322)
+        .collect();
+
+    // Should be TS2353 (excess property), not TS2322 (type mismatch)
+    assert!(!ts2353_errors.is_empty(), "Expected TS2353 error for excess property 'z', got: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| d.code).collect::<Vec<_>>());
+    assert!(ts2322_errors.is_empty(), "Should NOT emit TS2322, should be TS2353 instead");
+}
+
+#[test]
+fn test_union_object_literal_matches_member() {
+    use crate::thin_parser::ThinParserState;
+
+    // Should have NO errors - the object literal matches member A exactly
+    let source = r#"
+type A = { x: number };
+type B = { y: number };
+type U = A | B;
+const u: U = { x: 1 };
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    eprintln!("[UNION_MATCH] All diagnostics: {:?}", checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>());
+
+    // Should have no errors
+    assert!(checker.ctx.diagnostics.is_empty(), "Expected no errors when object literal matches union member, got: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| d.code).collect::<Vec<_>>());
+}
+
+#[test]
+fn test_union_object_literal_no_match() {
+    use crate::thin_parser::ThinParserState;
+
+    // Should emit TS2322 - the object literal doesn't match any member of the union
+    // { z: 1 } matches neither A (needs x) nor B (needs y)
+    let source = r#"
+type A = { x: number };
+type B = { y: number };
+type U = A | B;
+const u: U = { z: 1 };
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    eprintln!("[UNION_NO_MATCH] All diagnostics: {:?}", checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>());
+
+    let ts2322_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2322)
+        .collect();
+
+    // Should be TS2322 (type mismatch) since no member matches
+    assert!(!ts2322_errors.is_empty(), "Expected TS2322 error when object literal doesn't match any union member, got: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| d.code).collect::<Vec<_>>());
+}
+
+#[test]
+fn test_union_object_literal_multiple_excess_properties() {
+    use crate::thin_parser::ThinParserState;
+
+    // Should emit TS2353 for excess properties
+    // The object literal matches member B (has y: number) but has excess properties x and z
+    let source = r#"
+type A = { x: number };
+type B = { y: number };
+type U = A | B;
+const u: U = { y: 1, x: 2, z: 3 };
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    eprintln!("[UNION_MULTI_EXCESS] All diagnostics: {:?}", checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>());
+
+    let ts2353_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2353)
+        .collect();
+
+    // Should emit TS2353 for excess properties (may be multiple, one per excess property)
+    assert!(!ts2353_errors.is_empty(), "Expected TS2353 errors for excess properties, got: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| d.code).collect::<Vec<_>>());
+}
+
+#[test]
+fn test_union_object_literal_with_optional_properties() {
+    use crate::thin_parser::ThinParserState;
+
+    // Should emit TS2353 for excess property 'z'
+    // The object literal matches member A (has x: number, y is optional)
+    let source = r#"
+type A = { x: number; y?: string };
+type B = { y: number };
+type U = A | B;
+const u: U = { x: 1, y: "hello", z: 2 };
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    eprintln!("[UNION_OPTIONAL] All diagnostics: {:?}", checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>());
+
+    let ts2353_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2353)
+        .collect();
+
+    // Should emit TS2353 for excess property 'z'
+    assert!(!ts2353_errors.is_empty(), "Expected TS2353 error for excess property 'z', got: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| d.code).collect::<Vec<_>>());
+}
+
+#[test]
+fn test_union_object_literal_three_members() {
+    use crate::thin_parser::ThinParserState;
+
+    // Should emit TS2353 for excess property 'w'
+    // The object literal matches member B (has x, y) but has excess property 'w'
+    let source = r#"
+type A = { x: number };
+type B = { x: number; y: number };
+type C = { z: number };
+type U = A | B | C;
+const u: U = { x: 1, y: 2, w: 3 };
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    eprintln!("[UNION_THREE] All diagnostics: {:?}", checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>());
+
+    let ts2353_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2353)
+        .collect();
+
+    // Should emit TS2353 for excess property 'w'
+    assert!(!ts2353_errors.is_empty(), "Expected TS2353 error for excess property 'w', got: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| d.code).collect::<Vec<_>>());
+}
