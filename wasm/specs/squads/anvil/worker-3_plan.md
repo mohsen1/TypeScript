@@ -3,12 +3,58 @@
 Ready for Merge: Yes
 Status: Active
 
-## Current Assignment (2026-01-11)
+## Current Assignment (2026-01-11) - TS2454 Definite Assignment Analysis
 
-- Continue TS2339 property access fixes, prioritizing interface/index-signature cases in `interfaces` and `types` categories.
-- Run `node wasm/differential-test/find-ts2339.mjs --max=1000 --samples=5` to collect fresh samples (aim for interface/type-heavy cases).
-- Trace property lookup in `wasm/src/thin_checker.rs` (index signatures, interface merging, prototype chain, narrowing) and implement a minimal fix.
-- Add regression tests in `wasm/src/thin_checker_tests.rs` and report before/after TS2339 delta.
+Fix false positives for "variable used before assignment" errors. Focus on control flow analysis in `checker/control_flow.rs`.
+
+**Command**: `node wasm/differential-test/conformance-runner.mjs controlFlow --max=500`
+
+**Results**:
+- 10 extra TS2454 errors (false positives) - priority
+- 3 missing TS2454 errors (not reporting when should)
+
+**Analysis (2026-01-11)**:
+
+Definite assignment logic is in `checker/control_flow.rs`:
+- `check_definite_assignment()` - recursively checks if variable is assigned in all reachable paths
+- `assignment_targets_reference_node()` - checks if assignment targets specific variable
+- Key flow flags: `ASSIGNMENT`, `BRANCH_LABEL`, `LOOP_LABEL`, `CONDITION`, `UNREACHABLE`
+
+The logic traverses the flow graph from the reference point backward to the START, checking if the variable was assigned in all reachable paths. If any path doesn't have an assignment, TS2454 is reported.
+
+**Investigation in progress**: Need to identify specific failing cases and root causes.
+
+### Analysis (2026-01-11)
+
+**Issue**: Element access with index signatures doesn't narrow correctly after typeof checks.
+
+Example (`controlFlowElementAccess2.ts`):
+```typescript
+declare const config: {
+    [key: string]: boolean | { prop: string };
+};
+
+if (typeof config['works'] !== 'boolean') {
+    config.works.prop = 'test'; // ✅ OK - property access
+    config['works'].prop = 'test'; // ❌ ERROR - element access not narrowed
+}
+```
+
+**Root Cause**: The flow analysis system treats `config.works` (property access) and `config['works']` (element access) as different expressions, even when they access the same property. The typeof narrowing creates flow information for the property access syntax, but this doesn't apply to element access syntax.
+
+**Evidence**:
+- Flow narrowing test `test_flow_narrowing_applies_across_property_to_element_access` PASSES ✅
+- This test shows narrowing SHOULD work when property access is checked first
+- But the converse (element access checked first, then used again) doesn't work
+
+**Required Fix** (significant):
+1. **Binder**: Track literal element accesses specially to enable flow narrowing
+2. **Flow Analysis**: Normalize element access with literal string keys to match property access
+3. **Narrowing Cache**: Map both syntaxes to the same narrowing key
+
+**Complexity**: HIGH - Requires changes to binder, flow analysis, and narrowing cache
+
+**Alternative Approach**: Focus on other index signature issues (e.g., function arbitrary properties in `nullPropertyName.ts`)
 
 ### Update (2026-01-11) - Intersection Type Lowering Fix
 - Root cause: `get_type_from_type_node` was missing case for `INTERSECTION_TYPE`, causing intersection types (A & B) to fall through to default case returning `TypeId::ANY`.
