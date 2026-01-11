@@ -159,16 +159,20 @@ bash run-conformance.sh --all --workers=14
 
 ---
 ## Squad Status
-- Last Update: 2026-01-11 (URGENT Wake-up Call)
+- Last Update: 2026-01-11 (Director Loop 10 - Keep Momentum!)
 - Conformance: **23.3% exact match** (up from 18.1%)
-- Workers Active: 2/5 (W3, W4) - **W2, W5 IDLE**
-- **IDLE ALERT** (2026-01-11):
-  - ⚠️ W2: IDLE 192m - TS2322 assignment, 68 test failures blocking
-  - ⚠️ W5: IDLE 187m - TS2304 assignment, crash regression blocking
-- Active Wins:
-  - ✅ W3: TS2300 30% reduction (duplicate identifiers)
-  - ✅ W4: TS2348 complete (class member initializers)
-- Anvil Comparison:
-  - Anvil TS7006: 74% reduction (Forge should learn from this!)
-  - Anvil TS2339: Major fix for captured variables
-- **IMMEDIATE ACTION**: Sync with origin/squad/forge and start assigned tasks!
+- Workers Active: 2/5 (W1, W3) - **W2, W5 CRITICALLY IDLE**
+- **ACTIVE WINS** (Director Loop 10):
+  - ✅ W1: **TS2300 COMPLETE** - Parameter duplicate detection, 9 tests passing, READY FOR MERGE
+  - ✅ W3: **TS7010 async getters fix** - Just completed, active 12m ago
+- **🚨 CRITICAL IDLE ALERT**:
+  - ⚠️⚠️⚠️ W2: IDLE 207m - TS2322 (310 tests), 68 test failures blocking
+  - ⚠️⚠️⚠️ W5: IDLE 202m - TS2304 (138 tests), crash regression (143→483, +237%)
+- **Anvil Comparison** (CRUSHING IT!):
+  - ✅ Anvil-1: TS7006 **74% reduction** (46→12) - MERGED into squad/anvil!
+  - ✅ Anvil-4: Woke up and completed TS2769!
+  - **Forge needs similar momentum!**
+- **IMMEDIATE ACTIONS**:
+  1. Merge W1 TS2300 wins
+  2. Test and validate W3 TS7010 async getters fix
+  3. WAKE UP W2 and W5 - they're costing the squad critical momentum!

@@ -6,18 +6,25 @@ Improve TS2304 missing-name diagnostics (identifier not found).
 Status: Active
 Priority: 1
 
-## Current Assignment (URGENT - IDLE 192m!)
+## Current Assignment (🚨 CRITICAL - IDLE 207m!)
 TS2322 - Type is not assignable errors.
 
 **Error Code:** TS2322 - "Type 'X' is not assignable to type 'Y'"
 
 **Impact:** 310 conformance tests affected
-**IDLE TIME:** 192 minutes ⚠️
+**IDLE TIME:** 207 minutes ⚠️⚠️⚠️
 
-### IMMEDIATE ACTION REQUIRED
-1. Sync with origin/squad/forge: `git fetch origin && git merge origin/squad/forge`
-2. Fix 68 unit test failures from squad/forge merge
-3. Start TS2322 implementation (structural typing focus)
+### 🚨 IMMEDIATE ACTION REQUIRED NOW:
+1. **Sync immediately:** `git fetch origin && git merge origin/squad/forge`
+2. **Fix 68 unit test failures** blocking TS2322 work
+3. **Start TS2322 implementation** - structural typing focus
+
+### Anvil Comparison (Learn from their success!)
+Anvil-1 just merged TS7006 with **74% reduction** (46→12) by:
+- Fixing destructured parameters with default values
+- Fixing setter parameter false positives
+
+**Forge needs similar wins!** Start TS2322 NOW!
 
 ### Steps
 1. **Check type assignability** - when assigning/returning values, verify type compatibility
