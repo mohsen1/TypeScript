@@ -17471,6 +17471,10 @@ impl<'a> ThinCheckerState<'a> {
             return self.promise_like_type_argument_from_alias(sym_id, args, visited_aliases);
         }
 
+        if symbol.flags & symbol_flags::CLASS != 0 {
+            return self.promise_like_type_argument_from_class(sym_id, args, visited_aliases);
+        }
+
         None
     }
 
@@ -17553,6 +17557,108 @@ impl<'a> ThinCheckerState<'a> {
             // If we have args, try to return the first one (the T in Promise<T>)
             // Otherwise return ANY as a safe fallback
             return Some(args.first().copied().unwrap_or(TypeId::ANY));
+        }
+
+        None
+    }
+
+    fn promise_like_type_argument_from_class(
+        &mut self,
+        sym_id: SymbolId,
+        args: &[TypeId],
+        visited_aliases: &mut Vec<SymbolId>,
+    ) -> Option<TypeId> {
+        use crate::solver::TypeKey;
+
+        if visited_aliases.iter().any(|&seen| seen == sym_id) {
+            return None;
+        }
+        visited_aliases.push(sym_id);
+
+        let symbol = self.ctx.binder.get_symbol(sym_id)?;
+        let decl_idx = if !symbol.value_declaration.is_none() {
+            symbol.value_declaration
+        } else {
+            symbol.declarations.first().copied().unwrap_or(NodeIndex::NONE)
+        };
+        if decl_idx.is_none() {
+            return None;
+        }
+
+        let node = self.ctx.arena.get(decl_idx)?;
+        let class = self.ctx.arena.get_class(node)?;
+
+        // Build type parameter bindings for this class
+        let mut bindings = Vec::new();
+        if let Some(params) = &class.type_parameters {
+            if params.nodes.len() != args.len() {
+                return None;
+            }
+            for (&param_idx, &arg) in params.nodes.iter().zip(args.iter()) {
+                let param_node = self.ctx.arena.get(param_idx)?;
+                let param = self.ctx.arena.get_type_parameter(param_node)?;
+                let name_node = self.ctx.arena.get(param.name)?;
+                let ident = self.ctx.arena.get_identifier(name_node)?;
+                bindings.push((self.ctx.types.intern_string(&ident.escaped_text), arg));
+            }
+        } else if !args.is_empty() {
+            return None;
+        }
+
+        // Check heritage clauses for extends Promise/PromiseLike
+        let Some(heritage_clauses) = &class.heritage_clauses else {
+            return None;
+        };
+
+        for &clause_idx in heritage_clauses.nodes.iter() {
+            let clause_node = self.ctx.arena.get(clause_idx)?;
+            let heritage = self.ctx.arena.get_heritage_clause(clause_node)?;
+
+            // Only check extends clauses (token = ExtendsKeyword = 96)
+            if heritage.token != SyntaxKind::ExtendsKeyword as u16 {
+                continue;
+            }
+
+            // Get the first type in the extends clause (the base class)
+            let Some(&type_idx) = heritage.types.nodes.first() else {
+                continue;
+            };
+            let Some(type_node) = self.ctx.arena.get(type_idx) else {
+                continue;
+            };
+
+            // Handle both cases:
+            // 1. ExpressionWithTypeArguments (e.g., Promise<T>)
+            // 2. Simple Identifier (e.g., Promise)
+            let (expr_idx, type_arguments) = if let Some(expr_type_args) = self.ctx.arena.get_expr_type_args(type_node) {
+                (expr_type_args.expression, expr_type_args.type_arguments.as_ref())
+            } else {
+                (type_idx, None)
+            };
+
+            // Get the base class name
+            let Some(expr_node) = self.ctx.arena.get(expr_idx) else {
+                continue;
+            };
+            let Some(ident) = self.ctx.arena.get_identifier(expr_node) else {
+                continue;
+            };
+
+            // Check if it's Promise or PromiseLike
+            if !self.is_promise_like_name(&ident.escaped_text) {
+                continue;
+            }
+
+            // If it extends Promise<X>, extract X and substitute type parameters
+            if let Some(type_args) = type_arguments {
+                if let Some(&first_arg_node) = type_args.nodes.first() {
+                    let lowered = self.lower_type_with_bindings(first_arg_node, bindings);
+                    return Some(lowered);
+                }
+            }
+
+            // Promise with no type argument defaults to Promise<any>
+            return Some(TypeId::ANY);
         }
 
         None
