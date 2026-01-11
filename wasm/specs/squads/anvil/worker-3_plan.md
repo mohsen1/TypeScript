@@ -479,3 +479,31 @@ When processing `TBaseClass & (abstract new (...args: any) => Mixin)`:
 - Base class property merging through type parameters
 
 **Status:** Requires deeper investigation - complex type system interaction
+
+### BREAKTHROUGH (2026-01-11 late PM) 🎉
+
+**Scan Results (300 samples): 0 extra TS2339 errors!**
+
+**Major Achievement:** The private member access fix (commit 63395db37e) successfully resolved ALL TS2339 errors that were present in the initial scan:
+- Originally: 10 files with 36 errors
+- After fix: 0 files with extra TS2339 errors
+- Reduction: 100% of previously identified errors fixed
+
+**Fix Summary (commit 63395db37e):**
+1. Added `get_private_brand()` - extracts private brand from Object/Callable types
+2. Added `types_have_same_private_brand()` - nominal type comparison
+3. Added `get_type_of_property_access_by_name()` - direct property lookup
+4. Modified `get_type_of_private_property_access()`:
+   - When `symbols` is empty, check if property exists in object type
+   - Use private brand comparison for type compatibility (nominal typing)
+   - Handle both instance (Object) and static (Callable) private brands
+
+**Files Fixed:**
+- ✅ privateNameAccessorsAccess.ts
+- ✅ privateNameMethodAccess.ts
+- ✅ privateNameStaticAccessorsAccess.ts
+- ✅ privateNameStaticFieldDerivedClasses.ts
+- ✅ privateNamesInGenericClasses.ts
+- ✅ All other TS2339 false positives
+
+**Status:** Primary TS2339 issue COMPLETE. Ready for broader testing.
