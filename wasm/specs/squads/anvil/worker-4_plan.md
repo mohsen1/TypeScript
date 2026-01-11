@@ -1,17 +1,18 @@
 # Anvil Worker 4 - Mapped Type Recursion Guard
 
-## Current Assignment (2026-01-11) - Recursive Mapped Types Crash Verification
+## Current Assignment (2026-01-11) - Recursive Mapped Types Property Access Guard
 
-Status: Completed
+Status: Active
 
-- [x] Run `node wasm/differential-test/conformance-runner.mjs types/mapped --max=200 -v`.
-- [x] Capture crash stack for `recursiveMappedTypes.ts` and `mappedTypes2.ts`.
-- [x] Isolate minimal repro (recursive mapped type + property access).
+- Implement recursion guard/fallback for property access on recursive mapped types to prevent `unreachable` crash.
+- Start in `wasm/src/solver/operations.rs` (PropertyAccessEvaluator) and/or `wasm/src/thin_checker.rs` evaluation paths.
+- Add regression test using minimal repro from `types/mapped/recursiveMappedTypes.ts` (property access on Transform<T>).
+- Verify with targeted conformance run (`node wasm/differential-test/conformance-runner.mjs types/mapped --max=200 -v`) and report crash delta.
 - Queue: TS2769 variadic tuple false positives (see follow-up sections).
 
-## Follow-up (2026-01-11) - Recursive Mapped Types Unreachable Crash
+## Follow-up (2026-01-11) - Recursive Mapped Types Crash Verification
 
-Status: COMPLETED (verification only)
+Status: COMPLETED
 
 ### Conformance
 
@@ -45,8 +46,6 @@ product.users;
 - Crash only triggers on property access of recursive mapped types; declaring the type without property access is ok.
 - Likely in property access evaluation of mapped types (`wasm/src/solver/operations.rs` `PropertyAccessEvaluator` + `evaluate_type`).
 - Proposed direction: add a recursion guard in property access evaluation (for `TypeKey::Mapped`/`TypeKey::Application`) and/or short-circuit recursive mapped property access to `TypeId::ANY`/`TypeId::ERROR` to avoid panic until full recursive mapped semantics are implemented.
-
-Ready for Merge: Yes (plan update only; no code changes)
 
 ## Operation Conformance Assignment
 
