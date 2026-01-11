@@ -9005,15 +9005,52 @@ impl<'a> ThinCheckerState<'a> {
         match key {
             TypeKey::Function(func_id) => self.ctx.types.function_shape(func_id).is_constructor,
             TypeKey::Callable(shape_id) => {
-                !self.ctx.types.callable_shape(shape_id).construct_signatures.is_empty()
+                // A Callable is a concrete constructor target if it has construct signatures
+                // AND it's not an abstract constructor
+                let has_construct = !self.ctx.types.callable_shape(shape_id).construct_signatures.is_empty();
+                let is_abstract = self.ctx.abstract_constructor_types.contains(&type_id);
+                has_construct && !is_abstract
             }
-            TypeKey::TypeQuery(symbol) | TypeKey::Ref(symbol) => self
-                .resolve_type_env_symbol(symbol, env)
-                .map(|resolved| {
-                    resolved != type_id
-                        && self.is_concrete_constructor_target_inner(resolved, env, visited)
-                })
-                .unwrap_or(false),
+            TypeKey::TypeQuery(symbol) | TypeKey::Ref(symbol) => {
+                // First try to resolve via TypeEnvironment
+                if let Some(resolved) = self.resolve_type_env_symbol(symbol, env) {
+                    if resolved != type_id {
+                        return self.is_concrete_constructor_target_inner(resolved, env, visited);
+                    }
+                }
+                // Fallback: Check if the symbol is a non-abstract class or interface with construct signatures
+                // This handles `typeof ConcreteClass` and `typeof InterfaceWithConstructSig` when TypeEnvironment lookup fails
+                use crate::binder::SymbolId;
+                use crate::solver::SymbolRef;
+                if let Some(sym) = self.ctx.binder.get_symbol(SymbolId(symbol.0)) {
+                    // A non-abstract class is a concrete constructor target
+                    if sym.flags & symbol_flags::CLASS != 0 && sym.flags & symbol_flags::ABSTRACT == 0 {
+                        return true;
+                    }
+                    // An interface with construct signatures is also a concrete constructor target
+                    // (interfaces are never abstract)
+                    if sym.flags & symbol_flags::INTERFACE != 0 {
+                        // Check if the interface has a construct signature by examining its type
+                        let decl_idx = sym.value_declaration;
+                        if !decl_idx.is_none() {
+                            if let Some(decl_node) = self.ctx.arena.get(decl_idx) {
+                                if let Some(interface_data) = self.ctx.arena.get_interface(decl_node) {
+                                    // Check members for construct signatures
+                                    for &member_idx in &interface_data.members.nodes {
+                                        if let Some(member_node) = self.ctx.arena.get(member_idx) {
+                                            // CONSTRUCT_SIGNATURE = 194
+                                            if member_node.kind == 194 {
+                                                return true; // Interface has construct signature
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                false
+            }
             TypeKey::Union(_) | TypeKey::Intersection(_) => false,
             _ => false,
         }
