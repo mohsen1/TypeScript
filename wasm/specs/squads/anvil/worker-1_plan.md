@@ -9,27 +9,22 @@ Priority: 1
 
 **Target:** Reduce TS2300 "Duplicate identifier" false positives (41 occurrences)
 
-**Status:** IN PROGRESS - Investigating patterns
+**Status:** INVESTIGATING - Common merge patterns work correctly
 
-**Problem:** WASM incorrectly reports TS2300 when identifiers are NOT actually duplicates
-(e.g., interface merging, variable hoisting, module scope isolation)
+**Investigation Findings:**
+- ✅ Interface merging works: `interface A { x: number } interface A { y: string }` - no error
+- ✅ Namespace merging works: Multiple namespace declarations merge correctly
+- ✅ Class+Interface merging works: `class C {} interface C {}` - no error
+- ❓ Need to identify actual false positive patterns from 40 extra errors
 
-**Root Causes to Investigate:**
-1. Interface declaration merging conflicts
-2. Variable/function hoisting not handled correctly
-3. Module vs global scope duplicate detection
-4. Type alias vs value identifier conflicts
+**Next Steps:**
+1. Get specific list of test files with TS2300 EXTRA errors (not missing)
+2. Analyze those specific files to identify patterns
+3. Fix duplicate detection logic in `thin_binder.rs` or `thin_checker.rs`
 
-**Approach:**
-1. Collect samples from conformance tests
-2. Analyze patterns in false positives
-3. Fix duplicate detection in `thin_binder.rs`
-4. Add regression tests
-5. Run conformance baseline before/after
+**Files:** `wasm/src/thin_binder.rs`, `wasm/src/thin_checker.rs`
 
-**Files:** `wasm/src/thin_binder.rs`, `wasm/src/thin_checker.rs`, `wasm/src/thin_checker_tests.rs`
-
-**Success Criteria:** Reduce TS2300 from 41 to <20
+**Success Criteria:** Reduce TS2300 from 40 to <20
 
 ## Previous Assignment - TS7006 (COMPLETED - Target Achieved)
 
