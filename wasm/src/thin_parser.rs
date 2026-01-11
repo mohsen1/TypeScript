@@ -2678,6 +2678,34 @@ impl ThinParserState {
             self.next_token();
         }
 
+        // Recovery: Handle 'const'/'let'/'var' used as modifiers in class members
+        // Distinguish between: `const x = 1` (invalid, error) vs `const() {}` (valid method name)
+        if matches!(
+            self.token(),
+            SyntaxKind::ConstKeyword | SyntaxKind::LetKeyword | SyntaxKind::VarKeyword
+        ) {
+            // Look ahead to determine if this is being used as a modifier or as a name
+            let snapshot = self.scanner.save_state();
+            let current = self.current_token;
+            self.next_token(); // skip const/let/var
+            let next_token = self.token();
+            self.scanner.restore_state(snapshot);
+            self.current_token = current;
+
+            // If followed by `(`, it's a method name (e.g., `const() {}`), which is valid
+            // If followed by identifier and then `:` or `=`, it's being used as a modifier (invalid)
+            if !matches!(next_token, SyntaxKind::OpenParenToken) {
+                // This is likely being used as a modifier, emit error and recover
+                self.parse_error_at_current_token(
+                    "A class member cannot have the 'const', 'let', or 'var' keyword.",
+                    diagnostic_codes::UNEXPECTED_TOKEN_CLASS_MEMBER,
+                );
+                // Consume the invalid keyword and continue parsing
+                // The next identifier will be treated as the property/method name
+                self.next_token();
+            }
+        }
+
         // Handle methods and properties
         // For now, just parse name and check for ( for methods
         // Note: Many reserved keywords can be used as property names (const, class, etc.)
@@ -3644,7 +3672,22 @@ impl ThinParserState {
             );
             members.push(member);
 
+            // Parse comma or recover with missing comma
             if !self.parse_optional(SyntaxKind::CommaToken) {
+                // Recovery: If the next token looks like the start of a valid enum member,
+                // emit TS1005 and continue parsing instead of breaking
+                if self.is_token(SyntaxKind::Identifier)
+                    || self.is_token(SyntaxKind::StringLiteral)
+                    || self.is_token(SyntaxKind::PrivateIdentifier)
+                    || self.is_token(SyntaxKind::OpenBracketToken)
+                {
+                    self.parse_error_at_current_token(
+                        "',' expected",
+                        diagnostic_codes::TOKEN_EXPECTED,
+                    );
+                    // Continue to next iteration to parse the next member
+                    continue;
+                }
                 break;
             }
         }
