@@ -1139,6 +1139,27 @@ impl ThinBinderState {
                 self.bind_function_expression(arena, node, idx);
             }
 
+            // Object literal expressions - traverse into properties
+            k if k == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION => {
+                if let Some(literal) = arena.get_literal_expr(node) {
+                    for &prop_idx in &literal.elements.nodes {
+                        self.bind_node(arena, prop_idx);
+                    }
+                }
+            }
+
+            // Property assignments - traverse into initializer (which could be a function)
+            k if k == syntax_kind_ext::PROPERTY_ASSIGNMENT => {
+                if let Some(prop) = arena.get_property_assignment(node) {
+                    self.bind_node(arena, prop.initializer);
+                }
+            }
+
+            // Method declarations (shorthand methods in object literals and class methods)
+            k if k == syntax_kind_ext::METHOD_DECLARATION => {
+                self.bind_method_declaration(arena, node, idx);
+            }
+
             _ => {
                 // For other node types, no symbols to create
             }
@@ -2029,6 +2050,28 @@ impl ThinBinderState {
 
                 // Bind body
                 binder.bind_node(arena, func.body);
+            });
+
+            self.exit_scope(arena);
+        }
+    }
+
+    /// Bind a method declaration - creates a scope and binds the body.
+    fn bind_method_declaration(&mut self, arena: &ThinNodeArena, node: &ThinNode, idx: NodeIndex) {
+        if let Some(method) = arena.get_method_decl(node) {
+            self.bind_modifiers(arena, &method.modifiers);
+            // Enter function scope
+            self.enter_scope(ContainerKind::Function, idx);
+            self.declare_arguments_symbol();
+
+            self.with_fresh_flow(|binder| {
+                // Bind parameters
+                for &param_idx in &method.parameters.nodes {
+                    binder.bind_parameter(arena, param_idx);
+                }
+
+                // Bind body
+                binder.bind_node(arena, method.body);
             });
 
             self.exit_scope(arena);
