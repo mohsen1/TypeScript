@@ -637,6 +637,33 @@ fn test_void_return_assignability() {
 }
 
 #[test]
+fn test_void_undefined_return_assignability() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let returns_void = interner.function(FunctionShape {
+        params: Vec::new(),
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let returns_undefined = interner.function(FunctionShape {
+        params: Vec::new(),
+        this_type: None,
+        return_type: TypeId::UNDEFINED,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    assert!(checker.is_assignable(returns_undefined, returns_void));
+    assert!(!checker.is_assignable(returns_void, returns_undefined));
+}
+
+#[test]
 fn test_constructor_void_return_assignability() {
     let interner = TypeInterner::new();
     let mut checker = CompatChecker::new(&interner);
@@ -745,6 +772,41 @@ fn test_call_signature_void_return_assignability() {
 
     assert!(checker.is_assignable(returns_number, returns_void));
     assert!(!checker.is_assignable(returns_void, returns_number));
+}
+
+#[test]
+fn test_call_signature_void_undefined_return_assignability() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let returns_void = interner.callable(CallableShape {
+        call_signatures: vec![CallSignature {
+            params: Vec::new(),
+            this_type: None,
+            return_type: TypeId::VOID,
+            type_predicate: None,
+            type_params: Vec::new(),
+        }],
+        construct_signatures: Vec::new(),
+        properties: Vec::new(),
+        ..Default::default()
+    });
+
+    let returns_undefined = interner.callable(CallableShape {
+        call_signatures: vec![CallSignature {
+            params: Vec::new(),
+            this_type: None,
+            return_type: TypeId::UNDEFINED,
+            type_predicate: None,
+            type_params: Vec::new(),
+        }],
+        construct_signatures: Vec::new(),
+        properties: Vec::new(),
+        ..Default::default()
+    });
+
+    assert!(checker.is_assignable(returns_undefined, returns_void));
+    assert!(!checker.is_assignable(returns_void, returns_undefined));
 }
 
 #[test]
@@ -922,6 +984,55 @@ fn test_weak_union_rejects_no_common_properties() {
         is_method: false,
     }]);
 
+    assert!(!checker.is_assignable(source, target));
+    assert!(matches!(
+        checker.explain_failure(source, target),
+        Some(SubtypeFailureReason::TypeMismatch { .. })
+    ));
+}
+
+#[test]
+fn test_weak_union_rejects_no_common_properties_with_refs() {
+    let interner = TypeInterner::new();
+    let mut env = TypeEnvironment::new();
+
+    let a = interner.intern_string("a");
+    let b = interner.intern_string("b");
+    let c = interner.intern_string("c");
+
+    let weak_a = interner.object(vec![PropertyInfo {
+        name: a,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+    let weak_b = interner.object(vec![PropertyInfo {
+        name: b,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let sym_a = SymbolRef(1);
+    let sym_b = SymbolRef(2);
+    env.insert(sym_a, weak_a);
+    env.insert(sym_b, weak_b);
+
+    let target = interner.union(vec![interner.reference(sym_a), interner.reference(sym_b)]);
+    let source = interner.object(vec![PropertyInfo {
+        name: c,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let mut checker = CompatChecker::with_resolver(&interner, &env);
     assert!(!checker.is_assignable(source, target));
     assert!(matches!(
         checker.explain_failure(source, target),

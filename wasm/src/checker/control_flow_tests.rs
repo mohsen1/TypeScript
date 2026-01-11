@@ -364,6 +364,61 @@ if ("a" in x) {
 }
 
 #[test]
+fn test_in_operator_private_identifier_narrows_required_property() {
+    let source = r##"
+let x: { "#a": number } | { b: string };
+if (#a in x) {
+  x;
+} else {
+  x;
+}
+"##;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let arena = parser.get_arena();
+    let types = TypeInterner::new();
+    let analyzer = FlowAnalyzer::new(arena, &binder, &types);
+
+    let prop_a = types.intern_string("#a");
+    let prop_b = types.intern_string("b");
+
+    let type_a = types.object(vec![PropertyInfo {
+        name: prop_a,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let type_b = types.object(vec![PropertyInfo {
+        name: prop_b,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let union = types.union(vec![type_a, type_b]);
+
+    let ident_then = get_if_branch_expression(arena, root, 1, true);
+    let ident_else = get_if_branch_expression(arena, root, 1, false);
+
+    let flow_then = binder.get_node_flow(ident_then).expect("flow then");
+    let flow_else = binder.get_node_flow(ident_else).expect("flow else");
+
+    let narrowed_then = analyzer.get_flow_type(ident_then, union, flow_then);
+    assert_eq!(narrowed_then, type_a);
+
+    let narrowed_else = analyzer.get_flow_type(ident_else, union, flow_else);
+    assert_eq!(narrowed_else, type_b);
+}
+
+#[test]
 fn test_user_defined_type_predicate_narrows_branches() {
     let source = r#"
 function isString(x: string | number): x is string {
