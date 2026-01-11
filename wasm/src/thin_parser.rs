@@ -202,6 +202,31 @@ impl ThinParserState {
         }
     }
 
+    /// Check if current token can possibly start a type annotation
+    /// Used to emit TS1110 (Type expected) instead of TS1005 (identifier expected)
+    /// when a type is expected but we encounter a token that can't start a type
+    #[inline]
+    fn can_token_start_type(&self) -> bool {
+        match self.current_token {
+            // Tokens that definitely cannot start a type
+            SyntaxKind::CloseParenToken       // )
+            | SyntaxKind::CloseBraceToken     // }
+            | SyntaxKind::CloseBracketToken   // ]
+            | SyntaxKind::CommaToken          // ,
+            | SyntaxKind::SemicolonToken      // ;
+            | SyntaxKind::ColonToken          // :
+            | SyntaxKind::EqualsToken         // =
+            | SyntaxKind::EqualsGreaterThanToken  // =>
+            | SyntaxKind::BarToken            // | (when at start, not a union)
+            | SyntaxKind::AmpersandToken      // & (when at start, not an intersection)
+            | SyntaxKind::QuestionToken       // ?
+            | SyntaxKind::EndOfFileToken => false,
+            // Everything else could potentially start a type
+            // (identifiers, keywords, literals, type operators, etc.)
+            _ => true
+        }
+    }
+
     /// Check if we're inside an async function/method/arrow
     #[inline]
     fn in_async_context(&self) -> bool {
@@ -311,6 +336,15 @@ impl ThinParserState {
     fn error_type_expected(&mut self) {
         use crate::checker::types::diagnostics::diagnostic_codes;
         self.parse_error_at_current_token("Type expected", diagnostic_codes::TYPE_EXPECTED);
+    }
+
+    /// Error: Computed property names are not allowed in enums (TS1164)
+    fn error_computed_property_name_in_enum(&mut self) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+        self.parse_error_at_current_token(
+            "Computed property names are not allowed in enums",
+            diagnostic_codes::COMPUTED_PROPERTY_NAME_IN_ENUM,
+        );
     }
 
     /// Error: Identifier expected (TS1003)
@@ -3502,6 +3536,9 @@ impl ThinParserState {
                 self.parse_string_literal()
             } else if self.is_token(SyntaxKind::PrivateIdentifier) {
                 self.parse_private_identifier()
+            } else if self.is_token(SyntaxKind::OpenBracketToken) {
+                self.error_computed_property_name_in_enum();
+                self.parse_property_name()
             } else {
                 self.parse_identifier_name()
             };
@@ -5287,7 +5324,17 @@ impl ThinParserState {
 
         // Parse optional default: = DefaultType
         let default = if self.parse_optional(SyntaxKind::EqualsToken) {
-            self.parse_type()
+            if self.is_token(SyntaxKind::CommaToken)
+                || self.is_greater_than_or_compound()
+                || self.is_token(SyntaxKind::CloseParenToken)
+                || self.is_token(SyntaxKind::EndOfFileToken)
+                || self.is_token(SyntaxKind::EqualsGreaterThanToken)
+            {
+                self.error_type_expected();
+                NodeIndex::NONE
+            } else {
+                self.parse_type()
+            }
         } else {
             NodeIndex::NONE
         };
@@ -7014,6 +7061,10 @@ impl ThinParserState {
         let start_pos = self.token_pos();
         self.parse_expected(SyntaxKind::NewKeyword);
 
+        if self.is_token(SyntaxKind::LessThanToken) {
+            self.error_expression_expected();
+        }
+
         // Parse the callee expression - member access without call (we handle call ourselves)
         let expression = self.parse_member_expression_base();
         let mut end_pos = self
@@ -7528,6 +7579,24 @@ impl ThinParserState {
             || self.is_token(SyntaxKind::TemplateHead)
         {
             return self.parse_template_literal_type();
+        }
+
+        // Check if current token can possibly start a type
+        // If not, emit TS1110 (Type expected) instead of falling through to parse_identifier
+        // which would emit TS1005 (identifier expected)
+        if !self.can_token_start_type() {
+            self.error_type_expected();
+            // Return a synthetic identifier node to allow parsing to continue
+            return self.arena.add_identifier(
+                SyntaxKind::Identifier as u16,
+                start_pos,
+                self.token_pos(),
+                crate::parser::thin_node::IdentifierData {
+                    escaped_text: String::new(),
+                    original_text: None,
+                    type_arguments: None,
+                },
+            );
         }
 
         // Check for type keywords (string, number, boolean, etc.)
@@ -8796,99 +8865,11 @@ impl ThinParserState {
     /// Type assertions use <Type>expr syntax, JSX uses <Element>.
     fn parse_jsx_element_or_type_assertion(&mut self) -> NodeIndex {
         // In .tsx/.jsx files, all <...> syntax is JSX (use "as Type" for type assertions)
-        // In .ts files, we need to distinguish type assertions from JSX
+        // In .ts files, treat all <...> as type assertions (JSX is not allowed).
         if self.is_jsx_file() {
             return self.parse_jsx_element_or_self_closing_or_fragment(true);
         }
-
-        // Look ahead to determine if this is a type assertion or JSX
-        // Type assertion: <type>expression where type is a type keyword or identifier followed by >
-        // JSX: <element ...> where element is an identifier (starts with lowercase = intrinsic, uppercase = component)
-
-        let snapshot = self.scanner.save_state();
-        let current = self.current_token;
-
-        self.next_token(); // consume <
-
-        // Check if we have a type keyword (number, string, boolean, etc.) - definitely a type assertion
-        let is_type_assertion = match self.token() {
-            SyntaxKind::StringKeyword
-            | SyntaxKind::NumberKeyword
-            | SyntaxKind::BooleanKeyword
-            | SyntaxKind::SymbolKeyword
-            | SyntaxKind::BigIntKeyword
-            | SyntaxKind::VoidKeyword
-            | SyntaxKind::NullKeyword
-            | SyntaxKind::UndefinedKeyword
-            | SyntaxKind::NeverKeyword
-            | SyntaxKind::AnyKeyword
-            | SyntaxKind::UnknownKeyword
-            | SyntaxKind::ObjectKeyword
-            | SyntaxKind::KeyOfKeyword
-            | SyntaxKind::TypeOfKeyword
-            | SyntaxKind::ReadonlyKeyword
-            | SyntaxKind::UniqueKeyword
-            | SyntaxKind::InferKeyword
-            | SyntaxKind::ThisKeyword
-            | SyntaxKind::NewKeyword
-            | SyntaxKind::OpenBraceToken
-            | SyntaxKind::OpenBracketToken
-            | SyntaxKind::OpenParenToken
-            | SyntaxKind::StringLiteral
-            | SyntaxKind::NumericLiteral
-            | SyntaxKind::BigIntLiteral
-            | SyntaxKind::TrueKeyword
-            | SyntaxKind::FalseKeyword
-            | SyntaxKind::MinusToken
-            | SyntaxKind::NoSubstitutionTemplateLiteral
-            | SyntaxKind::TemplateHead
-            | SyntaxKind::LessThanToken
-            | SyntaxKind::GreaterThanToken => true,  // <> is a fragment, not type assertion
-            SyntaxKind::Identifier => {
-                // Could be either JSX or type assertion in .ts files
-                // Check if followed by type-related syntax
-                // If followed by >, it's a simple type assertion like <Error>expr
-                // If followed by type operators, it's a complex type assertion
-                // If followed by < it's a type assertion with type arguments like <Array<T>>
-                // Otherwise, assume JSX (has attributes, etc.)
-                self.next_token();
-                matches!(
-                    self.token(),
-                    SyntaxKind::GreaterThanToken   // <Error> - simple type assertion
-                        | SyntaxKind::LessThanToken   // <A<B>> or <Array<T>> - nested type arguments
-                        | SyntaxKind::ExtendsKeyword
-                        | SyntaxKind::BarToken
-                        | SyntaxKind::AmpersandToken
-                        | SyntaxKind::CommaToken
-                        | SyntaxKind::OpenBracketToken  // <Error[]> - array type
-                        | SyntaxKind::DotToken  // <foo.Bar> - qualified type
-                )
-            }
-            _ => false,
-        };
-
-        // Restore state
-        self.scanner.restore_state(snapshot);
-        self.current_token = current;
-
-        if is_type_assertion && !self.look_ahead_is_jsx_fragment() {
-            self.parse_type_assertion()
-        } else {
-            self.parse_jsx_element_or_self_closing_or_fragment(true)
-        }
-    }
-
-    /// Check if this is a JSX fragment: <>
-    fn look_ahead_is_jsx_fragment(&mut self) -> bool {
-        let snapshot = self.scanner.save_state();
-        let current = self.current_token;
-
-        self.next_token(); // consume <
-        let is_fragment = self.is_token(SyntaxKind::GreaterThanToken);
-
-        self.scanner.restore_state(snapshot);
-        self.current_token = current;
-        is_fragment
+        self.parse_type_assertion()
     }
 
     /// Parse a type assertion: <Type>expression

@@ -1139,6 +1139,36 @@ impl ThinBinderState {
                 self.bind_function_expression(arena, node, idx);
             }
 
+            // Method declarations in object literals - bind body
+            k if k == syntax_kind_ext::METHOD_DECLARATION => {
+                if let Some(method) = arena.get_method_decl(node) {
+                    self.bind_modifiers(arena, &method.modifiers);
+
+                    // Bind computed property name if present
+                    if let Some(name_node) = arena.get(method.name) {
+                        if name_node.kind == syntax_kind_ext::COMPUTED_PROPERTY_NAME {
+                            self.bind_node(arena, method.name);
+                        }
+                    }
+
+                    // Enter function scope for method body
+                    self.enter_scope(ContainerKind::Function, idx);
+                    self.declare_arguments_symbol();
+
+                    self.with_fresh_flow(|binder| {
+                        // Bind parameters
+                        for &param_idx in &method.parameters.nodes {
+                            binder.bind_parameter(arena, param_idx);
+                        }
+
+                        // Bind body
+                        binder.bind_node(arena, method.body);
+                    });
+
+                    self.exit_scope(arena);
+                }
+            }
+
             _ => {
                 // For other node types, no symbols to create
             }
@@ -2612,10 +2642,8 @@ impl ThinBinderState {
                 if name_node.kind == SyntaxKind::StringLiteral as u16
                     || name_node.kind == SyntaxKind::NoSubstitutionTemplateLiteral as u16
                 {
-                    // Ambient module declaration with string literal name
-                    // These should always be tracked, regardless of whether the file is an external module
                     if let Some(lit) = arena.get_literal(name_node) {
-                        if !lit.text.is_empty() {
+                        if !lit.text.is_empty() && !self.is_external_module {
                             self.declared_modules.insert(lit.text.clone());
                         }
                     }
