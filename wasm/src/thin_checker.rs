@@ -8816,11 +8816,8 @@ impl<'a> ThinCheckerState<'a> {
             let mut subst = TypeSubstitution::new();
             subst.insert(mapped.type_param.name, key_literal);
 
-            // Instantiate the template
+            // Instantiate the template without recursively expanding nested applications.
             let property_type = instantiate_type(self.ctx.types, mapped.template, &subst);
-
-            // Recursively evaluate the property type (handles nested Applications)
-            let property_type = self.evaluate_application_type(property_type);
 
             let optional = matches!(mapped.optional_modifier, Some(crate::solver::MappedModifier::Add));
             let readonly = matches!(mapped.readonly_modifier, Some(crate::solver::MappedModifier::Add));
