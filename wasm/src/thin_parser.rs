@@ -3606,6 +3606,7 @@ impl ThinParserState {
         start_pos: u32,
         modifiers: Option<NodeList>,
     ) -> NodeIndex {
+        use crate::checker::types::diagnostics::diagnostic_codes;
         self.parse_expected(SyntaxKind::TypeKeyword);
 
         let name = self.parse_identifier();
@@ -3617,7 +3618,30 @@ impl ThinParserState {
             None
         };
 
-        self.parse_expected(SyntaxKind::EqualsToken);
+        // Parse expected equals token, but recover gracefully if missing
+        // If the next token can start a type (e.g., {, (, [), emit error and continue parsing
+        if !self.is_token(SyntaxKind::EqualsToken) {
+            // Emit TS1005 for missing equals token
+            self.error_token_expected("=");
+            // If the next token looks like a type, continue parsing anyway
+            if !self.can_token_start_type() {
+                // Can't recover, return early with a dummy type
+                let end_pos = self.token_end();
+                return self.arena.add_type_alias(
+                    syntax_kind_ext::TYPE_ALIAS_DECLARATION,
+                    start_pos,
+                    end_pos,
+                    crate::parser::thin_node::TypeAliasData {
+                        modifiers,
+                        name,
+                        type_parameters,
+                        type_node: NodeIndex::NONE,
+                    },
+                );
+            }
+        } else {
+            self.next_token(); // Consume the equals token
+        }
 
         let type_node = self.parse_type();
 
@@ -3680,25 +3704,15 @@ impl ThinParserState {
         while !self.is_token(SyntaxKind::CloseBraceToken) && !self.is_token(SyntaxKind::EndOfFileToken) {
             let start_pos = self.token_pos();
 
-            // Handle computed property names in enum members: [expr]
+            // Enum member names can be identifiers, string literals, or computed property names
+            // Computed property names ([x]) are not valid in enums but we recover gracefully
             let name = if self.is_token(SyntaxKind::OpenBracketToken) {
-                // Emit TS1164: Computed property names are not allowed in enum members
+                // Handle computed property name - emit TS1164 and recover
                 self.parse_error_at_current_token(
-                    "Computed property names are not allowed in enum members.",
+                    "Computed property names are not allowed in enums.",
                     diagnostic_codes::COMPUTED_PROPERTY_NAME_IN_ENUM,
                 );
-                // Parse as computed property name anyway for recovery
-                let name_start = self.token_pos();
-                self.next_token(); // consume [
-                let expression = self.parse_expression();
-                self.parse_expected(SyntaxKind::CloseBracketToken);
-                let name_end = self.token_end();
-                self.arena.add_computed_property(
-                    syntax_kind_ext::COMPUTED_PROPERTY_NAME,
-                    name_start,
-                    name_end,
-                   crate::parser::thin_node::ComputedPropertyData { expression },
-                )
+                self.parse_property_name()
             } else if self.is_token(SyntaxKind::StringLiteral) {
                 self.parse_string_literal()
             } else if self.is_token(SyntaxKind::PrivateIdentifier) {

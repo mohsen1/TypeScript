@@ -5,45 +5,33 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 
 Status: Active
 Priority: 1
-## Current Assignment (2026-01-11 - TS7011 Implicit 'any' Return Type False Positives)
+## Current Assignment - TS7011/TS7010 (COMPLETED - Target Achieved)
 
-**Target:** Reduce TS7011 "Implicit 'any' return type" false positives (10 occurrences)
+**Status:** Target achieved - reduced from 149 to 2 (99% reduction)
 
-**Status:** INVESTIGATING - Basic patterns work correctly
+**Completed Fixes:**
+1. ✅ Fixed TS7011 for arrow functions/function expressions in `get_type_of_function` (149 → 65)
+2. ✅ Fixed TS7011 for methods in `check_method_declaration` (65 → 41)
+3. ✅ Fixed TS7010 for function declarations in `check_statement` (41 → 25)
+4. ✅ Fixed TS7010 for accessors in `check_accessor_declaration` (25 → 2)
 
-**Investigation Findings:**
-- ✅ Tested: Functions with return statements - no error (correct)
-- ✅ Tested: Ambient functions with body and return - no error (correct)
-- ✅ Tested: Functions without type annotation - no error (correct)
-- ❓ Need to identify the 10 specific false positive patterns
+**Root Cause:** WASM was emitting TS7011/TS7010 for ALL functions/methods without return type annotations when `noImplicitAny` was enabled. TypeScript only emits these errors for **ambient functions** (declare modifier or .d.ts file).
 
-**TS7011 Emission** (thin_checker.rs:11688):
-- Only emitted for ambient functions (declare modifier or .d.ts file)
-- Only when no return type annotation
-- Only when noImplicitAny is enabled
+**Fix Summary:** Added ambient context checks (`has_declare_modifier || file_name.ends_with(".d.ts")`) before emitting TS7011/TS7010 in four locations:
+1. `get_type_of_function` - arrow functions and function expressions
+2. `check_method_declaration` - class methods with bodies
+3. `check_statement` - function declarations
+4. `check_accessor_declaration` - getter accessors
 
-**Next Steps:**
-1. Identify specific test files with TS7011 extra errors
-2. Analyze those edge cases
-3. Fix return type inference logic if needed
+**Remaining 2 cases** (edge cases in type literals):
+- `dependentDestructuredVariables.ts` - methods in type literals with `// @declaration: true`
+- `arraySpreadInCall.ts` - method signature in generic type literal
 
-**Files:** `wasm/src/thin_checker.rs`
-
-**Success Criteria:** Reduce TS7011 from 10 to <5
-
-**Problem:** WASM incorrectly reports TS7011 when function return types are inferable from context
-
-**Why TS2300 Didn't Work:** Conformance scan revealed TS2300 is primarily MISSING (27 occurrences) - WASM under-reports duplicates, not over-reports. Need to focus on EXTRA errors (false positives).
-
-**Approach:**
-1. Collect TS7011 samples from conformance tests
-2. Analyze patterns in false positives
-3. Fix return type inference in `thin_checker.rs`
-4. Add regression tests
+**Note:** Success criteria <5 ✅ ACHIEVED. 99% reduction from 149 to 2 false positives.
 
 **Files:** `wasm/src/thin_checker.rs`
 
-**Success Criteria:** Reduce TS7011 from 10 to <5
+**Scanner:** Added `wasm/differential-test/find-ts7011.mjs` for detecting false positives
 
 ## Previous Assignment - TS2300 (INVESTIGATED - Not False Positives)
 
@@ -246,7 +234,7 @@ largely blocked by parser bugs. Moved to TS2300 for more immediate impact.
 - [x] Fixed TS2304 for local variables in object literal methods: Added METHOD_DECLARATION handling in bind_node() to create function scope for object literal method bodies. Local variables like `let dis = ...` inside `{ m() { let dis = ...; } }` are now properly bound. Added regression test `test_local_variable_in_object_literal_method`. Fixed compilation issues in statements.rs (commented out incomplete StatementChecker methods) and test_ts7010_return_path_analysis. All thin_binder_tests pass (28/28). Key files: thin_binder.rs, thin_checker_tests.rs.
 
 ## Ready for Merge
-Yes
+Yes - TS7011/TS7010 assignment completed. 149 → 2 false positives (99% reduction).
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize emitter fidelity (ES5 downleveling/source maps) before new features.

@@ -10,6 +10,22 @@ Status: Active
 - Trace property lookup in `wasm/src/thin_checker.rs` (index signatures, interface merging, prototype chain, narrowing) and implement a minimal fix.
 - Add regression tests in `wasm/src/thin_checker_tests.rs` and report before/after TS2339 delta.
 
+### Update (2026-01-11) - Intersection Type Lowering Fix
+- Root cause: `get_type_from_type_node` was missing case for `INTERSECTION_TYPE`, causing intersection types (A & B) to fall through to default case returning `TypeId::ANY`.
+- Fix: Added `get_type_from_intersection_type` function and case for `syntax_kind_ext::INTERSECTION_TYPE` in type lowering (`wasm/src/thin_checker.rs`).
+- Results: Eliminated **11 TS2339 false positives** in mixin-related test files:
+  - ✅ `mixinAbstractClasses.ts` (3 errors) - FIXED
+  - ✅ `mixinClassesAnnotated.ts` (2 errors) - FIXED
+  - ✅ `mixinClassesMembers.ts` (6 errors) - FIXED
+- Remaining 15 TS2339 errors are all private name related (separate issue).
+- Regression tests added:
+  - `test_intersection_type_typeof_declare_classes_ts2339`
+  - `test_intersection_type_three_way_constructor_ts2339`
+  - `test_class_extends_intersection_type_ts2339`
+  - `test_abstract_mixin_intersection_ts2339`
+- Build: `./wasm/build-wasm.sh` (warnings only)
+- Commit: Pushed to `origin/worker/anvil-3`
+
 ### Update (2026-01-11)
 - Samples (pre-fix): `ambient/ambientModuleDeclarationWithReservedIdentifierInDottedPath.ts`, `ambient/ambientModuleDeclarationWithReservedIdentifierInDottedPath2.ts`.
 - Fix: allow keywords in dotted namespace segments by using `parse_identifier_name` in `parse_nested_module_declaration` (`wasm/src/thin_parser.rs`).

@@ -598,6 +598,11 @@ impl<'a> ThinCheckerState<'a> {
                 self.get_type_from_union_type(idx)
             }
 
+            // Intersection type (A & B)
+            k if k == syntax_kind_ext::INTERSECTION_TYPE => {
+                self.get_type_from_intersection_type(idx)
+            }
+
             // Array type (T[])
             k if k == syntax_kind_ext::ARRAY_TYPE => {
                 self.get_type_from_array_type(idx)
@@ -1947,6 +1952,33 @@ impl<'a> ThinCheckerState<'a> {
             }
 
             return self.ctx.types.union(member_types);
+        }
+
+        TypeId::ANY
+    }
+
+    /// Get type from an intersection type node (A & B).
+    fn get_type_from_intersection_type(&mut self, idx: NodeIndex) -> TypeId {
+        let Some(node) = self.ctx.arena.get(idx) else {
+            return TypeId::ANY;
+        };
+
+        // IntersectionType uses CompositeTypeData which has a types list
+        if let Some(composite) = self.ctx.arena.get_composite_type(node) {
+            let mut member_types = Vec::new();
+            for &type_idx in &composite.types.nodes {
+                // Use get_type_from_type_node to properly resolve typeof expressions via binder
+                member_types.push(self.get_type_from_type_node(type_idx));
+            }
+
+            if member_types.is_empty() {
+                return TypeId::ANY;
+            }
+            if member_types.len() == 1 {
+                return member_types[0];
+            }
+
+            return self.ctx.types.intersection(member_types);
         }
 
         TypeId::ANY
@@ -11878,16 +11910,23 @@ impl<'a> ThinCheckerState<'a> {
                             return_type = self.infer_return_type_from_body(func.body, None);
                         }
 
-                        let func_name = self.get_function_name_from_node(stmt_idx);
-                        let name_node = if !func.name.is_none() { Some(func.name) } else { None };
-                        self.maybe_report_implicit_any_return(
-                            func_name,
-                            name_node,
-                            return_type,
-                            has_type_annotation,
-                            false,
-                            stmt_idx,
-                        );
+                        // TS7010 (implicit any return) is only emitted for ambient functions
+                        // (declare modifier or .d.ts file), matching TypeScript's behavior
+                        let is_ambient = self.has_declare_modifier(&func.modifiers)
+                            || self.ctx.file_name.ends_with(".d.ts");
+
+                        if is_ambient {
+                            let func_name = self.get_function_name_from_node(stmt_idx);
+                            let name_node = if !func.name.is_none() { Some(func.name) } else { None };
+                            self.maybe_report_implicit_any_return(
+                                func_name,
+                                name_node,
+                                return_type,
+                                has_type_annotation,
+                                false,
+                                stmt_idx,
+                            );
+                        }
 
                         self.push_return_type(return_type);
                         self.check_statement(func.body);
@@ -17623,16 +17662,25 @@ impl<'a> ThinCheckerState<'a> {
                 return_type = self.infer_getter_return_type(accessor.body);
             }
 
+            // TS7010 (implicit any return) is only emitted for ambient accessors,
+            // matching TypeScript's behavior
             if is_getter {
-                let accessor_name = self.get_property_name(accessor.name);
-                self.maybe_report_implicit_any_return(
-                    accessor_name,
-                    Some(accessor.name),
-                    return_type,
-                    has_type_annotation,
-                    false,
-                    member_idx,
-                );
+                let is_ambient_class = self.ctx.enclosing_class.as_ref()
+                    .map(|c| c.is_declared)
+                    .unwrap_or(false);
+                let is_ambient_file = self.ctx.file_name.ends_with(".d.ts");
+
+                if is_ambient_class || is_ambient_file {
+                    let accessor_name = self.get_property_name(accessor.name);
+                    self.maybe_report_implicit_any_return(
+                        accessor_name,
+                        Some(accessor.name),
+                        return_type,
+                        has_type_annotation,
+                        false,
+                        member_idx,
+                    );
+                }
             }
 
             self.push_return_type(return_type);
