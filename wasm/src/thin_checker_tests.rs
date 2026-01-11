@@ -14861,6 +14861,82 @@ class Foo {
     );
 }
 
+/// Test that TS2564 errors are NOT emitted when strict_property_initialization is disabled
+#[test]
+fn test_ts2564_disabled_when_flag_false() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Foo {
+    name: string;
+    value: number;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+
+    // Disable strict_property_initialization flag
+    checker.ctx.strict_property_initialization = false;
+
+    checker.check_source_file(root);
+
+    // Should have NO TS2564 errors when flag is disabled
+    let has_2564 = checker.ctx.diagnostics.iter().any(|d| d.code == 2564);
+    assert!(
+        !has_2564,
+        "Expected no TS2564 errors when strict_property_initialization is false, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// Test that strict_property_initialization flag can be toggled per checker instance
+#[test]
+fn test_ts2564_flag_independence() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Foo {
+    name: string;
+}
+"#;
+
+    // Parse once
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+    let arena = parser.get_arena();
+
+    let types = TypeInterner::new();
+
+    // Checker 1: strict_property_initialization = true (default)
+    let mut checker1 = ThinCheckerState::new(arena, &binder, &types, "test1.ts".to_string());
+    checker1.check_source_file(root);
+    let count1 = checker1.ctx.diagnostics.iter().filter(|d| d.code == 2564).count();
+
+    // Checker 2: strict_property_initialization = false
+    let mut binder2 = ThinBinderState::new();
+    binder2.bind_source_file(arena, root);
+    let mut checker2 = ThinCheckerState::new(arena, &binder2, &types, "test2.ts".to_string());
+    checker2.ctx.strict_property_initialization = false;
+    checker2.check_source_file(root);
+    let count2 = checker2.ctx.diagnostics.iter().filter(|d| d.code == 2564).count();
+
+    // Checker 1 should have TS2564 errors, checker 2 should not
+    assert_eq!(count1, 1, "Expected 1 TS2564 error with flag enabled");
+    assert_eq!(count2, 0, "Expected 0 TS2564 errors with flag disabled");
+}
+
 #[test]
 fn test_recursive_mapped_type_stack_guard() {
     use crate::thin_parser::ThinParserState;
