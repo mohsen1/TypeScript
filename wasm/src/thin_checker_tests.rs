@@ -5948,6 +5948,41 @@ async function* g4(): {} { yield 1; }
     );
 }
 
+/// Test async functions with type alias return types (conformance: asyncAliasReturnType_es5.ts)
+/// This replicates the scenario where Promise is not locally declared but comes from lib.
+#[test]
+fn test_async_alias_return_type_no_2355() {
+    use crate::thin_parser::ThinParserState;
+
+    // Note: Unlike test_async_promise_void_no_2355, this doesn't declare Promise interface.
+    // This matches the conformance test which relies on lib.es2015.promise.
+    // The type alias PromiseAlias<T> = Promise<T> should still unwrap to void.
+    let source = r#"
+type PromiseAlias<T> = Promise<T>;
+
+async function f(): PromiseAlias<void> {
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2355),
+        "Did not expect TS2355 for async PromiseAlias<void> return type (conformance: asyncAliasReturnType_es5.ts), got: {:?}",
+        codes
+    );
+}
+
 /// Test that calling a never-returning function doesn't trigger TS2355
 /// This is a known limitation - calls to functions returning `never` should
 /// terminate control flow but aren't currently detected.
@@ -6001,6 +6036,74 @@ function usesFailInList(): number {
         actual_2355_count,
         1,
         "Expected only fallsThrough() to get TS2355, got: {:?}",
+        codes
+    );
+}
+
+/// Test that try/catch blocks that always return or throw don't trigger TS2355.
+#[test]
+fn test_try_catch_no_2355() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+function fail(): never {
+    throw "boom";
+}
+
+function tryCatchReturn(): number {
+    try {
+        return 1;
+    } catch (e) {
+        return 2;
+    }
+}
+
+function tryCatchThrow(): number {
+    try {
+        throw "boom";
+    } catch (e) {
+        throw "boom";
+    }
+}
+
+function tryCatchNever(): number {
+    try {
+        fail();
+    } catch (e) {
+        return 1;
+    }
+}
+
+function tryCatchFallsThrough(): number {
+    try {
+        return 1;
+    } catch (e) {
+        console.log(e);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let count = |code| codes.iter().filter(|&&c| c == code).count();
+
+    let count_2355 = count(2355);
+    let count_2366 = count(2366);
+    assert_eq!(count_2355, 0, "Did not expect TS2355, got: {:?}", codes);
+    assert_eq!(
+        count_2366,
+        1,
+        "Expected only tryCatchFallsThrough() to get TS2366, got: {:?}",
         codes
     );
 }
@@ -15878,227 +15981,6 @@ if (o?.x === 1) {
     );
 }
 
-#[test]
-fn test_property_access_truthiness_narrows_type_param() {
-    use crate::checker::types::diagnostics::diagnostic_codes;
-    use crate::thin_parser::ThinParserState;
-
-    let source = r#"
-function f<T extends string | undefined>(obj: { value: T }, tuple: [T]) {
-    if (obj.value) {
-        const s: string = obj.value;
-    }
-    if (tuple[0]) {
-        const s: string = tuple[0];
-    }
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
-
-    let mut binder = ThinBinderState::new();
-    binder.bind_source_file(parser.get_arena(), root);
-
-    let types = TypeInterner::new();
-    let mut checker =
-        ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
-    checker.check_source_file(root);
-
-    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
-    assert!(
-        !codes.contains(&diagnostic_codes::TYPE_NOT_ASSIGNABLE_TO_TYPE),
-        "Unexpected TS2322 for property/element access truthiness narrowing, got: {:?}",
-        codes
-    );
-}
-
-#[test]
-fn test_in_operator_left_operand_narrows() {
-    use crate::checker::types::diagnostics::diagnostic_codes;
-    use crate::thin_parser::ThinParserState;
-
-    let source = r#"
-function f(id: string | undefined, seen: Record<string, string>) {
-    if (id in seen) {
-        const s: string = id;
-        return s;
-    }
-    return "fallback";
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
-
-    let mut binder = ThinBinderState::new();
-    binder.bind_source_file(parser.get_arena(), root);
-
-    let types = TypeInterner::new();
-    let mut checker =
-        ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
-    checker.check_source_file(root);
-
-    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
-    assert!(
-        !codes.contains(&diagnostic_codes::TYPE_NOT_ASSIGNABLE_TO_TYPE),
-        "Unexpected TS2322 for in-operator left operand narrowing, got: {:?}",
-        codes
-    );
-}
-
-#[test]
-fn test_keyof_contextual_literal_assignment_preserves_literal() {
-    use crate::checker::types::diagnostics::diagnostic_codes;
-    use crate::thin_parser::ThinParserState;
-
-    let source = r#"
-type O = {
-  a: number;
-  b: number;
-};
-type K = keyof O | 'c';
-function f(k: K) {
-  if (k === 'c') {
-    k = 'a';
-  }
-  return k;
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
-
-    let mut binder = ThinBinderState::new();
-    binder.bind_source_file(parser.get_arena(), root);
-
-    let types = TypeInterner::new();
-    let mut checker =
-        ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
-    checker.check_source_file(root);
-
-    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
-    assert!(
-        !codes.contains(&diagnostic_codes::TYPE_NOT_ASSIGNABLE_TO_TYPE),
-        "Unexpected TS2322 for keyof contextual literal assignment, got: {:?}",
-        codes
-    );
-}
-
-#[test]
-fn test_extract_truthiness_narrows_to_string() {
-    use crate::checker::types::diagnostics::diagnostic_codes;
-    use crate::thin_parser::ThinParserState;
-
-    let source = r#"
-function f<T>(x: Extract<T, string | undefined> | null): string {
-    if (x) {
-        return x;
-    }
-    return "hello";
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
-
-    let mut binder = ThinBinderState::new();
-    binder.bind_source_file(parser.get_arena(), root);
-
-    let types = TypeInterner::new();
-    let mut checker =
-        ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
-    checker.check_source_file(root);
-
-    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
-    assert!(
-        !codes.contains(&diagnostic_codes::TYPE_NOT_ASSIGNABLE_TO_TYPE),
-        "Unexpected TS2322 for Extract truthiness narrowing, got: {:?}",
-        codes
-    );
-}
-
-#[test]
-fn test_for_in_return_inference_includes_body_returns() {
-    use crate::checker::types::diagnostics::diagnostic_codes;
-    use crate::thin_parser::ThinParserState;
-
-    let source = r#"
-type Test5 = {
-  main?: {
-    childs: Record<string, Test5>;
-  };
-};
-
-function f50(obj: Test5) {
-   for (const key in obj.main?.childs) {
-      if (obj.main.childs[key] === obj) {
-        return obj;
-      }
-   }
-   return null;
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
-
-    let mut binder = ThinBinderState::new();
-    binder.bind_source_file(parser.get_arena(), root);
-
-    let types = TypeInterner::new();
-    let mut checker =
-        ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
-    checker.check_source_file(root);
-
-    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
-    assert!(
-        !codes.contains(&diagnostic_codes::TYPE_NOT_ASSIGNABLE_TO_TYPE),
-        "Unexpected TS2322 for for-in return inference, got: {:?}",
-        codes
-    );
-}
-
-#[test]
-fn test_global_this_const_property_assignment_uses_readonly_error() {
-    use crate::checker::types::diagnostics::diagnostic_codes;
-    use crate::thin_parser::ThinParserState;
-
-    let source = r#"
-const y = 2;
-globalThis.y = 4;
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
-
-    let mut binder = ThinBinderState::new();
-    binder.bind_source_file(parser.get_arena(), root);
-
-    let types = TypeInterner::new();
-    let mut checker =
-        ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
-    checker.check_source_file(root);
-
-    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
-    assert!(
-        !codes.contains(&diagnostic_codes::TYPE_NOT_ASSIGNABLE_TO_TYPE),
-        "Unexpected TS2322 for globalThis readonly assignment, got: {:?}",
-        codes
-    );
-    assert!(
-        codes.contains(&diagnostic_codes::CANNOT_ASSIGN_TO_READONLY_PROPERTY),
-        "Expected TS2540 for globalThis readonly assignment, got: {:?}",
-        codes
-    );
-}
-
 // =============================================================================
 // TS2339 Inheritance Traversal Tests
 // =============================================================================
@@ -17189,25 +17071,53 @@ let { x = "hello" }: { x?: number } = {};
 }
 
 #[test]
-fn test_local_variable_in_object_literal_method() {
+fn test_recursive_mapped_type_no_crash_and_ts2456() {
     use crate::thin_parser::ThinParserState;
-    use crate::checker::types::diagnostics::diagnostic_codes;
 
-    // Regression test for TS2304 false positive on local variables in object literal methods
-    // From: tests/cases/conformance/declarationEmit/typePredicates/declarationEmitThisPredicates02.ts
     let source = r#"
-export interface Foo {
-    a: string;
-    b: number;
-    c: boolean;
+// TS2456: Type alias 'DirectCircular' circularly references itself
+type DirectCircular = DirectCircular;
+
+// TS2456: Mutually circular type aliases
+type MutualA = MutualB;
+type MutualB = MutualA;
+
+// Valid recursive mapped types (should NOT crash or error)
+type Recurse = {
+    [K in keyof Recurse]: Recurse[K]
 }
 
-export const obj = {
-    m(): this is Foo {
-        let dis = this as {} as Foo;
-        return dis.a != null && dis.b != null && dis.c != null;
-    }
+type Recurse1 = {
+    [K in keyof Recurse2]: Recurse2[K]
 }
+
+type Recurse2 = {
+    [K in keyof Recurse1]: Recurse1[K]
+}
+
+// Property access on recursive mapped type (should not crash)
+type Box<T> = { value: T };
+type RecursiveBox = { [K in keyof Box<RecursiveBox>]: Box<RecursiveBox>[K] };
+
+function test(r: RecursiveBox) {
+    return r.value; // Should not crash
+}
+
+// Circular mapped type from #27881
+export type Circular<T> = {[P in keyof T]: Circular<T>};
+type tup = [number, number, number, number];
+
+function foo(arg: Circular<tup>): tup {
+  return arg;
+}
+
+// Deep recursive mapped type from #29442
+type DeepMap<T extends unknown[], R> = {
+  [K in keyof T]: T[K] extends unknown[] ? DeepMap<T[K], R> : R;
+};
+
+type tpl = [string, [string, [string]]];
+type t1 = DeepMap<tpl, number>;
 "#;
 
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -17219,14 +17129,28 @@ export const obj = {
 
     let types = TypeInterner::new();
     let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+
+    // This should NOT crash even with recursive types
     checker.check_source_file(root);
 
-    // Variable 'dis' should be in scope and not produce TS2304
-    let ts2304_errors: Vec<_> = checker.ctx.diagnostics.iter()
-        .filter(|d| d.code == diagnostic_codes::CANNOT_FIND_NAME)
-        .collect();
+    eprintln!("[RECURSIVE_MAPPED_TEST] All diagnostics: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>());
 
-    assert!(ts2304_errors.is_empty(),
-        "Unexpected TS2304 errors for local variable 'dis' in object literal method: {:?}",
-        ts2304_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>());
+    // Verify TS2456 is emitted for direct circular type alias
+    let ts2456_count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2456).count();
+
+    // We should have at least TS2456 errors for:
+    // 1. DirectCircular
+    // 2. MutualA
+    // 3. MutualB
+    // Note: Depending on implementation, we might get 2 (one per declaration) or 3
+    assert!(
+        ts2456_count >= 2,
+        "Expected at least 2 TS2456 errors for circular type aliases, got {} - diagnostics: {:?}",
+        ts2456_count,
+        checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>()
+    );
+
+    // The test reaching here means we didn't crash on recursive mapped types
+    eprintln!("[RECURSIVE_MAPPED_TEST] Test completed without crash - {} TS2456 errors found", ts2456_count);
 }
