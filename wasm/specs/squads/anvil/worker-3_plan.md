@@ -1,6 +1,6 @@
 # Anvil Worker 3 - TS2339 Property Resolution (Inherited Properties)
 
-Ready for Merge: No
+Ready for Merge: Yes
 Status: Active
 
 ## Current Assignment (2026-01-11)
@@ -12,9 +12,9 @@ Status: Active
 
 ### Update (2026-01-11)
 - Samples (pre-fix): `enums/enumBasics.ts`, `es6/spread/arrayLiteralSpread.ts`, `es6/spread/arrayLiteralSpreadES5iterable.ts`, `es6/templates/taggedTemplateStringsWithOverloadResolution3.ts`, `es6/templates/taggedTemplateStringsWithOverloadResolution3_ES6.ts`.
-- Fix (in progress): treat variable redeclaration types as compatible when bidirectionally assignable; refine stored var type to avoid widening; expand enum value types to enum object shapes before comparison (in `wasm/src/thin_checker.rs`).
-- Regression tests (in progress): `test_variable_redeclaration_enum_object_literal_no_2403`, `test_variable_redeclaration_array_spread_no_2403` in `wasm/src/thin_checker_tests.rs`.
-- TS2403 delta scan: pending (need rebuild + re-run).
+- Fix: treat variable redeclaration types as compatible when bidirectionally assignable; refine stored var type to avoid widening; expand enum value types to enum object shapes before comparison (commit 75316ba46e).
+- Regression tests: `test_variable_redeclaration_enum_object_literal_no_2403`, `test_variable_redeclaration_array_spread_no_2403` in `wasm/src/thin_checker_tests.rs`.
+- TS2403 delta scan: `node wasm/differential-test/find-ts2403.mjs --max=500 --samples=5` → 0 extra.
 
 ### Update (2026-01-11)
 - Fix: use TypeEnvironment-backed assignability in call/new resolution, and resolve Application symbols (including type param constraints) to improve generic mixin inference (commit 5cf3894068).
