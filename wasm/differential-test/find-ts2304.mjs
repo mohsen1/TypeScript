@@ -196,9 +196,49 @@ function runTscMulti(files, testOptions) {
   }));
 }
 
-function runWasmSingle(code, fileName, wasm) {
+// Lib file cache to avoid re-reading lib files for each test
+let libPromiseCache = null;
+
+async function loadLibFiles(wasm, target) {
+  if (libPromiseCache) {
+    return libPromiseCache;
+  }
+
+  const { readFileSync } = await import('fs');
+  const { join } = await import('path');
+  const typescriptLibPath = join(__dirname, '../orchestrator/node_modules/typescript/lib');
+
+  // Determine which lib files to load based on target
+  const libFiles = [];
+
+  // Always load lib.es5.d.ts (contains Promise interface)
+  libFiles.push({
+    name: 'lib.es5.d.ts',
+    content: readFileSync(join(typescriptLibPath, 'lib.es5.d.ts'), 'utf-8')
+  });
+
+  // For es2017 and later, also load the promise constructor
+  if (target && (target.startsWith('es2017') || target.startsWith('es2018') || target.startsWith('es2019') || target.startsWith('es2020') || target.startsWith('es2021') || target.startsWith('es2022') || target.startsWith('es2023') || target.startsWith('es2024') || target === 'esnext')) {
+    libFiles.push({
+      name: 'lib.es2015.promise.d.ts',
+      content: readFileSync(join(typescriptLibPath, 'lib.es2015.promise.d.ts'), 'utf-8')
+    });
+  }
+
+  libPromiseCache = libFiles;
+  return libFiles;
+}
+
+async function runWasmSingle(code, fileName, wasm, testOptions) {
   const parser = new wasm.ThinParser(fileName, code);
   parser.parseSourceFile();
+
+  // Load lib files based on target
+  const libFiles = await loadLibFiles(wasm, testOptions.target);
+  for (const lib of libFiles) {
+    parser.addLibFile(lib.name, lib.content);
+  }
+
   const parseDiags = JSON.parse(parser.getDiagnosticsJson());
   const checkResult = JSON.parse(parser.checkSourceFile());
   let wasmDiags = [
@@ -254,7 +294,7 @@ async function main() {
       } else {
         const fileName = basename(filePath);
         tscDiags = runTscSingle(cleanCode, fileName, options);
-        wasmDiags = runWasmSingle(cleanCode, fileName, wasm);
+        wasmDiags = await runWasmSingle(cleanCode, fileName, wasm, options);
       }
     } catch {
       continue;
