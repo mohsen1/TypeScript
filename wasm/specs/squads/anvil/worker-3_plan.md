@@ -1,6 +1,6 @@
 # Anvil Worker 3 - TS2339 Property Resolution (Inherited Properties)
 
-Ready for Merge: No
+Ready for Merge: Yes
 Status: Active
 
 ## Current Assignment (2026-01-11)
@@ -9,6 +9,12 @@ Status: Active
 - Run `node wasm/differential-test/find-ts2339.mjs --max=500 --samples=5` and collect 3-5 samples.
 - Trace property lookup in `wasm/src/thin_checker.rs` (narrowing/index signatures/interface merging/prototype chain).
 - Implement minimal fix + regression tests; report before/after TS2339 delta.
+
+### Update (2026-01-11)
+- Samples (pre-fix): `ambient/ambientModuleDeclarationWithReservedIdentifierInDottedPath.ts`, `ambient/ambientModuleDeclarationWithReservedIdentifierInDottedPath2.ts`.
+- Fix: allow keywords in dotted namespace segments by using `parse_identifier_name` in `parse_nested_module_declaration` (`wasm/src/thin_parser.rs`).
+- Regression: `test_namespace_dotted_keyword_member_access` in `wasm/src/thin_checker_tests.rs`.
+- TS2339 scan: `node wasm/differential-test/find-ts2339.mjs --max=500 --samples=5` → 0 extra (was 2).
 
 ### Update (2026-01-11)
 - Samples (pre-fix): `enums/enumBasics.ts`, `es6/spread/arrayLiteralSpread.ts`, `es6/spread/arrayLiteralSpreadES5iterable.ts`, `es6/templates/taggedTemplateStringsWithOverloadResolution3.ts`, `es6/templates/taggedTemplateStringsWithOverloadResolution3_ES6.ts`.

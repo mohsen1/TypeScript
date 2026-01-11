@@ -8328,6 +8328,35 @@ const viaAlias = Alias.value;
 }
 
 #[test]
+fn test_namespace_dotted_keyword_member_access() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+declare namespace chrome.debugger {
+    declare var tabId: number;
+}
+export const tabId = chrome.debugger.tabId;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2339),
+        "Expected no TS2339 for dotted namespace keyword member access, got: {:?}",
+        codes
+    );
+}
+
+#[test]
 fn test_namespace_value_member_element_access() {
     use crate::thin_parser::ThinParserState;
 
