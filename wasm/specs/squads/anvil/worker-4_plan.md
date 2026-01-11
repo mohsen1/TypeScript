@@ -37,9 +37,30 @@ Investigate `tests/cases/conformance/types/mapped/recursiveMappedTypes.ts` crash
 
 Ready for Merge: Yes
 
-## Current Assignment (2026-01-11) - TS2769 Overload Matching (remaining cases)
+## Current Assignment (2026-01-11 - CONTINUATION) - TS2769 Remaining Patterns
 
-Status: COMPLETED
+**Target:** Further reduce TS2769 false positives (125 total → aim for <60)
+
+**Previous Work MERGED:** Arg count mismatch fix (1 → 0 files in first 1000 tests)
+
+**Next Focus Areas:**
+1. Generic inference in overloads too strict
+2. Rest parameter matching incorrect
+3. Optional parameter handling wrong
+4. Tuple type inference issues
+
+**Approach:**
+1. Collect new samples: `node wasm/differential-test/conformance-runner.mjs --find-extra-error=TS2769 --max=1000 --samples=10`
+2. Analyze remaining false positive patterns
+3. Fix in `solver/operations.rs` or `thin_checker.rs`
+4. Add regression tests
+5. Verify no regressions
+
+**Success Criteria:** Further reduce TS2769 count with no regressions
+
+## Completed - TS2769 Arg Count Mismatch (MERGED)
+
+Status: MERGED to squad/anvil
 
 ### Mission
 Fix TS2769 false positives for overloaded constructors/functions when all overloads fail due to argument count mismatch.

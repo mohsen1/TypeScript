@@ -2390,6 +2390,42 @@ var x: number;
 }
 
 #[test]
+fn test_decorator_static_method_no_ts2304() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// @target: esnext
+// @experimentalDecorators: true
+@((t) => {})
+class C {
+    @((t, k, d) => { })
+    static f() {}
+
+    @((t, k, d) => { })
+    static get x() { return 1; }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2304_errs: Vec<_> = checker.ctx.diagnostics.iter().filter(|d| d.code == 2304).collect();
+    assert_eq!(
+        ts2304_errs.len(),
+        0,
+        "Should have no TS2304 errors for decorated static methods/getters, but found: {:#?}",
+        ts2304_errs
+    );
+}
+
+#[test]
 fn test_abstract_class_in_local_scope_2511() {
     use crate::thin_parser::ThinParserState;
     use crate::binder::symbol_flags;
