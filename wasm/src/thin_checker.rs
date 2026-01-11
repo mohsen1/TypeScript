@@ -598,6 +598,11 @@ impl<'a> ThinCheckerState<'a> {
                 self.get_type_from_union_type(idx)
             }
 
+            // Intersection type (A & B)
+            k if k == syntax_kind_ext::INTERSECTION_TYPE => {
+                self.get_type_from_intersection_type(idx)
+            }
+
             // Array type (T[])
             k if k == syntax_kind_ext::ARRAY_TYPE => {
                 self.get_type_from_array_type(idx)
@@ -1952,6 +1957,33 @@ impl<'a> ThinCheckerState<'a> {
             }
 
             return self.ctx.types.union(member_types);
+        }
+
+        TypeId::ANY
+    }
+
+    /// Get type from an intersection type node (A & B).
+    fn get_type_from_intersection_type(&mut self, idx: NodeIndex) -> TypeId {
+        let Some(node) = self.ctx.arena.get(idx) else {
+            return TypeId::ANY;
+        };
+
+        // IntersectionType uses CompositeTypeData which has a types list
+        if let Some(composite) = self.ctx.arena.get_composite_type(node) {
+            let mut member_types = Vec::new();
+            for &type_idx in &composite.types.nodes {
+                // Use get_type_from_type_node to properly resolve typeof expressions via binder
+                member_types.push(self.get_type_from_type_node(type_idx));
+            }
+
+            if member_types.is_empty() {
+                return TypeId::ANY;
+            }
+            if member_types.len() == 1 {
+                return member_types[0];
+            }
+
+            return self.ctx.types.intersection(member_types);
         }
 
         TypeId::ANY
