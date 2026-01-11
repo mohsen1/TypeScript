@@ -86,6 +86,7 @@ pub mod diagnostic_messages {
     pub const TYPE_NOT_ASSIGNABLE: &str = "Type '{0}' is not assignable to type '{1}'.";
     pub const CANNOT_FIND_NAME: &str = "Cannot find name '{0}'.";
     pub const DUPLICATE_IDENTIFIER: &str = "Duplicate identifier '{0}'.";
+    pub const MULTIPLE_CONSTRUCTOR_IMPLEMENTATIONS: &str = "Multiple constructor implementations are not allowed.";
     pub const PROPERTY_DOES_NOT_EXIST: &str = "Property '{0}' does not exist on type '{1}'.";
     pub const PROPERTY_MISSING: &str = "Property '{0}' is missing in type '{1}'.";
     pub const PROPERTY_MISSING_BUT_REQUIRED: &str = "Property '{0}' is missing in type '{1}' but required in type '{2}'.";
@@ -241,6 +242,7 @@ pub mod diagnostic_codes {
     pub const FUNCTION_IMPLEMENTATION_NAME_MUST_BE: u32 = 2389;  // Function implementation name must be '{0}'
     pub const CONSTRUCTOR_IMPLEMENTATION_MISSING: u32 = 2390;  // Constructor implementation is missing
     pub const FUNCTION_IMPLEMENTATION_MISSING: u32 = 2391;  // Function implementation is missing
+    pub const MULTIPLE_CONSTRUCTOR_IMPLEMENTATIONS: u32 = 2392;  // Multiple constructor implementations are not allowed
     pub const NOT_ALL_CODE_PATHS_RETURN_VALUE: u32 = 2366;
     pub const FUNCTION_LACKS_RETURN_TYPE: u32 = 2355;
     pub const FUNCTION_RETURN_TYPE_MISMATCH: u32 = 2322;
