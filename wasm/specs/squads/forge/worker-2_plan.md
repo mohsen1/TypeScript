@@ -7,27 +7,30 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-Reduce TS2304 false positives in decorator/noTypesAndSymbols parsing edge cases.
+TS2322 - Type is not assignable errors.
 
-**Error Code:** TS2304 - "Cannot find name 'X'."
+**Error Code:** TS2322 - "Type 'X' is not assignable to type 'Y'"
 
-**Impact:** Remaining TS2304 false positives after heritage fixes.
+**Impact:** 310 conformance tests affected
 
 ### Steps
-1. **Rebuild + scan**: `./wasm/build-wasm.sh` then `cd wasm/differential-test && node find-ts2304.mjs --max=1000 --samples=30`.
-2. **Target decorator/noTypesAndSymbols cases** from the scan.
-3. **Fix parser/checker handling** in `wasm/src/thin_parser.rs` and/or `wasm/src/thin_checker.rs`.
-4. **Add tests** in `wasm/src/thin_checker_tests.rs`.
-5. **Run focused tests** with `./wasm/test.sh` and report delta.
+1. **Check type assignability** - when assigning/returning values, verify type compatibility
+2. **Handle structural typing** - objects must have all required properties with compatible types
+3. **Handle unions/intersections** - check assignability rules for complex types
+4. **Handle generics** - verify type arguments satisfy constraints
+5. **Add tests** in `wasm/src/thin_checker_tests.rs` for assignability checks
+6. **Run focused tests** with `./wasm/test.sh` and record delta
 
 ### Key Files
-- `wasm/src/thin_parser.rs`
 - `wasm/src/thin_checker.rs`
+- `wasm/src/checker/expressions.rs`
+- `wasm/src/solver/subtype.rs`
 - `wasm/src/thin_checker_tests.rs`
 
 ### Success Criteria
-- TS2304 false positives reduced for decorator/noTypesAndSymbols cases
-- No new regressions in existing TS2304 tests
+- TS2322 emitted for incompatible assignments
+- Correct handling of structural typing, unions, generics
+- No new regressions
 
 ## Resume Notes
 - Branch: `worker/forge-2`.
@@ -96,7 +99,7 @@ Reduce TS2304 false positives in decorator/noTypesAndSymbols parsing edge cases.
 - Verified fix: legacyDecorators-contextualTypes.ts errors for 'static', 'f', 'get', 'x' are now resolved.
 
 ## Ready for Merge
-Yes
+No
 
 **Final Conformance Scan Results:**
 - Scan parameters: `--max=500 --samples=20`
