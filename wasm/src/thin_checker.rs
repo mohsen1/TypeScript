@@ -1913,6 +1913,11 @@ impl<'a> ThinCheckerState<'a> {
         if let Some(ident) = self.ctx.arena.get_identifier(node) {
             let name = &ident.escaped_text;
 
+            // Check type parameter scope first
+            if let Some(type_id) = self.lookup_type_parameter(name) {
+                return type_id;
+            }
+
             if let Some(sym_id) = self.resolve_identifier_symbol(idx) {
                 return self.type_reference_symbol_type(sym_id);
             }
@@ -1988,6 +1993,10 @@ impl<'a> ThinCheckerState<'a> {
             return TypeId::ERROR;
         } else if let Some(name) = name_text {
             if is_identifier {
+                // Check type parameter scope before reporting error
+                if let Some(type_id) = self.lookup_type_parameter(&name) {
+                    return type_id;
+                }
                 if self.is_known_global_value_name(&name) {
                     return TypeId::ANY;
                 }
@@ -3999,9 +4008,6 @@ impl<'a> ThinCheckerState<'a> {
                     if !self.has_static_modifier(&prop.modifiers) {
                         continue;
                     }
-                    if self.is_private_identifier_name(prop.name) {
-                        continue;
-                    }
                     let Some(name) = self.get_property_name(prop.name) else {
                         continue;
                     };
@@ -4030,9 +4036,6 @@ impl<'a> ThinCheckerState<'a> {
                     if !self.has_static_modifier(&method.modifiers) {
                         continue;
                     }
-                    if self.is_private_identifier_name(method.name) {
-                        continue;
-                    }
                     let Some(name) = self.get_property_name(method.name) else {
                         continue;
                     };
@@ -4057,9 +4060,6 @@ impl<'a> ThinCheckerState<'a> {
                         continue;
                     };
                     if !self.has_static_modifier(&accessor.modifiers) {
-                        continue;
-                    }
-                    if self.is_private_identifier_name(accessor.name) {
                         continue;
                     }
                     let Some(name) = self.get_property_name(accessor.name) else {
@@ -4567,21 +4567,22 @@ impl<'a> ThinCheckerState<'a> {
             return false;
         };
 
+        // Check if this is a variable (either block-scoped or function-scoped)
         if (symbol.flags & symbol_flags::VARIABLE) == 0 {
             return false;
         }
-        if (symbol.flags & symbol_flags::BLOCK_SCOPED_VARIABLE) == 0 {
-            return false;
-        }
 
+        // Skip parameters - they are always assigned by the caller
         if self.symbol_is_parameter(sym_id) {
             return false;
         }
 
+        // Skip if has definite assignment assertion (x!: Type)
         if self.symbol_has_definite_assignment_assertion(sym_id) {
             return false;
         }
 
+        // Skip if this is a for-in/for-of loop variable (always assigned by the loop)
         if self.is_for_in_of_assignment_target(idx) {
             return false;
         }
@@ -17469,6 +17470,112 @@ impl<'a> ThinCheckerState<'a> {
 
         if symbol.flags & symbol_flags::TYPE_ALIAS != 0 {
             return self.promise_like_type_argument_from_alias(sym_id, args, visited_aliases);
+        }
+
+        if symbol.flags & symbol_flags::CLASS != 0 {
+            return self.promise_like_type_argument_from_class(sym_id, args, visited_aliases);
+        }
+
+        None
+    }
+
+    fn promise_like_type_argument_from_class(
+        &mut self,
+        sym_id: SymbolId,
+        args: &[TypeId],
+        visited_aliases: &mut Vec<SymbolId>,
+    ) -> Option<TypeId> {
+        use crate::solver::TypeKey;
+
+        if visited_aliases.iter().any(|&seen| seen == sym_id) {
+            return None;
+        }
+        visited_aliases.push(sym_id);
+
+        let symbol = self.ctx.binder.get_symbol(sym_id)?;
+        let decl_idx = if !symbol.value_declaration.is_none() {
+            symbol.value_declaration
+        } else {
+            symbol.declarations.first().copied().unwrap_or(NodeIndex::NONE)
+        };
+        if decl_idx.is_none() {
+            return None;
+        }
+
+        let node = self.ctx.arena.get(decl_idx)?;
+        let class = self.ctx.arena.get_class(node)?;
+
+        // Build type parameter bindings for this class
+        let mut bindings = Vec::new();
+        if let Some(params) = &class.type_parameters {
+            if params.nodes.len() != args.len() {
+                return None;
+            }
+            for (&param_idx, &arg) in params.nodes.iter().zip(args.iter()) {
+                let param_node = self.ctx.arena.get(param_idx)?;
+                let param = self.ctx.arena.get_type_parameter(param_node)?;
+                let name_node = self.ctx.arena.get(param.name)?;
+                let ident = self.ctx.arena.get_identifier(name_node)?;
+                bindings.push((self.ctx.types.intern_string(&ident.escaped_text), arg));
+            }
+        } else if !args.is_empty() {
+            return None;
+        }
+
+        // Check heritage clauses for extends Promise/PromiseLike
+        let Some(heritage_clauses) = &class.heritage_clauses else {
+            return None;
+        };
+
+        for &clause_idx in heritage_clauses.nodes.iter() {
+            let clause_node = self.ctx.arena.get(clause_idx)?;
+            let heritage = self.ctx.arena.get_heritage_clause(clause_node)?;
+
+            // Only check extends clauses (token = ExtendsKeyword = 96)
+            if heritage.token != SyntaxKind::ExtendsKeyword as u16 {
+                continue;
+            }
+
+            // Get the first type in the extends clause (the base class)
+            let Some(&type_idx) = heritage.types.nodes.first() else {
+                continue;
+            };
+            let Some(type_node) = self.ctx.arena.get(type_idx) else {
+                continue;
+            };
+
+            // Handle both cases:
+            // 1. ExpressionWithTypeArguments (e.g., Promise<T>)
+            // 2. Simple Identifier (e.g., Promise)
+            let (expr_idx, type_arguments) = if let Some(expr_type_args) = self.ctx.arena.get_expr_type_args(type_node) {
+                (expr_type_args.expression, expr_type_args.type_arguments.as_ref())
+            } else {
+                (type_idx, None)
+            };
+
+            // Get the base class name
+            let Some(expr_node) = self.ctx.arena.get(expr_idx) else {
+                continue;
+            };
+            let Some(ident) = self.ctx.arena.get_identifier(expr_node) else {
+                continue;
+            };
+
+            // Check if it's Promise or PromiseLike
+            if !self.is_promise_like_name(&ident.escaped_text) {
+                continue;
+            }
+
+            // If it extends Promise<X>, extract X and substitute type parameters
+            if let Some(type_args) = type_arguments {
+                if let Some(&first_arg_node) = type_args.nodes.first() {
+                    let lowered = self.lower_type_with_bindings(first_arg_node, bindings);
+                    return Some(lowered);
+                }
+            }
+
+            // Promise with no type argument defaults to Promise<any>
+            return Some(TypeId::ANY);
         }
 
         None

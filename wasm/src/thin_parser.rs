@@ -2600,6 +2600,9 @@ impl ThinParserState {
         use crate::checker::types::diagnostics::diagnostic_codes;
         let start_pos = self.token_pos();
 
+        // Parse decorators first (if any)
+        let _decorators = self.parse_decorators();
+
         // Handle empty statement (semicolon) in class body - this is valid TypeScript/JavaScript
         // A standalone semicolon in a class body is an empty class element
         if self.is_token(SyntaxKind::SemicolonToken) {

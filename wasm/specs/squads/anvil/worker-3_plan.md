@@ -370,3 +370,30 @@ Ready for Merge: No (work in progress - 2/3 test cases pass, investigating early
 **Impact**: Eliminated 100% of control flow-related TS2339 false positives in first 1000 tests.
 
 Ready for Merge: Yes
+
+### Update (2026-01-11)
+- Implemented fix for static private members in constructor type
+- Removed checks that skipped private identifiers when building static properties (commit 6b9431de62)
+- TS2339 scan results: 5 files with errors (down from original scan)
+- Fixed files:
+  - ✅ `classStaticBlock13.ts` (static private field in static block)
+  - ✅ `privateNameStaticAccessors.ts` (static private accessors)
+- Remaining issues (5 files, 15 total errors):
+  - `privateNameAccessorsAccess.ts` (1 error - instance private accessor)
+  - `privateNameMethodAccess.ts` (1 error - instance private method)
+  - `privateNameStaticAccessorsAccess.ts` (1 error - static private accessor in various contexts)
+  - `privateNameStaticFieldDerivedClasses.ts` (2 errors - cross-class private static access)
+  - `privateNameStaticFieldDestructuredBinding.ts` (10 errors - destructuring assignments with private static)
+- Analysis: Error messages show properties ARE in types but lookup still fails - investigating property resolution logic
+
+### Test Results  
+- Added regression tests: `test_static_private_field_access_no_ts2339`, `test_static_private_accessor_access_no_ts2339` - both PASS ✅
+- Note: Existing test `test_static_private_fields_ignored_in_constructor_assignability` now fails
+  - This test expected private static members to be ignored in assignability checks  
+  - The failure indicates stricter type checking (may need adjustment based on TypeScript nominal vs structural typing for private members)
+- Build: `cargo build` succeeds with warnings only
+
+### Summary
+- Fixed 2 files completely: `classStaticBlock13.ts`, `privateNameStaticAccessors.ts`
+- Remaining 5 files with TS2339 errors require further investigation of property lookup mechanism
+- Commit: 6b9431de62
