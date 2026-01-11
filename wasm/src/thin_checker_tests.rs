@@ -14378,6 +14378,71 @@ d.mixinMethod();
 }
 
 #[test]
+fn test_mixin_return_type_preserves_base_properties() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type Constructor<T> = new (...args: any[]) => T;
+
+class Base {
+    constructor(public x: number, public y: number) {}
+}
+
+const Printable = <T extends Constructor<Base>>(superClass: T) => class extends superClass {
+    static message = "hello";
+    print() {
+        this.x;
+    }
+}
+
+function Tagged<T extends Constructor<{}>>(superClass: T) {
+    class C extends superClass {
+        _tag: string;
+        constructor(...args: any[]) {
+            super(...args);
+            this._tag = "hello";
+        }
+    }
+    return C;
+}
+
+const Thing2 = Tagged(Printable(Base));
+Thing2.message;
+
+function f() {
+    const thing = new Thing2(1, 2);
+    thing.x;
+    thing._tag;
+    thing.print();
+}
+
+class Thing3 extends Thing2 {
+    test() {
+        this.print();
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2339),
+        "Should not emit TS2339 for mixin constructor/instance properties, got errors: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
 fn test_interface_extension_property_access_ts2339() {
     use crate::thin_parser::ThinParserState;
 
