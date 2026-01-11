@@ -17154,8 +17154,6 @@ fn test_static_private_field_access_no_ts2339() {
 
     // Regression test for static private field access
     // Previously failed with TS2339 because static private members were excluded from constructor type
-    use crate::thin_parser::ThinParserState;
-
     let source = r#"
 class C {
     static #x = 123;
@@ -17192,8 +17190,6 @@ fn test_static_private_accessor_access_no_ts2339() {
     use crate::thin_parser::ThinParserState;
 
     // Regression test for static private accessor access
-    use crate::thin_parser::ThinParserState;
-
     let source = r#"
 class A {
     static get #prop() { return ""; }
