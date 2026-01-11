@@ -11577,19 +11577,18 @@ const animal = createAnimal(Animal); // Passing abstract class as value should b
 
     let error_count = checker.ctx.diagnostics.len();
 
-    // Currently expects 4 errors due to typeof class resolution issues
-    // Once typeof class types work correctly, change to expect 0 errors
-    if error_count != 4 {
+    // typeof class types now work correctly - expect 0 errors
+    if error_count != 0 {
         eprintln!("=== Abstract Constructor Assignability Diagnostics ===");
-        eprintln!("Expected 4 errors (typeof class issues), got {}", error_count);
+        eprintln!("Expected 0 errors (typeof class fixed), got {}", error_count);
         for diag in &checker.ctx.diagnostics {
             eprintln!("[{}] {}", diag.start, diag.message_text);
         }
     }
 
     assert_eq!(
-        error_count, 4,
-        "Expected 4 errors due to typeof class resolution: {:?}",
+        error_count, 0,
+        "Expected 0 errors (typeof class now works): {:?}",
         checker.ctx.diagnostics
     );
 }
@@ -11651,19 +11650,18 @@ const shapes: Shape[] = [new Circle(1), new Square(2)]; // Should be OK
 
     let error_count = checker.ctx.diagnostics.len();
 
-    // Currently expects 3 errors due to instance-to-class type comparison issues
-    // Once class inheritance type checking works, change to expect 0 errors
-    if error_count != 3 {
+    // Class inheritance type checking now works - expect 0 errors
+    if error_count != 0 {
         eprintln!("=== Concrete Extends Abstract Diagnostics ===");
-        eprintln!("Expected 3 errors (class type issues), got {}", error_count);
+        eprintln!("Expected 0 errors (class inheritance fixed), got {}", error_count);
         for diag in &checker.ctx.diagnostics {
             eprintln!("[{}] {}", diag.start, diag.message_text);
         }
     }
 
     assert_eq!(
-        error_count, 3,
-        "Expected 3 errors due to class type comparison: {:?}",
+        error_count, 0,
+        "Expected 0 errors (class inheritance now works): {:?}",
         checker.ctx.diagnostics
     );
 }
@@ -11943,19 +11941,18 @@ const name = pet.name; // OK: both Dog and Cat have name
 
     let error_count = checker.ctx.diagnostics.len();
 
-    // Currently expects 1 error due to class inheritance type issues
-    // Once class inheritance works, change to expect 0 errors
-    if error_count != 1 {
+    // Class inheritance now works - expect 0 errors
+    if error_count != 0 {
         eprintln!("=== Best Common Type Class Hierarchy Diagnostics ===");
-        eprintln!("Expected 1 error (class inheritance issues), got {}", error_count);
+        eprintln!("Expected 0 errors (class inheritance fixed), got {}", error_count);
         for diag in &checker.ctx.diagnostics {
             eprintln!("[{}] {}", diag.start, diag.message_text);
         }
     }
 
     assert_eq!(
-        error_count, 1,
-        "Expected 1 error due to class inheritance: {:?}",
+        error_count, 0,
+        "Expected 0 errors (class inheritance now works): {:?}",
         checker.ctx.diagnostics
     );
 }
@@ -12530,19 +12527,18 @@ const dogHandler: HandlerWithDogProp = animalHandler;
 
     let error_count = checker.ctx.diagnostics.len();
 
-    // Currently expects 1 error: interface inheritance not correctly resolved
-    // Once interface extends is properly handled, expect 0 errors
-    if error_count != 1 {
+    // Interface extends is now properly handled - expect 0 errors
+    if error_count != 0 {
         eprintln!("=== Function Property Contravariance Diagnostics ===");
-        eprintln!("Expected 1 error (interface inheritance not resolved), got {}", error_count);
+        eprintln!("Expected 0 errors (interface inheritance fixed), got {}", error_count);
         for diag in &checker.ctx.diagnostics {
             eprintln!("[{}] {}", diag.start, diag.message_text);
         }
     }
 
     assert_eq!(
-        error_count, 1,
-        "Expected 1 error for contravariant function prop (interface extends not yet resolved): {:?}",
+        error_count, 0,
+        "Expected 0 errors (interface extends now works, contravariance allows wider param): {:?}",
         checker.ctx.diagnostics
     );
 }
