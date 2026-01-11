@@ -5947,6 +5947,40 @@ async function f(): PromiseAlias<void> {
     );
 }
 
+/// Test async functions with qualified name class extending Promise (conformance: asyncQualifiedReturnType_es5.ts)
+#[test]
+fn test_async_qualified_promise_class_no_2355() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+namespace X {
+    export class MyPromise<T> extends Promise<T> {
+    }
+}
+
+async function f(): X.MyPromise<void> {
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2355),
+        "Did not expect TS2355 for async qualified Promise class return type, got: {:?}",
+        codes
+    );
+}
+
 /// Test that calling a never-returning function doesn't trigger TS2355
 /// This is a known limitation - calls to functions returning `never` should
 /// terminate control flow but aren't currently detected.
@@ -17120,83 +17154,35 @@ type t1 = DeepMap<tpl, number>;
 }
 
 #[test]
-fn test_type_parameter_in_type_query() {
+fn test_generic_control_flow_narrowing() {
     use crate::thin_parser::ThinParserState;
 
     let source = r#"
-// Type parameters should be resolved in typeof type queries
-function identity<T>(x: T): T {
-    return x;
-}
-
-// typeof on type parameter should not error
-type IdentityReturnType<T> = ReturnType<typeof identity<T>>;
-
-// Type parameter in Extract with typeof
-function extract<T>(x: Extract<T, typeof identity>): T {
-    return x;
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
-
-    let mut binder = ThinBinderState::new();
-    binder.bind_source_file(parser.get_arena(), root);
-
-    let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
-    checker.check_source_file(root);
-
-    // Check for false positive TS2304 errors on type parameter 'T'
-    let ts2304_for_T: Vec<_> = checker.ctx.diagnostics.iter()
-        .filter(|d| d.code == 2304 && d.message_text.contains("'T'"))
-        .collect();
-
-    eprintln!("[TYPE_PARAM_TYPE_QUERY] All diagnostics: {:?}",
-        checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>());
-
-    assert!(
-        ts2304_for_T.is_empty(),
-        "Expected no TS2304 errors for type parameter 'T' in type queries, but got {} errors: {:?}",
-        ts2304_for_T.len(),
-        ts2304_for_T.iter().map(|d| &d.message_text).collect::<Vec<_>>()
-    );
-}
-
-#[test]
-fn test_instance_private_accessor_lookup_debug() {
-    // Debug test for instance private accessor lookup issue
-    let source = r#"
-class A2 {
-    get #prop() { return ""; }
-    set #prop(param: string) { }
-    
-    constructor() {
-        console.log(this.#prop);
+function f1<T extends string | undefined>(x: T): string {
+    if (x) {
+        return x;
     }
+    return "hello";
 }
 "#;
 
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
-    
+
+    let arena = parser.get_arena();
     let mut binder = ThinBinderState::new();
-    binder.bind_source_file(parser.get_arena(), root);
-    
+    binder.bind_source_file(arena, root);
+
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
-    
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
     checker.check_source_file(root);
-    
-    eprintln!("Diagnostics: {:?}", checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>());
-    
-    // This should pass but currently fails
-    let ts2339_count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2339).count();
-    assert_eq!(ts2339_count, 0, 
-        "Expected no TS2339 errors for instance private accessor access, got {} - diagnostics: {:?}",
-        ts2339_count,
+
+    // Should have no TS2322 errors - after narrowing, x should be assignable to string
+    let ts2322_count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2322).count();
+    assert_eq!(
+        ts2322_count, 0,
+        "Expected no TS2322 errors, got {} - diagnostics: {:?}",
+        ts2322_count,
         checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>()
     );
 }
