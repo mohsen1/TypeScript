@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Find TS2339 false positives in conformance tests.
+ * Find TS2339 extra or missing diagnostics in conformance tests.
  * Compares WASM diagnostics to tsc, supports single-file tests.
  */
 
@@ -182,11 +182,19 @@ async function main() {
   const args = process.argv.slice(2);
   const maxTests = parseInt(args.find(a => a.startsWith('--max='))?.split('=')[1] || '2000', 10);
   const maxSamples = parseInt(args.find(a => a.startsWith('--samples='))?.split('=')[1] || '20', 10);
+  const modeArg = args.find(a => a.startsWith('--mode='))?.split('=')[1];
+  const mode = modeArg
+    || (args.includes('--missing') ? 'missing' : null)
+    || (args.includes('--extra') ? 'extra' : null)
+    || 'extra';
+  const reportExtra = mode === 'extra' || mode === 'both';
+  const reportMissing = mode === 'missing' || mode === 'both';
 
   const wasm = await import(join(CONFIG.wasmPkgPath, 'wasm.js'));
   const testFiles = getTestFiles(CONFIG.conformanceDir, maxTests);
 
-  const matches = [];
+  const extraMatches = [];
+  const missingMatches = [];
 
   for (const filePath of testFiles) {
     let rawCode;
@@ -215,8 +223,9 @@ async function main() {
     const tscCodes = new Set(tscDiags.map(d => d.code));
     const wasmCodes = new Set(wasmDiags.map(d => d.code));
     const extraCodes = [...wasmCodes].filter(code => !tscCodes.has(code));
+    const missingCodes = [...tscCodes].filter(code => !wasmCodes.has(code));
 
-    if (extraCodes.includes(2339)) {
+    if (reportExtra && extraCodes.includes(2339)) {
       const relPath = filePath.replace(CONFIG.conformanceDir + '/', '');
       const wasmMessages = wasmDiags.filter(d => d.code === 2339);
       console.log(`\n=== EXTRA TS2339: ${relPath} ===`);
@@ -227,18 +236,41 @@ async function main() {
       console.log('\nCode snippet:');
       const lines = cleanCode.split('\n');
       console.log(lines.slice(0, 30).map((l, i) => `${i + 1}: ${l}`).join('\n'));
-      matches.push({ path: relPath, messages: wasmMessages });
+      extraMatches.push({ path: relPath, messages: wasmMessages });
     }
 
-    if (matches.length >= maxSamples) {
+    if (reportMissing && missingCodes.includes(2339)) {
+      const relPath = filePath.replace(CONFIG.conformanceDir + '/', '');
+      const tscMessages = tscDiags.filter(d => d.code === 2339);
+      console.log(`\n=== MISSING TS2339: ${relPath} ===`);
+      console.log('TSC TS2339 errors:');
+      for (const m of tscMessages.slice(0, 5)) {
+        console.log(`  Line ${m.line}: ${m.message}`);
+      }
+      console.log('\nCode snippet:');
+      const lines = cleanCode.split('\n');
+      console.log(lines.slice(0, 30).map((l, i) => `${i + 1}: ${l}`).join('\n'));
+      missingMatches.push({ path: relPath, messages: tscMessages });
+    }
+
+    const totalMatches = extraMatches.length + missingMatches.length;
+    if (totalMatches >= maxSamples) {
       break;
     }
   }
 
   console.log('\n\n=== SUMMARY ===');
-  console.log(`Total files with extra TS2339: ${matches.length}`);
-  for (const m of matches) {
-    console.log(`  ${m.path}: ${m.messages.length} extra TS2339 errors`);
+  if (reportExtra) {
+    console.log(`Total files with extra TS2339: ${extraMatches.length}`);
+    for (const m of extraMatches) {
+      console.log(`  ${m.path}: ${m.messages.length} extra TS2339 errors`);
+    }
+  }
+  if (reportMissing) {
+    console.log(`Total files with missing TS2339: ${missingMatches.length}`);
+    for (const m of missingMatches) {
+      console.log(`  ${m.path}: ${m.messages.length} missing TS2339 errors`);
+    }
   }
   process.exit(0);
 }
