@@ -98,3 +98,9 @@ No
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/anvil-5`
 - **NEVER edit**: `DIRECTOR_AGENT.md`, `SQUAD_LEAD_AGENT.md`, `MANAGER_AGENT.md`, `AGENTS.md`, `start_*.sh`
+# Worker 5 Plan
+
+## Current Assignment (2026-01-11)
+- Reduce TS2355 false positives: run `node wasm/differential-test/conformance-runner.mjs types/contextualTypes/asyncFunctions --max=200 -v | rg TS2355` (or another targeted subset) and pick one sample.
+- Add a regression in `wasm/src/checker/control_flow_tests.rs` or `wasm/src/thin_checker_tests.rs`, then fix control-flow handling in `wasm/src/checker/control_flow.rs` / `wasm/src/thin_checker.rs`.
+- Run `./wasm/test.sh <new_test_name>` and report before/after TS2355 sample list.

@@ -98,3 +98,9 @@ No
 - Latest scan shows extra TS2304 still present in internalModules (4), moduleResolution (5), externalModules (26); ambient had 0.
 - Nested namespace visibility + heritage literal + CommonJS globals fix landed with targeted tests.
 - Awaiting next assignment from EM-Anvil.
+# Worker 2 Plan
+
+## Current Assignment (2026-01-11)
+- Triage parser false positives (TS1005/TS1109/TS1068/TS1128): run `node wasm/differential-test/conformance-runner.mjs --max=200 -v 2>&1 | rg 'TS1005|TS1109|TS1068|TS1128'` and pick one concrete sample.
+- Add a regression in `wasm/src/thin_parser_tests.rs` and fix parsing in `wasm/src/thin_parser.rs`.
+- Run `./wasm/test.sh <new_test_name>` and report the sample outcome.
