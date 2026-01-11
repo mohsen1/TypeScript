@@ -5,13 +5,16 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 
 Status: Active
 Priority: 1
-## Current Assignment (2026-01-11 - COMPLETED)
+## Current Assignment (2026-01-11 - IN PROGRESS)
 - ✅ Fixed TS2304 for local variables in object literal methods
 - ✅ Added METHOD_DECLARATION binding in bind_node()
-- ✅ Added regression test and verified all binder tests pass
-- ✅ Pushed to worker/anvil-1
+- ✅ Rebuilt WASM package
+- ✅ Ran differential test: found 10 TS2304 false positives (down from hundreds)
+- ✅ Categorized TS2304 issues by root cause (parser issues, type parameter scope, other scope issues)
+- ⏳ Partial fix for type parameter scope resolution in get_type_from_type_reference_by_name
+- ⏳ Need additional fixes for complete type parameter coverage across all code paths
 
-Awaiting new assignment.
+Next steps: Complete type parameter scope resolution fix, add comprehensive regression test, measure impact.
 - Trace name resolution in `wasm/src/thin_binder.rs` and `wasm/src/thin_checker.rs` (module exports, namespace merges, global augmentation).
 - Add regression tests in `wasm/src/thin_checker_tests.rs` and report before/after TS2304 delta.
 
