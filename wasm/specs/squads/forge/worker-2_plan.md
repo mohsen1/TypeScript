@@ -7,18 +7,17 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-Fix TS2304 false positives caused by type-predicate parsing (asserts/`this is`) in type positions.
+Reduce remaining TS2304 false positives in heritage or decorator/noTypesAndSymbols cases.
 
 **Error Code:** TS2304 - "Cannot find name 'X'."
 
 **Impact:** Remaining TS2304 false positives after predicate + exports fixes.
 
 ### Steps
-1. **Reproduce** with `tests/cases/conformance/controlFlow/assertionTypePredicates1.ts` (look for parse + TS2304 noise).
-2. **Parse type predicates** in type positions: `x is T`, `asserts x is T`, and `asserts this is T`, including contextual `asserts`.
-3. **Confirm lowering** already handles `TYPE_PREDICATE` (no change needed unless missing).
-4. **Add tests** in `wasm/src/thin_checker_tests.rs` covering assertion predicates and missing-name behavior.
-5. **Run focused tests** with `./wasm/test.sh` and report delta.
+1. **Rebuild + scan**: `./wasm/build-wasm.sh` then `cd wasm/differential-test && node find-ts2304.mjs --max=1000 --samples=30`.
+2. **Pick top remaining pattern** (heritage null/namespace cycles or decorator/noTypesAndSymbols).
+3. **Implement fix** in `thin_checker.rs`/`thin_parser.rs` and add a focused regression test.
+4. **Run focused tests** with `./wasm/test.sh` and report delta.
 
 ### Key Files
 - `wasm/src/thin_checker.rs`
@@ -31,16 +30,16 @@ Fix TS2304 false positives caused by type-predicate parsing (asserts/`this is`) 
 
 ## Resume Notes
 - Branch: `worker/forge-2`.
-- Latest commit: `[wasm] parser: treat asserts as type name keyword`
-- Recent changes: Allowed `asserts` to parse as a type name keyword when not used as a predicate, avoiding parse errors in non-predicate type positions.
-- Last tests: `./wasm/test.sh test_type_predicate_return_no_ts2304` (pass), `./wasm/test.sh test_type_predicate_this_return_no_ts2304` (pass)
-- **Latest TS2304 conformance scan results:** Not rerun after asserts parsing change (last run timed out at 200s; partial results still show heritage null/namespace cycles, catch/flow false positives, decorator/noTypesAndSymbols cases).
+- Latest commit: `[wasm] parser: treat heritage literals as expressions`
+- Recent changes: Parsed heritage literals (null/true/false/etc) as expressions to avoid TS2304 when extending null; added `test_extends_null_no_2304`.
+- Last tests: `./wasm/test.sh test_extends_null_no_2304` (pass)
+- **Latest TS2304 conformance scan results:** After rebuild, `find-ts2304.mjs --max=1000 --samples=30` timed out at 200s; partial results still show heritage null/namespace cycles and decorator/noTypesAndSymbols cases (scan captured before the extends-null fix).
 - Conformance scan command: `cd wasm/differential-test && node find-ts2304.mjs --max=1000 --samples=30`
 - Remember: do not touch `.role/AGENTS.md`.
 
 ## Task Queue
-- Investigate remaining TS2304 in heritage cycles and invalid heritage literals (null/undefined).
-- Re-run conformance scan after rebuild to confirm asserts/`this is` predicate fixes (and catch variable scoping).
+- Re-run conformance scan after rebuild to confirm extends-null fix.
+- Investigate remaining TS2304 in heritage cycles/namespace resolution.
 - Review TS2304 in decorator/noTypesAndSymbols cases.
 
 ## Completed
@@ -81,6 +80,7 @@ Fix TS2304 false positives caused by type-predicate parsing (asserts/`this is`) 
 - Allowed type predicates in `parse_type` to avoid TS2304 for `asserts`/`is` in parameter types.
 - Added `exports` to known global values and tests covering switch-case, type predicate params, and exports.
 - Added contextual `asserts` parsing for type predicates in type positions and tests for asserts return types + `this is`.
+- Parsed heritage literals as expressions to avoid TS2304 for `extends null`; added `test_extends_null_no_2304`.
 
 ## Ready for Merge
 No
