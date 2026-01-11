@@ -1,6 +1,7 @@
 //! Tests for ThinChecker - Type checker using ThinNodeArena and Solver
 
 use crate::thin_checker::ThinCheckerState;
+use crate::thin_parser::ThinParserState;
 use crate::parser::thin_node::ThinNodeArena;
 use crate::thin_binder::ThinBinderState;
 use crate::thin_parser::ThinParserState;
@@ -11578,10 +11579,11 @@ const animal = createAnimal(Animal); // Passing abstract class as value should b
 
     let error_count = checker.ctx.diagnostics.len();
 
-    // typeof class types now work correctly - expect 0 errors
+    // Fixed: Abstract constructor assignability now works correctly
+    // Concrete class constructors can be assigned to abstract class constructor types
     if error_count != 0 {
         eprintln!("=== Abstract Constructor Assignability Diagnostics ===");
-        eprintln!("Expected 0 errors (typeof class fixed), got {}", error_count);
+        eprintln!("Expected 0 errors, got {}", error_count);
         for diag in &checker.ctx.diagnostics {
             eprintln!("[{}] {}", diag.start, diag.message_text);
         }
@@ -11589,7 +11591,7 @@ const animal = createAnimal(Animal); // Passing abstract class as value should b
 
     assert_eq!(
         error_count, 0,
-        "Expected 0 errors (typeof class now works): {:?}",
+        "Expected 0 errors (abstract constructor assignability fixed): {:?}",
         checker.ctx.diagnostics
     );
 }
@@ -17378,35 +17380,19 @@ function f1<T extends string | undefined>(x: T): string {
 }
 
 #[test]
-<<<<<<< HEAD
-fn test_private_accessor_via_local_variable_no_error() {
-    use crate::thin_parser::ThinParserState;
-
-=======
 fn test_closure_captured_private_accessor_debug() {
     // Test case matching exact failing conformance test scenario
->>>>>>> origin/worker/anvil-3
     let source = r#"
 class A2 {
     get #prop() { return ""; }
     set #prop(param: string) { }
-<<<<<<< HEAD
 
-    constructor() {
-        console.log(this.#prop);
-        let a: A2 = this;
-        a.#prop;
-        function foo() {
-            a.#prop;
-=======
-    
     constructor() {
         console.log(this.#prop); // Direct - should work
         let a: A2 = this;
         a.#prop; // Same context - should work
         function foo() {
             a.#prop; // Closure captured - currently fails but shouldn't
->>>>>>> origin/worker/anvil-3
         }
     }
 }
@@ -17414,8 +17400,6 @@ class A2 {
 
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
-<<<<<<< HEAD
-    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
 
     let mut binder = ThinBinderState::new();
     binder.bind_source_file(parser.get_arena(), root);
@@ -17433,6 +17417,70 @@ class A2 {
         ts2339_errors.is_empty(),
         "Expected no TS2339 error for private accessor via local variable, got errors: {:?}",
         ts2339_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn test_class_constructor_without_new_emits_ts2348() {
+    use crate::thin_parser::ThinParserState;
+
+    // Regression test for TS2348: calling class constructor without 'new'
+    // When a class constructor is called without 'new', should emit TS2348
+    // (Cannot invoke an expression whose type lacks a call signature)
+    // instead of TS2769 (No overload matches this call)
+    let code = r#"
+namespace Tools {
+    export class NullLogger { }
+}
+
+// Calling class constructor without 'new' - should emit TS2348
+var logger = Tools.NullLogger();
+
+// Another case with a class that has a constructor
+class MyClass {
+    constructor(x: string) { }
+}
+
+// Should also emit TS2348
+var instance = MyClass();
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2348_errors: Vec<_> = checker.ctx.diagnostics.iter().filter(|d| d.code == 2348).collect();
+    let ts2769_errors: Vec<_> = checker.ctx.diagnostics.iter().filter(|d| d.code == 2769).collect();
+
+    // Should have TS2348 errors
+    assert!(
+        ts2348_errors.len() >= 2,
+        "Should emit TS2348 for class constructor without new, got {} TS2348 errors: {:?}",
+        ts2348_errors.len(),
+        ts2348_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>()
+    );
+
+    // Should NOT have TS2769 errors
+    assert!(
+        ts2769_errors.is_empty(),
+        "Should not emit TS2769 for class constructor without new, got {} TS2769 errors: {:?}",
+        ts2769_errors.len(),
+        ts2769_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>()
+    );
+
+    // Verify the message contains helpful text
+    let first_error_msg = &ts2348_errors[0].message_text;
+    assert!(
+        first_error_msg.contains("lacks a call signature"),
+        "TS2348 message should mention 'lacks a call signature', got: {}",
+        first_error_msg
     );
 }
 
@@ -17788,3 +17836,55 @@ function test2(obj: A & { c: boolean }) {
 }
 =======
 >>>>>>> origin/worker/anvil-3
+=======
+fn test_overload_arg_count_exceeds_all_only_ts2554_not_ts2769() {
+    use crate::thin_parser::ThinParserState;
+
+    // Regression test for overload calls where argument count exceeds ALL signatures
+    // When all overloads fail due to argument count mismatch, should emit TS2554 only, not TS2769
+    let code = r#"
+declare function mixed(x: string): void;
+declare function mixed(x: number, y: number): void;
+
+// This call has 3 arguments, which exceeds both overloads (1 param and 2 params)
+// Should emit TS2554 (argument count mismatch) only, not TS2769
+mixed(42, 99, 100);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2554_errors: Vec<_> = checker.ctx.diagnostics.iter().filter(|d| d.code == 2554).collect();
+    let ts2769_errors: Vec<_> = checker.ctx.diagnostics.iter().filter(|d| d.code == 2769).collect();
+
+    // Should have TS2554 (argument count mismatch)
+    assert!(
+        !ts2554_errors.is_empty(),
+        "Should emit TS2554 for argument count mismatch when all overloads fail due to arg count"
+    );
+
+    // Should NOT have TS2769 (No overload matches)
+    assert!(
+        ts2769_errors.is_empty(),
+        "Should not emit TS2769 when all overloads fail due to argument count mismatch, got {} TS2769 errors: {:?}",
+        ts2769_errors.len(),
+        ts2769_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>()
+    );
+
+    // Verify TS2554 message
+    let first_error_msg = &ts2554_errors[0].message_text;
+    assert!(
+        first_error_msg.contains("Expected") && first_error_msg.contains("arguments"),
+        "TS2554 message should mention expected arguments, got: {}",
+        first_error_msg
+    );
+}
+>>>>>>> origin/worker/anvil-4

@@ -1458,6 +1458,14 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
 
     /// Resolve a call to a callable type (with overloads).
     fn resolve_callable_call(&mut self, callable: &CallableShape, arg_types: &[TypeId]) -> CallResult {
+        // If there are no call signatures at all, this type is not callable
+        // (e.g., a class constructor without call signatures)
+        if callable.call_signatures.is_empty() {
+            return CallResult::NotCallable {
+                type_id: self.interner.callable(callable.clone()),
+            };
+        }
+
         if callable.call_signatures.len() == 1 {
             let sig = &callable.call_signatures[0];
             let func = FunctionShape {
