@@ -2429,7 +2429,7 @@ impl<'a> PropertyAccessEvaluator<'a> {
                 let elements = self.interner.tuple_list(elements);
                 self.tuple_element_union(&elements)
             }
-            _ => TypeId::ANY,
+            _ => TypeId::ERROR, // Return ERROR instead of ANY for non-array/tuple types
         }
     }
 
