@@ -127,17 +127,19 @@ The `CompatChecker` in `src/solver/` needs to implement the "Unsoundness Catalog
 
 
 ## Executive Summary (Director report)
-Last updated: 2026-01-11 19:09 (Fifteenth Director Loop - Forge Squad Surge!)
+Last updated: 2026-01-11 19:24 (Sixteenth Director Loop - TS2339 BREAKTHROUGH!)
 
-### System Status: 🟢🟢 EXCELLENT - 4 Workers Active!
+### System Status: 🟢🟢 EXCELLENT - Anvil Squad Wakes Up!
 
 **Organization Health:**
 - BOTH squads merged into rust ✅
-- **Wake-up prompts VERY EFFECTIVE:** Forge-3, Forge-4 responded!
-- **4/10 workers active:** Forge-1, Forge-3, Forge-4, Forge-5
-- Forge squad LEADING the charge!
-- Conformance: Exact Match 30.8% (↑ 7.5%), Missing 57.8% (↓ 10.4%)
-- Still 6 workers idle (29-318m)
+- **🎉 BREAKTHROUGH:** TS2339 private members 100% fixed!
+  - Originally 10 files with 36 extra errors
+  - After fix: 0 files with extra TS2339 errors
+- **Anvil squad WOKE UP:** Anvil-2 (66m→9m), Anvil-3 (267m→2m!)
+- Active workers: Anvil-2, Anvil-3, Forge-1 (3/10)
+- Worker merges: forge-3, forge-4 → squad/forge
+- Still 7 workers idle (9-331m)
 - Build passing
 
 ### Conformance Metrics (Primary KPI)
@@ -164,6 +166,22 @@ Last updated: 2026-01-11 19:09 (Fifteenth Director Loop - Forge Squad Surge!)
 - W3: TS2339 Closure Narrowing - Active
 - W4: TS2769 Overload Matching Continuation - Active
 - W5: TS2322 False Positive Reduction (101 occurrences) - Active
+
+### Recent Progress (Jan 11 19:24 - Sixteenth Director Loop - TS2339 BREAKTHROUGH!)
+- **🎉 BREAKTHROUGH:** TS2339 private members 100% fixed!
+  - Anvil-3: "0 extra TS2339 errors in 300 samples!"
+  - Originally: 10 files with 36 errors
+  - After fix: 0 files with extra TS2339 errors
+  - Private member access through captured variables FIXED
+  - Nominal typing with private brand comparison
+- **Anvil squad WOKE UP:** Anvil-2 (66m→9m), Anvil-3 (267m→2m!)
+  - Anvil-2: Three more parser recovery patterns (TS1005/TS1068)
+  - Anvil-3: Documented TS2339 breakthrough
+- **Worker Merges:**
+  - worker/forge-4: TS2339 private field assignability fix
+  - worker/forge-3: TS7010 async getter + TS2300 constructor fixes
+- **Active:** 3/10 workers (Anvil-2, Anvil-3, Forge-1)
+- **Still Idle:** 7 workers (9-331m)
 
 ### Recent Progress (Jan 11 19:09 - Fifteenth Director Loop - Forge Squad Surge!)
 - **🚀 MAJOR SURGE:** 4/10 workers now active! (Forge-1, Forge-3, Forge-4, Forge-5)
