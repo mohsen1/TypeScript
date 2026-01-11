@@ -4064,6 +4064,7 @@ impl<'a> ThinCheckerState<'a> {
         let mut accessors: FxHashMap<Atom, AccessorAggregate> = FxHashMap::default();
         let mut static_string_index: Option<crate::solver::IndexSignature> = None;
         let mut static_number_index: Option<crate::solver::IndexSignature> = None;
+        let mut has_static_nominal_members = false;
 
         for &member_idx in &class.members.nodes {
             let Some(member_node) = self.ctx.arena.get(member_idx) else {
@@ -4078,8 +4079,8 @@ impl<'a> ThinCheckerState<'a> {
                     if !self.has_static_modifier(&prop.modifiers) {
                         continue;
                     }
-                    if self.is_private_identifier_name(prop.name) {
-                        continue;
+                    if self.member_requires_nominal(&prop.modifiers, prop.name) {
+                        has_static_nominal_members = true;
                     }
                     let Some(name) = self.get_property_name(prop.name) else {
                         continue;
@@ -4109,8 +4110,8 @@ impl<'a> ThinCheckerState<'a> {
                     if !self.has_static_modifier(&method.modifiers) {
                         continue;
                     }
-                    if self.is_private_identifier_name(method.name) {
-                        continue;
+                    if self.member_requires_nominal(&method.modifiers, method.name) {
+                        has_static_nominal_members = true;
                     }
                     let Some(name) = self.get_property_name(method.name) else {
                         continue;
@@ -4138,8 +4139,8 @@ impl<'a> ThinCheckerState<'a> {
                     if !self.has_static_modifier(&accessor.modifiers) {
                         continue;
                     }
-                    if self.is_private_identifier_name(accessor.name) {
-                        continue;
+                    if self.member_requires_nominal(&accessor.modifiers, accessor.name) {
+                        has_static_nominal_members = true;
                     }
                     let Some(name) = self.get_property_name(accessor.name) else {
                         continue;

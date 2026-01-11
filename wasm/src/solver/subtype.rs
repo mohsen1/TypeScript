@@ -2217,9 +2217,18 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             }
         }
 
-        // Check properties (if any)
+        // Check properties (if any), excluding private fields (starting with #)
+        // Private fields should not affect structural typing for constructor types
+        let source_props: Vec<_> = source.properties.iter()
+            .filter(|p| !self.interner.resolve_atom(p.name).starts_with('#'))
+            .cloned()
+            .collect();
+        let target_props: Vec<_> = target.properties.iter()
+            .filter(|p| !self.interner.resolve_atom(p.name).starts_with('#'))
+            .cloned()
+            .collect();
         if !self
-            .check_object_subtype(&source.properties, None, &target.properties)
+            .check_object_subtype(&source_props, None, &target_props)
             .is_true()
         {
             return SubtypeResult::False;
