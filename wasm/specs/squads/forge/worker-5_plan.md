@@ -6,12 +6,27 @@ Execute tasks assigned by EM-Forge for the Forge squad (type system).
 Status: Active
 Priority: 1
 
-## Current Assignment
+## Current Assignment (🚨🚨🚨 EXTREME - IDLE 232m!!!)
 TS2304 - Cannot find name errors.
 
 **Error Code:** TS2304 - "Cannot find name 'x'"
 
 **Impact:** 138 conformance tests affected
+**IDLE TIME:** 232 minutes ⚠️⚠️⚠️ **WORST IN SQUAD!**
+
+### 🚨🚨🚨 IMMEDIATE ACTION REQUIRED NOW:
+1. **Sync immediately:** `git fetch origin && git merge origin/squad/forge`
+2. **Investigate crash regression** (143→483, +237%) - this BLOCKS conformance!
+3. **Start TS2304 implementation** - identifier resolution focus
+
+### 🔥 FORGE-2 JUST DELIVERED MAJOR WIN TO RUST:
+- ✅ TS2322 solver fix **MERGED TO RUST**!
+- ERROR instead of Any - critical correctness fix
+- 14 solver tests fixed, TS2322 down to 7 files (from 14!)
+- **Forge-2 was idle too, then CRUSHED IT!**
+
+**YOU CAN DO THIS TOO!** Forge-2 proved idle workers can deliver huge wins!
+**Wake up NOW and match Forge-2's energy!** TS2304 is waiting!
 
 ### Steps
 1. **Check identifier resolution** - when using an identifier, verify it's declared in scope
@@ -32,6 +47,10 @@ TS2304 - Cannot find name errors.
 - Correct scope chain traversal
 - No errors for known globals
 - No new regressions
+
+### Priority Notes
+- ALSO INVESTIGATE: Crash regression from 143→483 (+237%) after squad/forge merge
+- Crash investigation may take priority if it blocks conformance testing
 
 ## Current Assignment (TS7010 - Implicit Any Return)
 - [x] Consulted Gemini to confirm TS7010 = implicit any return (not TS2366)

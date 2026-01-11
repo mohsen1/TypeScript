@@ -109,14 +109,18 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
         };
         match self.resolve_function_call(&func, arg_types) {
             CallResult::Success(ret) => ret,
-            _ => TypeId::ANY,
+            // Return ERROR instead of ANY to avoid silencing TS2322 errors
+            CallResult::ArgumentTypeMismatch { .. } => TypeId::ERROR,
+            _ => TypeId::ERROR,
         }
     }
 
     pub fn infer_generic_function(&mut self, func: &FunctionShape, arg_types: &[TypeId]) -> TypeId {
         match self.resolve_function_call(func, arg_types) {
             CallResult::Success(ret) => ret,
-            _ => TypeId::ANY,
+            // Return ERROR instead of ANY to avoid silencing TS2322 errors
+            CallResult::ArgumentTypeMismatch { .. } => TypeId::ERROR,
+            _ => TypeId::ERROR,
         }
     }
 
@@ -266,14 +270,24 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                     self.checker.is_assignable_to(source, target)
                 }) {
                     Ok(ty) => ty,
-                    Err(_) => return CallResult::Success(TypeId::ANY),
+                    Err(_) => {
+                        // Inference from constraints failed - try fallback options
+                        // Use ERROR as ultimate fallback to avoid returning Any (which silences TS2322)
+                        if let Some(default) = tp.default {
+                            instantiate_type(self.interner, default, &final_subst)
+                        } else if let Some(constraint) = tp.constraint {
+                            instantiate_type(self.interner, constraint, &final_subst)
+                        } else {
+                            TypeId::ERROR
+                        }
+                    }
                 }
             } else if let Some(default) = tp.default {
                 instantiate_type(self.interner, default, &final_subst)
             } else if let Some(constraint) = tp.constraint {
                 instantiate_type(self.interner, constraint, &final_subst)
             } else {
-                TypeId::UNKNOWN
+                TypeId::ERROR
             };
 
             final_subst.insert(tp.name, ty);
@@ -281,7 +295,13 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
             if let Some(constraint) = tp.constraint {
                 let constraint_ty = instantiate_type(self.interner, constraint, &final_subst);
                 if !self.checker.is_assignable_to(ty, constraint_ty) {
-                    return CallResult::Success(TypeId::ANY);
+                    // Inferred type doesn't satisfy constraint - report as type mismatch
+                    // This allows the checker to emit TS2322 errors instead of silently accepting Any/ERROR
+                    return CallResult::ArgumentTypeMismatch {
+                        index: 0, // Placeholder - indicates a constraint violation occurred
+                        expected: constraint_ty,
+                        actual: ty,
+                    };
                 }
             }
         }
