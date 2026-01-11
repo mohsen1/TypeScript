@@ -6981,8 +6981,11 @@ impl<'a> ThinCheckerState<'a> {
                 type_id
             }
             PropertyAccessResult::PropertyNotFound { .. } => {
-                self.error_property_not_exist_at(&property_name.to_string(), object_type, idx);
-                return TypeId::ERROR;
+                // Don't emit TS2339 for private fields (starting with #) - they're handled elsewhere
+                if !property_name.starts_with('#') {
+                    self.error_property_not_exist_at(&property_name.to_string(), object_type, idx);
+                }
+                TypeId::ERROR
             }
             PropertyAccessResult::PossiblyNullOrUndefined { property_type, .. } => {
                 property_type.unwrap_or(TypeId::ANY)
