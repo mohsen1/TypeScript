@@ -7671,6 +7671,9 @@ impl<'a> ThinCheckerState<'a> {
             // Check that parameter default values are assignable to declared types (TS2322)
             self.check_parameter_initializers(&parameters.nodes);
 
+            // Check for duplicate parameter names (TS2300)
+            self.check_duplicate_parameters(&parameters.nodes);
+
             let mut has_contextual_return = false;
             if !has_type_annotation {
                 let return_context = ctx_helper.as_ref().and_then(|helper| helper.get_return_type());
@@ -11418,6 +11421,9 @@ impl<'a> ThinCheckerState<'a> {
 
                         // Check that parameter default values are assignable to declared types (TS2322)
                         self.check_parameter_initializers(&func.parameters.nodes);
+
+                        // Check for duplicate parameter names (TS2300)
+                        self.check_duplicate_parameters(&func.parameters.nodes);
 
                         if !has_type_annotation {
                             return_type = self.infer_return_type_from_body(func.body, None);
@@ -16321,6 +16327,104 @@ impl<'a> ThinCheckerState<'a> {
                 );
             }
         }
+    }
+
+    /// Check for duplicate parameter names (TS2300).
+    /// This checks both simple parameter names and names within destructuring patterns.
+    fn check_duplicate_parameters(&mut self, parameters: &[NodeIndex]) {
+        use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages, format_message};
+        use rustc_hash::FxHashMap;
+
+        let mut seen_names: FxHashMap<String, NodeIndex> = FxHashMap::default();
+
+        for &param_idx in parameters {
+            let Some(param_node) = self.ctx.arena.get(param_idx) else {
+                continue;
+            };
+            let Some(param) = self.ctx.arena.get_parameter(param_node) else {
+                continue;
+            };
+
+            // Skip 'this' parameter
+            if self.is_this_parameter_name(param.name) {
+                continue;
+            }
+
+            // Collect all names from this parameter (including destructured names)
+            self.collect_parameter_names(param.name, &mut seen_names);
+        }
+    }
+
+    /// Recursively collect parameter names from a binding pattern or identifier.
+    /// Reports TS2300 for duplicate names.
+    fn collect_parameter_names(&mut self, name_idx: NodeIndex, seen_names: &mut rustc_hash::FxHashMap<String, NodeIndex>) {
+        use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages, format_message};
+
+        if name_idx.is_none() {
+            return;
+        }
+
+        let Some(name_node) = self.ctx.arena.get(name_idx) else {
+            return;
+        };
+
+        match name_node.kind {
+            kind if kind == SyntaxKind::Identifier as u16 => {
+                // Simple identifier parameter
+                if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
+                    let name = ident.escaped_text.clone();
+                    if let Some(&first_occurrence) = seen_names.get(&name) {
+                        // Duplicate found - report error on both occurrences
+                        let message = format_message(diagnostic_messages::DUPLICATE_IDENTIFIER, &[&name]);
+                        self.error_at_node(name_idx, &message, diagnostic_codes::DUPLICATE_IDENTIFIER);
+                        // Also report on first occurrence if we haven't already
+                        if !self.has_error_at_node(first_occurrence, diagnostic_codes::DUPLICATE_IDENTIFIER) {
+                            self.error_at_node(first_occurrence, &message, diagnostic_codes::DUPLICATE_IDENTIFIER);
+                        }
+                    } else {
+                        seen_names.insert(name, name_idx);
+                    }
+                }
+            }
+            kind if kind == syntax_kind_ext::OBJECT_BINDING_PATTERN => {
+                // Object destructuring: { a, b: c, ...rest }
+                if let Some(pattern) = self.ctx.arena.get_binding_pattern(name_node) {
+                    for &element_idx in &pattern.elements.nodes {
+                        if let Some(element_node) = self.ctx.arena.get(element_idx) {
+                            if let Some(element) = self.ctx.arena.get_binding_element(element_node) {
+                                self.collect_parameter_names(element.name, seen_names);
+                            }
+                        }
+                    }
+                }
+            }
+            kind if kind == syntax_kind_ext::ARRAY_BINDING_PATTERN => {
+                // Array destructuring: [a, b, ...rest]
+                if let Some(pattern) = self.ctx.arena.get_binding_pattern(name_node) {
+                    for &element_idx in &pattern.elements.nodes {
+                        if let Some(element_node) = self.ctx.arena.get(element_idx) {
+                            if let Some(element) = self.ctx.arena.get_binding_element(element_node) {
+                                self.collect_parameter_names(element.name, seen_names);
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {
+                // Other kinds (like omitted array elements) - skip
+            }
+        }
+    }
+
+    /// Check if a node already has an error with a specific diagnostic code.
+    fn has_error_at_node(&self, node_idx: NodeIndex, code: u32) -> bool {
+        let Some((node_start, node_end)) = self.get_node_span(node_idx) else {
+            return false;
+        };
+
+        self.ctx.diagnostics.iter().any(|d| {
+            d.code == code && d.start == node_start && d.length == node_end.saturating_sub(node_start)
+        })
     }
 
     fn node_text(&self, node_idx: NodeIndex) -> Option<String> {
