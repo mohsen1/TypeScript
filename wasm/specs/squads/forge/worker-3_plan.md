@@ -1,6 +1,3 @@
-# Worker 3 Plan - Squad Forge
-
-## Mission
 Reduce TS2339 false positives via control flow narrowing.
 
 Status: Active
