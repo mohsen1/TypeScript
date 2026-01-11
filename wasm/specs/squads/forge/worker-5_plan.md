@@ -532,3 +532,77 @@ function f1<T extends string | undefined>(x: T, y: { a: T }, z: [T]): string {
 - `0d31b41c3a` - Add test for type parameter TS2304 resolution
 - `ac1d0138f8` - Add test for constrained type parameters
 
+
+### 🎯 CRITICAL FIX IMPLEMENTED (2026-01-11)
+
+**Root Cause Identified**: Type parameter constraints were resolved BEFORE type parameters were added to scope.
+
+**Bug Location**: `thin_checker.rs:2521-2543` (`push_type_parameters` function)
+
+**Problem**:
+```rust
+// OLD CODE - BROKEN
+for &param_idx in &list.nodes {
+    // This calls lower_type_parameter_info which resolves constraint IMMEDIATELY
+    if let Some((info, name)) = self.lower_type_parameter_info(param_idx) {
+        // T is added to scope AFTER constraint Box<T> was already resolved
+        let type_id = self.ctx.types.intern(TypeKey::TypeParameter(info.clone()));
+        let previous = self.ctx.type_parameter_scope.insert(name.clone(), type_id);
+    }
+}
+```
+
+When processing `T extends Box<T>`:
+1. Try to resolve constraint `Box<T>`
+2. Look up `T` in scope → NOT FOUND → TS2304 error
+3. Then add `T` to scope (too late!)
+
+**Solution**: Two-pass type parameter resolution
+
+```rust
+// NEW CODE - FIXED
+// Pass 1: Add all type parameters to scope WITHOUT constraints
+for &param_idx in &list.nodes {
+    let info = TypeParamInfo { name, constraint: None, default: None };
+    let type_id = self.ctx.types.intern(TypeKey::TypeParameter(info));
+    self.ctx.type_parameter_scope.insert(name.clone(), type_id);
+}
+
+// Pass 2: Now resolve constraints with all type parameters in scope
+for &param_idx in &param_indices {
+    let constraint = self.get_type_from_type_node(data.constraint); // T is now in scope!
+    params.push(TypeParamInfo { name, constraint, default });
+}
+```
+
+**Results**:
+- ✅ controlFlowGenericTypes.ts: **7 TS2304 errors → 0** (100% fixed)
+- ✅ All unit tests passing
+- ✅ No regressions
+- ✅ Minimal repro: `function g1<T extends Box<T>>(x: T)` now works
+
+**Test Coverage**:
+- `test_type_parameter_in_function_body_no_ts2304` ✅
+- `test_constrained_type_parameter_in_types_no_ts2304` ✅
+- `test_self_referential_type_constraint_no_ts2304` (NEW) ✅
+
+### Remaining TS2304 Issues (Lower Priority)
+
+1. **Private Names** (`privateNamesAndIndexedAccess.ts` - 1 error)
+   - Pattern: `C[#bar]` (private field indexed access)
+   - Status: Edge case, low priority
+
+2. **Constructor Parameters** (`initializerReferencingConstructorParameters.ts` - 11 errors)
+   - Pattern: `a = x; b: typeof x;` where x is constructor parameter
+   - Status: MAY BE CORRECT BEHAVIOR - parameters shouldn't be in initializer scope
+
+3. **Auto Accessors** (`staticAutoAccessorsWithDecorators.ts` - 3 errors)
+   - Pattern: `static accessor x = 1;`
+   - Status: Parser issue, separate from identifier resolution
+
+### Commits
+- `0d31b41c3a` - Add test for type parameter TS2304 resolution
+- `ac1d0138f8` - Add test for constrained type parameters  
+- `3f511a6ece` - Document TS2304 investigation findings
+- `25cf457016` - **CRITICAL FIX**: Self-referential type constraints (THIS FIX)
+
