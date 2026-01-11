@@ -7,13 +7,14 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- Awaiting next assignment from EM.
+- Awaiting next assignment from EM-Anvil.
 
 ## Task Queue
 - [x] Verify whether `types/mapped/recursiveMappedTypes.ts` still crashes; if so, capture stack and coordinate with Forge.
 
 
 ## Completed
+- [x] Fixed TS2355 for qualified Promise classes: Extended `promise_like_type_argument_from_base` to handle classes that extend Promise/PromiseLike. Added `promise_like_type_argument_from_class` to check class heritage clauses and extract type arguments with proper substitution. Added regression test `test_async_qualified_promise_class_no_2355` matching conformance tests `asyncQualifiedReturnType_es5.ts` and `asyncQualifiedReturnType_es6.ts`. TS2355 false positives reduced from 5 to 3 (40% reduction). Remaining 3 are legitimate (unresolvable imports from "missing" module). Commit: `94e36284e9`. Ran `./wasm/test.sh test_async_qualified_promise_class_no_2355` (PASS), and `node wasm/differential-test/find-ts2355.mjs --max=500 --samples=5`.
 - [x] Fixed TS2355 for async type alias returns: Fixed `promise_like_type_argument_from_alias` to handle Promise/PromiseLike types from lib by checking AST structure before lowering. Added regression test `test_async_alias_return_type_no_2355` matching conformance test `asyncAliasReturnType_es5.ts`. TS2355 false positives reduced from 10 to 5 (50% reduction). Remaining 5 are: imported unresolvable types (legitimate) and qualified names like `X.MyPromise<void>` (different issue). Also fixed build break from control_flow refactor. Commits: `d54611f310`, `3afa1f8d5d`. Ran `./wasm/test.sh test_async_alias_return_type_no_2355` (PASS), all async promise tests (PASS), and `node wasm/differential-test/find-ts2355.mjs --max=500 --samples=5`.
 - [x] TS2355 return-analysis: added catch-clause fallthrough handling, added `test_try_catch_no_2355`, and added `wasm/differential-test/find-ts2355.mjs` with sample collection. Samples (`--max=500 --samples=5`) still point to async Promise<void>/alias cases; total false positive files within 500 tests: 10 (no delta from sample set). Ran `./wasm/test.sh test_try_catch_no_2355` (PASS), `./wasm/build-wasm.sh`, and `node wasm/differential-test/find-ts2355.mjs --max=500 --samples=5` (output `/tmp/find_ts2355_samples_after.txt`).
 - [x] Quantified TS2304 extras in `internalModules`, `moduleResolution`, `externalModules` (max=200 each). Extra TS2304 counts: internalModules=5, moduleResolution=5, externalModules=26. Outputs: `/tmp/conformance_internalModules_ts2304.txt`, `/tmp/conformance_moduleResolution_ts2304.txt`, `/tmp/conformance_externalModules_ts2304.txt`.
