@@ -6841,6 +6841,45 @@ impl ThinParserState {
 
     /// Parse a type (handles keywords, type references, unions, intersections, conditionals)
     fn parse_type(&mut self) -> NodeIndex {
+        // Allow type predicate parsing in type positions to avoid cascading errors.
+        if self.is_identifier_or_keyword() || self.is_token(SyntaxKind::ThisKeyword) {
+            let snapshot = self.scanner.save_state();
+            let current = self.current_token;
+
+            self.next_token();
+            let is_predicate = self.is_token(SyntaxKind::IsKeyword);
+            self.scanner.restore_state(snapshot);
+            self.current_token = current;
+
+            if is_predicate {
+                let name = self.parse_type_predicate_parameter_name();
+                let start_pos = if let Some(node) = self.arena.get(name) {
+                    node.pos
+                } else {
+                    self.token_pos()
+                };
+
+                self.next_token(); // consume 'is'
+                let type_node = self.parse_type();
+                let end_pos = self.token_end();
+
+                return self.arena.add_type_predicate(
+                    syntax_kind_ext::TYPE_PREDICATE,
+                    start_pos,
+                    end_pos,
+                    crate::parser::thin_node::TypePredicateData {
+                        asserts_modifier: false,
+                        parameter_name: name,
+                        type_node,
+                    },
+                );
+            }
+        }
+
+        if self.is_token(SyntaxKind::AssertsKeyword) {
+            return self.parse_asserts_type_predicate();
+        }
+
         self.parse_conditional_type()
     }
 

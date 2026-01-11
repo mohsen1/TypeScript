@@ -14288,6 +14288,99 @@ type Foo = {
 }
 
 #[test]
+fn test_switch_case_param_reference_no_ts2304() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+function area(s: { kind: "square"; size: number } | { kind: "circle"; radius: number }) {
+    switch (s.kind) {
+        case "square":
+            return s.size * s.size;
+        case "circle":
+            return s.radius * s.radius;
+        default:
+            return 0;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2304),
+        "Unexpected TS2304 for switch case param references, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_type_predicate_param_type_no_ts2304() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Wat {
+    set p1(x: this is string) {}
+    set p2(x: asserts this is string) {}
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2304),
+        "Unexpected TS2304 for type predicate parameter types, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_exports_reference_no_ts2304() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+exports.foo = 1;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2304),
+        "Unexpected TS2304 for exports reference, got: {:?}",
+        codes
+    );
+}
+
+#[test]
 fn test_mapped_type_param_no_ts2304() {
     use crate::thin_parser::ThinParserState;
 

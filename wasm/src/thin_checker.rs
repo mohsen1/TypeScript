@@ -10326,6 +10326,7 @@ impl<'a> ThinCheckerState<'a> {
                 | "fetch" | "setTimeout" | "setInterval" | "clearTimeout" | "clearInterval"
                 | "queueMicrotask" | "structuredClone" | "atob" | "btoa"
                 | "performance" | "crypto" | "navigator" | "location" | "history"
+                | "exports"
         )
     }
 
