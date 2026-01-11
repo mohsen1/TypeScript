@@ -87,6 +87,6 @@ Yes
 - **NEVER edit**: `STRUCTURE.md`, `GOALS.md`, other workers' plan files, or anything in `orchestrator/`
 
 ## Resume
-- Branch/state: `worker/forge-4`, changes pending commit/push.
+- Branch/state: `worker/forge-4`, changes committed/pushed, ready for merge.
 - Session work: fix duplicate identifier handling for accessors (GET/SET excludes) to allow getter+setter pairs; added class accessor tests.
 - Unit tests: `./wasm/test.sh class_accessor_pair_no_duplicate_2300`; `./wasm/test.sh class_duplicate_getter_2300`; `./wasm/test.sh compile_class_accessors`.
