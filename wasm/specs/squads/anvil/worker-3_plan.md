@@ -399,28 +399,36 @@ Ready for Merge: Yes
 - Commit: 6b9431de62
 
 ### Investigation Update (2026-01-11 PM)
-**Status:** Root cause identified - is_assignable_to fails for private property access
+**Status:** FIX IMPLEMENTED - 5 files resolved, 5 remaining
 
-**Scan Results (1000 samples):**
-- 36 extra TS2339 errors across 10 files
-- 25 errors: Private member access through variables/static members/generic classes
-- 11 errors: Mixin class property inheritance
+**Scan Results (post-fix, 1000 samples):**
+- 5 files with extra TS2339 errors (down from 10!)
+- ~25 errors remaining (down from 36)
 
-**Root Cause:**
-In `wasm/src/thin_checker.rs:6924`, the check `is_assignable_to(object_type_for_check, declaring_type)` fails even when both types represent the same class. The error messages show properties ARE in types:
+**FIXED (5 files, ~11 errors):**
+- ✅ `privateNameAccessorsAccess.ts` - 1 error
+- ✅ `privateNameMethodAccess.ts` - 1 error
+- ✅ `privateNameStaticAccessorsAccess.ts` - 1 error
+- ✅ `privateNameStaticFieldDerivedClasses.ts` - 2 errors
+- ✅ `privateNamesInGenericClasses.ts` - 6 errors
 
-```
-Property '#prop' does not exist on type '{ readonly __private_brand_1: any; #prop: string }'.
-```
+**Remaining (5 files, ~14 errors):**
+- `privateNameStaticFieldDestructuredBinding.ts` - 10 errors
+- `privateNameStaticMethodAssignment.ts` - 4 errors
+- `mixinAbstractClasses.ts` - 3 errors
+- `mixinClassesAnnotated.ts` - 2 errors
+- `mixinClassesMembers.ts` - 6 errors
 
-**Affected Patterns:**
-1. `let a: A2 = this; a.#prop;` - variable capture in closures
-2. `let a: typeof A2 = A2; a.#prop;` - static private access
-3. Private members in generic classes (`C<T>`)
-4. Destructuring with private members
+**Fix Implementation (commit 63395db37e):**
+1. Added `get_private_brand()` - extracts private brand from Object/Callable types
+2. Added `types_have_same_private_brand()` - nominal type comparison
+3. Added `get_type_of_property_access_by_name()` - direct property lookup
+4. Modified `get_type_of_private_property_access()`:
+   - When `symbols` is empty, check if property exists in object type
+   - Use private brand comparison for type compatibility (nominal typing)
+   - Handle both instance (Object) and static (Callable) private brands
 
 **Next Steps:**
-1. Fix `is_assignable_to` to recognize same-class private member access
-2. Ensure nominal type equality for private member accessibility
-3. Add regression tests for all affected patterns
-4. Fix mixin property inheritance (11 errors)
+1. Fix remaining private name errors (destructuring, assignment)
+2. Fix mixin property inheritance (11 errors)
+3. Add comprehensive regression tests
