@@ -7,25 +7,25 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-Reduce remaining TS2304 missing-name false positives.
+Reduce remaining TS2304 false positives in heritage/decorator/noTypesAndSymbols cases.
 
 **Error Code:** TS2304 - "Cannot find name 'X'."
 
-**Impact:** 30 false positives in 1000-file scan (Promise/await resolved; remaining in heritage/literal/parse contexts)
+**Impact:** Remaining TS2304 false positives after predicate + exports fixes.
 
 ### Steps
-1. **Run a scan**: `cd wasm/differential-test && node find-ts2304.mjs --max=1000 --samples=30` (done; timed out at 180s, partial results captured).
-2. **Pick top missing-name pattern** (done: builtin/global types + missing-name scope for signature type params).
-3. **Implement the fix** in `thin_checker.rs`/`binder.rs` and add a focused regression test (done).
-4. **Run focused tests** with `./wasm/test.sh` and report delta (done; see Resume Notes).
+1. **Re-run scan**: `cd wasm/differential-test && node find-ts2304.mjs --max=1000 --samples=30` (after `./wasm/build-wasm.sh`).
+2. **Pick top remaining pattern** (heritage null/namespace cycles or decorator/noTypesAndSymbols).
+3. **Implement fix** in `thin_checker.rs`/`thin_parser.rs` and add a focused regression test.
+4. **Run focused tests** with `./wasm/test.sh` and report delta.
 
 ### Key Files
 - `wasm/src/thin_checker.rs`
-- `wasm/src/binder.rs`
+- `wasm/src/thin_parser.rs`
 - `wasm/src/thin_checker_tests.rs`
 
 ### Success Criteria
-- TS2304 false positives reduced for the selected pattern
+- TS2304 false positives reduced for selected remaining pattern
 - No new regressions in existing TS2304 tests
 
 ## Resume Notes
@@ -39,8 +39,7 @@ Reduce remaining TS2304 missing-name false positives.
 
 ## Task Queue
 - Investigate remaining TS2304 in heritage cycles and invalid heritage literals (null/undefined).
-- Fix TS2304 for type predicate parsing (`asserts`/`is`) if parser is mis-tokenizing.
-- Review TS2304 in private name + decorator/noTypesAndSymbols cases.
+- Review TS2304 in decorator/noTypesAndSymbols cases.
 
 ## Completed
 - Implemented property access on constrained type parameters in checker and solver.
@@ -78,7 +77,7 @@ Reduce remaining TS2304 missing-name false positives.
 - Added tests for builtin types in type literals and expanded builtin coverage (Promise/NonNullable/PropertyKey/etc).
 
 ## Ready for Merge
-Yes
+No
 
 ## Notes
 - **Post-merge test status:** 68 unit test failures after merging origin/rust + origin/squad/forge
