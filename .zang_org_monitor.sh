@@ -168,7 +168,7 @@ while tmux has-session -t "$SESSION" 2>/dev/null; do
 
       if [ "$threshold" -gt 0 ] && [ "$idle" -ge "$threshold" ]; then
         poke=$(get_poke_message "$window" "$pane")
-        tmux send-keys -t "$SESSION:$window.$pane" "$poke"
+        tmux send-keys -t "$SESSION:$window.$pane" "$poke"; sleep 2  # CRITICAL: Wait for Codex to process
         sleep "$SEND_ENTER_PAUSE"
         tmux send-keys -t "$SESSION:$window.$pane" C-m
         set_last_change "$key" "$now"

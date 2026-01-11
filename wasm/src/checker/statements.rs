@@ -5,6 +5,7 @@
 
 use crate::parser::NodeIndex;
 use crate::parser::syntax_kind_ext;
+use super::control_flow;
 use super::context::CheckerContext;
 
 /// Statement type checker that operates on the shared context.
@@ -63,6 +64,16 @@ impl<'a, 'ctx> StatementChecker<'a, 'ctx> {
                 // Unhandled statement types - will be expanded incrementally
             }
         }
+    }
+
+    /// Check whether a function body can fall through to the end.
+    pub fn function_body_falls_through(&self, body_idx: NodeIndex) -> bool {
+        control_flow::function_body_falls_through(self.ctx.arena, body_idx)
+    }
+
+    /// Check whether a statement can fall through to the next statement.
+    pub fn statement_falls_through(&self, stmt_idx: NodeIndex) -> bool {
+        control_flow::statement_falls_through(self.ctx.arena, stmt_idx)
     }
 
     /// Check a block statement.
