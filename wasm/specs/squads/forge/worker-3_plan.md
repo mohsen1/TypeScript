@@ -133,6 +133,25 @@ TS7010 - Implicit any return type errors (42→40 FP fixed, investigating remain
 ## Ready for Merge
 Yes
 
+### TS7010 Work (IN PROGRESS)
+- [x] Created `find-ts7010.mjs` differential test tool (already exists)
+- [x] Analyzed baseline: 42 extra (false positives), 15 missing
+- [x] Fixed async getter false positives - changed infer_getter_return_type to return void instead of any
+- [x] Updated initial return type for getters without annotation from any to void
+- TS7010 results (500 conformance tests):
+  * Before: 42 extra (false positives), 15 missing
+  * After: 40 extra (false positives), 15 missing
+  * **Improvement: Reduced false positives by 2 (async getter cases)**
+- Remaining 40 false positives:
+  * async function declarations
+  * class expressions
+  * constructor declarations
+  * accessibility modifiers
+- Remaining 15 missing:
+  * 9 abstract class cases (need investigation)
+  * 6 other cases
+- Tests: `./wasm/test.sh` (TS7010 tests to be added)
+
 ## Notes
 - Similar infrastructure to TS2564 (property init) - share patterns with Workers 1-2
 - Control flow analysis already exists in `control_flow.rs` - extend it
