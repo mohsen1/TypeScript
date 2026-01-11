@@ -2212,6 +2212,47 @@ class D extends (null) {}
 }
 
 #[test]
+fn test_decorator_invalid_declarations_no_ts2304() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+declare function dec<T>(target: T): T;
+
+@dec
+enum E {}
+
+@dec
+interface I {}
+
+@dec
+namespace M {}
+
+@dec
+type T = number;
+
+@dec
+var x: number;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2304),
+        "Unexpected TS2304 for invalid decorator declarations, got: {:?}",
+        codes
+    );
+}
+
+#[test]
 fn test_abstract_class_in_local_scope_2511() {
     use crate::thin_parser::ThinParserState;
     use crate::binder::symbol_flags;

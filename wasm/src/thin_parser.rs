@@ -1817,6 +1817,21 @@ impl ThinParserState {
                 // Full decorator support would need function modifications
                 self.parse_function_declaration()
             }
+            SyntaxKind::EnumKeyword => {
+                self.parse_enum_declaration_with_modifiers(start_pos, decorators)
+            }
+            SyntaxKind::InterfaceKeyword => {
+                self.parse_interface_declaration_with_modifiers(start_pos, decorators)
+            }
+            SyntaxKind::TypeKeyword => {
+                self.parse_type_alias_declaration_with_modifiers(start_pos, decorators)
+            }
+            SyntaxKind::NamespaceKeyword | SyntaxKind::ModuleKeyword => {
+                self.parse_module_declaration_with_modifiers(start_pos, decorators)
+            }
+            SyntaxKind::VarKeyword | SyntaxKind::LetKeyword | SyntaxKind::ConstKeyword => {
+                self.parse_variable_statement_with_modifiers(Some(start_pos), decorators)
+            }
             SyntaxKind::ExportKeyword => {
                 // Export with decorators: @decorator export class Foo {}
                 self.parse_export_declaration()
@@ -2763,6 +2778,15 @@ impl ThinParserState {
     /// Parse interface declaration
     fn parse_interface_declaration(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
+        self.parse_interface_declaration_with_modifiers(start_pos, None)
+    }
+
+    /// Parse interface declaration with explicit modifiers
+    fn parse_interface_declaration_with_modifiers(
+        &mut self,
+        start_pos: u32,
+        modifiers: Option<NodeList>,
+    ) -> NodeIndex {
         self.parse_expected(SyntaxKind::InterfaceKeyword);
 
         // Parse interface name - keywords like 'string', 'abstract' can be used as interface names
@@ -2820,7 +2844,7 @@ impl ThinParserState {
             start_pos,
             end_pos,
             crate::parser::thin_node::InterfaceData {
-                modifiers: None,
+                modifiers,
                 name,
                 type_parameters,
                 heritage_clauses,
@@ -3227,6 +3251,14 @@ impl ThinParserState {
     /// Parse type alias declaration: type Foo = ... or type Foo<T> = ...
     fn parse_type_alias_declaration(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
+        self.parse_type_alias_declaration_with_modifiers(start_pos, None)
+    }
+
+    fn parse_type_alias_declaration_with_modifiers(
+        &mut self,
+        start_pos: u32,
+        modifiers: Option<NodeList>,
+    ) -> NodeIndex {
         self.parse_expected(SyntaxKind::TypeKeyword);
 
         let name = self.parse_identifier();
@@ -3250,7 +3282,7 @@ impl ThinParserState {
             start_pos,
             end_pos,
             crate::parser::thin_node::TypeAliasData {
-                modifiers: None,
+                modifiers,
                 name,
                 type_parameters,
                 type_node,
@@ -3403,7 +3435,14 @@ impl ThinParserState {
     /// Parse module or namespace declaration: module "name" { } or namespace X { }
     fn parse_module_declaration(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
+        self.parse_module_declaration_with_modifiers(start_pos, None)
+    }
 
+    fn parse_module_declaration_with_modifiers(
+        &mut self,
+        start_pos: u32,
+        modifiers: Option<NodeList>,
+    ) -> NodeIndex {
         // Skip module/namespace/global keyword
         let is_global = self.is_token(SyntaxKind::GlobalKeyword);
         let name = if is_global {
@@ -3447,7 +3486,7 @@ impl ThinParserState {
             start_pos,
             end_pos,
             crate::parser::thin_node::ModuleData {
-                modifiers: None,
+                modifiers,
                 name,
                 body,
             },
