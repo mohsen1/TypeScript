@@ -5,10 +5,10 @@ Status: Active
 
 ## Current Assignment (2026-01-11)
 
-- Reduce TS2403 false positives (subsequent variable declarations).
-- Collect 3-5 failing samples via conformance output (search for TS2403); capture file + expected vs actual diagnostics.
-- Trace symbol/decl merging in `wasm/src/thin_checker.rs` and `wasm/src/solver/subtype.rs`; implement fix + regression tests.
-- Deliverables: sample list + root cause notes, regression test(s), and before/after TS2403 delta from a targeted conformance run.
+- Expand TS2403 scan to larger sample set (e.g., `find-ts2403.mjs --max=2000 --samples=5`) and collect remaining extras.
+- Focus on `enums/enumBasics.ts` and `es6/templates/taggedTemplateStringsWithOverloadResolution3*.ts` if still present.
+- Implement fixes in `wasm/src/thin_checker.rs`/`wasm/src/solver/subtype.rs` and add regression tests.
+- Report before/after TS2403 delta from the expanded scan.
 
 ### Update (2026-01-11)
 - Fix: use TypeEnvironment-backed assignability in call/new resolution, and resolve Application symbols (including type param constraints) to improve generic mixin inference (commit 5cf3894068).
