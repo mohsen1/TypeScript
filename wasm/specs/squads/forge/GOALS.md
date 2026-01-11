@@ -159,9 +159,9 @@ bash run-conformance.sh --all --workers=14
 
 ---
 ## Squad Status
-- Last Update: 2026-01-11 00:54
+- Last Update: 2026-01-11 12:25
 - Conformance: **23.3% exact match** (up from 18.1%)
 - Workers Active: 5/5
-- Branches Pending Merge: None
-- Current Focus: TS2300 duplicates, TS2304 missing names, TS2322 assignability, TS2339 missing errors, TS2695 comma operator
-- Blockers: None
+- Branches Merged Today: worker/forge-1 (TS2300), worker/forge-4 (union typing), worker/forge-5 (TS7010 infra)
+- Current Focus: W1=TS2454 definite assignment, W2=TS2564 prop init, W3=TS7006/TS7008 implicit any, W4=TS2792 module resolution, W5=TS7010 return checking
+- Blockers: None (shorthand method binding fixed, pushed to em/forge)
