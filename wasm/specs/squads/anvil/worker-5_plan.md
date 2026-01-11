@@ -8,12 +8,44 @@ Priority: 5
 
 ## Current Assignment
 - **TS2322 False Positives**: Reduce TS2322 'Type X is not assignable to type Y' false positives.
-  - Status: Partially fixed (basic case works, complex cases remain)
-  - Files: controlFlowGenericTypes.ts (3 FP), controlFlowInOperator.ts (1 FP), controlFlowOptionalChain.ts (1 FP), exhaustiveSwitchStatements1.ts (1 FP), globalThisReadonlyProperties.ts (1 FP)
-  - Pattern: Control flow narrowing for generic types
-  - Fixed: Basic `T extends string | undefined` with truthiness checks (commit in progress)
-  - Remaining: Property access (`y.a`), tuple access (`z[0]`), `Extract<T, ...>` types
-  - Next: Investigate complex cases and implement remaining fixes
+  - Status: Partially fixed (1/7 cases resolved)
+  - Total: 7 extra TS2322 errors across 5 test files
+
+### Fixed Cases
+1. ✅ **Direct generic narrowing**: `T extends string | undefined` with truthiness checks
+   - Example: `if (x) { return x; }` where `x: T` and `T extends string | undefined`
+   - Fix: Enhanced intersection source handling in `src/solver/subtype.rs` to narrow type parameter constraints by other intersection members
+   - Test: `test_generic_control_flow_narrowing` (PASS)
+   - Commit: Pending
+
+### Remaining Issues (6 false positives)
+1. **Property access narrowing** (controlFlowGenericTypes.ts - 2 cases)
+   - Issue: `if (y.a) { return y.a; }` where `y: { a: T }` and `T extends string | undefined`
+   - Root cause: Flow analysis doesn't track property access expressions
+   - Fix requires: Adding flow position tracking for property access in binder
+
+2. **Tuple access narrowing** (controlFlowGenericTypes.ts - 1 case)
+   - Issue: `if (z[0]) { return z[0]; }` where `z: [T]` and `T extends string | undefined`
+   - Root cause: Flow analysis doesn't track element access expressions
+   - Fix requires: Adding flow position tracking for element access in binder
+
+3. **Assignment narrowing** (controlFlowInOperator.ts - 1 case)
+   - Issue: `if (id === undefined) { id = "1"; } return id;` where `id: string | undefined`
+   - Root cause: Assignment doesn't narrow type in control flow
+   - Fix requires: Tracking assignments in flow analysis
+
+4. **Conditional type narrowing** (controlFlowGenericTypes.ts - 1 case)
+   - Issue: `x: Extract<T, string | undefined> | null` with truthiness check
+   - Root cause: Extract type resolves to `unknown` instead of narrowed union
+   - Fix requires: Conditional type resolution improvements
+
+5. **Property existence vs type error** (globalThisReadonlyProperties.ts - 1 case)
+   - Issue: WASM reports TS2322 (type mismatch) instead of TS2339 (property doesn't exist)
+   - Root cause: globalThis property checking incorrectly thinks property exists
+   - Fix requires: globalThis property existence checking
+
+6. **Optional chaining** (controlFlowOptionalChain.ts - 1 case)
+   - Issue: Unknown (needs investigation)
 
 ## Task Queue
 - [x] Verify whether `types/mapped/recursiveMappedTypes.ts` still crashes; if so, capture stack and coordinate with Forge.
