@@ -5947,6 +5947,41 @@ async function f(): PromiseAlias<void> {
     );
 }
 
+/// Test async functions with qualified name class extending Promise (conformance: asyncQualifiedReturnType_es5.ts)
+/// This replicates the scenario where a class in a namespace extends Promise.
+#[test]
+fn test_async_qualified_promise_class_no_2355() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+namespace X {
+    export class MyPromise<T> extends Promise<T> {
+    }
+}
+
+async function f(): X.MyPromise<void> {
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2355),
+        "Did not expect TS2355 for async qualified Promise class return type, got: {:?}",
+        codes
+    );
+}
+
 /// Test that calling a never-returning function doesn't trigger TS2355
 /// This is a known limitation - calls to functions returning `never` should
 /// terminate control flow but aren't currently detected.
@@ -17117,4 +17152,64 @@ type t1 = DeepMap<tpl, number>;
 
     // The test reaching here means we didn't crash on recursive mapped types
     eprintln!("[RECURSIVE_MAPPED_TEST] Test completed without crash - {} TS2456 errors found", ts2456_count);
+}
+
+#[test]
+fn test_overloaded_constructor_arg_count_mismatch_ts2554_not_ts2769() {
+    use crate::thin_parser::ThinParserState;
+
+    // Regression test for TS2769 false positives on overloaded constructors
+    // When all overloads fail due to argument count mismatch (not type mismatch),
+    // TSC emits TS2554 (argument count mismatch) instead of TS2769 (no overload matches)
+    let code = r#"
+// Overloaded constructor - all overloads require arguments
+class C {
+    constructor(x: number);
+    constructor(x: string);
+    constructor(x: any) { }
+}
+
+// Calling with no arguments should emit TS2554, not TS2769
+var c = new C();
+
+// Generic overloaded constructor
+class D<T, U> {
+    constructor(x: T);
+    constructor(x: T, y: U);
+    constructor(x: any) { }
+}
+
+// Calling with no arguments should emit TS2554, not TS2769
+var d = new D();
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2769_errors: Vec<_> = checker.ctx.diagnostics.iter().filter(|d| d.code == 2769).collect();
+    let ts2554_errors: Vec<_> = checker.ctx.diagnostics.iter().filter(|d| d.code == 2554).collect();
+
+    // Should have no TS2769 errors
+    assert!(
+        ts2769_errors.is_empty(),
+        "Should not emit TS2769 when all overloads fail on argument count, got {} TS2769 errors: {:?}",
+        ts2769_errors.len(),
+        ts2769_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>()
+    );
+
+    // Should have TS2554 errors instead
+    assert!(
+        ts2554_errors.len() >= 2,
+        "Should emit TS2554 for argument count mismatch, got {} TS2554 errors: {:?}",
+        ts2554_errors.len(),
+        ts2554_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>()
+    );
 }
