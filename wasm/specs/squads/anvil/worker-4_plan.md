@@ -122,6 +122,14 @@ Expanded conformance scan (3000 tests) found **2 remaining TS2769 false positive
 - **Root Cause**: Complex spread handling may not match overload signatures correctly
 - **Fix Needed**: Investigate spread argument expansion in overload resolution
 
+**Status**: INVESTIGATION IN PROGRESS
+
+**Findings (2026-01-11)**:
+- Discovered a bug where TS2769 is emitted at the wrong position (rest parameter annotation instead of call expression)
+- This appears to be a source location tracking issue, not directly related to spread argument handling
+- Need to investigate further to understand if this is the actual issue or a separate bug
+- The position calculation suggests the diagnostic is being emitted during type resolution of the callable type itself
+
 ### Checklist
 
 - [x] Run extended conformance scan (3000 tests)
