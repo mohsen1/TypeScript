@@ -6,10 +6,10 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 1
 ## Current Assignment
-- Investigate crash in `es6/templates/TemplateExpression1.ts` (unreachable).
-- Reproduce via full conformance run or alternate harness; capture exact command + stack/log.
-- Trace template literal handling in `wasm/src/thin_checker.rs`/`wasm/src/thin_parser.rs`; implement fix + regression test if repro found.
-- Deliverables: repro command/logs or confirmation it's fixed upstream, regression test (if applicable), and conformance delta.
+- Reduce TS2322 false positives ("Type is not assignable").
+- Collect 3-5 failing samples via conformance output or `node wasm/differential-test/find-ts2322.mjs`; focus on cases with contextual typing or type queries.
+- Trace assignability paths in `wasm/src/thin_checker.rs` and `wasm/src/solver/subtype.rs`; implement fix + regression tests.
+- Deliverables: sample list + root cause notes, regression test(s), and before/after TS2322 delta from a targeted conformance run.
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)
