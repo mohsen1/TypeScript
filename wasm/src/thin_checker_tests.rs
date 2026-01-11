@@ -3264,6 +3264,38 @@ obj.foo;
 }
 
 #[test]
+fn test_ts2339_catch_binding_unknown() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// @strict: true
+function f() {
+    try {
+    } catch ({ x }) {
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2339).count();
+    assert_eq!(
+        count, 1,
+        "Expected one 2339 for catch destructuring from unknown, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
 fn test_ts2339_union_optional_property_access() {
     use crate::thin_parser::ThinParserState;
 
