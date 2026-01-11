@@ -22,8 +22,8 @@ TS2339 - Property does not exist errors (CONTINUED).
 6. **Run focused tests** with `./wasm/test.sh` and record delta
 
 ### Key Files
-- `wasm/src/thin_checker.rs`
-- `wasm/src/checker/expressions.rs`
+- `wasm/src/thin_checker.rs` (check_property_access_expression)
+- `wasm/src/checker/types/diagnostics.rs` (TS2339)
 - `wasm/src/thin_checker_tests.rs`
 
 ### Success Criteria
