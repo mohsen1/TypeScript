@@ -18270,3 +18270,300 @@ const tryFinallyFallthrough = (): number => {
         "Expected 2 TS2366 errors for arrow functions with try/catch fallthrough, got: {:?}", codes);
 }
 
+#[test]
+fn test_ts7027_unreachable_code_after_return() {
+    use crate::thin_parser::ThinParserState;
+
+    // Test TS7027 for unreachable code after return
+    let source = r#"
+function test1(): number {
+    return 1;
+    console.log("unreachable");  // Should error: TS7027
+}
+
+function test2(): void {
+    return;
+    const x = 5;  // Should error: TS7027
+}
+
+function test3(): string {
+    if (true) {
+        return "yes";
+    }
+    return "no";
+    console.log("unreachable");  // Should error: TS7027
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+
+    // Should have 3 TS7027 errors
+    assert_eq!(codes.iter().filter(|&&c| c == 7027).count(), 3,
+        "Expected 3 TS7027 errors for unreachable code after return, got: {:?}", codes);
+}
+
+#[test]
+fn test_ts7027_unreachable_code_after_throw() {
+    use crate::thin_parser::ThinParserState;
+
+    // Test TS7027 for unreachable code after throw
+    let source = r#"
+function test1(): never {
+    throw new Error("error");
+    console.log("unreachable");  // Should error: TS7027
+}
+
+function test2(): number {
+    throw new Error("error");
+    return 1;  // Should error: TS7027
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+
+    // Should have 2 TS7027 errors
+    assert_eq!(codes.iter().filter(|&&c| c == 7027).count(), 2,
+        "Expected 2 TS7027 errors for unreachable code after throw, got: {:?}", codes);
+}
+
+#[test]
+fn test_ts7027_unreachable_after_never_expression() {
+    use crate::thin_parser::ThinParserState;
+
+    // Test TS7027 for unreachable code after never-type expressions
+    let source = r#"
+declare function fail(): never;
+
+function test1(): number {
+    fail();
+    return 1;  // Should error: TS7027
+}
+
+function test2(): void {
+    fail();
+    console.log("unreachable");  // Should error: TS7027
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+
+    // Should have 2 TS7027 errors
+    assert_eq!(codes.iter().filter(|&&c| c == 7027).count(), 2,
+        "Expected 2 TS7027 errors for unreachable code after never expression, got: {:?}", codes);
+}
+
+#[test]
+fn test_ts2366_conditional_returns_all_paths() {
+    use crate::thin_parser::ThinParserState;
+
+    // Test that functions with conditional returns that cover all paths don't error
+    let source = r#"
+function test1(flag: boolean): number {
+    if (flag) {
+        return 1;
+    } else {
+        return 2;
+    }
+}
+
+function test2(x: number): string {
+    if (x > 0) {
+        return "positive";
+    } else if (x < 0) {
+        return "negative";
+    } else {
+        return "zero";
+    }
+}
+
+function test3(x: number): number {
+    switch (x) {
+        case 1:
+            return 1;
+        case 2:
+            return 2;
+        default:
+            return 0;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+
+    // Should have no TS2366 errors - all paths return
+    assert_eq!(codes.iter().filter(|&&c| c == 2366).count(), 0,
+        "Expected 0 TS2366 errors when all paths return, got: {:?}", codes);
+}
+
+#[test]
+fn test_ts2366_early_return() {
+    use crate::thin_parser::ThinParserState;
+
+    // Test that early returns are handled correctly
+    let source = r#"
+function test1(x: number): number {
+    if (x < 0) {
+        return -1;
+    }
+    return x;  // OK - this is reached when x >= 0
+}
+
+function test2(x: number): number {
+    if (x < 0) {
+        return -1;
+    }
+    if (x > 0) {
+        return 1;
+    }
+    return 0;  // OK - this is reached when x == 0
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+
+    // Should have no TS2366 errors - all paths return
+    assert_eq!(codes.iter().filter(|&&c| c == 2366).count(), 0,
+        "Expected 0 TS2366 errors with early returns, got: {:?}", codes);
+}
+
+#[test]
+fn test_ts2366_throw_as_exit() {
+    use crate::thin_parser::ThinParserState;
+
+    // Test that throw statements are treated as exits
+    let source = r#"
+function test1(x: number): number {
+    if (x < 0) {
+        throw new Error("negative");
+    }
+    return x;
+}
+
+function test2(x: number): never {
+    throw new Error("always throws");
+}
+
+function test3(x: number): number {
+    if (x < 0) {
+        throw new Error("negative");
+    }
+    if (x > 100) {
+        throw new Error("too large");
+    }
+    return x;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+
+    // Should have no TS2366 errors - throw exits the function
+    assert_eq!(codes.iter().filter(|&&c| c == 2366).count(), 0,
+        "Expected 0 TS2366 errors when throw is used as exit, got: {:?}", codes);
+}
+
+#[test]
+fn test_function_overload_no_ts2366() {
+    use crate::thin_parser::ThinParserState;
+
+    // Test that function overloads (signatures without bodies) don't trigger TS2366
+    let source = r#"
+function overloaded(x: number): number;
+function overloaded(x: string): string;
+function overloaded(x: number | string): number | string {
+    return x;
+}
+
+class MyClass {
+    method(x: number): number;
+    method(x: string): string;
+    method(x: number | string): number | string {
+        return x;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+
+    // Should have no TS2366 errors - overloads don't have bodies
+    assert_eq!(codes.iter().filter(|&&c| c == 2366).count(), 0,
+        "Expected 0 TS2366 errors for function overloads, got: {:?}", codes);
+}
+
+
