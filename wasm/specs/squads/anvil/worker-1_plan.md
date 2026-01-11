@@ -5,35 +5,33 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 
 Status: Active
 Priority: 1
-## Current Assignment (2026-01-11 - NEW: TS2304 Namespace/Module Merging)
-**Target:** Reduce TS2304 false positives in namespace/module contexts
+## Current Assignment (2026-01-11 - TS7006 Implicit 'any' Parameter False Positives)
 
-**Previous Work COMPLETED & MERGED:** Type parameter scope resolution (10 TS2304 false positives remaining)
+**Status:** IN PROGRESS - 74% reduction achieved (46 → 12)
 
-**Focus Areas:**
-1. Namespace members not finding sibling exports (6 files in internalModules)
-2. Module augmentation not merging correctly
-3. Export declarations in nested namespaces
-4. Global ambient declarations scope issues
+**Completed Fixes:**
+1. ✅ Setter parameter type inference from getter return type (46 → 15)
+2. ✅ Destructured parameter elements with default values (15 → 12)
 
-**Approach:**
-1. Run `node wasm/differential-test/conformance-runner.mjs internalModules --max=200 -v` to collect namespace samples
-2. Analyze the 6 remaining TS2304 false positives in internalModules
-3. Fix namespace/module export merging in `thin_binder.rs`
-4. Add regression tests for each pattern
-5. Verify with conformance baseline
+**Remaining 12 patterns** (require deeper type resolution work):
+- Contextual typing with tuple union function types: `(...args: ['A', number] | ['B', string]) => void`
+- Decorator parameter handling
+- IIFE callback patterns
+- Instance member prototype assignment
 
-**Files:** `wasm/src/thin_binder.rs`, `wasm/src/thin_checker.rs`, `wasm/src/thin_checker_tests.rs`
+**Files Modified:** `wasm/src/thin_checker.rs`
 
-**Success Criteria:** Reduce internalModules TS2304 from 6 to <3 with no regressions
+**Commits:**
+- b5f9502636: Fix TS7006 for setter parameters (67% reduction)
+- b55d30154b: Fix TS7006 for destructured parameters with default values (20% more)
 
-## Completed - TS2304 Type Parameter Scope (MERGED)
-- ✅ Fixed TS2304 for local variables in object literal methods
-- ✅ Fixed TS2304 type parameter scope resolution
-- ✅ Differential test: 10 TS2304 false positives remaining (down from 759)
-- ✅ Categorized remaining: parser syntax (3), scope edge cases (7)
-- Trace name resolution in `wasm/src/thin_binder.rs` and `wasm/src/thin_checker.rs` (module exports, namespace merges, global augmentation).
-- Add regression tests in `wasm/src/thin_checker_tests.rs` and report before/after TS2304 delta.
+**Success Criteria:** Target <20 ✅ ACHIEVED (12 remaining)
+
+## Previous Assignment - TS2403 (COMPLETED)
+
+**Status:** Already resolved by Worker 2's bi-directional assignability fix
+**Verification:** Ran conformance scan of 1000 tests - **0 extra TS2403 errors found**
+**Note:** TS2403 false positives eliminated using bi-directional assignability check in `are_var_decl_types_compatible`
 
 ## Task Queue
 (empty - will receive new tasks from EM after completing current assignment)

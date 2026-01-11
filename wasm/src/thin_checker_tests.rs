@@ -17150,6 +17150,82 @@ function identity<T>(x: T): T {
 }
 
 #[test]
+fn test_static_private_field_access_no_ts2339() {
+    // Regression test for static private field access
+    // Previously failed with TS2339 because static private members were excluded from constructor type
+    let source = r#"
+class C {
+    static #x = 123;
+    static {
+        console.log(C.#x);
+    }
+    foo() {
+        return C.#x;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Should have NO TS2339 errors for C.#x access
+    let ts2339_count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2339).count();
+    assert_eq!(ts2339_count, 0,
+        "Expected no TS2339 errors for static private field access, got {} - diagnostics: {:?}",
+        ts2339_count,
+        checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn test_static_private_accessor_access_no_ts2339() {
+    // Regression test for static private accessor access
+    let source = r#"
+class A {
+    static get #prop() { return ""; }
+    static set #prop(param: string) { }
+
+    static get #roProp() { return ""; }
+
+    constructor(name: string) {
+        A.#prop = "";
+        console.log(A.#prop);
+        console.log(A.#roProp);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+
+    checker.check_source_file(root);
+
+    // Filter out TS2540 for read-only property assignment (expected error)
+    let ts2339_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2339)
+        .collect();
+
+    assert_eq!(ts2339_errors.len(), 0,
+        "Expected no TS2339 errors for static private accessor access, got {} - TS2339 diagnostics: {:?}",
+        ts2339_errors.len(),
+        ts2339_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>()
+    );
+}
+
+#[test]
 fn test_type_parameter_in_type_query() {
     use crate::thin_parser::ThinParserState;
 
@@ -17170,6 +17246,7 @@ function extract<T>(x: Extract<T, typeof identity>): T {
 
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
+
     assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
 
     let mut binder = ThinBinderState::new();
@@ -17272,6 +17349,39 @@ function g1<T extends Box<T> | undefined>(x: T) {
         "Expected no TS2304 errors for type parameter 'T' in type queries, but got {} errors: {:?}",
         ts2304_for_T.len(),
         ts2304_for_T.iter().map(|d| &d.message_text).collect::<Vec<_>>()
->>>>>>> origin/rust
+    );
+}
+
+#[test]
+fn test_generic_control_flow_narrowing() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+function f1<T extends string | undefined>(x: T): string {
+    if (x) {
+        return x;
+    }
+    return "hello";
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Should have no TS2322 errors - after narrowing, x should be assignable to string
+    let ts2322_count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2322).count();
+    assert_eq!(
+        ts2322_count, 0,
+        "Expected no TS2322 errors, got {} - diagnostics: {:?}",
+        ts2322_count,
+        checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>()
     );
 }
