@@ -198,7 +198,15 @@ impl<'a> FlowAnalyzer<'a> {
                 if flow.antecedent.is_empty() {
                     false
                 } else {
+                    // Check all reachable antecedents (skip unreachable paths like return/throw)
                     flow.antecedent.iter().all(|&ant| {
+                        // Skip unreachable branches - they satisfy the condition vacuously
+                        // since execution never reaches the merge point from that path
+                        if let Some(ant_node) = self.binder.flow_nodes.get(ant) {
+                            if ant_node.has_any_flags(flow_flags::UNREACHABLE) {
+                                return true;
+                            }
+                        }
                         self.check_definite_assignment(reference, ant, visited, cache)
                     })
                 }
@@ -218,7 +226,15 @@ impl<'a> FlowAnalyzer<'a> {
                 if flow.antecedent.is_empty() {
                     false
                 } else {
+                    // Check all reachable antecedents (skip unreachable paths like return/throw/break)
                     flow.antecedent.iter().all(|&ant| {
+                        // Skip unreachable branches - they satisfy the condition vacuously
+                        // since execution never reaches the merge point from that path
+                        if let Some(ant_node) = self.binder.flow_nodes.get(ant) {
+                            if ant_node.has_any_flags(flow_flags::UNREACHABLE) {
+                                return true;
+                            }
+                        }
                         self.check_definite_assignment(reference, ant, visited, cache)
                     })
                 }
