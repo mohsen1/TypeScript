@@ -1,7 +1,7 @@
 # Anvil Worker 3 - TS2339 Property Resolution (Inherited Properties)
 
 Ready for Merge: No (merged)
-Status: Blocked (Gemini key required)
+Status: Active
 
 ## Current Assignment (2026-01-11)
 
