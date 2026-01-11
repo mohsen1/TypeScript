@@ -3999,9 +3999,6 @@ impl<'a> ThinCheckerState<'a> {
                     if !self.has_static_modifier(&prop.modifiers) {
                         continue;
                     }
-                    if self.is_private_identifier_name(prop.name) {
-                        continue;
-                    }
                     let Some(name) = self.get_property_name(prop.name) else {
                         continue;
                     };
@@ -4030,9 +4027,6 @@ impl<'a> ThinCheckerState<'a> {
                     if !self.has_static_modifier(&method.modifiers) {
                         continue;
                     }
-                    if self.is_private_identifier_name(method.name) {
-                        continue;
-                    }
                     let Some(name) = self.get_property_name(method.name) else {
                         continue;
                     };
@@ -4057,9 +4051,6 @@ impl<'a> ThinCheckerState<'a> {
                         continue;
                     };
                     if !self.has_static_modifier(&accessor.modifiers) {
-                        continue;
-                    }
-                    if self.is_private_identifier_name(accessor.name) {
                         continue;
                     }
                     let Some(name) = self.get_property_name(accessor.name) else {
