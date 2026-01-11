@@ -7,30 +7,35 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-TS2300 - Duplicate identifier errors.
+TS2322 - Type is not assignable errors.
 
-**Error Code:** TS2300 - "Duplicate identifier 'x'"
+**Error Code:** TS2322 - "Type 'X' is not assignable to type 'Y'"
 
-**Impact:** 105 conformance tests affected
+**Impact:** 310 conformance tests affected
 
 ### Steps
-1. **Check for duplicate declarations** - variables, functions, classes, interfaces in same scope
-2. **Handle block scoping** - let/const duplicates in same block
-3. **Handle function scoping** - var duplicates in same function
-4. **Handle module/namespace merging** - allow valid namespace/interface merging
-5. **Add tests** in `wasm/src/thin_checker_tests.rs` for duplicate identifiers
+1. **Check type assignability** - when assigning/returning values, verify type compatibility
+2. **Handle structural typing** - objects must have all required properties with compatible types
+3. **Handle unions/intersections** - check assignability rules for complex types
+4. **Handle generics** - verify type arguments satisfy constraints
+5. **Add tests** in `wasm/src/thin_checker_tests.rs` for assignability checks
 6. **Run focused tests** with `./wasm/test.sh` and record delta
 
 ### Key Files
 - `wasm/src/thin_checker.rs`
-- `wasm/src/thin_binder.rs`
+- `wasm/src/checker/expressions.rs`
+- `wasm/src/solver/subtype.rs`
 - `wasm/src/thin_checker_tests.rs`
 
 ### Success Criteria
-- TS2300 emitted for duplicate declarations
-- Correct scoping rules (block vs function)
-- Allow valid merging patterns
+- TS2322 emitted for incompatible assignments
+- Correct handling of structural typing, unions, generics
 - No new regressions
+
+### Focus Areas (split with W2)
+- Function return type assignability
+- Variable declaration assignability
+- Generic constraint checking
 
 ## Task Queue
 - (empty)
