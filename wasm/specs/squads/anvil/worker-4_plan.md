@@ -4,9 +4,10 @@
 
 Status: Active
 
-- Verify whether `types/mapped/recursiveMappedTypes.ts` still crashes; run targeted conformance and capture stack/logs if it does.
-- If crashing, trace recursion in `wasm/src/thin_checker.rs`/`wasm/src/solver/evaluate.rs`, implement fix + regression.
-- If not crashing, document repro commands and note current conformance delta.
+- Implement recursion guard/fallback for property access on recursive mapped types to prevent `unreachable` crash.
+- Start in `wasm/src/solver/operations.rs` (PropertyAccessEvaluator) and/or `wasm/src/thin_checker.rs` evaluation paths.
+- Add regression test using minimal repro from `types/mapped/recursiveMappedTypes.ts` (property access on Transform<T>).
+- Verify with targeted conformance run (`node wasm/differential-test/conformance-runner.mjs types/mapped --max=200 -v`) and report crash delta.
 
 ## Operation Conformance Assignment
 
