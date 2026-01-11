@@ -128,38 +128,48 @@ The `CompatChecker` in `src/solver/` needs to implement the "Unsoundness Catalog
 
 
 ## Executive Summary (Director report)
-Last updated: 2026-01-11
+Last updated: 2026-01-11 14:30 (Priority Override)
+
+### ⚠️ CRITICAL PRIORITY CHANGE: Parser Recovery First
+
+**Architectural Bottleneck Identified:**
+Parser errors cascade through the entire pipeline:
+- **1,122 Parser Errors** (TS1005/1109/1068/1128) → Incomplete AST
+- **702 TS2304 Errors** (Cannot find name) ← Caused by incomplete AST
+- **Missing Type Checks** (TS2322/TS7006) ← Caused by unresolved symbols defaulting to `Any`
+
+**Action:** Anvil W2 now has **exclusive focus** on parser error recovery with target: **1,122 → <100**
 
 ### Conformance Metrics (Primary KPI)
 | Metric | Value | Target |
 |--------|-------|--------|
-| Exact Match | 17.7% (86/487) | 50%+ |
-| Missing Errors | 70.0% | <30% |
-| Extra Errors (False Positives) | 47.2% | <20% |
-| Build Status | Passing (4771/4789) | Green |
+| Exact Match | 23.3% (1148/4928) | 50%+ |
+| Missing Errors | 68.2% (3361 tests) | <30% |
+| Extra Errors (False Positives) | 35.8% (1766 tests) | <20% |
+| **Parser Errors** | **1,122** (20% of extra errors) | **<100** |
+| Build Status | Passing | Green |
 
 ### Current Squad Structure
-- **Squad Forge (5 workers)**: Missing error implementation (TS2454, TS2564, TS7006, TS2792, TS2339, TS2300)
-- **Squad Anvil (5 workers)**: False positive elimination (TS2304, TS2322, TS2339, TS2769, TS2355)
+- **Squad Forge (5 workers)**: Missing error implementation (TS2300, TS2304, TS2322, TS2339, TS2695)
+- **Squad Anvil (5 workers)**: **W2: PARSER RECOVERY (Priority 0)** | Others: False positive elimination
 
-### Top Missing Errors (Forge Focus)
-- TS2564: 64 occurrences (property initialization)
-- TS2454: 43 occurrences (definite assignment) - control flow analysis IMPLEMENTED
-- TS7006: 42 occurrences (implicit any)
-- TS2705: 37 occurrences
-- TS2322: 19 occurrences (type assignability)
+### Top Parser Errors (Anvil W2 - CRITICAL)
+- TS1005: 548 occurrences (Expected token) ← Need error recovery/synchronization
+- TS1109: 273 occurrences (Expression expected) ← Need resynchronization
+- TS1068: 200 occurrences (Unexpected token) ← Need class member parsing fixes
+- TS1128: 101 occurrences (Declaration expected) ← Need statement parsing fixes
 
-### Top False Positives (Anvil Focus)
-- TS2304: 136 occurrences (cannot find name)
-- TS2355: 82 occurrences (return analysis)
-- TS1005: 65 occurrences (parser) - parser fixes IMPLEMENTED
-- TS2339: 35 occurrences (property access)
-- TS1109: 25 occurrences (parser)
+### Top False Positives (Anvil W1/W3/W4/W5)
+- TS2304: 759 occurrences (cannot find name) ← **Will improve when parser fixed**
+- TS2339: 292 occurrences (property access)
+- TS2769: 125 occurrences (overload matching)
+- TS2355: 116 occurrences (return analysis)
 
 ### Recent Progress (Jan 11)
-- TS2304 namespace false-positive reductions and mixin call type resolution merged (Anvil).
-- TS2769 variadic tuple overload matching and TS2355 never-return flow handling improvements merged (Anvil).
-- Added thin_parser/thin_node updates and expanded thin_checker tests; conformance baselines not re-run yet.
+- **PRIORITY OVERRIDE:** Parser recovery identified as bottleneck. Anvil W2 redirected to exclusive parser work.
+- Merged `squad/anvil` into `rust`: TS2304 fixes, TS2322 flow narrowing improvements, control_flow.rs updates
+- Director analysis: 1,122 parser errors causing cascading failures → 702 TS2304 → Any-type suppression
+- Strategy: Implement error recovery/synchronization in thin_parser.rs to complete AST even with syntax errors
 
 ### Recent Progress (Jan 9)
 - TS2454 control flow analysis (+315 lines in checker/control_flow.rs)
