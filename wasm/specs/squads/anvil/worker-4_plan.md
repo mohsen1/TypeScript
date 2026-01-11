@@ -1,5 +1,42 @@
 # Anvil Worker 4 - Mapped Type Recursion Guard
 
+## Current Assignment (2026-01-11) - TS2456 Circular Type Alias Detection
+
+Status: COMPLETED
+
+### Mission
+Investigate `tests/cases/conformance/types/mapped/recursiveMappedTypes.ts` crash / missing TS2456 errors. Add regression test and fix recursion handling.
+
+### Checklist
+
+- [x] Add regression test for recursive mapped types (crash + TS2456)
+- [x] Implement TS2456 diagnostic in thin_checker.rs for circular type aliases
+- [x] Add diagnostic message TYPE_ALIAS_CIRCULARLY_REFERENCES_ITSELF
+- [x] Add stub implementations for missing control_flow functions
+- [x] Run regression test and verify fix
+- [x] Run conformance test on types/mapped
+
+### Results
+
+- No crash on recursive mapped types (conformance shows 0 crashes)
+- TS2456 now correctly emitted for circular type aliases
+- Regression test `test_recursive_mapped_type_no_crash_and_ts2456` passes
+- Conformance: `types/mapped` tests pass with 0 crashes
+
+### Files Modified
+
+- `wasm/src/thin_checker.rs` - Added TS2456 emission in circular type alias detection
+- `wasm/src/checker/types/diagnostics.rs` - Added TYPE_ALIAS_CIRCULARLY_REFERENCES_ITSELF message
+- `wasm/src/checker/control_flow.rs` - Added stub functions for function_body_falls_through and statement_falls_through
+- `wasm/src/thin_checker_tests.rs` - Added regression test
+
+### Tests
+
+- `./wasm/test.sh test_recursive_mapped_type_no_crash_and_ts2456` (PASS)
+- `node wasm/differential-test/conformance-runner.mjs types/mapped --max=100` (0 crashes)
+
+Ready for Merge: Yes
+
 ## Current Assignment (2026-01-11) - TS2769 Overload Matching (remaining cases)
 
 Status: Active
@@ -318,6 +355,38 @@ Ready for Merge: No (merged 2026-01-10)
 - `wasm/src/thin_checker_tests.rs`
 
 Ready for Merge: No (merged 2026-01-11)
+
+## Follow-up (2026-01-11) - TS2769 Variadic Tuple Spreads
+
+**Mission**: Eliminate remaining TS2769 false positives from variadic tuple spreads.
+
+**Status**: COMPLETED
+
+### Changes
+
+- Use unary expr data to read spread element expressions (call args + array literals).
+- Expand tuple spreads in call argument collection; array literal spread elements use element types outside tuple context.
+- Resolve contextual tuple types via `resolve_type_for_property_access` to allow mapped tuple contexts.
+- Treat single-signature callables as non-overload calls (avoid TS2769 on non-overloads).
+
+### Tests
+
+- `./wasm/test.sh test_overload_call_handles_tuple_spread_params`
+- `./wasm/test.sh test_variadic_tuple_optional_tail_inference_no_ts2769`
+
+### Conformance (types/tuple, max=200)
+
+- `node wasm/differential-test/conformance-runner.mjs types/tuple --max=200 -v`
+- Exact Match: 9 (26.5%); Same Error Count: 10 (29.4%); Crashes: 0
+- `variadicTuples1.ts`: WASM errors 72; TS2769 count 0
+- `variadicTuples2.ts`: WASM errors 46; TS2769 count 0
+
+### Remaining false positives
+
+- `variadicTuples1.ts`: `fm1([...])` (TS2345 at line 123)
+- `variadicTuples1.ts`: `ft([...], [...])` (TS2345 at lines 356-359)
+
+Ready for Merge: Yes
 
 ## Follow-up (2026-01-09) - TS2339 False Positives (Class-Like Extends)
 
