@@ -637,6 +637,33 @@ fn test_void_return_assignability() {
 }
 
 #[test]
+fn test_void_undefined_return_assignability() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let returns_void = interner.function(FunctionShape {
+        params: Vec::new(),
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let returns_undefined = interner.function(FunctionShape {
+        params: Vec::new(),
+        this_type: None,
+        return_type: TypeId::UNDEFINED,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    assert!(checker.is_assignable(returns_undefined, returns_void));
+    assert!(!checker.is_assignable(returns_void, returns_undefined));
+}
+
+#[test]
 fn test_constructor_void_return_assignability() {
     let interner = TypeInterner::new();
     let mut checker = CompatChecker::new(&interner);
@@ -745,6 +772,41 @@ fn test_call_signature_void_return_assignability() {
 
     assert!(checker.is_assignable(returns_number, returns_void));
     assert!(!checker.is_assignable(returns_void, returns_number));
+}
+
+#[test]
+fn test_call_signature_void_undefined_return_assignability() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let returns_void = interner.callable(CallableShape {
+        call_signatures: vec![CallSignature {
+            params: Vec::new(),
+            this_type: None,
+            return_type: TypeId::VOID,
+            type_predicate: None,
+            type_params: Vec::new(),
+        }],
+        construct_signatures: Vec::new(),
+        properties: Vec::new(),
+        ..Default::default()
+    });
+
+    let returns_undefined = interner.callable(CallableShape {
+        call_signatures: vec![CallSignature {
+            params: Vec::new(),
+            this_type: None,
+            return_type: TypeId::UNDEFINED,
+            type_predicate: None,
+            type_params: Vec::new(),
+        }],
+        construct_signatures: Vec::new(),
+        properties: Vec::new(),
+        ..Default::default()
+    });
+
+    assert!(checker.is_assignable(returns_undefined, returns_void));
+    assert!(!checker.is_assignable(returns_void, returns_undefined));
 }
 
 #[test]

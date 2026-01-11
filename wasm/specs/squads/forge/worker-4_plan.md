@@ -76,16 +76,16 @@ TS2322 return-type assignability (void/undefined).
 - [x] Applied check_parameter_initializers to constructors, methods, accessors, functions
 
 ## Ready for Merge
-No
+Yes
 
 ## Notes
-- Progress: duplicate identifier logic now treats accessors with GET/SET excludes; added class accessor pair/duplicate getter tests.
-- Tests: `./wasm/test.sh class_accessor_pair_no_duplicate_2300`; `./wasm/test.sh class_duplicate_getter_2300`; `./wasm/test.sh compile_class_accessors`.
-- Commit format: `[wasm] checker: fix accessor duplicate identifier`
+- Progress: added compat coverage for void/undefined return-type assignability; no compat/subtype changes required.
+- Tests: `./wasm/test.sh void_undefined_return_assignability`.
+- Commit format: `[wasm] solver: cover void/undefined return assignability`
 - Push to: `origin/worker/forge-4`
 - **NEVER edit**: `STRUCTURE.md`, `GOALS.md`, other workers' plan files, or anything in `orchestrator/`
 
 ## Resume
 - Branch/state: `worker/forge-4`, changes committed/pushed, ready for merge.
-- Session work: fix duplicate identifier handling for accessors (GET/SET excludes) to allow getter+setter pairs; added class accessor tests.
-- Unit tests: `./wasm/test.sh class_accessor_pair_no_duplicate_2300`; `./wasm/test.sh class_duplicate_getter_2300`; `./wasm/test.sh compile_class_accessors`.
+- Session work: added compat tests for void/undefined return-type assignability in functions and call signatures.
+- Unit tests: `./wasm/test.sh void_undefined_return_assignability`.
