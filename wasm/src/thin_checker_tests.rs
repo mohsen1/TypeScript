@@ -17789,34 +17789,11 @@ function test2(obj: A | B) {
     // Should have 2 TS2339 errors: one for obj.c, one for obj.a
     assert_eq!(ts2339_errors.len(), 2,
         "Expected 2 TS2339 errors for union property access, got {}: {:?}",
-=======
-    
-    let mut binder = ThinBinderState::new();
-    binder.bind_source_file(parser.get_arena(), root);
-    
-    let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
-    
-    checker.check_source_file(root);
-    
-    let ts2339_errors: Vec<_> = checker.ctx.diagnostics.iter()
-        .filter(|d| d.code == 2339)
-        .collect();
-    
-    eprintln!("TS2339 errors found: {}", ts2339_errors.len());
-    for err in &ts2339_errors {
-        eprintln!("  - {}", err.message_text);
-    }
-    
-    // All accesses should work - they're all from within the class
-    assert_eq!(ts2339_errors.len(), 0,
-        "Expected no TS2339 errors for private accessor access (including in closures), got {} - errors: {:?}",
->>>>>>> origin/worker/anvil-3
+
         ts2339_errors.len(),
         ts2339_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>()
     );
 }
-<<<<<<< HEAD
 
 #[test]
 fn test_ts2339_union_shared_property_no_error() {
@@ -18023,9 +18000,8 @@ function test2(obj: A & { c: boolean }) {
             .map(|d| &d.message_text).collect::<Vec<_>>()
     );
 }
-=======
->>>>>>> origin/worker/anvil-3
-=======
+
+#[test]
 fn test_overload_arg_count_exceeds_all_only_ts2554_not_ts2769() {
     use crate::thin_parser::ThinParserState;
 
@@ -18076,4 +18052,363 @@ mixed(42, 99, 100);
         first_error_msg
     );
 }
->>>>>>> origin/worker/anvil-4
+
+// =============================================================================
+// TS2454: Definite Assignment Tests
+// =============================================================================
+
+#[test]
+fn test_ts2454_simple_variable_no_initializer() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let x: number;
+console.log(x);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2454_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2454)
+        .collect();
+
+    assert!(!ts2454_errors.is_empty(),
+        "Expected TS2454 for variable without initializer, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_ts2454_if_else_both_branches_assign() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let x: number;
+if (Math.random() > 0.5) {
+    x = 1;
+} else {
+    x = 2;
+}
+console.log(x);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2454_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2454)
+        .collect();
+
+    assert_eq!(ts2454_errors.len(), 0,
+        "Expected no TS2454 errors when both branches assign, got {}: {:?}",
+        ts2454_errors.len(),
+        ts2454_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn test_ts2454_if_only_then_assigns() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let x: number;
+if (Math.random() > 0.5) {
+    x = 1;
+}
+console.log(x);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2454_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2454)
+        .collect();
+
+    assert!(!ts2454_errors.is_empty(),
+        "Expected TS2454 when only then branch assigns, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_ts2454_if_else_only_then_assigns() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let x: number;
+if (Math.random() > 0.5) {
+    x = 1;
+} else {
+    // do nothing
+}
+console.log(x);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2454_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2454)
+        .collect();
+
+    assert!(!ts2454_errors.is_empty(),
+        "Expected TS2454 when only then branch assigns (else doesn't), got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_ts2454_if_with_return_in_else() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let x: number;
+if (Math.random() > 0.5) {
+    x = 1;
+} else {
+    return;
+}
+console.log(x);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2454_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2454)
+        .collect();
+
+    // Should NOT emit TS2454 because the else branch returns (unreachable)
+    // So only the then branch matters for the merge point
+    assert_eq!(ts2454_errors.len(), 0,
+        "Expected no TS2454 when else branch returns, got {}: {:?}",
+        ts2454_errors.len(),
+        ts2454_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn test_ts2454_while_loop_assignment_inside() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let x: number;
+while (Math.random() > 0.5) {
+    x = 1;
+    break;
+}
+console.log(x);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2454_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2454)
+        .collect();
+
+    // Should emit TS2454 because the loop might not execute
+    assert!(!ts2454_errors.is_empty(),
+        "Expected TS2454 for variable assigned inside while loop, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_ts2454_for_loop_assignment_inside() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let x: number;
+for (let i = 0; i < 10; i++) {
+    x = i;
+}
+console.log(x);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2454_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2454)
+        .collect();
+
+    // Should emit TS2454 because the loop might not execute
+    assert!(!ts2454_errors.is_empty(),
+        "Expected TS2454 for variable assigned inside for loop, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_ts2454_assigned_before_loop() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let x: number;
+x = 5;
+for (let i = 0; i < 10; i++) {
+    console.log(x);
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2454_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2454)
+        .collect();
+
+    // Should NOT emit TS2454 because x is assigned before the loop
+    assert_eq!(ts2454_errors.len(), 0,
+        "Expected no TS2454 when variable assigned before loop, got {}: {:?}",
+        ts2454_errors.len(),
+        ts2454_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn test_ts2454_nested_conditionals() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let x: number;
+if (Math.random() > 0.5) {
+    if (Math.random() > 0.5) {
+        x = 1;
+    } else {
+        x = 2;
+    }
+} else {
+    x = 3;
+}
+console.log(x);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2454_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2454)
+        .collect();
+
+    // Should NOT emit TS2454 because all paths assign x
+    assert_eq!(ts2454_errors.len(), 0,
+        "Expected no TS2454 for nested conditionals with all paths assigning, got {}: {:?}",
+        ts2454_errors.len(),
+        ts2454_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn test_ts2454_nested_conditionals_missing_assignment() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let x: number;
+if (Math.random() > 0.5) {
+    if (Math.random() > 0.5) {
+        x = 1;
+    }
+    // else path doesn't assign x
+} else {
+    x = 3;
+}
+console.log(x);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2454_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2454)
+        .collect();
+
+    // Should emit TS2454 because one path doesn't assign x
+    assert!(!ts2454_errors.is_empty(),
+        "Expected TS2454 for nested conditionals with missing assignment, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
