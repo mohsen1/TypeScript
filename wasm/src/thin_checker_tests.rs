@@ -14876,6 +14876,53 @@ fn test_variadic_tuple_rest_param_no_ts2769() {
 }
 
 #[test]
+fn test_variadic_tuple_optional_tail_inference_no_ts2769() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+        declare function ft3<T extends unknown[]>(t: [...T]): T;
+        declare function f20<T extends unknown[] = []>(args: [...T, number?]): T;
+        declare function f22<T extends unknown[] = []>(args: [...T, number]): T;
+        declare function f22<T extends unknown[] = []>(args: [...T]): T;
+
+        ft3(['hello', 42]);
+        f20(["foo", "bar"]);
+        f20(["foo", 42]);
+
+        function f21<U extends string[]>(args: [...U, number?]) {
+            f20(args);
+            f20(["foo", "bar"]);
+            f20(["foo", 42]);
+        }
+
+        function f23<U extends string[]>(args: [...U, number]) {
+            f22(args);
+            f22(["foo", "bar"]);
+            f22(["foo", 42]);
+        }
+    "#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2769_errors: Vec<_> = checker.ctx.diagnostics.iter().filter(|d| d.code == 2769).collect();
+    assert!(
+        ts2769_errors.is_empty(),
+        "Should not emit TS2769 for optional variadic tuple tails, got {} TS2769 errors: {:?}",
+        ts2769_errors.len(),
+        ts2769_errors
+    );
+}
+
+#[test]
 fn test_recursive_mapped_types_no_crash() {
     use crate::thin_parser::ThinParserState;
 
