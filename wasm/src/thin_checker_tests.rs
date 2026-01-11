@@ -1,4 +1,9 @@
 
+use crate::thin_binder::ThinBinderState;
+use crate::thin_checker::ThinCheckerState;
+use crate::thin_parser::ThinParserState;
+use crate::solver::TypeInterner;
+
 #[test]
 fn test_ts2339_union_shared_property_no_error() {
     use crate::thin_parser::ThinParserState;
@@ -204,9 +209,8 @@ function test2(obj: A & { c: boolean }) {
             .map(|d| &d.message_text).collect::<Vec<_>>()
     );
 }
-=======
->>>>>>> origin/worker/anvil-3
-=======
+
+#[test]
 fn test_overload_arg_count_exceeds_all_only_ts2554_not_ts2769() {
     use crate::thin_parser::ThinParserState;
 
@@ -257,4 +261,88 @@ mixed(42, 99, 100);
         first_error_msg
     );
 }
->>>>>>> origin/worker/anvil-4
+
+#[test]
+fn test_ts2564_declare_properties_no_error() {
+    use crate::thin_parser::ThinParserState;
+
+    // Test that 'declare' properties don't require initializers (no TS2564)
+    let source = r#"
+// @strict: true
+class A {
+    property = 'x';
+}
+class B extends A {
+    declare property: any; // ok because it's declare
+}
+class C {
+    declare x: string; // ok
+    declare y: number; // ok
+    declare z: boolean; // ok
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Should NOT have TS2564 errors for declare properties
+    let ts2564_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2564)
+        .collect();
+
+    assert_eq!(ts2564_errors.len(), 0,
+        "Expected no TS2564 errors for declare properties, got {}: {:?}",
+        ts2564_errors.len(),
+        ts2564_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn test_ts2564_property_without_initializer_has_error() {
+    use crate::thin_parser::ThinParserState;
+
+    // Test that non-declare properties without initializers emit TS2564
+    let source = r#"
+// @strict: true
+class A {
+    property: string; // should emit TS2564
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Should have TS2564 error for property without initializer
+    let ts2564_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2564)
+        .collect();
+
+    assert_eq!(ts2564_errors.len(), 1,
+        "Expected 1 TS2564 error for property without initializer, got {}: {:?}",
+        ts2564_errors.len(),
+        ts2564_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>()
+    );
+
+    // Verify error message mentions the property name
+    assert!(
+        ts2564_errors[0].message_text.contains("property"),
+        "TS2564 message should mention 'property', got: {}",
+        ts2564_errors[0].message_text
+    );
+}
