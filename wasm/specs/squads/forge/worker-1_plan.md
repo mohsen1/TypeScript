@@ -7,25 +7,24 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-Implement TS2300 "Duplicate identifier" diagnostics for basic redeclaration cases.
+Implement TS2792 module resolution diagnostics updates (scan + binder/driver fix).
 
-**Error Code:** TS2300 - "Duplicate identifier '{0}'."
-
-**Impact:** 105 conformance tests affected
+**Error Code:** TS2792 - "Cannot find module '{0}' or its corresponding type declarations."
 
 ### Steps
-1. **Review redeclaration checks** in `wasm/src/binder.rs` (symbol flags + declaration rules).
-2. **Emit TS2300** when incompatible declarations share a scope (var/let/const/function/type alias).
-3. **Add tests** in `wasm/src/thin_checker_tests.rs` for duplicate var/function/type alias combos.
-4. **Run focused tests** with `./wasm/test.sh` and report delta.
+1. Add `find-ts2792.mjs` scanner and verify missing patterns.
+2. Fix module declaration handling in `wasm/src/thin_binder.rs` and driver behavior in `wasm/src/cli/driver.rs`.
+3. Add tests in `wasm/src/thin_checker_tests.rs`.
+4. Run focused tests with `./wasm/test.sh` and report results.
 
 ### Key Files
-- `wasm/src/binder.rs`
-- `wasm/src/thin_checker.rs`
+- `wasm/src/thin_binder.rs`
+- `wasm/src/cli/driver.rs`
+- `wasm/src/thin_checker_tests.rs`
 
 ### Success Criteria
-- TS2300 emitted for obvious duplicate declarations
-- Valid merges (interface/namespace) still allowed
+- TS2792 emitted for unresolved module augmentations in external modules
+- Ambient module declarations still recorded in script files
 
 ## Task Queue
 (empty - single focused task)
@@ -55,6 +54,9 @@ Implement TS2300 "Duplicate identifier" diagnostics for basic redeclaration case
 - Implemented TS2300 duplicate identifier detection using declaration conflict rules; added tests for var/function, var/let, type alias conflicts, and type alias + function allowed. Ran `./wasm/test.sh duplicate_identifier` and `./wasm/test.sh type_alias_with_function_no_duplicate_2300`.
 - Re-synced with `origin/rust` and reran `./wasm/test.sh duplicate_identifier` (passed).
 - Re-synced with `origin/rust` and reran `./wasm/test.sh duplicate_identifier` after API key setup (passed).
+- Added `find-ts2792.mjs` scan with virtual FS support and directive parsing; no mismatches in first 500 tests.
+- Updated binder to avoid recording ambient module declarations in external modules; driver now suppresses checker import diagnostics in multi-file mode.
+- Added TS2792 tests for module augmentation resolution and declared module recording; ran `./wasm/test.sh ts2792` and `./wasm/test.sh declared_module_recorded_in_script`.
 
 ## Ready for Merge
 Yes

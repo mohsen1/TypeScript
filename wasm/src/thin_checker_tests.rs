@@ -2038,6 +2038,63 @@ let x: MissingType;
 }
 
 #[test]
+fn test_ts2792_import_with_module_augmentation() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+import { value } from "dep";
+
+declare module "dep" {
+    export const value: number;
+}
+
+value;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        codes.contains(&diagnostic_codes::CANNOT_FIND_MODULE),
+        "Expected TS2792 for module augmentation without resolution, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_declared_module_recorded_in_script() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+declare module "dep" {
+    export const value: number;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    assert!(
+        binder.declared_modules.contains("dep"),
+        "Expected declared module to be recorded"
+    );
+}
+
+#[test]
 fn test_missing_type_reference_in_function_type_emits_2304() {
     use crate::thin_parser::ThinParserState;
 
