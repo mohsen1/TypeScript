@@ -1913,11 +1913,6 @@ impl<'a> ThinCheckerState<'a> {
         if let Some(ident) = self.ctx.arena.get_identifier(node) {
             let name = &ident.escaped_text;
 
-            // Check type parameter scope first
-            if let Some(type_id) = self.lookup_type_parameter(name) {
-                return type_id;
-            }
-
             if let Some(sym_id) = self.resolve_identifier_symbol(idx) {
                 return self.type_reference_symbol_type(sym_id);
             }
@@ -1993,10 +1988,6 @@ impl<'a> ThinCheckerState<'a> {
             return TypeId::ERROR;
         } else if let Some(name) = name_text {
             if is_identifier {
-                // Check type parameter scope before reporting error
-                if let Some(type_id) = self.lookup_type_parameter(&name) {
-                    return type_id;
-                }
                 if self.is_known_global_value_name(&name) {
                     return TypeId::ANY;
                 }
@@ -4055,6 +4046,9 @@ impl<'a> ThinCheckerState<'a> {
                     if !self.has_static_modifier(&prop.modifiers) {
                         continue;
                     }
+                    if self.is_private_identifier_name(prop.name) {
+                        continue;
+                    }
                     let Some(name) = self.get_property_name(prop.name) else {
                         continue;
                     };
@@ -4083,6 +4077,9 @@ impl<'a> ThinCheckerState<'a> {
                     if !self.has_static_modifier(&method.modifiers) {
                         continue;
                     }
+                    if self.is_private_identifier_name(method.name) {
+                        continue;
+                    }
                     let Some(name) = self.get_property_name(method.name) else {
                         continue;
                     };
@@ -4107,6 +4104,9 @@ impl<'a> ThinCheckerState<'a> {
                         continue;
                     };
                     if !self.has_static_modifier(&accessor.modifiers) {
+                        continue;
+                    }
+                    if self.is_private_identifier_name(accessor.name) {
                         continue;
                     }
                     let Some(name) = self.get_property_name(accessor.name) else {
@@ -4614,22 +4614,21 @@ impl<'a> ThinCheckerState<'a> {
             return false;
         };
 
-        // Check if this is a variable (either block-scoped or function-scoped)
         if (symbol.flags & symbol_flags::VARIABLE) == 0 {
             return false;
         }
+        if (symbol.flags & symbol_flags::BLOCK_SCOPED_VARIABLE) == 0 {
+            return false;
+        }
 
-        // Skip parameters - they are always assigned by the caller
         if self.symbol_is_parameter(sym_id) {
             return false;
         }
 
-        // Skip if has definite assignment assertion (x!: Type)
         if self.symbol_has_definite_assignment_assertion(sym_id) {
             return false;
         }
 
-        // Skip if this is a for-in/for-of loop variable (always assigned by the loop)
         if self.is_for_in_of_assignment_target(idx) {
             return false;
         }
@@ -5741,7 +5740,12 @@ impl<'a> ThinCheckerState<'a> {
             }
 
             CallResult::NotCallable { .. } => {
-                self.error_not_callable_at(callee_type, call.expression);
+                // Check if it's a class constructor called without 'new' (TS2348)
+                if self.is_class_constructor_type(callee_type) {
+                    self.error_class_constructor_without_new_at(callee_type, call.expression);
+                } else {
+                    self.error_not_callable_at(callee_type, call.expression);
+                }
                 TypeId::ERROR
             }
 
@@ -6875,6 +6879,11 @@ impl<'a> ThinCheckerState<'a> {
                 }
 
                 PropertyAccessResult::PropertyNotFound { .. } => {
+                    // Check for optional chaining (?.) - suppress TS2339 error when using optional chaining
+                    if access.question_dot_token {
+                        // With optional chaining, missing property results in undefined
+                        return TypeId::UNDEFINED;
+                    }
                     // Don't emit TS2339 for private fields (starting with #) - they're handled elsewhere
                     if !property_name.starts_with('#') {
                         self.error_property_not_exist_at(property_name, object_type_for_access, idx);
@@ -6918,6 +6927,45 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    /// Get the type of a property access when we know the property name.
+    /// This is used for private member access when symbols resolution fails
+    /// but the property exists in the object type.
+    fn get_type_of_property_access_by_name(
+        &mut self,
+        idx: NodeIndex,
+        access: &crate::parser::thin_node::AccessExprData,
+        object_type: TypeId,
+        property_name: &str,
+    ) -> TypeId {
+        use crate::solver::{PropertyAccessResult, QueryDatabase};
+
+        let object_type = self.resolve_type_for_property_access(object_type);
+        let result_type = match self.ctx.types.property_access_type(object_type, property_name) {
+            PropertyAccessResult::Success { type_id, from_index_signature } => {
+                if from_index_signature {
+                    self.error_property_not_exist_at(&property_name.to_string(), object_type, idx);
+                    return TypeId::ERROR;
+                }
+                type_id
+            }
+            PropertyAccessResult::PropertyNotFound { .. } => {
+                self.error_property_not_exist_at(&property_name.to_string(), object_type, idx);
+                return TypeId::ERROR;
+            }
+            PropertyAccessResult::PossiblyNullOrUndefined { property_type, .. } => {
+                property_type.unwrap_or(TypeId::ANY)
+            }
+            PropertyAccessResult::IsUnknown => TypeId::ANY,
+        };
+
+        // Handle nullish coercion
+        if access.question_dot_token {
+            self.ctx.types.union(vec![result_type, TypeId::UNDEFINED])
+        } else {
+            result_type
+        }
+    }
+
     fn get_type_of_private_property_access(
         &mut self,
         idx: NodeIndex,
@@ -6936,12 +6984,6 @@ impl<'a> ThinCheckerState<'a> {
         let property_name = ident.escaped_text.clone();
 
         let (symbols, saw_class_scope) = self.resolve_private_identifier_symbols(name_idx);
-        if symbols.is_empty() {
-            if saw_class_scope {
-                self.error_property_not_exist_at(&property_name, object_type, name_idx);
-            }
-            return TypeId::ERROR;
-        }
 
         let object_type = self.evaluate_application_type(object_type);
         let (object_type_for_check, nullish_cause) = self.split_nullish_type(object_type);
@@ -6954,6 +6996,27 @@ impl<'a> ThinCheckerState<'a> {
             }
             return TypeId::ERROR;
         };
+
+        // When symbols are empty but we're inside a class scope, check if the object type
+        // itself has private properties matching the name. This handles cases like:
+        //   let a: A2 = this;
+        //   a.#prop;  // Should work if A2 has #prop
+        if symbols.is_empty() {
+            // Try to find the property directly in the object type
+            use crate::solver::{PropertyAccessResult, QueryDatabase};
+            match self.ctx.types.property_access_type(object_type_for_check, &property_name) {
+                PropertyAccessResult::Success { .. } => {
+                    // Property exists in the type, proceed with the access
+                    return self.get_type_of_property_access_by_name(idx, access, object_type_for_check, &property_name);
+                }
+                _ => {
+                    if saw_class_scope {
+                        self.error_property_not_exist_at(&property_name, object_type, name_idx);
+                    }
+                    return TypeId::ERROR;
+                }
+            }
+        }
 
         let declaring_type = match self.private_member_declaring_type(symbols[0]) {
             Some(ty) => ty,
@@ -6972,25 +7035,25 @@ impl<'a> ThinCheckerState<'a> {
             return TypeId::ANY;
         }
 
-        // For private field access, check if the object type is compatible with the declaring type.
-        // Use both assignability AND class declaration comparison, since types might be
-        // structurally equivalent but have different TypeIds (e.g., after type narrowing).
-        let is_compatible = self.is_assignable_to(object_type_for_check, declaring_type)
-            || {
-                // Check if both types refer to the same class declaration
-                match (
-                    self.get_class_decl_from_type(object_type_for_check),
-                    self.get_class_decl_from_type(declaring_type),
-                ) {
-                    (Some(obj_class), Some(decl_class)) => obj_class == decl_class,
-                    _ => false,
-                }
-            };
+        // For private member access, use nominal typing based on private brand.
+        // If both types have the same private brand, they're from the same class
+        // declaration and the access should be allowed.
+        let types_compatible = if self.types_have_same_private_brand(object_type_for_check, declaring_type) {
+            true
+        } else {
+            self.is_assignable_to(object_type_for_check, declaring_type)
+        };
 
-        if !is_compatible {
+        if !types_compatible {
             let shadowed = symbols.iter().skip(1).any(|sym_id| {
                 self.private_member_declaring_type(*sym_id)
-                    .map(|ty| self.is_assignable_to(object_type_for_check, ty))
+                    .map(|ty| {
+                        if self.types_have_same_private_brand(object_type_for_check, ty) {
+                            true
+                        } else {
+                            self.is_assignable_to(object_type_for_check, ty)
+                        }
+                    })
                     .unwrap_or(false)
             });
             if shadowed {
@@ -7902,15 +7965,35 @@ impl<'a> ThinCheckerState<'a> {
                 return_type = self.infer_return_type_from_body(body, return_context);
             }
 
+            // TS7011 (implicit any return) is only emitted for ambient functions
+            // (declare modifier or .d.ts file), matching TypeScript's behavior
             if !is_function_declaration {
-                self.maybe_report_implicit_any_return(
-                    name_for_error,
-                    name_node,
-                    return_type,
-                    has_type_annotation,
-                    has_contextual_return,
-                    idx,
-                );
+                let is_ambient = if let Some(func) = self.ctx.arena.get_function(node) {
+                    self.has_declare_modifier(&func.modifiers)
+                        || self.ctx.file_name.ends_with(".d.ts")
+                } else {
+                    self.ctx.file_name.ends_with(".d.ts")
+                };
+
+                // For methods, check if enclosing class is ambient
+                let is_ambient = if node.kind == syntax_kind_ext::METHOD_DECLARATION {
+                    is_ambient || self.ctx.enclosing_class.as_ref()
+                        .map(|c| c.is_declared)
+                        .unwrap_or(false)
+                } else {
+                    is_ambient
+                };
+
+                if is_ambient {
+                    self.maybe_report_implicit_any_return(
+                        name_for_error,
+                        name_node,
+                        return_type,
+                        has_type_annotation,
+                        has_contextual_return,
+                        idx,
+                    );
+                }
             }
 
             self.push_return_type(return_type);
@@ -9018,6 +9101,7 @@ impl<'a> ThinCheckerState<'a> {
         use crate::solver::TypeKey;
         use crate::binder::SymbolId;
 
+        // First check the cached set
         if self.ctx.abstract_constructor_types.contains(&type_id) {
             return true;
         }
@@ -9038,6 +9122,16 @@ impl<'a> ThinCheckerState<'a> {
                 .resolve_type_env_symbol(symbol, env)
                 .map(|resolved| resolved != type_id && self.is_abstract_constructor_type(resolved, env))
                 .unwrap_or(false),
+            TypeKey::Callable(shape_id) => {
+                // For Callable types (constructor types), check if they're in the abstract set
+                // This handles `typeof AbstractClass` which returns a Callable type
+                self.ctx.abstract_constructor_types.contains(&type_id)
+            }
+            TypeKey::Application(app_id) => {
+                // For generic type applications, check the base type
+                let app = self.ctx.types.type_application(app_id);
+                self.is_abstract_constructor_type(app.base, env)
+            }
             _ => false,
         }
     }
@@ -9070,15 +9164,52 @@ impl<'a> ThinCheckerState<'a> {
         match key {
             TypeKey::Function(func_id) => self.ctx.types.function_shape(func_id).is_constructor,
             TypeKey::Callable(shape_id) => {
-                !self.ctx.types.callable_shape(shape_id).construct_signatures.is_empty()
+                // A Callable is a concrete constructor target if it has construct signatures
+                // AND it's not an abstract constructor
+                let has_construct = !self.ctx.types.callable_shape(shape_id).construct_signatures.is_empty();
+                let is_abstract = self.ctx.abstract_constructor_types.contains(&type_id);
+                has_construct && !is_abstract
             }
-            TypeKey::TypeQuery(symbol) | TypeKey::Ref(symbol) => self
-                .resolve_type_env_symbol(symbol, env)
-                .map(|resolved| {
-                    resolved != type_id
-                        && self.is_concrete_constructor_target_inner(resolved, env, visited)
-                })
-                .unwrap_or(false),
+            TypeKey::TypeQuery(symbol) | TypeKey::Ref(symbol) => {
+                // First try to resolve via TypeEnvironment
+                if let Some(resolved) = self.resolve_type_env_symbol(symbol, env) {
+                    if resolved != type_id {
+                        return self.is_concrete_constructor_target_inner(resolved, env, visited);
+                    }
+                }
+                // Fallback: Check if the symbol is a non-abstract class or interface with construct signatures
+                // This handles `typeof ConcreteClass` and `typeof InterfaceWithConstructSig` when TypeEnvironment lookup fails
+                use crate::binder::SymbolId;
+                use crate::solver::SymbolRef;
+                if let Some(sym) = self.ctx.binder.get_symbol(SymbolId(symbol.0)) {
+                    // A non-abstract class is a concrete constructor target
+                    if sym.flags & symbol_flags::CLASS != 0 && sym.flags & symbol_flags::ABSTRACT == 0 {
+                        return true;
+                    }
+                    // An interface with construct signatures is also a concrete constructor target
+                    // (interfaces are never abstract)
+                    if sym.flags & symbol_flags::INTERFACE != 0 {
+                        // Check if the interface has a construct signature by examining its type
+                        let decl_idx = sym.value_declaration;
+                        if !decl_idx.is_none() {
+                            if let Some(decl_node) = self.ctx.arena.get(decl_idx) {
+                                if let Some(interface_data) = self.ctx.arena.get_interface(decl_node) {
+                                    // Check members for construct signatures
+                                    for &member_idx in &interface_data.members.nodes {
+                                        if let Some(member_node) = self.ctx.arena.get(member_idx) {
+                                            // CONSTRUCT_SIGNATURE = 194
+                                            if member_node.kind == 194 {
+                                                return true; // Interface has construct signature
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                false
+            }
             TypeKey::Union(_) | TypeKey::Intersection(_) => false,
             _ => false,
         }
@@ -11170,6 +11301,51 @@ impl<'a> ThinCheckerState<'a> {
             let diag = builder.not_callable(type_id, loc.start, loc.length());
             self.ctx.diagnostics.push(diag.to_checker_diagnostic(&self.ctx.file_name));
         }
+    }
+
+    /// Check if a type is a class constructor (typeof Class).
+    /// Returns true for Callable types with only construct signatures (no call signatures).
+    fn is_class_constructor_type(&self, type_id: TypeId) -> bool {
+        use crate::solver::TypeKey;
+
+        let Some(type_key) = self.ctx.types.lookup(type_id) else {
+            return false;
+        };
+
+        // A class constructor is a Callable with construct signatures but no call signatures
+        if let TypeKey::Callable(shape_id) = type_key {
+            let shape = self.ctx.types.callable_shape(shape_id);
+            return !shape.construct_signatures.is_empty() && shape.call_signatures.is_empty();
+        }
+
+        false
+    }
+
+    /// Report TS2348: "Cannot invoke an expression whose type lacks a call signature"
+    /// This is specifically for class constructors called without 'new'.
+    pub fn error_class_constructor_without_new_at(&mut self, type_id: TypeId, idx: NodeIndex) {
+        use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
+        use crate::solver::TypeFormatter;
+
+        let Some(loc) = self.get_source_location(idx) else {
+            return;
+        };
+
+        let mut formatter = TypeFormatter::with_symbols(self.ctx.types, &self.ctx.binder.symbols);
+        let type_str = formatter.format(type_id);
+
+        let message = diagnostic_messages::CANNOT_INVOKE_EXPRESSION_LACKING_CALL_SIGNATURE
+            .replace("{0}", &type_str);
+
+        self.ctx.diagnostics.push(Diagnostic {
+            code: diagnostic_codes::CANNOT_INVOKE_EXPRESSION_WHOSE_TYPE_LACKS_CALL_SIGNATURE,
+            category: DiagnosticCategory::Error,
+            message_text: message,
+            file: self.ctx.file_name.clone(),
+            start: loc.start,
+            length: loc.length(),
+            related_information: Vec::new(),
+        });
     }
 
     /// Report an excess property error using solver diagnostics with source tracking.
@@ -16671,28 +16847,6 @@ impl<'a> ThinCheckerState<'a> {
             return;
         }
 
-        // Check if parameter name is a binding pattern with default values
-        // For destructured parameters like ({ x = 1 }) => {}, binding elements have default values
-        if let Some(name_node) = self.ctx.arena.get(param.name) {
-            if name_node.kind == syntax_kind_ext::OBJECT_BINDING_PATTERN
-                || name_node.kind == syntax_kind_ext::ARRAY_BINDING_PATTERN
-            {
-                // Check if any binding element has an initializer (default value)
-                if let Some(pattern) = self.ctx.arena.get_binding_pattern(name_node) {
-                    for &element_idx in &pattern.elements.nodes {
-                        if let Some(element_node) = self.ctx.arena.get(element_idx) {
-                            if let Some(element) = self.ctx.arena.get_binding_element(element_node) {
-                                if !element.initializer.is_none() {
-                                    // Binding element has default value, type can be inferred
-                                    return;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
         let param_name = self.parameter_name_for_error(param.name);
         let message = format_message(diagnostic_messages::PARAMETER_IMPLICIT_ANY, &[&param_name, "any"]);
         self.error_at_node(param.name, &message, diagnostic_codes::IMPLICIT_ANY_PARAMETER);
@@ -16748,6 +16902,47 @@ impl<'a> ThinCheckerState<'a> {
                     .map(|accessor| self.has_static_modifier(&accessor.modifiers))
                     .unwrap_or(false)
             }
+            _ => false,
+        }
+    }
+
+    /// Extract the private brand property name from a type if it has one.
+    /// Returns `Some(brand_name)` if the type has a private brand, `None` otherwise.
+    fn get_private_brand(&self, type_id: TypeId) -> Option<String> {
+        use crate::solver::TypeKey;
+
+        let key = self.ctx.types.lookup(type_id)?;
+        match key {
+            TypeKey::Object(shape_id) | TypeKey::ObjectWithIndex(shape_id) => {
+                let shape = self.ctx.types.object_shape(shape_id);
+                for prop in &shape.properties {
+                    let name = self.ctx.types.resolve_atom(prop.name);
+                    if name.starts_with("__private_brand_") {
+                        return Some(name);
+                    }
+                }
+                None
+            }
+            TypeKey::Callable(callable_id) => {
+                // Constructor types (Callable) can also have private brands for static members
+                let callable = self.ctx.types.callable_shape(callable_id);
+                for prop in &callable.properties {
+                    let name = self.ctx.types.resolve_atom(prop.name);
+                    if name.starts_with("__private_brand_") {
+                        return Some(name);
+                    }
+                }
+                None
+            }
+            _ => None,
+        }
+    }
+
+    /// Check if two types have the same private brand (i.e., are from the same class declaration).
+    /// This is used for nominal typing of private member access.
+    fn types_have_same_private_brand(&self, type1: TypeId, type2: TypeId) -> bool {
+        match (self.get_private_brand(type1), self.get_private_brand(type2)) {
+            (Some(brand1), Some(brand2)) => brand1 == brand2,
             _ => false,
         }
     }
@@ -17205,15 +17400,24 @@ impl<'a> ThinCheckerState<'a> {
                 return_type = self.infer_return_type_from_body(method.body, None);
             }
 
-            let method_name = self.get_property_name(method.name);
-            self.maybe_report_implicit_any_return(
-                method_name,
-                Some(method.name),
-                return_type,
-                has_type_annotation,
-                false,
-                member_idx,
-            );
+            // TS7011 (implicit any return) is only emitted for ambient methods,
+            // matching TypeScript's behavior
+            let is_ambient_class = self.ctx.enclosing_class.as_ref()
+                .map(|c| c.is_declared)
+                .unwrap_or(false);
+            let is_ambient_file = self.ctx.file_name.ends_with(".d.ts");
+
+            if is_ambient_class || is_ambient_file {
+                let method_name = self.get_property_name(method.name);
+                self.maybe_report_implicit_any_return(
+                    method_name,
+                    Some(method.name),
+                    return_type,
+                    has_type_annotation,
+                    false,
+                    member_idx,
+                );
+            }
 
             self.push_return_type(return_type);
             self.check_statement(method.body);
@@ -17253,17 +17457,18 @@ impl<'a> ThinCheckerState<'a> {
             }
 
             self.pop_return_type();
-        } else if self.ctx.no_implicit_any && !has_type_annotation {
-            if let Some(class_info) = self.ctx.enclosing_class.as_ref() {
-                if class_info.is_declared && !self.has_private_modifier(&method.modifiers) {
-                    if let Some(name) = self.property_name_for_error(method.name) {
-                        use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages, format_message};
-                        let message =
-                            format_message(diagnostic_messages::IMPLICIT_ANY_RETURN, &[&name, "any"]);
-                        self.error_at_node(method.name, &message, diagnostic_codes::IMPLICIT_ANY_RETURN);
-                    }
-                }
-            }
+        } else {
+            // Abstract method or method overload signature
+            // Report TS7010 for abstract methods without return type annotation
+            let method_name = self.get_property_name(method.name);
+            self.maybe_report_implicit_any_return(
+                method_name,
+                Some(method.name),
+                return_type,
+                has_type_annotation,
+                false,
+                member_idx,
+            );
         }
 
         self.pop_type_parameters(type_param_updates);
@@ -17313,7 +17518,8 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
 
-        // Constructors don't have explicit return types
+        // Constructors don't have explicit return types, but they implicitly return the class instance type
+        // Get the class instance type to validate constructor return expressions (TS2322)
 
         self.cache_parameter_types(&ctor.parameters.nodes, None);
 
@@ -17327,7 +17533,22 @@ impl<'a> ThinCheckerState<'a> {
 
         // Check constructor body
         if !ctor.body.is_none() {
+            // Get class instance type for constructor return expression validation
+            let instance_type = if let Some(ref class_info) = self.ctx.enclosing_class {
+                let class_node = self.ctx.arena.get(class_info.class_idx);
+                if let Some(class) = class_node.and_then(|n| self.ctx.arena.get_class(n)) {
+                    self.get_class_instance_type(class_info.class_idx, class)
+                } else {
+                    TypeId::ANY
+                }
+            } else {
+                TypeId::ANY
+            };
+
+            // Set expected return type to class instance type
+            self.push_return_type(instance_type);
             self.check_statement(ctor.body);
+            self.pop_return_type();
         }
 
         // Reset in_constructor flag
@@ -17386,10 +17607,7 @@ impl<'a> ThinCheckerState<'a> {
         for &param_idx in &accessor.parameters.nodes {
             if let Some(param_node) = self.ctx.arena.get(param_idx) {
                 if let Some(param) = self.ctx.arena.get_parameter(param_node) {
-                    // For setters, skip implicit 'any' parameter check - the parameter type
-                    // is inferred from the corresponding getter's return type
-                    let is_setter_param = !is_getter;
-                    self.maybe_report_implicit_any_parameter(param, is_setter_param);
+                    self.maybe_report_implicit_any_parameter(param, false);
                 }
             }
         }
@@ -17592,6 +17810,90 @@ impl<'a> ThinCheckerState<'a> {
         None
     }
 
+    fn promise_like_type_argument_from_alias(
+        &mut self,
+        sym_id: SymbolId,
+        args: &[TypeId],
+        visited_aliases: &mut Vec<SymbolId>,
+    ) -> Option<TypeId> {
+        use crate::solver::TypeKey;
+
+        if visited_aliases.iter().any(|&seen| seen == sym_id) {
+            return None;
+        }
+        visited_aliases.push(sym_id);
+
+        let symbol = self.ctx.binder.get_symbol(sym_id)?;
+        let decl_idx = if !symbol.value_declaration.is_none() {
+            symbol.value_declaration
+        } else {
+            symbol.declarations.first().copied().unwrap_or(NodeIndex::NONE)
+        };
+        if decl_idx.is_none() {
+            return None;
+        }
+
+        let node = self.ctx.arena.get(decl_idx)?;
+        let type_alias = self.ctx.arena.get_type_alias(node)?;
+
+        let mut bindings = Vec::new();
+        if let Some(params) = &type_alias.type_parameters {
+            if params.nodes.len() != args.len() {
+                return None;
+            }
+            for (&param_idx, &arg) in params.nodes.iter().zip(args.iter()) {
+                let param_node = self.ctx.arena.get(param_idx)?;
+                let param = self.ctx.arena.get_type_parameter(param_node)?;
+                let name_node = self.ctx.arena.get(param.name)?;
+                let ident = self.ctx.arena.get_identifier(name_node)?;
+                bindings.push((self.ctx.types.intern_string(&ident.escaped_text), arg));
+            }
+        } else if !args.is_empty() {
+            return None;
+        }
+
+        // Check if the alias RHS is directly a Promise/PromiseLike type reference
+        // before lowering (e.g., Promise<T> where Promise is from lib and might not fully resolve)
+        if let Some(type_node) = self.ctx.arena.get(type_alias.type_node) {
+            if let Some(type_ref) = self.ctx.arena.get_type_ref(type_node) {
+                if let Some(name_node) = self.ctx.arena.get(type_ref.type_name) {
+                    if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
+                        if self.is_promise_like_name(ident.escaped_text.as_str()) {
+                            // It's Promise<...> or PromiseLike<...>
+                            // Get the first type argument and substitute bindings
+                            if let Some(type_args) = &type_ref.type_arguments {
+                                if let Some(&first_arg_idx) = type_args.nodes.first() {
+                                    // Try to substitute bindings in the type argument
+                                    let arg_type = self.lower_type_with_bindings(first_arg_idx, bindings.clone());
+                                    return Some(arg_type);
+                                }
+                            }
+                            // No type args means Promise (equivalent to Promise<any>)
+                            return Some(TypeId::ANY);
+                        }
+                    }
+                }
+            }
+        }
+
+        let lowered = self.lower_type_with_bindings(type_alias.type_node, bindings);
+        if let Some(TypeKey::Application(app_id)) = self.ctx.types.lookup(lowered) {
+            let app = self.ctx.types.type_application(app_id);
+            return self.promise_like_type_argument_from_base(app.base, &app.args, visited_aliases);
+        }
+
+        // Fallback: if the alias expands to a promise-like type reference (e.g., Promise from lib),
+        // treat it as Promise<any> even if we can't get the type argument.
+        // This handles cases like: type PromiseAlias<T> = Promise<T> where Promise comes from lib.
+        if self.type_ref_is_promise_like(lowered) {
+            // If we have args, try to return the first one (the T in Promise<T>)
+            // Otherwise return ANY as a safe fallback
+            return Some(args.first().copied().unwrap_or(TypeId::ANY));
+        }
+
+        None
+    }
+
     fn promise_like_type_argument_from_class(
         &mut self,
         sym_id: SymbolId,
@@ -17689,90 +17991,6 @@ impl<'a> ThinCheckerState<'a> {
 
             // Promise with no type argument defaults to Promise<any>
             return Some(TypeId::ANY);
-        }
-
-        None
-    }
-
-    fn promise_like_type_argument_from_alias(
-        &mut self,
-        sym_id: SymbolId,
-        args: &[TypeId],
-        visited_aliases: &mut Vec<SymbolId>,
-    ) -> Option<TypeId> {
-        use crate::solver::TypeKey;
-
-        if visited_aliases.iter().any(|&seen| seen == sym_id) {
-            return None;
-        }
-        visited_aliases.push(sym_id);
-
-        let symbol = self.ctx.binder.get_symbol(sym_id)?;
-        let decl_idx = if !symbol.value_declaration.is_none() {
-            symbol.value_declaration
-        } else {
-            symbol.declarations.first().copied().unwrap_or(NodeIndex::NONE)
-        };
-        if decl_idx.is_none() {
-            return None;
-        }
-
-        let node = self.ctx.arena.get(decl_idx)?;
-        let type_alias = self.ctx.arena.get_type_alias(node)?;
-
-        let mut bindings = Vec::new();
-        if let Some(params) = &type_alias.type_parameters {
-            if params.nodes.len() != args.len() {
-                return None;
-            }
-            for (&param_idx, &arg) in params.nodes.iter().zip(args.iter()) {
-                let param_node = self.ctx.arena.get(param_idx)?;
-                let param = self.ctx.arena.get_type_parameter(param_node)?;
-                let name_node = self.ctx.arena.get(param.name)?;
-                let ident = self.ctx.arena.get_identifier(name_node)?;
-                bindings.push((self.ctx.types.intern_string(&ident.escaped_text), arg));
-            }
-        } else if !args.is_empty() {
-            return None;
-        }
-
-        // Check if the alias RHS is directly a Promise/PromiseLike type reference
-        // before lowering (e.g., Promise<T> where Promise is from lib and might not fully resolve)
-        if let Some(type_node) = self.ctx.arena.get(type_alias.type_node) {
-            if let Some(type_ref) = self.ctx.arena.get_type_ref(type_node) {
-                if let Some(name_node) = self.ctx.arena.get(type_ref.type_name) {
-                    if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
-                        if self.is_promise_like_name(ident.escaped_text.as_str()) {
-                            // It's Promise<...> or PromiseLike<...>
-                            // Get the first type argument and substitute bindings
-                            if let Some(type_args) = &type_ref.type_arguments {
-                                if let Some(&first_arg_idx) = type_args.nodes.first() {
-                                    // Try to substitute bindings in the type argument
-                                    let arg_type = self.lower_type_with_bindings(first_arg_idx, bindings.clone());
-                                    return Some(arg_type);
-                                }
-                            }
-                            // No type args means Promise (equivalent to Promise<any>)
-                            return Some(TypeId::ANY);
-                        }
-                    }
-                }
-            }
-        }
-
-        let lowered = self.lower_type_with_bindings(type_alias.type_node, bindings);
-        if let Some(TypeKey::Application(app_id)) = self.ctx.types.lookup(lowered) {
-            let app = self.ctx.types.type_application(app_id);
-            return self.promise_like_type_argument_from_base(app.base, &app.args, visited_aliases);
-        }
-
-        // Fallback: if the alias expands to a promise-like type reference (e.g., Promise from lib),
-        // treat it as Promise<any> even if we can't get the type argument.
-        // This handles cases like: type PromiseAlias<T> = Promise<T> where Promise comes from lib.
-        if self.type_ref_is_promise_like(lowered) {
-            // If we have args, try to return the first one (the T in Promise<T>)
-            // Otherwise return ANY as a safe fallback
-            return Some(args.first().copied().unwrap_or(TypeId::ANY));
         }
 
         None
