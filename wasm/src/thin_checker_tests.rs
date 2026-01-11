@@ -5641,7 +5641,6 @@ function createClass() {
 
 #[test]
 fn test_ts7010_return_path_analysis() {
-    use crate::checker::{CheckerContext, StatementChecker};
     use crate::thin_parser::ThinParserState;
 
     let source = r#"
@@ -5689,18 +5688,11 @@ function loopWithNestedSwitchBreak(flag: boolean) {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut ctx = CheckerContext::new(
-        parser.get_arena(),
-        &binder,
-        &types,
-        "test.ts".to_string(),
-    );
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
 
     let arena = parser.get_arena();
     let root_node = arena.get(root).expect("root node");
     let source_file = arena.get_source_file(root_node).expect("source file");
-
-    let checker = StatementChecker::new(&mut ctx);
 
     let body_at = |index: usize| {
         let stmt_idx = *source_file
@@ -16937,4 +16929,47 @@ let { x = "hello" }: { x?: number } = {};
     // This test may currently fail if default values in binding elements aren't being checked
     assert!(!ts2322_errors.is_empty(), "Expected TS2322 error for binding element default value 'hello' (string) not assignable to number, got: {:?}",
         checker.ctx.diagnostics.iter().map(|d| d.code).collect::<Vec<_>>());
+}
+
+#[test]
+fn test_local_variable_in_object_literal_method() {
+    use crate::thin_parser::ThinParserState;
+    use crate::checker::types::diagnostics::diagnostic_codes;
+
+    // Regression test for TS2304 false positive on local variables in object literal methods
+    // From: tests/cases/conformance/declarationEmit/typePredicates/declarationEmitThisPredicates02.ts
+    let source = r#"
+export interface Foo {
+    a: string;
+    b: number;
+    c: boolean;
+}
+
+export const obj = {
+    m(): this is Foo {
+        let dis = this as {} as Foo;
+        return dis.a != null && dis.b != null && dis.c != null;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Variable 'dis' should be in scope and not produce TS2304
+    let ts2304_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == diagnostic_codes::CANNOT_FIND_NAME)
+        .collect();
+
+    assert!(ts2304_errors.is_empty(),
+        "Unexpected TS2304 errors for local variable 'dis' in object literal method: {:?}",
+        ts2304_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>());
 }

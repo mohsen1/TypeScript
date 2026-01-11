@@ -17940,7 +17940,7 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
-    fn function_body_falls_through(&mut self, body_idx: NodeIndex) -> bool {
+    pub fn function_body_falls_through(&mut self, body_idx: NodeIndex) -> bool {
         let Some(body_node) = self.ctx.arena.get(body_idx) else {
             return true;
         };
