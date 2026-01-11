@@ -88,6 +88,6 @@ Yes
 - **NEVER edit**: `STRUCTURE.md`, `GOALS.md`, other workers' plan files, or anything in `orchestrator/`
 
 ## Resume
-- Branch/state: `worker/forge-4`, changes committed and ready to push.
+- Branch/state: `worker/forge-4`, changes pushed; ready for merge.
 - Session work: implemented union optional assignability guard in `wasm/src/solver/compat.rs`; added union excess property handling in `wasm/src/thin_checker.rs`; added tests for TS2322/TS2353 behavior.
 - Unit tests: `./wasm/test.sh` (fails: `cli::driver_tests::compile_shorthand_methods`), `./wasm/test.sh union_optional`.
