@@ -4,7 +4,6 @@ use crate::thin_checker::ThinCheckerState;
 use crate::thin_parser::ThinParserState;
 use crate::parser::thin_node::ThinNodeArena;
 use crate::thin_binder::ThinBinderState;
-use crate::thin_parser::ThinParserState;
 use crate::solver::{TypeId, TypeInterner};
 
 #[test]
@@ -17154,7 +17153,6 @@ fn test_static_private_field_access_no_ts2339() {
 
     // Regression test for static private field access
     // Previously failed with TS2339 because static private members were excluded from constructor type
-    use crate::thin_parser::ThinParserState;
 
     let source = r#"
 class C {
@@ -17192,7 +17190,6 @@ fn test_static_private_accessor_access_no_ts2339() {
     use crate::thin_parser::ThinParserState;
 
     // Regression test for static private accessor access
-    use crate::thin_parser::ThinParserState;
 
     let source = r#"
 class A {
@@ -17600,243 +17597,61 @@ function test2(obj: A | B) {
     // Should have 2 TS2339 errors: one for obj.c, one for obj.a
     assert_eq!(ts2339_errors.len(), 2,
         "Expected 2 TS2339 errors for union property access, got {}: {:?}",
-=======
-    
+        ts2339_errors.len(),
+        ts2339_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn test_ts2339_private_accessor_in_closure_no_error() {
+    use crate::thin_parser::ThinParserState;
+
+    // Private accessor access from within closure should work
+    let source = r#"
+class A {
+    private get #prop() { return ""; }
+    private set #prop(param: string) { }
+
+    foo() {
+        // Direct access - should work
+        const a = this.#prop;
+        this.#prop = "test";
+
+        // Access from closure - should also work
+        const fn = () => {
+            const b = this.#prop;
+            this.#prop = "test2";
+        };
+
+        fn();
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
     let mut binder = ThinBinderState::new();
-    binder.bind_source_file(parser.get_arena(), root);
-    
+    binder.bind_source_file(arena, root);
+
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
-    
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
     checker.check_source_file(root);
-    
+
     let ts2339_errors: Vec<_> = checker.ctx.diagnostics.iter()
         .filter(|d| d.code == 2339)
         .collect();
-    
-    eprintln!("TS2339 errors found: {}", ts2339_errors.len());
-    for err in &ts2339_errors {
-        eprintln!("  - {}", err.message_text);
-    }
-    
+
     // All accesses should work - they're all from within the class
     assert_eq!(ts2339_errors.len(), 0,
         "Expected no TS2339 errors for private accessor access (including in closures), got {} - errors: {:?}",
->>>>>>> origin/worker/anvil-3
-        ts2339_errors.len(),
-        ts2339_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>()
-    );
-}
-<<<<<<< HEAD
-
-#[test]
-fn test_ts2339_union_shared_property_no_error() {
-    use crate::thin_parser::ThinParserState;
-
-    // Property that exists on ALL union members should NOT produce TS2339
-    let source = r#"
-interface A { common: string; a: string; }
-interface B { common: number; b: number; }
-
-function test(obj: A | B) {
-    // This should NOT produce TS2339 because 'common' exists on both A and B
-    const result = obj.common;
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let arena = parser.get_arena();
-    let mut binder = ThinBinderState::new();
-    binder.bind_source_file(arena, root);
-
-    let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
-    checker.check_source_file(root);
-
-    let ts2339_count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2339).count();
-    assert_eq!(ts2339_count, 0,
-        "Expected no TS2339 errors for shared union property, got {}: {:?}",
-        ts2339_count,
-        checker.ctx.diagnostics.iter().filter(|d| d.code == 2339)
-            .map(|d| &d.message_text).collect::<Vec<_>>()
-    );
-}
-
-#[test]
-fn test_ts2339_index_signature_allows_any_property() {
-    use crate::thin_parser::ThinParserState;
-
-    // String/number index signatures should allow any property access
-    let source = r#"
-interface StringIndexed {
-    [key: string]: number;
-    a: number; // explicit property
-}
-
-interface NumberIndexed {
-    [key: number]: string;
-}
-
-function test1(obj: StringIndexed) {
-    // These should NOT produce TS2339 - index signature allows any string property
-    const x = obj.anyProp;
-    const y = obj.anotherProp;
-    const z = obj.a; // explicit property
-}
-
-function test2(obj: NumberIndexed) {
-    // This should NOT produce TS2339 - number index signature allows numeric access
-    const x = obj[0];
-    const y = obj[42];
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let arena = parser.get_arena();
-    let mut binder = ThinBinderState::new();
-    binder.bind_source_file(arena, root);
-
-    let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
-    checker.check_source_file(root);
-
-    let ts2339_count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2339).count();
-    assert_eq!(ts2339_count, 0,
-        "Expected no TS2339 errors for index signature access, got {}: {:?}",
-        ts2339_count,
-        checker.ctx.diagnostics.iter().filter(|d| d.code == 2339)
-            .map(|d| &d.message_text).collect::<Vec<_>>()
-    );
-}
-
-#[test]
-fn test_ts2339_no_index_signature_error() {
-    use crate::thin_parser::ThinParserState;
-
-    // Without index signature, accessing non-existent property should produce TS2339
-    let source = r#"
-interface NoIndex {
-    a: string;
-}
-
-function test(obj: NoIndex) {
-    // This SHOULD produce TS2339 - property 'b' doesn't exist
-    const result = obj.b;
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let arena = parser.get_arena();
-    let mut binder = ThinBinderState::new();
-    binder.bind_source_file(arena, root);
-
-    let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
-    checker.check_source_file(root);
-
-    let ts2339_count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2339).count();
-    assert_eq!(ts2339_count, 1,
-        "Expected 1 TS2339 error for missing property without index signature, got {}: {:?}",
-        ts2339_count,
-        checker.ctx.diagnostics.iter().filter(|d| d.code == 2339)
-            .map(|d| &d.message_text).collect::<Vec<_>>()
-    );
-}
-
-#[test]
-fn test_ts2339_nullable_union_with_optional_chaining() {
-    use crate::thin_parser::ThinParserState;
-
-    // Test union with null/undefined using optional chaining
-    let source = r#"
-interface A { a: string; }
-
-function test(obj: A | null) {
-    // With optional chaining, this should NOT produce TS2339
-    const result = obj?.a;
-
-    // Without optional chaining, this SHOULD produce TS2339 for non-null property access
-    // (though it might produce a different error about possible null)
-    const result2 = obj.a;
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let arena = parser.get_arena();
-    let mut binder = ThinBinderState::new();
-    binder.bind_source_file(arena, root);
-
-    let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
-    checker.check_source_file(root);
-
-    // obj?.a should NOT produce TS2339
-    let ts2339_errors: Vec<_> = checker.ctx.diagnostics.iter()
-        .filter(|d| d.code == 2339)
-        .collect();
-
-    // The optional chaining case should not have TS2339
-    // obj.a might have other diagnostics but not TS2339 for property access
-    assert!(ts2339_errors.is_empty(),
-        "Expected no TS2339 errors, got {}: {:?}",
         ts2339_errors.len(),
         ts2339_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>()
     );
 }
 
 #[test]
-fn test_ts2339_intersection_property_access() {
-    use crate::thin_parser::ThinParserState;
-
-    // Test property access on intersection types
-    let source = r#"
-type A = { a: string };
-type B = { b: number };
-type AB = A & B;
-
-function test(obj: AB) {
-    // These should NOT produce TS2339 - intersection has both properties
-    const x = obj.a;
-    const y = obj.b;
-}
-
-function test2(obj: A & { c: boolean }) {
-    // These should NOT produce TS2339
-    const x = obj.a;
-    const y = obj.c;
-}
-"#;
-
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-    let root = parser.parse_source_file();
-
-    let arena = parser.get_arena();
-    let mut binder = ThinBinderState::new();
-    binder.bind_source_file(arena, root);
-
-    let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
-    checker.check_source_file(root);
-
-    let ts2339_count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2339).count();
-    assert_eq!(ts2339_count, 0,
-        "Expected no TS2339 errors for intersection property access, got {}: {:?}",
-        ts2339_count,
-        checker.ctx.diagnostics.iter().filter(|d| d.code == 2339)
-            .map(|d| &d.message_text).collect::<Vec<_>>()
-    );
-}
-=======
->>>>>>> origin/worker/anvil-3
-=======
 fn test_overload_arg_count_exceeds_all_only_ts2554_not_ts2769() {
     use crate::thin_parser::ThinParserState;
 
@@ -17887,4 +17702,231 @@ mixed(42, 99, 100);
         first_error_msg
     );
 }
->>>>>>> origin/worker/anvil-4
+
+// =============================================================================
+// TS2339 Union Edge Case Tests (Additional Coverage)
+// =============================================================================
+
+#[test]
+fn test_ts2339_union_with_null_undefined_members() {
+    use crate::thin_parser::ThinParserState;
+
+    // Test that null/undefined union members are handled correctly
+    let source = r#"
+interface A { x: string; }
+
+function test(obj: A | null | undefined) {
+    // Should produce TS2339 because 'y' doesn't exist on A
+    // (null/undefined are excluded from property check)
+    const result = obj.y;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2339_count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2339).count();
+    assert_eq!(ts2339_count, 1,
+        "Expected 1 TS2339 error for missing property on union with null/undefined, got {}: {:?}",
+        ts2339_count,
+        checker.ctx.diagnostics.iter().filter(|d| d.code == 2339)
+            .map(|d| &d.message_text).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn test_ts2339_union_three_members() {
+    use crate::thin_parser::ThinParserState;
+
+    // Test union with 3+ members - all must have the property
+    let source = r#"
+interface A { a: string; }
+interface B { b: number; }
+interface C { c: boolean; }
+
+function test(obj: A | B | C) {
+    // Should produce TS2339 because 'x' doesn't exist on any member
+    const result = obj.x;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2339_count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2339).count();
+    assert_eq!(ts2339_count, 1,
+        "Expected 1 TS2339 error for missing property on 3-member union, got {}: {:?}",
+        ts2339_count,
+        checker.ctx.diagnostics.iter().filter(|d| d.code == 2339)
+            .map(|d| &d.message_text).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn test_ts2339_union_partial_shared_property() {
+    use crate::thin_parser::ThinParserState;
+
+    // Test union where property exists on SOME but not ALL members
+    let source = r#"
+interface A { common: string; onlyA: string; }
+interface B { common: number; onlyB: number; }
+
+function test(obj: A | B) {
+    // 'common' exists on both - should NOT produce TS2339
+    const x = obj.common;
+
+    // 'onlyA' only exists on A - SHOULD produce TS2339
+    const y = obj.onlyA;
+
+    // 'onlyB' only exists on B - SHOULD produce TS2339
+    const z = obj.onlyB;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2339_count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2339).count();
+    assert_eq!(ts2339_count, 2,
+        "Expected 2 TS2339 errors for partial shared properties, got {}: {:?}",
+        ts2339_count,
+        checker.ctx.diagnostics.iter().filter(|d| d.code == 2339)
+            .map(|d| &d.message_text).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn test_ts2339_union_with_index_signature() {
+    use crate::thin_parser::ThinParserState;
+
+    // Test that index signatures in unions work correctly
+    let source = r#"
+interface A { [key: string]: number; }
+interface B { [key: string]: number; }
+
+function test(obj: A | B) {
+    // Should NOT produce TS2339 - both have index signatures
+    const x = obj.anyProp;
+    const y = obj.anotherProp;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2339_count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2339).count();
+    assert_eq!(ts2339_count, 0,
+        "Expected no TS2339 errors for union with index signatures, got {}: {:?}",
+        ts2339_count,
+        checker.ctx.diagnostics.iter().filter(|d| d.code == 2339)
+            .map(|d| &d.message_text).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn test_ts2339_union_mixed_index_signature() {
+    use crate::thin_parser::ThinParserState;
+
+    // Test union where some members have index signature and some don't
+    // Even if one member has an index signature, the property must exist on ALL members
+    let source = r#"
+interface A { [key: string]: number; }
+interface B { specificProp: string; }
+
+function test(obj: A | B) {
+    // SHOULD produce TS2339 - B doesn't have anyProp, even though A has index signature
+    const x = obj.anyProp;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2339_count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2339).count();
+    assert_eq!(ts2339_count, 1,
+        "Expected 1 TS2339 error for union with mixed index signature, got {}: {:?}",
+        ts2339_count,
+        checker.ctx.diagnostics.iter().filter(|d| d.code == 2339)
+            .map(|d| &d.message_text).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn test_ts2339_discriminated_union_property_access() {
+    use crate::thin_parser::ThinParserState;
+
+    // Test discriminated unions
+    let source = r#"
+interface Square { kind: 'square'; size: number; }
+interface Circle { kind: 'circle'; radius: number; }
+
+function test(shape: Square | Circle) {
+    // 'kind' exists on both - should NOT produce TS2339
+    const k = shape.kind;
+
+    // These properties don't exist on all members - SHOULD produce TS2339
+    const s = shape.size;
+    const r = shape.radius;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2339_count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2339).count();
+    // Should have 2 TS2339 errors - one for size, one for radius
+    assert_eq!(ts2339_count, 2,
+        "Expected 2 TS2339 errors for discriminated union, got {}: {:?}",
+        ts2339_count,
+        checker.ctx.diagnostics.iter().filter(|d| d.code == 2339)
+            .map(|d| &d.message_text).collect::<Vec<_>>()
+    );
+}
