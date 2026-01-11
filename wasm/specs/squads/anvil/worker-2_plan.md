@@ -7,10 +7,12 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- Parser recovery: reduce TS1005/TS1068 false positives (PRIORITY 0)
+- TS2355 - Return Analysis (MEDIUM): Fix 'function must return value' false positives. Focus on recognizing throw statements and never-returning calls as valid exits.
 
 ## Task Queue
-- Continue parser recovery: identify and fix remaining TS1068 (24 occurrences) and TS1005 (42 occurrences) patterns
+- Run find-ts7011.mjs to identify TS2355 patterns
+- Analyze control flow in thin_checker.rs and checker/control_flow.rs
+- Implement fixes for throw statements and never-returning calls as valid exits
 
 ## Completed
 - [x] Parser recovery: computed enum members (TS1164) and missing type alias equals (TS1005) (2026-01-11): Added computed enum member recovery in `parse_enum_members()` - now emits TS1164 "Computed property names are not allowed in enums" instead of TS1005 for `[x] = 1` pattern. Added missing type alias assignment recovery in `parse_type_alias_declaration_with_modifiers()` - emits TS1005 for missing `=` but continues parsing the type if the next token can start a type. Also fixed pre-existing missing ThinParserState import in thin_checker_tests.rs. Added regression tests: `test_thin_parser_enum_computed_property_name`, `test_thin_parser_type_alias_missing_equals`, `test_thin_parser_type_alias_missing_equals_recovers_with_object_type`, `test_thin_parser_function_keyword_in_class_recovers`. Tests: `./wasm/test.sh thin_parser` (222 passed, 3 pre-existing failures). Commit: 66a97605da.
@@ -206,7 +208,7 @@ Priority: 2
 - [x] Further fixed TS2403 false positives: changed from TypeId equality to bi-directional assignability check. TypeScript's "same type" semantics requires mutual assignability, not identical TypeIds. Fixes patterns like `var e = E1; var e: typeof E1;` (enum/typeof) and `var n = 42; var n: number;` (inferred vs annotated). Also fixed compilation error in solver/subtype.rs (s_sym referenced but undefined). Added regression tests for enum typeof and inferred vs annotated patterns. Quick conformance (200 files): TS2403 removed from top 10 extra errors list; appears only as 7 missing errors (legitimate cases where TSC emits but we don't).
 
 ## Ready for Merge
-Yes - Pushed 66a97605da
+No - Working on TS2355 return analysis
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize emitter fidelity (ES5 downleveling/source maps) before new features.
