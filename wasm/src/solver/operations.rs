@@ -19,6 +19,7 @@
 //! - Optimized independently
 
 use crate::interner::Atom;
+use std::cell::RefCell;
 use crate::solver::types::*;
 use crate::solver::{
     apparent_object_member_kind,
@@ -1526,6 +1527,20 @@ pub enum PropertyAccessResult {
 pub struct PropertyAccessEvaluator<'a> {
     interner: &'a dyn TypeDatabase,
     no_unchecked_indexed_access: bool,
+    mapped_access_visiting: RefCell<FxHashSet<TypeId>>,
+    mapped_access_depth: RefCell<u32>,
+}
+
+struct MappedAccessGuard<'a> {
+    evaluator: &'a PropertyAccessEvaluator<'a>,
+    obj_type: TypeId,
+}
+
+impl<'a> Drop for MappedAccessGuard<'a> {
+    fn drop(&mut self) {
+        self.evaluator.mapped_access_visiting.borrow_mut().remove(&self.obj_type);
+        *self.evaluator.mapped_access_depth.borrow_mut() -= 1;
+    }
 }
 
 impl<'a> PropertyAccessEvaluator<'a> {
@@ -1533,6 +1548,8 @@ impl<'a> PropertyAccessEvaluator<'a> {
         PropertyAccessEvaluator {
             interner,
             no_unchecked_indexed_access: false,
+            mapped_access_visiting: RefCell::new(FxHashSet::default()),
+            mapped_access_depth: RefCell::new(0),
         }
     }
 
@@ -1547,6 +1564,26 @@ impl<'a> PropertyAccessEvaluator<'a> {
         prop_name: &str,
     ) -> PropertyAccessResult {
         self.resolve_property_access_inner(obj_type, prop_name, None)
+    }
+
+    fn enter_mapped_access_guard(&self, obj_type: TypeId) -> Option<MappedAccessGuard<'_>> {
+        const MAX_MAPPED_ACCESS_DEPTH: u32 = 50;
+
+        let mut depth = self.mapped_access_depth.borrow_mut();
+        if *depth >= MAX_MAPPED_ACCESS_DEPTH {
+            return None;
+        }
+        *depth += 1;
+        drop(depth);
+
+        let mut visiting = self.mapped_access_visiting.borrow_mut();
+        if !visiting.insert(obj_type) {
+            drop(visiting);
+            *self.mapped_access_depth.borrow_mut() -= 1;
+            return None;
+        }
+
+        Some(MappedAccessGuard { evaluator: self, obj_type })
     }
 
     fn resolve_property_access_inner(
@@ -1910,6 +1947,13 @@ impl<'a> PropertyAccessEvaluator<'a> {
 
             // Application: evaluate the generic type and resolve property on the result
             TypeKey::Application(_) => {
+                let _guard = match self.enter_mapped_access_guard(obj_type) {
+                    Some(guard) => guard,
+                    None => {
+                        return PropertyAccessResult::IsUnknown;
+                    }
+                };
+
                 let evaluated = evaluate_type(self.interner, obj_type);
                 if evaluated != obj_type {
                     // Successfully evaluated - resolve property on the concrete type
@@ -1925,6 +1969,13 @@ impl<'a> PropertyAccessEvaluator<'a> {
 
             // Mapped: evaluate the mapped type to get concrete properties
             TypeKey::Mapped(_) => {
+                let _guard = match self.enter_mapped_access_guard(obj_type) {
+                    Some(guard) => guard,
+                    None => {
+                        return PropertyAccessResult::IsUnknown;
+                    }
+                };
+
                 let evaluated = evaluate_type(self.interner, obj_type);
                 if evaluated != obj_type {
                     // Successfully evaluated - resolve property on the concrete type
