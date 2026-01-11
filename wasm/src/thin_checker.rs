@@ -7958,6 +7958,84 @@ impl<'a> ThinCheckerState<'a> {
         Some(SymbolId(sym_id))
     }
 
+    fn enum_symbol_from_value_type(&self, type_id: TypeId) -> Option<SymbolId> {
+        use crate::solver::{SymbolRef, TypeKey};
+
+        let sym_id = match self.ctx.types.lookup(type_id) {
+            Some(TypeKey::Ref(SymbolRef(sym_id))) => sym_id,
+            Some(TypeKey::TypeQuery(SymbolRef(sym_id))) => sym_id,
+            _ => return None,
+        };
+
+        let symbol = self.ctx.binder.get_symbol(SymbolId(sym_id))?;
+        if symbol.flags & symbol_flags::ENUM == 0 {
+            return None;
+        }
+        Some(SymbolId(sym_id))
+    }
+
+    fn enum_object_type(&mut self, sym_id: SymbolId) -> Option<TypeId> {
+        use crate::solver::{IndexSignature, ObjectShape, PropertyInfo};
+        use rustc_hash::FxHashMap;
+
+        let symbol = self.ctx.binder.get_symbol(sym_id)?;
+        if symbol.flags & symbol_flags::ENUM == 0 {
+            return None;
+        }
+
+        let member_type = match self.enum_kind(sym_id) {
+            Some(EnumKind::String) => TypeId::STRING,
+            Some(EnumKind::Numeric) => TypeId::NUMBER,
+            None => TypeId::ANY,
+        };
+
+        let mut props: FxHashMap<Atom, PropertyInfo> = FxHashMap::default();
+        for &decl_idx in &symbol.declarations {
+            let Some(node) = self.ctx.arena.get(decl_idx) else {
+                continue;
+            };
+            let Some(enum_decl) = self.ctx.arena.get_enum(node) else {
+                continue;
+            };
+            for &member_idx in &enum_decl.members.nodes {
+                let Some(member_node) = self.ctx.arena.get(member_idx) else {
+                    continue;
+                };
+                let Some(member) = self.ctx.arena.get_enum_member(member_node) else {
+                    continue;
+                };
+                let Some(name) = self.get_property_name(member.name) else {
+                    continue;
+                };
+                let name_atom = self.ctx.types.intern_string(&name);
+                props.entry(name_atom).or_insert(PropertyInfo {
+                    name: name_atom,
+                    type_id: member_type,
+                    write_type: member_type,
+                    optional: false,
+                    readonly: true,
+                    is_method: false,
+                });
+            }
+        }
+
+        let properties: Vec<PropertyInfo> = props.into_values().collect();
+        if self.enum_kind(sym_id) == Some(EnumKind::Numeric) {
+            let number_index = Some(IndexSignature {
+                key_type: TypeId::NUMBER,
+                value_type: TypeId::STRING,
+                readonly: true,
+            });
+            return Some(self.ctx.types.object_with_index(ObjectShape {
+                properties,
+                string_index: None,
+                number_index,
+            }));
+        }
+
+        Some(self.ctx.types.object(properties))
+    }
+
     fn enum_kind(&self, sym_id: SymbolId) -> Option<EnumKind> {
         let symbol = self.ctx.binder.get_symbol(sym_id)?;
         if symbol.flags & symbol_flags::ENUM == 0 {
@@ -8645,6 +8723,37 @@ impl<'a> ThinCheckerState<'a> {
     /// O(1) operation - just compare TypeId values (structural interning).
     pub fn are_types_identical(&self, type1: TypeId, type2: TypeId) -> bool {
         type1 == type2
+    }
+
+    fn are_var_decl_types_compatible(&mut self, prev_type: TypeId, current_type: TypeId) -> bool {
+        let prev_type = self
+            .enum_symbol_from_value_type(prev_type)
+            .and_then(|sym_id| self.enum_object_type(sym_id))
+            .unwrap_or(prev_type);
+        let current_type = self
+            .enum_symbol_from_value_type(current_type)
+            .and_then(|sym_id| self.enum_object_type(sym_id))
+            .unwrap_or(current_type);
+
+        if prev_type == current_type {
+            return true;
+        }
+        if matches!(prev_type, TypeId::ERROR) || matches!(current_type, TypeId::ERROR) {
+            return true;
+        }
+        self.ensure_application_symbols_resolved(prev_type);
+        self.ensure_application_symbols_resolved(current_type);
+        self.is_assignable_to(prev_type, current_type)
+            && self.is_assignable_to(current_type, prev_type)
+    }
+
+    fn refine_var_decl_type(&self, prev_type: TypeId, current_type: TypeId) -> TypeId {
+        if matches!(prev_type, TypeId::ANY | TypeId::ERROR)
+            && !matches!(current_type, TypeId::ANY | TypeId::ERROR)
+        {
+            return current_type;
+        }
+        prev_type
     }
 
     /// Check if a type is assignable to a union of types.
@@ -11397,8 +11506,18 @@ impl<'a> ThinCheckerState<'a> {
             // let/const duplicates are caught earlier by the binder (TS2451).
             if let Some(prev_type) = self.ctx.var_decl_types.get(&sym_id).copied() {
                 if let Some(ref name) = var_name {
-                    if !self.are_types_identical(final_type, prev_type) {
-                        self.error_subsequent_variable_declaration(name, prev_type, final_type, decl_idx);
+                    if !self.are_var_decl_types_compatible(prev_type, final_type) {
+                        self.error_subsequent_variable_declaration(
+                            name,
+                            prev_type,
+                            final_type,
+                            decl_idx,
+                        );
+                    } else {
+                        let refined = self.refine_var_decl_type(prev_type, final_type);
+                        if refined != prev_type {
+                            self.ctx.var_decl_types.insert(sym_id, refined);
+                        }
                     }
                 }
             } else {

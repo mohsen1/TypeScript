@@ -1,13 +1,19 @@
 # Anvil Worker 3 - TS2339 Property Resolution (Inherited Properties)
 
-Ready for Merge: Yes
+Ready for Merge: No
 Status: Active
 
 ## Current Assignment (2026-01-11)
 
-- Investigate remaining TS2339 extras in `classes/classDeclarations/classExtendingClassLikeType.ts` (class-like constructors).
-- Trace property lookup/heritage typing in `wasm/src/thin_checker.rs` for class-like constructor types and overloads.
-- Add regression test; run `node wasm/differential-test/find-ts2339.mjs --max=500 --samples=5` and report delta.
+- Investigate TS2403 false positives (subsequent variable declarations type mismatch).
+- Use conformance output to collect 3-5 samples; trace symbol/decl merging in `wasm/src/thin_checker.rs` and related solver checks.
+- Implement fix + regression test(s); run a targeted TS2403 scan and report delta.
+
+### Update (2026-01-11)
+- Samples (pre-fix): `enums/enumBasics.ts`, `es6/spread/arrayLiteralSpread.ts`, `es6/spread/arrayLiteralSpreadES5iterable.ts`, `es6/templates/taggedTemplateStringsWithOverloadResolution3.ts`, `es6/templates/taggedTemplateStringsWithOverloadResolution3_ES6.ts`.
+- Fix (in progress): treat variable redeclaration types as compatible when bidirectionally assignable; refine stored var type to avoid widening; expand enum value types to enum object shapes before comparison (in `wasm/src/thin_checker.rs`).
+- Regression tests (in progress): `test_variable_redeclaration_enum_object_literal_no_2403`, `test_variable_redeclaration_array_spread_no_2403` in `wasm/src/thin_checker_tests.rs`.
+- TS2403 delta scan: pending (need rebuild + re-run).
 
 ### Update (2026-01-11)
 - Fix: use TypeEnvironment-backed assignability in call/new resolution, and resolve Application symbols (including type param constraints) to improve generic mixin inference (commit 5cf3894068).
