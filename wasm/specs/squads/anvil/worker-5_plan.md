@@ -14,6 +14,7 @@ Priority: 5
 
 
 ## Completed
+- [x] Quantified TS2304 extras in `internalModules`, `moduleResolution`, `externalModules` (max=200 each). Extra TS2304 counts: internalModules=5, moduleResolution=5, externalModules=26. Outputs: `/tmp/conformance_internalModules_ts2304.txt`, `/tmp/conformance_moduleResolution_ts2304.txt`, `/tmp/conformance_externalModules_ts2304.txt`.
 - [x] Fixed remaining TS2355 extras in asyncGenerators/contextualTypes by unwrapping async promise-like return types and skipping implicit-return checks for async generators; added `test_async_promise_number_requires_return` and `test_async_generator_no_2355`. Targeted conformance (`types/asyncGenerators`, `types/contextualTypes/asyncFunctions`) shows TS2355 extras removed (outputs in `/tmp/conformance_types_asyncGenerators_after.txt` and `/tmp/conformance_types_contextual_asyncFunctions_after.txt`). Ran `./wasm/test.sh test_async_promise_void_no_2355`, `./wasm/test.sh test_async_promise_number_requires_return`, `./wasm/test.sh test_async_generator_no_2355` (PASS).
 - [x] Broader TS2355 scan: ran `conformance-runner.mjs` for `statements`, `expressions`, `classes`, `types` (200 each). No TS2355 extras in statements/expressions/classes; types still has TS2355 extras in `types/asyncGenerators/types.asyncGenerators.es2018.1.ts`, `types/asyncGenerators/types.asyncGenerators.es2018.2.ts`, `types/contextualTypes/asyncFunctions/contextuallyTypeAsyncFunctionReturnType.ts`. Outputs in `/tmp/conformance_{statements,expressions,classes,types}_after.txt`.
 - [x] Verified `types/mapped/recursiveMappedTypes.ts` still crashes in ThinParser: `RuntimeError: unreachable` (stack captured).
@@ -198,6 +199,7 @@ Yes
 - Last commit: `730c8e0b64` (merge origin/rust into worker/anvil-5)
 - Docker: working
 - Tests: `./wasm/test.sh test_async_promise_void_no_2355`, `./wasm/test.sh test_async_promise_number_requires_return`, `./wasm/test.sh test_async_generator_no_2355` (PASS). Conformance: `node wasm/differential-test/conformance-runner.mjs types/asyncGenerators --max=200 -v`, `node wasm/differential-test/conformance-runner.mjs types/contextualTypes/asyncFunctions --max=200 -v` (TS2355 extras removed in the 3 targeted files). Known failures when running `./wasm/test.sh thin_checker_tests`: `test_abstract_class_through_type_alias_2511`, `test_abstract_class_union_type_2511` expecting 2511 vs 2564.
+- Conformance TS2304 scan: `node wasm/differential-test/conformance-runner.mjs internalModules --max=200 -v`, `node wasm/differential-test/conformance-runner.mjs moduleResolution --max=200 -v`, `node wasm/differential-test/conformance-runner.mjs externalModules --max=200 -v` (extra TS2304 counts: 5/5/26). Outputs in `/tmp/conformance_internalModules_ts2304.txt`, `/tmp/conformance_moduleResolution_ts2304.txt`, `/tmp/conformance_externalModules_ts2304.txt`.
 - Stashed work: `enum_es5_tests.rs` was stashed (incomplete) when new assignment arrived
 - TS2355 status:
   - Fixed: throw-only functions (commit `3eea80b3d93`)
