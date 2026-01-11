@@ -128,7 +128,7 @@ The `CompatChecker` in `src/solver/` needs to implement the "Unsoundness Catalog
 
 
 ## Executive Summary (Director report)
-Last updated: 2026-01-09
+Last updated: 2026-01-11
 
 ### Conformance Metrics (Primary KPI)
 | Metric | Value | Target |
@@ -155,6 +155,11 @@ Last updated: 2026-01-09
 - TS1005: 65 occurrences (parser) - parser fixes IMPLEMENTED
 - TS2339: 35 occurrences (property access)
 - TS1109: 25 occurrences (parser)
+
+### Recent Progress (Jan 11)
+- TS2304 namespace false-positive reductions and mixin call type resolution merged (Anvil).
+- TS2769 variadic tuple overload matching and TS2355 never-return flow handling improvements merged (Anvil).
+- Added thin_parser/thin_node updates and expanded thin_checker tests; conformance baselines not re-run yet.
 
 ### Recent Progress (Jan 9)
 - TS2454 control flow analysis (+315 lines in checker/control_flow.rs)

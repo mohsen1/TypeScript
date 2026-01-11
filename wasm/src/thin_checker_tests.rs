@@ -12481,6 +12481,80 @@ function getResult(): Result {
     );
 }
 
+#[test]
+fn test_union_optional_object_literal_excess_property() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type U = { a?: number } | { b?: number };
+const u: U = { a: 1, c: 2 };
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let excess_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == 2353)
+        .collect();
+
+    if excess_errors.is_empty() {
+        eprintln!("=== Union Optional Excess Property Diagnostics ===");
+        for diag in &checker.ctx.diagnostics {
+            eprintln!("[{}] code={} {}", diag.start, diag.code, diag.message_text);
+        }
+    }
+
+    assert_eq!(
+        excess_errors.len(), 1,
+        "Expected excess property error for union optional object literal: {:?}",
+        checker.ctx.diagnostics
+    );
+
+    let ts2322_count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2322).count();
+    assert_eq!(
+        ts2322_count, 0,
+        "Did not expect TS2322 for union optional excess property, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_union_optional_variable_assignment_no_common_properties() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type U = { a?: number } | { b?: number };
+const obj = { c: 1 };
+const u: U = obj;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<_> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        codes.contains(&2322),
+        "Expected TS2322 for union optional variable assignment, got: {:?}",
+        codes
+    );
+}
+
 /// TS Unsoundness #4: Freshness / Excess Property Checks - Spread removes freshness
 ///
 /// Using spread on an object can remove freshness in some contexts.
@@ -14198,6 +14272,15 @@ declare const doc: Document;
 declare const win: Window;
 declare const event: Event;
 declare const nodes: NodeList;
+declare const date: Date;
+declare const regex: RegExp;
+declare const regexExec: RegExpExecArray;
+declare const key: PropertyKey;
+declare const desc: PropertyDescriptor;
+
+type NN = NonNullable<string | null>;
+type Ex = Extract<string | number, string>;
+type Th = ThisType<{ x: number }>;
 
 // Type alias with builtin generic
 type MyPromise<T> = Promise<T>;
@@ -14234,6 +14317,46 @@ interface MyError extends Error {
     assert!(
         ts2304_errors.is_empty(),
         "Should not emit TS2304 errors for builtin types, got: {:?}",
+        ts2304_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn test_builtin_types_in_type_literal_no_ts2304() {
+    // Ensure builtin generics used inside type literals don't emit TS2304 when lib is absent.
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type Box<T> = { value: T };
+type Foo = {
+  promise: Promise<string>;
+  map: Map<string, number>;
+  list: ReadonlyArray<number>;
+  partial: Partial<{ x: number }>;
+  node: NodeList;
+  doc: Document;
+};
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2304_errors: Vec<_> = checker.ctx.diagnostics
+        .iter()
+        .filter(|d| d.code == 2304)
+        .collect();
+
+    assert!(
+        ts2304_errors.is_empty(),
+        "Unexpected TS2304 for builtin types in type literals, got: {:?}",
         ts2304_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>()
     );
 }
@@ -14295,6 +14418,178 @@ accessor export default V1;
     assert!(
         !codes.contains(&2304),
         "Unexpected TS2304 for accessor modifier recovery, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_namespace_sibling_export_resolves() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+namespace Utils {
+    export const x = 1;
+}
+
+namespace Utils {
+    export const y = x;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&diagnostic_codes::CANNOT_FIND_NAME),
+        "Unexpected TS2304 for namespace sibling export, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_namespace_type_literal_resolves_members() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+namespace A {
+    class Point { x: number = 0; y: number = 0; }
+    export type Square = {
+        top: { left: Point; right: Point };
+        bottom: { left: Point; right: Point };
+    };
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&diagnostic_codes::CANNOT_FIND_NAME),
+        "Unexpected TS2304 for namespace type literal members, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_namespace_type_query_resolves_alias() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+namespace A {
+    export class Point {}
+}
+
+namespace C {
+    import a = A;
+    type AliasType = typeof a;
+    type PointType = a.Point;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&diagnostic_codes::CANNOT_FIND_NAME),
+        "Unexpected TS2304 for namespace import alias type query, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_declare_global_merges_into_global_scope() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+export {};
+
+declare global {
+    interface GlobalThing { value: number; }
+    var globalValue: GlobalThing;
+}
+
+const x = globalValue;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&diagnostic_codes::CANNOT_FIND_NAME),
+        "Unexpected TS2304 for declare global, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_ambient_module_declaration_resolves_import() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+declare module "foo" {
+    export interface Options { value: number; }
+}
+
+import { Options } from "foo";
+const opts: Options = { value: 1 };
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&diagnostic_codes::CANNOT_FIND_NAME),
+        "Unexpected TS2304 for ambient module import, got: {:?}",
         codes
     );
 }
@@ -14380,6 +14675,71 @@ d.mixinMethod();
     assert!(
         !codes.contains(&2339),
         "Should not emit TS2339 for mixin-based inheritance, got errors: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
+fn test_mixin_return_type_preserves_base_properties() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type Constructor<T> = new (...args: any[]) => T;
+
+class Base {
+    constructor(public x: number, public y: number) {}
+}
+
+const Printable = <T extends Constructor<Base>>(superClass: T) => class extends superClass {
+    static message = "hello";
+    print() {
+        this.x;
+    }
+}
+
+function Tagged<T extends Constructor<{}>>(superClass: T) {
+    class C extends superClass {
+        _tag: string;
+        constructor(...args: any[]) {
+            super(...args);
+            this._tag = "hello";
+        }
+    }
+    return C;
+}
+
+const Thing2 = Tagged(Printable(Base));
+Thing2.message;
+
+function f() {
+    const thing = new Thing2(1, 2);
+    thing.x;
+    thing._tag;
+    thing.print();
+}
+
+class Thing3 extends Thing2 {
+    test() {
+        this.print();
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2339),
+        "Should not emit TS2339 for mixin constructor/instance properties, got errors: {:?}",
         checker.ctx.diagnostics
     );
 }
@@ -14843,6 +15203,62 @@ aFn(), b;
 }
 
 #[test]
+fn test_ts2695_comma_operator_edge_cases() {
+    use crate::thin_parser::ThinParserState;
+    use crate::checker::types::diagnostics::diagnostic_codes;
+
+    let source = r#"
+declare function eval(input: string): any;
+let a = 1;
+let b = 2;
+const obj = { method() {} };
+
+a + b, b;
+!a, b;
+a ? b : 3, b;
+a!, b;
+typeof a, b;
+`template`, b;
+
+void a, b;
+(a as any), b;
+(0, eval)("1");
+(0, obj.method)();
+(0, obj["method"])();
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2695_errors: Vec<_> = checker
+        .ctx
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == diagnostic_codes::LEFT_SIDE_OF_COMMA_OPERATOR_IS_UNUSED_AND_HAS_NO_SIDE_EFFECTS)
+        .collect();
+
+    assert_eq!(
+        ts2695_errors.len(),
+        6,
+        "Expected six TS2695 errors, got: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| d.code).collect::<Vec<_>>()
+    );
+    assert!(
+        checker.ctx.diagnostics.iter().all(|d| d.code == diagnostic_codes::LEFT_SIDE_OF_COMMA_OPERATOR_IS_UNUSED_AND_HAS_NO_SIDE_EFFECTS),
+        "Expected only TS2695 diagnostics, got: {:?}",
+        checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>()
+    );
+}
+
+#[test]
 fn test_variadic_tuple_rest_param_no_ts2769() {
     use crate::thin_parser::ThinParserState;
 
@@ -14877,6 +15293,53 @@ fn test_variadic_tuple_rest_param_no_ts2769() {
     assert!(
         ts2769_errors.is_empty(),
         "Should not emit TS2769 for variadic tuple rest parameters, got {} TS2769 errors: {:?}",
+        ts2769_errors.len(),
+        ts2769_errors
+    );
+}
+
+#[test]
+fn test_variadic_tuple_optional_tail_inference_no_ts2769() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+        declare function ft3<T extends unknown[]>(t: [...T]): T;
+        declare function f20<T extends unknown[] = []>(args: [...T, number?]): T;
+        declare function f22<T extends unknown[] = []>(args: [...T, number]): T;
+        declare function f22<T extends unknown[] = []>(args: [...T]): T;
+
+        ft3(['hello', 42]);
+        f20(["foo", "bar"]);
+        f20(["foo", 42]);
+
+        function f21<U extends string[]>(args: [...U, number?]) {
+            f20(args);
+            f20(["foo", "bar"]);
+            f20(["foo", 42]);
+        }
+
+        function f23<U extends string[]>(args: [...U, number]) {
+            f22(args);
+            f22(["foo", "bar"]);
+            f22(["foo", 42]);
+        }
+    "#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let ts2769_errors: Vec<_> = checker.ctx.diagnostics.iter().filter(|d| d.code == 2769).collect();
+    assert!(
+        ts2769_errors.is_empty(),
+        "Should not emit TS2769 for optional variadic tuple tails, got {} TS2769 errors: {:?}",
         ts2769_errors.len(),
         ts2769_errors
     );

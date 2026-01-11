@@ -513,7 +513,7 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
     }
 
     fn rest_tuple_inference_target(
-        &self,
+        &mut self,
         params: &[ParamInfo],
         arg_types: &[TypeId],
         var_map: &FxHashMap<TypeId, crate::solver::infer::InferenceVar>,
@@ -532,8 +532,24 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                 for (i, elem) in elements.iter().enumerate() {
                     if elem.rest {
                         if var_map.contains_key(&elem.type_id) {
-                            // Count trailing fixed elements after the variadic part
-                            let trailing_count = elements.len() - i - 1;
+                            // Count trailing elements after the variadic part, but allow optional
+                            // tail elements to be omitted when they don't match.
+                            let tail = &elements[i + 1..];
+                            let min_index = rest_start + prefix_len;
+                            let mut trailing_count = 0usize;
+                            let mut arg_index = arg_types.len();
+                            for tail_elem in tail.iter().rev() {
+                                if arg_index <= min_index {
+                                    break;
+                                }
+                                let arg_type = arg_types[arg_index - 1];
+                                let assignable = self.checker.is_assignable_to(arg_type, tail_elem.type_id);
+                                if tail_elem.optional && !assignable {
+                                    break;
+                                }
+                                trailing_count += 1;
+                                arg_index -= 1;
+                            }
                             target = Some((rest_start + prefix_len, elem.type_id, trailing_count));
                         }
                         break;
@@ -1339,8 +1355,28 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
         for (i, t_elem) in target.iter().enumerate() {
             if t_elem.rest {
                 if var_map.contains_key(&t_elem.type_id) {
+                    let tail = &target[i + 1..];
+                    let mut trailing_count = 0usize;
+                    let mut source_index = source.len();
+                    for tail_elem in tail.iter().rev() {
+                        if source_index <= i {
+                            break;
+                        }
+                        let s_elem = &source[source_index - 1];
+                        if s_elem.rest {
+                            break;
+                        }
+                        let assignable = self.checker.is_assignable_to(s_elem.type_id, tail_elem.type_id);
+                        if tail_elem.optional && !assignable {
+                            break;
+                        }
+                        trailing_count += 1;
+                        source_index -= 1;
+                    }
+
+                    let end_index = source.len().saturating_sub(trailing_count).max(i);
                     let mut tail = Vec::new();
-                    for s_elem in source.iter().skip(i) {
+                    for s_elem in source.iter().take(end_index).skip(i) {
                         tail.push(TupleElement {
                             type_id: s_elem.type_id,
                             name: s_elem.name.clone(),
@@ -1351,8 +1387,12 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                             break;
                         }
                     }
-                    let tail_tuple = self.interner.tuple(tail);
-                    self.constrain_types(ctx, var_map, tail_tuple, t_elem.type_id);
+                    if tail.len() == 1 && tail[0].rest {
+                        self.constrain_types(ctx, var_map, tail[0].type_id, t_elem.type_id);
+                    } else {
+                        let tail_tuple = self.interner.tuple(tail);
+                        self.constrain_types(ctx, var_map, tail_tuple, t_elem.type_id);
+                    }
                     return;
                 }
                 let rest_elem_type = self.rest_element_type(t_elem.type_id);
