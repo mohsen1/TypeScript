@@ -59,9 +59,10 @@ Emit TS2300 for duplicate identifiers in parameter lists (including destructured
 - Updated binder to avoid recording ambient module declarations in external modules; driver now suppresses checker import diagnostics in multi-file mode.
 - Added TS2792 tests for module augmentation resolution and declared module recording; ran `./wasm/test.sh ts2792` and `./wasm/test.sh declared_module_recorded_in_script`.
 - Re-ran `find-ts2792.mjs --max=1000 --samples=30`: 0 missing, 0 extra, 0 mismatched.
+- **TS2300 parameter duplicate detection complete**: Implemented `check_duplicate_parameters()` and `collect_parameter_names()` to detect duplicate parameter names in function/method/constructor/accessor parameter lists. Handles simple parameters (a, b, a), object destructuring ({ a, b, a }), array destructuring ([x, y, x]), and nested patterns. Added 9 comprehensive tests covering all scenarios. All tests passing: `./wasm/test.sh duplicate_parameter` (9/9 passed), `./wasm/test.sh duplicate_identifier` (3/3 passed). Pushed to `origin/worker/forge-1`.
 
 ## Ready for Merge
-No
+Yes
 
 ## Notes
 - Run `./wasm/test.sh` before pushing

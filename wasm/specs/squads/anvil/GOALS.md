@@ -1,8 +1,22 @@
 # Squad Anvil Goals
 
-Updated: 2026-01-09 (14:00)
+Updated: 2026-01-11 (Director Priority Override)
 
 Priority: 1
+
+---
+## CRITICAL: Parser Recovery is Priority 0
+
+**Architectural Insight: Cascading Failure Effect**
+
+Parse → Bind → Check pipeline means parser errors cascade:
+1. **1,122 Parser Errors** (TS1005/TS1109/TS1068/TS1128) → Incomplete AST
+2. **Incomplete AST** → Binder can't find declarations → **702 TS2304 errors**
+3. **Unresolved Symbols** → Solver defaults to `Any` → **Missing TS2322/TS7006**
+
+**By fixing ~1,122 parser errors, we will automatically fix hundreds of binding/checking errors.**
+
+**W2 EXCLUSIVE FOCUS:** Parser recovery until parser error count < 100. All other workers continue their assignments.
 
 ---
 ## Current Conformance Baseline (5655 tests)
@@ -10,7 +24,7 @@ Priority: 1
 | Metric | Value | Notes |
 |--------|-------|-------|
 | Exact Match | 23.3% (1148/4928) | Up from 18.1% |
-| Tests with Extra Errors | 35.8% (1766) | False positives - WASM says error, TSC doesn't |
+| Tests with Extra Errors | 35.8% (1766) | **20% are parser errors!** |
 | Skipped (multi-file) | 727 | Need WasmProgram API fixes |
 | Crashed | 2 | Stack overflow, unreachable |
 
@@ -45,16 +59,24 @@ Root Causes:
 
 Files: `thin_binder.rs`, `thin_checker.rs`
 
-### Worker 2: Parser Bugs (TS1005/TS1109/TS1068/TS1128) - 1122 combined
-**Problem:** Valid TypeScript syntax rejected by parser
+### Worker 2: Parser Bugs (TS1005/TS1109/TS1068/TS1128) - 1122 combined ⚠️ PRIORITY 0
+**Problem:** Valid TypeScript syntax rejected by parser → cascades into TS2304/Any types
 
-Common patterns failing:
-1. Type assertions in certain positions
-2. Generic type parameters with defaults
-3. JSX-like syntax in .ts files
-4. Computed property names
+**CRITICAL FIX REQUIRED - EXCLUSIVE FOCUS:**
+1. **Implement Error Recovery/Synchronization:**
+   - When parser hits unexpected token, DON'T bail with ErrorNode
+   - Scan forward to next `;` or `}` and RESUME parsing
+   - Goal: Complete AST even with syntax errors
+2. **Fix TS1068 (Class Members):**
+   - Review `parse_class_member` in `thin_parser.rs`
+   - Add support for newer TS syntax: `override`, `accessor`, decorator combinations
+3. **Verify:** Run `node wasm/differential-test/conformance-runner.mjs parser --max=500`
 
-Files: `parser/` - all parse functions
+**Success Criteria:** Reduce parser error count from 1,122 to < 100
+
+**DO NOT WORK ON:** TS2454/TS7006 until parser fixed (can't trust control flow on broken AST)
+
+Files: `wasm/src/parser/thin_parser.rs`, all parse functions
 
 ### Worker 3: Property Access (TS2339) - 292 false positives
 **Problem:** "Property 'X' does not exist on type 'Y'" when it does
@@ -166,7 +188,7 @@ bash run-conformance.sh --all --workers=14
 
 ---
 ## Squad Status
-- Last EM Report: 2026-01-11 11:57
+- Last EM Report: 2026-01-11 12:15
 - Workers Active: 5/5
 - Branches Pending Merge: None
 - Current Focus:
@@ -175,5 +197,8 @@ bash run-conformance.sh --all --workers=14
   - W3: TS2339 property access false positives
   - W4: recursiveMappedTypes crash / TS2456 detection
   - W5: TS2355 return analysis false positives
-- Blockers: None
+- Blockers: None (Fixed build blocker - compile_shorthand_methods test now passing)
+- Recent Actions:
+  - EM fixed binder issue: shorthand method parameters weren't being bound
+  - Pushed fix to origin/em/anvil, awaiting Director merge into rust
 - Strategy: Each worker owns one error code category, reduce false positives independently

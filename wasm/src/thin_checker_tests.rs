@@ -5641,7 +5641,6 @@ function createClass() {
 
 #[test]
 fn test_ts7010_return_path_analysis() {
-    use crate::checker::{CheckerContext, StatementChecker};
     use crate::thin_parser::ThinParserState;
 
     let source = r#"
@@ -5689,18 +5688,11 @@ function loopWithNestedSwitchBreak(flag: boolean) {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut ctx = CheckerContext::new(
-        parser.get_arena(),
-        &binder,
-        &types,
-        "test.ts".to_string(),
-    );
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
 
     let arena = parser.get_arena();
     let root_node = arena.get(root).expect("root node");
     let source_file = arena.get_source_file(root_node).expect("source file");
-
-    let checker = StatementChecker::new(&mut ctx);
 
     let body_at = |index: usize| {
         let stmt_idx = *source_file
@@ -15850,6 +15842,227 @@ if (o?.x === 1) {
     );
 }
 
+#[test]
+fn test_property_access_truthiness_narrows_type_param() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+function f<T extends string | undefined>(obj: { value: T }, tuple: [T]) {
+    if (obj.value) {
+        const s: string = obj.value;
+    }
+    if (tuple[0]) {
+        const s: string = tuple[0];
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker =
+        ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&diagnostic_codes::TYPE_NOT_ASSIGNABLE_TO_TYPE),
+        "Unexpected TS2322 for property/element access truthiness narrowing, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_in_operator_left_operand_narrows() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+function f(id: string | undefined, seen: Record<string, string>) {
+    if (id in seen) {
+        const s: string = id;
+        return s;
+    }
+    return "fallback";
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker =
+        ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&diagnostic_codes::TYPE_NOT_ASSIGNABLE_TO_TYPE),
+        "Unexpected TS2322 for in-operator left operand narrowing, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_keyof_contextual_literal_assignment_preserves_literal() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type O = {
+  a: number;
+  b: number;
+};
+type K = keyof O | 'c';
+function f(k: K) {
+  if (k === 'c') {
+    k = 'a';
+  }
+  return k;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker =
+        ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&diagnostic_codes::TYPE_NOT_ASSIGNABLE_TO_TYPE),
+        "Unexpected TS2322 for keyof contextual literal assignment, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_extract_truthiness_narrows_to_string() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+function f<T>(x: Extract<T, string | undefined> | null): string {
+    if (x) {
+        return x;
+    }
+    return "hello";
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker =
+        ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&diagnostic_codes::TYPE_NOT_ASSIGNABLE_TO_TYPE),
+        "Unexpected TS2322 for Extract truthiness narrowing, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_for_in_return_inference_includes_body_returns() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type Test5 = {
+  main?: {
+    childs: Record<string, Test5>;
+  };
+};
+
+function f50(obj: Test5) {
+   for (const key in obj.main?.childs) {
+      if (obj.main.childs[key] === obj) {
+        return obj;
+      }
+   }
+   return null;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker =
+        ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&diagnostic_codes::TYPE_NOT_ASSIGNABLE_TO_TYPE),
+        "Unexpected TS2322 for for-in return inference, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_global_this_const_property_assignment_uses_readonly_error() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+const y = 2;
+globalThis.y = 4;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker =
+        ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&diagnostic_codes::TYPE_NOT_ASSIGNABLE_TO_TYPE),
+        "Unexpected TS2322 for globalThis readonly assignment, got: {:?}",
+        codes
+    );
+    assert!(
+        codes.contains(&diagnostic_codes::CANNOT_ASSIGN_TO_READONLY_PROPERTY),
+        "Expected TS2540 for globalThis readonly assignment, got: {:?}",
+        codes
+    );
+}
+
 // =============================================================================
 // TS2339 Inheritance Traversal Tests
 // =============================================================================
@@ -16937,4 +17150,47 @@ let { x = "hello" }: { x?: number } = {};
     // This test may currently fail if default values in binding elements aren't being checked
     assert!(!ts2322_errors.is_empty(), "Expected TS2322 error for binding element default value 'hello' (string) not assignable to number, got: {:?}",
         checker.ctx.diagnostics.iter().map(|d| d.code).collect::<Vec<_>>());
+}
+
+#[test]
+fn test_local_variable_in_object_literal_method() {
+    use crate::thin_parser::ThinParserState;
+    use crate::checker::types::diagnostics::diagnostic_codes;
+
+    // Regression test for TS2304 false positive on local variables in object literal methods
+    // From: tests/cases/conformance/declarationEmit/typePredicates/declarationEmitThisPredicates02.ts
+    let source = r#"
+export interface Foo {
+    a: string;
+    b: number;
+    c: boolean;
+}
+
+export const obj = {
+    m(): this is Foo {
+        let dis = this as {} as Foo;
+        return dis.a != null && dis.b != null && dis.c != null;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Variable 'dis' should be in scope and not produce TS2304
+    let ts2304_errors: Vec<_> = checker.ctx.diagnostics.iter()
+        .filter(|d| d.code == diagnostic_codes::CANNOT_FIND_NAME)
+        .collect();
+
+    assert!(ts2304_errors.is_empty(),
+        "Unexpected TS2304 errors for local variable 'dis' in object literal method: {:?}",
+        ts2304_errors.iter().map(|d| &d.message_text).collect::<Vec<_>>());
 }
