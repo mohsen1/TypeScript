@@ -3,21 +3,18 @@
 ## Mission
 Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transforms, cli, lsp).
 
-Status: Blocked (Gemini key required)
+Status: Ready for Merge (TS2355 work complete)
 Priority: 5
 
 ## Current Assignment
-- Prereq: run `./scripts/ask-gemini.mjs "I need to reduce TS2355 false positives (return analysis). What's the best approach?"` once the API key is available.
-- Reduce TS2355 false positives (return analysis: throw-only paths, never-returning calls, unreachable code).
-- Collect 3-5 failing samples from conformance output; trace control flow in `wasm/src/thin_checker.rs` and `wasm/src/checker/control_flow.rs`.
-- Implement fix + regression tests; run a targeted TS2355 scan and report the delta.
-- Deliverables: sample list + root cause notes, regression test(s), and a before/after conformance delta.
+- Awaiting new assignment from EM (TS2355 task complete).
 
 ## Task Queue
 - [ ] Verify whether `types/mapped/recursiveMappedTypes.ts` still crashes; if so, capture stack and coordinate with Forge.
 
 
 ## Completed
+- [x] Reduced TS2355 false positives for never-returning calls/initializers; TS2355 now requires fallthrough and treats `never` expression statements as terminal; updated `test_never_returning_call_no_2355` and added `usesFailInInit`/`usesFailInList`; conformance delta TS2355 extras -5 (controlflow -1, functions -1, async -3). Commit: `ebc080b312`.
 - [x] Fixed merge conflicts from origin/rust sync: binder.rs can_merge_flags and CallableShape missing fields in thin_checker.rs. Added test documenting never-returning call limitation. Commit: `bb137e9631d`.
 - [x] Fixed TS2355 false positives for throw-only functions. Added `falls_through` check to TS2355 condition for functions, methods, and getters. Functions that only throw no longer incorrectly trigger "must return a value". Added tests `test_throw_only_function_no_2355` and `test_infinite_loop_no_2355`. Commit: `3eea80b3d93`.
 - [x] Fixed TS2355 false positives for async `Promise<void>`/alias returns by unwrapping async return types before checking `requires_return_value`. Added `test_async_promise_void_no_2355`. Commit: `031b7f1ffe`.
@@ -191,20 +188,21 @@ Priority: 5
 - [x] Added async computed object literal source-map coverage in `wasm/src/source_map_tests.rs`; ran `./wasm/test.sh source_map` (PASS).
 
 ## Ready for Merge
-No (merged 2026-01-10)
+Yes
 
 ## Resume Notes
 - Branch: `worker/anvil-5`
-- Last commit: `3f3315eada` (`[wasm] checker: fix variadic tuple literal typing`)
+- Last commit: `ebc080b312` (`[wasm] checker: treat never returns as terminal`)
 - Docker: working
-- Tests: `./wasm/test.sh test_overload_call_handles_variadic_tuple_param` (PASS). Conformance: `node wasm/differential-test/conformance-runner.mjs types/tuple --max=200 -v` (Extra TS2769 count 5; see TS2769 status). Known failures when running `./wasm/test.sh thin_checker_tests`: `test_abstract_class_through_type_alias_2511`, `test_abstract_class_union_type_2511` expecting 2511 vs 2564.
+- Tests: `./wasm/test.sh test_never_returning_call_no_2355` (PASS). Conformance: `node wasm/differential-test/conformance-runner.mjs controlFlow --max=200 -v`, `node wasm/differential-test/conformance-runner.mjs functions --max=200 -v`, `node wasm/differential-test/conformance-runner.mjs async --max=200 -v` (TS2355 extras -5). Known failures when running `./wasm/test.sh thin_checker_tests`: `test_abstract_class_through_type_alias_2511`, `test_abstract_class_union_type_2511` expecting 2511 vs 2564.
 - Stashed work: `enum_es5_tests.rs` was stashed (incomplete) when new assignment arrived
 - TS2355 status:
   - Fixed: throw-only functions (commit `3eea80b3d93`)
   - Fixed: infinite loops without break (commit `3eea80b3d93`)
   - Fixed: async Promise<void>/alias returns (commit `031b7f1ffe`)
   - Covered: async PromiseLike<void>/alias returns (commit `9a40689eb0`)
-  - Documented: never-returning calls limitation (test added, needs type integration for fix)
+  - Fixed: never-returning calls in expression statements/variable initializers now treated as terminal (commit `ebc080b312`)
+  - Samples: `controlflow/controlFlowIterationErrorsAsync.ts`, `functions/functionImplementations.ts`, `async/es2017/asyncFunctionDeclaration14_es2017.ts`, `async/es5/asyncFunctionDeclaration14_es5.ts`, `async/es6/asyncFunctionDeclaration14_es6.ts`
 - TS2769 status:
   - Fixed: spread tuple args now resolve in overload calls (commit `c7d86a60c5`)
   - Fixed: tuple literal rest elements no longer marked as rest during inference (commit `3f3315eada`).
