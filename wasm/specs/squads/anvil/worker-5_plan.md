@@ -6,27 +6,12 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 Status: Active
 Priority: 5
 
-## Current Assignment (2026-01-11 - NEW: TS2322 False Positives)
-**Target:** Reduce TS2322 "Type 'X' is not assignable to type 'Y'" false positives (101 occurrences)
-
-**Problem:** WASM incorrectly reports TS2322 when types are actually assignable.
-
-**Root Causes to Investigate:**
-1. Type widening/narrowing not applied correctly in assignments
-2. Structural compatibility checks too strict
-3. Generic type inference failures
-4. Contextual typing not propagated
-
-**Approach:**
-1. Run `node wasm/differential-test/conformance-runner.mjs --find-extra-error=TS2322 --max=1000 --samples=10` to collect samples
-2. Analyze patterns in false positives
-3. Fix type assignability checks in `thin_checker.rs` and/or solver
-4. Add regression tests for each pattern fixed
-5. Run conformance baseline before/after to verify reduction
-
-**Files:** `wasm/src/thin_checker.rs`, `wasm/src/solver/`, `wasm/src/thin_checker_tests.rs`
-
-**Success Criteria:** Reduce TS2322 from 101 to <50 with no regressions in other error codes
+## Current Assignment
+- **TS2322 False Positives**: Reduce TS2322 'Type X is not assignable to type Y' false positives.
+  - Status: Investigating (5 false positives in 1000 tests)
+  - Files: controlFlowGenericTypes.ts, controlFlowInOperator.ts, controlFlowOptionalChain.ts, exhaustiveSwitchStatements1.ts, globalThisReadonlyProperties.ts
+  - Pattern: Control flow narrowing for generic types and property access
+  - Next: Identify root cause and implement fix
 
 ## Task Queue
 - [x] Verify whether `types/mapped/recursiveMappedTypes.ts` still crashes; if so, capture stack and coordinate with Forge.
