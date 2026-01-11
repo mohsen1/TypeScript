@@ -94,6 +94,8 @@ pub mod diagnostic_messages {
         "'{0}' only refers to a type, but is being used as a value here.";
     pub const ONLY_REFERS_TO_A_VALUE_BUT_IS_BEING_USED_AS_A_TYPE_HERE: &str =
         "'{0}' refers to a value, but is being used as a type here. Did you mean 'typeof {0}'?";
+    pub const LEFT_SIDE_OF_COMMA_OPERATOR_IS_UNUSED_AND_HAS_NO_SIDE_EFFECTS: &str =
+        "Left side of comma operator is unused and has no side effects.";
 
     // Function/call errors
     pub const EXPECTED_ARGUMENTS: &str = "Expected {0} arguments, but got {1}.";
@@ -219,6 +221,7 @@ pub mod diagnostic_codes {
     pub const PROPERTY_DOES_NOT_EXIST_ON_TYPE: u32 = 2339;
     pub const TYPE_HAS_NO_PROPERTY: u32 = 2339;
     pub const ONLY_REFERS_TO_A_TYPE_BUT_IS_BEING_USED_AS_A_VALUE_HERE: u32 = 2693;
+    pub const LEFT_SIDE_OF_COMMA_OPERATOR_IS_UNUSED_AND_HAS_NO_SIDE_EFFECTS: u32 = 2695;
     pub const ONLY_REFERS_TO_A_VALUE_BUT_IS_BEING_USED_AS_A_TYPE_HERE: u32 = 2749;
 
     // Function/call errors
