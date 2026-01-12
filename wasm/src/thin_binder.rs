@@ -2508,6 +2508,8 @@ impl ThinBinderState {
 
                 self.current_scope.set(name.to_string(), sym_id);
                 self.node_symbols.insert(idx.0, sym_id);
+                // Also add to persistent scope for checker lookup
+                self.declare_in_persistent_scope(name.to_string(), sym_id);
             }
         }
     }

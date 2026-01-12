@@ -1170,6 +1170,36 @@ impl<'a> ThinCheckerState<'a> {
         Some(sym_id)
     }
 
+    /// Check if a node is a `require()` call expression.
+    /// This is used to detect import equals declarations like `import x = require('./module')`
+    /// where we want to return ANY type instead of the literal string type.
+    fn is_require_call(&self, idx: NodeIndex) -> bool {
+        let node = match self.ctx.arena.get(idx) {
+            Some(n) => n,
+            None => return false,
+        };
+        if node.kind != syntax_kind_ext::CALL_EXPRESSION {
+            return false;
+        }
+
+        let call = match self.ctx.arena.get_call_expr(node) {
+            Some(c) => c,
+            None => return false,
+        };
+
+        let callee_node = match self.ctx.arena.get(call.expression) {
+            Some(n) => n,
+            None => return false,
+        };
+
+        let callee_ident = match self.ctx.arena.get_identifier(callee_node) {
+            Some(ident) => ident,
+            None => return false,
+        };
+
+        callee_ident.escaped_text == "require"
+    }
+
     fn missing_type_query_left(&self, idx: NodeIndex) -> Option<NodeIndex> {
         let mut current = idx;
         loop {
@@ -5180,6 +5210,12 @@ impl<'a> ThinCheckerState<'a> {
                             }
                             if let Some(target_sym) = self.resolve_require_call_symbol(import.module_specifier, None) {
                                 return (self.get_type_of_symbol(target_sym), Vec::new());
+                            }
+                            // Check if this is a require() call - if so, return ANY type instead of the literal type
+                            // This handles cases like: import x = require('./module') where multi-file module
+                            // resolution isn't available. The ANY type allows property access without errors.
+                            if self.is_require_call(import.module_specifier) {
+                                return (TypeId::ANY, Vec::new());
                             }
                             // Fall back to get_type_of_node for simple identifiers
                             return (self.get_type_of_node(import.module_specifier), Vec::new());
