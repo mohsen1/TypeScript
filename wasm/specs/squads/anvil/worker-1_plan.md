@@ -49,14 +49,38 @@ fn emit_modifier(&mut self, modifier: SyntaxKind) {
 }
 ```
 
+## Progress
+
+### Fixed Issues
+1. **test_two_phase_emission_es5_class_try_throw_parenthesized** - FIXED ✅
+   - Issue: Catch clause variable `e` was missing (output showed `catch ()` instead of `catch (e)`)
+   - Fix: Updated `ClassES5Emitter::emit_try_statement` to properly extract and emit the variable declaration's name
+   - Location: `src/transforms/class_es5.rs:2887-2901`
+
+2. **Type assertion emission** - FIXED ✅
+   - Issue: AS_EXPRESSION, TYPE_ASSERTION, and SATISFIES_EXPRESSION were not handled in ClassES5Emitter
+   - Fix: Added case in `emit_expression` to strip TypeScript-only type assertions
+   - Location: `src/transforms/class_es5.rs:3078-3086`
+
+### Remaining Issue
+**test_class_es5_readonly_class_members** - PARTIALLY FIXED ⚠️
+   - Issue: Method name `with` is being emitted as `Partial`
+   - Root cause: Unknown - appears to be a deeper parser/emitter issue
+   - The test expects `ImmutableRecord.prototype.with` but output shows `ImmutableRecord.prototype.Partial`
+   - Note: This is NOT related to readonly modifiers as initially suspected
+   - The `with` method in source has type parameter `Partial<T>`, and somehow `Partial` is being used as the method name
+   - Needs further investigation - possibly in parser or arena storage
+
 ## Task Queue
+- [ ] Investigate `with` vs `Partial` issue in class method emission
 - [ ] After emitter edge cases: help with private identifier control flow
 
 ## Completed
-- [x] (Move finished items here with brief notes and tests run)
+- [x] Fixed catch clause variable emission (65b99a3305)
+- [x] Added AS_EXPRESSION/TYPE_ASSERTION/SATISFIES_EXPRESSION handling (65b99a3305)
 
 ## Ready for Merge
-No
+Yes (65b99a3305)
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
