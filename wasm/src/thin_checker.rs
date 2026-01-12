@@ -8348,7 +8348,19 @@ impl<'a> ThinCheckerState<'a> {
                 let has_return = self.body_has_return_with_value(body);
                 let falls_through = self.function_body_falls_through(body);
 
-                if has_type_annotation && requires_return && falls_through {
+                // Determine if this is an async function
+                let is_async = if let Some(func) = self.ctx.arena.get_function(node) {
+                    func.is_async
+                } else if let Some(method) = self.ctx.arena.get_method_decl(node) {
+                    self.has_async_modifier(&method.modifiers)
+                } else {
+                    false
+                };
+
+                // TS2355: Skip for async functions - they implicitly return Promise<void>
+                // Async functions without a return statement automatically resolve to Promise<void>
+                // so they should not emit "function must return a value" errors
+                if has_type_annotation && requires_return && falls_through && !is_async {
                     use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
                     if !has_return {
                         self.error_at_node(
@@ -12548,7 +12560,8 @@ impl<'a> ThinCheckerState<'a> {
                         let has_return = self.body_has_return_with_value(func.body);
                         let falls_through = self.function_body_falls_through(func.body);
 
-                        if has_type_annotation && requires_return && falls_through {
+                        // TS2355: Skip for async functions - they implicitly return Promise<void>
+                        if has_type_annotation && requires_return && falls_through && !is_async {
                             if !has_return {
                                 use crate::checker::types::diagnostics::diagnostic_codes;
                                 self.error_at_node(
@@ -18191,7 +18204,8 @@ impl<'a> ThinCheckerState<'a> {
             let has_return = self.body_has_return_with_value(method.body);
             let falls_through = self.function_body_falls_through(method.body);
 
-            if has_type_annotation && requires_return && falls_through {
+            // TS2355: Skip for async methods - they implicitly return Promise<void>
+            if has_type_annotation && requires_return && falls_through && !is_async {
                 if !has_return {
                     self.error_at_node(
                         method.type_annotation,
@@ -18416,10 +18430,13 @@ impl<'a> ThinCheckerState<'a> {
             self.push_return_type(return_type);
             self.check_statement(accessor.body);
             if is_getter {
+                // Check if this is an async getter
+                let is_async = self.has_async_modifier(&accessor.modifiers);
                 let requires_return = self.requires_return_value(return_type);
                 let has_return = self.body_has_return_with_value(accessor.body);
                 let falls_through = self.function_body_falls_through(accessor.body);
-                if has_type_annotation && requires_return && falls_through {
+                // TS2355: Skip for async getters - they implicitly return Promise<void>
+                if has_type_annotation && requires_return && falls_through && !is_async {
                     if !has_return {
                         self.error_at_node(
                             accessor.type_annotation,
