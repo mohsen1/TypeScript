@@ -11850,11 +11850,23 @@ impl<'a> ThinCheckerState<'a> {
 
             // Handle constructors separately - they use TS2392 (multiple constructor implementations), not TS2300
             if symbol.escaped_name == "constructor" {
-                // Report TS2392 for multiple constructor implementations
-                if symbol.declarations.len() > 1 {
+                // Count only constructor implementations (with body), not overloads (without body)
+                let implementations: Vec<NodeIndex> = symbol.declarations.iter().filter_map(|&decl_idx| {
+                    let node = self.ctx.arena.get(decl_idx)?;
+                    let constructor = self.ctx.arena.get_constructor(node)?;
+                    // Only count constructors with a body as implementations
+                    if !constructor.body.is_none() {
+                        Some(decl_idx)
+                    } else {
+                        None
+                    }
+                }).collect();
+
+                // Report TS2392 for multiple constructor implementations (not overloads)
+                if implementations.len() > 1 {
                     use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
                     let message = diagnostic_messages::MULTIPLE_CONSTRUCTOR_IMPLEMENTATIONS;
-                    for &decl_idx in &symbol.declarations {
+                    for &decl_idx in &implementations {
                         self.error_at_node(decl_idx, message, diagnostic_codes::MULTIPLE_CONSTRUCTOR_IMPLEMENTATIONS);
                     }
                 }

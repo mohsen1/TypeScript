@@ -1413,7 +1413,7 @@ fn test_new_expression_infers_class_instance_type() {
 
     let source = r#"
 class Foo {
-    name: string;
+    name = "";
     count = 1;
     readonly tag: string = "x";
     greet(msg: string): number { return 1; }
@@ -1537,9 +1537,15 @@ fn test_new_expression_infers_base_class_properties() {
     let source = r#"
 class Base<T> {
     value: T;
+    constructor(value: T) {
+        this.value = value;
+    }
 }
 class Derived extends Base<string> {
     count = 1;
+    constructor() {
+        super("default");
+    }
 }
 const d = new Derived();
 "#;
