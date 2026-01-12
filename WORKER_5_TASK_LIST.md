@@ -1,20 +1,23 @@
 # Worker 5 Task List - Binder Squad
 
 ## Current Task
-- [ ] **BIND-8: Handle ambient module contexts**
-  - Fix `declare module "node"` resolution
-  - Ensure module-scoped symbols don't leak to global
-  - Test import resolution for ambient modules
-
-## Queue
 - [ ] **BIND-10: Integrate lib loader with Binder**
   - Call `LibLoader` during Binder initialization
   - Merge lib symbols into root SymbolTable
   - Verify global symbols resolve correctly
-- [ ] **BIND-11: Test cross-file symbol resolution**
-  - Create multi-file test cases for module augmentation
-  - Verify `interface Window` merging works across files
-  - Test `declare global` in module contexts
+  - Test: `console.log("hello")` should not produce TS2304
+
+## Queue
+- [ ] **BIND-13: Fix import/export symbol resolution**
+  - Ensure re-exported symbols are properly bound
+  - Handle `export { X } from "module"` correctly
+  - Fix default export/import binding
+  - Test: `import X from "module"` resolution
+- [ ] **BIND-14: Write Binder integration tests**
+  - Create test file: `tests/conformance/binder_integration.ts`
+  - Test full binder pipeline: lib loading -> binding -> symbol resolution
+  - Verify all global symbols resolve correctly
+  - Goal: TS2304 errors < 50
 
 ## Completed
 - [x] **BIND-2: Implement lib.d.ts parsing and loading**
@@ -27,3 +30,8 @@
   - Implemented `merge_interface_declarations` for cross-file interfaces
   - Handle `interface Window` merging across multiple files
   - Support `declare global` augmentation in modules
+- [x] **BIND-8: Handle ambient module contexts**
+  - Created `wasm/src/binder/ambient.rs`
+  - Fixed `declare module "node"` resolution
+  - Ensured module-scoped symbols don't leak to global
+  - Added tests for ambient module import resolution
