@@ -16,16 +16,19 @@ Priority: P0 (Highest)
 `cli::driver_tests::invalidate_paths_with_dependents_symbols_handles_import_equals`
 
 ### Implementation Steps
-1. [ ] Read the failing test to understand expected behavior
-2. [ ] Find import equals handling in `src/thin_emitter.rs` or `src/transforms/`
-3. [ ] Ensure proper transformation: `import x = require('y')` → `var x = require('y')`
-4. [ ] Fix type inference - should be `any` type, not `string`
-5. [ ] Test: `./wasm/test.sh invalidate_paths_with_dependents_symbols_handles_import_equals`
+1. [x] Read the failing test to understand expected behavior
+2. [x] Find import equals handling in `src/thin_checker.rs`
+3. [x] Fix type inference - was returning `string` instead of `any`
+4. [x] Test: `invalidate_paths_with_dependents_symbols_handles_import_equals` passes
 
 ### Key Code Locations
-- `src/thin_emitter.rs` - main emission
-- `src/thin_checker.rs` - type checking (fix to return any for import equals)
-- `src/binder.rs` - symbol binding (declare_in_persistent_scope)
+- `src/thin_checker.rs:5184-5190` - Fixed to check for StringLiteral and return TypeId::ANY
+
+### Fix Applied
+In `src/thin_checker.rs`, added check for StringLiteral module_specifier:
+- For `import x = require('y')`, module_specifier is a StringLiteral
+- Previously: `get_type_of_node(StringLiteral)` returned `string` type
+- Fixed: Return `TypeId::ANY` for StringLiteral module_specifiers
 
 ## Task Queue
 - [ ] After import equals: help with other CLI/Driver issues
@@ -35,6 +38,13 @@ Priority: P0 (Highest)
 - [x] Added AS_EXPRESSION/TYPE_ASSERTION/SATISFIES_EXPRESSION handling - MERGED to squad/anvil
 - [x] LSP Semantic Tokens (decorators, type parameters, modifiers) - MERGED to squad/anvil
 - [x] Source Map Implementation - Verified complete (905 tests passing)
+
+### Session 4: Import Equals Emission Fix - COMPLETE ✅
+- [x] Fixed import equals type to return `any` instead of `string`
+- [x] For `import x = require('y')`, module_specifier is a StringLiteral
+- [x] Added check in `src/thin_checker.rs:5184-5190` to return TypeId::ANY for StringLiteral module_specifiers
+- [x] Test passes: `invalidate_paths_with_dependents_symbols_handles_import_equals`
+- Commit: 8271a07cb1
 
 ### Session 3: Source Map Implementation - VERIFICATION COMPLETE ✅
 - [x] VLQ encoding fully implemented (vlq::encode, vlq::decode)
@@ -56,7 +66,7 @@ Priority: P0 (Highest)
 - Status: Implementation complete and verified via CLI testing
 
 ## Ready for Merge
-No commits (task in progress)
+Yes (8271a07cb1)
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
