@@ -127,6 +127,7 @@ pub struct SemanticTokensProvider<'a> {
     line_map: &'a LineMap,
     source_text: &'a str,
     builder: SemanticTokensBuilder,
+    in_decorator: bool,
 }
 
 impl<'a> SemanticTokensProvider<'a> {
@@ -143,6 +144,7 @@ impl<'a> SemanticTokensProvider<'a> {
             line_map,
             source_text,
             builder: SemanticTokensBuilder::new(),
+            in_decorator: false,
         }
     }
 
@@ -161,6 +163,27 @@ impl<'a> SemanticTokensProvider<'a> {
     fn visit_node(&mut self, node_idx: NodeIndex) {
         let Some(node) = self.arena.get(node_idx) else { return };
 
+        // Handle modifiers (keywords like public, private, static, readonly)
+        if self.is_modifier(node.kind) {
+            self.emit_token_for_node(node_idx, SemanticTokenType::Modifier, 0);
+            return;
+        }
+
+        // Handle identifiers in decorator context
+        if self.in_decorator && node.kind == SyntaxKind::Identifier as u16 {
+            self.emit_token_for_node(node_idx, SemanticTokenType::Decorator, 0);
+            return;
+        }
+
+        // Handle Decorator node wrapper
+        if node.kind == syntax_kind_ext::DECORATOR {
+            let prev_in_decorator = self.in_decorator;
+            self.in_decorator = true;
+            self.visit_children(node_idx);
+            self.in_decorator = prev_in_decorator;
+            return;
+        }
+
         // Check if this declaration node has a symbol
         if let Some(sym_id) = self.binder.get_node_symbol(node_idx) {
             if let Some(symbol) = self.binder.get_symbol(sym_id) {
@@ -171,6 +194,35 @@ impl<'a> SemanticTokensProvider<'a> {
 
         // Recurse into children
         self.visit_children(node_idx);
+    }
+
+    /// Check if a node kind is a modifier keyword.
+    fn is_modifier(&self, kind: u16) -> bool {
+        matches!(
+            SyntaxKind::try_from_u16(kind),
+            Some(
+                SyntaxKind::PublicKeyword
+                    | SyntaxKind::PrivateKeyword
+                    | SyntaxKind::ProtectedKeyword
+                    | SyntaxKind::StaticKeyword
+                    | SyntaxKind::ReadonlyKeyword
+                    | SyntaxKind::AbstractKeyword
+                    | SyntaxKind::AsyncKeyword
+                    | SyntaxKind::ExportKeyword
+                    | SyntaxKind::DefaultKeyword
+                    | SyntaxKind::ConstKeyword
+                    | SyntaxKind::DeclareKeyword
+                    | SyntaxKind::OverrideKeyword
+            )
+        )
+    }
+
+    /// Emit a semantic token for a specific node.
+    fn emit_token_for_node(&mut self, node_idx: NodeIndex, token_type: SemanticTokenType, modifiers: u32) {
+        let Some(node) = self.arena.get(node_idx) else { return };
+        let pos = self.line_map.offset_to_position(node.pos, self.source_text);
+        let length = node.end - node.pos;
+        self.builder.push(pos.line, pos.character, length, token_type, modifiers);
     }
 
     /// Visit all children of a node in document order.
@@ -199,6 +251,11 @@ impl<'a> SemanticTokensProvider<'a> {
             }
             k if k == syntax_kind_ext::VARIABLE_STATEMENT => {
                 if let Some(var) = self.arena.get_variable(node) {
+                    if let Some(modifiers) = &var.modifiers {
+                        for &mod_idx in &modifiers.nodes {
+                            self.visit_node(mod_idx);
+                        }
+                    }
                     for &decl_list in &var.declarations.nodes {
                         self.visit_node(decl_list);
                     }
@@ -224,8 +281,18 @@ impl<'a> SemanticTokensProvider<'a> {
             }
             k if k == syntax_kind_ext::FUNCTION_DECLARATION => {
                 if let Some(func) = self.arena.get_function(node) {
+                    if let Some(modifiers) = &func.modifiers {
+                        for &mod_idx in &modifiers.nodes {
+                            self.visit_node(mod_idx);
+                        }
+                    }
                     if !func.name.is_none() {
                         self.visit_node(func.name);
+                    }
+                    if let Some(type_params) = &func.type_parameters {
+                        for &param in &type_params.nodes {
+                            self.visit_node(param);
+                        }
                     }
                     for &param in &func.parameters.nodes {
                         self.visit_node(param);
@@ -240,8 +307,23 @@ impl<'a> SemanticTokensProvider<'a> {
             }
             k if k == syntax_kind_ext::CLASS_DECLARATION => {
                 if let Some(class) = self.arena.get_class(node) {
+                    if let Some(modifiers) = &class.modifiers {
+                        for &mod_idx in &modifiers.nodes {
+                            self.visit_node(mod_idx);
+                        }
+                    }
                     if !class.name.is_none() {
                         self.visit_node(class.name);
+                    }
+                    if let Some(type_params) = &class.type_parameters {
+                        for &param in &type_params.nodes {
+                            self.visit_node(param);
+                        }
+                    }
+                    if let Some(heritage) = &class.heritage_clauses {
+                        for &clause in &heritage.nodes {
+                            self.visit_node(clause);
+                        }
                     }
                     for &member in &class.members.nodes {
                         self.visit_node(member);
@@ -250,11 +332,24 @@ impl<'a> SemanticTokensProvider<'a> {
             }
             k if k == syntax_kind_ext::METHOD_DECLARATION => {
                 if let Some(method) = self.arena.get_method_decl(node) {
+                    if let Some(modifiers) = &method.modifiers {
+                        for &mod_idx in &modifiers.nodes {
+                            self.visit_node(mod_idx);
+                        }
+                    }
                     if !method.name.is_none() {
                         self.visit_node(method.name);
                     }
+                    if let Some(type_params) = &method.type_parameters {
+                        for &param in &type_params.nodes {
+                            self.visit_node(param);
+                        }
+                    }
                     for &param in &method.parameters.nodes {
                         self.visit_node(param);
+                    }
+                    if !method.type_annotation.is_none() {
+                        self.visit_node(method.type_annotation);
                     }
                     if !method.body.is_none() {
                         self.visit_node(method.body);
@@ -285,8 +380,23 @@ impl<'a> SemanticTokensProvider<'a> {
             }
             k if k == syntax_kind_ext::INTERFACE_DECLARATION => {
                 if let Some(iface) = self.arena.get_interface(node) {
+                    if let Some(modifiers) = &iface.modifiers {
+                        for &mod_idx in &modifiers.nodes {
+                            self.visit_node(mod_idx);
+                        }
+                    }
                     if !iface.name.is_none() {
                         self.visit_node(iface.name);
+                    }
+                    if let Some(type_params) = &iface.type_parameters {
+                        for &param in &type_params.nodes {
+                            self.visit_node(param);
+                        }
+                    }
+                    if let Some(heritage) = &iface.heritage_clauses {
+                        for &clause in &heritage.nodes {
+                            self.visit_node(clause);
+                        }
                     }
                     for &member in &iface.members.nodes {
                         self.visit_node(member);
@@ -295,6 +405,11 @@ impl<'a> SemanticTokensProvider<'a> {
             }
             k if k == syntax_kind_ext::ENUM_DECLARATION => {
                 if let Some(enum_decl) = self.arena.get_enum(node) {
+                    if let Some(modifiers) = &enum_decl.modifiers {
+                        for &mod_idx in &modifiers.nodes {
+                            self.visit_node(mod_idx);
+                        }
+                    }
                     if !enum_decl.name.is_none() {
                         self.visit_node(enum_decl.name);
                     }
@@ -310,6 +425,105 @@ impl<'a> SemanticTokensProvider<'a> {
                     }
                     if !member.initializer.is_none() {
                         self.visit_node(member.initializer);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::TYPE_ALIAS_DECLARATION => {
+                if let Some(alias) = self.arena.get_type_alias(node) {
+                    if let Some(modifiers) = &alias.modifiers {
+                        for &mod_idx in &modifiers.nodes {
+                            self.visit_node(mod_idx);
+                        }
+                    }
+                    if !alias.name.is_none() {
+                        self.visit_node(alias.name);
+                    }
+                    if let Some(type_params) = &alias.type_parameters {
+                        for &param in &type_params.nodes {
+                            self.visit_node(param);
+                        }
+                    }
+                    if !alias.type_node.is_none() {
+                        self.visit_node(alias.type_node);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::DECORATOR => {
+                if let Some(decorator) = self.arena.get_decorator(node) {
+                    self.visit_node(decorator.expression);
+                }
+            }
+            k if k == syntax_kind_ext::TYPE_PARAMETER => {
+                if let Some(param) = self.arena.get_type_parameter(node) {
+                    self.visit_node(param.name);
+                    if !param.constraint.is_none() {
+                        self.visit_node(param.constraint);
+                    }
+                    if !param.default.is_none() {
+                        self.visit_node(param.default);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::PROPERTY_DECLARATION => {
+                if let Some(prop) = self.arena.get_property_decl(node) {
+                    if let Some(modifiers) = &prop.modifiers {
+                        for &mod_idx in &modifiers.nodes {
+                            self.visit_node(mod_idx);
+                        }
+                    }
+                    self.visit_node(prop.name);
+                    if !prop.type_annotation.is_none() {
+                        self.visit_node(prop.type_annotation);
+                    }
+                    if !prop.initializer.is_none() {
+                        self.visit_node(prop.initializer);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::PARAMETER => {
+                if let Some(param) = self.arena.get_parameter(node) {
+                    if let Some(modifiers) = &param.modifiers {
+                        for &mod_idx in &modifiers.nodes {
+                            self.visit_node(mod_idx);
+                        }
+                    }
+                    self.visit_node(param.name);
+                    if !param.type_annotation.is_none() {
+                        self.visit_node(param.type_annotation);
+                    }
+                    if !param.initializer.is_none() {
+                        self.visit_node(param.initializer);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::GET_ACCESSOR || k == syntax_kind_ext::SET_ACCESSOR => {
+                if let Some(accessor) = self.arena.get_accessor(node) {
+                    if let Some(modifiers) = &accessor.modifiers {
+                        for &mod_idx in &modifiers.nodes {
+                            self.visit_node(mod_idx);
+                        }
+                    }
+                    self.visit_node(accessor.name);
+                    for &param in &accessor.parameters.nodes {
+                        self.visit_node(param);
+                    }
+                    if !accessor.body.is_none() {
+                        self.visit_node(accessor.body);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::CONSTRUCTOR => {
+                if let Some(ctor) = self.arena.get_constructor(node) {
+                    if let Some(modifiers) = &ctor.modifiers {
+                        for &mod_idx in &modifiers.nodes {
+                            self.visit_node(mod_idx);
+                        }
+                    }
+                    for &param in &ctor.parameters.nodes {
+                        self.visit_node(param);
+                    }
+                    if !ctor.body.is_none() {
+                        self.visit_node(ctor.body);
                     }
                 }
             }
@@ -356,6 +570,12 @@ impl<'a> SemanticTokensProvider<'a> {
             }
             k if k == syntax_kind_ext::PARAMETER => {
                 self.arena.get_parameter(decl_node).map(|p| p.name)
+            }
+            k if k == syntax_kind_ext::TYPE_PARAMETER => {
+                self.arena.get_type_parameter(decl_node).map(|t| t.name)
+            }
+            k if k == syntax_kind_ext::GET_ACCESSOR || k == syntax_kind_ext::SET_ACCESSOR => {
+                self.arena.get_accessor(decl_node).map(|a| a.name)
             }
             _ => None,
         };
