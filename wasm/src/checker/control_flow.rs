@@ -2050,6 +2050,16 @@ impl<'a> FlowAnalyzer<'a> {
 
     fn in_property_name(&self, idx: NodeIndex) -> Option<(Atom, bool)> {
         let idx = self.skip_parenthesized(idx);
+
+        // Handle private identifiers (e.g., `#field in obj`)
+        if let Some(node) = self.arena.get(idx) {
+            if node.kind == SyntaxKind::PrivateIdentifier as u16 {
+                if let Some(ident) = self.arena.get_identifier(node) {
+                    return Some((self.interner.intern_string(&ident.escaped_text), false));
+                }
+            }
+        }
+
         self.literal_atom_and_kind_from_node_or_type(idx)
     }
 
@@ -2241,6 +2251,11 @@ impl<'a> FlowAnalyzer<'a> {
             || node.kind == SyntaxKind::NoSubstitutionTemplateLiteral as u16
         {
             return self.arena.get_literal(node).map(|lit| lit.text.as_str());
+        }
+
+        // Handle private identifiers (e.g., #a) for `in` operator narrowing
+        if node.kind == SyntaxKind::PrivateIdentifier as u16 {
+            return self.arena.get_identifier(node).map(|ident| ident.escaped_text.as_str());
         }
 
         None
@@ -2795,6 +2810,14 @@ impl<'a> FlowAnalyzer<'a> {
         }
         if let Some(name) = self.literal_string_from_node(idx) {
             return Some((self.interner.intern_string(name), false));
+        }
+
+        // Handle private identifiers (e.g., #a in x)
+        let idx = self.skip_parenthesized(idx);
+        let node = self.arena.get(idx)?;
+        if node.kind == SyntaxKind::PrivateIdentifier as u16 {
+            let ident = self.arena.get_identifier(node)?;
+            return Some((self.interner.intern_string(&ident.escaped_text), false));
         }
 
         let node_types = self.node_types?;

@@ -353,6 +353,7 @@ impl<'a> TypeInstantiator<'a> {
                     return_type: instantiated_return,
                     type_predicate,
                     is_constructor: shape.is_constructor,
+                    is_method: shape.is_method,
                 })
             }
 

@@ -1,67 +1,48 @@
 # Worker 4 Plan - Squad Anvil
 
 ## Mission
-Fix CLI/Driver Issues and Import Equals
+Diagnostic Formatting Enhancement
 
 Status: Active
 Priority: P1 (High)
 
 ## Current Assignment
-**Fix CLI/Driver Compilation Issues (3 failing tests)**
+**Enhance Diagnostic Error Messages**
 
-### Failing Tests
-1. `cli::driver_tests::compile_generic_utility_library_type_utilities`
-2. `cli::driver_tests::compile_shorthand_methods`
-3. `cli::driver_tests::invalidate_paths_with_dependents_symbols_handles_import_equals`
+### Background
+TypeScript's error messages are detailed and helpful. Our diagnostic messages should match tsc's format and quality.
 
 ### Implementation Steps
 
-#### Part 1: Import Equals (`import x = require()`)
-1. [ ] Read the failing test `invalidate_paths_with_dependents_symbols_handles_import_equals`
-2. [ ] Find import equals handling in `src/thin_emitter.rs`
-3. [ ] Ensure CommonJS output: `import x = require('y')` -> `var x = require('y')`
-4. [ ] Test: `./wasm/test.sh 2>&1 | grep -E "import_equals"`
-
-#### Part 2: Generic Utility Library
-1. [ ] Read the failing test `compile_generic_utility_library_type_utilities`
-2. [ ] This likely tests complex generic patterns - check if it's a type inference issue or emission issue
-3. [ ] If emission: ensure generic type annotations are stripped correctly
-4. [ ] If inference: may need Forge squad help
-
-#### Part 3: Shorthand Methods
-1. [ ] Read the failing test `compile_shorthand_methods`
-2. [ ] Ensure shorthand method syntax is handled: `{ foo() {} }` vs `{ foo: function() {} }`
-3. [ ] Check both parsing and emission
+1. [ ] Read current diagnostic implementation in `src/checker/types/diagnostics/`
+2. [ ] Check which error messages differ from tsc
+3. [ ] Enhance error messages with:
+   - Better context information
+   - Suggestions for fixes
+   - Related code locations
+4. [ ] Format error messages to match tsc output:
+   - File location (line:column)
+   - Error code TS#####: Message
+   - Underlined error span
+5. [ ] Test: Compare output with `npx tsc --noEmit`
 
 ### Key Code Locations
-- `src/cli/driver.rs` - compilation driver
-- `src/thin_emitter.rs` - import/export emission
-- `src/thin_parser.rs` - shorthand method parsing
-
-### Import Equals Transformation
-```typescript
-// TypeScript
-import fs = require('fs');
-
-// CommonJS output
-var fs = require('fs');
-
-// ES module output (if module: esnext)
-// Keep as-is or convert to: import * as fs from 'fs';
-```
+- `src/checker/types/diagnostics/` - diagnostic messages and codes
+- `src/checker/types/diagnostics/diagnostic_messages.rs` - message templates
 
 ## Task Queue
-- [ ] After CLI fixes: help with parser error recovery
+- [ ] After diagnostic formatting: help with source maps or CLI flags
 
 ## Completed
-- [x] (Move finished items here)
+- [x] Fixed shorthand methods binding in object literals (fc2b39a217) - MERGED to squad/anvil
+- [x] Fixed declare_symbol persistence for scope_chain updates (fc2b39a217)
 
 ## Ready for Merge
-No
+Yes - Previous work merged to squad/anvil
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
 - Use Docker for Rust tests: `./wasm/test.sh`
-- Commit format: `[wasm] cli: Fix import equals emission for CommonJS`
+- Commit format: `[wasm] diagnostics: Enhance error message formatting with context`
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/anvil-4`

@@ -750,6 +750,7 @@ impl<'a> TypeLowering<'a> {
                 return_type,
                 type_predicate,
                 is_constructor: false,
+                is_method: false,
             };
 
             self.interner.function(shape)
@@ -1019,6 +1020,7 @@ impl<'a> TypeLowering<'a> {
             return_type,
             type_predicate,
             is_constructor: false,
+            is_method: true,
         })
     }
 
@@ -2250,6 +2252,7 @@ impl<'a> TypeLowering<'a> {
                 return_type,
                 type_predicate,
                 is_constructor: true, // Mark as constructor
+                is_method: false,
             };
 
             self.interner.function(shape)
