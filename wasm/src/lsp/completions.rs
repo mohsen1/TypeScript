@@ -7,6 +7,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use std::borrow::Cow;
 
 use crate::binder::SymbolId;
+use crate::lsp::jsdoc::jsdoc_for_node;
 use crate::checker::TypeCache;
 use crate::parser::thin_node::ThinNodeArena;
 use crate::parser::NodeIndex;
@@ -35,6 +36,8 @@ pub enum CompletionItemKind {
     Parameter,
     /// A property
     Property,
+    /// A keyword
+    Keyword,
 }
 
 /// A completion item to be suggested to the user.
@@ -90,6 +93,17 @@ pub struct Completions<'a> {
     interner: Option<&'a TypeInterner>,
     file_name: Option<String>,
 }
+
+/// JavaScript/TypeScript keywords for completion.
+const KEYWORDS: &[&str] = &[
+    "break", "case", "catch", "class", "const", "continue", "debugger",
+    "default", "delete", "do", "else", "enum", "export", "extends",
+    "false", "finally", "for", "function", "if", "import", "in",
+    "interface", "let", "new", "null", "return", "super", "switch",
+    "this", "throw", "true", "try", "typeof", "var", "void", "while",
+    "with", "async", "await", "yield", "type", "readonly", "abstract",
+    "declare", "static", "public", "private", "protected", "get", "set"
+];
 
 impl<'a> Completions<'a> {
     /// Create a new Completions provider.
@@ -212,8 +226,30 @@ impl<'a> Completions<'a> {
                         item = item.with_detail(detail);
                     }
 
+                    // Add JSDoc documentation if available
+                    let decl_node = if !symbol.value_declaration.is_none() {
+                        symbol.value_declaration
+                    } else {
+                        symbol.declarations.first().copied().unwrap_or(NodeIndex::NONE)
+                    };
+                    if !decl_node.is_none() {
+                        let doc = jsdoc_for_node(self.arena, root, decl_node, self.source_text);
+                        if !doc.is_empty() {
+                            item = item.with_documentation(doc);
+                        }
+                    }
+
                     completions.push(item);
                 }
+            }
+        }
+
+        // Add keywords for non-member completions (when not typing after a dot)
+        // Note: If we were in member context, we would have returned early above
+        for &kw in KEYWORDS {
+            // Skip if keyword is already in completions (e.g., if user defined a variable named 'function')
+            if !seen_names.contains(kw) {
+                completions.push(CompletionItem::new(kw.to_string(), CompletionItemKind::Keyword));
             }
         }
 
@@ -644,5 +680,69 @@ mod completions_tests {
         let names: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
 
         assert!(names.contains(&"length"), "Should suggest string member 'length'");
+    }
+
+    #[test]
+    fn test_completions_includes_keywords() {
+        let source = "const x = 1;\n";
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+        let arena = parser.get_arena();
+
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(arena, root);
+
+        let line_map = LineMap::build(source);
+
+        // Position at the end
+        let position = Position::new(1, 0);
+
+        let completions = Completions::new(arena, &binder, &line_map, source);
+        let items = completions.get_completions(root, position);
+
+        assert!(items.is_some(), "Should have completions");
+
+        if let Some(items) = items {
+            let names: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
+
+            // Should include keywords
+            assert!(names.contains(&"function"), "Should suggest keyword 'function'");
+            assert!(names.contains(&"const"), "Should suggest keyword 'const'");
+            assert!(names.contains(&"class"), "Should suggest keyword 'class'");
+        }
+    }
+
+    #[test]
+    fn test_completions_jsdoc_documentation() {
+        // Test that JSDoc comments are included in completion items
+        let source = "/** This is a test function */\nfunction foo() {}\n";
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+        let arena = parser.get_arena();
+
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(arena, root);
+
+        let line_map = LineMap::build(source);
+
+        // Position at the end
+        let position = Position::new(2, 0);
+
+        let completions = Completions::new(arena, &binder, &line_map, source);
+        let items = completions.get_completions(root, position);
+
+        assert!(items.is_some(), "Should have completions");
+
+        if let Some(items) = items {
+            let foo_item = items.iter().find(|i| i.label == "foo");
+            assert!(foo_item.is_some(), "Should suggest 'foo'");
+
+            if let Some(item) = foo_item {
+                assert!(
+                    item.documentation.as_ref().map_or(false, |d| d.contains("test function")),
+                    "Should include JSDoc documentation"
+                );
+            }
+        }
     }
 }
