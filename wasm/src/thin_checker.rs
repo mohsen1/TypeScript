@@ -13339,14 +13339,18 @@ impl<'a> ThinCheckerState<'a> {
 
         let module_name = &literal.text;
 
-        if self.ctx.binder.declared_modules.contains(module_name) {
-            return;
-        }
+        // Check if the module was resolved by the CLI driver (multi-file mode)
         if let Some(ref resolved) = self.ctx.resolved_modules {
             if resolved.contains(module_name) {
                 return;
             }
         }
+
+        // Note: We do NOT skip TS2792 for declared_modules (ambient modules).
+        // Imports from ambient modules should emit TS2792 because ambient modules
+        // don't provide runtime values - they only provide type information.
+        // If you want to use an ambient module's types, you should use `import type`
+        // or reference the types directly in a type annotation.
 
         // In single-file mode, any external import is considered unresolved.
         // This is correct because WASM checker operates on individual files
