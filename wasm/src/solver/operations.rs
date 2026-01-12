@@ -148,6 +148,17 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
         }
     }
 
+    /// Expand a TypeParameter to its constraint (if it has one).
+    /// This is used when a TypeParameter from an outer scope is used as an argument.
+    fn expand_type_param(&self, ty: TypeId) -> TypeId {
+        match self.interner.lookup(ty) {
+            Some(TypeKey::TypeParameter(tp)) => {
+                tp.constraint.unwrap_or(ty)
+            }
+            _ => ty,
+        }
+    }
+
     /// Resolve a call to a simple function type.
     fn resolve_function_call(&mut self, func: &FunctionShape, arg_types: &[TypeId]) -> CallResult {
         // Check argument count
@@ -242,14 +253,29 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
             };
 
             let mut visited = FxHashSet::default();
-            if !self.type_contains_placeholder(target_type, &var_map, &mut visited)
-                && !self.checker.is_assignable_to(arg_type, target_type)
-            {
-                return CallResult::ArgumentTypeMismatch {
-                    index: i,
-                    expected: target_type,
-                    actual: arg_type,
-                };
+            if !self.type_contains_placeholder(target_type, &var_map, &mut visited) {
+                // No placeholder in target_type - check assignability directly
+                if !self.checker.is_assignable_to(arg_type, target_type) {
+                    return CallResult::ArgumentTypeMismatch {
+                        index: i,
+                        expected: target_type,
+                        actual: arg_type,
+                    };
+                }
+            } else {
+                // Target type contains placeholders - check against their constraints
+                if let Some(TypeKey::TypeParameter(tp)) = self.interner.lookup(target_type) {
+                    if let Some(constraint) = tp.constraint {
+                        // Check if argument is assignable to the type parameter's constraint
+                        if !self.checker.is_assignable_to(arg_type, constraint) {
+                            return CallResult::ArgumentTypeMismatch {
+                                index: i,
+                                expected: constraint,
+                                actual: arg_type,
+                            };
+                        }
+                    }
+                }
             }
 
             // arg_type <: target_type
@@ -308,9 +334,10 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
         }
 
         let instantiated_params: Vec<ParamInfo> = func.params.iter().map(|p| {
+            let instantiated = instantiate_type(self.interner, p.type_id, &final_subst);
             ParamInfo {
                 name: p.name.clone(),
-                type_id: instantiate_type(self.interner, p.type_id, &final_subst),
+                type_id: instantiated,
                 optional: p.optional,
                 rest: p.rest,
             }
@@ -356,10 +383,14 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                 break;
             };
 
+            // Expand TypeParameters to their constraints for assignability checking
+            // This handles the case where a TypeParameter from an outer scope is used as an argument
+            let expanded_arg_type = self.expand_type_param(*arg_type);
+
             let assignable = if strict {
-                self.checker.is_assignable_to_strict(*arg_type, param_type)
+                self.checker.is_assignable_to_strict(expanded_arg_type, param_type)
             } else {
-                self.checker.is_assignable_to(*arg_type, param_type)
+                self.checker.is_assignable_to(expanded_arg_type, param_type)
             };
 
             if !assignable {

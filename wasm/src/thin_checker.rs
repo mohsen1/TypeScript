@@ -2620,7 +2620,7 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         // Second pass: Now resolve constraints and defaults with all type parameters in scope
-        for &param_idx in &param_indices {
+        for (idx, &param_idx) in param_indices.iter().enumerate() {
             let Some(node) = self.ctx.arena.get(param_idx) else { continue };
             let Some(data) = self.ctx.arena.get_type_parameter(node) else { continue };
 
@@ -2647,7 +2647,13 @@ impl<'a> ThinCheckerState<'a> {
                 constraint,
                 default,
             };
-            params.push(info);
+            params.push(info.clone());
+
+            // UPDATE: Create a new TypeParameter with constraints and update the scope
+            // This ensures that when function parameters reference these type parameters,
+            // they get the constrained version, not the unconstrained placeholder
+            let constrained_type_id = self.ctx.types.intern(TypeKey::TypeParameter(info));
+            self.ctx.type_parameter_scope.insert(name.clone(), constrained_type_id);
         }
 
         (params, updates)
