@@ -2253,6 +2253,11 @@ impl<'a> FlowAnalyzer<'a> {
             return self.arena.get_literal(node).map(|lit| lit.text.as_str());
         }
 
+        // Handle private identifiers (e.g., #a) for `in` operator narrowing
+        if node.kind == SyntaxKind::PrivateIdentifier as u16 {
+            return self.arena.get_identifier(node).map(|ident| ident.escaped_text.as_str());
+        }
+
         None
     }
 
