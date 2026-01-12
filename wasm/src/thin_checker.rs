@@ -4831,7 +4831,11 @@ impl<'a> ThinCheckerState<'a> {
         if (symbol.flags & symbol_flags::VARIABLE) == 0 {
             return false;
         }
-        if (symbol.flags & symbol_flags::BLOCK_SCOPED_VARIABLE) == 0 {
+        // Check both block-scoped (let/const) and function-scoped (var) variables
+        // definite assignment should apply to all typed variables without initializers
+        if (symbol.flags & symbol_flags::BLOCK_SCOPED_VARIABLE) == 0
+            && (symbol.flags & symbol_flags::FUNCTION_SCOPED_VARIABLE) == 0
+        {
             return false;
         }
 
