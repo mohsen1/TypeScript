@@ -1,4 +1,4 @@
-# Worker 7 Task List - Solver Squad
+# Worker 7 Task List - Solver Squad (Lead)
 
 ## Current Task
 - [ ] **SOLV-4: Change fallback from Any to Unknown**
@@ -6,6 +6,7 @@
   - Update `Type::Unknown` to be more strict than `Any`
   - Ensure unknown types still propagate errors (not silence them)
   - Test: `let x: number = "string"` should error even with unknown in scope
+  - Coordinate with Worker 8 on Lawyer layer integration
 
 ## Queue
 - [ ] **SOLV-7: Test TS2322 fixes**
@@ -15,7 +16,12 @@
 - [ ] **SOLV-11: Coordinate Solver Squad integration**
   - Review Workers 8-9 implementations for consistency
   - Ensure Lawyer layer integration is correct across all solver components
-  - Verify conformance test coverage for all solver fixes
+  - Merge completed solver components into main branch
+- [ ] **SOLV-15: Verify overall Solver improvements**
+  - Run full conformance suite after all solver fixes
+  - Measure TS2322 and TS7006 missing error reduction
+  - Goal: Convert 310 TS2322 and 357 TS7006 missing errors
+  - Document final solver conformance metrics
 
 ## Completed
 - [x] **SOLV-1: Audit current solve_subtype implementation**

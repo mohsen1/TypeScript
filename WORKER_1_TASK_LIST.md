@@ -1,4 +1,4 @@
-# Worker 1 Task List - CFA Squad
+# Worker 1 Task List - CFA Squad (Lead)
 
 ## Current Task
 - [ ] **CFA-4: Implement definite assignment analysis algorithm**
@@ -14,10 +14,15 @@
   - Query FlowGraph for variable state at usage point
   - Emit TS2454 error for variables used before definite assignment
   - Test with cases: `let x; console.log(x);` and `let x; x = 1; console.log(x);`
-- [ ] **CFA-10: Coordinate CFA integration and testing**
+- [ ] **CFA-11: Merge and coordinate CFA Squad work**
   - Review Workers 2-3 implementations for consistency
+  - Merge completed FlowGraph components into main branch
   - Ensure FlowGraph API is stable across all CFA components
-  - Verify conformance test coverage
+  - Coordinate integration testing with Worker 3
+- [ ] **CFA-12: Verify TS2454/TS2564 reduction goal**
+  - Run conformance tests targeting 573 TS2454 and 443 TS2564 missing errors
+  - Measure improvement toward 90% reduction goal
+  - Document remaining gaps
 
 ## Completed
 - [x] **CFA-1: Design Flow Graph data structure**

@@ -6,6 +6,7 @@
   - Track variable state across catch blocks
   - Ensure finally blocks affect all exit paths
   - Test: `let x; try { x = 1; } finally { } console.log(x);`
+  - Coordinate with Worker 2 on FlowGraphBuilder implementation
 
 ## Queue
 - [ ] **CFA-9: Write conformance tests for CFA**
@@ -13,6 +14,15 @@
   - Add 50+ cases covering all CFA error codes (TS2454, TS2564)
   - Verify error counts match tsc output
   - Goal: Reduce missing TS2454/TS2564 errors by 90%
+- [ ] **CFA-13: Test complex control flow scenarios**
+  - Add tests for nested try/catch/finally blocks
+  - Test loops with break/continue and definite assignment
+  - Verify switch statement fallthrough tracking
+  - Test conditional assignments with all branch paths
+- [ ] **CFA-14: Coordinate CFA integration with Worker 1**
+  - Work with Worker 1 to merge FlowGraph integration
+  - Ensure Checker integration is complete
+  - Verify all CFA components work together
 
 ## Completed
 - [x] **CFA-3: Integrate FlowGraph into Checker**
