@@ -542,6 +542,19 @@ impl<'a> ThinCheckerState<'a> {
             // void expression
             k if k == syntax_kind_ext::VOID_EXPRESSION => TypeId::UNDEFINED,
 
+            // await expression - unwrap Promise<T> to get T
+            k if k == syntax_kind_ext::AWAIT_EXPRESSION => {
+                if let Some(unary) = self.ctx.arena.get_unary_expr_ex(node) {
+                    let expr_type = self.get_type_of_node(unary.expression);
+                    // If the awaited type is Promise-like, extract the type argument
+                    // Otherwise, just return the type as-is
+                    self.promise_like_return_type_argument(expr_type)
+                        .unwrap_or(expr_type)
+                } else {
+                    TypeId::ANY
+                }
+            }
+
             // Parenthesized expression - just pass through to inner expression
             k if k == syntax_kind_ext::PARENTHESIZED_EXPRESSION => {
                 if let Some(paren) = self.ctx.arena.get_parenthesized(node) {
@@ -9572,7 +9585,28 @@ impl<'a> ThinCheckerState<'a> {
         match key {
             TypeKey::TypeQuery(symbol) => {
                 if let Some(symbol) = self.ctx.binder.get_symbol(SymbolId(symbol.0)) {
-                    symbol.flags & symbol_flags::ABSTRACT != 0
+                    // Check if the symbol is marked as abstract
+                    if symbol.flags & symbol_flags::ABSTRACT != 0 {
+                        return true;
+                    }
+                    // Also check if this is an abstract class by examining its declaration
+                    // The ABSTRACT flag might not be set on the symbol, so check the class modifiers
+                    if symbol.flags & symbol_flags::CLASS != 0 {
+                        // Get the class declaration and check if it has the abstract modifier
+                        let decl_idx = if !symbol.value_declaration.is_none() {
+                            symbol.value_declaration
+                        } else {
+                            symbol.declarations.first().copied().unwrap_or(NodeIndex::NONE)
+                        };
+                        if !decl_idx.is_none() {
+                            if let Some(node) = self.ctx.arena.get(decl_idx) {
+                                if let Some(class) = self.ctx.arena.get_class(node) {
+                                    return self.has_abstract_modifier(&class.modifiers);
+                                }
+                            }
+                        }
+                    }
+                    false
                 } else {
                     false
                 }
