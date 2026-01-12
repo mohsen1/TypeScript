@@ -41,8 +41,7 @@ Type parameter constraint checking issue: when calling `deepFreeze<T extends obj
 - [x] LSP Semantic Tokens - MERGED to squad/anvil
 - [x] Source Map Implementation - Verified complete
 - [x] Import Equals Emission Fix - Test passes
-- [x] CLI Flags (--outFile, --tsBuildInfoFile, --incremental) - Complete
-- [x] Emitter Fixes - All 756/756 emitter tests pass (commit 0e3b0b935f)
+- [x] CLI Flags (--outFile, --tsBuildInfoFile, --incremental) - Complete (commit 9754ae94f1)
 
 ### Session 5: Additional CLI Features - COMPLETE ✅
 - [x] Added --outFile flag (concatenate output to single file)
