@@ -107,27 +107,37 @@ Updated: 2026-01-11
 - Use `./scripts/ask-gemini.mjs --review` for code review
 
 ## Squad Status
-- Last EM Update: 2026-01-12 (Blocker fixed: private identifier `in` operator)
+- Last EM Update: 2026-01-12 (W1, W2 reassigned to backlog tasks)
 - Conformance: **30.8% exact match** (+7.5pp from 23.3%)
-- Build: Passing (1 pre-existing test failure unrelated to recent changes)
-- **Blocker Fixed**: ✅ Private identifier narrowing in `in` operator (commit 1539a1744f)
+- Build: Passing
+- **Recent Merges**: W1 (method bivariance), W4 (element access), W5 (new expression) - All tests passing
 - Workers: All 5 active
 
 ### Worker Assignments (Current)
 
 | Worker | Priority | Assignment | Status |
 |--------|----------|------------|--------|
-| W1 | HIGH | Method Bivariance | Active - fixing FunctionShape construction errors |
-| W2 | HIGH | Namespace Merging | Active - enum exports added, tests failing |
+| W1 | HIGH | TS7006 Parameter 'any' Type | Active - implementing |
+| W2 | HIGH | TS7010 Implicit Any Return | Reassigned (3rd time) - implementing |
 | W3 | HIGH | Element Access Literal Keys | Active - definite assignment analysis |
-| W4 | HIGH | Namespace Merging (help W2) | Active - redirected from duplicate work |
-| W5 | MEDIUM | New Expression Inference | Active - constructor overload detection |
+| W4 | HIGH | TS2792 Module Resolution | Reassigned (2nd time) - implementing |
+| W5 | HIGH | TS2564 Property No Initializer | Active - implementing |
+
+**MERGED WORKERS (to squad/forge):**
+- ✅ W1: Method bivariance (4/4 tests pass)
+- ✅ W4: Element access literal keys (3/3 tests pass)
+- ✅ W5: New expression inference (7/7 tests pass)
+
+**REASSIGNMENT HISTORY:**
+- W2: TS7010 → TS2454 → TS2322 → TS7010 (3rd reassignment)
+- W4: Namespace debug → TS2322 → TS2792 (2nd reassignment)
 
 **PRIORITY ORDER:**
-1. **W2/W4** - Namespace merging (collaborative, high priority)
-2. **W1** - Method bivariance (quick win, making progress)
-3. **W3** - Element access literal keys
-4. **W5** - New expression inference
+1. **W1** - TS7006 parameter 'any' (42 occurrences)
+2. **W5** - TS2564 property initialization (64 occurrences)
+3. **W2** - TS7010 implicit any return
+4. **W4** - TS2792 module resolution
+5. **W3** - Element access literal keys
 
 ### Before Starting Any Task
 **IMPORTANT:** Workers must consult Gemini before starting work:

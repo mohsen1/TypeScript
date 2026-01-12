@@ -1,39 +1,66 @@
 # Worker 1 Plan - Squad Forge
 
 ## Mission
-Fix Method Bivariance in the solver - QUICK WIN task
+Fix TS2300: Duplicate Identifier
 
-Status: Complete
-Priority: P0 (Highest)
+Status: Active
+Priority: P0 (CRITICAL)
 
 ## Current Assignment
-**Fix Method Bivariance (3 failing tests)** - COMPLETED
+**Implement TS2300 Error: Duplicate identifier**
 
 ### Background
-In TypeScript, method parameters are bivariant (both covariant and contravariant) while function parameters are contravariant (when `strictFunctionTypes` is enabled). The solver now correctly distinguishes between methods and standalone functions.
+TypeScript should emit TS2300 error when the same identifier is declared multiple times in the same scope. This includes:
+1. Duplicate variable declarations (let/const/var)
+2. Duplicate function declarations
+3. Duplicate parameter names
+4. Duplicate class members
+5. Duplicate enum members
+6. Duplicate type aliases/interfaces
 
-### Implementation Summary
-1. [x] Added `is_method: bool` field to `FunctionShape` in `src/solver/types.rs`
-2. [x] Updated `lower_method_signature` in `src/solver/lower.rs` to set `is_method: true`
-3. [x] Updated solver logic in `src/solver/subtype.rs` to apply bivariance for methods
-4. [x] Updated all `FunctionShape` constructions across the codebase
-5. [x] All 3 method bivariance tests now pass
+### Success Criteria
+- Emit TS2300 for duplicate declarations in the same scope
+- Don't emit for declarations in different scopes (shadowing)
+- Handle all declaration types
+- Report the location of both declarations
 
-### Test Results
-- `test_method_bivariance_wider_argument` - PASSED (bivariance allows unsafe direction)
-- `test_method_bivariance_narrower_argument` - PASSED (bivariance allows both directions)
-- `test_method_bivariance_event_handler_pattern` - UPDATED (interface inheritance needed, separate issue)
+### Implementation Steps
+1. [ ] Find symbol declaration tracking in binder
+2. [ ] Implement duplicate detection when declaring symbols
+3. [ ] Emit TS2300 when duplicate found in same scope
+4. [ ] Test with various duplicate patterns
+5. [ ] Ensure no false positives for valid shadowing
 
-## Task Queue
-- [ ] Help with element access literal keys if time permits
+### Key Code Locations
+- `src/binder.rs` - symbol declaration, scope management
+- `src/thin_binder.rs` - symbol table
+- `src/checker/types/diagnostics.rs` - TS2300 error code
+
+### Test Cases to Implement
+```typescript
+// Should emit TS2300
+let x = 1;
+let x = 2; // Error: Duplicate identifier 'x'
+
+function foo() { }
+function foo() { } // Error: Duplicate identifier 'foo'
+
+// Should NOT emit (different scopes)
+let y = 1;
+{
+  let y = 2; // OK - different scope
+}
+```
 
 ## Completed
-- [x] Fix Method Bivariance - Added `is_method` field to `FunctionShape`, updated lowering logic to set the flag for methods, and modified parameter compatibility checking to use bivariance for methods regardless of `strict_function_types` setting. All tests pass.
+- [x] Fix Method Bivariance - Merged to squad/forge
 
 ## Ready for Merge
-Yes
+No
 
 ## Notes
-- Commit: `79a29f026d` - [wasm] solver: Implement method bivariance for strict function types
+- Follow `wasm/specs/WASM_ARCHITECTURE.md`
+- Use Docker for Rust tests: `./wasm/test.sh`
+- Commit format: `[wasm] binder: Implement TS2300 duplicate identifier detection`
+- Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/forge-1`
-- Next: Awaiting merge to `origin/rust` branch
