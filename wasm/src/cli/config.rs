@@ -48,6 +48,8 @@ pub struct CompilerOptions {
     #[serde(default)]
     pub out_dir: Option<String>,
     #[serde(default)]
+    pub out_file: Option<String>,
+    #[serde(default)]
     pub declaration: Option<bool>,
     #[serde(default)]
     pub declaration_dir: Option<String>,
@@ -55,6 +57,10 @@ pub struct CompilerOptions {
     pub source_map: Option<bool>,
     #[serde(default)]
     pub declaration_map: Option<bool>,
+    #[serde(default)]
+    pub ts_build_info_file: Option<String>,
+    #[serde(default)]
+    pub incremental: Option<bool>,
     #[serde(default)]
     pub strict: Option<bool>,
     #[serde(default)]
@@ -82,10 +88,13 @@ pub struct ResolvedCompilerOptions {
     pub paths: Option<Vec<PathMapping>>,
     pub root_dir: Option<PathBuf>,
     pub out_dir: Option<PathBuf>,
+    pub out_file: Option<PathBuf>,
     pub declaration_dir: Option<PathBuf>,
     pub emit_declarations: bool,
     pub source_map: bool,
     pub declaration_map: bool,
+    pub ts_build_info_file: Option<PathBuf>,
+    pub incremental: bool,
     pub no_emit: bool,
     pub no_emit_on_error: bool,
 }
@@ -169,10 +178,13 @@ impl Default for ResolvedCompilerOptions {
             paths: None,
             root_dir: None,
             out_dir: None,
+            out_file: None,
             declaration_dir: None,
             emit_declarations: false,
             source_map: false,
             declaration_map: false,
+            ts_build_info_file: None,
+            incremental: false,
             no_emit: false,
             no_emit_on_error: false,
         }
@@ -280,6 +292,12 @@ pub fn resolve_compiler_options(options: Option<&CompilerOptions>) -> Result<Res
         }
     }
 
+    if let Some(out_file) = options.out_file.as_deref() {
+        if !out_file.is_empty() {
+            resolved.out_file = Some(PathBuf::from(out_file));
+        }
+    }
+
     if let Some(declaration_dir) = options.declaration_dir.as_deref() {
         if !declaration_dir.is_empty() {
             resolved.declaration_dir = Some(PathBuf::from(declaration_dir));
@@ -296,6 +314,16 @@ pub fn resolve_compiler_options(options: Option<&CompilerOptions>) -> Result<Res
 
     if let Some(declaration_map) = options.declaration_map {
         resolved.declaration_map = declaration_map;
+    }
+
+    if let Some(ts_build_info_file) = options.ts_build_info_file.as_deref() {
+        if !ts_build_info_file.is_empty() {
+            resolved.ts_build_info_file = Some(PathBuf::from(ts_build_info_file));
+        }
+    }
+
+    if let Some(incremental) = options.incremental {
+        resolved.incremental = incremental;
     }
 
     if let Some(strict) = options.strict {
@@ -396,10 +424,13 @@ fn merge_compiler_options(base: CompilerOptions, child: CompilerOptions) -> Comp
         paths: child.paths.or(base.paths),
         root_dir: child.root_dir.or(base.root_dir),
         out_dir: child.out_dir.or(base.out_dir),
+        out_file: child.out_file.or(base.out_file),
         declaration: child.declaration.or(base.declaration),
         declaration_dir: child.declaration_dir.or(base.declaration_dir),
         source_map: child.source_map.or(base.source_map),
         declaration_map: child.declaration_map.or(base.declaration_map),
+        ts_build_info_file: child.ts_build_info_file.or(base.ts_build_info_file),
+        incremental: child.incremental.or(base.incremental),
         strict: child.strict.or(base.strict),
         no_emit: child.no_emit.or(base.no_emit),
         no_emit_on_error: child.no_emit_on_error.or(base.no_emit_on_error),

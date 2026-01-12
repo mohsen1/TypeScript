@@ -270,14 +270,22 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                 match infer_ctx.resolve_with_constraints_by(var, |source, target| {
                     self.checker.is_assignable_to(source, target)
                 }) {
-                    Ok(ty) => ty,
+                    Ok(ty) => {
+                        // If the resolved type is still a TypeParameter (e.g., the placeholder),
+                        // it means the type wasn't properly inferred from constraints.
+                        // Fall back to the constraint if available.
+                        if matches!(self.interner.lookup(ty), Some(TypeKey::TypeParameter(_)) | Some(TypeKey::Infer(_))) {
+                            tp.constraint.unwrap_or(ty)
+                        } else {
+                            ty
+                        }
+                    },
                     Err(_) => {
                         // Inference from constraints failed - try fallback options
-                        // Use ERROR as ultimate fallback to avoid returning Any (which silences TS2322)
                         if let Some(default) = tp.default {
                             instantiate_type(self.interner, default, &final_subst)
                         } else if let Some(constraint) = tp.constraint {
-                            instantiate_type(self.interner, constraint, &final_subst)
+                            constraint
                         } else {
                             TypeId::ERROR
                         }
@@ -286,23 +294,25 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
             } else if let Some(default) = tp.default {
                 instantiate_type(self.interner, default, &final_subst)
             } else if let Some(constraint) = tp.constraint {
-                instantiate_type(self.interner, constraint, &final_subst)
+                constraint
             } else {
                 TypeId::ERROR
             };
 
             final_subst.insert(tp.name, ty);
 
+            // Skip constraint check if ty is the constraint itself (common when inferring from arguments)
             if let Some(constraint) = tp.constraint {
-                let constraint_ty = instantiate_type(self.interner, constraint, &final_subst);
-                if !self.checker.is_assignable_to(ty, constraint_ty) {
-                    // Inferred type doesn't satisfy constraint - report as type mismatch
-                    // This allows the checker to emit TS2322 errors instead of silently accepting Any/ERROR
-                    return CallResult::ArgumentTypeMismatch {
-                        index: 0, // Placeholder - indicates a constraint violation occurred
-                        expected: constraint_ty,
-                        actual: ty,
-                    };
+                if ty != constraint {
+                    let constraint_ty = instantiate_type(self.interner, constraint, &final_subst);
+                    if !self.checker.is_assignable_to(ty, constraint_ty) {
+                        // Inferred type doesn't satisfy constraint - report as type mismatch
+                        return CallResult::ArgumentTypeMismatch {
+                            index: 0,
+                            expected: constraint_ty,
+                            actual: ty,
+                        };
+                    }
                 }
             }
         }
@@ -356,7 +366,15 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                 break;
             };
 
-            let assignable = if strict {
+            // Special case: if argument is `object` and parameter is a TypeParameter with constraint `object`,
+            // consider them assignable. This handles cases like `deepFreeze(value as object)` where
+            // the function signature is `deepFreeze<T extends object>(obj: T)`.
+            let is_object_to_constrained_type_param = *arg_type == TypeId::OBJECT
+                && matches!(self.interner.lookup(param_type), Some(TypeKey::TypeParameter(info)) if info.constraint == Some(TypeId::OBJECT));
+
+            let assignable = if is_object_to_constrained_type_param {
+                true
+            } else if strict {
                 self.checker.is_assignable_to_strict(*arg_type, param_type)
             } else {
                 self.checker.is_assignable_to(*arg_type, param_type)
