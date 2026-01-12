@@ -5309,6 +5309,13 @@ impl<'a> ThinCheckerState<'a> {
                             if let Some(target_sym) = self.resolve_require_call_symbol(import.module_specifier, None) {
                                 return (self.get_type_of_symbol(target_sym), Vec::new());
                             }
+                            // Check if module_specifier is a StringLiteral (require() call)
+                            // If so, return ANY type instead of string type
+                            if let Some(ms_node) = self.ctx.arena.get(import.module_specifier) {
+                                if ms_node.kind == SyntaxKind::StringLiteral as u16 {
+                                    return (TypeId::ANY, Vec::new());
+                                }
+                            }
                             // Fall back to get_type_of_node for simple identifiers
                             return (self.get_type_of_node(import.module_specifier), Vec::new());
                         }
