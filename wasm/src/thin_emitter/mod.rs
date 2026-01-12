@@ -1699,6 +1699,7 @@ impl<'a> ThinPrinter<'a> {
                 helpers.make_template_object |= es5_helpers.make_template_object;
                 helpers.class_private_field_get |= es5_helpers.class_private_field_get;
                 helpers.class_private_field_set |= es5_helpers.class_private_field_set;
+                helpers.decorate |= es5_helpers.decorate;
             } else {
                 if self.needs_extends_helper(&source.statements) {
                     helpers.extends = true;

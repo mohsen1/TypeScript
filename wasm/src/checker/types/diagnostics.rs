@@ -109,6 +109,7 @@ pub mod diagnostic_messages {
 
     // Object literal errors
     pub const EXCESS_PROPERTY: &str = "Object literal may only specify known properties, and '{0}' does not exist in type '{1}'.";
+    pub const OBJECT_LITERAL_DUPLICATE_PROPERTY: &str = "An object literal cannot have multiple properties with the same name '{0}'.";
 
     // Null/undefined errors
     pub const OBJECT_POSSIBLY_UNDEFINED: &str = "Object is possibly 'undefined'.";
@@ -141,6 +142,8 @@ pub mod diagnostic_messages {
     pub const SWITCH_NOT_EXHAUSTIVE: &str = "Switch is not exhaustive. Did you forget to handle '{0}'?";
     pub const FUNCTION_LACKS_ENDING_RETURN_STATEMENT: &str =
         "Function lacks ending return statement and return type does not include 'undefined'.";
+    pub const ASYNC_FUNCTION_RETURNS_PROMISE: &str =
+        "Async function return type must be Promise.";
     pub const UNREACHABLE_CODE_DETECTED: &str = "Unreachable code detected.";
 
     // Generic/type parameter errors
@@ -193,6 +196,7 @@ pub mod diagnostic_codes {
     pub const TYPE_PARAMETER_LIST_CANNOT_BE_EMPTY: u32 = 1098;
     pub const EXPRESSION_EXPECTED: u32 = 1109;
     pub const TYPE_EXPECTED: u32 = 1110;
+    pub const OBJECT_LITERAL_DUPLICATE_PROPERTY: u32 = 1117;  // An object literal cannot have multiple properties with the same name.
     pub const DECLARATION_EXPECTED: u32 = 1146;
     pub const EXTENDS_CLAUSE_ALREADY_SEEN: u32 = 1172;
     pub const EXTENDS_CLAUSE_MUST_PRECEDE_IMPLEMENTS_CLAUSE: u32 = 1173;
@@ -249,6 +253,7 @@ pub mod diagnostic_codes {
     pub const NOT_ALL_CODE_PATHS_RETURN_VALUE: u32 = 2366;
     pub const FUNCTION_LACKS_RETURN_TYPE: u32 = 2355;
     pub const FUNCTION_RETURN_TYPE_MISMATCH: u32 = 2322;
+    pub const ASYNC_FUNCTION_RETURNS_PROMISE: u32 = 2705;  // Async function must return Promise
     pub const PARAMETER_PROPERTY_NOT_ALLOWED: u32 = 2369;  // A parameter property is only allowed in a constructor implementation.
 
     // Variable declaration errors

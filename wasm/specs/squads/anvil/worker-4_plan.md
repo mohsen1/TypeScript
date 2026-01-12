@@ -1,47 +1,52 @@
 # Worker 4 Plan - Squad Anvil
 
 ## Mission
-Decorators Metadata Emission
+LSP Document Highlighting
 
 Status: Active
 Priority: P1 (High)
 
 ## Current Assignment
-**Implement Decorator Metadata Emission**
+**Implement LSP Document Highlighting**
 
 ### Background
-Decorators need metadata for runtime reflection. TypeScript emits `__decorate` helper calls.
+Document highlighting provides symbol highlights (read/write occurrences) for better code navigation.
 
 ### Implementation Steps
 
-1. [ ] Read current decorator handling in `src/transforms/` and `src/thin_emitter.rs`
-2. [ ] Implement decorator metadata:
-   - Generate `__decorate` helper function if not exists
-   - Emit decorator applications at runtime
-   - Handle class decorators, method decorators, parameter decorators
-3. [ ] Order decorator execution correctly (bottom-up for parameters, top-down for classes)
-4. [ ] Test: Compile class with decorators and verify `__decorate` calls
+1. [ ] Read current highlighting in `src/lsp/highlighting.rs` or create if missing
+2. [ ] Implement document highlighting:
+   - Find symbol at cursor position
+   - Find all occurrences in document
+   - Distinguish between read, write, and reference occurrences
+3. [ ] Return list of document highlight ranges
+4. [ ] Test: Request highlights and verify correct ranges
 
 ### Key Code Locations
-- `src/transforms/` - decorator transformations
-- `src/thin_emitter.rs` - emission
-- `src/thin_parser.rs` - decorator parsing
+- `src/lsp/highlighting.rs` - highlighting implementation
+- `src/lsp/mod.rs` - LSP server
+- `src/binder/` - symbol resolution
 
 ## Task Queue
-- [ ] After decorator metadata: help with source maps or CLI features
+- [ ] After highlighting: help with folding ranges or selection ranges
 
 ## Completed
 - [x] Fixed shorthand methods binding - MERGED to squad/anvil
 - [x] Diagnostic formatting with snippets - MERGED to squad/anvil
 - [x] Parser recovery: JSX-like syntax and type assertion in new - MERGED to squad/anvil
-- [x] Module System Emission review - Working correctly, no fixes needed
+- [x] Module System Emission review - Working correctly
+- [x] Decorator Metadata Emission - All 171 tests passing
+- [x] Generic Type Inference Fix - Test passes
+- [x] LSP Document Symbols - All 5 tests PASS
+- [x] LSP Rename Symbol - All tests passing
+- [x] LSP Document Formatting - All tests PASS (commit 805a12080f)
 
 ## Ready for Merge
-Previous work merged to squad/anvil
+Previous work merged, latest ready for merge
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
 - Use Docker for Rust tests: `./wasm/test.sh`
-- Commit format: `[wasm] transforms: Implement decorator metadata emission`
+- Commit format: `[wasm] lsp: Implement document highlighting`
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/anvil-4`
