@@ -267,9 +267,10 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             return SubtypeResult::False;
         }
 
-        // Error types are compatible with everything (for error recovery)
+        // Error types are NOT compatible (propagate errors instead of silencing)
+        // This treats ERROR as more strict than Any/Unknown to catch type errors
         if source == TypeId::ERROR || target == TypeId::ERROR {
-            return SubtypeResult::True;
+            return SubtypeResult::False;
         }
 
         // =========================================================================
