@@ -1,58 +1,54 @@
 # Worker 4 Plan - Squad Anvil
 
 ## Mission
-Generic Type Inference Enhancement
+LSP Document Symbols
 
 Status: Active
 Priority: P1 (High)
 
 ## Current Assignment
-**Fix Generic Utility Library Type Inference**
+**Implement LSP Document Symbols**
 
 ### Background
-Complex generic patterns aren't inferring correctly. Need to enhance type inference for utility functions.
-
-### Failing Test
-`cli::driver_tests::compile_generic_utility_library_type_utilities`
-
-### Error
-```
-TS2345: Argument of type 'T' is not assignable to parameter of type 'object'.
-```
+Document symbols provides a tree outline of symbols in a file (classes, functions, variables). Essential for code navigation.
 
 ### Implementation Steps
 
-1. [ ] Read the failing test to understand the generic patterns
-2. [ ] Check type inference in `src/solver/infer.rs` or `src/solver/contextual.rs`
-3. [ ] Investigate constraint handling for generic type parameters
-4. [ ] Fix inference to properly handle:
-   - Generic utility functions (map, filter, reduce)
-   - Type parameter constraints
-   - Conditional types
-5. [ ] Test: `./wasm/test.sh compile_generic_utility_library_type_utilities`
+1. [ ] Read current document symbols in `src/lsp/symbols.rs` or create if missing
+2. [ ] Implement symbol extraction:
+   - Traverse AST to find all symbols
+   - Return hierarchical tree structure
+   - Include symbol kinds (class, function, variable, interface, etc.)
+3. [ ] Handle different symbol types:
+   - Namespaces and modules
+   - Classes and interfaces
+   - Functions and methods
+   - Variables and parameters
+4. [ ] Support symbol range and selection range
+5. [ ] Test: Request document symbols and verify tree structure
 
 ### Key Code Locations
-- `src/solver/infer.rs` - type inference
-- `src/solver/contextual.rs` - contextual typing
-- `src/solver/operations.rs` - type operations
-- `src/solver/subtype.rs` - type compatibility
+- `src/lsp/symbols.rs` - document symbols implementation
+- `src/lsp/mod.rs` - LSP server
+- `src/binder/` - symbol resolution
 
 ## Task Queue
-- [ ] After generic inference: help with more CLI/Driver issues or LSP features
+- [ ] After document symbols: help with rename symbol or workspace symbols
 
 ## Completed
 - [x] Fixed shorthand methods binding - MERGED to squad/anvil
 - [x] Diagnostic formatting with snippets - MERGED to squad/anvil
 - [x] Parser recovery: JSX-like syntax and type assertion in new - MERGED to squad/anvil
 - [x] Module System Emission review - Working correctly
-- [x] Decorator Metadata Emission - All 171 tests passing, pushed to origin/worker/anvil-4
+- [x] Decorator Metadata Emission - All 171 tests passing
+- [x] Generic Type Inference Fix - Test passes (commit 3cde014e51)
 
 ## Ready for Merge
-Previous work merged to squad/anvil
+Previous work merged to squad/anvil, latest ready for merge
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
 - Use Docker for Rust tests: `./wasm/test.sh`
-- Commit format: `[wasm] solver: Fix generic type inference for utility functions`
+- Commit format: `[wasm] lsp: Implement document symbols`
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/anvil-4`
