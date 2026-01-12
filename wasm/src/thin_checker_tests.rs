@@ -9228,9 +9228,10 @@ fn test_flow_narrowing_not_applied_in_closure() {
 
     let source = r#"
 let x: string | number;
+x = Math.random() > 0.5 ? "hello" : 42;
 if (typeof x === "string") {
     const run = () => {
-        x.toUpperCase();
+        x.toFixed(2);
     };
 }
 "#;
@@ -9259,7 +9260,7 @@ fn test_flow_narrowing_applies_in_while() {
     use crate::parser::syntax_kind_ext;
 
     let source = r#"
-let x: string | number;
+let x: string | number = Math.random() > 0.5 ? "hello" : 42;
 while (typeof x === "string") {
     x;
 }
