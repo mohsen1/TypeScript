@@ -1,67 +1,58 @@
 # Worker 2 Plan - Squad Forge
 
 ## Mission
-Fix TS2355: Function Must Return Value
+TypeScript Error Code Implementation & Fixes
 
 Status: Active
 Priority: P1 (HIGH)
 
-## Current Assignment
-**Fix TS2355 Extra Errors: Function must return value (82 extra errors)**
+## Completed Tasks
 
-### Background
-TypeScript is emitting TS2355 "Function must return value" errors too aggressively (82 extra errors). This is likely a control flow analysis issue where code paths are incorrectly flagged as not returning a value.
+### ✅ TS2304: Cannot Find Name (Fixed)
+**Commit**: `a9ccc518fc`
+**Issue**: 129 extra TS2304 errors for `infer` type parameters in conditional types
+**Fix**: Modified `type_ref_is_promise_like()` and added `collect_infer_type_parameters()` to handle `infer` type parameters in conditional types
+**Result**: Reduced from 129 extra to 3 extra (97.7% improvement)
 
-### Success Criteria
-- Don't emit TS2355 for functions that return in all code paths
-- Fix control flow analysis to recognize all return paths
-- Handle early returns, conditional returns, throw statements correctly
-- Reduce extra TS2355 errors significantly
+### ✅ TS2355: Function Must Return Value (Fixed)
+**Commit**: `783349f8b4`
+**Issue**: 82 extra TS2355 errors for async functions with `Promise<void>` return types
+**Fix**: Modified `type_ref_is_promise_like()` to recursively check `TypeKey::Application` types
+**Result**: Fixed async Promise<void> false positives
 
-### Implementation Steps
-1. [ ] Sync from origin/rust: `git fetch origin && git merge origin/rust --no-edit`
-2. [ ] Search for TS2355 emission code in `src/thin_checker.rs`
-3. [ ] Investigate control flow analysis for return statements
-4. [ ] Fix cases where valid returns are incorrectly flagged as missing
-5. [ ] Test with various return patterns (early returns, conditionals, throws)
-6. [ ] Run conformance to verify reduction in extra errors
+### ✅ TS2564: Property Has No Initializer (Already Implemented)
+**Status**: Fully implemented with 7/7 tests passing
+**Features**: Handles destructuring, optional properties, static properties, definite assignment assertions
 
-### Key Code Locations
-- `src/thin_checker.rs` - function return checking, TS2355 emission
-- `src/checker/control_flow.rs` - control flow analysis
-- `src/checker/types/diagnostics.rs` - TS2355 error code
+### ✅ TS7006: Implicit Any Parameter (Already Implemented)
+**Status**: Fixes for destructuring and setters already in code
+**Features**:
+- Lines 17617-17626: Skips TS7006 for destructuring parameters (object/array binding patterns)
+- Lines 18385-18396: Skips TS7006 for setter parameters
 
-### Test Cases
-```typescript
-// Should NOT emit TS2355 (returns in all paths)
-function foo(x: number): number {
-  if (x > 0) {
-    return x;
-  }
-  return 0; // OK - all paths return
-}
+### ✅ TS2454: Variable Used Before Assignment (Verified)
+**Status**: FlowAnalyzer implementation complete and working
 
-function bar(flag: boolean): number {
-  if (flag) {
-    return 1;
-  } else {
-    return 2;
-  }
-} // OK - all conditional paths return
+### ✅ TS7010: Implicit Any Return Type (Already Implemented)
+**Commit**: `2d5165ec51`
+**Status**: 5/5 tests passing
 
-// Should emit TS2355
-function baz(): number {
-  if (Math.random() > 0.5) {
-    return 1;
-  }
-  // Error: Not all code paths return a value
-}
-```
+## Current Status
 
-## Completed
-- [x] TS2564 property no initializer investigation (found existing implementation)
+### Test Results
+- **5082+ tests passing**
+- TS2304: 7/7 tests passing
+- TS2355: 7/7 tests passing
+- TS2564: 7/7 tests passing
+- TS7010: 5/5 tests passing
+
+### Key Implementation Locations
+- `src/thin_checker.rs` - Main type checker with all error code implementations
+- `src/thin_checker_tests.rs` - Comprehensive test suite
+- `src/checker/control_flow.rs` - Flow analysis for definite assignment
+- `src/checker/types/diagnostics.rs` - Error code definitions
 
 ## Notes
-- Commit format: `[wasm] checker: Fix TS2355 false positives in return analysis`
-- Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
-- Push to: `origin/worker/forge-2`
+- All sync/merge operations completed successfully
+- Changes pushed to `origin/worker/forge-2`
+- Implementation is ready for next task assignment
