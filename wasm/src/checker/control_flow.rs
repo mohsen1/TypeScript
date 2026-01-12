@@ -2050,6 +2050,16 @@ impl<'a> FlowAnalyzer<'a> {
 
     fn in_property_name(&self, idx: NodeIndex) -> Option<(Atom, bool)> {
         let idx = self.skip_parenthesized(idx);
+
+        // Handle private identifiers (e.g., `#field in obj`)
+        if let Some(node) = self.arena.get(idx) {
+            if node.kind == SyntaxKind::PrivateIdentifier as u16 {
+                if let Some(ident) = self.arena.get_identifier(node) {
+                    return Some((self.interner.intern_string(&ident.escaped_text), false));
+                }
+            }
+        }
+
         self.literal_atom_and_kind_from_node_or_type(idx)
     }
 
