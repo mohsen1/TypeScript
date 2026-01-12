@@ -7290,13 +7290,34 @@ impl<'a> ThinCheckerState<'a> {
         //   a.#prop;  // Should work if A2 has #prop
         if symbols.is_empty() {
             // Try to find the property directly in the object type
-            use crate::solver::{PropertyAccessResult, QueryDatabase};
+            use crate::solver::{PropertyAccessResult, QueryDatabase, TypeKey};
             match self.ctx.types.property_access_type(object_type_for_check, &property_name) {
                 PropertyAccessResult::Success { .. } => {
                     // Property exists in the type, proceed with the access
                     return self.get_type_of_property_access_by_name(idx, access, object_type_for_check, &property_name);
                 }
                 _ => {
+                    // FALLBACK: Manually check if the property exists in the callable type
+                    // This fixes cases where property_access_type fails due to atom comparison issues
+                    // The property IS in the type (as shown by error messages), but the lookup fails
+                    if let Some(TypeKey::Callable(shape_id)) = self.ctx.types.lookup(object_type_for_check) {
+                        let shape = self.ctx.types.callable_shape(shape_id);
+                        let prop_atom = self.ctx.types.intern_string(&property_name);
+                        for prop in &shape.properties {
+                            if prop.name == prop_atom {
+                                // Property found in the callable's properties list!
+                                // Return the property type (handle optional and write_type)
+                                let prop_type = if prop.optional {
+                                    self.ctx.types.union(vec![prop.type_id, TypeId::UNDEFINED])
+                                } else {
+                                    prop.type_id
+                                };
+                                return self.apply_flow_narrowing(idx, prop_type);
+                            }
+                        }
+                    }
+
+                    // Property not found, emit error if appropriate
                     if saw_class_scope {
                         self.error_property_not_exist_at(&property_name, object_type, name_idx);
                     }
@@ -7362,9 +7383,25 @@ impl<'a> ThinCheckerState<'a> {
                 type_id
             }
             PropertyAccessResult::PropertyNotFound { .. } => {
-                // If we got here, we already resolved the symbol (line 6887), so the private field exists.
-                // The solver might not find it due to type encoding issues, but don't emit TS2339.
-                // Just return ANY for type recovery.
+                // If we got here, we already resolved the symbol, so the private field exists.
+                // The solver might not find it due to type encoding issues.
+                // FALLBACK: Try to manually find the property in the callable type
+                use crate::solver::TypeKey;
+                if let Some(TypeKey::Callable(shape_id)) = self.ctx.types.lookup(declaring_type) {
+                    let shape = self.ctx.types.callable_shape(shape_id);
+                    let prop_atom = self.ctx.types.intern_string(&property_name);
+                    for prop in &shape.properties {
+                        if prop.name == prop_atom {
+                            // Property found! Return its type
+                            return if prop.optional {
+                                self.ctx.types.union(vec![prop.type_id, TypeId::UNDEFINED])
+                            } else {
+                                prop.type_id
+                            };
+                        }
+                    }
+                }
+                // Property not found even in fallback, return ANY for type recovery
                 TypeId::ANY
             }
             PropertyAccessResult::PossiblyNullOrUndefined { property_type, .. } => {

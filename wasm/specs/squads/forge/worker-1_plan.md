@@ -77,7 +77,29 @@ The type display shows `#field: number` is present, but property lookup still fa
 - WASM package: DOES emit TS2339 in destructuring contexts
 - Suggests there may be a code path difference between cargo and WASM
 
-### Remaining Work
+### Fix Implementation Attempt
+
+**Implemented**: Option 2 - Fallback in `get_type_of_private_property_access`
+
+**Commit**: `afc120f6e8` - Fix implemented and pushed to origin/worker/forge-1
+
+**Test Results**:
+- ✅ `cargo run`: NO TS2339 errors for private static members in destructuring
+- ❌ WASM package: STILL has 10+ TS2339 errors for same test cases
+
+**Analysis**: There's a FUNDAMENTAL DIFFERENCE between cargo and WASM execution:
+- The fix works in native Rust execution
+- But fails in WASM package despite using same code
+- Suggests different code paths or execution models
+
+### Differential Test Results (After Fix)
+```
+Total extra TS2339 errors: ~46 (similar to before)
+
+Private static members: 10 errors (unchanged)
+Mixin classes: ~15 errors (unchanged)
+Control flow/other: ~21 errors (unchanged)
+```
 - Fix atom comparison issue in solver property access resolution
 - Debug why `prop.name == prop_atom` fails when both represent `#field`
 - Investigate potential difference between cargo and WASM behavior
