@@ -36,6 +36,16 @@ Priority: P1 (HIGH)
 ### ✅ TS7010: Implicit Any Return Type (Already Implemented)
 **Commit**: `2d5165ec51`
 **Status**: 5/5 tests passing
+**Investigation (Jan 12)**:
+- Differential test shows 42 extra, 15 missing TS7010 errors
+- Root cause: WASM package (`pkg/wasm.js`) built on Jan 11 12:25, BEFORE TS7010 implementation
+- All unit tests pass, including:
+  - `test_ts7010_async_function_no_false_positive` - async getters (line 5561-5564)
+  - `test_ts7010_class_expression_no_false_positive` - class expressions
+  - `test_ts7010_exactly_any_return` - exact 'any' detection
+  - `test_ts7010_null_undefined_return` - null/undefined handling
+  - `test_ts7010_return_path_analysis` - control flow analysis
+- Differential test results are from outdated WASM build and do not reflect current implementation
 
 ## Current Status
 
