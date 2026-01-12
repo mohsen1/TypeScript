@@ -74,11 +74,20 @@ This ensures:
 
 1. **Sync first**: `git fetch origin && git merge origin/rust --no-edit`
 2. Read your plan file.
-3. **🤖 ASK GEMINI FIRST (MANDATORY)**: Get a plan BEFORE coding!
+3. **🤖 ASK GEMINI FIRST (MANDATORY - NO EXCEPTIONS)**:
    ```bash
-   ./scripts/ask-gemini.mjs "I need to implement <your task>. What's the best approach?"
+   # STOP! Do not write ANY code until you run this:
+   ./scripts/ask-gemini.mjs "I need to implement <your task>. What files should I modify and what's the approach?"
    ```
-4. Write code, add tests, run `./wasm/test.sh`.
+   **Why this is mandatory:**
+   - Gemini has 800k tokens of codebase context - YOU DON'T
+   - Gemini knows where similar patterns exist - YOU DON'T
+   - Gemini can prevent you from going down wrong paths
+   - 30 seconds asking = hours saved from wrong approaches
+
+   **If you skip this step, you WILL waste time.**
+
+4. Write code following Gemini's guidance, add tests, run `./wasm/test.sh`.
 5. Commit and push to your worker branch.
 6. Mark "Ready for Merge: Yes" in your plan.
 7. Repeat.
@@ -92,6 +101,12 @@ This ensures:
 Commit frequently and atomically
 
 ## 🚨 Rules
+
+**⚠️ RULE ZERO: ASK GEMINI BEFORE CODING!**
+```bash
+./scripts/ask-gemini.mjs "I need to implement <task>. What's the approach?"
+```
+This is not optional. This is not a suggestion. DO IT.
 
 1. **Stay on your assignment**; do not self-switch tasks.
 2. **Docker-only Rust tests**: `./wasm/test.sh` (never `cargo test/bench`).
