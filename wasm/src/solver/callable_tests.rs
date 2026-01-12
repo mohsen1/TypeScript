@@ -220,6 +220,7 @@ fn test_function_to_callable() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let callable = interner.callable(CallableShape {
@@ -277,6 +278,7 @@ fn test_callable_to_function() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     assert!(is_subtype_of(&interner, callable, fn_type));

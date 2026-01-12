@@ -306,6 +306,7 @@ impl TypeInterner {
                 return_type: TypeId::ERROR,
                 type_predicate: None,
                 is_constructor: false,
+                is_method: false,
             }))
     }
 

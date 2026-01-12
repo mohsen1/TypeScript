@@ -46,6 +46,7 @@ fn make_object_interface(interner: &TypeInterner) -> TypeId {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
     let method_with_any = |return_type| FunctionShape {
         params: vec![ParamInfo {
@@ -59,6 +60,7 @@ fn make_object_interface(interner: &TypeInterner) -> TypeId {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let constructor = PropertyInfo {
@@ -231,6 +233,7 @@ fn test_function_bivariance_default() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let fn_animal = interner.function(FunctionShape {
@@ -245,6 +248,7 @@ fn test_function_bivariance_default() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     assert!(checker.is_assignable(fn_dog, fn_animal));
@@ -270,6 +274,7 @@ fn test_function_variance_strict() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let fn_animal = interner.function(FunctionShape {
@@ -284,6 +289,7 @@ fn test_function_variance_strict() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     assert!(!checker.is_assignable(fn_dog, fn_animal));
@@ -327,6 +333,7 @@ fn test_optional_parameter_assignability_allows_extra_optional() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let target = interner.function(FunctionShape {
@@ -341,6 +348,7 @@ fn test_optional_parameter_assignability_allows_extra_optional() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     assert!(checker.is_assignable(source, target));
@@ -371,6 +379,7 @@ fn test_optional_parameter_assignability_rejects_required_extra() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let target = interner.function(FunctionShape {
@@ -393,6 +402,7 @@ fn test_optional_parameter_assignability_rejects_required_extra() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     assert!(!checker.is_assignable(source, target));
@@ -410,6 +420,7 @@ fn test_this_parameter_assignability_respects_strictness() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let string_or_number = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
@@ -420,6 +431,7 @@ fn test_this_parameter_assignability_respects_strictness() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     assert!(checker.is_assignable(source, target));
@@ -445,6 +457,7 @@ fn test_rest_parameter_assignability_rejects_incompatible_fixed() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let target = interner.function(FunctionShape {
@@ -459,6 +472,7 @@ fn test_rest_parameter_assignability_rejects_incompatible_fixed() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     assert!(!checker.is_assignable(source, target));
@@ -485,6 +499,7 @@ fn test_method_bivariance_even_strict() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let target_fn = interner.function(FunctionShape {
@@ -499,6 +514,7 @@ fn test_method_bivariance_even_strict() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let source = interner.object(vec![PropertyInfo {
@@ -543,6 +559,7 @@ fn test_function_property_stays_strict() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let target_fn = interner.function(FunctionShape {
@@ -557,6 +574,7 @@ fn test_function_property_stays_strict() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let source = interner.object(vec![PropertyInfo {
@@ -594,6 +612,7 @@ fn test_function_return_covariance() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let returns_animal = interner.function(FunctionShape {
@@ -603,6 +622,7 @@ fn test_function_return_covariance() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     assert!(checker.is_assignable(returns_dog, returns_animal));
@@ -621,6 +641,7 @@ fn test_void_return_assignability() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let returns_void = interner.function(FunctionShape {
@@ -630,6 +651,7 @@ fn test_void_return_assignability() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     assert!(checker.is_assignable(returns_number, returns_void));
@@ -648,6 +670,7 @@ fn test_void_undefined_return_assignability() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let returns_undefined = interner.function(FunctionShape {
@@ -657,6 +680,7 @@ fn test_void_undefined_return_assignability() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     assert!(checker.is_assignable(returns_undefined, returns_void));
@@ -684,6 +708,7 @@ fn test_constructor_void_return_assignability() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: true,
+        is_method: false,
     });
 
     let returns_void = interner.function(FunctionShape {
@@ -693,6 +718,7 @@ fn test_constructor_void_return_assignability() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: true,
+        is_method: false,
     });
 
     assert!(checker.is_assignable(returns_instance, returns_void));
@@ -844,6 +870,7 @@ fn test_explain_failure_parameter_mismatch_strict() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let fn_animal = interner.function(FunctionShape {
@@ -858,6 +885,7 @@ fn test_explain_failure_parameter_mismatch_strict() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let reason = checker.explain_failure(fn_dog, fn_animal);
@@ -1097,6 +1125,7 @@ fn test_rest_any_bivariant_even_strict() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let source = interner.function(FunctionShape {
@@ -1111,6 +1140,7 @@ fn test_rest_any_bivariant_even_strict() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     assert!(checker.is_assignable(source, target));
@@ -1135,6 +1165,7 @@ fn test_rest_unknown_bivariant_even_strict() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let source = interner.function(FunctionShape {
@@ -1149,6 +1180,7 @@ fn test_rest_unknown_bivariant_even_strict() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     assert!(checker.is_assignable(source, target));
@@ -1173,6 +1205,7 @@ fn test_rest_unknown_bivariant_strict_assignable() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let source = interner.function(FunctionShape {
@@ -1195,6 +1228,7 @@ fn test_rest_unknown_bivariant_strict_assignable() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     assert!(checker.is_assignable_strict(source, target));
@@ -1219,6 +1253,7 @@ fn test_rest_number_not_bivariant_even_strict() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let source = interner.function(FunctionShape {
@@ -1233,6 +1268,7 @@ fn test_rest_number_not_bivariant_even_strict() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     assert!(!checker.is_assignable(source, target));
@@ -1257,6 +1293,7 @@ fn test_rest_unknown_vs_number_assignability_strict() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let rest_number = interner.array(TypeId::NUMBER);
@@ -1272,6 +1309,7 @@ fn test_rest_unknown_vs_number_assignability_strict() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let source = interner.function(FunctionShape {
@@ -1286,6 +1324,7 @@ fn test_rest_unknown_vs_number_assignability_strict() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     assert!(checker.is_assignable(source, target_unknown));
@@ -1310,6 +1349,7 @@ fn test_rest_any_still_checks_return_type() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let source = interner.function(FunctionShape {
@@ -1324,6 +1364,7 @@ fn test_rest_any_still_checks_return_type() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     assert!(!checker.is_assignable(source, target));
@@ -1348,6 +1389,7 @@ fn test_explain_failure_skips_rest_unknown() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let source = interner.function(FunctionShape {
@@ -1370,6 +1412,7 @@ fn test_explain_failure_skips_rest_unknown() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     assert!(checker.explain_failure(source, target).is_none());
@@ -1393,6 +1436,7 @@ fn test_explain_failure_reports_rest_mismatch() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let source = interner.function(FunctionShape {
@@ -1415,6 +1459,7 @@ fn test_explain_failure_reports_rest_mismatch() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let reason = checker.explain_failure(source, target);
@@ -1447,6 +1492,7 @@ fn test_explain_failure_reports_rest_mismatch_source_rest() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let target = interner.function(FunctionShape {
@@ -1461,6 +1507,7 @@ fn test_explain_failure_reports_rest_mismatch_source_rest() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let reason = checker.explain_failure(source, target);
@@ -1496,6 +1543,7 @@ fn test_empty_object_accepts_non_nullish() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     assert!(checker.is_assignable(func, empty_object));
 }
@@ -1711,6 +1759,7 @@ fn test_object_keyword_accepts_non_primitives() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     assert!(checker.is_assignable(func, TypeId::OBJECT));
 }
@@ -1833,6 +1882,7 @@ fn test_function_type_accepts_callables() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     assert!(checker.is_assignable(function, function_top));
 
@@ -1985,6 +2035,7 @@ fn test_apparent_string_members_assignable() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let target = interner.object(vec![
@@ -2031,6 +2082,7 @@ fn test_apparent_string_members_include_substr_and_locale_compare() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let substr_type = interner.function(FunctionShape {
         params: vec![
@@ -2052,6 +2104,7 @@ fn test_apparent_string_members_include_substr_and_locale_compare() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let target = interner.object(vec![
@@ -2092,6 +2145,7 @@ fn test_apparent_string_members_include_legacy_and_unicode() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let is_well_formed_type = interner.function(FunctionShape {
         params: Vec::new(),
@@ -2100,6 +2154,7 @@ fn test_apparent_string_members_include_legacy_and_unicode() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let fontcolor_type = interner.function(FunctionShape {
         params: Vec::new(),
@@ -2108,6 +2163,7 @@ fn test_apparent_string_members_include_legacy_and_unicode() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let target = interner.object(vec![
@@ -2171,6 +2227,7 @@ fn test_apparent_number_method_assignable() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let target = interner.object(vec![PropertyInfo {
@@ -2198,6 +2255,7 @@ fn test_apparent_number_method_not_assignable_to_number() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let target = interner.object(vec![PropertyInfo {
@@ -2231,6 +2289,7 @@ fn test_apparent_number_member_rejects_mismatch() {
             type_params: Vec::new(),
             type_predicate: None,
             is_constructor: false,
+                                is_method: false,
         })
     };
 
@@ -2261,6 +2320,7 @@ fn test_number_interface_boxing_assignability() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let number_object = interner.object(vec![PropertyInfo {
         name: to_fixed,
@@ -2292,6 +2352,7 @@ fn test_apparent_boolean_members_assignable() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let target = interner.object(vec![PropertyInfo {
@@ -2319,6 +2380,7 @@ fn test_apparent_bigint_members_assignable() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let target = interner.object(vec![PropertyInfo {
@@ -2348,6 +2410,7 @@ fn test_apparent_symbol_members_assignable() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let target = interner.object(vec![
@@ -2580,6 +2643,7 @@ fn test_rest_any_callable_target_from_function() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     assert!(checker.is_assignable(source, target));

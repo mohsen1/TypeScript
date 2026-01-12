@@ -107,27 +107,27 @@ Updated: 2026-01-11
 - Use `./scripts/ask-gemini.mjs --review` for code review
 
 ## Squad Status
-- Last EM Update: 2026-01-11 (✅ CRISIS RESOLVED)
+- Last EM Update: 2026-01-12 (Blocker fixed: private identifier `in` operator)
 - Conformance: **30.8% exact match** (+7.5pp from 23.3%)
-- Build: Passing
-- **Crashes**: ✅ **FALSE ALARM** - W5 found bug, fixed, 5099/5100 tests passing
-- Workers: W2,W3,W5 merged, all 5 active
+- Build: Passing (1 pre-existing test failure unrelated to recent changes)
+- **Blocker Fixed**: ✅ Private identifier narrowing in `in` operator (commit 1539a1744f)
+- Workers: All 5 active
 
-### Worker Assignments (Post-Crisis)
+### Worker Assignments (Current)
 
 | Worker | Priority | Assignment | Status |
 |--------|----------|------------|--------|
-| W1 | HIGH | TS2454 Definite Assignment | Needs debugging help |
-| W2 | HIGH | TS2564 Property Initialization | ✅ 16/16 tests pass, reassigned |
-| W3 | HIGH | TS2322 Solver Strictness | ✅ Merged, reassigned |
-| W4 | HIGH | TS2339 Property Access | Active - protected members |
-| W5 | ✅ **COMPLETE** | **Crash Investigation** | ✅ **P0 RESOLVED** - reassigned |
+| W1 | HIGH | Method Bivariance | Active - fixing FunctionShape construction errors |
+| W2 | HIGH | Namespace Merging | Active - enum exports added, tests failing |
+| W3 | HIGH | Element Access Literal Keys | Active - definite assignment analysis |
+| W4 | HIGH | Namespace Merging (help W2) | Active - redirected from duplicate work |
+| W5 | MEDIUM | New Expression Inference | Active - constructor overload detection |
 
 **PRIORITY ORDER:**
-1. **W1** - Needs help debugging TS2454 not emitting
-2. **W2/W3** - Continue high-priority tasks
-3. **W4** - Protected member access
-4. **W5** - Return to normal priority tasks
+1. **W2/W4** - Namespace merging (collaborative, high priority)
+2. **W1** - Method bivariance (quick win, making progress)
+3. **W3** - Element access literal keys
+4. **W5** - New expression inference
 
 ### Before Starting Any Task
 **IMPORTANT:** Workers must consult Gemini before starting work:

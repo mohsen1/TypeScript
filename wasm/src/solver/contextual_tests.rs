@@ -39,6 +39,7 @@ fn test_contextual_function_parameter() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let ctx = ContextualTypeContext::with_expected(&interner, handler);
@@ -65,6 +66,7 @@ fn test_contextual_function_this_parameter() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let ctx = ContextualTypeContext::with_expected(&interner, handler);
@@ -84,6 +86,7 @@ fn test_contextual_function_return() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let ctx = ContextualTypeContext::with_expected(&interner, fn_type);
@@ -215,6 +218,7 @@ fn test_contextual_function_rest_parameter() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let ctx = ContextualTypeContext::with_expected(&interner, fn_type);
@@ -334,6 +338,7 @@ fn test_contextual_for_parameter() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let ctx = ContextualTypeContext::with_expected(&interner, fn_type);
@@ -418,6 +423,7 @@ fn test_contextual_generic_call_union_preserves_literal() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let literal = interner.literal_string("ready");
@@ -442,6 +448,7 @@ fn test_contextual_generic_return_union_preserves_literal() {
         return_type: union,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let ctx = ContextualTypeContext::with_expected(&interner, expected_fn);
     let return_ctx = ctx.for_return();
@@ -468,6 +475,7 @@ fn test_contextual_union_function_return_preserves_literal() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let fn_number = interner.function(FunctionShape {
         type_params: Vec::new(),
@@ -476,6 +484,7 @@ fn test_contextual_union_function_return_preserves_literal() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let union = interner.union(vec![fn_string, fn_number]);
 
@@ -498,6 +507,7 @@ fn test_contextual_generic_return_union_any_uses_context() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let fn_number = interner.function(FunctionShape {
         type_params: Vec::new(),
@@ -506,6 +516,7 @@ fn test_contextual_generic_return_union_any_uses_context() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let union = interner.union(vec![fn_string, fn_number]);
 
@@ -550,6 +561,7 @@ fn test_contextual_union_function() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let fn2 = interner.function(FunctionShape {
         type_params: vec![],
@@ -560,6 +572,7 @@ fn test_contextual_union_function() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let union = interner.union(vec![fn1, fn2]);
 
@@ -585,6 +598,7 @@ fn test_contextual_union_arity_param_preserves_literal() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let fn_two = interner.function(FunctionShape {
         type_params: vec![],
@@ -596,6 +610,7 @@ fn test_contextual_union_arity_param_preserves_literal() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let union = interner.union(vec![fn_one, fn_two]);
     let ctx = ContextualTypeContext::with_expected(&interner, union);
@@ -626,6 +641,7 @@ fn test_contextual_union_rest_param_preserves_literal() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let rest_array = interner.array(TypeId::STRING);
     let fn_rest = interner.function(FunctionShape {
@@ -637,6 +653,7 @@ fn test_contextual_union_rest_param_preserves_literal() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let union = interner.union(vec![fn_one, fn_rest]);
 
@@ -662,6 +679,7 @@ fn test_contextual_union_empty_param_preserves_literal() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let fn_one = interner.function(FunctionShape {
         type_params: vec![],
@@ -672,6 +690,7 @@ fn test_contextual_union_empty_param_preserves_literal() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let union = interner.union(vec![fn_empty, fn_one]);
 
@@ -699,6 +718,7 @@ fn test_contextual_union_optional_param_preserves_literal() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let fn_required = interner.function(FunctionShape {
         type_params: vec![],
@@ -709,6 +729,7 @@ fn test_contextual_union_optional_param_preserves_literal() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let union = interner.union(vec![fn_optional, fn_required]);
 
@@ -736,6 +757,7 @@ fn test_contextual_union_function_param_return_preserves_literal() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let fn_number = interner.function(FunctionShape {
         type_params: vec![],
@@ -746,6 +768,7 @@ fn test_contextual_union_function_param_return_preserves_literal() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let union = interner.union(vec![fn_string, fn_number]);
 
@@ -775,6 +798,7 @@ fn test_contextual_union_param_preserves_literal() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let ctx = ContextualTypeContext::with_expected(&interner, fn_type);
