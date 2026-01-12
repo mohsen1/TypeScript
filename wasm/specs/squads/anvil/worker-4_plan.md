@@ -1,48 +1,47 @@
 # Worker 4 Plan - Squad Anvil
 
 ## Mission
-Diagnostic Formatting Enhancement
+Decorators Metadata Emission
 
 Status: Active
 Priority: P1 (High)
 
 ## Current Assignment
-**Enhance Diagnostic Error Messages**
+**Implement Decorator Metadata Emission**
 
 ### Background
-TypeScript's error messages are detailed and helpful. Our diagnostic messages should match tsc's format and quality.
+Decorators need metadata for runtime reflection. TypeScript emits `__decorate` helper calls.
 
 ### Implementation Steps
 
-1. [ ] Read current diagnostic implementation in `src/checker/types/diagnostics/`
-2. [ ] Check which error messages differ from tsc
-3. [ ] Enhance error messages with:
-   - Better context information
-   - Suggestions for fixes
-   - Related code locations
-4. [ ] Format error messages to match tsc output:
-   - File location (line:column)
-   - Error code TS#####: Message
-   - Underlined error span
-5. [ ] Test: Compare output with `npx tsc --noEmit`
+1. [ ] Read current decorator handling in `src/transforms/` and `src/thin_emitter.rs`
+2. [ ] Implement decorator metadata:
+   - Generate `__decorate` helper function if not exists
+   - Emit decorator applications at runtime
+   - Handle class decorators, method decorators, parameter decorators
+3. [ ] Order decorator execution correctly (bottom-up for parameters, top-down for classes)
+4. [ ] Test: Compile class with decorators and verify `__decorate` calls
 
 ### Key Code Locations
-- `src/checker/types/diagnostics/` - diagnostic messages and codes
-- `src/checker/types/diagnostics/diagnostic_messages.rs` - message templates
+- `src/transforms/` - decorator transformations
+- `src/thin_emitter.rs` - emission
+- `src/thin_parser.rs` - decorator parsing
 
 ## Task Queue
-- [ ] After diagnostic formatting: help with source maps or CLI flags
+- [ ] After decorator metadata: help with source maps or CLI features
 
 ## Completed
-- [x] Fixed shorthand methods binding in object literals (fc2b39a217) - MERGED to squad/anvil
-- [x] Fixed declare_symbol persistence for scope_chain updates (fc2b39a217)
+- [x] Fixed shorthand methods binding - MERGED to squad/anvil
+- [x] Diagnostic formatting with snippets - MERGED to squad/anvil
+- [x] Parser recovery: JSX-like syntax and type assertion in new - MERGED to squad/anvil
+- [x] Module System Emission review - Working correctly, no fixes needed
 
 ## Ready for Merge
-Yes - Previous work merged to squad/anvil
+Previous work merged to squad/anvil
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
 - Use Docker for Rust tests: `./wasm/test.sh`
-- Commit format: `[wasm] diagnostics: Enhance error message formatting with context`
+- Commit format: `[wasm] transforms: Implement decorator metadata emission`
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/anvil-4`

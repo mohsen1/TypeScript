@@ -1,49 +1,48 @@
 # Worker 2 Plan - Squad Anvil
 
 ## Mission
-CLI Flags Enhancement
+Declaration File Emission (.d.ts)
 
-Status: Complete
+Status: Active
 Priority: P1 (High)
 
 ## Current Assignment
-**[COMPLETE] Implement Missing CLI Flags**
+**Implement Declaration File Generation**
 
 ### Background
-The TypeScript compiler has many CLI flags. Our WASM compiler needs to support common flags for compatibility.
+TypeScript can generate .d.ts declaration files for libraries. Essential for publishing TypeScript packages.
 
 ### Implementation Steps
-
-1. [x] Read current CLI implementation in `src/cli/driver.rs`
-2. [x] Check which flags from `tsc --help` are missing
-3. [x] Add support for missing important flags:
-   - `--declaration` or `-d`: Generate .d.ts files
-   - `--declarationMap`: Generate .d.ts.map files
-   - `--sourceMap` or `-sourcemaps`: Generate .map files
-   - `--outDir`: Output directory (already existed)
-   - `--rootDir`: Root directory
-4. [x] Update argument parsing in clap configuration
-5. [x] Test: Run `./wasm/target/release/tsz --help` and verify flags are listed
+1. [ ] Read current declaration emission in `src/thin_emitter.rs` or `src/transforms/`
+2. [ ] Implement .d.ts file generation:
+   - Strip function bodies
+   - Keep type annotations
+   - Export declarations
+   - Generate for all .ts files in compilation
+3. [ ] Handle `--declaration` CLI flag (already added by W2)
+4. [ ] Handle `--declarationMap` for source maps of .d.ts files
+5. [ ] Test: Compile with `--declaration` and verify .d.ts files are created
 
 ### Key Code Locations
-- `src/cli/driver.rs` - CLI driver and argument parsing
-- `src/cli/args.rs` - CLI argument definitions
-- `src/thin_emitter.rs` - source map emission
+- `src/thin_emitter.rs` - main emitter
+- `src/cli/args.rs` - --declaration flag exists
+- `src/cli/driver.rs` - compilation driver
 
 ## Task Queue
-- Awaiting next assignment
+- [ ] After declaration files: help with source maps or CLI features
 
 ## Completed
-- [x] Private accessor collection (c76225e474) - MERGED to squad/anvil (with Worker 3 emission)
-- [x] All 7 ES5 private accessor tests now passing (Worker 3 completed emission)
-- [x] CLI flags enhancement: --declaration, --declarationMap, --sourceMap, --rootDir (2f5834504e)
+- [x] Private accessor collection - MERGED to squad/anvil
+- [x] ES5 private accessor tests passing (with W3)
+- [x] CLI flags: --declaration, --declarationMap, --sourceMap, --rootDir - MERGED to squad/anvil
+- [x] LSP Signature Help - All 21 tests passing - MERGED to squad/anvil
 
 ## Ready for Merge
-Yes
+Previous work merged to squad/anvil
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
 - Use Docker for Rust tests: `./wasm/test.sh`
-- Commit format: `[wasm] cli: Add --declaration and --sourceMap flags`
+- Commit format: `[wasm] emitter: Implement .d.ts declaration file generation`
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/anvil-2`
