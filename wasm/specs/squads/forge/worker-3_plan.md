@@ -1,38 +1,51 @@
 # Worker 3 Plan - Squad Forge
 
 ## Mission
-Fix TS2454: Variable Used Before Assignment
+Fix TS2304: Cannot Find Name
 
 Status: Active
-Priority: P0 (CRITICAL)
+Priority: P1 (HIGH)
 
 ## Current Assignment
-**Implement TS2454 Error: Variable used before assignment**
+**Fix TS2304 Extra Errors: Cannot find name (129 extra errors)**
 
 ### Background
-TypeScript should emit TS2454 error when a variable is used before it's definitely assigned.
+TypeScript is emitting TS2304 "Cannot find name" errors too aggressively (129 extra errors). This is likely a scope resolution issue where valid identifiers are incorrectly flagged as undefined.
 
 ### Success Criteria
-- Emit TS2454 for variables used before definite assignment
-- Handle control flow branches correctly
-- Don't emit false positives
+- Don't emit TS2304 for valid identifiers in scope
+- Fix scope resolution for all variable types (let/const/var, functions, classes, interfaces)
+- Handle global/builtin types correctly (Array, Object, etc.)
+- Reduce extra TS2304 errors significantly
 
 ### Implementation Steps
-1. [ ] Find definite assignment code in `src/thin_checker.rs`
-2. [ ] Implement check for variable usage before assignment
-3. [ ] Test with control flow scenarios
-4. [ ] Ensure no false positives
+1. [ ] Sync from origin/rust: `git fetch origin && git merge origin/rust --no-edit`
+2. [ ] Search for TS2304 emission code in `src/thin_checker.rs` or binder
+3. [ ] Investigate scope resolution logic
+4. [ ] Fix cases where valid identifiers are incorrectly flagged as undefined
+5. [ ] Test with various identifier resolution patterns
+6. [ ] Run conformance to verify reduction in extra errors
+
+### Key Code Locations
+- `src/thin_checker.rs` - identifier resolution, TS2304 emission
+- `src/binder.rs` - symbol table lookup, scope management
+- `src/checker/types/diagnostics.rs` - TS2304 error code
 
 ### Test Cases
 ```typescript
-// Should emit TS2454
-let x;
-console.log(x); // Error: 'x' used before assignment
+// Should NOT emit TS2304 (defined)
+let x = 42;
+console.log(x); // OK
 
-// Should NOT emit
-let y;
-if (c) { y = 1; } else { y = 2; }
-console.log(y); // OK
+function foo() { return 1; }
+console.log(foo()); // OK
+
+class Bar { }
+const b = new Bar(); // OK
+
+// Should emit TS2304 (undefined)
+console.log(undefinedVar); // Error: Cannot find name 'undefinedVar'
+let y: NotDefined; // Error: Cannot find name 'NotDefined'
 ```
 
 ## Completed
@@ -40,5 +53,6 @@ console.log(y); // OK
 - [x] TS2322 investigation (already implemented)
 
 ## Notes
-- Commit format: `[wasm] checker: Implement TS2454 definite assignment errors`
+- Commit format: `[wasm] checker: Fix TS2304 false positives in scope resolution`
+- Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/forge-3`

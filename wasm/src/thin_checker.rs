@@ -8090,37 +8090,19 @@ impl<'a> ThinCheckerState<'a> {
                 return_type = self.infer_return_type_from_body(body, return_context);
             }
 
-            // TS7010 (implicit any return) is emitted for:
-            // 1. Ambient functions/methods (declare modifier or .d.ts file)
-            // 2. Non-ambient function expressions, arrow functions, and object literal methods when @noImplicitAny is true
+            // TS7010/TS7011 (implicit any return) is emitted for functions without
+            // return type annotations when noImplicitAny is enabled and the return
+            // type cannot be inferred (e.g., is 'any' or only returns undefined)
+            // maybe_report_implicit_any_return handles the noImplicitAny check internally
             if !is_function_declaration {
-                let is_ambient = if let Some(func) = self.ctx.arena.get_function(node) {
-                    self.has_declare_modifier(&func.modifiers)
-                        || self.ctx.file_name.ends_with(".d.ts")
-                } else {
-                    self.ctx.file_name.ends_with(".d.ts")
-                };
-
-                // For methods, check if enclosing class is ambient
-                let is_ambient = if node.kind == syntax_kind_ext::METHOD_DECLARATION {
-                    is_ambient || self.ctx.enclosing_class.as_ref()
-                        .map(|c| c.is_declared)
-                        .unwrap_or(false)
-                } else {
-                    is_ambient
-                };
-
-                // Check TS7010 if ambient OR if @noImplicitAny is true
-                if is_ambient || self.ctx.no_implicit_any {
-                    self.maybe_report_implicit_any_return(
-                        name_for_error,
-                        name_node,
-                        return_type,
-                        has_type_annotation,
-                        has_contextual_return,
-                        idx,
-                    );
-                }
+                self.maybe_report_implicit_any_return(
+                    name_for_error,
+                    name_node,
+                    return_type,
+                    has_type_annotation,
+                    has_contextual_return,
+                    idx,
+                );
             }
 
             // TS2366 (not all code paths return value) for function expressions and arrow functions
@@ -12183,24 +12165,20 @@ impl<'a> ThinCheckerState<'a> {
                             return_type = self.infer_return_type_from_body(func.body, None);
                         }
 
-                        // TS7010 (implicit any return) is emitted for:
-                        // 1. Ambient functions (declare modifier or .d.ts file)
-                        // 2. Non-ambient functions when @noImplicitAny is true
-                        let is_ambient = self.has_declare_modifier(&func.modifiers)
-                            || self.ctx.file_name.ends_with(".d.ts");
-
-                        if is_ambient || self.ctx.no_implicit_any {
-                            let func_name = self.get_function_name_from_node(stmt_idx);
-                            let name_node = if !func.name.is_none() { Some(func.name) } else { None };
-                            self.maybe_report_implicit_any_return(
-                                func_name,
-                                name_node,
-                                return_type,
-                                has_type_annotation,
-                                false,
-                                stmt_idx,
-                            );
-                        }
+                        // TS7010 (implicit any return) is emitted for functions without
+                        // return type annotations when noImplicitAny is enabled and the return
+                        // type cannot be inferred (e.g., is 'any' or only returns undefined)
+                        // maybe_report_implicit_any_return handles the noImplicitAny check internally
+                        let func_name = self.get_function_name_from_node(stmt_idx);
+                        let name_node = if !func.name.is_none() { Some(func.name) } else { None };
+                        self.maybe_report_implicit_any_return(
+                            func_name,
+                            name_node,
+                            return_type,
+                            has_type_annotation,
+                            false,
+                            stmt_idx,
+                        );
 
                         self.push_return_type(return_type);
                         self.check_statement(func.body);
@@ -13342,14 +13320,18 @@ impl<'a> ThinCheckerState<'a> {
 
         let module_name = &literal.text;
 
-        if self.ctx.binder.declared_modules.contains(module_name) {
-            return;
-        }
+        // Check if the module was resolved by the CLI driver (multi-file mode)
         if let Some(ref resolved) = self.ctx.resolved_modules {
             if resolved.contains(module_name) {
                 return;
             }
         }
+
+        // Note: We do NOT skip TS2792 for declared_modules (ambient modules).
+        // Imports from ambient modules should emit TS2792 because ambient modules
+        // don't provide runtime values - they only provide type information.
+        // If you want to use an ambient module's types, you should use `import type`
+        // or reference the types directly in a type annotation.
 
         // In single-file mode, any external import is considered unresolved.
         // This is correct because WASM checker operates on individual files
@@ -15437,39 +15419,9 @@ impl<'a> ThinCheckerState<'a> {
             }
             k if k == syntax_kind_ext::CONDITIONAL_TYPE => {
                 if let Some(cond) = self.ctx.arena.get_conditional_type(node) {
-                    // Check check_type and extends_type first (infer type params not in scope yet)
                     self.check_type_for_missing_names(cond.check_type);
                     self.check_type_for_missing_names(cond.extends_type);
-
-                    // Collect infer type parameters from extends_type and add them to scope for true_type
-                    let infer_params = self.collect_infer_type_parameters(cond.extends_type);
-                    let mut param_bindings = Vec::new();
-                    for param_name in &infer_params {
-                        let atom = self.ctx.types.intern_string(param_name);
-                        let type_id = self.ctx.types.intern(crate::solver::TypeKey::TypeParameter(
-                            crate::solver::TypeParamInfo {
-                                name: atom,
-                                constraint: None,
-                                default: None,
-                            },
-                        ));
-                        let previous = self.ctx.type_parameter_scope.insert(param_name.clone(), type_id);
-                        param_bindings.push((param_name.clone(), previous));
-                    }
-
-                    // Check true_type with infer type parameters in scope
                     self.check_type_for_missing_names(cond.true_type);
-
-                    // Remove infer type parameters from scope
-                    for (name, previous) in param_bindings.into_iter().rev() {
-                        if let Some(prev_type) = previous {
-                            self.ctx.type_parameter_scope.insert(name, prev_type);
-                        } else {
-                            self.ctx.type_parameter_scope.remove(&name);
-                        }
-                    }
-
-                    // Check false_type (infer type params not in scope)
                     self.check_type_for_missing_names(cond.false_type);
                 }
             }
@@ -15601,111 +15553,6 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         updates
-    }
-
-    /// Collect all `infer` type parameter names from a type node.
-    /// This is used to add inferred type parameters to the scope when checking conditional types.
-    fn collect_infer_type_parameters(&self, type_idx: NodeIndex) -> Vec<String> {
-        let mut params = Vec::new();
-        self.collect_infer_type_parameters_inner(type_idx, &mut params);
-        params
-    }
-
-    fn collect_infer_type_parameters_inner(&self, type_idx: NodeIndex, params: &mut Vec<String>) {
-        let Some(node) = self.ctx.arena.get(type_idx) else {
-            return;
-        };
-
-        match node.kind {
-            k if k == syntax_kind_ext::INFER_TYPE => {
-                if let Some(infer) = self.ctx.arena.get_infer_type(node) {
-                    if let Some(param_node) = self.ctx.arena.get(infer.type_parameter) {
-                        if let Some(param) = self.ctx.arena.get_type_parameter(param_node) {
-                            if let Some(name_node) = self.ctx.arena.get(param.name) {
-                                if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
-                                    let name = ident.escaped_text.clone();
-                                    if !params.contains(&name) {
-                                        params.push(name);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            k if k == syntax_kind_ext::TYPE_REFERENCE => {
-                if let Some(type_ref) = self.ctx.arena.get_type_ref(node) {
-                    if let Some(ref args) = type_ref.type_arguments {
-                        for &arg_idx in &args.nodes {
-                            self.collect_infer_type_parameters_inner(arg_idx, params);
-                        }
-                    }
-                }
-            }
-            k if k == syntax_kind_ext::UNION_TYPE || k == syntax_kind_ext::INTERSECTION_TYPE => {
-                if let Some(composite) = self.ctx.arena.get_composite_type(node) {
-                    for &member_idx in &composite.types.nodes {
-                        self.collect_infer_type_parameters_inner(member_idx, params);
-                    }
-                }
-            }
-            k if k == syntax_kind_ext::FUNCTION_TYPE || k == syntax_kind_ext::CONSTRUCTOR_TYPE => {
-                if let Some(func_type) = self.ctx.arena.get_function_type(node) {
-                    for &param_idx in &func_type.parameters.nodes {
-                        if let Some(param_node) = self.ctx.arena.get(param_idx) {
-                            if let Some(param) = self.ctx.arena.get_parameter(param_node) {
-                                if !param.type_annotation.is_none() {
-                                    self.collect_infer_type_parameters_inner(param.type_annotation, params);
-                                }
-                            }
-                        }
-                    }
-                    if !func_type.type_annotation.is_none() {
-                        self.collect_infer_type_parameters_inner(func_type.type_annotation, params);
-                    }
-                }
-            }
-            k if k == syntax_kind_ext::ARRAY_TYPE => {
-                if let Some(arr) = self.ctx.arena.get_array_type(node) {
-                    self.collect_infer_type_parameters_inner(arr.element_type, params);
-                }
-            }
-            k if k == syntax_kind_ext::TUPLE_TYPE => {
-                if let Some(tuple) = self.ctx.arena.get_tuple_type(node) {
-                    for &elem_idx in &tuple.elements.nodes {
-                        self.collect_infer_type_parameters_inner(elem_idx, params);
-                    }
-                }
-            }
-            k if k == syntax_kind_ext::OPTIONAL_TYPE
-                || k == syntax_kind_ext::REST_TYPE
-                || k == syntax_kind_ext::PARENTHESIZED_TYPE => {
-                if let Some(wrapped) = self.ctx.arena.get_wrapped_type(node) {
-                    self.collect_infer_type_parameters_inner(wrapped.type_node, params);
-                }
-            }
-            k if k == syntax_kind_ext::INDEXED_ACCESS_TYPE => {
-                if let Some(indexed) = self.ctx.arena.get_indexed_access_type(node) {
-                    self.collect_infer_type_parameters_inner(indexed.object_type, params);
-                    self.collect_infer_type_parameters_inner(indexed.index_type, params);
-                }
-            }
-            k if k == syntax_kind_ext::CONDITIONAL_TYPE => {
-                if let Some(cond) = self.ctx.arena.get_conditional_type(node) {
-                    // Collect from check_type and extends_type for nested conditionals
-                    self.collect_infer_type_parameters_inner(cond.check_type, params);
-                    self.collect_infer_type_parameters_inner(cond.extends_type, params);
-                    self.collect_infer_type_parameters_inner(cond.true_type, params);
-                    self.collect_infer_type_parameters_inner(cond.false_type, params);
-                }
-            }
-            k if k == syntax_kind_ext::TYPE_OPERATOR => {
-                if let Some(op) = self.ctx.arena.get_type_operator(node) {
-                    self.collect_infer_type_parameters_inner(op.type_node, params);
-                }
-            }
-            _ => {}
-        }
     }
 
     fn check_type_parameter_node_for_missing_names(&mut self, param_idx: NodeIndex) {

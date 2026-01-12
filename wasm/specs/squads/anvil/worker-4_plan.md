@@ -1,39 +1,34 @@
 # Worker 4 Plan - Squad Anvil
 
 ## Mission
-LSP Document Symbols
+LSP Document Highlighting
 
 Status: Active
 Priority: P1 (High)
 
 ## Current Assignment
-**Implement LSP Document Symbols**
+**Implement LSP Document Highlighting**
 
 ### Background
-Document symbols provides a tree outline of symbols in a file (classes, functions, variables). Essential for code navigation.
+Document highlighting provides symbol highlights (read/write occurrences) for better code navigation.
 
 ### Implementation Steps
 
-1. [ ] Read current document symbols in `src/lsp/symbols.rs` or create if missing
-2. [ ] Implement symbol extraction:
-   - Traverse AST to find all symbols
-   - Return hierarchical tree structure
-   - Include symbol kinds (class, function, variable, interface, etc.)
-3. [ ] Handle different symbol types:
-   - Namespaces and modules
-   - Classes and interfaces
-   - Functions and methods
-   - Variables and parameters
-4. [ ] Support symbol range and selection range
-5. [ ] Test: Request document symbols and verify tree structure
+1. [ ] Read current highlighting in `src/lsp/highlighting.rs` or create if missing
+2. [ ] Implement document highlighting:
+   - Find symbol at cursor position
+   - Find all occurrences in document
+   - Distinguish between read, write, and reference occurrences
+3. [ ] Return list of document highlight ranges
+4. [ ] Test: Request highlights and verify correct ranges
 
 ### Key Code Locations
-- `src/lsp/symbols.rs` - document symbols implementation
+- `src/lsp/highlighting.rs` - highlighting implementation
 - `src/lsp/mod.rs` - LSP server
 - `src/binder/` - symbol resolution
 
 ## Task Queue
-- [ ] After document symbols: help with rename symbol or workspace symbols
+- [ ] After highlighting: help with folding ranges or selection ranges
 
 ## Completed
 - [x] Fixed shorthand methods binding - MERGED to squad/anvil
@@ -41,14 +36,17 @@ Document symbols provides a tree outline of symbols in a file (classes, function
 - [x] Parser recovery: JSX-like syntax and type assertion in new - MERGED to squad/anvil
 - [x] Module System Emission review - Working correctly
 - [x] Decorator Metadata Emission - All 171 tests passing
-- [x] Generic Type Inference Fix - Test passes (commit 3cde014e51)
+- [x] Generic Type Inference Fix - Test passes
+- [x] LSP Document Symbols - All 5 tests PASS
+- [x] LSP Rename Symbol - All tests passing
+- [x] LSP Document Formatting - All tests PASS (commit 805a12080f)
 
 ## Ready for Merge
-Previous work merged to squad/anvil, latest ready for merge
+Previous work merged, latest ready for merge
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
 - Use Docker for Rust tests: `./wasm/test.sh`
-- Commit format: `[wasm] lsp: Implement document symbols`
+- Commit format: `[wasm] lsp: Implement document highlighting`
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/anvil-4`
