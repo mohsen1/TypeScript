@@ -48,3 +48,7 @@ We are mobilizing 10 engineers to address the three fundamental pillars of unsou
 1.  **Exact Match:** Increase from 23.4% -> **35%**.
 2.  **Missing Errors:** Decrease from 68.2% -> **<40%**.
 3.  **TS2304 (Cannot find name):** Eliminate false positives.
+
+### Fix the drift. Code outside of wasm/ should be read-only.
+
+If any changes were made outside of `wasm/`, please double check and revert if it was a mistake. We want to keep the TypeScript codebase pristine. The git remote `git@github.com:microsoft/TypeScript.git` is source of truth for TypeScript code. 

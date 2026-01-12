@@ -64,3 +64,7 @@ This is not optional. This is not a suggestion. DO IT.
 This is a complex compiler project. Take time to understand the code before making changes. Reading architecture docs, tracing call paths, and understanding existing patterns is valuable work - not wasted time.
 
 
+## We work in wasm/
+
+Unless it's absolutely necessary, do not modify code outside `wasm/`. The TypeScript codebase is read-only.
+if previous work has modified code outside `wasm/`, please document the reason in your plan. Or if it's a mistake undo those changes. The git remote `git@github.com:microsoft/TypeScript.git` is source of truth for TypeScript code. 
