@@ -18,7 +18,7 @@
 //! }
 //! ```
 
-use crate::binder::{FlowNode, FlowNodeId, flow_flags, symbol_flags, SymbolId};
+use crate::binder::{FlowNode, FlowNodeId, FlowNodeArena, flow_flags, symbol_flags, SymbolId};
 use crate::interner::Atom;
 use crate::parser::thin_node::{BinaryExprData, CallExprData, ThinNodeArena};
 use crate::parser::{NodeIndex, NodeList, node_flags, syntax_kind_ext};
@@ -27,6 +27,73 @@ use crate::solver::{LiteralValue, ParamInfo, TypeId, TypeInterner, TypeKey, Type
 use crate::thin_binder::ThinBinderState;
 use rustc_hash::FxHashMap;
 use std::borrow::Cow;
+
+// =============================================================================
+// FlowGraph
+// =============================================================================
+
+/// A control flow graph that provides query methods for flow analysis.
+///
+/// This wraps the `FlowNodeArena` and provides convenient methods for querying
+/// flow information during type checking.
+pub struct FlowGraph<'a> {
+    /// Reference to the flow node arena containing all flow nodes
+    arena: &'a FlowNodeArena,
+}
+
+impl<'a> FlowGraph<'a> {
+    /// Create a new FlowGraph from a FlowNodeArena.
+    pub fn new(arena: &'a FlowNodeArena) -> Self {
+        Self { arena }
+    }
+
+    /// Get a flow node by ID.
+    pub fn get(&self, id: FlowNodeId) -> Option<&FlowNode> {
+        self.arena.get(id)
+    }
+
+    /// Get a mutable reference to a flow node by ID.
+    pub fn get_mut(&mut self, id: FlowNodeId) -> Option<&mut FlowNode> {
+        // Note: This would require interior mutability or a different API design
+        // For now, we'll return None as FlowGraph is meant for querying, not modifying
+        None
+    }
+
+    /// Get the number of flow nodes in the graph.
+    pub fn len(&self) -> usize {
+        self.arena.len()
+    }
+
+    /// Check if the flow graph is empty.
+    pub fn is_empty(&self) -> bool {
+        self.arena.is_empty()
+    }
+
+    /// Check if a flow node has a specific flag.
+    pub fn node_has_flag(&self, id: FlowNodeId, flag: u32) -> bool {
+        self.get(id)
+            .map(|node| node.has_any_flags(flag))
+            .unwrap_or(false)
+    }
+
+    /// Get the antecedents (predecessors) of a flow node.
+    pub fn antecedents(&self, id: FlowNodeId) -> Vec<FlowNodeId> {
+        self.get(id)
+            .map(|node| node.antecedent.clone())
+            .unwrap_or_default()
+    }
+
+    /// Get the AST node associated with a flow node.
+    pub fn node(&self, id: FlowNodeId) -> NodeIndex {
+        self.get(id)
+            .map(|node| node.node)
+            .unwrap_or(NodeIndex::NONE)
+    }
+}
+
+// =============================================================================
+// FlowAnalyzer
+// =============================================================================
 
 /// Flow analyzer for control flow-based type narrowing.
 ///
@@ -37,6 +104,7 @@ pub struct FlowAnalyzer<'a> {
     binder: &'a ThinBinderState,
     interner: &'a TypeInterner,
     node_types: Option<&'a FxHashMap<u32, TypeId>>,
+    flow_graph: Option<FlowGraph<'a>>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -66,7 +134,8 @@ impl<'a> FlowAnalyzer<'a> {
         binder: &'a ThinBinderState,
         interner: &'a TypeInterner,
     ) -> Self {
-        Self { arena, binder, interner, node_types: None }
+        let flow_graph = Some(FlowGraph::new(&binder.flow_nodes));
+        Self { arena, binder, interner, node_types: None, flow_graph }
     }
 
     pub fn with_node_types(
@@ -75,7 +144,13 @@ impl<'a> FlowAnalyzer<'a> {
         interner: &'a TypeInterner,
         node_types: &'a FxHashMap<u32, TypeId>,
     ) -> Self {
-        Self { arena, binder, interner, node_types: Some(node_types) }
+        let flow_graph = Some(FlowGraph::new(&binder.flow_nodes));
+        Self { arena, binder, interner, node_types: Some(node_types), flow_graph }
+    }
+
+    /// Get a reference to the flow graph.
+    pub fn flow_graph(&self) -> Option<&FlowGraph<'a>> {
+        self.flow_graph.as_ref()
     }
 
     /// Get the narrowed type of a symbol at a specific flow node.

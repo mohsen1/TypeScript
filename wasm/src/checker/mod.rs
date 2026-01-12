@@ -40,4 +40,4 @@ pub use expr::ExpressionChecker;
 pub use statements::StatementChecker;
 pub use declarations::DeclarationChecker;
 pub use flow_graph_builder::{FlowGraph, FlowGraphBuilder};
-pub use control_flow::FlowAnalyzer;
+pub use control_flow::{FlowAnalyzer, FlowGraph as ControlFlowGraph};
