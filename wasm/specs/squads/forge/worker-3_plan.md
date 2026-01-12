@@ -19,12 +19,12 @@ TypeScript is emitting TS2304 "Cannot find name" errors too aggressively (129 ex
 - Reduce extra TS2304 errors significantly
 
 ### Implementation Steps
-1. [ ] Sync from origin/rust: `git fetch origin && git merge origin/rust --no-edit`
-2. [ ] Search for TS2304 emission code in `src/thin_checker.rs` or binder
-3. [ ] Investigate scope resolution logic
-4. [ ] Fix cases where valid identifiers are incorrectly flagged as undefined
-5. [ ] Test with various identifier resolution patterns
-6. [ ] Run conformance to verify reduction in extra errors
+1. [x] Sync from origin/rust: `git fetch origin && git merge origin/rust --no-edit`
+2. [x] Search for TS2304 emission code in `src/thin_checker.rs` or binder
+3. [x] Investigate scope resolution logic
+4. [x] Fix cases where valid identifiers are incorrectly flagged as undefined
+5. [x] Test with various identifier resolution patterns
+6. [x] Run conformance to verify reduction in extra errors
 
 ### Key Code Locations
 - `src/thin_checker.rs` - identifier resolution, TS2304 emission
@@ -51,6 +51,11 @@ let y: NotDefined; // Error: Cannot find name 'NotDefined'
 ## Completed
 - [x] Namespace merging enum/function work
 - [x] TS2322 investigation (already implemented)
+- [x] TS2304 fix for infer type parameters in conditional types
+  - Fixed `test_redux_pattern_extract_state_with_infer`
+  - Fixed `test_redux_pattern_state_from_reducers_mapped`
+  - Fixed `test_redux_pattern_indexed_access_on_mapped_union`
+  - Improved test results: 5024 -> 5051 passed (27 tests)
 
 ## Notes
 - Commit format: `[wasm] checker: Fix TS2304 false positives in scope resolution`
