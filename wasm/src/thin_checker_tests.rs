@@ -18756,3 +18756,36 @@ const arrowPromise = async (): Promise<string> => "test";
     assert_eq!(codes.iter().filter(|&&c| c == 2705).count(), 4,
         "Expected 4 TS2705 errors for async functions with non-Promise return types, got: {:?}", codes);
 }
+
+#[test]
+fn test_duplicate_class_members() {
+    use crate::thin_parser::ThinParserState;
+    use crate::checker::types::diagnostics::diagnostic_codes;
+
+    // Simplified test - just duplicate properties
+    let source = r#"
+class DuplicateProperties {
+    x: number;
+    x: string;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+
+    println!("All diagnostics: {:?}", checker.ctx.diagnostics);
+
+    // The symbol-level duplicate check emits TS2300 on both declarations
+    assert_eq!(codes.iter().filter(|&&c| c == 2300).count(), 2,
+        "Expected 2 TS2300 errors for duplicate class members, got: {:?}", codes);
+}
