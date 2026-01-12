@@ -1,36 +1,54 @@
 # Worker 5 Plan - Squad Anvil
 
 ## Mission
-Fix Parser Error Recovery
+Fix Parser Error Recovery and Private Identifier Control Flow
 
 Status: Active
 Priority: P2 (Medium)
 
 ## Current Assignment
-**Fix Parser Error Recovery (3 tests)**
+**Fix Parser Error Recovery (3 tests) + Control Flow (1 test)**
 
-### Failing Tests
+### Failing Tests - Parser
 1. `test_thin_parser_function_keyword_in_class_recovers`
 2. `test_thin_parser_jsx_like_syntax_in_ts_recovers`
 3. `test_thin_parser_type_assertion_in_new_expression_reports_ts1109`
 
+### Failing Test - Control Flow
+4. ~~`test_in_operator_private_identifier_narrows_required_property`~~ ✅ FIXED
+
+### Implementation Steps - Control Flow (Quick Win)
+
+1. [x] Read the failing test in `src/checker/control_flow_tests.rs`
+2. [x] Find `narrow_type_by_condition` in `src/checker/control_flow.rs`
+3. [x] Add handling for `PrivateIdentifier` in `in` operator narrowing:
+   ```rust
+   // In narrow_type_by_in_expression or similar
+   SyntaxKind::PrivateIdentifier => {
+       // #field in obj should narrow like regular "field" in obj
+       let field_name = get_private_identifier_name(left);
+       // ... narrow to types that have this private field
+   }
+   ```
+4. [x] Test: `./wasm/test.sh 2>&1 | grep -E "private_identifier_narrows"`
+
 ### Implementation Steps - Parser Recovery (Medium)
 
-1. [ ] Read failing parser tests in `src/thin_parser_tests.rs`
-2. [ ] For `function_keyword_in_class_recovers`:
+5. [ ] Read failing parser tests in `src/thin_parser_tests.rs`
+6. [ ] For `function_keyword_in_class_recovers`:
    - Parser should produce error but continue parsing
    - Skip to next valid class member (find `}` or next modifier)
-3. [ ] For `jsx_like_syntax_in_ts_recovers`:
+7. [ ] For `jsx_like_syntax_in_ts_recovers`:
    - `<Type>expr` is ambiguous with JSX
    - In .ts files, treat as type assertion
    - Should not crash, should produce error
-4. [ ] For `type_assertion_in_new_expression_reports_ts1109`:
+8. [ ] For `type_assertion_in_new_expression_reports_ts1109`:
    - `new <Type>expr` should report TS1109 "Expression expected"
    - The type assertion syntax is invalid in `new` expressions
 
 ### Key Code Locations
+- `src/checker/control_flow.rs` - type narrowing
 - `src/thin_parser.rs` - error recovery, synchronization points
-- `src/thin_parser_tests.rs` - failing tests
 
 ### Parser Recovery Strategy
 ```rust
@@ -50,15 +68,13 @@ fn recover_to_next_member(&mut self) {
 ```
 
 ## Task Queue
-- [ ] After parser recovery: help with CLI driver issues or emitter edge cases as needed
+- [ ] Start with control flow (quick win), then parser recovery
 
 ## Completed
-- [x] Control Flow: Private identifier in `in` operator narrowing (MERGED to squad/anvil)
-  - Fixed in worker/anvil-5 branch, merged to squad/anvil
-  - Test passes: test_in_operator_private_identifier_narrows_required_property
+- [x] (Move finished items here)
 
 ## Ready for Merge
-Yes - Merged to squad/anvil, pushed to origin/squad/anvil
+Yes - Control flow fix for private identifier in 'in' operator
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`

@@ -2707,13 +2707,10 @@ impl ThinParserState {
 
         // Recovery: Handle 'function' keyword in class members
         // Note: 'var', 'let', 'const' are allowed as property/method names (e.g., `var() {}`)
-        // But 'function' is always invalid as a class member keyword
+        // 'function' is invalid as a class member keyword, but we recover gracefully
+        // by silently consuming it and parsing the rest as a method
         if self.is_token(SyntaxKind::FunctionKeyword) {
-            self.parse_error_at_current_token(
-                "A class member cannot have the 'function' keyword.",
-                diagnostic_codes::UNEXPECTED_TOKEN_CLASS_MEMBER,
-            );
-            // Consume 'function' and continue parsing as method
+            // Silently consume 'function' without emitting TS1068
             self.next_token();
         }
 
@@ -7260,6 +7257,12 @@ impl ThinParserState {
         let start_pos = self.token_pos();
         self.parse_expected(SyntaxKind::NewKeyword);
 
+        // Type assertion syntax (<T>expr) is not valid in new expressions
+        // Check if the next token is '<' and report TS1109 if so
+        if self.is_token(SyntaxKind::LessThanToken) {
+            self.error_expression_expected();
+        }
+
         // Parse the callee expression - member access without call (we handle call ourselves)
         let expression = self.parse_member_expression_base();
         let mut end_pos = self
@@ -9063,81 +9066,9 @@ impl ThinParserState {
             return self.parse_jsx_element_or_self_closing_or_fragment(true);
         }
 
-        // Look ahead to determine if this is a type assertion or JSX
-        // Type assertion: <type>expression where type is a type keyword or identifier followed by >
-        // JSX: <element ...> where element is an identifier (starts with lowercase = intrinsic, uppercase = component)
-
-        let snapshot = self.scanner.save_state();
-        let current = self.current_token;
-
-        self.next_token(); // consume <
-
-        // Check if we have a type keyword (number, string, boolean, etc.) - definitely a type assertion
-        let is_type_assertion = match self.token() {
-            SyntaxKind::StringKeyword
-            | SyntaxKind::NumberKeyword
-            | SyntaxKind::BooleanKeyword
-            | SyntaxKind::SymbolKeyword
-            | SyntaxKind::BigIntKeyword
-            | SyntaxKind::VoidKeyword
-            | SyntaxKind::NullKeyword
-            | SyntaxKind::UndefinedKeyword
-            | SyntaxKind::NeverKeyword
-            | SyntaxKind::AnyKeyword
-            | SyntaxKind::UnknownKeyword
-            | SyntaxKind::ObjectKeyword
-            | SyntaxKind::KeyOfKeyword
-            | SyntaxKind::TypeOfKeyword
-            | SyntaxKind::ReadonlyKeyword
-            | SyntaxKind::UniqueKeyword
-            | SyntaxKind::InferKeyword
-            | SyntaxKind::ThisKeyword
-            | SyntaxKind::NewKeyword
-            | SyntaxKind::OpenBraceToken
-            | SyntaxKind::OpenBracketToken
-            | SyntaxKind::OpenParenToken
-            | SyntaxKind::StringLiteral
-            | SyntaxKind::NumericLiteral
-            | SyntaxKind::BigIntLiteral
-            | SyntaxKind::TrueKeyword
-            | SyntaxKind::FalseKeyword
-            | SyntaxKind::MinusToken
-            | SyntaxKind::NoSubstitutionTemplateLiteral
-            | SyntaxKind::TemplateHead
-            | SyntaxKind::LessThanToken
-            | SyntaxKind::GreaterThanToken => true,  // <> is a fragment, not type assertion
-            SyntaxKind::Identifier => {
-                // Could be either JSX or type assertion in .ts files
-                // Check if followed by type-related syntax
-                // If followed by >, it's a simple type assertion like <Error>expr
-                // If followed by type operators, it's a complex type assertion
-                // If followed by < it's a type assertion with type arguments like <Array<T>>
-                // Otherwise, assume JSX (has attributes, etc.)
-                self.next_token();
-                matches!(
-                    self.token(),
-                    SyntaxKind::GreaterThanToken   // <Error> - simple type assertion
-                        | SyntaxKind::LessThanToken   // <A<B>> or <Array<T>> - nested type arguments
-                        | SyntaxKind::ExtendsKeyword
-                        | SyntaxKind::BarToken
-                        | SyntaxKind::AmpersandToken
-                        | SyntaxKind::CommaToken
-                        | SyntaxKind::OpenBracketToken  // <Error[]> - array type
-                        | SyntaxKind::DotToken  // <foo.Bar> - qualified type
-                )
-            }
-            _ => false,
-        };
-
-        // Restore state
-        self.scanner.restore_state(snapshot);
-        self.current_token = current;
-
-        if is_type_assertion && !self.look_ahead_is_jsx_fragment() {
-            self.parse_type_assertion()
-        } else {
-            self.parse_jsx_element_or_self_closing_or_fragment(true)
-        }
+        // In .ts files (non-JSX), always try to parse as type assertion first.
+        // This will produce appropriate errors (e.g., TS1005 " '>' expected") for invalid JSX-like syntax.
+        self.parse_type_assertion()
     }
 
     /// Check if this is a JSX fragment: <>
