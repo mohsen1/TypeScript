@@ -50,43 +50,60 @@ Priority: P1 (HIGH)
 ## Current Status
 
 ### Active Task: Namespace Merging (GOALS.md Objective #1)
-**Commit**: `9485b8b320`
 **Status**: 5/13 tests passing (partial implementation)
+**Latest Commit**: `5c2edc248a`
 
-#### Implementation
-Enhanced namespace merging for class/enum/function + namespace symbols with same name:
+#### Implementation Progress
 
-1. **Modified `resolve_qualified_name`** (thin_checker.rs:1934-1963):
-   - Added symbol-based lookup for merged symbols before type-based lookup
-   - Handles type access like `Foo.Bar` when Foo is both a class and namespace
-   - Resolves member from merged symbol's exports table
+**Complete (5/13 tests passing)**:
+1. ✅ Type exports (interfaces) - enum and function work in both normal and reverse order
+2. ✅ Class type exports (normal order) - `namespace_merges_with_class_exports` passes
 
-2. **Modified `type_reference_symbol_type`** (thin_checker.rs:975-1008):
-   - For merged class+namespace symbols, returns constructor type (with exports)
-   - Instead of instance type, to allow type member access
+**Remaining Work (8 tests)**:
+1. ❌ Class type exports (reverse order) - `namespace_merges_with_class_exports_reverse_order`
+2. ❌ All value access tests - `Foo.value` for class/enum/function
+3. ❌ Element access - `Foo["value"]`
 
-3. **Enhanced `merge_namespace_exports_into_constructor`** (thin_checker.rs:1010-1055):
-   - Now includes type-only exports (interfaces, type aliases)
-   - Previously only merged value exports
+#### Key Fixes Implemented
 
-#### Test Results (5/13 passing)
-**Passing (5)**:
-- `namespace_merges_with_class_exports` - type access (normal order)
-- `namespace_merges_with_enum_type_exports` - type access (normal+reverse order)
-- `namespace_merges_with_function_type_exports` - type access (normal+reverse order)
+**binder.rs declare_symbol()** (lines 1064-1073):
+```rust
+// Update value_declaration for merged class/enum/function + namespace symbols
+if (flags & symbol_flags::CLASS) != 0
+    || (flags & symbol_flags::FUNCTION) != 0
+    || (flags & symbol_flags::REGULAR_ENUM) != 0
+{
+    sym.value_declaration = declaration;
+}
+```
+When a class/enum/function merges with a namespace, `value_declaration` now correctly points to the class/enum/function instead of the namespace.
 
-**Failing (8)**:
-- `namespace_merges_with_class_exports_reverse_order` - type access (reverse order)
-- `namespace_merges_with_class_value_exports` - value access (normal+reverse order)
-- `namespace_merges_with_enum_value_exports` - value access (normal+reverse order)
-- `namespace_merges_with_function_value_exports` - value access (normal+reverse order)
-- `namespace_merges_with_class_element_access` - element access
+**thin_checker.rs resolve_qualified_name()** (lines 1934-1963):
+Added symbol-based lookup for merged symbols before type-based lookup, allowing type access like `Foo.Bar`.
 
-#### Remaining Work
-Value access failures require deeper integration with solver's `property_access_type`:
-- Callable types need to expose their merged symbol's exports
-- Element access `Foo["value"]` needs special handling
-- Reverse order issues need investigation
+**thin_checker.rs type_reference_symbol_type()** (lines 975-1008):
+For merged class+namespace symbols, returns constructor type (with exports) instead of instance type.
+
+**thin_checker.rs merge_namespace_exports_into_constructor()** (lines 1010-1055):
+Now includes type-only exports (interfaces, type aliases) in addition to value exports.
+
+**thin_checker.rs get_type_of_property_access_inner()** (lines 7173-7205):
+Added file_locals-based lookup for merged symbols to handle value access attempts.
+
+#### Root Cause of Value Access Failures
+
+The value access failure (`Foo.value` not returning NUMBER) is a complex issue:
+
+1. **Type Computation Order**: When `Foo.value` is accessed, the type of `Foo` might be computed before namespace exports are fully populated
+2. **Cache Invalidation**: Simply invalidating caches doesn't solve the problem because the type is computed with incomplete information
+3. **Symbol-to-Type Mapping**: The solver doesn't track which symbol a Callable type came from, making it difficult to find exports from the type
+
+#### Potential Solutions for Remaining 8 Tests
+
+1. **Modify Type Lowering**: Track symbol origin in Callable types to enable property lookup from exports
+2. **Lazy Type Computation**: Ensure merged symbol types are only computed after all declarations are bound
+3. **Solver-Level Integration**: Add merged symbol handling directly in `solver::property_access_type()`
+4. **Pre-Compute Exports**: Populate namespace exports in a pre-pass before type checking begins
 
 ### Test Results
 - **5087+ tests passing** (+5 from namespace merging)
@@ -94,7 +111,7 @@ Value access failures require deeper integration with solver's `property_access_
 - TS2355: 7/7 tests passing
 - TS2564: 7/7 tests passing
 - TS7010: 5/5 tests passing
-- Namespace merging: 5/13 tests passing
+- Namespace merging: 5/13 tests passing (38% complete)
 
 ### Key Implementation Locations
 - `src/thin_checker.rs` - Main type checker with all error code implementations
