@@ -7,8 +7,33 @@ Updated: 2026-01-11
 - **Conformance:** 17.9% exact match, 23.4% same error count
 - **Forge-related failures:** 47 thin_checker + 3 solver + 1 control_flow = 51 tests
 
+## Conformance Metrics
+| Metric | Current | Previous | Target | Status |
+|--------|---------|----------|--------|--------|
+| Exact Match | **30.8%** | 23.3% | 50%+ | +7.5pp |
+| Missing Errors | **57.8%** | 68.2% | <30% | -10.4pp |
+| Extra Errors | **28.9%** | 35.8% | <20% | -6.9pp |
+| Parser Errors | **~85** | 1,122 | <100 | **TARGET MET** |
+| **"Crashes"** | **✅ RESOLVED** | ~478 | **0** | **FALSE ALARM** |
+
 ## Current Milestone
 **Milestone 3: Type System Parity** - Fix checker/solver issues blocking conformance
+
+## ✅ CRISIS RESOLVED: "Crash" Investigation Complete
+
+**Status:** **FALSE ALARM** - The 478 "panics" were test assertion failures, NOT runtime crashes!
+
+**Root Cause Found by W5:**
+- Bug in `is_definitely_assigned_at` (thin_checker.rs:4756)
+- Was returning `true` instead of `false` for missing flow info
+- Caused false positive TS2454 errors, making tests appear to "crash"
+- **FIXED:** Changed to return `false` - no more false positives
+
+**Resolution:**
+- ✅ Bug fixed by W5
+- ✅ 5100 tests: 5099 passing, 1 pre-existing failure
+- ✅ **Zero actual runtime crashes in production code**
+- ✅ W5's P0 investigation **COMPLETE**
 
 ## Objectives (Ranked)
 
@@ -82,8 +107,30 @@ Updated: 2026-01-11
 - Use `./scripts/ask-gemini.mjs --review` for code review
 
 ## Squad Status
-- Last EM Report: Session starting
-- Workers Active: 0/5
-- Branches Pending Merge: None
-- Current Focus: Namespace merging + Method bivariance
-- Blockers: None
+- Last EM Update: 2026-01-11 (✅ CRISIS RESOLVED)
+- Conformance: **30.8% exact match** (+7.5pp from 23.3%)
+- Build: Passing
+- **Crashes**: ✅ **FALSE ALARM** - W5 found bug, fixed, 5099/5100 tests passing
+- Workers: W2,W3,W5 merged, all 5 active
+
+### Worker Assignments (Post-Crisis)
+
+| Worker | Priority | Assignment | Status |
+|--------|----------|------------|--------|
+| W1 | HIGH | TS2454 Definite Assignment | Needs debugging help |
+| W2 | HIGH | TS2564 Property Initialization | ✅ 16/16 tests pass, reassigned |
+| W3 | HIGH | TS2322 Solver Strictness | ✅ Merged, reassigned |
+| W4 | HIGH | TS2339 Property Access | Active - protected members |
+| W5 | ✅ **COMPLETE** | **Crash Investigation** | ✅ **P0 RESOLVED** - reassigned |
+
+**PRIORITY ORDER:**
+1. **W1** - Needs help debugging TS2454 not emitting
+2. **W2/W3** - Continue high-priority tasks
+3. **W4** - Protected member access
+4. **W5** - Return to normal priority tasks
+
+### Before Starting Any Task
+**IMPORTANT:** Workers must consult Gemini before starting work:
+```bash
+./scripts/ask-gemini.mjs "I need to implement <your task>. What's the best approach?"
+```
