@@ -2887,7 +2887,14 @@ impl<'a> ClassES5Emitter<'a> {
             if let Some(catch_node) = self.arena.get(try_stmt.catch_clause) {
                 if let Some(catch_data) = self.arena.get_catch_clause(catch_node) {
                     self.write("catch (");
-                    self.emit_binding_name(catch_data.variable_declaration);
+                    // variable_declaration is a VARIABLE_DECLARATION node, need to get its name
+                    if !catch_data.variable_declaration.is_none() {
+                        if let Some(var_decl_node) = self.arena.get(catch_data.variable_declaration) {
+                            if let Some(var_decl) = self.arena.get_variable_declaration(var_decl_node) {
+                                self.emit_binding_name(var_decl.name);
+                            }
+                        }
+                    }
                     self.write(") ");
                     self.emit_statement(catch_data.block);
                 }
@@ -3066,6 +3073,15 @@ impl<'a> ClassES5Emitter<'a> {
                     self.write("(");
                     self.emit_expression(paren.expression);
                     self.write(")");
+                }
+            }
+            // TypeScript-only type assertions - strip the type and emit just the expression
+            k if k == syntax_kind_ext::TYPE_ASSERTION
+                || k == syntax_kind_ext::AS_EXPRESSION
+                || k == syntax_kind_ext::SATISFIES_EXPRESSION =>
+            {
+                if let Some(assertion) = self.arena.get_type_assertion(expr_node) {
+                    self.emit_expression(assertion.expression);
                 }
             }
             k if k == syntax_kind_ext::CONDITIONAL_EXPRESSION => {
