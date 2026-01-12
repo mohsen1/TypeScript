@@ -1,59 +1,54 @@
 # Worker 1 Plan - Squad Forge
 
 ## Mission
-Fix TS2454: Variable Used Before Assignment
+Fix TS7006: Parameter Implicitly Has 'any' Type
 
 Status: Active
 Priority: P1 (High)
 
 ## Current Assignment
-**Implement TS2454 Error: Variable used before assignment (43 occurrences)**
+**Implement TS7006 Error: Parameter implicitly has 'any' type (42 occurrences)**
 
 ### Background
-TypeScript should emit TS2454 error when a variable is used before it's definitely assigned. The definite assignment analysis needs to identify these cases and report errors.
+TypeScript should emit TS7006 error when a function parameter has no type annotation and its type cannot be inferred. This commonly happens when:
+1. Function parameters lack type annotations
+2. No contextual type is available for inference
+3. The `noImplicitAny` compiler option is enabled
 
 ### Success Criteria
-- Emit TS2454 for variables used before definite assignment
-- Handle all variable declaration contexts (let, const, var)
-- Account for control flow branches and early returns
-- Don't emit false positives (variables that are definitely assigned)
+- Emit TS7006 for parameters without type annotations when type cannot be inferred
+- Don't emit when type can be inferred from context
+- Handle all function types: function declarations, arrow functions, method signatures
+- Account for contextual type inference
 
 ### Implementation Steps
-1. [ ] Read existing definite assignment code in `src/thin_checker.rs`
-2. [ ] Find where variables are checked for usage before assignment
-3. [ ] Implement check: if variable used before any assignment, emit TS2454
-4. [ ] Test with cases that should emit TS2454
-5. [ ] Ensure no false positives for definitely-assigned variables
+1. [ ] Read existing parameter type checking code in `src/thin_checker.rs`
+2. [ ] Find where parameter types are checked
+3. [ ] Implement check: if parameter has no type and no inference source, emit TS7006
+4. [ ] Test with various function patterns
+5. [ ] Ensure no false positives when types can be inferred
 
 ### Key Code Locations
-- `src/thin_checker.rs` - definite assignment analysis, `should_check_definite_assignment`
-- `src/checker/control_flow.rs` - flow analysis for definite assignment
+- `src/thin_checker.rs` - parameter type checking
+- `src/solver/infer.rs` - type inference
+- `src/checker/types/diagnostics.rs` - TS7006 error code
 
 ### Test Cases to Implement
 ```typescript
-// Should emit TS2454
-let x;
-console.log(x); // Error: 'x' used before assignment
+// Should emit TS7006
+function foo(x) { } // Error: Parameter 'x' implicitly has 'any' type
+const bar = (y) => { }; // Error: Parameter 'y' implicitly has 'any' type
 
-// Should NOT emit (assigned in all paths)
-let y;
-if (condition) {
-  y = 1;
-} else {
-  y = 2;
-}
-console.log(y); // OK
+// Should NOT emit (type can be inferred)
+function baz(x: number) { } // OK
+const qux = (z: string) => { }; // OK
 
-// Should emit TS2454 (not all paths assign)
-let z;
-if (condition) {
-  z = 1;
-}
-console.log(z); // Error: 'z' might not be assigned
+// Should NOT emit (contextual type)
+[1, 2, 3].forEach(n => console.log(n)); // OK - 'n' inferred as number
 ```
 
 ## Task Queue
-- [ ] After TS2454: coordinate with W4 on other definite assignment issues
+- [ ] After TS7006: coordinate with W5 on definite assignment issues
 
 ## Completed
 - [x] Fix Method Bivariance - Merged to squad/forge
@@ -64,6 +59,6 @@ No
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
 - Use Docker for Rust tests: `./wasm/test.sh`
-- Commit format: `[wasm] checker: Implement TS2454 definite assignment errors`
+- Commit format: `[wasm] checker: Implement TS7006 implicit any parameter errors`
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/forge-1`
