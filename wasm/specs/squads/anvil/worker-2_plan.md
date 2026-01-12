@@ -3,69 +3,46 @@
 ## Mission
 Declaration File Emission (.d.ts)
 
-Status: Complete - Feature Already Implemented
+Status: Active
 Priority: P1 (High)
 
 ## Current Assignment
-**[COMPLETE] Declaration File Emission (.d.ts)**
+**Implement Declaration File Generation**
 
 ### Background
-TypeScript declaration files (.d.ts) provide type information for JavaScript libraries. The compiler must generate these files from TypeScript source.
+TypeScript can generate .d.ts declaration files for libraries. Essential for publishing TypeScript packages.
 
-### Implementation Summary
-
-The declaration file emission feature is **fully implemented** in `src/declaration_emitter.rs`:
-
-1. **DeclarationEmitter class** - Generates .d.ts files by:
-   - Stripping function bodies (keeping only signatures)
-   - Preserving type annotations
-   - Handling all declaration types (functions, classes, interfaces, enums, type aliases)
-   - Supporting `declare` keyword for ambient contexts
-   - Handling export/import statements
-
-2. **CLI Integration** - `src/cli/driver.rs`:
-   - Handles `--declaration` flag via `emit_declarations` option
-   - Generates .d.ts files alongside .js output
-   - Supports `--declarationDir` for custom output directory
-   - Supports `--declarationMap` for source maps
-
-3. **CLI Flags** (added in earlier work):
-   - `--declaration` / `-d` - Generate .d.ts files
-   - `--declarationMap` - Generate .d.ts.map files
-   - `--sourceMap` - Generate .map files
-   - `--rootDir` - Root directory
-   - `--outDir` - Output directory
-
-### Test Status
-All 6 declaration tests passing:
-- ✅ compile_declaration_true_emits_dts_files
-- ✅ compile_declaration_false_no_dts_files
-- ✅ compile_declaration_absent_no_dts_files
-- ✅ compile_declaration_interface_and_type
-- ✅ compile_declaration_class_with_methods
-- ✅ compile_declaration_with_declaration_dir
+### Implementation Steps
+1. [ ] Read current declaration emission in `src/thin_emitter.rs` or `src/transforms/`
+2. [ ] Implement .d.ts file generation:
+   - Strip function bodies
+   - Keep type annotations
+   - Export declarations
+   - Generate for all .ts files in compilation
+3. [ ] Handle `--declaration` CLI flag (already added by W2)
+4. [ ] Handle `--declarationMap` for source maps of .d.ts files
+5. [ ] Test: Compile with `--declaration` and verify .d.ts files are created
 
 ### Key Code Locations
-- `src/declaration_emitter.rs` - DeclarationEmitter implementation
-- `src/cli/driver.rs` - CLI integration (lines 3000-3043)
-- `src/cli/args.rs` - CLI argument definitions
-- `src/cli/config.rs` - Compiler options
+- `src/thin_emitter.rs` - main emitter
+- `src/cli/args.rs` - --declaration flag exists
+- `src/cli/driver.rs` - compilation driver
 
 ## Task Queue
-- Awaiting next assignment
+- [ ] After declaration files: help with source maps or CLI features
 
 ## Completed
-- [x] Private accessor collection (c76225e474) - MERGED to squad/anvil
-- [x] All 7 ES5 private accessor tests passing
-- [x] CLI flags enhancement: --declaration, --declarationMap, --sourceMap, --rootDir (2f5834504e) - MERGED to squad/anvil
-- [x] Declaration file emission (.d.ts) - Already fully implemented and tested
+- [x] Private accessor collection - MERGED to squad/anvil
+- [x] ES5 private accessor tests passing (with W3)
+- [x] CLI flags: --declaration, --declarationMap, --sourceMap, --rootDir - MERGED to squad/anvil
+- [x] LSP Signature Help - All 21 tests passing - MERGED to squad/anvil
 
 ## Ready for Merge
-No new commits - Declaration emission was already implemented
+Previous work merged to squad/anvil
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
 - Use Docker for Rust tests: `./wasm/test.sh`
-- Commit format: `[wasm] cli: Add --declaration and --sourceMap flags`
+- Commit format: `[wasm] emitter: Implement .d.ts declaration file generation`
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/anvil-2`
