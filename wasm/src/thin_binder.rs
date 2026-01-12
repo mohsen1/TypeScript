@@ -1754,7 +1754,8 @@ impl ThinBinderState {
     }
 
     /// Check if two symbol flag sets can be merged.
-    fn can_merge_flags(existing_flags: u32, new_flags: u32) -> bool {
+    /// Made public for use in checker to detect duplicate identifiers (TS2300).
+    pub fn can_merge_flags(existing_flags: u32, new_flags: u32) -> bool {
         if (existing_flags & symbol_flags::INTERFACE) != 0
             && (new_flags & symbol_flags::INTERFACE) != 0
         {
