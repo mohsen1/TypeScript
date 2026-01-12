@@ -13271,7 +13271,16 @@ impl<'a> ThinCheckerState<'a> {
         self.ensure_application_symbols_resolved(expected_type);
 
         // Check if the return type is assignable to the expected type
-        if expected_type != TypeId::ANY && !self.is_assignable_to(return_type, expected_type) {
+        // Exception: Constructors allow `return;` without an expression (no assignability check)
+        let is_constructor_return_without_expr = self.ctx.enclosing_class.as_ref()
+            .map(|c| c.in_constructor)
+            .unwrap_or(false)
+            && return_data.expression.is_none();
+
+        if expected_type != TypeId::ANY
+            && !is_constructor_return_without_expr
+            && !self.is_assignable_to(return_type, expected_type)
+        {
             // Report error at the return expression (or at return keyword if no expression)
             let error_node = if !return_data.expression.is_none() {
                 return_data.expression
