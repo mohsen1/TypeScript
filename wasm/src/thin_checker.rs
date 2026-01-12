@@ -788,6 +788,11 @@ impl<'a> ThinCheckerState<'a> {
                     _ => {}
                 }
 
+                // Check if this is a type parameter (generic type like T in function<T>)
+                if let Some(type_param) = self.lookup_type_parameter(name) {
+                    return type_param;
+                }
+
                 if name != "Array" && name != "ReadonlyArray" {
                     if let Some(sym_id) = self.resolve_identifier_symbol(type_name_idx) {
                         if self.alias_resolves_to_value_only(sym_id) || self.symbol_is_value_only(sym_id) {
