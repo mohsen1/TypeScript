@@ -1,51 +1,47 @@
 # Worker 3 Plan - Squad Forge
 
 ## Mission
-Fix TS2339: Property Does Not Exist
+Fix TS2322: Type Not Assignable
 
 Status: Active
 Priority: P0 (CRITICAL)
 
 ## Current Assignment
-**Implement TS2339 Error: Property does not exist on type**
+**Implement TS2322 Error: Type is not assignable to other type**
 
 ### Background
-TypeScript should emit TS2339 error when accessing a property that doesn't exist on a type. This includes:
-1. Property access on objects
-2. Method access on objects
-3. Index signatures
-4. Optional chaining (?.)
-5. Nested property access
+TypeScript should emit TS2322 error when a value of one type is assigned to a variable/parameter of a different, incompatible type. The type checker needs to verify assignability using subtyping rules.
 
 ### Success Criteria
-- Emit TS2339 for non-existent properties
-- Don't emit for existing properties
-- Handle optional chaining correctly
-- Handle index signatures
-- Suggest typos if similar property exists
+- Emit TS2322 for type mismatches in assignments
+- Handle all assignment contexts: variable declarations, parameter passing, return statements
+- Account for type compatibility rules (subtype, supertype, unrelated)
+- Don't emit false positives for compatible types
+- Handle contextual typing (inferred from usage)
 
 ### Implementation Steps
-1. [ ] Find property access checking in `src/thin_checker.rs`
-2. [ ] Implement check: if property not found on type, emit TS2339
-3. [ ] Test with various property access patterns
-4. [ ] Ensure no false positives for valid properties
+1. [ ] Read existing assignability checking code in `src/solver/subtype.rs` and `src/thin_checker.rs`
+2. [ ] Find where type assignability is checked
+3. [ ] Implement or fix check: if source type not assignable to target type, emit TS2322
+4. [ ] Test with various assignment patterns
+5. [ ] Ensure no false positives for compatible types
 
 ### Key Code Locations
-- `src/thin_checker.rs` - property access checking
-- `src/solver/operations.rs` - property lookup operations
-- `src/checker/types/diagnostics.rs` - TS2339 error code
+- `src/solver/subtype.rs` - subtype checking and assignability logic
+- `src/thin_checker.rs` - assignment expression checking
+- `src/checker/types/diagnostics.rs` - TS2322 error code
 
 ### Test Cases to Implement
 ```typescript
-// Should emit TS2339
-const obj = { x: 1 };
-console.log(obj.y); // Error: Property 'y' does not exist on type '{ x: number }'
+// Should emit TS2322
+let x: number = "string"; // Error: Type 'string' is not assignable to type 'number'
+function foo(y: string) { }
+foo(42); // Error: Type 'number' is not assignable to parameter of type 'string'
 
-// Should NOT emit (property exists)
-console.log(obj.x); // OK
-
-// Should handle optional chaining
-console.log(obj?.z); // Error: Property 'z' does not exist
+// Should NOT emit (compatible types)
+let a: number = 42; // OK
+let b: number = a; // OK
+let c: string | number = "hello"; // OK
 ```
 
 ## Completed
@@ -57,6 +53,6 @@ No
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
 - Use Docker for Rust tests: `./wasm/test.sh`
-- Commit format: `[wasm] checker: Implement TS2339 property access errors`
+- Commit format: `[wasm] solver/checker: Implement TS2322 type assignability errors`
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/forge-3`
