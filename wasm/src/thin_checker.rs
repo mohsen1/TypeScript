@@ -18775,11 +18775,29 @@ impl<'a> ThinCheckerState<'a> {
     }
 
     fn promise_like_return_type_argument(&mut self, return_type: TypeId) -> Option<TypeId> {
-        use crate::solver::TypeKey;
+        use crate::solver::{TypeKey, SymbolRef};
 
         if let Some(TypeKey::Application(app_id)) = self.ctx.types.lookup(return_type) {
             let app = self.ctx.types.type_application(app_id);
-            return self.promise_like_type_argument_from_base(app.base, &app.args, &mut Vec::new());
+
+            // Try to get the type argument from the base symbol
+            if let Some(result) = self.promise_like_type_argument_from_base(app.base, &app.args, &mut Vec::new()) {
+                return Some(result);
+            }
+
+            // Fallback: if the base is a Promise-like reference (e.g., Promise from lib files)
+            // and we have type arguments, return the first one
+            // This handles cases where Promise doesn't have expected flags or where
+            // promise_like_type_argument_from_base fails for other reasons
+            if let Some(TypeKey::Ref(SymbolRef(sym_id))) = self.ctx.types.lookup(app.base) {
+                if let Some(symbol) = self.ctx.binder.get_symbol(SymbolId(sym_id)) {
+                    if self.is_promise_like_name(symbol.escaped_name.as_str()) {
+                        if let Some(&first_arg) = app.args.first() {
+                            return Some(first_arg);
+                        }
+                    }
+                }
+            }
         }
 
         if self.type_ref_is_promise_like(return_type) {
