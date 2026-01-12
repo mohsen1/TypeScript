@@ -3,86 +3,53 @@
 ## Mission
 Fix ES5 Private Accessors - Part 2: Emission
 
-Status: Active
+Status: Complete
 Priority: P1 (High)
 
 ## Current Assignment
-**Implement ES5 Private Accessor Transform - Phase 2 (3 failing tests)**
+**[COMPLETED] Implement ES5 Private Accessor Transform - Phase 2**
 
 ### Background
 Continuation of Worker 2's work. This handles the actual emission of private accessor code.
 
-### Failing Tests
-1. `test_parity_es5_private_accessor_getter`
-2. `test_parity_es5_private_accessor_pair`
-3. `test_parity_es5_private_accessor_setter`
+### Implementation Completed
 
-### Expected Output Pattern
-```javascript
-// Input:
-class Person { get #privateName() { return "value"; } }
+1. [x] Added `PrivateAccessorInfo` struct to track private accessor data
+2. [x] Added `collect_private_accessors()` function in `private_fields_es5.rs`
+3. [x] Modified `ClassES5Emitter` to include `private_accessors` field
+4. [x] Modified `emit_constructor_body` to emit WeakMap.set() calls for accessors
+5. [x] Modified `emit_class_epilogue` to emit WeakMap initializations
+6. [x] Skip private accessors from being emitted as regular accessors in `emit_methods` and `emit_static_members`
 
-// Output:
-var _Person_privateName_get;
-var Person = (function () {
-    function Person() {
-        _Person_privateName_get.set(this, function () { return "value"; });
-    }
-    return Person;
-}());
-_Person_privateName_get = new WeakMap();
-```
-
-### Implementation Steps
-
-1. [ ] Wait for Worker 2 to complete collection phase (or work in parallel on interfaces)
-2. [ ] Modify `emit_constructor_body` in `src/transforms/class_es5.rs`:
-   ```rust
-   // For each private accessor
-   for acc in &state.private_accessors {
-       if let Some(get_var) = &acc.get_var_name {
-           // Emit: _get_var.set(this, function() { ...body... });
-           writer.write(get_var);
-           writer.write(".set(this, ");
-           self.emit_function_expression(acc.getter_body_idx);
-           writer.write(");");
-       }
-       // Same for setter
-   }
-   ```
-3. [ ] Modify `emit_class_epilogue` to emit WeakMap initializations:
-   ```rust
-   for acc in &state.private_accessors {
-       if let Some(get_var) = &acc.get_var_name {
-           writer.write(&format!("{} = new WeakMap();", get_var));
-       }
-       // Same for setter
-   }
-   ```
-4. [ ] Transform property access for private accessors:
-   - `this.#name` (read) -> `__classPrivateFieldGet(this, _Class_name_get, "a")`
-   - `this.#name = x` (write) -> `__classPrivateFieldSet(this, _Class_name_set, x, "a")`
-5. [ ] Test: `./wasm/test.sh 2>&1 | grep -E "private_accessor"`
+### Test Results
+All 7 private accessor parity tests now pass:
+- test_parity_es5_private_accessor_getter
+- test_parity_es5_private_accessor_setter
+- test_parity_es5_private_accessor_pair
+- test_parity_es5_private_accessor_static
+- test_parity_es5_private_accessor_complex
+- test_parity_es5_private_accessor_computed_values
+- test_parity_es5_private_accessor_validation
 
 ### Key Code Locations
-- `src/transforms/class_es5.rs` - class transformation
-- `src/transforms/private_fields_es5.rs` - `__classPrivateFieldGet/Set` usage
+- `src/transforms/class_es5.rs` - class transformation (added 122 lines)
+- `src/transforms/private_fields_es5.rs` - `PrivateAccessorInfo` and collection function (added 95 lines)
 
 ### The "a" Flag
 The `"a"` flag in `__classPrivateFieldGet(obj, map, "a")` tells the helper this is an accessor (call the function) vs a field (return the value directly).
 
 ## Task Queue
-- [ ] After emission: help with parser error recovery if time
+- [ ] Help with parser error recovery if time
 
 ## Completed
-- [x] (Move finished items here)
+- [x] Implement ES5 Private Accessor Transform - Phase 2 (Emission)
 
 ## Ready for Merge
-No
+Yes
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
 - Use Docker for Rust tests: `./wasm/test.sh`
-- Commit format: `[wasm] transforms: Emit ES5 private accessors with WeakMap`
+- Commit format: `[wasm] transforms: Implement ES5 private accessor emission`
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/anvil-3`

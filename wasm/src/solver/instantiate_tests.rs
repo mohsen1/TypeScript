@@ -171,6 +171,7 @@ fn test_instantiate_function() {
         return_type: type_param_t,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Substitute T = string -> (x: string) => string
@@ -191,6 +192,7 @@ fn test_instantiate_function() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     assert_eq!(result, expected);
 }
@@ -218,6 +220,7 @@ fn test_instantiate_function_shadowed_type_params() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let mut subst = TypeSubstitution::new();
@@ -236,6 +239,7 @@ fn test_instantiate_function_shadowed_type_params() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     assert_eq!(result, expected);
 }

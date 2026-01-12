@@ -338,6 +338,7 @@ fn test_narrow_by_typeof_negation_function() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let obj = interner.object(vec![PropertyInfo {
         name: interner.intern_string("value"),
@@ -378,6 +379,7 @@ fn test_narrow_by_typeof_negation_function_branded_intersection() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let branded = interner.intersection(vec![func, brand]);
     let union = interner.union(vec![branded, TypeId::NUMBER]);
@@ -403,6 +405,7 @@ fn test_narrow_by_typeof_negation_function_type_param_with_union_constraint() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let constraint = interner.union(vec![func, TypeId::STRING]);
     let param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
@@ -435,6 +438,7 @@ fn test_narrow_by_typeof_negation_function_type_param_to_never() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
         name: interner.intern_string("T"),
@@ -478,6 +482,7 @@ fn test_narrow_by_typeof_function_type_param_with_union_constraint() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let constraint = interner.union(vec![func, TypeId::STRING]);
     let param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
@@ -590,6 +595,7 @@ fn test_narrow_by_typeof_branded_function_intersection() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let branded = interner.intersection(vec![func, brand]);
     let union = interner.union(vec![branded, TypeId::NUMBER]);
@@ -622,6 +628,7 @@ fn test_narrow_by_typeof_object_excludes_branded_function_intersection() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let branded = interner.intersection(vec![func, brand]);
     let obj = interner.object(vec![PropertyInfo {
@@ -680,6 +687,7 @@ fn test_narrow_by_typeof_object_excludes_function() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let union = interner.union(vec![obj, func]);
 
@@ -936,6 +944,7 @@ fn test_function_shape_with_type_predicate() {
             type_id: Some(TypeId::STRING),
         }),
         is_constructor: false,
+                                is_method: false,
     };
 
     assert!(shape.type_predicate.is_some());

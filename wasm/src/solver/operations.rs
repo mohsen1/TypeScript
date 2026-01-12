@@ -106,6 +106,7 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
             type_params: sig.type_params.clone(),
             type_predicate: sig.type_predicate.clone(),
             is_constructor: false,
+            is_method: false,
         };
         match self.resolve_function_call(&func, arg_types) {
             CallResult::Success(ret) => ret,
@@ -1187,6 +1188,7 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
             return_type: sig.return_type,
             type_predicate: sig.type_predicate.clone(),
             is_constructor,
+            is_method: false,
         })
     }
 
@@ -1475,6 +1477,7 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                 type_params: sig.type_params.clone(),
                 type_predicate: sig.type_predicate.clone(),
                 is_constructor: false,
+                is_method: false,
             };
             return self.resolve_function_call(&func, arg_types);
         }
@@ -1495,6 +1498,7 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                 type_params: sig.type_params.clone(),
                 type_predicate: sig.type_predicate.clone(),
                 is_constructor: false,
+                is_method: false,
             };
 
             match self.resolve_function_call(&func, arg_types) {
@@ -2102,6 +2106,7 @@ impl<'a> PropertyAccessEvaluator<'a> {
             type_params: Vec::new(),
             type_predicate: None,
             is_constructor: false,
+            is_method: false,
         })
     }
 
@@ -2582,6 +2587,7 @@ impl<'a> PropertyAccessEvaluator<'a> {
             return_type,
             type_predicate: None,
             is_constructor: false,
+            is_method: false,
         })
     }
 

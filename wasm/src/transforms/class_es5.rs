@@ -41,9 +41,8 @@ use crate::source_writer::source_position_from_offset;
 use crate::transforms::arrow_es5::contains_this_reference;
 use crate::transforms::async_es5::AsyncES5Emitter;
 use crate::transforms::emit_utils;
-use crate::transforms::private_fields_es5::{PrivateFieldInfo, collect_private_fields, is_private_identifier};
+use crate::transforms::private_fields_es5::{PrivateFieldInfo, PrivateAccessorInfo, collect_private_fields, collect_private_accessors, is_private_identifier};
 use memchr;
-use std::collections::HashMap;
 
 struct ParamTransform {
     name: String,
@@ -72,23 +71,6 @@ struct TemplateParts {
     cooked: Vec<String>,
     raw: Vec<String>,
     expressions: Vec<NodeIndex>,
-}
-
-/// Information about a private accessor (get/set) in a class
-#[derive(Debug, Clone)]
-pub struct PrivateAccessorInfo {
-    /// The private accessor name without # (e.g., "value" for "#value")
-    pub name: String,
-    /// Whether this accessor is static
-    pub is_static: bool,
-    /// WeakMap variable name for getter (e.g., "_Person_name_get")
-    pub get_var_name: Option<String>,
-    /// WeakMap variable name for setter (e.g., "_Person_name_set")
-    pub set_var_name: Option<String>,
-    /// The node index of the getter body (if any)
-    pub getter_body_idx: Option<NodeIndex>,
-    /// The node index of the setter body (if any)
-    pub setter_body_idx: Option<NodeIndex>,
 }
 
 /// ES5 class emitter - emits ES5 IIFE pattern for classes
@@ -239,7 +221,7 @@ impl<'a> ClassES5Emitter<'a> {
         self.private_fields = collect_private_fields(self.arena, class_idx, &class_name);
 
         // Collect private accessors from the class
-        self.private_accessors = self.collect_private_accessors(class_data, &class_name);
+        self.private_accessors = collect_private_accessors(self.arena, class_idx, &class_name);
 
         // Check for extends clause and get base class name
         let base_class_name = self.get_extends_class_name(&class_data.heritage_clauses);
@@ -247,12 +229,21 @@ impl<'a> ClassES5Emitter<'a> {
 
         // Emit WeakMap variable declarations before the class (if we have private fields)
         // var _ClassName_field1, _ClassName_field2;
-        if !self.private_fields.is_empty() {
+        let mut weakmap_names: Vec<String> = self.private_fields.iter()
+            .map(|f| f.weakmap_name.clone())
+            .collect();
+        // Also add private accessor WeakMap variables
+        for acc in &self.private_accessors {
+            if let Some(get_var) = &acc.get_var_name {
+                weakmap_names.push(get_var.clone());
+            }
+            if let Some(set_var) = &acc.set_var_name {
+                weakmap_names.push(set_var.clone());
+            }
+        }
+        if !weakmap_names.is_empty() {
             self.write("var ");
-            let names: Vec<&str> = self.private_fields.iter()
-                .map(|f| f.weakmap_name.as_str())
-                .collect();
-            self.write(&names.join(", "));
+            self.write(&weakmap_names.join(", "));
             self.write(";");
             self.write_line();
         }
@@ -309,10 +300,21 @@ impl<'a> ClassES5Emitter<'a> {
 
         // Emit WeakMap instantiations after the class (for instance private fields)
         // _ClassName_field1 = new WeakMap(), _ClassName_field2 = new WeakMap();
-        let instantiations: Vec<String> = self.private_fields.iter()
+        let mut instantiations: Vec<String> = self.private_fields.iter()
             .filter(|f| !f.is_static)
             .map(|f| format!("{} = new WeakMap()", f.weakmap_name))
             .collect();
+        // Also add private accessor WeakMap instantiations
+        for acc in &self.private_accessors {
+            if !acc.is_static {
+                if let Some(get_var) = &acc.get_var_name {
+                    instantiations.push(format!("{} = new WeakMap()", get_var));
+                }
+                if let Some(set_var) = &acc.set_var_name {
+                    instantiations.push(format!("{} = new WeakMap()", set_var));
+                }
+            }
+        }
         if !instantiations.is_empty() {
             self.write_line();
             self.write(&instantiations.join(", "));
@@ -405,6 +407,8 @@ impl<'a> ClassES5Emitter<'a> {
 
                     // Emit private field initializations FIRST
                     self.emit_private_field_initializations(false);
+                    // Emit private accessor initializations
+                    self.emit_private_accessor_initializations(false);
 
                     // Then emit instance props and parameter props
                     self.emit_instance_property_initializers(&instance_props);
@@ -479,6 +483,8 @@ impl<'a> ClassES5Emitter<'a> {
 
                 // Emit private field initializations first
                 self.emit_private_field_initializations(true);
+                // Emit private accessor initializations
+                self.emit_private_accessor_initializations(true);
 
                 // Emit instance property initializers
                 for &prop_idx in &instance_props {
@@ -513,6 +519,8 @@ impl<'a> ClassES5Emitter<'a> {
                     self.this_capture_available = true;
                 }
                 self.emit_private_field_initializations(false);
+                // Emit private accessor initializations
+                self.emit_private_accessor_initializations(false);
 
                 for &prop_idx in &instance_props {
                     let Some(prop_node) = self.arena.get(prop_idx) else { continue };
@@ -770,6 +778,64 @@ impl<'a> ClassES5Emitter<'a> {
         }
     }
 
+    /// Emit private accessor initializations using WeakMap.set() pattern
+    /// For each private accessor:
+    /// - _ClassName_accessor_get.set(this, function() { ...getter body... });
+    /// - _ClassName_accessor_set.set(this, function(param) { ...setter body... });
+    fn emit_private_accessor_initializations(&mut self, use_this: bool) {
+        let receiver = if use_this { "_this" } else { "this" };
+
+        for acc in &self.private_accessors.clone() {
+            // Skip static accessors - they're handled differently
+            if acc.is_static {
+                continue;
+            }
+
+            // Emit getter: _ClassName_accessor_get.set(this, function() { ... });
+            if let Some(get_var) = &acc.get_var_name {
+                if let Some(getter_body) = acc.getter_body {
+                    self.write_indent();
+                    self.write(get_var);
+                    self.write(".set(");
+                    self.write(receiver);
+                    self.write(", function() {");
+                    self.write_line();
+                    self.increase_indent();
+                    self.emit_block_contents(getter_body);
+                    self.decrease_indent();
+                    self.write_indent();
+                    self.write("});");
+                    self.write_line();
+                }
+            }
+
+            // Emit setter: _ClassName_accessor_set.set(this, function(param) { ... });
+            if let Some(set_var) = &acc.set_var_name {
+                if let Some(setter_body) = acc.setter_body {
+                    self.write_indent();
+                    self.write(set_var);
+                    self.write(".set(");
+                    self.write(receiver);
+                    self.write(", function(");
+                    // Emit parameter name
+                    if let Some(param) = acc.setter_param {
+                        self.write_identifier_text(param);
+                    } else {
+                        self.write("value");
+                    }
+                    self.write(") {");
+                    self.write_line();
+                    self.increase_indent();
+                    self.emit_block_contents(setter_body);
+                    self.decrease_indent();
+                    self.write_indent();
+                    self.write("});");
+                    self.write_line();
+                }
+            }
+        }
+    }
+
     /// Emit __classPrivateFieldGet(receiver, _ClassName_field, "f")
     /// Called when encountering `this.#field` in method bodies
     fn emit_private_field_get(&mut self, receiver_idx: NodeIndex, field_name_idx: NodeIndex) {
@@ -941,6 +1007,8 @@ impl<'a> ClassES5Emitter<'a> {
 
         // Emit private field initializations using _this (after super)
         self.emit_private_field_initializations(true);
+        // Emit private accessor initializations
+        self.emit_private_accessor_initializations(true);
 
         // Emit instance property initializers using _this
         for &prop_idx in instance_props {
@@ -1067,6 +1135,10 @@ impl<'a> ClassES5Emitter<'a> {
                     if self.is_abstract(&accessor_data.modifiers) {
                         continue;
                     }
+                    // Skip private accessors (they use WeakMap pattern)
+                    if is_private_identifier(self.arena, accessor_data.name) {
+                        continue;
+                    }
                     let name = self.get_identifier_text(accessor_data.name);
                     let entry = accessor_map.entry(name).or_insert((None, None, is_static));
                     entry.0 = Some(member_idx);
@@ -1080,6 +1152,10 @@ impl<'a> ClassES5Emitter<'a> {
                     }
                     // Skip abstract accessors (they have no body and shouldn't be emitted)
                     if self.is_abstract(&accessor_data.modifiers) {
+                        continue;
+                    }
+                    // Skip private accessors (they use WeakMap pattern)
+                    if is_private_identifier(self.arena, accessor_data.name) {
                         continue;
                     }
                     let name = self.get_identifier_text(accessor_data.name);
@@ -1356,6 +1432,10 @@ impl<'a> ClassES5Emitter<'a> {
             if member_node.kind == syntax_kind_ext::GET_ACCESSOR {
                 if let Some(accessor_data) = self.arena.get_accessor(member_node) {
                     if self.is_static(&accessor_data.modifiers) {
+                        // Skip private static accessors (they use WeakMap pattern)
+                        if is_private_identifier(self.arena, accessor_data.name) {
+                            continue;
+                        }
                         let name = self.get_identifier_text(accessor_data.name);
                         let entry = static_accessor_map.entry(name).or_insert((None, None));
                         entry.0 = Some(member_idx);
@@ -1364,6 +1444,10 @@ impl<'a> ClassES5Emitter<'a> {
             } else if member_node.kind == syntax_kind_ext::SET_ACCESSOR {
                 if let Some(accessor_data) = self.arena.get_accessor(member_node) {
                     if self.is_static(&accessor_data.modifiers) {
+                        // Skip private static accessors (they use WeakMap pattern)
+                        if is_private_identifier(self.arena, accessor_data.name) {
+                            continue;
+                        }
                         let name = self.get_identifier_text(accessor_data.name);
                         let entry = static_accessor_map.entry(name).or_insert((None, None));
                         entry.1 = Some(member_idx);
@@ -2911,7 +2995,14 @@ impl<'a> ClassES5Emitter<'a> {
             if let Some(catch_node) = self.arena.get(try_stmt.catch_clause) {
                 if let Some(catch_data) = self.arena.get_catch_clause(catch_node) {
                     self.write("catch (");
-                    self.emit_binding_name(catch_data.variable_declaration);
+                    // variable_declaration is a VARIABLE_DECLARATION node, need to get its name
+                    if !catch_data.variable_declaration.is_none() {
+                        if let Some(var_decl_node) = self.arena.get(catch_data.variable_declaration) {
+                            if let Some(var_decl) = self.arena.get_variable_declaration(var_decl_node) {
+                                self.emit_binding_name(var_decl.name);
+                            }
+                        }
+                    }
                     self.write(") ");
                     self.emit_statement(catch_data.block);
                 }
@@ -3090,6 +3181,15 @@ impl<'a> ClassES5Emitter<'a> {
                     self.write("(");
                     self.emit_expression(paren.expression);
                     self.write(")");
+                }
+            }
+            // TypeScript-only type assertions - strip the type and emit just the expression
+            k if k == syntax_kind_ext::TYPE_ASSERTION
+                || k == syntax_kind_ext::AS_EXPRESSION
+                || k == syntax_kind_ext::SATISFIES_EXPRESSION =>
+            {
+                if let Some(assertion) = self.arena.get_type_assertion(expr_node) {
+                    self.emit_expression(assertion.expression);
                 }
             }
             k if k == syntax_kind_ext::CONDITIONAL_EXPRESSION => {
@@ -3934,89 +4034,6 @@ impl<'a> ClassES5Emitter<'a> {
             }
         }
         false
-    }
-
-    /// Collect private accessor information from class members
-    /// Scans for GetAccessor and SetAccessor declarations with PrivateIdentifier names
-    fn collect_private_accessors(&self, class_data: &ClassData, class_name: &str) -> Vec<PrivateAccessorInfo> {
-        let mut accessors = Vec::new();
-        let mut name_to_index: HashMap<String, usize> = HashMap::new();
-
-        for &member_idx in &class_data.members.nodes {
-            let Some(member_node) = self.arena.get(member_idx) else {
-                continue;
-            };
-
-            // Check if this is a GetAccessor or SetAccessor
-            let is_getter = member_node.kind == syntax_kind_ext::GET_ACCESSOR;
-            let is_setter = member_node.kind == syntax_kind_ext::SET_ACCESSOR;
-
-            if !is_getter && !is_setter {
-                continue;
-            }
-
-            let Some(accessor_data) = self.arena.get_accessor(member_node) else {
-                continue;
-            };
-
-            // Check if the name is a PrivateIdentifier
-            let Some(name_node) = self.arena.get(accessor_data.name) else {
-                continue;
-            };
-
-            if name_node.kind != SyntaxKind::PrivateIdentifier as u16 {
-                continue;
-            }
-
-            // Extract the name (e.g., "#foo" -> "foo")
-            let raw_text = self.get_identifier_text(accessor_data.name);
-            let clean_name = raw_text.trim_start_matches('#').to_string();
-
-            // Check if this accessor is static
-            let is_static = self.is_static(&accessor_data.modifiers);
-
-            // Merge with existing accessor entry or create a new one
-            if let Some(&idx) = name_to_index.get(&clean_name) {
-                // Merge into existing entry
-                let info: &mut PrivateAccessorInfo = &mut accessors[idx];
-                if is_getter {
-                    info.getter_body_idx = Some(accessor_data.body);
-                } else {
-                    info.setter_body_idx = Some(accessor_data.body);
-                }
-            } else {
-                // Create new entry
-                let mut info = PrivateAccessorInfo {
-                    name: clean_name.clone(),
-                    is_static,
-                    get_var_name: None,
-                    set_var_name: None,
-                    getter_body_idx: None,
-                    setter_body_idx: None,
-                };
-
-                if is_getter {
-                    info.getter_body_idx = Some(accessor_data.body);
-                } else {
-                    info.setter_body_idx = Some(accessor_data.body);
-                }
-
-                name_to_index.insert(clean_name, accessors.len());
-                accessors.push(info);
-            }
-        }
-
-        // Final pass: generate variable names for any accessors that have them
-        for info in &mut accessors {
-            if info.getter_body_idx.is_some() && info.get_var_name.is_none() {
-                info.get_var_name = Some(format!("_{}_{}_get", class_name, info.name));
-            }
-            if info.setter_body_idx.is_some() && info.set_var_name.is_none() {
-                info.set_var_name = Some(format!("_{}_{}_set", class_name, info.name));
-            }
-        }
-
-        accessors
     }
 
     /// Check if heritage clauses contain an `extends` clause (not just `implements`)
