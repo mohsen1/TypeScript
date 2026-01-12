@@ -1,31 +1,39 @@
-# Binder Gap Analysis: Global Scope and lib.d.ts Integration
+# Binder Gap Analysis: Global Symbol Loading
 
 **Author:** Worker 4 (Binder Squad)
-**Date:** 2026-01-12
+**Date:** 2025-01-12
 **Task:** BIND-1 - Audit current global scope implementation
+
+---
 
 ## Executive Summary
 
-The TypeScript compiler currently has **no mechanism to load lib.d.ts symbols into the global scope**. This is the root cause of the high TS2304 ("Cannot find name") error count (702 extra errors).
+The WASM Rust binder (`wasm/src/binder.rs` and `wasm/src/thin_binder.rs`) does **not** automatically load global symbols from `lib.d.ts` files. This is the root cause of the TS2304 "Cannot find name" errors for built-in JavaScript globals like `console`, `Array`, `Promise`, `Object`, etc.
 
-The compiler uses a workaround in the checker (hardcoded lists of known globals) that returns `ANY` or `UNKNOWN` types instead of properly typed symbols, which leads to "error poisoning" - downstream type checking is suppressed.
+---
 
-## Current State
+## Current Implementation
 
-### 1. SymbolTable Implementation (`wasm/src/binder.rs`)
+### 1. SymbolTable Structure
 
-The `SymbolTable` is correctly implemented as a `FxHashMap<String, SymbolId>`:
+**Location:** `wasm/src/binder.rs:173-183`
 
 ```rust
-// Lines 170-224
+#[derive(Clone, Debug, Default, Serialize)]
 pub struct SymbolTable {
     symbols: FxHashMap<String, SymbolId>,
 }
 ```
 
-### 2. Source File Binding (`wasm/src/binder.rs:671-699`)
+The `SymbolTable` is a simple hash map from symbol names to `SymbolId`. It correctly handles:
+- Scope management via `ScopeContext` stack
+- Function vs block scoping
+- Variable hoisting for `var` declarations
+- Declaration merging for interfaces/namespaces/classes
 
-The `bind_source_file` function initializes the scope chain with a **SourceFile scope** but does **NOT** populate it with lib.d.ts symbols:
+### 2. Source File Binding
+
+**Location:** `wasm/src/binder.rs:671-699`
 
 ```rust
 pub fn bind_source_file(&mut self, arena: &NodeArena, root: NodeIndex) {
@@ -33,202 +41,187 @@ pub fn bind_source_file(&mut self, arena: &NodeArena, root: NodeIndex) {
     self.scope_chain.clear();
     self.scope_chain.push(ScopeContext::new(ContainerKind::SourceFile, root, None));
     self.current_scope_idx = 0;
-    self.current_scope = SymbolTable::new();
+    self.current_scope = SymbolTable::new();  // <-- EMPTY scope!
 
-    // ❌ NO LIB SYMBOLS LOADED HERE
-
-    // Bind user code...
+    // Create START flow node for the file
+    let start_flow = self.flow_nodes.alloc(flow_flags::START);
+    self.current_flow = start_flow;
+    // ... rest of binding
 }
 ```
 
-**Problem:** The global scope starts empty. Any reference to `console`, `Array`, `Promise`, etc. will fail to resolve.
+**Key Issue:** The `SymbolTable::new()` creates an **empty** scope. No global symbols are injected.
 
-### 3. Global Value Resolution (`wasm/src/thin_checker.rs:11773-11775`)
+### 3. LibContext Infrastructure Exists but Unused
 
-The checker attempts to resolve global values by looking in `file_locals`:
+**Location:** `wasm/src/checker/context.rs:248-257`
 
 ```rust
-fn resolve_global_value_symbol(&self, name: &str) -> Option<SymbolId> {
-    self.ctx.binder.file_locals.get(name)
+/// Lib file contexts for global type resolution (lib.es5.d.ts, lib.dom.d.ts, etc.).
+/// Each entry is a (arena, binder) pair from a pre-parsed lib file.
+pub lib_contexts: Vec<LibContext>,
+/// Initialized as Vec::new() - EMPTY!
+
+/// Context for a lib file (arena + binder) for global type resolution.
+pub struct LibContext {
+    pub arena: Arc<ThinNodeArena>,
+    pub binder: Arc<ThinBinderState>,
 }
 ```
 
-**Problem:** `file_locals` only contains symbols from the user's source file, not from lib.d.ts.
+The infrastructure exists (`LibContext`, `lib_contexts` vector) but:
+1. It is **never populated** with actual lib.d.ts files
+2. The binder doesn't inject lib symbols during `bind_source_file()`
 
-### 4. The Workaround: Known Globals Lists
+---
 
-Instead of properly loading lib symbols, the compiler uses hardcoded lists:
+## Global Symbols That Are Missing
 
-#### Known Global Values (`thin_checker.rs:11777-11799`)
+### ECMAScript Built-ins (from `src/lib/es5.d.ts`, `src/lib/es2015.d.ts`, etc.)
 
-```rust
-fn is_known_global_value_name(&self, name: &str) -> bool {
-    matches!(
-        name,
-        "console" | "Math" | "JSON" | "Object" | "Array" | "String"
-        | "Number" | "Boolean" | "Function" | "Date" | "RegExp" | "Error" | "Promise"
-        | "Map" | "Set" | "WeakMap" | "WeakSet" | "WeakRef" | "Proxy"
-        // ... ~40 more names
-    )
-}
-```
+| Symbol | Type | Location |
+|--------|------|----------|
+| `console` | `Console` interface | `dom.generated.d.ts:38688`, `webworker.generated.d.ts:13042` |
+| `Array` | interface | `lib.es5.d.ts` |
+| `Object` | interface | `lib.es5.d.ts` |
+| `String` | interface | `lib.es5.d.ts` |
+| `Number` | interface | `lib.es5.d.ts` |
+| `Boolean` | interface | `lib.es5.d.ts` |
+| `Promise` | interface | `lib.es2015.promise.d.ts` |
+| `Symbol` | interface | `lib.es2015.symbol.d.ts` |
+| `Map` | interface | `lib.es2015.collection.d.ts` |
+| `Set` | interface | `lib.es2015.collection.d.ts` |
+| `eval`, `parseInt`, `parseFloat` | functions | `lib.es5.d.ts` |
+| `NaN`, `Infinity` | variables | `lib.es5.d.ts` |
 
-#### Known Global Types (`thin_checker.rs:11801-11815`)
+### Example: console Declaration
 
-```rust
-fn is_known_global_type_name(&self, name: &str) -> bool {
-    matches!(
-        name,
-        "Object" | "String" | "Number" | "Boolean" | "Symbol" | "Function"
-        | "Promise" | "PromiseLike" | "Array" | "ReadonlyArray" | "ArrayLike"
-        // ... ~30 more names
-    )
-}
-```
-
-When these names are encountered, the checker returns permissive types (`ANY` or `UNKNOWN`) instead of properly typed symbols.
-
-### 5. lib.d.ts File Resolution
-
-The config system **can resolve** lib.d.ts files (`wasm/src/cli/config.rs:544-574`):
-
-```rust
-fn resolve_lib_files(lib_list: &[String]) -> Result<Vec<PathBuf>> {
-    let lib_dir = default_lib_dir()?;
-    let lib_map = build_lib_map(&lib_dir)?;
-    // ...
-}
-```
-
-A default lib.d.ts exists at `tests/lib/lib.d.ts` with proper declarations like:
+**Location:** `src/lib/dom.generated.d.ts:38570-38688`
 
 ```typescript
-declare var NaN: number;
-declare var Infinity: number;
-declare function parseInt(s: string, radix?: number): number;
-interface Object { ... }
-interface Array<T> { ... }
-// ...
+interface Console {
+    assert(condition?: boolean, ...data: any[]): void;
+    clear(): void;
+    count(label?: string): void;
+    debug(...data: any[]): void;
+    // ... many more methods
+}
+
+declare var console: Console;
 ```
 
-**Problem:** The resolved lib file paths are **never parsed** and their symbols are **never injected** into the global scope.
+---
+
+## How TypeScript Compiler Handles This
+
+In the reference TypeScript compiler (`src/compiler/binder.ts`), global symbols from lib.d.ts are loaded during compilation initialization. The compiler:
+
+1. Reads compiler options to determine which lib files to include (e.g., `lib: ["es2015", "dom"]`)
+2. Parses each lib.d.ts file
+3. Creates symbols for all top-level `declare` statements
+4. Merges these symbols into the global scope of each source file
+
+---
 
 ## The Gap
 
-### What Should Happen
+### What Should Happen (but doesn't)
 
-1. User's `tsconfig.json` specifies `compilerOptions.lib: ["ES2022"]`
-2. Config system resolves lib.d.ts file paths (e.g., `lib.es2022.d.ts`)
-3. **Each lib.d.ts file is parsed** into AST
-4. **Each lib.d.ts file is bound** - creating symbols for `console`, `Array`, `Promise`, etc.
-5. **Lib symbols are merged into the global scope** before binding user files
-6. User code can reference `console.log()` with proper types
+1. **During binder initialization**, load default lib.d.ts files based on target ES version
+2. **Parse lib.d.ts files** into `ThinNodeArena`
+3. **Run binder** on lib files to create `LibContext` entries
+4. **Inject lib symbols** into the root scope during `bind_source_file()`
 
-### What Actually Happens
+### Current State
 
-1. User's `tsconfig.json` specifies `compilerOptions.lib: ["ES2022"]`
-2. Config system resolves lib.d.ts file paths
-3. ❌ **Lib files are never parsed**
-4. ❌ **Lib symbols are never created**
-5. ❌ **Global scope remains empty**
-6. User code `console.log(...)` fails to resolve
-7. Checker's workaround returns `ANY` type
-8. Type checking is suppressed (error poisoning)
+| Step | Status | Notes |
+|------|--------|-------|
+| Parse lib.d.ts files | ❌ Not implemented | No code to load lib files |
+| Create LibContext entries | ❌ Not implemented | `lib_contexts` is always empty |
+| Inject symbols into root scope | ❌ Not implemented | `bind_source_file()` creates empty scope |
+| Use lib_contexts for resolution | ⚠️ Partially implemented | `resolve_lib_type_by_name()` exists but never finds anything |
 
-## Impact on Conformance
+---
 
-Per PROJECT_DIRECTION.md:
+## Impact
 
-> **TS2304** (Cannot find name) is the #1 extra error (702 hits).
-> When the Binder fails to resolve `console`, `Promise`, or `Array`, the Solver defaults the type to `Any` (Error Poisoning).
+The 702 TS2304 errors in test files are caused by this missing global symbol loading:
 
-This suppresses downstream errors, contributing to the **68.2% missing error rate**.
+```
+TS2304: Cannot find name 'console'.
+TS2304: Cannot find name 'Array'.
+TS2304: Cannot find name 'Promise'.
+TS2304: Cannot find name 'Object'.
+TS2304: Cannot find name 'String'.
+... (700+ more)
+```
 
-## Root Cause Analysis
+Each of these would resolve correctly if the appropriate lib.d.ts symbols were loaded.
 
-| Component | File | Status | Issue |
-|-----------|------|--------|-------|
-| Config resolution | `cli/config.rs` | ✅ Works | Resolves lib file paths correctly |
-| lib.d.ts storage | `tests/lib/lib.d.ts` | ✅ Exists | Contains proper type declarations |
-| Parser | `parser/*.rs` | ✅ Capable | Can parse .d.ts files |
-| Binder | `binder.rs` | ❌ Incomplete | Never loads lib symbols into global scope |
-| Checker | `thin_checker.rs` | ⚠️ Workaround | Uses hardcoded lists instead of proper symbols |
+---
 
-## Recommended Fix Approach
+## Proposed Fix Location
 
-### Phase 1: Load Lib Files (BIND-4)
+The fix should be implemented in `wasm/src/binder.rs` or `wasm/src/thin_binder.rs`:
 
-**Location:** `wasm/src/binder.rs` - `BinderState::bind_source_file`
+### Option 1: Inject During `bind_source_file()`
 
-**Changes needed:**
-
-1. Add a `bind_lib_file(&mut self, arena: &NodeArena, root: NodeIndex)` method
-2. Call `bind_lib_file` **before** binding user code
-3. Merge lib symbols into the root scope's `file_locals`
-
-**Pseudo-code:**
+Modify `bind_source_file()` to accept a list of `LibContext` entries and merge their `file_locals` into the root scope:
 
 ```rust
-pub fn bind_source_file(&mut self, arena: &NodeArena, root: NodeIndex) {
-    // 1. Initialize scope chain
+pub fn bind_source_file_with_libs(
+    &mut self,
+    arena: &NodeArena,
+    root: NodeIndex,
+    lib_contexts: &[Arc<ThinBinderState>],
+) {
+    // Initialize scope chain
     self.scope_chain.clear();
     self.scope_chain.push(ScopeContext::new(ContainerKind::SourceFile, root, None));
     self.current_scope_idx = 0;
+    self.current_scope = SymbolTable::new();
 
-    // 2. ✅ NEW: Load and bind lib.d.ts symbols first
-    if let Some(lib_arenas) = &self.lib_arenas {
-        for lib_arena in lib_arenas {
-            self.bind_lib_file(lib_arena, lib_arena.root);
+    // TODO: Merge lib symbols into current_scope here!
+    for lib_binder in lib_contexts {
+        for (name, sym_id) in lib_binder.file_locals.iter() {
+            self.current_scope.set(name.clone(), *sym_id);
         }
     }
 
-    // 3. Then bind user code (user symbols can override lib)
-    // ...
+    // ... rest of binding
 }
 ```
 
-### Phase 2: Symbol Merging
+### Option 2: Pre-populate Symbol Arena
 
-**Challenge:** lib.d.ts files use `declare` keywords and ambient contexts.
+Copy lib symbols into the main binder's symbol arena at initialization time, preserving the original IDs via arena merging.
 
-**Solution:**
-- Treat lib.d.ts symbols as having `AMBIENT` flag
-- Allow user code to override lib declarations (TypeScript behavior)
-- Merge interfaces from lib with user-defined interfaces
+---
 
-### Phase 3: Remove Workarounds
+## Next Steps (for Worker 4)
 
-**Location:** `wasm/src/thin_checker.rs`
+Based on this analysis, the next tasks are:
 
-Once lib symbols are properly loaded:
-1. Remove `is_known_global_value_name()` usage
-2. Remove `is_known_global_type_name()` usage
-3. Delete or deprecate these functions
+1. **BIND-4:** Fix Global SymbolTable initialization
+   - Modify `Binder::new` or `bind_source_file()` to inject lib symbols
+   - Load `lib.d.ts` types from `stdlib/lib.d.ts`
+   - Ensure symbols are merged correctly at module level
 
-## Test Plan (BIND-7)
+2. **BIND-7:** Test TS2304 fixes
+   - Create test file for all previously failing global symbols
+   - Verify `console`, `Promise`, `Array`, `Object`, `String`, `Number` resolve correctly
+   - Goal: Reduce TS2304 extra errors from 702 to <50
 
-After implementing the fix:
+---
 
-```typescript
-// Should resolve without TS2304 errors:
-console.log("hello");
-const x: Promise<number> = Promise.resolve(42);
-const arr: Array<string> = ["a", "b"];
-const obj: Object = new Object();
-```
+## Files Referenced
 
-**Expected:** TS2304 errors for global symbols drop from 702 to <50.
-
-## Files Requiring Changes
-
-1. **`wasm/src/binder.rs`** - Add lib loading to `bind_source_file`
-2. **`wasm/src/cli/driver.rs`** - Parse lib files and create lib arenas
-3. **`wasm/src/thin_checker.rs`** - Remove workaround code
-4. **`wasm/src/lib.rs`** - Add public API for lib binding
-
-## Notes
-
-- The parser already supports `.d.ts` files (ambient declarations)
-- The `SymbolTable` architecture is sound - just needs population
-- Module augmentation (merging `interface Window` across files) may need additional work
-- The `resolve_lib_files()` function returns correct paths - use it!
+| File | Purpose |
+|------|---------|
+| `wasm/src/binder.rs` | Main binder implementation (SymbolTable, BinderState) |
+| `wasm/src/thin_binder.rs` | ThinBinder using ThinNodeArena (used in production) |
+| `wasm/src/checker/context.rs` | CheckerContext with `lib_contexts` vector |
+| `src/lib/es5.d.ts` | ECMAScript 5 built-in types |
+| `src/lib/dom.generated.d.ts` | DOM API types (includes `console`) |
+| `src/lib/webworker.generated.d.ts` | Web Worker API types |
+| `tests/lib/lib.d.ts` | Test lib file |
