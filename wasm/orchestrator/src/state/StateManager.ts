@@ -53,7 +53,7 @@ export class StateManager {
    */
   async saveState(options: SaveOptions = {}): Promise<void> {
     const opts = { ...DEFAULT_SAVE_OPTIONS, ...options };
-    const windows = ['director', 'forge', 'anvil'];
+    const windows = ['director', ...this.config.squads.map(s => s.name)];
     const panes: Record<string, PaneState> = {};
 
     for (const window of windows) {
