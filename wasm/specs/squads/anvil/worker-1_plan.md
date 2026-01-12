@@ -7,23 +7,25 @@ Status: Active
 Priority: P0 (Highest)
 
 ## Current Assignment
-**Fix Remaining Emitter Issues** - IN PROGRESS
+**Fix Generic Type Parameter Constraint Checking** - IN PROGRESS (since session 6)
 
 ### Background
-ES5 class transforms and emitter edge cases need attention.
+Type parameter constraint checking issue: when calling `deepFreeze<T extends object>(value as object)`, the type checker incorrectly reports "Argument of type 'T' is not assignable to parameter of type 'object'".
 
-### Implementation Steps
-1. [x] Check for failing emitter tests in `src/transforms/*_tests.rs` - All 756 tests pass
-2. [x] Review readonly modifier emission - No issues found
-3. [x] Fix any remaining try/catch/finally emission issues - Already fixed in previous session
-4. [x] Test: `./wasm/test.sh --test emitter` - All 756 tests pass
+### Failing Test
+- `compile_generic_utility_library_type_utilities` - Tests generic type utilities with constraints
+- Error: TS2345 at line 793 (recursive call `deepFreeze(value as object)`)
 
-### Session Status: Emitter Tests Verified ✅
-- All 756 emitter tests pass
-- No failing emitter tests found
-- Catch clause variable emission fix (previous session) verified
-- Try/catch/finally emission working correctly
-- Readonly emission working correctly
+### Investigation Status
+1. [x] Identified issue in `src/solver/operations.rs` - generic function call resolution
+2. [x] Added fallback to constraint when resolved type is TypeParameter
+3. [x] Added special case for `object` to TypeParameter with `object` constraint
+4. [ ] **ISSUE PERSISTS**: Type parameter 'T' not being resolved to 'object'
+5. [ ] Need deeper investigation of type parameter resolution in recursive calls
+
+### Commits
+- `db2e4e6c7d` - Initial constraint checking fix attempt
+- `f3b659d09d` - Added special case for object to constrained type parameter
 
 ### Key Code Locations
 - `src/transforms/class_es5.rs` - ES5 transforms
