@@ -1,58 +1,58 @@
 # Worker 3 Plan - Squad Forge
 
 ## Mission
-Fix TS2322: Type Not Assignable
+Fix TS2304: Cannot Find Name
 
 Status: Active
-Priority: P0 (CRITICAL)
+Priority: P1 (HIGH)
 
 ## Current Assignment
-**Implement TS2322 Error: Type is not assignable to other type**
+**Fix TS2304 Extra Errors: Cannot find name (129 extra errors)**
 
 ### Background
-TypeScript should emit TS2322 error when a value of one type is assigned to a variable/parameter of a different, incompatible type. The type checker needs to verify assignability using subtyping rules.
+TypeScript is emitting TS2304 "Cannot find name" errors too aggressively (129 extra errors). This is likely a scope resolution issue where valid identifiers are incorrectly flagged as undefined.
 
 ### Success Criteria
-- Emit TS2322 for type mismatches in assignments
-- Handle all assignment contexts: variable declarations, parameter passing, return statements
-- Account for type compatibility rules (subtype, supertype, unrelated)
-- Don't emit false positives for compatible types
-- Handle contextual typing (inferred from usage)
+- Don't emit TS2304 for valid identifiers in scope
+- Fix scope resolution for all variable types (let/const/var, functions, classes, interfaces)
+- Handle global/builtin types correctly (Array, Object, etc.)
+- Reduce extra TS2304 errors significantly
 
 ### Implementation Steps
-1. [ ] Read existing assignability checking code in `src/solver/subtype.rs` and `src/thin_checker.rs`
-2. [ ] Find where type assignability is checked
-3. [ ] Implement or fix check: if source type not assignable to target type, emit TS2322
-4. [ ] Test with various assignment patterns
-5. [ ] Ensure no false positives for compatible types
+1. [ ] Sync from origin/rust: `git fetch origin && git merge origin/rust --no-edit`
+2. [ ] Search for TS2304 emission code in `src/thin_checker.rs` or binder
+3. [ ] Investigate scope resolution logic
+4. [ ] Fix cases where valid identifiers are incorrectly flagged as undefined
+5. [ ] Test with various identifier resolution patterns
+6. [ ] Run conformance to verify reduction in extra errors
 
 ### Key Code Locations
-- `src/solver/subtype.rs` - subtype checking and assignability logic
-- `src/thin_checker.rs` - assignment expression checking
-- `src/checker/types/diagnostics.rs` - TS2322 error code
+- `src/thin_checker.rs` - identifier resolution, TS2304 emission
+- `src/binder.rs` - symbol table lookup, scope management
+- `src/checker/types/diagnostics.rs` - TS2304 error code
 
-### Test Cases to Implement
+### Test Cases
 ```typescript
-// Should emit TS2322
-let x: number = "string"; // Error: Type 'string' is not assignable to type 'number'
-function foo(y: string) { }
-foo(42); // Error: Type 'number' is not assignable to parameter of type 'string'
+// Should NOT emit TS2304 (defined)
+let x = 42;
+console.log(x); // OK
 
-// Should NOT emit (compatible types)
-let a: number = 42; // OK
-let b: number = a; // OK
-let c: string | number = "hello"; // OK
+function foo() { return 1; }
+console.log(foo()); // OK
+
+class Bar { }
+const b = new Bar(); // OK
+
+// Should emit TS2304 (undefined)
+console.log(undefinedVar); // Error: Cannot find name 'undefinedVar'
+let y: NotDefined; // Error: Cannot find name 'NotDefined'
 ```
 
 ## Completed
-- [x] Namespace merging enum/function work (committed)
-
-## Ready for Merge
-No
+- [x] Namespace merging enum/function work
+- [x] TS2322 investigation (already implemented)
 
 ## Notes
-- Follow `wasm/specs/WASM_ARCHITECTURE.md`
-- Use Docker for Rust tests: `./wasm/test.sh`
-- Commit format: `[wasm] solver/checker: Implement TS2322 type assignability errors`
+- Commit format: `[wasm] checker: Fix TS2304 false positives in scope resolution`
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/forge-3`

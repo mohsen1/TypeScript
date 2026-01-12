@@ -1,51 +1,47 @@
 # Worker 3 Plan - Squad Anvil
 
 ## Mission
-LSP Find References
+LSP Code Actions
 
 Status: Active
 Priority: P1 (High)
 
 ## Current Assignment
-**Implement LSP Find All References**
+**Implement LSP Code Actions**
 
 ### Background
-Find all references shows where a symbol is used throughout the codebase. Essential for refactoring.
+Code actions provide quick fixes and refactorings (e.g., "organize imports", "fix all", "extract to function"). Essential for IDE UX.
 
 ### Implementation Steps
 
-1. [ ] Read current find references in `src/lsp/references.rs` or create if missing
-2. [ ] Implement reference finding:
-   - Find symbol at cursor position
-   - Search all files in project for symbol usage
-   - Return list of locations (file, line, column)
-3. [ ] Handle different symbol types:
-   - Variables and functions
-   - Class members
-   - Parameters
-   - Type aliases
-4. [ ] Distinguish between definition, read, and write references
-5. [ ] Test: Find references and verify all usages are found
+1. [ ] Read current code actions in `src/lsp/code_actions.rs` or create if missing
+2. [ ] Implement common code actions:
+   - Organize imports (sort and deduplicate)
+   - Remove unused imports
+   - Fix all auto-fixable errors
+   - Extract to function/refactor
+3. [ ] Handle code action resolution
+4. [ ] Test: Request code actions and verify suggestions
 
 ### Key Code Locations
-- `src/lsp/references.rs` - find references implementation
+- `src/lsp/code_actions.rs` - code actions implementation
 - `src/lsp/mod.rs` - LSP server
-- `src/binder/` - symbol resolution
 
 ## Task Queue
-- [ ] After find references: help with rename symbol or document symbols
+- [ ] After code actions: help with other LSP features or emitter work
 
 ## Completed
 - [x] ES5 Private Accessor Emission (7 tests passing) - MERGED to squad/anvil
 - [x] Parser error recovery: function keyword in class - MERGED to squad/anvil
 - [x] LSP Go-To-Definition - All 25 tests passing - MERGED to squad/anvil
+- [x] LSP Find All References - All 48 LSP tests passing - Complete
 
 ## Ready for Merge
-Previous work merged to squad/anvil
+Previous work merged, latest ready for merge
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
 - Use Docker for Rust tests: `./wasm/test.sh`
-- Commit format: `[wasm] lsp: Implement find all references`
+- Commit format: `[wasm] lsp: Implement code actions`
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/anvil-3`
