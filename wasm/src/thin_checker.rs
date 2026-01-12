@@ -1469,7 +1469,11 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
         let expr_type = self.get_type_of_node(expr_idx);
-        let ctor_types = self.constructor_types_from_type(expr_type);
+
+        // Evaluate application types to get the actual intersection type
+        let evaluated_type = self.evaluate_application_type(expr_type);
+
+        let ctor_types = self.constructor_types_from_type(evaluated_type);
         if ctor_types.is_empty() {
             return None;
         }
@@ -1553,6 +1557,13 @@ impl<'a> ThinCheckerState<'a> {
                 if expanded != evaluated {
                     self.collect_constructor_types_from_type_inner(expanded, ctor_types, visited);
                 }
+            }
+            TypeKey::TypeQuery(sym_ref) => {
+                // typeof X - get the type of the symbol X and collect constructors from it
+                use crate::binder::SymbolId;
+                let sym_id = SymbolId(sym_ref.0);
+                let sym_type = self.get_type_of_symbol(sym_id);
+                self.collect_constructor_types_from_type_inner(sym_type, ctor_types, visited);
             }
             _ => {}
         }
@@ -2630,6 +2641,111 @@ impl<'a> ThinCheckerState<'a> {
             } else {
                 self.ctx.type_parameter_scope.remove(&name);
             }
+        }
+    }
+
+    /// Collect all `infer` type parameter names from a type node.
+    /// This is used to add inferred type parameters to the scope when checking conditional types.
+    fn collect_infer_type_parameters(&self, type_idx: NodeIndex) -> Vec<String> {
+        let mut params = Vec::new();
+        self.collect_infer_type_parameters_inner(type_idx, &mut params);
+        params
+    }
+
+    fn collect_infer_type_parameters_inner(&self, type_idx: NodeIndex, params: &mut Vec<String>) {
+        let Some(node) = self.ctx.arena.get(type_idx) else {
+            return;
+        };
+
+        match node.kind {
+            k if k == syntax_kind_ext::INFER_TYPE => {
+                if let Some(infer) = self.ctx.arena.get_infer_type(node) {
+                    if let Some(param_node) = self.ctx.arena.get(infer.type_parameter) {
+                        if let Some(param) = self.ctx.arena.get_type_parameter(param_node) {
+                            if let Some(name_node) = self.ctx.arena.get(param.name) {
+                                if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
+                                    let name = ident.escaped_text.clone();
+                                    if !params.contains(&name) {
+                                        params.push(name);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::TYPE_REFERENCE => {
+                if let Some(type_ref) = self.ctx.arena.get_type_ref(node) {
+                    if let Some(ref args) = type_ref.type_arguments {
+                        for &arg_idx in &args.nodes {
+                            self.collect_infer_type_parameters_inner(arg_idx, params);
+                        }
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::UNION_TYPE || k == syntax_kind_ext::INTERSECTION_TYPE => {
+                if let Some(composite) = self.ctx.arena.get_composite_type(node) {
+                    for &member_idx in &composite.types.nodes {
+                        self.collect_infer_type_parameters_inner(member_idx, params);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::FUNCTION_TYPE || k == syntax_kind_ext::CONSTRUCTOR_TYPE => {
+                if let Some(func_type) = self.ctx.arena.get_function_type(node) {
+                    for &param_idx in &func_type.parameters.nodes {
+                        if let Some(param_node) = self.ctx.arena.get(param_idx) {
+                            if let Some(param) = self.ctx.arena.get_parameter(param_node) {
+                                if !param.type_annotation.is_none() {
+                                    self.collect_infer_type_parameters_inner(param.type_annotation, params);
+                                }
+                            }
+                        }
+                    }
+                    if !func_type.type_annotation.is_none() {
+                        self.collect_infer_type_parameters_inner(func_type.type_annotation, params);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::ARRAY_TYPE => {
+                if let Some(arr) = self.ctx.arena.get_array_type(node) {
+                    self.collect_infer_type_parameters_inner(arr.element_type, params);
+                }
+            }
+            k if k == syntax_kind_ext::TUPLE_TYPE => {
+                if let Some(tuple) = self.ctx.arena.get_tuple_type(node) {
+                    for &elem_idx in &tuple.elements.nodes {
+                        self.collect_infer_type_parameters_inner(elem_idx, params);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::OPTIONAL_TYPE
+                || k == syntax_kind_ext::REST_TYPE
+                || k == syntax_kind_ext::PARENTHESIZED_TYPE => {
+                if let Some(wrapped) = self.ctx.arena.get_wrapped_type(node) {
+                    self.collect_infer_type_parameters_inner(wrapped.type_node, params);
+                }
+            }
+            k if k == syntax_kind_ext::INDEXED_ACCESS_TYPE => {
+                if let Some(indexed) = self.ctx.arena.get_indexed_access_type(node) {
+                    self.collect_infer_type_parameters_inner(indexed.object_type, params);
+                    self.collect_infer_type_parameters_inner(indexed.index_type, params);
+                }
+            }
+            k if k == syntax_kind_ext::CONDITIONAL_TYPE => {
+                if let Some(cond) = self.ctx.arena.get_conditional_type(node) {
+                    // Collect from check_type and extends_type for nested conditionals
+                    self.collect_infer_type_parameters_inner(cond.check_type, params);
+                    self.collect_infer_type_parameters_inner(cond.extends_type, params);
+                    self.collect_infer_type_parameters_inner(cond.true_type, params);
+                    self.collect_infer_type_parameters_inner(cond.false_type, params);
+                }
+            }
+            k if k == syntax_kind_ext::TYPE_OPERATOR => {
+                if let Some(op) = self.ctx.arena.get_type_operator(node) {
+                    self.collect_infer_type_parameters_inner(op.type_node, params);
+                }
+            }
+            _ => {}
         }
     }
 
@@ -5043,6 +5159,13 @@ impl<'a> ThinCheckerState<'a> {
         // Enum - return a nominal reference type
         if flags & symbol_flags::ENUM != 0 {
             return (self.ctx.types.intern(TypeKey::Ref(SymbolRef(sym_id.0))), Vec::new());
+        }
+
+        // Enum member - determine type from parent enum
+        if flags & symbol_flags::ENUM_MEMBER != 0 {
+            // Find the parent enum by walking up to find the containing enum declaration
+            let member_type = self.enum_member_type_from_decl(value_decl);
+            return (member_type, Vec::new());
         }
 
         // Function - build function type or callable overload set
@@ -8105,6 +8228,27 @@ impl<'a> ThinCheckerState<'a> {
                 );
             }
 
+            // TS2705: Async function must return Promise
+            // Check for arrow functions and function expressions
+            if !is_function_declaration && has_type_annotation {
+                let is_async = if let Some(func) = self.ctx.arena.get_function(node) {
+                    func.is_async
+                } else if let Some(method) = self.ctx.arena.get_method_decl(node) {
+                    self.has_async_modifier(&method.modifiers)
+                } else {
+                    false
+                };
+
+                if is_async && !self.is_promise_type(return_type) {
+                    use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
+                    self.error_at_node(
+                        type_annotation,
+                        diagnostic_messages::ASYNC_FUNCTION_RETURNS_PROMISE,
+                        diagnostic_codes::ASYNC_FUNCTION_RETURNS_PROMISE,
+                    );
+                }
+            }
+
             // TS2366 (not all code paths return value) for function expressions and arrow functions
             // Check if all code paths return a value when return type requires it
             if !is_function_declaration && !body.is_none() {
@@ -8749,6 +8893,72 @@ impl<'a> ThinCheckerState<'a> {
         } else {
             Some(EnumKind::Numeric)
         }
+    }
+
+    /// Get the type of an enum member (STRING or NUMBER) by finding its parent enum.
+    /// This is used when enum members are accessed through namespace exports.
+    fn enum_member_type_from_decl(&self, member_decl: NodeIndex) -> TypeId {
+        use crate::parser::node_flags;
+
+        // Get the extended node to find parent
+        let Some(ext) = self.ctx.arena.get_extended(member_decl) else {
+            return TypeId::ANY;
+        };
+        let parent_idx = ext.parent;
+        if parent_idx.is_none() {
+            return TypeId::ANY;
+        }
+
+        // Walk up to find the enum declaration
+        let mut current = parent_idx;
+        let max_depth = 10; // Prevent infinite loops
+        for _ in 0..max_depth {
+            let Some(parent_node) = self.ctx.arena.get(current) else {
+                break;
+            };
+
+            // Found the enum declaration
+            if parent_node.kind == syntax_kind_ext::ENUM_DECLARATION {
+                let Some(enum_decl) = self.ctx.arena.get_enum(parent_node) else {
+                    break;
+                };
+
+                // Check if any member has a string initializer
+                for &member_idx in &enum_decl.members.nodes {
+                    let Some(member_node) = self.ctx.arena.get(member_idx) else {
+                        continue;
+                    };
+                    let Some(member) = self.ctx.arena.get_enum_member(member_node) else {
+                        continue;
+                    };
+                    if member.initializer.is_none() {
+                        continue;
+                    }
+                    let Some(init_node) = self.ctx.arena.get(member.initializer) else {
+                        continue;
+                    };
+                    if init_node.kind == SyntaxKind::StringLiteral as u16
+                        || init_node.kind == SyntaxKind::NoSubstitutionTemplateLiteral as u16
+                    {
+                        return TypeId::STRING;
+                    }
+                }
+
+                // No string initializer found, so it's a numeric enum
+                return TypeId::NUMBER;
+            }
+
+            // Move to parent
+            let Some(ext) = self.ctx.arena.get_extended(current) else {
+                break;
+            };
+            current = ext.parent;
+            if current.is_none() {
+                break;
+            }
+        }
+
+        TypeId::ANY
     }
 
     fn enum_assignability_override(
@@ -12180,6 +12390,17 @@ impl<'a> ThinCheckerState<'a> {
                             stmt_idx,
                         );
 
+                        // TS2705: Async function must return Promise
+                        // Only check if there's an explicit return type annotation
+                        if func.is_async && has_type_annotation && !self.is_promise_type(return_type) {
+                            use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
+                            self.error_at_node(
+                                func.type_annotation,
+                                diagnostic_messages::ASYNC_FUNCTION_RETURNS_PROMISE,
+                                diagnostic_codes::ASYNC_FUNCTION_RETURNS_PROMISE,
+                            );
+                        }
+
                         self.push_return_type(return_type);
                         self.check_statement(func.body);
 
@@ -15419,9 +15640,39 @@ impl<'a> ThinCheckerState<'a> {
             }
             k if k == syntax_kind_ext::CONDITIONAL_TYPE => {
                 if let Some(cond) = self.ctx.arena.get_conditional_type(node) {
+                    // Check check_type and extends_type first (infer type params not in scope yet)
                     self.check_type_for_missing_names(cond.check_type);
                     self.check_type_for_missing_names(cond.extends_type);
+
+                    // Collect infer type parameters from extends_type and add them to scope for true_type
+                    let infer_params = self.collect_infer_type_parameters(cond.extends_type);
+                    let mut param_bindings = Vec::new();
+                    for param_name in &infer_params {
+                        let atom = self.ctx.types.intern_string(param_name);
+                        let type_id = self.ctx.types.intern(crate::solver::TypeKey::TypeParameter(
+                            crate::solver::TypeParamInfo {
+                                name: atom,
+                                constraint: None,
+                                default: None,
+                            },
+                        ));
+                        let previous = self.ctx.type_parameter_scope.insert(param_name.clone(), type_id);
+                        param_bindings.push((param_name.clone(), previous));
+                    }
+
+                    // Check true_type with infer type parameters in scope
                     self.check_type_for_missing_names(cond.true_type);
+
+                    // Remove infer type parameters from scope
+                    for (name, previous) in param_bindings.into_iter().rev() {
+                        if let Some(prev_type) = previous {
+                            self.ctx.type_parameter_scope.insert(name, prev_type);
+                        } else {
+                            self.ctx.type_parameter_scope.remove(&name);
+                        }
+                    }
+
+                    // Check false_type (infer type params not in scope)
                     self.check_type_for_missing_names(cond.false_type);
                 }
             }
@@ -18401,6 +18652,27 @@ impl<'a> ThinCheckerState<'a> {
         // Match exact Promise/PromiseLike names, or any name containing "Promise" (case-insensitive)
         // This handles types like MyPromise, CustomPromise, etc.
         matches!(name, "Promise" | "PromiseLike") || name.contains("Promise")
+    }
+
+    /// Check if a type is a Promise or Promise-like type.
+    /// This is used to validate async function return types.
+    fn is_promise_type(&self, type_id: TypeId) -> bool {
+        use crate::solver::{SymbolRef, TypeKey};
+
+        // Check for Promise<T> or PromiseLike<T> type application
+        if let Some(TypeKey::Application(app_id)) = self.ctx.types.lookup(type_id) {
+            let app = self.ctx.types.type_application(app_id);
+            return self.type_ref_is_promise_like(app.base);
+        }
+
+        // Check for direct Promise or PromiseLike reference (this also handles type aliases)
+        if let Some(TypeKey::Ref(SymbolRef(sym_id))) = self.ctx.types.lookup(type_id) {
+            if let Some(symbol) = self.ctx.binder.get_symbol(SymbolId(sym_id)) {
+                return self.is_promise_like_name(symbol.escaped_name.as_str());
+            }
+        }
+
+        false
     }
 
     fn is_null_or_undefined_only(&self, return_type: TypeId) -> bool {
