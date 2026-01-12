@@ -8,6 +8,7 @@
 //! - `statements` - Statement type checking
 //! - `declarations` - Declaration type checking
 //! - `flow_graph_builder` - Control flow graph builder
+//! - `flow_analyzer` - Definite assignment analysis
 //! - `control_flow` - Flow analyzer for type narrowing
 //!
 //! Note: CheckerState has been replaced by ThinCheckerState in thin_checker.rs
@@ -20,6 +21,7 @@ pub mod expr;
 pub mod statements;
 pub mod declarations;
 pub mod flow_graph_builder;
+pub mod flow_analyzer;
 pub mod control_flow;
 
 #[cfg(test)]
@@ -40,4 +42,8 @@ pub use expr::ExpressionChecker;
 pub use statements::StatementChecker;
 pub use declarations::DeclarationChecker;
 pub use flow_graph_builder::{FlowGraph, FlowGraphBuilder};
+pub use flow_analyzer::{
+    DefiniteAssignmentAnalyzer, AssignmentState, AssignmentStateMap,
+    DefiniteAssignmentResult, merge_assignment_states,
+};
 pub use control_flow::{FlowAnalyzer, FlowGraph as ControlFlowGraph};
