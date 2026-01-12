@@ -351,6 +351,10 @@ impl<'a> LoweringPass<'a> {
                 if let Some(decorator) = self.arena.get_decorator(node) {
                     self.visit(decorator.expression);
                 }
+                // When targeting ES5, decorators need the __decorate helper
+                if self.ctx.target_es5 {
+                    self.transforms.helpers_mut().decorate = true;
+                }
             }
             k if k == SyntaxKind::NoSubstitutionTemplateLiteral as u16 => {
                 if self.ctx.target_es5 {

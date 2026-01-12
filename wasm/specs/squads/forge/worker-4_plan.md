@@ -1,74 +1,59 @@
 # Worker 4 Plan - Squad Forge
 
 ## Mission
-Fix TS2322: Type Not Assignable
+Fix TS2339: Property Does Not Exist
 
 Status: Active
 Priority: P1 (HIGH)
 
 ## Current Assignment
-**Fix TS2322 Missing Errors: Type not assignable (19 occurrences - some missing)**
+**Fix TS2339 False Positives: Property does not exist (35 extra errors)**
 
 ### Background
-TypeScript is missing TS2322 "Type not assignable" errors in some cases. This is a type compatibility issue where the assignability checker isn't catching all invalid type assignments.
+W1 implemented a TS2339 fix that works in cargo but fails in WASM. The fix addresses atom comparison issues in the solver's property access resolution. Need to investigate and fix the WASM-specific behavior.
 
 ### Success Criteria
-- Emit TS2322 for all invalid type assignments
-- Handle type compatibility checking for:
-  - Interface implementations
-  - Class inheritance
-  - Generic type constraints
-  - Union/intersection types
-- Don't emit false positives for valid assignments
-- Fix missing TS2322 detections (19 occurrences)
+- Debug why the TS2339 fix works in cargo but not in WASM
+- Fix the discrepancy between cargo run and WASM package execution
+- Ensure property access works correctly for private static members
+- Test with various property access patterns
+- Run conformance to verify error reduction
 
 ### Implementation Steps
 1. [ ] Sync from origin/rust: `git fetch origin && git merge origin/rust --no-edit`
-2. [ ] Search for TS2322 emission code in `src/solver/operations.rs` or `src/thin_checker.rs`
-3. [ ] Investigate assignability checking logic
-4. [ ] Find cases where TS2322 should be emitted but isn't
-5. [ ] Fix type compatibility checking
-6. [ ] Test with various assignability patterns
-7. [ ] Run conformance to verify TS2322 is emitted correctly
+2. [ ] Review W1's implementation in `src/thin_checker.rs`
+3. [ ] Investigate WASM-specific behavior differences
+4. [ ] Check for atom interning issues in WASM context
+5. [ ] Fix the discrepancy to make it work in both cargo and WASM
+6. [ ] Test with various property access patterns
+7. [ ] Run conformance to verify error reduction
 
 ### Key Code Locations
-- `src/solver/operations.rs` - type assignability checking
-- `src/thin_checker.rs` - assignment expression checking
-- `src/checker/types/diagnostics.rs` - TS2322 error code
+- `src/thin_checker.rs` - W1's TS2339 fix implementation
+- `src/solver/operations.rs` - property access resolution
+- `wasm/src/thin_checker.rs` - WASM-specific code
 
 ### Test Cases
 ```typescript
-// Should emit TS2322
-let x: string = 42; // Error: Type 'number' is not assignable to type 'string'
-
-interface Foo {
-  x: number;
+// TS2339 should NOT emit for valid property accesses
+class Foo {
+  static #field: number;
+  static getField() { return Foo.#field; } // OK - private static member
 }
 
-class Bar implements Foo {
-  x: string; // Error: Type 'string' is not assignable to type 'number'
-}
-
-function baz<T extends number>(arg: T): T {
-  return "hello" as T; // Error: Type 'string' is not assignable to type 'T'
-}
-
-// Should NOT emit
-let y: number = 42; // OK
-
-class Qux implements Foo {
-  x: number; // OK
-}
+// Should still emit TS2339 for invalid properties
+const obj = { x: 1 };
+console.log(obj.y); // Error: Property 'y' does not exist
 ```
 
 ## Completed
-- [x] TS7010 Implicit Any Return - Merged to squad/forge
-- [x] TS7006 Parameter 'Any' Type - Basic implementation complete, committed
-
-## Ready for Merge
-No
+- [x] TS7010 - Implicit any return type (merged to squad/forge)
+- [x] TS7006 - Parameter 'any' type (destructuring and setter fixes, merged)
+- [x] TS2322 - Constructor return statement fix (merged to squad/forge)
 
 ## Notes
-- Commit format: `[wasm] checker: Fix TS2322 missing type assignability errors`
+- W1's commit: afc120f6e8 - "Implement TS2339 fix for private static members"
+- Investigate WASM vs cargo discrepancy
+- Commit format: `[wasm] checker: Fix TS2339 WASM discrepancy in property access`
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/forge-4`

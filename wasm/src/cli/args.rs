@@ -23,6 +23,10 @@ pub struct CliArgs {
     #[arg(long = "rootDir", alias = "root-dir")]
     pub root_dir: Option<PathBuf>,
 
+    /// Concatenate and emit output to single file.
+    #[arg(long = "outFile", alias = "out-file")]
+    pub out_file: Option<PathBuf>,
+
     /// Generate .d.ts declaration files.
     #[arg(long = "declaration", short = 'd')]
     pub declaration: bool,
@@ -34,6 +38,14 @@ pub struct CliArgs {
     /// Generate .map source map files.
     #[arg(long = "sourceMap", alias = "source-map")]
     pub source_map: bool,
+
+    /// Specify file for storing incremental build information.
+    #[arg(long = "tsBuildInfoFile", alias = "ts-build-info-file")]
+    pub ts_build_info_file: Option<PathBuf>,
+
+    /// Enable incremental compilation.
+    #[arg(long)]
+    pub incremental: bool,
 
     /// Path to tsconfig.json or a directory containing it.
     #[arg(short = 'p', long = "project")]

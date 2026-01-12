@@ -7,6 +7,8 @@
 //! - Hover
 //! - Signature Help
 //! - Document Symbols
+//! - Document Formatting
+//! - Document Highlighting
 //! - Rename
 //! - Semantic Tokens
 //! - (Future: Code Actions, Diagnostics, etc.)
@@ -26,6 +28,9 @@ pub mod completions;
 pub mod hover;
 pub mod signature_help;
 pub mod document_symbols;
+pub mod symbols;
+pub mod formatting;
+pub mod highlighting;
 pub mod rename;
 pub mod semantic_tokens;
 pub mod code_actions;
@@ -45,6 +50,9 @@ pub use completions::{Completions, CompletionItem, CompletionItemKind};
 pub use hover::{HoverProvider, HoverInfo};
 pub use signature_help::{SignatureHelpProvider, SignatureHelp, SignatureInformation, ParameterInformation};
 pub use document_symbols::{DocumentSymbolProvider, DocumentSymbol, SymbolKind};
+pub use symbols::DocumentSymbols;
+pub use formatting::{DocumentFormattingProvider, FormattingOptions, TextEdit as FormattingTextEdit};
+pub use highlighting::{DocumentHighlightProvider, DocumentHighlight, DocumentHighlightKind};
 pub use rename::{RenameProvider, WorkspaceEdit, TextEdit};
 pub use semantic_tokens::{SemanticTokensProvider, SemanticTokenType, semantic_token_modifiers};
 pub use code_actions::{

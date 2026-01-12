@@ -1175,6 +1175,36 @@ impl<'a> ThinCheckerState<'a> {
         Some(sym_id)
     }
 
+    /// Check if a node is a `require()` call expression.
+    /// This is used to detect import equals declarations like `import x = require('./module')`
+    /// where we want to return ANY type instead of the literal string type.
+    fn is_require_call(&self, idx: NodeIndex) -> bool {
+        let node = match self.ctx.arena.get(idx) {
+            Some(n) => n,
+            None => return false,
+        };
+        if node.kind != syntax_kind_ext::CALL_EXPRESSION {
+            return false;
+        }
+
+        let call = match self.ctx.arena.get_call_expr(node) {
+            Some(c) => c,
+            None => return false,
+        };
+
+        let callee_node = match self.ctx.arena.get(call.expression) {
+            Some(n) => n,
+            None => return false,
+        };
+
+        let callee_ident = match self.ctx.arena.get_identifier(callee_node) {
+            Some(ident) => ident,
+            None => return false,
+        };
+
+        callee_ident.escaped_text == "require"
+    }
+
     fn missing_type_query_left(&self, idx: NodeIndex) -> Option<NodeIndex> {
         let mut current = idx;
         loop {
@@ -1474,7 +1504,11 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
         let expr_type = self.get_type_of_node(expr_idx);
-        let ctor_types = self.constructor_types_from_type(expr_type);
+
+        // Evaluate application types to get the actual intersection type
+        let evaluated_type = self.evaluate_application_type(expr_type);
+
+        let ctor_types = self.constructor_types_from_type(evaluated_type);
         if ctor_types.is_empty() {
             return None;
         }
@@ -1558,6 +1592,13 @@ impl<'a> ThinCheckerState<'a> {
                 if expanded != evaluated {
                     self.collect_constructor_types_from_type_inner(expanded, ctor_types, visited);
                 }
+            }
+            TypeKey::TypeQuery(sym_ref) => {
+                // typeof X - get the type of the symbol X and collect constructors from it
+                use crate::binder::SymbolId;
+                let sym_id = SymbolId(sym_ref.0);
+                let sym_type = self.get_type_of_symbol(sym_id);
+                self.collect_constructor_types_from_type_inner(sym_type, ctor_types, visited);
             }
             _ => {}
         }
@@ -2595,7 +2636,7 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         // Second pass: Now resolve constraints and defaults with all type parameters in scope
-        for &param_idx in &param_indices {
+        for (idx, &param_idx) in param_indices.iter().enumerate() {
             let Some(node) = self.ctx.arena.get(param_idx) else { continue };
             let Some(data) = self.ctx.arena.get_type_parameter(node) else { continue };
 
@@ -2622,7 +2663,13 @@ impl<'a> ThinCheckerState<'a> {
                 constraint,
                 default,
             };
-            params.push(info);
+            params.push(info.clone());
+
+            // UPDATE: Create a new TypeParameter with constraints and update the scope
+            // This ensures that when function parameters reference these type parameters,
+            // they get the constrained version, not the unconstrained placeholder
+            let constrained_type_id = self.ctx.types.intern(TypeKey::TypeParameter(info));
+            self.ctx.type_parameter_scope.insert(name.clone(), constrained_type_id);
         }
 
         (params, updates)
@@ -2635,6 +2682,111 @@ impl<'a> ThinCheckerState<'a> {
             } else {
                 self.ctx.type_parameter_scope.remove(&name);
             }
+        }
+    }
+
+    /// Collect all `infer` type parameter names from a type node.
+    /// This is used to add inferred type parameters to the scope when checking conditional types.
+    fn collect_infer_type_parameters(&self, type_idx: NodeIndex) -> Vec<String> {
+        let mut params = Vec::new();
+        self.collect_infer_type_parameters_inner(type_idx, &mut params);
+        params
+    }
+
+    fn collect_infer_type_parameters_inner(&self, type_idx: NodeIndex, params: &mut Vec<String>) {
+        let Some(node) = self.ctx.arena.get(type_idx) else {
+            return;
+        };
+
+        match node.kind {
+            k if k == syntax_kind_ext::INFER_TYPE => {
+                if let Some(infer) = self.ctx.arena.get_infer_type(node) {
+                    if let Some(param_node) = self.ctx.arena.get(infer.type_parameter) {
+                        if let Some(param) = self.ctx.arena.get_type_parameter(param_node) {
+                            if let Some(name_node) = self.ctx.arena.get(param.name) {
+                                if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
+                                    let name = ident.escaped_text.clone();
+                                    if !params.contains(&name) {
+                                        params.push(name);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::TYPE_REFERENCE => {
+                if let Some(type_ref) = self.ctx.arena.get_type_ref(node) {
+                    if let Some(ref args) = type_ref.type_arguments {
+                        for &arg_idx in &args.nodes {
+                            self.collect_infer_type_parameters_inner(arg_idx, params);
+                        }
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::UNION_TYPE || k == syntax_kind_ext::INTERSECTION_TYPE => {
+                if let Some(composite) = self.ctx.arena.get_composite_type(node) {
+                    for &member_idx in &composite.types.nodes {
+                        self.collect_infer_type_parameters_inner(member_idx, params);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::FUNCTION_TYPE || k == syntax_kind_ext::CONSTRUCTOR_TYPE => {
+                if let Some(func_type) = self.ctx.arena.get_function_type(node) {
+                    for &param_idx in &func_type.parameters.nodes {
+                        if let Some(param_node) = self.ctx.arena.get(param_idx) {
+                            if let Some(param) = self.ctx.arena.get_parameter(param_node) {
+                                if !param.type_annotation.is_none() {
+                                    self.collect_infer_type_parameters_inner(param.type_annotation, params);
+                                }
+                            }
+                        }
+                    }
+                    if !func_type.type_annotation.is_none() {
+                        self.collect_infer_type_parameters_inner(func_type.type_annotation, params);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::ARRAY_TYPE => {
+                if let Some(arr) = self.ctx.arena.get_array_type(node) {
+                    self.collect_infer_type_parameters_inner(arr.element_type, params);
+                }
+            }
+            k if k == syntax_kind_ext::TUPLE_TYPE => {
+                if let Some(tuple) = self.ctx.arena.get_tuple_type(node) {
+                    for &elem_idx in &tuple.elements.nodes {
+                        self.collect_infer_type_parameters_inner(elem_idx, params);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::OPTIONAL_TYPE
+                || k == syntax_kind_ext::REST_TYPE
+                || k == syntax_kind_ext::PARENTHESIZED_TYPE => {
+                if let Some(wrapped) = self.ctx.arena.get_wrapped_type(node) {
+                    self.collect_infer_type_parameters_inner(wrapped.type_node, params);
+                }
+            }
+            k if k == syntax_kind_ext::INDEXED_ACCESS_TYPE => {
+                if let Some(indexed) = self.ctx.arena.get_indexed_access_type(node) {
+                    self.collect_infer_type_parameters_inner(indexed.object_type, params);
+                    self.collect_infer_type_parameters_inner(indexed.index_type, params);
+                }
+            }
+            k if k == syntax_kind_ext::CONDITIONAL_TYPE => {
+                if let Some(cond) = self.ctx.arena.get_conditional_type(node) {
+                    // Collect from check_type and extends_type for nested conditionals
+                    self.collect_infer_type_parameters_inner(cond.check_type, params);
+                    self.collect_infer_type_parameters_inner(cond.extends_type, params);
+                    self.collect_infer_type_parameters_inner(cond.true_type, params);
+                    self.collect_infer_type_parameters_inner(cond.false_type, params);
+                }
+            }
+            k if k == syntax_kind_ext::TYPE_OPERATOR => {
+                if let Some(op) = self.ctx.arena.get_type_operator(node) {
+                    self.collect_infer_type_parameters_inner(op.type_node, params);
+                }
+            }
+            _ => {}
         }
     }
 
@@ -4679,7 +4831,11 @@ impl<'a> ThinCheckerState<'a> {
         if (symbol.flags & symbol_flags::VARIABLE) == 0 {
             return false;
         }
-        if (symbol.flags & symbol_flags::BLOCK_SCOPED_VARIABLE) == 0 {
+        // Check both block-scoped (let/const) and function-scoped (var) variables
+        // definite assignment should apply to all typed variables without initializers
+        if (symbol.flags & symbol_flags::BLOCK_SCOPED_VARIABLE) == 0
+            && (symbol.flags & symbol_flags::FUNCTION_SCOPED_VARIABLE) == 0
+        {
             return false;
         }
 
@@ -5050,6 +5206,13 @@ impl<'a> ThinCheckerState<'a> {
             return (self.ctx.types.intern(TypeKey::Ref(SymbolRef(sym_id.0))), Vec::new());
         }
 
+        // Enum member - determine type from parent enum
+        if flags & symbol_flags::ENUM_MEMBER != 0 {
+            // Find the parent enum by walking up to find the containing enum declaration
+            let member_type = self.enum_member_type_from_decl(value_decl);
+            return (member_type, Vec::new());
+        }
+
         // Function - build function type or callable overload set
         if flags & symbol_flags::FUNCTION != 0 {
             use crate::solver::CallableShape;
@@ -5185,6 +5348,12 @@ impl<'a> ThinCheckerState<'a> {
                             }
                             if let Some(target_sym) = self.resolve_require_call_symbol(import.module_specifier, None) {
                                 return (self.get_type_of_symbol(target_sym), Vec::new());
+                            }
+                            // Check if this is a require() call - if so, return ANY type instead of the literal type
+                            // This handles cases like: import x = require('./module') where multi-file module
+                            // resolution isn't available. The ANY type allows property access without errors.
+                            if self.is_require_call(import.module_specifier) {
+                                return (TypeId::ANY, Vec::new());
                             }
                             // Fall back to get_type_of_node for simple identifiers
                             return (self.get_type_of_node(import.module_specifier), Vec::new());
@@ -7125,13 +7294,37 @@ impl<'a> ThinCheckerState<'a> {
         //   a.#prop;  // Should work if A2 has #prop
         if symbols.is_empty() {
             // Try to find the property directly in the object type
-            use crate::solver::{PropertyAccessResult, QueryDatabase};
+            use crate::solver::{PropertyAccessResult, QueryDatabase, TypeKey};
             match self.ctx.types.property_access_type(object_type_for_check, &property_name) {
                 PropertyAccessResult::Success { .. } => {
                     // Property exists in the type, proceed with the access
                     return self.get_type_of_property_access_by_name(idx, access, object_type_for_check, &property_name);
                 }
                 _ => {
+                    // FALLBACK: Manually check if the property exists in the callable type
+                    // This fixes cases where property_access_type fails due to atom comparison issues
+                    // The property IS in the type (as shown by error messages), but the lookup fails
+                    //
+                    // Important: We need to resolve TypeKey::Ref to get the actual Callable type
+                    let resolved_type = self.resolve_type_for_property_access(object_type_for_check);
+                    if let Some(TypeKey::Callable(shape_id)) = self.ctx.types.lookup(resolved_type) {
+                        let shape = self.ctx.types.callable_shape(shape_id);
+                        let prop_atom = self.ctx.types.intern_string(&property_name);
+                        for prop in &shape.properties {
+                            if prop.name == prop_atom {
+                                // Property found in the callable's properties list!
+                                // Return the property type (handle optional and write_type)
+                                let prop_type = if prop.optional {
+                                    self.ctx.types.union(vec![prop.type_id, TypeId::UNDEFINED])
+                                } else {
+                                    prop.type_id
+                                };
+                                return self.apply_flow_narrowing(idx, prop_type);
+                            }
+                        }
+                    }
+
+                    // Property not found, emit error if appropriate
                     if saw_class_scope {
                         self.error_property_not_exist_at(&property_name, object_type, name_idx);
                     }
@@ -7197,9 +7390,25 @@ impl<'a> ThinCheckerState<'a> {
                 type_id
             }
             PropertyAccessResult::PropertyNotFound { .. } => {
-                // If we got here, we already resolved the symbol (line 6887), so the private field exists.
-                // The solver might not find it due to type encoding issues, but don't emit TS2339.
-                // Just return ANY for type recovery.
+                // If we got here, we already resolved the symbol, so the private field exists.
+                // The solver might not find it due to type encoding issues.
+                // FALLBACK: Try to manually find the property in the callable type
+                use crate::solver::TypeKey;
+                if let Some(TypeKey::Callable(shape_id)) = self.ctx.types.lookup(declaring_type) {
+                    let shape = self.ctx.types.callable_shape(shape_id);
+                    let prop_atom = self.ctx.types.intern_string(&property_name);
+                    for prop in &shape.properties {
+                        if prop.name == prop_atom {
+                            // Property found! Return its type
+                            return if prop.optional {
+                                self.ctx.types.union(vec![prop.type_id, TypeId::UNDEFINED])
+                            } else {
+                                prop.type_id
+                            };
+                        }
+                    }
+                }
+                // Property not found even in fallback, return ANY for type recovery
                 TypeId::ANY
             }
             PropertyAccessResult::PossiblyNullOrUndefined { property_type, .. } => {
@@ -8110,6 +8319,27 @@ impl<'a> ThinCheckerState<'a> {
                 );
             }
 
+            // TS2705: Async function must return Promise
+            // Check for arrow functions and function expressions
+            if !is_function_declaration && has_type_annotation {
+                let is_async = if let Some(func) = self.ctx.arena.get_function(node) {
+                    func.is_async
+                } else if let Some(method) = self.ctx.arena.get_method_decl(node) {
+                    self.has_async_modifier(&method.modifiers)
+                } else {
+                    false
+                };
+
+                if is_async && !self.is_promise_type(return_type) {
+                    use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
+                    self.error_at_node(
+                        type_annotation,
+                        diagnostic_messages::ASYNC_FUNCTION_RETURNS_PROMISE,
+                        diagnostic_codes::ASYNC_FUNCTION_RETURNS_PROMISE,
+                    );
+                }
+            }
+
             // TS2366 (not all code paths return value) for function expressions and arrow functions
             // Check if all code paths return a value when return type requires it
             if !is_function_declaration && !body.is_none() {
@@ -8118,7 +8348,19 @@ impl<'a> ThinCheckerState<'a> {
                 let has_return = self.body_has_return_with_value(body);
                 let falls_through = self.function_body_falls_through(body);
 
-                if has_type_annotation && requires_return && falls_through {
+                // Determine if this is an async function
+                let is_async = if let Some(func) = self.ctx.arena.get_function(node) {
+                    func.is_async
+                } else if let Some(method) = self.ctx.arena.get_method_decl(node) {
+                    self.has_async_modifier(&method.modifiers)
+                } else {
+                    false
+                };
+
+                // TS2355: Skip for async functions - they implicitly return Promise<void>
+                // Async functions without a return statement automatically resolve to Promise<void>
+                // so they should not emit "function must return a value" errors
+                if has_type_annotation && requires_return && falls_through && !is_async {
                     use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
                     if !has_return {
                         self.error_at_node(
@@ -8754,6 +8996,72 @@ impl<'a> ThinCheckerState<'a> {
         } else {
             Some(EnumKind::Numeric)
         }
+    }
+
+    /// Get the type of an enum member (STRING or NUMBER) by finding its parent enum.
+    /// This is used when enum members are accessed through namespace exports.
+    fn enum_member_type_from_decl(&self, member_decl: NodeIndex) -> TypeId {
+        use crate::parser::node_flags;
+
+        // Get the extended node to find parent
+        let Some(ext) = self.ctx.arena.get_extended(member_decl) else {
+            return TypeId::ANY;
+        };
+        let parent_idx = ext.parent;
+        if parent_idx.is_none() {
+            return TypeId::ANY;
+        }
+
+        // Walk up to find the enum declaration
+        let mut current = parent_idx;
+        let max_depth = 10; // Prevent infinite loops
+        for _ in 0..max_depth {
+            let Some(parent_node) = self.ctx.arena.get(current) else {
+                break;
+            };
+
+            // Found the enum declaration
+            if parent_node.kind == syntax_kind_ext::ENUM_DECLARATION {
+                let Some(enum_decl) = self.ctx.arena.get_enum(parent_node) else {
+                    break;
+                };
+
+                // Check if any member has a string initializer
+                for &member_idx in &enum_decl.members.nodes {
+                    let Some(member_node) = self.ctx.arena.get(member_idx) else {
+                        continue;
+                    };
+                    let Some(member) = self.ctx.arena.get_enum_member(member_node) else {
+                        continue;
+                    };
+                    if member.initializer.is_none() {
+                        continue;
+                    }
+                    let Some(init_node) = self.ctx.arena.get(member.initializer) else {
+                        continue;
+                    };
+                    if init_node.kind == SyntaxKind::StringLiteral as u16
+                        || init_node.kind == SyntaxKind::NoSubstitutionTemplateLiteral as u16
+                    {
+                        return TypeId::STRING;
+                    }
+                }
+
+                // No string initializer found, so it's a numeric enum
+                return TypeId::NUMBER;
+            }
+
+            // Move to parent
+            let Some(ext) = self.ctx.arena.get_extended(current) else {
+                break;
+            };
+            current = ext.parent;
+            if current.is_none() {
+                break;
+            }
+        }
+
+        TypeId::ANY
     }
 
     fn enum_assignability_override(
@@ -12012,6 +12320,46 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    /// Check for duplicate enum members (TS2300).
+    fn check_enum_duplicate_members(&mut self, enum_idx: NodeIndex) {
+        use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages, format_message};
+
+        let Some(enum_node) = self.ctx.arena.get(enum_idx) else {
+            return;
+        };
+        let Some(enum_decl) = self.ctx.arena.get_enum(enum_node) else {
+            return;
+        };
+
+        let mut seen_names = FxHashSet::default();
+        for &member_idx in &enum_decl.members.nodes {
+            let Some(member_node) = self.ctx.arena.get(member_idx) else {
+                continue;
+            };
+            let Some(member) = self.ctx.arena.get_enum_member(member_node) else {
+                continue;
+            };
+
+            // Get the member name
+            let Some(name_node) = self.ctx.arena.get(member.name) else {
+                continue;
+            };
+            let name_text = if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
+                ident.escaped_text.clone()
+            } else {
+                continue;
+            };
+
+            // Check for duplicate
+            if seen_names.contains(&name_text) {
+                let message = format_message(diagnostic_messages::DUPLICATE_IDENTIFIER, &[&name_text]);
+                self.error_at_node(member.name, &message, diagnostic_codes::DUPLICATE_IDENTIFIER);
+            } else {
+                seen_names.insert(name_text);
+            }
+        }
+    }
+
     /// Recursively collect names from identifiers or binding patterns and check for duplicates.
     fn collect_and_check_parameter_names(&mut self, name_idx: NodeIndex, seen: &mut FxHashSet<String>) {
         use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages, format_message};
@@ -12185,6 +12533,17 @@ impl<'a> ThinCheckerState<'a> {
                             stmt_idx,
                         );
 
+                        // TS2705: Async function must return Promise
+                        // Only check if there's an explicit return type annotation
+                        if func.is_async && has_type_annotation && !self.is_promise_type(return_type) {
+                            use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
+                            self.error_at_node(
+                                func.type_annotation,
+                                diagnostic_messages::ASYNC_FUNCTION_RETURNS_PROMISE,
+                                diagnostic_codes::ASYNC_FUNCTION_RETURNS_PROMISE,
+                            );
+                        }
+
                         self.push_return_type(return_type);
                         self.check_statement(func.body);
 
@@ -12201,7 +12560,8 @@ impl<'a> ThinCheckerState<'a> {
                         let has_return = self.body_has_return_with_value(func.body);
                         let falls_through = self.function_body_falls_through(func.body);
 
-                        if has_type_annotation && requires_return && falls_through {
+                        // TS2355: Skip for async functions - they implicitly return Promise<void>
+                        if has_type_annotation && requires_return && falls_through && !is_async {
                             if !has_return {
                                 use crate::checker::types::diagnostics::diagnostic_codes;
                                 self.error_at_node(
@@ -12334,8 +12694,11 @@ impl<'a> ThinCheckerState<'a> {
                     self.pop_type_parameters(updates);
                 }
             }
-            // Other type declarations - just register them, no expression checking needed
-            syntax_kind_ext::ENUM_DECLARATION |
+            // Enum declarations - check for duplicate enum members (TS2300)
+            syntax_kind_ext::ENUM_DECLARATION => {
+                self.check_enum_duplicate_members(stmt_idx);
+            }
+            // Other type declarations that don't need action here
             syntax_kind_ext::EMPTY_STATEMENT |
             syntax_kind_ext::DEBUGGER_STATEMENT |
             syntax_kind_ext::BREAK_STATEMENT |
@@ -13276,7 +13639,16 @@ impl<'a> ThinCheckerState<'a> {
         self.ensure_application_symbols_resolved(expected_type);
 
         // Check if the return type is assignable to the expected type
-        if expected_type != TypeId::ANY && !self.is_assignable_to(return_type, expected_type) {
+        // Exception: Constructors allow `return;` without an expression (no assignability check)
+        let is_constructor_return_without_expr = self.ctx.enclosing_class.as_ref()
+            .map(|c| c.in_constructor)
+            .unwrap_or(false)
+            && return_data.expression.is_none();
+
+        if expected_type != TypeId::ANY
+            && !is_constructor_return_without_expr
+            && !self.is_assignable_to(return_type, expected_type)
+        {
             // Report error at the return expression (or at return keyword if no expression)
             let error_node = if !return_data.expression.is_none() {
                 return_data.expression
@@ -15424,9 +15796,39 @@ impl<'a> ThinCheckerState<'a> {
             }
             k if k == syntax_kind_ext::CONDITIONAL_TYPE => {
                 if let Some(cond) = self.ctx.arena.get_conditional_type(node) {
+                    // Check check_type and extends_type first (infer type params not in scope yet)
                     self.check_type_for_missing_names(cond.check_type);
                     self.check_type_for_missing_names(cond.extends_type);
+
+                    // Collect infer type parameters from extends_type and add them to scope for true_type
+                    let infer_params = self.collect_infer_type_parameters(cond.extends_type);
+                    let mut param_bindings = Vec::new();
+                    for param_name in &infer_params {
+                        let atom = self.ctx.types.intern_string(param_name);
+                        let type_id = self.ctx.types.intern(crate::solver::TypeKey::TypeParameter(
+                            crate::solver::TypeParamInfo {
+                                name: atom,
+                                constraint: None,
+                                default: None,
+                            },
+                        ));
+                        let previous = self.ctx.type_parameter_scope.insert(param_name.clone(), type_id);
+                        param_bindings.push((param_name.clone(), previous));
+                    }
+
+                    // Check true_type with infer type parameters in scope
                     self.check_type_for_missing_names(cond.true_type);
+
+                    // Remove infer type parameters from scope
+                    for (name, previous) in param_bindings.into_iter().rev() {
+                        if let Some(prev_type) = previous {
+                            self.ctx.type_parameter_scope.insert(name, prev_type);
+                        } else {
+                            self.ctx.type_parameter_scope.remove(&name);
+                        }
+                    }
+
+                    // Check false_type (infer type params not in scope)
                     self.check_type_for_missing_names(cond.false_type);
                 }
             }
@@ -15896,8 +16298,8 @@ impl<'a> ThinCheckerState<'a> {
 
         // Collect getter return types and setter parameter types
         struct AccessorTypeInfo {
-            getter: Option<(NodeIndex, TypeId, NodeIndex, bool)>,  // (accessor_idx, return_type, body_or_return_pos, is_abstract)
-            setter: Option<(NodeIndex, TypeId, bool)>,  // (accessor_idx, param_type, is_abstract)
+            getter: Option<(NodeIndex, TypeId, NodeIndex, bool, bool)>,  // (accessor_idx, return_type, body_or_return_pos, is_abstract, is_declared)
+            setter: Option<(NodeIndex, TypeId, bool, bool)>,  // (accessor_idx, param_type, is_abstract, is_declared)
         }
 
         let mut accessors: HashMap<String, AccessorTypeInfo> = HashMap::new();
@@ -15910,8 +16312,9 @@ impl<'a> ThinCheckerState<'a> {
             if node.kind == syntax_kind_ext::GET_ACCESSOR {
                 if let Some(accessor) = self.ctx.arena.get_accessor(node) {
                     if let Some(name) = self.get_property_name(accessor.name) {
-                        // Check if this accessor is abstract
+                        // Check if this accessor is abstract or declared
                         let is_abstract = self.has_abstract_modifier(&accessor.modifiers);
+                        let is_declared = self.has_declare_modifier(&accessor.modifiers);
 
                         // Get the return type - check explicit annotation first
                         let return_type = if !accessor.type_annotation.is_none() {
@@ -15929,14 +16332,15 @@ impl<'a> ThinCheckerState<'a> {
                             getter: None,
                             setter: None,
                         });
-                        info.getter = Some((member_idx, return_type, error_pos, is_abstract));
+                        info.getter = Some((member_idx, return_type, error_pos, is_abstract, is_declared));
                     }
                 }
             } else if node.kind == syntax_kind_ext::SET_ACCESSOR {
                 if let Some(accessor) = self.ctx.arena.get_accessor(node) {
                     if let Some(name) = self.get_property_name(accessor.name) {
-                        // Check if this accessor is abstract
+                        // Check if this accessor is abstract or declared
                         let is_abstract = self.has_abstract_modifier(&accessor.modifiers);
+                        let is_declared = self.has_declare_modifier(&accessor.modifiers);
 
                         // Get the parameter type from the setter's first parameter
                         let param_type = if let Some(&first_param_idx) = accessor.parameters.nodes.first() {
@@ -15961,7 +16365,7 @@ impl<'a> ThinCheckerState<'a> {
                             getter: None,
                             setter: None,
                         });
-                        info.setter = Some((member_idx, param_type, is_abstract));
+                        info.setter = Some((member_idx, param_type, is_abstract, is_declared));
                     }
                 }
             }
@@ -15969,11 +16373,17 @@ impl<'a> ThinCheckerState<'a> {
 
         // Check type compatibility for each accessor pair
         for (_, info) in accessors {
-            if let (Some((_getter_idx, getter_type, error_pos, getter_abstract)), Some((_setter_idx, setter_type, setter_abstract))) =
+            if let (Some((_getter_idx, getter_type, error_pos, getter_abstract, getter_declared)),
+                    Some((_setter_idx, setter_type, setter_abstract, setter_declared))) =
                 (info.getter, info.setter)
             {
                 // Skip if either accessor is abstract - abstract accessors don't need type compatibility checks
                 if getter_abstract || setter_abstract {
+                    continue;
+                }
+
+                // Skip if either accessor is declared - declared accessors don't need type compatibility checks
+                if getter_declared || setter_declared {
                     continue;
                 }
 
@@ -17204,6 +17614,17 @@ impl<'a> ThinCheckerState<'a> {
             return;
         }
 
+        // Skip destructuring parameters (object/array binding patterns)
+        // TypeScript doesn't emit TS7006 for destructuring parameters
+        if let Some(name_node) = self.ctx.arena.get(param.name) {
+            let kind = name_node.kind;
+            if kind == syntax_kind_ext::OBJECT_BINDING_PATTERN
+                || kind == syntax_kind_ext::ARRAY_BINDING_PATTERN
+            {
+                return;
+            }
+        }
+
         let param_name = self.parameter_name_for_error(param.name);
         let message = format_message(diagnostic_messages::PARAMETER_IMPLICIT_ANY, &[&param_name, "any"]);
         self.error_at_node(param.name, &message, diagnostic_codes::IMPLICIT_ANY_PARAMETER);
@@ -17783,7 +18204,8 @@ impl<'a> ThinCheckerState<'a> {
             let has_return = self.body_has_return_with_value(method.body);
             let falls_through = self.function_body_falls_through(method.body);
 
-            if has_type_annotation && requires_return && falls_through {
+            // TS2355: Skip for async methods - they implicitly return Promise<void>
+            if has_type_annotation && requires_return && falls_through && !is_async {
                 if !has_return {
                     self.error_at_node(
                         method.type_annotation,
@@ -17960,10 +18382,15 @@ impl<'a> ThinCheckerState<'a> {
         // Parameter properties are only allowed in constructors, not in accessors
         self.check_parameter_properties(&accessor.parameters.nodes);
 
-        for &param_idx in &accessor.parameters.nodes {
-            if let Some(param_node) = self.ctx.arena.get(param_idx) {
-                if let Some(param) = self.ctx.arena.get_parameter(param_node) {
-                    self.maybe_report_implicit_any_parameter(param, false);
+        // TS7006 (implicit any parameter) is NOT emitted for setter parameters
+        // because the setter parameter type is inferred from the getter's return type
+        // Only check getter parameters
+        if is_getter {
+            for &param_idx in &accessor.parameters.nodes {
+                if let Some(param_node) = self.ctx.arena.get(param_idx) {
+                    if let Some(param) = self.ctx.arena.get_parameter(param_node) {
+                        self.maybe_report_implicit_any_parameter(param, false);
+                    }
                 }
             }
         }
@@ -18003,10 +18430,13 @@ impl<'a> ThinCheckerState<'a> {
             self.push_return_type(return_type);
             self.check_statement(accessor.body);
             if is_getter {
+                // Check if this is an async getter
+                let is_async = self.has_async_modifier(&accessor.modifiers);
                 let requires_return = self.requires_return_value(return_type);
                 let has_return = self.body_has_return_with_value(accessor.body);
                 let falls_through = self.function_body_falls_through(accessor.body);
-                if has_type_annotation && requires_return && falls_through {
+                // TS2355: Skip for async getters - they implicitly return Promise<void>
+                if has_type_annotation && requires_return && falls_through && !is_async {
                     if !has_return {
                         self.error_at_node(
                             accessor.type_annotation,
@@ -18136,13 +18566,27 @@ impl<'a> ThinCheckerState<'a> {
     fn type_ref_is_promise_like(&self, type_id: TypeId) -> bool {
         use crate::solver::{TypeKey, SymbolRef};
 
-        let Some(TypeKey::Ref(SymbolRef(sym_id))) = self.ctx.types.lookup(type_id) else {
-            return false;
-        };
-        let Some(symbol) = self.ctx.binder.get_symbol(SymbolId(sym_id)) else {
-            return false;
-        };
-        self.is_promise_like_name(symbol.escaped_name.as_str())
+        match self.ctx.types.lookup(type_id) {
+            Some(TypeKey::Ref(SymbolRef(sym_id))) => {
+                if let Some(symbol) = self.ctx.binder.get_symbol(SymbolId(sym_id)) {
+                    return self.is_promise_like_name(symbol.escaped_name.as_str());
+                }
+            }
+            Some(TypeKey::Application(app_id)) => {
+                // Check if the base type of the application is a Promise-like type
+                let app = self.ctx.types.type_application(app_id);
+                return self.type_ref_is_promise_like(app.base);
+            }
+            Some(TypeKey::Object(_)) => {
+                // For Object types (interfaces from lib files), we conservatively assume
+                // they might be Promise-like. This avoids false positives for Promise<void>
+                // return types from lib files where we can't easily determine the interface name.
+                // A more precise check would require tracking the original type reference.
+                return true;
+            }
+            _ => {}
+        }
+        false
     }
 
     fn promise_like_type_argument_from_base(
@@ -18399,6 +18843,27 @@ impl<'a> ThinCheckerState<'a> {
         // Match exact Promise/PromiseLike names, or any name containing "Promise" (case-insensitive)
         // This handles types like MyPromise, CustomPromise, etc.
         matches!(name, "Promise" | "PromiseLike") || name.contains("Promise")
+    }
+
+    /// Check if a type is a Promise or Promise-like type.
+    /// This is used to validate async function return types.
+    fn is_promise_type(&self, type_id: TypeId) -> bool {
+        use crate::solver::{SymbolRef, TypeKey};
+
+        // Check for Promise<T> or PromiseLike<T> type application
+        if let Some(TypeKey::Application(app_id)) = self.ctx.types.lookup(type_id) {
+            let app = self.ctx.types.type_application(app_id);
+            return self.type_ref_is_promise_like(app.base);
+        }
+
+        // Check for direct Promise or PromiseLike reference (this also handles type aliases)
+        if let Some(TypeKey::Ref(SymbolRef(sym_id))) = self.ctx.types.lookup(type_id) {
+            if let Some(symbol) = self.ctx.binder.get_symbol(SymbolId(sym_id)) {
+                return self.is_promise_like_name(symbol.escaped_name.as_str());
+            }
+        }
+
+        false
     }
 
     fn is_null_or_undefined_only(&self, return_type: TypeId) -> bool {

@@ -141,6 +141,8 @@ pub mod diagnostic_messages {
     pub const SWITCH_NOT_EXHAUSTIVE: &str = "Switch is not exhaustive. Did you forget to handle '{0}'?";
     pub const FUNCTION_LACKS_ENDING_RETURN_STATEMENT: &str =
         "Function lacks ending return statement and return type does not include 'undefined'.";
+    pub const ASYNC_FUNCTION_RETURNS_PROMISE: &str =
+        "Async function return type must be Promise.";
     pub const UNREACHABLE_CODE_DETECTED: &str = "Unreachable code detected.";
 
     // Generic/type parameter errors
@@ -249,6 +251,7 @@ pub mod diagnostic_codes {
     pub const NOT_ALL_CODE_PATHS_RETURN_VALUE: u32 = 2366;
     pub const FUNCTION_LACKS_RETURN_TYPE: u32 = 2355;
     pub const FUNCTION_RETURN_TYPE_MISMATCH: u32 = 2322;
+    pub const ASYNC_FUNCTION_RETURNS_PROMISE: u32 = 2705;  // Async function must return Promise
     pub const PARAMETER_PROPERTY_NOT_ALLOWED: u32 = 2369;  // A parameter property is only allowed in a constructor implementation.
 
     // Variable declaration errors
