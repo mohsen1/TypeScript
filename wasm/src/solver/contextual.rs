@@ -333,18 +333,68 @@ impl<'a> ContextualTypeContext<'a> {
         if index < params.len() {
             let param = &params[index];
             if param.rest {
-                // Rest parameter - extract element type from array
+                // Rest parameter - extract element type from array or tuple
                 if let Some(TypeKey::Array(elem)) = self.interner.lookup(param.type_id) {
                     return Some(elem);
+                }
+                // For rest parameter with union type (e.g., union of tuples), extract element at index from each member
+                if let Some(TypeKey::Union(members)) = self.interner.lookup(param.type_id) {
+                    let members = self.interner.type_list(members);
+                    let elem_types: Vec<TypeId> = members.iter()
+                        .filter_map(|&m| {
+                            let ctx = ContextualTypeContext::with_expected(self.interner, m);
+                            ctx.get_tuple_element_type(index)
+                        })
+                        .collect();
+                    if !elem_types.is_empty() {
+                        return Some(self.interner.union(elem_types));
+                    }
+                }
+                // For rest parameter with tuple type, extract the element at the given index
+                if let Some(TypeKey::Tuple(elements)) = self.interner.lookup(param.type_id) {
+                    let elements = self.interner.tuple_list(elements);
+                    // Find the tuple element at the given index
+                    if index < elements.len() {
+                        return Some(elements[index].type_id);
+                    } else if let Some(last_elem) = elements.last() {
+                        if last_elem.rest {
+                            return Some(last_elem.type_id);
+                        }
+                    }
                 }
             }
             Some(param.type_id)
         } else if let Some(last) = params.last() {
             // Index beyond params - check if last is rest
             if last.rest {
-                // Extract element type from array
+                // Extract element type from array or tuple
                 if let Some(TypeKey::Array(elem)) = self.interner.lookup(last.type_id) {
                     return Some(elem);
+                }
+                // For rest parameter with union type (e.g., union of tuples), extract element at index from each member
+                if let Some(TypeKey::Union(members)) = self.interner.lookup(last.type_id) {
+                    let members = self.interner.type_list(members);
+                    let elem_types: Vec<TypeId> = members.iter()
+                        .filter_map(|&m| {
+                            let ctx = ContextualTypeContext::with_expected(self.interner, m);
+                            ctx.get_tuple_element_type(index)
+                        })
+                        .collect();
+                    if !elem_types.is_empty() {
+                        return Some(self.interner.union(elem_types));
+                    }
+                }
+                // For rest parameter with tuple type, extract the element at the given index
+                if let Some(TypeKey::Tuple(elements)) = self.interner.lookup(last.type_id) {
+                    let elements = self.interner.tuple_list(elements);
+                    // Find the tuple element at the given index
+                    if index < elements.len() {
+                        return Some(elements[index].type_id);
+                    } else if let Some(last_elem) = elements.last() {
+                        if last_elem.rest {
+                            return Some(last_elem.type_id);
+                        }
+                    }
                 }
             }
             None
