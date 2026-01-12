@@ -1175,6 +1175,36 @@ impl<'a> ThinCheckerState<'a> {
         Some(sym_id)
     }
 
+    /// Check if a node is a `require()` call expression.
+    /// This is used to detect import equals declarations like `import x = require('./module')`
+    /// where we want to return ANY type instead of the literal string type.
+    fn is_require_call(&self, idx: NodeIndex) -> bool {
+        let node = match self.ctx.arena.get(idx) {
+            Some(n) => n,
+            None => return false,
+        };
+        if node.kind != syntax_kind_ext::CALL_EXPRESSION {
+            return false;
+        }
+
+        let call = match self.ctx.arena.get_call_expr(node) {
+            Some(c) => c,
+            None => return false,
+        };
+
+        let callee_node = match self.ctx.arena.get(call.expression) {
+            Some(n) => n,
+            None => return false,
+        };
+
+        let callee_ident = match self.ctx.arena.get_identifier(callee_node) {
+            Some(ident) => ident,
+            None => return false,
+        };
+
+        callee_ident.escaped_text == "require"
+    }
+
     fn missing_type_query_left(&self, idx: NodeIndex) -> Option<NodeIndex> {
         let mut current = idx;
         loop {
@@ -2606,7 +2636,7 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         // Second pass: Now resolve constraints and defaults with all type parameters in scope
-        for &param_idx in &param_indices {
+        for (idx, &param_idx) in param_indices.iter().enumerate() {
             let Some(node) = self.ctx.arena.get(param_idx) else { continue };
             let Some(data) = self.ctx.arena.get_type_parameter(node) else { continue };
 
@@ -2633,7 +2663,13 @@ impl<'a> ThinCheckerState<'a> {
                 constraint,
                 default,
             };
-            params.push(info);
+            params.push(info.clone());
+
+            // UPDATE: Create a new TypeParameter with constraints and update the scope
+            // This ensures that when function parameters reference these type parameters,
+            // they get the constrained version, not the unconstrained placeholder
+            let constrained_type_id = self.ctx.types.intern(TypeKey::TypeParameter(info));
+            self.ctx.type_parameter_scope.insert(name.clone(), constrained_type_id);
         }
 
         (params, updates)
@@ -5309,12 +5345,11 @@ impl<'a> ThinCheckerState<'a> {
                             if let Some(target_sym) = self.resolve_require_call_symbol(import.module_specifier, None) {
                                 return (self.get_type_of_symbol(target_sym), Vec::new());
                             }
-                            // Check if module_specifier is a StringLiteral (require() call)
-                            // If so, return ANY type instead of string type
-                            if let Some(ms_node) = self.ctx.arena.get(import.module_specifier) {
-                                if ms_node.kind == SyntaxKind::StringLiteral as u16 {
-                                    return (TypeId::ANY, Vec::new());
-                                }
+                            // Check if this is a require() call - if so, return ANY type instead of the literal type
+                            // This handles cases like: import x = require('./module') where multi-file module
+                            // resolution isn't available. The ANY type allows property access without errors.
+                            if self.is_require_call(import.module_specifier) {
+                                return (TypeId::ANY, Vec::new());
                             }
                             // Fall back to get_type_of_node for simple identifiers
                             return (self.get_type_of_node(import.module_specifier), Vec::new());
