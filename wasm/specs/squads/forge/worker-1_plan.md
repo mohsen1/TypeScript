@@ -10,20 +10,40 @@ Priority: P1 (HIGH)
 **Fix TS2339 False Positives: Property does not exist (35 extra errors)**
 
 ### Background
-TypeScript is emitting TS2339 "Property does not exist" errors too aggressively (35 extra errors). This is likely a type narrowing issue where valid property accesses are incorrectly flagged.
+TypeScript is emitting TS2339 "Property does not exist" errors too aggressively. Investigation revealed two main issues:
 
-### Success Criteria
-- Don't emit TS2339 for valid property accesses on narrowed types
-- Only emit TS2339 when property truly doesn't exist on type
-- Fix type narrowing in property access expressions
+1. **Private static members** - After WASM rebuild, private static members ARE being added to class constructor types (type correctly shows `#field: number`), but property lookup fails in destructuring contexts.
+
+2. **Mixin classes** - Instance types missing base class properties (not yet investigated).
+
+### Investigation Findings
+
+#### Private Static Members
+- Private static members ARE collected in `get_class_constructor_type()` (lines 4136-4176)
+- The type correctly shows the property: `{ new (): { ... }; #field: number; ... }`
+- **Root Issue**: Property access resolution fails even though property exists in type
+- The atom comparison `prop.name == prop_atom` in solver fails
+- Occurs in destructuring assignment contexts: `({ x: A.#field, y } = ...)`
+
+#### Key Code Locations
+- `src/thin_checker.rs:4038-4470` - `get_class_constructor_type()` collects static members
+- `src/thin_checker.rs:8458-8504` - `get_property_name()` handles private identifiers
+- `src/solver/operations.rs:1784-1803` - Callable property access lookup
+- `src/solver/db.rs:248-254` - `property_access_type()` entry point
 
 ### Implementation Steps
-1. [ ] Sync from origin/rust: `git fetch origin && git merge origin/rust --no-edit`
-2. [ ] Search for TS2339 emission code in `src/thin_checker.rs`
-3. [ ] Investigate type narrowing logic for property access
-4. [ ] Fix cases where valid properties are incorrectly flagged
-5. [ ] Test with various property access patterns
-6. [ ] Run conformance to verify reduction in extra errors
+1. [x] Sync from origin/rust
+2. [x] Search for TS2339 emission code in `src/thin_checker.rs`
+3. [x] Investigate type narrowing logic for property access
+4. [x] Identify root cause: property lookup fails despite property existing in type
+5. [ ] Fix atom comparison issue in property access resolution
+6. [ ] Test with various property access patterns
+7. [ ] Run conformance to verify reduction in extra errors
+
+### Remaining Work
+- Fix property lookup for private members in destructuring contexts
+- Investigate mixin class instance types
+- Verify no regressions in existing tests
 
 ### Key Code Locations
 - `src/thin_checker.rs` - property access checking, TS2339 emission
