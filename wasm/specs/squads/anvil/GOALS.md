@@ -85,8 +85,9 @@ Check if these are causing conformance failures:
 - Use `./scripts/ask-gemini.mjs --review` for code review
 
 ## Squad Status
-- Last EM Report: Session starting
-- Workers Active: 0/5
-- Branches Pending Merge: None
-- Current Focus: ES5 private accessors + emitter edge cases
+- Last EM Report: 2025-01-12 (Session start)
+- Workers Active: 5/5
+- Branches Pending Merge: worker/anvil-5 (ready for review)
+- Current Focus: ES5 private accessors, catch clause emission, import equals
 - Blockers: None
+- EM Actions: Fixed private identifier in `in` operator narrowing (control_flow.rs), pushed to em/anvil
