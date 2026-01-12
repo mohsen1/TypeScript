@@ -2,7 +2,7 @@
 
 use crate::solver::subtype::{NoopResolver, SubtypeChecker, SubtypeFailureReason, TypeResolver};
 use crate::solver::types::{PropertyInfo, TypeId, TypeKey};
-use crate::solver::{AssignabilityChecker, TypeDatabase};
+use crate::solver::{AnyPropagationRules, AssignabilityChecker, TypeDatabase};
 use rustc_hash::FxHashMap;
 
 #[cfg(test)]
@@ -10,9 +10,14 @@ use crate::solver::TypeInterner;
 
 /// Compatibility checker that applies TypeScript's unsound rules
 /// before delegating to the structural subtype engine.
+///
+/// This layer integrates with the "Lawyer" layer to apply nuanced rules
+/// for `any` propagation.
 pub struct CompatChecker<'a, R: TypeResolver = NoopResolver> {
     interner: &'a dyn TypeDatabase,
     subtype: SubtypeChecker<'a, R>,
+    /// The "Lawyer" layer - handles nuanced rules for `any` propagation.
+    lawyer: AnyPropagationRules,
     strict_function_types: bool,
     strict_null_checks: bool,
     no_unchecked_indexed_access: bool,
@@ -26,6 +31,7 @@ impl<'a> CompatChecker<'a, NoopResolver> {
         CompatChecker {
             interner,
             subtype: SubtypeChecker::new(interner),
+            lawyer: AnyPropagationRules::new(),
             strict_function_types: false,
             strict_null_checks: true,
             no_unchecked_indexed_access: false,
@@ -41,6 +47,7 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
         CompatChecker {
             interner,
             subtype: SubtypeChecker::with_resolver(interner, resolver),
+            lawyer: AnyPropagationRules::new(),
             strict_function_types: false,
             strict_null_checks: true,
             no_unchecked_indexed_access: false,
@@ -81,6 +88,27 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
             self.exact_optional_property_types = exact;
             self.cache.clear();
         }
+    }
+
+    /// Configure strict mode for `any` propagation.
+    ///
+    /// When strict mode is enabled, `any` does NOT silence structural mismatches.
+    /// This means the type checker will still report errors even when `any` is involved,
+    /// if there's a real structural mismatch.
+    pub fn set_strict_any_propagation(&mut self, strict: bool) {
+        self.lawyer.set_allow_any_suppression(!strict);
+        self.cache.clear();
+    }
+
+    /// Get a reference to the lawyer layer for `any` propagation rules.
+    pub fn lawyer(&self) -> &AnyPropagationRules {
+        &self.lawyer
+    }
+
+    /// Get a mutable reference to the lawyer layer for `any` propagation rules.
+    pub fn lawyer_mut(&mut self) -> &mut AnyPropagationRules {
+        self.cache.clear();
+        &mut self.lawyer
     }
 
     /// Check if `source` is assignable to `target` using TS compatibility rules.
