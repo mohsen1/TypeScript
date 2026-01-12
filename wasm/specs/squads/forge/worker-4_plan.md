@@ -1,45 +1,59 @@
 # Worker 4 Plan - Squad Forge
 
 ## Mission
-Fix Element Access with Literal Keys
+Help W2 Fix Namespace Merging (P1 Priority)
 
-Status: ✅ MERGED to squad/forge
+Status: Active
 Priority: P1 (High)
 
-## Completed
-✅ **Element Access Type Resolution** - Merged to squad/forge
-
-### Implementation Summary
-- Fixed definite assignment check to skip variables with literal types
-- Fixed definite assignment check to skip variables whose types include `undefined`
-- Added helper functions: `symbol_has_literal_type`, `is_union_of_literals_including_undefined`
-- Updated `should_check_definite_assignment` to check for literal/undefined union types
-
-### Test Results (3/3 passing)
-1. `test_checker_lowers_element_access_literal_key_type` - PASSED
-2. `test_checker_lowers_element_access_literal_key_union` - PASSED
-3. `test_flow_narrowing_applies_for_computed_element_access_literal_key` - PASSED
-
-### Commit
-- `b54ef14d40` - [wasm] checker: Skip definite assignment check for literal types and undefined unions
-- Pushed to `origin/worker/forge-4`
-- Merged to `squad/forge`
-
 ## Current Assignment
-None - Ready for next task assignment from EM
+**Collaborate with W2 to fix namespace merging test failures**
+
+### Background
+W2 has implemented namespace+class merging in the binder, but 2 tests are failing with TypeId mismatches. This is a high-priority collaborative task to get namespace merging working.
+
+### Test Failures (from W2)
+1. ❌ `test_checker_namespace_merges_across_decls_value_access` - TypeId mismatch (4 vs 9)
+2. ❌ `test_checker_namespace_merges_with_class_element_access` - TypeId mismatch (111 vs 9)
+
+### What W2 Implemented
+- ✅ Updated `can_merge_flags()` to allow MODULE + CLASS merging
+- ✅ Updated `bind_class_declaration()` to populate `symbol.exports` with static members
+- ✅ Updated `bind_module_declaration()` to merge exported members
+- ✅ Updated `bind_enum_declaration()` to add enum members to exports
+
+### Debugging Approach
+The exports are being populated but type resolution returns wrong TypeIds. Investigate:
+1. **Symbol exports combination**: Are exports correctly merged when namespace merges with class?
+2. **Checker lookup**: Does `get_type_of_symbol` correctly resolve merged symbols?
+3. **TypeId consistency**: Do TypeIds match between declaration and access?
+
+### Implementation Steps
+1. [ ] Coordinate with W2 - don't duplicate work
+2. [ ] Read the failing tests to understand expected vs actual behavior
+3. [ ] Add debug logging to trace symbol export resolution
+4. [ ] Check if the checker is looking up the right symbol after merge
+5. [ ] Fix the type resolution issue
+6. [ ] Test: `./wasm/test.sh namespace_merges 2>&1 | grep -E "FAIL|PASS"`
+
+### Key Code Locations
+- `src/binder.rs` - `can_merge_flags()`, `bind_class_declaration()`, `bind_module_declaration()`
+- `src/thin_binder.rs` - enum export population
+- `src/thin_checker.rs` - symbol resolution and type access
 
 ## Task Queue
-- Await EM direction for next priority task
+- [ ] After namespace merging: other element access issues
 
 ## Completed
-- [x] Fix Element Access Type Resolution - All tests pass, merged to squad/forge
+- [x] Fix Element Access Literal Keys - Merged to squad/forge
 
 ## Ready for Merge
-No - Already merged
+No
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
 - Use Docker for Rust tests: `./wasm/test.sh`
-- Commit format: `[wasm] <component>: <description>`
+- Commit format: `[wasm] checker/binder: Fix namespace+class merge type resolution`
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/forge-4`
+- **IMPORTANT**: Coordinate with W2 - this is collaborative work

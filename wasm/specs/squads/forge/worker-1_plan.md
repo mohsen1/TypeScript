@@ -1,47 +1,69 @@
 # Worker 1 Plan - Squad Forge
 
 ## Mission
-Fix Method Bivariance in the solver - QUICK WIN task
+Fix TS2454: Variable Used Before Assignment
 
-Status: ✅ MERGED to squad/forge
-Priority: P0 (Highest)
-
-## Completed
-✅ **Method Bivariance Implementation** - Merged to squad/forge
-
-### Implementation Summary
-1. [x] Added `is_method: bool` field to `FunctionShape` in `src/solver/types.rs`
-2. [x] Updated `lower_method_signature` in `src/solver/lower.rs` to set `is_method: true`
-3. [x] Updated solver logic in `src/solver/subtype.rs` to apply bivariance for methods
-4. [x] Updated all `FunctionShape` constructions across the codebase
-5. [x] All 4 method bivariance tests now pass
-
-### Test Results (4/4 passing)
-- `test_method_bivariance_wider_argument` - PASSED (bivariance allows unsafe direction)
-- `test_method_bivariance_narrower_argument` - PASSED (bivariance allows both directions)
-- `test_method_bivariance_event_handler_pattern` - PASSED
-- `test_method_bivariance_even_strict` - PASSED (methods bivariant even with strictFunctionTypes)
-
-### Commit
-- `79a29f026d` - [wasm] solver: Implement method bivariance for strict function types
-- Pushed to `origin/worker/forge-1`
-- Merged to `squad/forge`
+Status: Active
+Priority: P1 (High)
 
 ## Current Assignment
-None - Ready for next task assignment from EM
+**Implement TS2454 Error: Variable used before assignment (43 occurrences)**
+
+### Background
+TypeScript should emit TS2454 error when a variable is used before it's definitely assigned. The definite assignment analysis needs to identify these cases and report errors.
+
+### Success Criteria
+- Emit TS2454 for variables used before definite assignment
+- Handle all variable declaration contexts (let, const, var)
+- Account for control flow branches and early returns
+- Don't emit false positives (variables that are definitely assigned)
+
+### Implementation Steps
+1. [ ] Read existing definite assignment code in `src/thin_checker.rs`
+2. [ ] Find where variables are checked for usage before assignment
+3. [ ] Implement check: if variable used before any assignment, emit TS2454
+4. [ ] Test with cases that should emit TS2454
+5. [ ] Ensure no false positives for definitely-assigned variables
+
+### Key Code Locations
+- `src/thin_checker.rs` - definite assignment analysis, `should_check_definite_assignment`
+- `src/checker/control_flow.rs` - flow analysis for definite assignment
+
+### Test Cases to Implement
+```typescript
+// Should emit TS2454
+let x;
+console.log(x); // Error: 'x' used before assignment
+
+// Should NOT emit (assigned in all paths)
+let y;
+if (condition) {
+  y = 1;
+} else {
+  y = 2;
+}
+console.log(y); // OK
+
+// Should emit TS2454 (not all paths assign)
+let z;
+if (condition) {
+  z = 1;
+}
+console.log(z); // Error: 'z' might not be assigned
+```
 
 ## Task Queue
-- Await EM direction for next priority task
+- [ ] After TS2454: coordinate with W4 on other definite assignment issues
 
 ## Completed
-- [x] Fix Method Bivariance - All tests pass, merged to squad/forge
+- [x] Fix Method Bivariance - Merged to squad/forge
 
 ## Ready for Merge
-No - Already merged
+No
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
 - Use Docker for Rust tests: `./wasm/test.sh`
-- Commit format: `[wasm] <component>: <description>`
+- Commit format: `[wasm] checker: Implement TS2454 definite assignment errors`
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/forge-1`
