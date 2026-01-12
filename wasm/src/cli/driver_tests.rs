@@ -2118,6 +2118,13 @@ fn invalidate_paths_with_dependents_symbols_handles_import_equals() {
     let args = default_args();
 
     let result = compile_with_cache(&args, base, &mut cache).expect("compile should succeed");
+    if !result.diagnostics.is_empty() {
+        eprintln!("\n=== DIAGNOSTICS FOUND ===");
+        for diag in &result.diagnostics {
+            eprintln!("  TS{}: {} (at {}:{})", diag.code, diag.message_text, diag.file, diag.start);
+        }
+        eprintln!("=========================\n");
+    }
     assert!(result.diagnostics.is_empty());
     assert_eq!(cache.len(), 2);
 
