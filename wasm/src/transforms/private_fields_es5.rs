@@ -42,6 +42,25 @@ pub struct PrivateFieldInfo {
     pub is_static: bool,
 }
 
+/// Information about a private accessor (get/set) in a class
+#[derive(Debug, Clone)]
+pub struct PrivateAccessorInfo {
+    /// The private accessor name without # (e.g., "value" for "#value")
+    pub name: String,
+    /// The WeakMap variable name for the getter (e.g., "_C_value_get")
+    pub get_var_name: Option<String>,
+    /// The WeakMap variable name for the setter (e.g., "_C_value_set")
+    pub set_var_name: Option<String>,
+    /// The node index of the getter body (if any)
+    pub getter_body: Option<NodeIndex>,
+    /// The node index of the setter body (if any)
+    pub setter_body: Option<NodeIndex>,
+    /// The node index of the setter parameter (if any)
+    pub setter_param: Option<NodeIndex>,
+    /// Whether this is a static private accessor
+    pub is_static: bool,
+}
+
 /// State for tracking private fields during class transformation
 #[derive(Debug, Default)]
 pub struct PrivateFieldState {
@@ -211,6 +230,82 @@ fn has_static_modifier(arena: &ThinNodeArena, modifiers: &Option<NodeList>) -> b
         }
     }
     false
+}
+
+/// Collect private accessors from a class
+pub fn collect_private_accessors(
+    arena: &ThinNodeArena,
+    class_idx: NodeIndex,
+    class_name: &str,
+) -> Vec<PrivateAccessorInfo> {
+    let mut accessors: std::collections::HashMap<String, PrivateAccessorInfo> = std::collections::HashMap::new();
+
+    let Some(class_node) = arena.get(class_idx) else {
+        return Vec::new();
+    };
+    let Some(class_data) = arena.get_class(class_node) else {
+        return Vec::new();
+    };
+
+    for &member_idx in &class_data.members.nodes {
+        let Some(member_node) = arena.get(member_idx) else {
+            continue;
+        };
+
+        // Check for both GET_ACCESSOR and SET_ACCESSOR
+        if member_node.kind == syntax_kind_ext::GET_ACCESSOR
+            || member_node.kind == syntax_kind_ext::SET_ACCESSOR
+        {
+            let Some(accessor_data) = arena.get_accessor(member_node) else {
+                continue;
+            };
+
+            // Check if this is a private accessor (name is a private identifier)
+            if !is_private_identifier(arena, accessor_data.name) {
+                continue;
+            }
+
+            let field_name = get_private_field_name(arena, accessor_data.name)
+                .unwrap_or_default();
+            let clean_name = field_name.strip_prefix('#').unwrap_or(&field_name);
+            let is_static = has_static_modifier(arena, &accessor_data.modifiers);
+
+            // Get or create the accessor info for this name
+            let entry = accessors
+                .entry(clean_name.to_string())
+                .or_insert_with(|| PrivateAccessorInfo {
+                    name: clean_name.to_string(),
+                    get_var_name: Some(format!("_{}_{}_get", class_name, clean_name)),
+                    set_var_name: Some(format!("_{}_{}_set", class_name, clean_name)),
+                    getter_body: None,
+                    setter_body: None,
+                    setter_param: None,
+                    is_static,
+                });
+
+            // Update based on accessor type
+            if member_node.kind == syntax_kind_ext::GET_ACCESSOR {
+                if !accessor_data.body.is_none() {
+                    entry.getter_body = Some(accessor_data.body);
+                }
+            } else if member_node.kind == syntax_kind_ext::SET_ACCESSOR {
+                if !accessor_data.body.is_none() {
+                    entry.setter_body = Some(accessor_data.body);
+                }
+                // Get the first parameter from the setter
+                let params = &accessor_data.parameters;
+                if let Some(first_param) = params.nodes.first() {
+                    entry.setter_param = Some(*first_param);
+                }
+            }
+        }
+    }
+
+    // Convert to Vec, filtering out entries that have neither getter nor setter
+    accessors
+        .into_values()
+        .filter(|a| a.getter_body.is_some() || a.setter_body.is_some())
+        .collect()
 }
 
 /// Generate the WeakMap variable declaration line
