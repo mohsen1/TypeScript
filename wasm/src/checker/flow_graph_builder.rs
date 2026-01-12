@@ -553,14 +553,18 @@ impl<'a> FlowGraphBuilder<'a> {
         });
 
         // Bind case block
-        if let Some(case_block) = self.arena.get_case_block(switch_data.case_block) {
+        if let Some(case_block_node) = self.arena.get(switch_data.case_block) {
+            let Some(case_block) = self.arena.get_block(case_block_node) else {
+                self.flow_stack.pop();
+                self.current_flow = end_label;
+                return;
+            };
             let mut fallthrough_flow = FlowNodeId::NONE;
 
-            for &clause_idx in &case_block.clauses.nodes {
+            for &clause_idx in &case_block.statements.nodes {
                 if clause_idx.is_none() {
                     continue;
                 }
-
                 let Some(clause_node) = self.arena.get(clause_idx) else {
                     continue;
                 };
@@ -593,11 +597,11 @@ impl<'a> FlowGraphBuilder<'a> {
                     }
 
                     syntax_kind_ext::DEFAULT_CLAUSE => {
-                        if let Some(clause) = self.arena.get_default_clause(clause_node) {
+                        if let Some(clause) = self.arena.get_case_clause(clause_node) {
                             let clause_flow = self.create_switch_clause_flow(
                                 pre_switch_flow,
                                 fallthrough_flow,
-                                clause_idx, // No expression for default
+                                NodeIndex::NONE, // No expression for default
                             );
                             self.current_flow = clause_flow;
 
@@ -634,7 +638,8 @@ impl<'a> FlowGraphBuilder<'a> {
 
         // Bind catch clause if present
         if !try_data.catch_clause.is_none() {
-            if let Some(catch) = self.arena.get_catch_clause(try_data.catch_clause) {
+            if let Some(catch_node) = self.arena.get(try_data.catch_clause) {
+                if let Some(catch) = self.arena.get_catch_clause(catch_node) {
                 // Reset flow - catch can be entered from any point in try
                 self.current_flow = pre_try_flow;
 
@@ -646,6 +651,7 @@ impl<'a> FlowGraphBuilder<'a> {
                 // Bind catch block
                 self.build_statement(catch.block);
                 self.add_antecedent(end_label, self.current_flow);
+                }
             }
         }
 

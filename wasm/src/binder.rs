@@ -465,7 +465,7 @@ impl FlowNode {
 }
 
 /// Arena for flow nodes.
-#[derive(Debug, Default, Serialize)]
+#[derive(Clone, Debug, Default, Serialize)]
 pub struct FlowNodeArena {
     nodes: Vec<FlowNode>,
 }
