@@ -3268,6 +3268,15 @@ pub(crate) fn apply_cli_overrides(options: &mut ResolvedCompilerOptions, args: &
     if args.source_map {
         options.source_map = true;
     }
+    if let Some(out_file) = args.out_file.as_ref() {
+        options.out_file = Some(out_file.clone());
+    }
+    if let Some(ts_build_info_file) = args.ts_build_info_file.as_ref() {
+        options.ts_build_info_file = Some(ts_build_info_file.clone());
+    }
+    if args.incremental {
+        options.incremental = true;
+    }
     if args.strict {
         options.checker.strict = true;
     }
