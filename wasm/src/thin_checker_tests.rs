@@ -18671,3 +18671,46 @@ class MyClass {
         "Expected 0 TS2366 errors for function overloads, got: {:?}", codes);
 }
 
+/// Test TS2705: Async function must return Promise
+#[test]
+fn test_async_function_returns_promise() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+interface Promise<T> {}
+
+// Should emit TS2705 for these
+async function foo(): number { return 42; }
+async function bar(): string { return "hello"; }
+
+const baz = async (): boolean => false;
+
+class Qux {
+    async method(): void { console.log("test"); }
+}
+
+// Should NOT emit TS2705 for these
+async function qux(): Promise<number> { return 42; }
+async function quux() { return "hello"; }
+async function corge(): Promise<void> { console.log("test"); }
+
+const arrowPromise = async (): Promise<string> => "test";
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+
+    // Should have 4 TS2705 errors for foo, bar, baz, and Qux.method
+    assert_eq!(codes.iter().filter(|&&c| c == 2705).count(), 4,
+        "Expected 4 TS2705 errors for async functions with non-Promise return types, got: {:?}", codes);
+}

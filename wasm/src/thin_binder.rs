@@ -2285,23 +2285,45 @@ impl ThinBinderState {
                 // Check if exported BEFORE allocating symbol
                 let is_exported = self.has_export_modifier(arena, &enum_decl.modifiers);
 
-                self.declare_symbol(name, symbol_flags::REGULAR_ENUM, idx, is_exported);
-            }
+                let enum_sym_id = self.declare_symbol(name, symbol_flags::REGULAR_ENUM, idx, is_exported);
 
-            // Bind enum members
-            self.enter_scope(ContainerKind::Block, idx);
-            for &member_idx in &enum_decl.members.nodes {
-                if let Some(member_node) = arena.get(member_idx) {
-                    if let Some(member) = arena.get_enum_member(member_node) {
-                        if let Some(member_name) = self.get_identifier_name(arena, member.name) {
-                            let sym_id = self.symbols.alloc(symbol_flags::ENUM_MEMBER, member_name.to_string());
-                            self.current_scope.set(member_name.to_string(), sym_id);
-                            self.node_symbols.insert(member_idx.0, sym_id);
+                // Get existing exports (for namespace merging)
+                let mut exports = SymbolTable::new();
+                if let Some(enum_symbol) = self.symbols.get(enum_sym_id) {
+                    if let Some(ref existing_exports) = enum_symbol.exports {
+                        exports = (**existing_exports).clone();
+                    }
+                }
+
+                // Bind enum members and add them to exports
+                // This allows enum members to be accessed as Enum.MemberName
+                // and enables enum + namespace merging
+                self.enter_scope(ContainerKind::Block, idx);
+                for &member_idx in &enum_decl.members.nodes {
+                    if let Some(member_node) = arena.get(member_idx) {
+                        if let Some(member) = arena.get_enum_member(member_node) {
+                            if let Some(member_name) = self.get_identifier_name(arena, member.name) {
+                                let sym_id = self.symbols.alloc(symbol_flags::ENUM_MEMBER, member_name.to_string());
+                                // Set value_declaration for enum members so the checker can find the parent enum
+                                if let Some(sym) = self.symbols.get_mut(sym_id) {
+                                    sym.value_declaration = member_idx;
+                                    sym.declarations.push(member_idx);
+                                }
+                                self.current_scope.set(member_name.to_string(), sym_id);
+                                self.node_symbols.insert(member_idx.0, sym_id);
+                                // Add to exports for namespace merging
+                                exports.set(member_name.to_string(), sym_id);
+                            }
                         }
                     }
                 }
+                self.exit_scope(arena);
+
+                // Update the enum's exports with members
+                if let Some(enum_symbol) = self.symbols.get_mut(enum_sym_id) {
+                    enum_symbol.exports = Some(Box::new(exports));
+                }
             }
-            self.exit_scope(arena);
         }
     }
 
