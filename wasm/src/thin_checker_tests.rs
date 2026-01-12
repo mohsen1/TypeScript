@@ -18789,3 +18789,74 @@ class DuplicateProperties {
     assert_eq!(codes.iter().filter(|&&c| c == 2300).count(), 2,
         "Expected 2 TS2300 errors for duplicate class members, got: {:?}", codes);
 }
+
+#[test]
+fn test_duplicate_object_literal_properties() {
+    use crate::thin_parser::ThinParserState;
+    use crate::checker::types::diagnostics::diagnostic_codes;
+
+    // Test duplicate properties in object literal
+    let source = r#"
+const obj = {
+    x: 1,
+    x: 2,
+};
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+
+    // Should have 1 TS1117 error for the duplicate 'x' property
+    assert_eq!(codes.iter().filter(|&&c| c == 1117).count(), 1,
+        "Expected 1 TS1117 error for duplicate object literal properties, got: {:?}", codes);
+}
+
+#[test]
+fn test_duplicate_object_literal_mixed_properties() {
+    use crate::thin_parser::ThinParserState;
+    use crate::checker::types::diagnostics::diagnostic_codes;
+
+    // Test duplicate properties with different syntax (shorthand, method)
+    let source = r#"
+const obj1 = {
+    x: 1,
+    x: 2,  // duplicate
+    y: 3,
+};
+
+const obj2 = {
+    a: 1,
+    a: 2,  // duplicate
+    b: 3,
+    c() { return 4; },
+    c() { return 5; },  // duplicate method
+};
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+
+    // Should have 3 TS1117 errors (x, a, c)
+    assert_eq!(codes.iter().filter(|&&c| c == 1117).count(), 3,
+        "Expected 3 TS1117 errors for duplicate object literal properties, got: {:?}", codes);
+}

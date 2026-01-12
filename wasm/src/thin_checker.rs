@@ -8534,6 +8534,7 @@ impl<'a> ThinCheckerState<'a> {
     /// Get type of object literal.
     fn get_type_of_object_literal(&mut self, idx: NodeIndex) -> TypeId {
         use crate::solver::{PropertyInfo, QueryDatabase};
+        use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages, format_message};
         use rustc_hash::FxHashMap;
 
         let Some(node) = self.ctx.arena.get(idx) else {
@@ -8567,6 +8568,13 @@ impl<'a> ThinCheckerState<'a> {
                     self.ctx.contextual_type = prev_context;
 
                     let name_atom = self.ctx.types.intern_string(&name);
+
+                    // Check for duplicate property
+                    if properties.contains_key(&name_atom) {
+                        let message = format_message(diagnostic_messages::OBJECT_LITERAL_DUPLICATE_PROPERTY, &[&name]);
+                        self.error_at_node(prop.name, &message, diagnostic_codes::OBJECT_LITERAL_DUPLICATE_PROPERTY);
+                    }
+
                     properties.insert(name_atom, PropertyInfo {
                         name: name_atom,
                         type_id: value_type,
@@ -8581,7 +8589,15 @@ impl<'a> ThinCheckerState<'a> {
             else if elem_node.kind == syntax_kind_ext::SHORTHAND_PROPERTY_ASSIGNMENT {
                 if let Some(ident) = self.ctx.arena.get_identifier(elem_node) {
                     let value_type = self.get_type_of_node(elem_idx);
-                    let name_atom = self.ctx.types.intern_string(&ident.escaped_text);
+                    let name = ident.escaped_text.clone();
+                    let name_atom = self.ctx.types.intern_string(&name);
+
+                    // Check for duplicate property
+                    if properties.contains_key(&name_atom) {
+                        let message = format_message(diagnostic_messages::OBJECT_LITERAL_DUPLICATE_PROPERTY, &[&name]);
+                        self.error_at_node(elem_idx, &message, diagnostic_codes::OBJECT_LITERAL_DUPLICATE_PROPERTY);
+                    }
+
                     properties.insert(name_atom, PropertyInfo {
                         name: name_atom,
                         type_id: value_type,
@@ -8607,6 +8623,13 @@ impl<'a> ThinCheckerState<'a> {
                     self.ctx.contextual_type = prev_context;
 
                     let name_atom = self.ctx.types.intern_string(&name);
+
+                    // Check for duplicate property
+                    if properties.contains_key(&name_atom) {
+                        let message = format_message(diagnostic_messages::OBJECT_LITERAL_DUPLICATE_PROPERTY, &[&name]);
+                        self.error_at_node(method.name, &message, diagnostic_codes::OBJECT_LITERAL_DUPLICATE_PROPERTY);
+                    }
+
                     properties.insert(name_atom, PropertyInfo {
                         name: name_atom,
                         type_id: method_type,
@@ -8639,6 +8662,13 @@ impl<'a> ThinCheckerState<'a> {
                         TypeId::VOID
                     };
                     let name_atom = self.ctx.types.intern_string(&name);
+
+                    // Check for duplicate property
+                    if properties.contains_key(&name_atom) {
+                        let message = format_message(diagnostic_messages::OBJECT_LITERAL_DUPLICATE_PROPERTY, &[&name]);
+                        self.error_at_node(accessor.name, &message, diagnostic_codes::OBJECT_LITERAL_DUPLICATE_PROPERTY);
+                    }
+
                     properties.insert(name_atom, PropertyInfo {
                         name: name_atom,
                         type_id: accessor_type,
