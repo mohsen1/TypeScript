@@ -1,63 +1,59 @@
 # Worker 3 Plan - Squad Forge
 
 ## Mission
-Fix TS2304: Cannot Find Name
+Fix TS2705: Async Function Must Return Promise
 
 Status: Active
 Priority: P1 (HIGH)
 
 ## Current Assignment
-**Fix TS2304 Extra Errors: Cannot find name (129 extra errors)**
+**Implement TS2705 Error: Async function must return Promise (37 occurrences)**
 
 ### Background
-TypeScript is emitting TS2304 "Cannot find name" errors too aggressively (129 extra errors). This is likely a scope resolution issue where valid identifiers are incorrectly flagged as undefined.
+TypeScript should emit TS2705 when an async function is declared with a return type that is not a Promise. Async functions always return Promises, so the return type must reflect that.
 
 ### Success Criteria
-- Don't emit TS2304 for valid identifiers in scope
-- Fix scope resolution for all variable types (let/const/var, functions, classes, interfaces)
-- Handle global/builtin types correctly (Array, Object, etc.)
-- Reduce extra TS2304 errors significantly
+- Emit TS2705 when async function has non-Promise return type annotation
+- Handle all async function types: function declarations, expressions, arrow functions, methods
+- Don't emit when return type is Promise or generic Promise<T>
+- Don't emit when return type is omitted (inferred as Promise)
+- Handle async arrow functions correctly
 
 ### Implementation Steps
-1. [x] Sync from origin/rust: `git fetch origin && git merge origin/rust --no-edit`
-2. [x] Search for TS2304 emission code in `src/thin_checker.rs` or binder
-3. [x] Investigate scope resolution logic
-4. [x] Fix cases where valid identifiers are incorrectly flagged as undefined
-5. [x] Test with various identifier resolution patterns
-6. [x] Run conformance to verify reduction in extra errors
+1. [ ] Sync from origin/rust: `git fetch origin && git merge origin/rust --no-edit`
+2. [ ] Search for async function type checking in `src/thin_checker.rs`
+3. [ ] Find where function return types are validated
+4. [ ] Implement TS2705 emission: if function is async and return type is not Promise, emit error
+5. [ ] Test with various async function patterns
+6. [ ] Run conformance to verify TS2705 is emitted correctly
 
 ### Key Code Locations
-- `src/thin_checker.rs` - identifier resolution, TS2304 emission
-- `src/binder.rs` - symbol table lookup, scope management
-- `src/checker/types/diagnostics.rs` - TS2304 error code
+- `src/thin_checker.rs` - async function type checking
+- `src/checker/types/diagnostics.rs` - TS2705 error code
+- `src/checker/types.rs` - Promise type definition
 
 ### Test Cases
 ```typescript
-// Should NOT emit TS2304 (defined)
-let x = 42;
-console.log(x); // OK
+// Should emit TS2705
+async function foo(): number { } // Error: Async function must return Promise
+async function bar(): string { return "x"; } // Error: return type is string, not Promise<string>
 
-function foo() { return 1; }
-console.log(foo()); // OK
+const baz = async (): boolean => false; // Error: Async arrow function must return Promise
 
-class Bar { }
-const b = new Bar(); // OK
+class Qux {
+  async method(): void { } // Error: Async method must return Promise
+}
 
-// Should emit TS2304 (undefined)
-console.log(undefinedVar); // Error: Cannot find name 'undefinedVar'
-let y: NotDefined; // Error: Cannot find name 'NotDefined'
+// Should NOT emit
+async function qux(): Promise<number> { } // OK - explicit Promise
+async function quux() { } // OK - inferred as Promise<any>
+async function corge(): Promise<void> { } // OK - Promise<void>
 ```
 
 ## Completed
-- [x] Namespace merging enum/function work
-- [x] TS2322 investigation (already implemented)
-- [x] TS2304 fix for infer type parameters in conditional types
-  - Fixed `test_redux_pattern_extract_state_with_infer`
-  - Fixed `test_redux_pattern_state_from_reducers_mapped`
-  - Fixed `test_redux_pattern_indexed_access_on_mapped_union`
-  - Improved test results: 5024 -> 5051 passed (27 tests)
+- [x] TS2304 Cannot Find Name - Fixed infer type parameter false positives, committed
 
 ## Notes
-- Commit format: `[wasm] checker: Fix TS2304 false positives in scope resolution`
+- Commit format: `[wasm] checker: Implement TS2705 async function return type errors`
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/forge-3`
