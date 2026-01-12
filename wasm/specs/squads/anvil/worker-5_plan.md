@@ -10,9 +10,9 @@ Priority: P2 (Medium)
 **Fix Parser Error Recovery (3 tests) + Control Flow (1 test)**
 
 ### Failing Tests - Parser
-1. `test_thin_parser_function_keyword_in_class_recovers`
-2. `test_thin_parser_jsx_like_syntax_in_ts_recovers`
-3. `test_thin_parser_type_assertion_in_new_expression_reports_ts1109`
+1. ~~`test_thin_parser_function_keyword_in_class_recovers`~~ ✅ FIXED
+2. ~~`test_thin_parser_jsx_like_syntax_in_ts_recovers`~~ ✅ FIXED
+3. ~~`test_thin_parser_type_assertion_in_new_expression_reports_ts1109`~~ ✅ FIXED
 
 ### Failing Test - Control Flow
 4. ~~`test_in_operator_private_identifier_narrows_required_property`~~ ✅ FIXED
@@ -34,15 +34,15 @@ Priority: P2 (Medium)
 
 ### Implementation Steps - Parser Recovery (Medium)
 
-5. [ ] Read failing parser tests in `src/thin_parser_tests.rs`
-6. [ ] For `function_keyword_in_class_recovers`:
-   - Parser should produce error but continue parsing
-   - Skip to next valid class member (find `}` or next modifier)
-7. [ ] For `jsx_like_syntax_in_ts_recovers`:
+5. [x] Read failing parser tests in `src/thin_parser_tests.rs`
+6. [x] For `function_keyword_in_class_recovers`:
+   - Parser should silently skip 'function' keyword without emitting TS1068
+   - Parser recovers gracefully and parses the rest as a method
+7. [x] For `jsx_like_syntax_in_ts_recovers`:
    - `<Type>expr` is ambiguous with JSX
-   - In .ts files, treat as type assertion
-   - Should not crash, should produce error
-8. [ ] For `type_assertion_in_new_expression_reports_ts1109`:
+   - In .ts files, always try to parse as type assertion first
+   - This produces appropriate TS1005 error for invalid JSX-like syntax
+8. [x] For `type_assertion_in_new_expression_reports_ts1109`:
    - `new <Type>expr` should report TS1109 "Expression expected"
    - The type assertion syntax is invalid in `new` expressions
 
@@ -74,7 +74,11 @@ fn recover_to_next_member(&mut self) {
 - [x] (Move finished items here)
 
 ## Ready for Merge
-Yes - Control flow fix for private identifier in 'in' operator
+Yes - All 4 tests fixed:
+- Control flow: private identifier in 'in' operator
+- Parser: function keyword in class recovery
+- Parser: JSX-like syntax in .ts files
+- Parser: type assertion in new expression
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
