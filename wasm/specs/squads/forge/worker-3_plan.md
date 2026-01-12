@@ -20,12 +20,12 @@ TypeScript should emit TS2705 when an async function is declared with a return t
 - Handle async arrow functions correctly
 
 ### Implementation Steps
-1. [ ] Sync from origin/rust: `git fetch origin && git merge origin/rust --no-edit`
-2. [ ] Search for async function type checking in `src/thin_checker.rs`
-3. [ ] Find where function return types are validated
-4. [ ] Implement TS2705 emission: if function is async and return type is not Promise, emit error
-5. [ ] Test with various async function patterns
-6. [ ] Run conformance to verify TS2705 is emitted correctly
+1. [x] Sync from origin/rust: `git fetch origin && git merge origin/rust --no-edit`
+2. [x] Search for async function type checking in `src/thin_checker.rs`
+3. [x] Find where function return types are validated
+4. [x] Implement TS2705 emission: if function is async and return type is not Promise, emit error
+5. [x] Test with various async function patterns
+6. [x] Run conformance to verify TS2705 is emitted correctly
 
 ### Key Code Locations
 - `src/thin_checker.rs` - async function type checking
@@ -52,6 +52,11 @@ async function corge(): Promise<void> { } // OK - Promise<void>
 
 ## Completed
 - [x] TS2304 Cannot Find Name - Fixed infer type parameter false positives, committed
+- [x] TS2705 Async Function Must Return Promise - Implemented TS2705 emission for async functions with non-Promise return types
+  - Added ASYNC_FUNCTION_RETURNS_PROMISE error code (2705)
+  - Added is_promise_type() helper function
+  - Handles function declarations, arrow functions, function expressions, and methods
+  - Test added: test_async_function_returns_promise
 
 ## Notes
 - Commit format: `[wasm] checker: Implement TS2705 async function return type errors`
