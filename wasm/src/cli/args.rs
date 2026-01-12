@@ -19,6 +19,22 @@ pub struct CliArgs {
     #[arg(long = "outDir", alias = "out-dir")]
     pub out_dir: Option<PathBuf>,
 
+    /// Root directory of project files.
+    #[arg(long = "rootDir", alias = "root-dir")]
+    pub root_dir: Option<PathBuf>,
+
+    /// Generate .d.ts declaration files.
+    #[arg(long = "declaration", short = 'd')]
+    pub declaration: bool,
+
+    /// Generate .d.ts.map source maps for declaration files.
+    #[arg(long = "declarationMap", alias = "declaration-map")]
+    pub declaration_map: bool,
+
+    /// Generate .map source map files.
+    #[arg(long = "sourceMap", alias = "source-map")]
+    pub source_map: bool,
+
     /// Path to tsconfig.json or a directory containing it.
     #[arg(short = 'p', long = "project")]
     pub project: Option<PathBuf>,
