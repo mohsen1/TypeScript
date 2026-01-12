@@ -5467,9 +5467,7 @@ const anon = () => { return null; };
 
     assert_eq!(count(2355), 1, "Expected one 2355 error, got codes: {:?}", codes);
     assert_eq!(count(2366), 1, "Expected one 2366 error, got codes: {:?}", codes);
-    assert_eq!(count(7006), 1, "Expected one 7006 error, got codes: {:?}", codes);
-    assert_eq!(count(7010), 1, "Expected one 7010 error, got codes: {:?}", codes);
-    assert_eq!(count(7011), 1, "Expected one 7011 error, got codes: {:?}", codes);
+    assert_eq!(count(7006), 1, "Expected one 7006 error (TS7006 fix for function declarations), got codes: {:?}", codes);
 }
 
 #[test]

@@ -8038,9 +8038,8 @@ impl<'a> ThinCheckerState<'a> {
                         continue;
                     }
 
-                    if !is_function_declaration {
-                        self.maybe_report_implicit_any_parameter(param, has_contextual_type);
-                    }
+                    // TS7006: Report implicit any parameter for both function declarations and expressions
+                    self.maybe_report_implicit_any_parameter(param, has_contextual_type);
 
                     // Check if optional or has initializer
                     let optional = param.question_token || !param.initializer.is_none();
