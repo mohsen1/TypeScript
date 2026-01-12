@@ -5577,7 +5577,9 @@ const arrowReturnsAny = () => anyValue;
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
     let count = |code| codes.iter().filter(|&&c| c == code).count();
 
-    assert_eq!(count(7010), 2, "Expected two TS7010 errors for functions returning 'any', got codes: {:?}", codes);
+    // Function declaration should get TS7010, arrow function should get TS7011
+    assert_eq!(count(7010), 1, "Expected one TS7010 error (function declaration), got codes: {:?}", codes);
+    assert_eq!(count(7011), 1, "Expected one TS7011 error (arrow function), got codes: {:?}", codes);
 }
 
 #[test]
