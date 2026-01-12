@@ -107,37 +107,42 @@ Updated: 2026-01-11
 - Use `./scripts/ask-gemini.mjs --review` for code review
 
 ## Squad Status
-- Last EM Update: 2026-01-12 (W1, W2 reassigned to backlog tasks)
+- Last EM Update: 2026-01-12 (W4 TS7010 merged, reassigned to TS7006)
 - Conformance: **30.8% exact match** (+7.5pp from 23.3%)
 - Build: Passing
-- **Recent Merges**: W1 (method bivariance), W4 (element access), W5 (new expression) - All tests passing
+- **Recent Merges**: W1 (method bivariance), W4 (element access), W5 (new expression), W4 (TS7010)
 - Workers: All 5 active
 
 ### Worker Assignments (Current)
 
 | Worker | Priority | Assignment | Status |
 |--------|----------|------------|--------|
-| W1 | HIGH | TS7006 Parameter 'any' Type | Active - implementing |
-| W2 | HIGH | TS7010 Implicit Any Return | Reassigned (3rd time) - implementing |
-| W3 | HIGH | Element Access Literal Keys | Active - definite assignment analysis |
-| W4 | HIGH | TS2792 Module Resolution | Reassigned (2nd time) - implementing |
-| W5 | HIGH | TS2564 Property No Initializer | Active - implementing |
+| W1 | HIGH | TS2339 Property Does Not Exist | Syncing - fixing 35 extra errors |
+| W2 | HIGH | TS2564 Property No Initializer | Active - investigating existing tests |
+| W3 | HIGH | TS2304 Cannot Find Name | Syncing - fixing 129 extra errors |
+| W4 | HIGH | TS7006 Parameter 'Any' Type | Syncing - 42 occurrences |
+| W5 | HIGH | TS2564 Property No Initializer | Syncing - continuing implementation |
 
 **MERGED WORKERS (to squad/forge):**
 - ✅ W1: Method bivariance (4/4 tests pass)
 - ✅ W4: Element access literal keys (3/3 tests pass)
 - ✅ W5: New expression inference (7/7 tests pass)
+- ✅ W4: TS7010 implicit any return type - Merged 2026-01-12
+- ⏳ W1: TS7010/TS7011 - pushed to origin/worker/forge-1 (not yet merged)
 
 **REASSIGNMENT HISTORY:**
-- W2: TS7010 → TS2454 → TS2322 → TS7010 (3rd reassignment)
-- W4: Namespace debug → TS2322 → TS2792 (2nd reassignment)
+- W1: Method bivariance → TS7010 → TS2339 (3rd task)
+- W2: TS7010 → TS2454 → TS2322 → TS2564 (4th task)
+- W3: TS2322 → TS2454 → TS2304 (3rd task)
+- W4: Namespace debug → TS2322 → TS2792 → TS7010 (4th task)
+- W5: New expression → TS2564 (2nd task)
 
 **PRIORITY ORDER:**
-1. **W1** - TS7006 parameter 'any' (42 occurrences)
-2. **W5** - TS2564 property initialization (64 occurrences)
-3. **W2** - TS7010 implicit any return
-4. **W4** - TS2792 module resolution
-5. **W3** - Element access literal keys
+1. **W3** - TS2304 cannot find name (129 extra errors)
+2. **W5/W2** - TS2564 property initialization (64 occurrences)
+3. **W1** - TS2339 property does not exist (35 extra errors)
+4. **W4** - TS7010 implicit any return
+5. Pending - TS7006 parameter 'any' (42 occurrences)
 
 ### Before Starting Any Task
 **IMPORTANT:** Workers must consult Gemini before starting work:

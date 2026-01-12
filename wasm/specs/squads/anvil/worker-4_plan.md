@@ -1,39 +1,34 @@
 # Worker 4 Plan - Squad Anvil
 
 ## Mission
-LSP Rename Symbol
+Additional LSP Features
 
 Status: Active
 Priority: P1 (High)
 
 ## Current Assignment
-**Implement LSP Rename Symbol**
+**Enhance LSP Features**
 
 ### Background
-Rename symbol allows renaming identifiers across all references. Critical for refactoring.
+Various LSP features need implementation for better IDE support.
 
 ### Implementation Steps
 
-1. [ ] Read current rename implementation in `src/lsp/rename.rs` or create if missing
-2. [ ] Implement rename functionality:
-   - Find symbol at cursor position
-   - Find all references to that symbol
-   - Prepare workspace edit with all changes
-   - Validate rename (check for conflicts)
-3. [ ] Handle different symbol types:
-   - Variables and functions
-   - Class members
-   - Parameters
-4. [ ] Support rename preview
-5. [ ] Test: Rename a symbol and verify all references updated
+1. [ ] Read current LSP implementation in `src/lsp/`
+2. [ ] Choose from available features:
+   - Document formatting
+   - Document highlighting
+   - Folding ranges
+   - Selection ranges
+3. [ ] Implement chosen feature(s)
+4. [ ] Test: Verify feature works in LSP client
 
 ### Key Code Locations
-- `src/lsp/rename.rs` - rename implementation
+- `src/lsp/` - LSP implementations
 - `src/lsp/mod.rs` - LSP server
-- `src/binder/` - symbol resolution
 
 ## Task Queue
-- [ ] After rename: help with code actions or workspace symbols
+- [ ] After LSP features: help with emitter or CLI work
 
 ## Completed
 - [x] Fixed shorthand methods binding - MERGED to squad/anvil
@@ -42,7 +37,8 @@ Rename symbol allows renaming identifiers across all references. Critical for re
 - [x] Module System Emission review - Working correctly
 - [x] Decorator Metadata Emission - All 171 tests passing
 - [x] Generic Type Inference Fix - Test passes
-- [x] LSP Document Symbols - All 5 tests PASS (commit 77bf219aaf)
+- [x] LSP Document Symbols - All 5 tests PASS
+- [x] LSP Rename Symbol - All tests passing, complete
 
 ## Ready for Merge
 Previous work merged, latest ready for merge
@@ -50,6 +46,6 @@ Previous work merged, latest ready for merge
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
 - Use Docker for Rust tests: `./wasm/test.sh`
-- Commit format: `[wasm] lsp: Implement rename symbol`
+- Commit format: `[wasm] lsp: Implement document formatting`
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/anvil-4`
