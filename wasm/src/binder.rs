@@ -1060,7 +1060,15 @@ impl BinderState {
                     // Merge the flags and add the declaration
                     sym.flags |= flags;
                     sym.declarations.push(declaration);
-                    if sym.value_declaration.is_none() && (flags & symbol_flags::VALUE) != 0 {
+
+                    // Update value_declaration for merged class/enum/function + namespace symbols
+                    // When a class/enum/function merges with a namespace, value_declaration should point to the class/enum/function
+                    if (flags & symbol_flags::CLASS) != 0
+                        || (flags & symbol_flags::FUNCTION) != 0
+                        || (flags & symbol_flags::REGULAR_ENUM) != 0
+                    {
+                        sym.value_declaration = declaration;
+                    } else if sym.value_declaration.is_none() && (flags & symbol_flags::VALUE) != 0 {
                         sym.value_declaration = declaration;
                     }
                 } else {
