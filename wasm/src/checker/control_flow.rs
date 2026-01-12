@@ -2807,6 +2807,14 @@ impl<'a> FlowAnalyzer<'a> {
             return Some((self.interner.intern_string(name), false));
         }
 
+        // Handle private identifiers (e.g., #a in x)
+        let idx = self.skip_parenthesized(idx);
+        let node = self.arena.get(idx)?;
+        if node.kind == SyntaxKind::PrivateIdentifier as u16 {
+            let ident = self.arena.get_identifier(node)?;
+            return Some((self.interner.intern_string(&ident.escaped_text), false));
+        }
+
         let node_types = self.node_types?;
         let type_id = *node_types.get(&idx.0)?;
         match self.interner.lookup(type_id)? {
