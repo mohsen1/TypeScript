@@ -1,64 +1,66 @@
 # Worker 4 Plan - Squad Forge
 
 ## Mission
-Fix TS2322: Type Not Assignable
+Fix TS2792: Module Resolution
 
 Status: Active
 Priority: P1 (High)
 
 ## Current Assignment
-**Implement TS2322 Error: Type is not assignable to other type (19 occurrences)**
+**Implement TS2792 Error: Module not found or cannot be resolved**
 
 ### Background
-TypeScript should emit TS2322 error when a value of one type is assigned to a variable/parameter of a different, incompatible type. The type checker needs to verify assignability using subtyping rules.
+TypeScript should emit TS2792 error when an import/export statement references a module that cannot be found or resolved. This involves module resolution logic including:
+1. Finding module files based on module specifier
+2. Resolving module extensions (.ts, .tsx, .d.ts)
+3. Handling node_modules resolution
+4. Supporting path mappings (tsconfig paths)
+5. Supporting @types package resolution
 
 ### Success Criteria
-- Emit TS2322 for type mismatches in assignments
-- Handle all assignment contexts: variable declarations, parameter passing, return statements
-- Account for type compatibility rules (subtype, supertype, unrelated)
-- Don't emit false positives for compatible types
-- Handle contextual typing (inferred from usage)
+- Emit TS2792 when module cannot be found
+- Don't emit for existing modules
+- Handle relative imports (./foo, ../bar)
+- Handle absolute imports from node_modules
+- Handle module resolution with @types packages
+- Support baseUrl and paths from tsconfig
 
 ### Implementation Steps
-1. [ ] Read existing assignability checking code in `src/solver/subtype.rs` and `src/thin_checker.rs`
-2. [ ] Find where type assignability is checked
-3. [ ] Implement or fix check: if source type not assignable to target type, emit TS2322
-4. [ ] Test with various assignment patterns
-5. [ ] Ensure no false positives for compatible types
+1. [ ] Read existing module resolution code in `src/`
+2. [ ] Find where imports are resolved
+3. [ ] Implement module lookup logic:
+   - Check if file exists with .ts, .tsx, .d.ts extensions
+   - Check node_modules for package
+   - Check @types/ package
+4. [ ] Implement TS2792 error emission when module not found
+5. [ ] Test with various import patterns
 
 ### Key Code Locations
-- `src/solver/subtype.rs` - subtype checking and assignability logic
-- `src/thin_checker.rs` - assignment expression checking
-- `src/checker/types/diagnostics.rs` - TS2322 error code
+- Module resolution code (likely in `src/` directory)
+- Import statement handling in binder/checker
+- `src/checker/types/diagnostics.rs` - TS2792 error code
 
 ### Test Cases to Implement
 ```typescript
-// Should emit TS2322
-let x: number = "string"; // Error: Type 'string' is not assignable to type 'number'
-function foo(y: string) { }
-foo(42); // Error: Type 'number' is not assignable to parameter of type 'string'
+// Should emit TS2792
+import { foo } from './nonexistent'; // Error: Cannot find module './nonexistent'
+import { bar } from 'missing-package'; // Error: Cannot find module 'missing-package'
 
-// Should NOT emit (compatible types)
-let a: number = 42; // OK
-let b: number = a; // OK
-let c: string | number = "hello"; // OK
-
-// Should NOT emit (subtype relationships)
-interface Base { x: number; }
-interface Derived extends Base { y: string; }
-let d: Derived = { x: 1, y: "hi" };
-let e: Base = d; // OK - Derived is subtype of Base
+// Should NOT emit (module exists)
+import { baz } from './existing'; // OK - ./existing.ts exists
+import { qux } from 'typescript'; // OK - in node_modules
+import { Any } from '@types/node'; // OK - @types package
 ```
 
 ### Edge Cases
-- Any types are assignable to everything (unless noImplicitAny)
-- Never is assignable to everything
-- Everything is assignable to unknown
-- Void only assignable to void or any
-- Enum members are assignable to numbers
+- Module specifier with no extension
+- Module specifier in quotes ("lodash" vs 'lodash')
+- Triple-slash directives (/// <reference types="node" />)
+- Re-exports (export * from 'foo')
+- Type-only imports (import type { X } from 'y')
 
 ## Task Queue
-- [ ] After TS2322: coordinate with W1 on type system issues
+- [ ] After TS2792: coordinate with other workers on module system
 
 ## Completed
 - [x] Fix Element Access Literal Keys - Merged to squad/forge
@@ -69,6 +71,6 @@ No
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
 - Use Docker for Rust tests: `./wasm/test.sh`
-- Commit format: `[wasm] solver/checker: Implement TS2322 type assignability errors`
+- Commit format: `[wasm] binder/module: Implement TS2792 module resolution errors`
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/forge-4`
