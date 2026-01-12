@@ -11,6 +11,7 @@
 //! - Document Highlighting
 //! - Rename
 //! - Semantic Tokens
+//! - Folding Ranges
 //! - (Future: Code Actions, Diagnostics, etc.)
 //!
 //! Architecture:
@@ -36,6 +37,11 @@ pub mod semantic_tokens;
 pub mod code_actions;
 pub mod project;
 pub mod diagnostics;
+pub mod folding;
+pub mod code_lens;
+pub mod inlay_hints;
+pub mod selection_range;
+pub mod type_definition;
 
 #[cfg(test)]
 mod tests;
@@ -62,3 +68,4 @@ pub use code_actions::{
 pub use position::{Position, Location, SourceLocation, Range};
 pub use project::{Project, ProjectFile, ProjectPerformance, ProjectRequestKind, ProjectRequestTiming};
 pub use diagnostics::{LspDiagnostic, DiagnosticSeverity};
+pub use folding::{FoldingRange, FoldingRangeProvider};
