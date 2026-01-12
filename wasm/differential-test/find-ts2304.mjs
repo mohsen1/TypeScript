@@ -302,22 +302,18 @@ async function main() {
 
     const tscCodes = new Set(tscDiags.map(d => d.code));
     const wasmCodes = new Set(wasmDiags.map(d => d.code));
-    const extraCodes = [...wasmCodes].filter(code => !tscCodes.has(code));
+    const missingCodes = [...tscCodes].filter(code => !wasmCodes.has(code));
 
-    if (extraCodes.includes(2304)) {
+    if (missingCodes.includes(2304)) {
       const relPath = filePath.replace(CONFIG.conformanceDir + '/', '');
-      const messages = wasmDiags.filter(d => d.code === 2304).map(d => d.message).filter(Boolean);
-      console.log(`\n=== FALSE POSITIVE: ${relPath} ===`);
-      if (messages.length > 0) {
-        console.log('WASM TS2304 errors:');
-        for (const message of messages.slice(0, 4)) {
-          console.log(`  ${message}`);
-        }
-      } else {
-        console.log('WASM TS2304 errors: (no message available)');
+      const tscErrors = tscDiags.filter(d => d.code === 2304);
+      console.log(`\n=== MISSING TS2304: ${relPath} ===`);
+      console.log('TSC errors:');
+      for (const err of tscErrors.slice(0, 3)) {
+        console.log(`  ${err.message}`);
       }
       console.log('Code snippet:');
-      console.log(rawCode.slice(0, 500));
+      console.log(rawCode.slice(0, 600));
       matches.push(relPath);
     }
 
@@ -327,7 +323,7 @@ async function main() {
   }
 
   console.log('\n\n=== SUMMARY ===');
-  console.log(`Total false positive files: ${matches.length}`);
+  console.log(`Total missing TS2304 files: ${matches.length}`);
   process.exit(0);
 }
 
