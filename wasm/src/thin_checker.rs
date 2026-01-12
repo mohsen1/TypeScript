@@ -1469,7 +1469,11 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
         let expr_type = self.get_type_of_node(expr_idx);
-        let ctor_types = self.constructor_types_from_type(expr_type);
+
+        // Evaluate application types to get the actual intersection type
+        let evaluated_type = self.evaluate_application_type(expr_type);
+
+        let ctor_types = self.constructor_types_from_type(evaluated_type);
         if ctor_types.is_empty() {
             return None;
         }
@@ -1553,6 +1557,13 @@ impl<'a> ThinCheckerState<'a> {
                 if expanded != evaluated {
                     self.collect_constructor_types_from_type_inner(expanded, ctor_types, visited);
                 }
+            }
+            TypeKey::TypeQuery(sym_ref) => {
+                // typeof X - get the type of the symbol X and collect constructors from it
+                use crate::binder::SymbolId;
+                let sym_id = SymbolId(sym_ref.0);
+                let sym_type = self.get_type_of_symbol(sym_id);
+                self.collect_constructor_types_from_type_inner(sym_type, ctor_types, visited);
             }
             _ => {}
         }
