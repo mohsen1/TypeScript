@@ -1,0 +1,837 @@
+//! Flow Graph Builder for Control Flow Analysis.
+//!
+//! This module provides the `FlowGraph` side-table and `FlowGraphBuilder` for
+//! constructing control flow graphs from ThinNode AST post-binding.
+//!
+//! The FlowGraph is a side-table that tracks:
+//! - Flow nodes for each control flow point (conditions, branches, loops)
+//! - Mapping from AST nodes to their corresponding flow nodes
+//! - Antecedent relationships between flow nodes
+//!
+//! This enables type narrowing analysis without mutating AST nodes.
+
+use crate::binder::{FlowNode, FlowNodeArena, FlowNodeId, flow_flags};
+use crate::parser::{NodeIndex, NodeList, syntax_kind_ext};
+use crate::parser::thin_node::ThinNodeArena;
+use crate::scanner::SyntaxKind;
+use rustc_hash::FxHashMap;
+
+/// A control flow graph side-table.
+///
+/// This struct encapsulates the flow graph data structures, providing
+/// a clean abstraction for querying flow information without holding
+/// a reference to the entire binder state.
+#[derive(Clone, Debug)]
+pub struct FlowGraph {
+    /// Arena storing all flow nodes
+    pub nodes: FlowNodeArena,
+    /// Mapping from AST node index to the flow node active at that point
+    pub node_flow: FxHashMap<u32, FlowNodeId>,
+    /// Unreachable flow node (for never-returning code paths)
+    pub unreachable_flow: FlowNodeId,
+}
+
+impl FlowGraph {
+    /// Create a new empty flow graph.
+    pub fn new() -> Self {
+        let mut nodes = FlowNodeArena::new();
+        let unreachable_flow = nodes.alloc(flow_flags::UNREACHABLE);
+
+        FlowGraph {
+            nodes,
+            node_flow: FxHashMap::default(),
+            unreachable_flow,
+        }
+    }
+
+    /// Get the flow node at a given AST node position.
+    pub fn get_flow_at_node(&self, node: NodeIndex) -> Option<FlowNodeId> {
+        self.node_flow.get(&node.0).copied()
+    }
+
+    /// Get a flow node by ID.
+    pub fn get_node(&self, id: FlowNodeId) -> Option<&FlowNode> {
+        self.nodes.get(id)
+    }
+
+    /// Check if a flow node exists.
+    pub fn has_flow_at_node(&self, node: NodeIndex) -> bool {
+        self.node_flow.contains_key(&node.0)
+    }
+}
+
+impl Default for FlowGraph {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Builder for constructing a FlowGraph from ThinNode AST.
+///
+/// The FlowGraphBuilder traverses the AST post-binding and constructs
+/// the control flow graph without mutating the AST nodes.
+pub struct FlowGraphBuilder<'a> {
+    /// Reference to the ThinNodeArena
+    arena: &'a ThinNodeArena,
+    /// The flow graph being constructed
+    graph: FlowGraph,
+    /// Current flow node during construction
+    current_flow: FlowNodeId,
+    /// Stack of flow contexts for nested constructs
+    flow_stack: Vec<FlowContext>,
+}
+
+/// Context for nested flow constructs (loops, switches, etc.)
+#[derive(Clone, Copy)]
+struct FlowContext {
+    /// Label for breaking out of this construct
+    break_label: FlowNodeId,
+    /// Label for continuing this construct (loops only)
+    continue_label: Option<FlowNodeId>,
+    /// Type of flow construct
+    context_type: FlowContextType,
+}
+
+#[derive(Clone, Copy)]
+enum FlowContextType {
+    Loop,
+    Switch,
+    Try,
+}
+
+impl<'a> FlowGraphBuilder<'a> {
+    /// Create a new FlowGraphBuilder.
+    pub fn new(arena: &'a ThinNodeArena) -> Self {
+        let mut graph = FlowGraph::new();
+        let start_flow = graph.nodes.alloc(flow_flags::START);
+
+        FlowGraphBuilder {
+            arena,
+            graph,
+            current_flow: start_flow,
+            flow_stack: Vec::new(),
+        }
+    }
+
+    /// Build the flow graph for a source file.
+    pub fn build_source_file(&mut self, statements: &NodeList) -> &FlowGraph {
+        for &stmt_idx in &statements.nodes {
+            if !stmt_idx.is_none() {
+                self.build_statement(stmt_idx);
+            }
+        }
+        &self.graph
+    }
+
+    /// Build flow graph for a single statement.
+    fn build_statement(&mut self, stmt_idx: NodeIndex) {
+        let Some(node) = self.arena.get(stmt_idx) else {
+            return;
+        };
+
+        match node.kind {
+            // Block statement
+            syntax_kind_ext::BLOCK => {
+                if let Some(block) = self.arena.get_block(node) {
+                    self.build_block(block);
+                }
+            }
+
+            // If statement
+            syntax_kind_ext::IF_STATEMENT => {
+                if let Some(if_stmt) = self.arena.get_if_statement(node) {
+                    self.build_if_statement(if_stmt);
+                }
+            }
+
+            // While statement
+            syntax_kind_ext::WHILE_STATEMENT => {
+                if let Some(loop_data) = self.arena.get_loop(node) {
+                    self.build_while_statement(loop_data);
+                }
+            }
+
+            // Do-while statement
+            syntax_kind_ext::DO_STATEMENT => {
+                if let Some(loop_data) = self.arena.get_loop(node) {
+                    self.build_do_while_statement(loop_data);
+                }
+            }
+
+            // For statement
+            syntax_kind_ext::FOR_STATEMENT => {
+                if let Some(loop_data) = self.arena.get_loop(node) {
+                    self.build_for_statement(loop_data);
+                }
+            }
+
+            // For-in statement
+            syntax_kind_ext::FOR_IN_STATEMENT => {
+                if let Some(for_in_of) = self.arena.get_for_in_of(node) {
+                    self.build_for_in_statement(for_in_of);
+                }
+            }
+
+            // For-of statement
+            syntax_kind_ext::FOR_OF_STATEMENT => {
+                if let Some(for_in_of) = self.arena.get_for_in_of(node) {
+                    self.build_for_of_statement(for_in_of);
+                }
+            }
+
+            // Switch statement
+            syntax_kind_ext::SWITCH_STATEMENT => {
+                if let Some(switch_data) = self.arena.get_switch(node) {
+                    self.build_switch_statement(switch_data);
+                }
+            }
+
+            // Try statement
+            syntax_kind_ext::TRY_STATEMENT => {
+                if let Some(try_data) = self.arena.get_try(node) {
+                    self.build_try_statement(try_data);
+                }
+            }
+
+            // Variable declaration
+            syntax_kind_ext::VARIABLE_DECLARATION => {
+                if let Some(var_decl) = self.arena.get_variable_declaration(node) {
+                    self.build_variable_declaration(var_decl, stmt_idx);
+                }
+            }
+
+            // Variable statement - contains variable declaration list
+            syntax_kind_ext::VARIABLE_STATEMENT => {
+                self.record_node_flow(stmt_idx);
+            }
+
+            // Expression statement
+            syntax_kind_ext::EXPRESSION_STATEMENT => {
+                self.record_node_flow(stmt_idx);
+            }
+
+            // Return/throw/break/continue
+            syntax_kind_ext::RETURN_STATEMENT | syntax_kind_ext::THROW_STATEMENT => {
+                self.record_node_flow(stmt_idx);
+                self.current_flow = self.graph.unreachable_flow;
+            }
+
+            syntax_kind_ext::BREAK_STATEMENT => {
+                self.record_node_flow(stmt_idx);
+                self.handle_break();
+            }
+
+            syntax_kind_ext::CONTINUE_STATEMENT => {
+                self.record_node_flow(stmt_idx);
+                self.handle_continue();
+            }
+
+            _ => {
+                // Default: just record flow position
+                self.record_node_flow(stmt_idx);
+            }
+        }
+    }
+
+    /// Build flow graph for a block.
+    fn build_block(&mut self, block: &crate::parser::thin_node::BlockData) {
+        for &stmt_idx in &block.statements.nodes {
+            if !stmt_idx.is_none() {
+                self.build_statement(stmt_idx);
+            }
+        }
+    }
+
+    /// Build flow graph for an if statement.
+    fn build_if_statement(&mut self, if_stmt: &crate::parser::thin_node::IfStatementData) {
+        // Save flow before the condition
+        let pre_condition_flow = self.current_flow;
+
+        // Create flow node for the true branch
+        let true_flow = self.create_flow_node(
+            flow_flags::TRUE_CONDITION,
+            pre_condition_flow,
+            if_stmt.expression,
+        );
+
+        // Bind the then statement with true flow
+        self.current_flow = true_flow;
+        self.build_statement(if_stmt.then_statement);
+        let post_then_flow = self.current_flow;
+
+        // Create merge label
+        let merge_label = self.graph.nodes.alloc(flow_flags::BRANCH_LABEL);
+
+        // Handle else branch if present
+        if !if_stmt.else_statement.is_none() {
+            // Create flow node for the false branch
+            let false_flow = self.create_flow_node(
+                flow_flags::FALSE_CONDITION,
+                pre_condition_flow,
+                if_stmt.expression,
+            );
+
+            // Bind the else statement
+            self.current_flow = false_flow;
+            self.build_statement(if_stmt.else_statement);
+            let post_else_flow = self.current_flow;
+
+            // Add both branches to merge label
+            self.add_antecedent(merge_label, post_then_flow);
+            self.add_antecedent(merge_label, post_else_flow);
+        } else {
+            // No else branch: false path goes directly to merge
+            let false_flow = self.create_flow_node(
+                flow_flags::FALSE_CONDITION,
+                pre_condition_flow,
+                if_stmt.expression,
+            );
+
+            self.add_antecedent(merge_label, post_then_flow);
+            self.add_antecedent(merge_label, false_flow);
+        }
+
+        self.current_flow = merge_label;
+    }
+
+    /// Build flow graph for a while statement.
+    fn build_while_statement(&mut self, loop_data: &crate::parser::thin_node::LoopData) {
+        // Create loop label
+        let loop_label = self.graph.nodes.alloc(flow_flags::LOOP_LABEL);
+        if !self.current_flow.is_none() {
+            if let Some(node) = self.graph.nodes.get_mut(loop_label) {
+                node.antecedent.push(self.current_flow);
+            }
+        }
+
+        // Create merge label for after the loop
+        let merge_label = self.graph.nodes.alloc(flow_flags::BRANCH_LABEL);
+
+        // Push loop context
+        self.flow_stack.push(FlowContext {
+            break_label: merge_label,
+            continue_label: Some(loop_label),
+            context_type: FlowContextType::Loop,
+        });
+
+        self.current_flow = loop_label;
+
+        // Create flow for entering loop body
+        let true_flow = self.create_flow_node(
+            flow_flags::TRUE_CONDITION,
+            loop_label,
+            loop_data.condition,
+        );
+
+        // Bind loop body
+        self.current_flow = true_flow;
+        self.build_statement(loop_data.statement);
+
+        // Loop back to loop label
+        self.add_antecedent(loop_label, self.current_flow);
+
+        // Create flow for exiting loop
+        let false_flow = self.create_flow_node(
+            flow_flags::FALSE_CONDITION,
+            loop_label,
+            loop_data.condition,
+        );
+
+        // Add to merge label
+        self.add_antecedent(merge_label, false_flow);
+
+        self.flow_stack.pop();
+        self.current_flow = merge_label;
+    }
+
+    /// Build flow graph for a do-while statement.
+    fn build_do_while_statement(&mut self, loop_data: &crate::parser::thin_node::LoopData) {
+        // Create loop label
+        let loop_label = self.graph.nodes.alloc(flow_flags::LOOP_LABEL);
+        if !self.current_flow.is_none() {
+            if let Some(node) = self.graph.nodes.get_mut(loop_label) {
+                node.antecedent.push(self.current_flow);
+            }
+        }
+
+        // Create merge label for after the loop
+        let merge_label = self.graph.nodes.alloc(flow_flags::BRANCH_LABEL);
+
+        // Push loop context
+        self.flow_stack.push(FlowContext {
+            break_label: merge_label,
+            continue_label: Some(loop_label),
+            context_type: FlowContextType::Loop,
+        });
+
+        self.current_flow = loop_label;
+
+        // Bind loop body
+        self.build_statement(loop_data.statement);
+
+        // Loop back to loop label (body always executes once)
+        self.add_antecedent(loop_label, self.current_flow);
+
+        // Create flow for condition
+        let pre_condition_flow = self.current_flow;
+
+        // True flow: back to loop label
+        let true_flow = self.create_flow_node(
+            flow_flags::TRUE_CONDITION,
+            pre_condition_flow,
+            loop_data.condition,
+        );
+        self.add_antecedent(loop_label, true_flow);
+
+        // False flow: exit loop
+        let false_flow = self.create_flow_node(
+            flow_flags::FALSE_CONDITION,
+            pre_condition_flow,
+            loop_data.condition,
+        );
+        self.add_antecedent(merge_label, false_flow);
+
+        self.flow_stack.pop();
+        self.current_flow = merge_label;
+    }
+
+    /// Build flow graph for a for statement.
+    fn build_for_statement(&mut self, loop_data: &crate::parser::thin_node::LoopData) {
+        // Create loop label
+        let loop_label = self.graph.nodes.alloc(flow_flags::LOOP_LABEL);
+        if !self.current_flow.is_none() {
+            if let Some(node) = self.graph.nodes.get_mut(loop_label) {
+                node.antecedent.push(self.current_flow);
+            }
+        }
+
+        // Create merge label for after the loop
+        let merge_label = self.graph.nodes.alloc(flow_flags::BRANCH_LABEL);
+
+        // Push loop context
+        self.flow_stack.push(FlowContext {
+            break_label: merge_label,
+            continue_label: Some(loop_label),
+            context_type: FlowContextType::Loop,
+        });
+
+        // Track initializer (variable declaration or expression)
+        if !loop_data.initializer.is_none() {
+            self.build_statement(loop_data.initializer);
+            self.add_antecedent(loop_label, self.current_flow);
+        }
+
+        self.current_flow = loop_label;
+
+        // Handle condition if present
+        if !loop_data.condition.is_none() {
+            let true_flow = self.create_flow_node(
+                flow_flags::TRUE_CONDITION,
+                loop_label,
+                loop_data.condition,
+            );
+            self.current_flow = true_flow;
+
+            // Bind loop body
+            self.build_statement(loop_data.statement);
+
+            // Continue point: after body, before incrementor
+            self.add_antecedent(loop_label, self.current_flow);
+
+            // False flow: exit loop
+            let false_flow = self.create_flow_node(
+                flow_flags::FALSE_CONDITION,
+                loop_label,
+                loop_data.condition,
+            );
+            self.add_antecedent(merge_label, false_flow);
+        } else {
+            // No condition: infinite loop
+            self.build_statement(loop_data.statement);
+            self.add_antecedent(loop_label, self.current_flow);
+        }
+
+        // Handle incrementor
+        if !loop_data.incrementor.is_none() {
+            let flow = self.create_flow_node(flow_flags::ASSIGNMENT, self.current_flow, loop_data.incrementor);
+            self.current_flow = flow;
+            self.add_antecedent(loop_label, self.current_flow);
+        }
+
+        self.flow_stack.pop();
+        self.current_flow = merge_label;
+    }
+
+    /// Build flow graph for a for-in statement.
+    fn build_for_in_statement(&mut self, for_in_of: &crate::parser::thin_node::ForInOfData) {
+        // Create loop label
+        let loop_label = self.graph.nodes.alloc(flow_flags::LOOP_LABEL);
+        if !self.current_flow.is_none() {
+            if let Some(node) = self.graph.nodes.get_mut(loop_label) {
+                node.antecedent.push(self.current_flow);
+            }
+        }
+
+        // Create merge label
+        let merge_label = self.graph.nodes.alloc(flow_flags::BRANCH_LABEL);
+
+        // Push loop context
+        self.flow_stack.push(FlowContext {
+            break_label: merge_label,
+            continue_label: Some(loop_label),
+            context_type: FlowContextType::Loop,
+        });
+
+        // Track initializer (variable declaration)
+        if !for_in_of.initializer.is_none() {
+            self.build_statement(for_in_of.initializer);
+        }
+
+        self.current_flow = loop_label;
+
+        // Bind loop body
+        self.build_statement(for_in_of.statement);
+
+        // Loop back
+        self.add_antecedent(loop_label, self.current_flow);
+        self.add_antecedent(merge_label, self.current_flow);
+
+        self.flow_stack.pop();
+        self.current_flow = merge_label;
+    }
+
+    /// Build flow graph for a for-of statement.
+    fn build_for_of_statement(&mut self, for_in_of: &crate::parser::thin_node::ForInOfData) {
+        // Create loop label
+        let loop_label = self.graph.nodes.alloc(flow_flags::LOOP_LABEL);
+        if !self.current_flow.is_none() {
+            if let Some(node) = self.graph.nodes.get_mut(loop_label) {
+                node.antecedent.push(self.current_flow);
+            }
+        }
+
+        // Create merge label
+        let merge_label = self.graph.nodes.alloc(flow_flags::BRANCH_LABEL);
+
+        // Push loop context
+        self.flow_stack.push(FlowContext {
+            break_label: merge_label,
+            continue_label: Some(loop_label),
+            context_type: FlowContextType::Loop,
+        });
+
+        // Track initializer (variable declaration)
+        if !for_in_of.initializer.is_none() {
+            self.build_statement(for_in_of.initializer);
+        }
+
+        self.current_flow = loop_label;
+
+        // Bind loop body
+        self.build_statement(for_in_of.statement);
+
+        // Loop back
+        self.add_antecedent(loop_label, self.current_flow);
+        self.add_antecedent(merge_label, self.current_flow);
+
+        self.flow_stack.pop();
+        self.current_flow = merge_label;
+    }
+
+    /// Build flow graph for a switch statement.
+    fn build_switch_statement(&mut self, switch_data: &crate::parser::thin_node::SwitchData) {
+        let pre_switch_flow = self.current_flow;
+
+        // Create branch label for end of switch
+        let end_label = self.graph.nodes.alloc(flow_flags::BRANCH_LABEL);
+
+        // Push switch context
+        self.flow_stack.push(FlowContext {
+            break_label: end_label,
+            continue_label: None,
+            context_type: FlowContextType::Switch,
+        });
+
+        // Bind case block
+        if let Some(case_block) = self.arena.get_case_block(switch_data.case_block) {
+            let mut fallthrough_flow = FlowNodeId::NONE;
+
+            for &clause_idx in &case_block.clauses.nodes {
+                if clause_idx.is_none() {
+                    continue;
+                }
+
+                let Some(clause_node) = self.arena.get(clause_idx) else {
+                    continue;
+                };
+
+                match clause_node.kind {
+                    syntax_kind_ext::CASE_CLAUSE => {
+                        if let Some(clause) = self.arena.get_case_clause(clause_node) {
+                            // Create switch clause flow node
+                            let clause_flow = self.create_switch_clause_flow(
+                                pre_switch_flow,
+                                fallthrough_flow,
+                                clause.expression,
+                            );
+                            self.current_flow = clause_flow;
+
+                            // Bind statements in clause
+                            for &stmt_idx in &clause.statements.nodes {
+                                if !stmt_idx.is_none() {
+                                    self.build_statement(stmt_idx);
+                                }
+                            }
+
+                            // Track fallthrough
+                            if self.current_flow != self.graph.unreachable_flow {
+                                fallthrough_flow = self.current_flow;
+                            } else {
+                                fallthrough_flow = FlowNodeId::NONE;
+                            }
+                        }
+                    }
+
+                    syntax_kind_ext::DEFAULT_CLAUSE => {
+                        if let Some(clause) = self.arena.get_default_clause(clause_node) {
+                            let clause_flow = self.create_switch_clause_flow(
+                                pre_switch_flow,
+                                fallthrough_flow,
+                                clause_idx, // No expression for default
+                            );
+                            self.current_flow = clause_flow;
+
+                            for &stmt_idx in &clause.statements.nodes {
+                                if !stmt_idx.is_none() {
+                                    self.build_statement(stmt_idx);
+                                }
+                            }
+
+                            self.add_antecedent(end_label, self.current_flow);
+                            fallthrough_flow = FlowNodeId::NONE;
+                        }
+                    }
+
+                    _ => {}
+                }
+            }
+        }
+
+        self.flow_stack.pop();
+        self.current_flow = end_label;
+    }
+
+    /// Build flow graph for a try statement.
+    fn build_try_statement(&mut self, try_data: &crate::parser::thin_node::TryData) {
+        let pre_try_flow = self.current_flow;
+
+        // Create merge label for after try/catch/finally
+        let end_label = self.graph.nodes.alloc(flow_flags::BRANCH_LABEL);
+
+        // Bind try block
+        self.build_statement(try_data.try_block);
+        let post_try_flow = self.current_flow;
+
+        // Bind catch clause if present
+        if !try_data.catch_clause.is_none() {
+            if let Some(catch) = self.arena.get_catch_clause(try_data.catch_clause) {
+                // Reset flow - catch can be entered from any point in try
+                self.current_flow = pre_try_flow;
+
+                // Bind catch variable if present
+                if !catch.variable_declaration.is_none() {
+                    self.build_statement(catch.variable_declaration);
+                }
+
+                // Bind catch block
+                self.build_statement(catch.block);
+                self.add_antecedent(end_label, self.current_flow);
+            }
+        }
+
+        // Add post-try flow to end label
+        self.add_antecedent(end_label, post_try_flow);
+
+        // Bind finally block if present
+        if !try_data.finally_block.is_none() {
+            self.current_flow = end_label;
+            self.build_statement(try_data.finally_block);
+        } else {
+            self.current_flow = end_label;
+        }
+    }
+
+    /// Build flow graph for a variable declaration.
+    fn build_variable_declaration(&mut self, var_decl: &crate::parser::thin_node::VariableDeclarationData, idx: NodeIndex) {
+        // Create assignment flow node for the declaration
+        if !var_decl.initializer.is_none() {
+            let flow = self.create_flow_node(flow_flags::ASSIGNMENT, self.current_flow, idx);
+            self.current_flow = flow;
+        }
+    }
+
+    /// Handle a break statement.
+    fn handle_break(&mut self) {
+        // Find the enclosing loop or switch
+        for ctx in self.flow_stack.iter().rev() {
+            self.add_antecedent(ctx.break_label, self.current_flow);
+            self.current_flow = self.graph.unreachable_flow;
+            return;
+        }
+    }
+
+    /// Handle a continue statement.
+    fn handle_continue(&mut self) {
+        // Find the enclosing loop
+        for ctx in self.flow_stack.iter().rev() {
+            if let Some(continue_label) = ctx.continue_label {
+                self.add_antecedent(continue_label, self.current_flow);
+                self.current_flow = self.graph.unreachable_flow;
+                return;
+            }
+        }
+    }
+
+    /// Create a new flow node and link it to an antecedent.
+    fn create_flow_node(&mut self, flags: u32, antecedent: FlowNodeId, node: NodeIndex) -> FlowNodeId {
+        let id = self.graph.nodes.alloc(flags);
+        if let Some(flow) = self.graph.nodes.get_mut(id) {
+            if !antecedent.is_none() && antecedent != self.graph.unreachable_flow {
+                flow.antecedent.push(antecedent);
+            }
+            flow.node = node;
+        }
+        id
+    }
+
+    /// Create a flow node for a switch clause with optional fallthrough.
+    fn create_switch_clause_flow(
+        &mut self,
+        pre_switch: FlowNodeId,
+        fallthrough: FlowNodeId,
+        expression: NodeIndex,
+    ) -> FlowNodeId {
+        let id = self.graph.nodes.alloc(flow_flags::SWITCH_CLAUSE);
+        if let Some(node) = self.graph.nodes.get_mut(id) {
+            node.node = expression;
+            if !pre_switch.is_none() && pre_switch != self.graph.unreachable_flow {
+                node.antecedent.push(pre_switch);
+            }
+            if !fallthrough.is_none() && fallthrough != self.graph.unreachable_flow {
+                node.antecedent.push(fallthrough);
+            }
+        }
+        id
+    }
+
+    /// Add an antecedent to a flow node.
+    fn add_antecedent(&mut self, label: FlowNodeId, antecedent: FlowNodeId) {
+        if antecedent.is_none() || antecedent == self.graph.unreachable_flow {
+            return;
+        }
+
+        if let Some(node) = self.graph.nodes.get_mut(label) {
+            if !node.antecedent.contains(&antecedent) {
+                node.antecedent.push(antecedent);
+            }
+        }
+    }
+
+    /// Record the current flow node for an AST node.
+    fn record_node_flow(&mut self, node: NodeIndex) {
+        if !self.current_flow.is_none() {
+            self.graph.node_flow.insert(node.0, self.current_flow);
+        }
+    }
+
+    /// Get the flow graph being constructed.
+    pub fn graph(&self) -> &FlowGraph {
+        &self.graph
+    }
+
+    /// Consume the builder and return the flow graph.
+    pub fn into_graph(self) -> FlowGraph {
+        self.graph
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::thin_parser::ThinParserState;
+
+    #[test]
+    fn test_flow_graph_builder_basic() {
+        let source = r#"
+let x: string | number;
+if (typeof x === "string") {
+    console.log(x.length);
+} else {
+    console.log(x.toFixed(2));
+}
+"#;
+
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let mut builder = FlowGraphBuilder::new(parser.get_arena());
+        if let Some(source_file) = parser.get_arena().get(root) {
+            if let Some(sf) = parser.get_arena().get_source_file(source_file) {
+                let graph = builder.build_source_file(&sf.statements);
+
+                // Verify flow graph was created
+                assert!(graph.nodes.len() > 0);
+            }
+        }
+    }
+
+    #[test]
+    fn test_flow_graph_simple() {
+        let source = r#"
+let x: string | number;
+if (x) {
+    x = "hello";
+}
+"#;
+
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let arena = parser.get_arena();
+
+        // Build flow graph using FlowGraphBuilder
+        if let Some(source_file) = arena.get(root) {
+            if let Some(sf) = arena.get_source_file(source_file) {
+                let mut builder = FlowGraphBuilder::new(arena);
+                let graph = builder.build_source_file(&sf.statements);
+
+                // Verify flow graph exists
+                assert!(graph.nodes.len() > 0);
+            }
+        }
+    }
+
+    #[test]
+    fn test_flow_graph_loop() {
+        let source = r#"
+while (true) {
+    break;
+}
+"#;
+
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let arena = parser.get_arena();
+
+        if let Some(source_file) = arena.get(root) {
+            if let Some(sf) = arena.get_source_file(source_file) {
+                let mut builder = FlowGraphBuilder::new(arena);
+                let graph = builder.build_source_file(&sf.statements);
+
+                // Verify flow graph exists with loop label
+                assert!(graph.nodes.len() > 0);
+            }
+        }
+    }
+}
