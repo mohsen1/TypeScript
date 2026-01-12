@@ -17199,6 +17199,17 @@ impl<'a> ThinCheckerState<'a> {
             return;
         }
 
+        // Skip destructuring parameters (object/array binding patterns)
+        // TypeScript doesn't emit TS7006 for destructuring parameters
+        if let Some(name_node) = self.ctx.arena.get(param.name) {
+            let kind = name_node.kind;
+            if kind == syntax_kind_ext::OBJECT_BINDING_PATTERN
+                || kind == syntax_kind_ext::ARRAY_BINDING_PATTERN
+            {
+                return;
+            }
+        }
+
         let param_name = self.parameter_name_for_error(param.name);
         let message = format_message(diagnostic_messages::PARAMETER_IMPLICIT_ANY, &[&param_name, "any"]);
         self.error_at_node(param.name, &message, diagnostic_codes::IMPLICIT_ANY_PARAMETER);
@@ -17955,10 +17966,15 @@ impl<'a> ThinCheckerState<'a> {
         // Parameter properties are only allowed in constructors, not in accessors
         self.check_parameter_properties(&accessor.parameters.nodes);
 
-        for &param_idx in &accessor.parameters.nodes {
-            if let Some(param_node) = self.ctx.arena.get(param_idx) {
-                if let Some(param) = self.ctx.arena.get_parameter(param_node) {
-                    self.maybe_report_implicit_any_parameter(param, false);
+        // TS7006 (implicit any parameter) is NOT emitted for setter parameters
+        // because the setter parameter type is inferred from the getter's return type
+        // Only check getter parameters
+        if is_getter {
+            for &param_idx in &accessor.parameters.nodes {
+                if let Some(param_node) = self.ctx.arena.get(param_idx) {
+                    if let Some(param) = self.ctx.arena.get_parameter(param_node) {
+                        self.maybe_report_implicit_any_parameter(param, false);
+                    }
                 }
             }
         }
