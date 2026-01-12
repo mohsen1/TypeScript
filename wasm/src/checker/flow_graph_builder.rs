@@ -15,6 +15,7 @@ use crate::parser::{NodeIndex, NodeList, syntax_kind_ext};
 use crate::parser::thin_node::ThinNodeArena;
 use crate::scanner::SyntaxKind;
 use rustc_hash::FxHashMap;
+use rustc_hash::FxHashSet;
 
 /// A control flow graph side-table.
 ///
@@ -29,6 +30,8 @@ pub struct FlowGraph {
     pub node_flow: FxHashMap<u32, FlowNodeId>,
     /// Unreachable flow node (for never-returning code paths)
     pub unreachable_flow: FlowNodeId,
+    /// Set of AST node indices that are unreachable
+    pub unreachable_nodes: FxHashSet<u32>,
 }
 
 impl FlowGraph {
@@ -41,6 +44,7 @@ impl FlowGraph {
             nodes,
             node_flow: FxHashMap::default(),
             unreachable_flow,
+            unreachable_nodes: FxHashSet::default(),
         }
     }
 
@@ -57,6 +61,16 @@ impl FlowGraph {
     /// Check if a flow node exists.
     pub fn has_flow_at_node(&self, node: NodeIndex) -> bool {
         self.node_flow.contains_key(&node.0)
+    }
+
+    /// Check if an AST node is unreachable.
+    pub fn is_unreachable(&self, node: NodeIndex) -> bool {
+        self.unreachable_nodes.contains(&node.0)
+    }
+
+    /// Mark an AST node as unreachable.
+    pub fn mark_unreachable(&mut self, node: NodeIndex) {
+        self.unreachable_nodes.insert(node.0);
     }
 }
 
@@ -747,6 +761,11 @@ impl<'a> FlowGraphBuilder<'a> {
     fn record_node_flow(&mut self, node: NodeIndex) {
         if !self.current_flow.is_none() {
             self.graph.node_flow.insert(node.0, self.current_flow);
+
+            // Mark node as unreachable if current flow is unreachable
+            if self.current_flow == self.graph.unreachable_flow {
+                self.graph.mark_unreachable(node);
+            }
         }
     }
 

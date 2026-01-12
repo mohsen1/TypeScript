@@ -1,0 +1,17 @@
+{
+  "env": {
+    "FORCE_COLOR": "1"
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl -s -X POST -H Content-Type:application/json -d \"{\\\"instance_id\\\":\\\"worker-2\\\",\\\"worker_id\\\":2,\\\"instance_type\\\":\\\"worker\\\"}\" http://localhost:3000/hooks/stop"
+          }
+        ]
+      }
+    ]
+  }
+}
