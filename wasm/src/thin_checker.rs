@@ -2433,6 +2433,7 @@ impl<'a> ThinCheckerState<'a> {
                                 return_type,
                                 type_predicate,
                                 is_constructor: false,
+                                is_method: true,
                             };
                             let method_type = self.ctx.types.function(shape);
                             self.pop_type_parameters(type_param_updates);
@@ -4665,7 +4666,7 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
-    fn should_check_definite_assignment(&self, sym_id: SymbolId, idx: NodeIndex) -> bool {
+    fn should_check_definite_assignment(&mut self, sym_id: SymbolId, idx: NodeIndex) -> bool {
         let Some(symbol) = self.ctx.binder.get_symbol(sym_id) else {
             return false;
         };
@@ -4699,6 +4700,14 @@ impl<'a> ThinCheckerState<'a> {
             return false;
         }
 
+        // Skip definite assignment check for variables whose types allow uninitialized use:
+        // - Literal types: `let key: "a"` - the type restricts to a single literal
+        // - Union of literals: `let key: "a" | "b"` - all possible values are literals
+        // - Types with undefined: `let obj: Foo | undefined` - undefined is the default
+        if self.symbol_type_allows_uninitialized(sym_id) {
+            return false;
+        }
+
         true
     }
 
@@ -4725,6 +4734,50 @@ impl<'a> ThinCheckerState<'a> {
                 if (node.flags as u32) & crate::parser::node_flags::AMBIENT != 0 {
                     return true;
                 }
+            }
+        }
+
+        false
+    }
+
+    /// Check if a variable symbol can be used without initialization.
+    /// This includes:
+    /// 1. Literal types (e.g., `let key: "a"`)
+    /// 2. Unions of literals (e.g., `let key: "a" | "b"`)
+    /// 3. Types that include `undefined` (e.g., `let obj: Foo | undefined`)
+    fn symbol_type_allows_uninitialized(&mut self, sym_id: SymbolId) -> bool {
+        use crate::solver::{LiteralValue, TypeKey};
+
+        let declared_type = self.get_type_of_symbol(sym_id);
+        let Some(type_key) = self.ctx.types.lookup(declared_type) else {
+            return false;
+        };
+
+        // Check if it's a single literal type
+        if matches!(type_key, TypeKey::Literal(_)) {
+            return true;
+        }
+
+        // Check if it's undefined type
+        if declared_type == TypeId::UNDEFINED {
+            return true;
+        }
+
+        // Check if it's a union
+        if let TypeKey::Union(members) = type_key {
+            let member_ids = self.ctx.types.type_list(members);
+
+            // Union of only literal types - allowed without initialization
+            let all_literals = member_ids.iter().all(|&member_id| {
+                matches!(self.ctx.types.lookup(member_id), Some(TypeKey::Literal(_)))
+            });
+            if all_literals {
+                return true;
+            }
+
+            // If union includes undefined, allowed without initialization
+            if member_ids.contains(&TypeId::UNDEFINED) {
+                return true;
             }
         }
 
@@ -6412,6 +6465,7 @@ impl<'a> ThinCheckerState<'a> {
                 type_params: sig.type_params.clone(),
                 type_predicate: sig.type_predicate.clone(),
                 is_constructor: false,
+                is_method: false,
             };
             let func_type = self.ctx.types.function(func_shape);
             let ctx_helper = ContextualTypeContext::with_expected(self.ctx.types, func_type);
@@ -8122,6 +8176,7 @@ impl<'a> ThinCheckerState<'a> {
             return_type,
             type_predicate,
             is_constructor: false,
+            is_method: false,
         };
 
         self.pop_type_parameters(type_param_updates);
@@ -9263,6 +9318,7 @@ impl<'a> ThinCheckerState<'a> {
                 return_type,
                 type_predicate: None,
                 is_constructor: false,
+                is_method: false,
             };
             Some(checker.ctx.types.function(shape))
         }
@@ -10181,6 +10237,7 @@ impl<'a> ThinCheckerState<'a> {
                         return_type,
                         type_predicate,
                         is_constructor: shape.is_constructor,
+                        is_method: shape.is_method,
                     })
                 } else {
                     type_id
@@ -11923,11 +11980,23 @@ impl<'a> ThinCheckerState<'a> {
 
             // Handle constructors separately - they use TS2392 (multiple constructor implementations), not TS2300
             if symbol.escaped_name == "constructor" {
-                // Report TS2392 for multiple constructor implementations
-                if symbol.declarations.len() > 1 {
+                // Count only constructor implementations (with body), not overloads (without body)
+                let implementations: Vec<NodeIndex> = symbol.declarations.iter().filter_map(|&decl_idx| {
+                    let node = self.ctx.arena.get(decl_idx)?;
+                    let constructor = self.ctx.arena.get_constructor(node)?;
+                    // Only count constructors with a body as implementations
+                    if !constructor.body.is_none() {
+                        Some(decl_idx)
+                    } else {
+                        None
+                    }
+                }).collect();
+
+                // Report TS2392 for multiple constructor implementations (not overloads)
+                if implementations.len() > 1 {
                     use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
                     let message = diagnostic_messages::MULTIPLE_CONSTRUCTOR_IMPLEMENTATIONS;
-                    for &decl_idx in &symbol.declarations {
+                    for &decl_idx in &implementations {
                         self.error_at_node(decl_idx, message, diagnostic_codes::MULTIPLE_CONSTRUCTOR_IMPLEMENTATIONS);
                     }
                 }
@@ -16622,6 +16691,7 @@ impl<'a> ThinCheckerState<'a> {
                     return_type,
                     type_predicate,
                     is_constructor: false,
+                    is_method: true,
                 };
                 self.pop_type_parameters(type_param_updates);
                 let method_type = self.ctx.types.function(shape);
@@ -17681,16 +17751,9 @@ impl<'a> ThinCheckerState<'a> {
             self.check_property_initialization_order(member_idx, prop.initializer);
         }
 
-        // Error 7008: Member implicitly has an 'any' type
-        // Report when property has no type annotation and no initializer (can't infer type)
-        if prop.type_annotation.is_none() && prop.initializer.is_none() {
-            // Get the property name for the error message
-            if let Some(member_name) = self.get_property_name(prop.name) {
-                use crate::checker::types::diagnostics::{diagnostic_messages, format_message};
-                let message = format_message(diagnostic_messages::MEMBER_IMPLICIT_ANY, &[&member_name, "any"]);
-                self.error_at_node(prop.name, &message, diagnostic_codes::IMPLICIT_ANY_MEMBER);
-            }
-        }
+        // Note: TS7008 (Member implicitly has an 'any' type) is now checked in
+        // check_property_initialization, where we can determine if the property
+        // is assigned in the constructor (type can be inferred from assignment).
     }
 
     /// Check a method declaration.

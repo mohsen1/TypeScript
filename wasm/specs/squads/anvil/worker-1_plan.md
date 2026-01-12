@@ -1,66 +1,51 @@
 # Worker 1 Plan - Squad Anvil
 
 ## Mission
-Fix Emitter Edge Cases - QUICK WIN tasks
+Source Map Implementation
 
 Status: Active
 Priority: P0 (Highest)
 
 ## Current Assignment
-**Fix Emitter Edge Cases (2 failing tests)**
+**Implement Source Map Generation**
 
 ### Background
-The emitter has small bugs in handling readonly modifiers and parentheses around throw expressions.
+Source maps allow debugging tools to map generated/transpiled code back to original source. Essential for debugging compiled TypeScript.
 
-### Failing Tests
-1. `test_class_es5_readonly_class_members`
-2. `test_two_phase_emission_es5_class_try_throw_parenthesized`
-
-### Implementation Steps for Readonly
-
-1. [ ] Read the failing test `test_class_es5_readonly_class_members` in `src/transforms/class_es5_tests.rs`
-2. [ ] Find where class members are emitted in `src/thin_emitter.rs`
-3. [ ] Ensure `readonly` keyword is NOT emitted to JavaScript output
-4. [ ] The `readonly` modifier only exists in TypeScript - strip it during emit
-5. [ ] Test: `./wasm/test.sh 2>&1 | grep -E "readonly_class_members"`
-
-### Implementation Steps for Try-Throw Parentheses
-
-1. [ ] Read the failing test `test_two_phase_emission_es5_class_try_throw_parenthesized`
-2. [ ] Find throw statement emission in `src/thin_emitter.rs`
-3. [ ] Check if parentheses are being added or removed incorrectly
-4. [ ] Ensure parentheses are preserved when the throw argument is a complex expression
-5. [ ] Test: `./wasm/test.sh 2>&1 | grep -E "try_throw_parenthesized"`
+### Implementation Steps
+1. [ ] Read current source map infrastructure in `src/source_map*.rs`
+2. [ ] Check what's missing compared to standard source map v3 spec
+3. [ ] Implement source map generation:
+   - Track mappings from output positions to source positions
+   - Generate VLQ-encoded mappings
+   - Create .map file alongside .js output
+4. [ ] Add source content to maps for better debugging
+5. [ ] Test: Compile a file and verify .map file is generated correctly
 
 ### Key Code Locations
-- `src/thin_emitter.rs` - member emission, statement emission
-- `src/scanner.rs` - `SyntaxKind::ReadonlyKeyword`
-
-### Expected Fix Pattern
-```rust
-// In emit_modifier_list or similar:
-fn emit_modifier(&mut self, modifier: SyntaxKind) {
-    match modifier {
-        SyntaxKind::ReadonlyKeyword => {
-            // Skip - TypeScript only, not emitted to JS
-        }
-        // ... other modifiers
-    }
-}
-```
+- `src/source_map*.rs` - source map implementation
+- `src/thin_emitter.rs` - add mapping tracking during emission
+- `src/cli/args.rs` --sourceMap flag already added
 
 ## Task Queue
-- [ ] After emitter edge cases: help with private identifier control flow
+- [ ] After source maps: help with more LSP features or additional CLI flags
 
 ## Completed
-- [x] (Move finished items here with brief notes and tests run)
+### Session 1: Emitter Edge Cases
+- [x] Fixed catch clause variable emission (65b99a3305)
+- [x] Added AS_EXPRESSION/TYPE_ASSERTION/SATISFIES_EXPRESSION handling (65b99a3305)
+
+### Session 2: LSP Semantic Tokens Enhancement
+- [x] Added semantic token support for decorators (adea84beac) - MERGED to squad/anvil
+- [x] Added semantic token support for type parameters (adea84beac) - MERGED to squad/anvil
+- [x] Added semantic token support for modifiers (adea84beac) - MERGED to squad/anvil
 
 ## Ready for Merge
-No
+Previous sessions merged to squad/anvil
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
 - Use Docker for Rust tests: `./wasm/test.sh`
-- Commit format: `[wasm] emitter: Strip readonly modifier from JS output`
+- Commit format: `[wasm] source_maps: Implement VLQ mapping generation`
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/anvil-1`

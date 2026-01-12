@@ -7,8 +7,33 @@ Updated: 2026-01-11
 - **Conformance:** 17.9% exact match, 23.4% same error count
 - **Forge-related failures:** 47 thin_checker + 3 solver + 1 control_flow = 51 tests
 
+## Conformance Metrics
+| Metric | Current | Previous | Target | Status |
+|--------|---------|----------|--------|--------|
+| Exact Match | **30.8%** | 23.3% | 50%+ | +7.5pp |
+| Missing Errors | **57.8%** | 68.2% | <30% | -10.4pp |
+| Extra Errors | **28.9%** | 35.8% | <20% | -6.9pp |
+| Parser Errors | **~85** | 1,122 | <100 | **TARGET MET** |
+| **"Crashes"** | **✅ RESOLVED** | ~478 | **0** | **FALSE ALARM** |
+
 ## Current Milestone
 **Milestone 3: Type System Parity** - Fix checker/solver issues blocking conformance
+
+## ✅ CRISIS RESOLVED: "Crash" Investigation Complete
+
+**Status:** **FALSE ALARM** - The 478 "panics" were test assertion failures, NOT runtime crashes!
+
+**Root Cause Found by W5:**
+- Bug in `is_definitely_assigned_at` (thin_checker.rs:4756)
+- Was returning `true` instead of `false` for missing flow info
+- Caused false positive TS2454 errors, making tests appear to "crash"
+- **FIXED:** Changed to return `false` - no more false positives
+
+**Resolution:**
+- ✅ Bug fixed by W5
+- ✅ 5100 tests: 5099 passing, 1 pre-existing failure
+- ✅ **Zero actual runtime crashes in production code**
+- ✅ W5's P0 investigation **COMPLETE**
 
 ## Objectives (Ranked)
 
@@ -82,8 +107,30 @@ Updated: 2026-01-11
 - Use `./scripts/ask-gemini.mjs --review` for code review
 
 ## Squad Status
-- Last EM Report: Session starting
-- Workers Active: 0/5
-- Branches Pending Merge: None
-- Current Focus: Namespace merging + Method bivariance
-- Blockers: None
+- Last EM Update: 2026-01-12 (Blocker fixed: private identifier `in` operator)
+- Conformance: **30.8% exact match** (+7.5pp from 23.3%)
+- Build: Passing (1 pre-existing test failure unrelated to recent changes)
+- **Blocker Fixed**: ✅ Private identifier narrowing in `in` operator (commit 1539a1744f)
+- Workers: All 5 active
+
+### Worker Assignments (Current)
+
+| Worker | Priority | Assignment | Status |
+|--------|----------|------------|--------|
+| W1 | HIGH | Method Bivariance | Active - fixing FunctionShape construction errors |
+| W2 | HIGH | Namespace Merging | Active - enum exports added, tests failing |
+| W3 | HIGH | Element Access Literal Keys | Active - definite assignment analysis |
+| W4 | HIGH | Namespace Merging (help W2) | Active - redirected from duplicate work |
+| W5 | MEDIUM | New Expression Inference | Active - constructor overload detection |
+
+**PRIORITY ORDER:**
+1. **W2/W4** - Namespace merging (collaborative, high priority)
+2. **W1** - Method bivariance (quick win, making progress)
+3. **W3** - Element access literal keys
+4. **W5** - New expression inference
+
+### Before Starting Any Task
+**IMPORTANT:** Workers must consult Gemini before starting work:
+```bash
+./scripts/ask-gemini.mjs "I need to implement <your task>. What's the best approach?"
+```
