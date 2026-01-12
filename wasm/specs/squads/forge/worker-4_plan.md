@@ -1,50 +1,61 @@
 # Worker 4 Plan - Squad Forge
 
 ## Mission
-Fix Namespace Merging
+Fix TS7006: Parameter Implicitly Has 'any' Type
 
 Status: Active
-Priority: P1 (High)
+Priority: P0 (CRITICAL)
 
 ## Current Assignment
-**Help W2 with Namespace Merging (12 failing tests)**
+**Implement TS7006 Error: Parameter implicitly has 'any' type**
 
-W2 has made changes to `bind_enum_declaration` to add enum members to exports, but tests are still failing.
+### Background
+TypeScript should emit TS7006 error when a function parameter has no type annotation and its type cannot be inferred. This commonly happens when:
+1. Function parameters lack type annotations
+2. No contextual type is available for inference
+3. The `noImplicitAny` compiler option is enabled
 
-### Failing Tests
-1. `test_checker_namespace_merges_with_class_element_access`
-2. `test_checker_namespace_merges_with_class_exports`
-3. `test_checker_namespace_merges_with_class_exports_reverse_order`
-4. And 9 more namespace_merges_with_* tests
+### Success Criteria
+- Emit TS7006 for parameters without type annotations when type cannot be inferred
+- Don't emit when type can be inferred from context
+- Handle all function types: function declarations, arrow functions, method signatures
+- Account for contextual type inference
 
-### Next Steps
-1. [ ] Review W2's pane output for specific test failures
-2. [ ] Coordinate with W2 - don't duplicate work
-3. [ ] Check if exports are properly combined when namespace merges with class
-4. [ ] Verify class static members are added to namespace exports
-5. [ ] Test: `./wasm/test.sh 2>&1 | grep namespace_merges_with_class`
+### Implementation Steps
+1. [ ] Read existing parameter type checking code in `src/thin_checker.rs`
+2. [ ] Find where parameter types are checked
+3. [ ] Implement check: if parameter has no type and no inference source, emit TS7006
+4. [ ] Test with various function patterns
+5. [ ] Ensure no false positives when types can be inferred
 
 ### Key Code Locations
-- `src/binder.rs` - `can_merge_flags()`, `bind_module_declaration()`, namespace exports
-- `src/thin_checker.rs` - namespace member resolution
+- `src/thin_checker.rs` - parameter type checking
+- `src/solver/infer.rs` - type inference
+- `src/checker/types/diagnostics.rs` - TS7006 error code
 
-## Task Queue
-- [ ] After namespace merging: element access literal keys (if W3 hasn't completed)
+### Test Cases to Implement
+```typescript
+// Should emit TS7006
+function foo(x) { } // Error: Parameter 'x' implicitly has 'any' type
+const bar = (y) => { }; // Error: Parameter 'y' implicitly has 'any' type
+
+// Should NOT emit (type can be inferred)
+function baz(x: number) { } // OK
+const qux = (z: string) => { }; // OK
+
+// Should NOT emit (contextual type)
+[1, 2, 3].forEach(n => console.log(n)); // OK - 'n' inferred as number
+```
 
 ## Completed
-- [x] Fix Element Access Type Resolution (5 failing tests)
-  - Fixed definite assignment check to skip variables with literal types
-  - Fixed definite assignment check to skip variables whose types include `undefined`
-  - All 5 tests now pass: literal_key_type, literal_key_union, mixed_literal_key_union,
-    numeric_literal_union, optional_chain_nullable_object
+- [x] Fix Element Access Literal Keys - Merged to squad/forge
 
 ## Ready for Merge
-Yes
+No
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
 - Use Docker for Rust tests: `./wasm/test.sh`
-- Commit format: `[wasm] binder: Fix namespace+class merge exports`
+- Commit format: `[wasm] checker: Implement TS7006 implicit any parameter errors`
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/forge-4`
-- COORDINATE with W2 - this is a collaborative task
