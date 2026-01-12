@@ -366,7 +366,15 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                 break;
             };
 
-            let assignable = if strict {
+            // Special case: if argument is `object` and parameter is a TypeParameter with constraint `object`,
+            // consider them assignable. This handles cases like `deepFreeze(value as object)` where
+            // the function signature is `deepFreeze<T extends object>(obj: T)`.
+            let is_object_to_constrained_type_param = *arg_type == TypeId::OBJECT
+                && matches!(self.interner.lookup(param_type), Some(TypeKey::TypeParameter(info)) if info.constraint == Some(TypeId::OBJECT));
+
+            let assignable = if is_object_to_constrained_type_param {
+                true
+            } else if strict {
                 self.checker.is_assignable_to_strict(*arg_type, param_type)
             } else {
                 self.checker.is_assignable_to(*arg_type, param_type)
