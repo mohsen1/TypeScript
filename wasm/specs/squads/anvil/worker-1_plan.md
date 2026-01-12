@@ -3,29 +3,38 @@
 ## Mission
 Additional CLI Features
 
-Status: Active
+Status: COMPLETE ✅
 Priority: P0 (Highest)
 
 ## Current Assignment
-**Add More CLI Flags**
+**Add More CLI Flags - COMPLETE**
+
+All flags implemented and verified:
+- --outFile <FILE> - Concatenate and emit output to single file
+- --tsBuildInfoFile <FILE> - Specify .tsbuildinfo file path
+- --incremental - Enable incremental compilation
 
 ### Background
 TypeScript compiler has many CLI flags. Add more commonly-used flags for better compatibility.
 
 ### Implementation Steps
-1. [ ] Read current CLI implementation in `src/cli/args.rs`
-2. [ ] Add support for important flags:
+1. [x] Read current CLI implementation in `src/cli/args.rs`
+2. [x] Add support for important flags:
    - `--outFile`: Concatenate and emit output to single file
    - `--tsBuildInfoFile`: Specify .tsbuildinfo file
    - `--incremental`: Enable incremental compilation
-3. [ ] Update argument parsing in clap configuration
-4. [ ] Wire up flags to config.rs and driver.rs
-5. [ ] Test: Run `./wasm/target/release/tsz --help` and verify flags are listed
+3. [x] Update argument parsing in clap configuration
+4. [x] Wire up flags to config.rs and driver.rs
+5. [x] Test: Run `./wasm/target/release/tsz --help` and verify flags are listed
 
 ### Key Code Locations
-- `src/cli/args.rs` - CLI argument definitions
-- `src/cli/config.rs` - CompilerOptions struct
-- `src/cli/driver.rs` - compilation driver
+- `src/cli/args.rs:26-48` - Added CLI flag definitions
+- `src/cli/config.rs:50-63` - Added CompilerOptions fields
+- `src/cli/config.rs:91-97` - Added ResolvedCompilerOptions fields
+- `src/cli/config.rs:181,186-187` - Added Default impl
+- `src/cli/config.rs:295-327` - Added resolution logic
+- `src/cli/config.rs:427,432-433` - Added merge logic
+- `src/cli/driver.rs:3271-3279` - Added CLI override logic
 
 ## Task Queue
 - [ ] After CLI flags: help with LSP features or emitter work
@@ -36,6 +45,15 @@ TypeScript compiler has many CLI flags. Add more commonly-used flags for better 
 - [x] LSP Semantic Tokens (decorators, type parameters, modifiers) - MERGED to squad/anvil
 - [x] Source Map Implementation - Verified complete (905 tests passing)
 - [x] Import Equals Emission Fix - Test passes (commit 8271a07cb1)
+
+### Session 5: Additional CLI Features - COMPLETE ✅
+- [x] Added --outFile flag (concatenate output to single file)
+- [x] Added --tsBuildInfoFile flag (specify .tsbuildinfo file path)
+- [x] Added --incremental flag (enable incremental compilation)
+- [x] Wired flags to CompilerOptions in config.rs
+- [x] Added CLI override handling in driver.rs
+- [x] All flags verified in --help output
+- Commit: 9754ae94f1
 
 ### Session 4: Import Equals Emission Fix - COMPLETE ✅
 - [x] Fixed import equals type to return `any` instead of `string`
@@ -64,7 +82,7 @@ TypeScript compiler has many CLI flags. Add more commonly-used flags for better 
 - Status: Implementation complete and verified via CLI testing
 
 ## Ready for Merge
-No commits (task in progress)
+Yes (9754ae94f1)
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
