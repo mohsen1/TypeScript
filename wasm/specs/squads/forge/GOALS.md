@@ -107,27 +107,32 @@ Updated: 2026-01-11
 - Use `./scripts/ask-gemini.mjs --review` for code review
 
 ## Squad Status
-- Last EM Update: 2026-01-11 (✅ CRISIS RESOLVED)
+- Last EM Update: 2026-01-12 (3 workers merged to squad/forge)
 - Conformance: **30.8% exact match** (+7.5pp from 23.3%)
 - Build: Passing
-- **Crashes**: ✅ **FALSE ALARM** - W5 found bug, fixed, 5099/5100 tests passing
-- Workers: W2,W3,W5 merged, all 5 active
+- **Recent Merges**: W1 (method bivariance), W4 (element access), W5 (new expression) - All tests passing
+- Workers: All 5 active on new tasks
 
-### Worker Assignments (Post-Crisis)
+### Worker Assignments (Current)
 
 | Worker | Priority | Assignment | Status |
 |--------|----------|------------|--------|
-| W1 | HIGH | TS2454 Definite Assignment | Needs debugging help |
-| W2 | HIGH | TS2564 Property Initialization | ✅ 16/16 tests pass, reassigned |
-| W3 | HIGH | TS2322 Solver Strictness | ✅ Merged, reassigned |
-| W4 | HIGH | TS2339 Property Access | Active - protected members |
-| W5 | ✅ **COMPLETE** | **Crash Investigation** | ✅ **P0 RESOLVED** - reassigned |
+| W1 | HIGH | TS2454 Variable Used Before Assignment | New task - implementing |
+| W2 | HIGH | Namespace Merging (12 tests) | Active - debugging TypeId mismatches |
+| W3 | HIGH | Element Access Literal Keys | Active - definite assignment analysis |
+| W4 | HIGH | Namespace Merging (help W2) | New task - collaborative debugging |
+| W5 | HIGH | TS2564 Property No Initializer | New task - implementing |
+
+**MERGED WORKERS (to squad/forge):**
+- ✅ W1: Method bivariance (4/4 tests pass)
+- ✅ W4: Element access literal keys (3/3 tests pass)
+- ✅ W5: New expression inference (7/7 tests pass)
 
 **PRIORITY ORDER:**
-1. **W1** - Needs help debugging TS2454 not emitting
-2. **W2/W3** - Continue high-priority tasks
-3. **W4** - Protected member access
-4. **W5** - Return to normal priority tasks
+1. **W2/W4** - Namespace merging (P1, collaborative, test failures to fix)
+2. **W1** - TS2454 definite assignment (43 occurrences)
+3. **W5** - TS2564 property initialization (64 occurrences)
+4. **W3** - Element access literal keys
 
 ### Before Starting Any Task
 **IMPORTANT:** Workers must consult Gemini before starting work:
