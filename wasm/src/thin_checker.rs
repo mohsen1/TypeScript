@@ -8228,6 +8228,27 @@ impl<'a> ThinCheckerState<'a> {
                 );
             }
 
+            // TS2705: Async function must return Promise
+            // Check for arrow functions and function expressions
+            if !is_function_declaration && has_type_annotation {
+                let is_async = if let Some(func) = self.ctx.arena.get_function(node) {
+                    func.is_async
+                } else if let Some(method) = self.ctx.arena.get_method_decl(node) {
+                    self.has_async_modifier(&method.modifiers)
+                } else {
+                    false
+                };
+
+                if is_async && !self.is_promise_type(return_type) {
+                    use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
+                    self.error_at_node(
+                        type_annotation,
+                        diagnostic_messages::ASYNC_FUNCTION_RETURNS_PROMISE,
+                        diagnostic_codes::ASYNC_FUNCTION_RETURNS_PROMISE,
+                    );
+                }
+            }
+
             // TS2366 (not all code paths return value) for function expressions and arrow functions
             // Check if all code paths return a value when return type requires it
             if !is_function_declaration && !body.is_none() {
@@ -12368,6 +12389,17 @@ impl<'a> ThinCheckerState<'a> {
                             false,
                             stmt_idx,
                         );
+
+                        // TS2705: Async function must return Promise
+                        // Only check if there's an explicit return type annotation
+                        if func.is_async && has_type_annotation && !self.is_promise_type(return_type) {
+                            use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
+                            self.error_at_node(
+                                func.type_annotation,
+                                diagnostic_messages::ASYNC_FUNCTION_RETURNS_PROMISE,
+                                diagnostic_codes::ASYNC_FUNCTION_RETURNS_PROMISE,
+                            );
+                        }
 
                         self.push_return_type(return_type);
                         self.check_statement(func.body);
@@ -18613,6 +18645,27 @@ impl<'a> ThinCheckerState<'a> {
         // Match exact Promise/PromiseLike names, or any name containing "Promise" (case-insensitive)
         // This handles types like MyPromise, CustomPromise, etc.
         matches!(name, "Promise" | "PromiseLike") || name.contains("Promise")
+    }
+
+    /// Check if a type is a Promise or Promise-like type.
+    /// This is used to validate async function return types.
+    fn is_promise_type(&self, type_id: TypeId) -> bool {
+        use crate::solver::{SymbolRef, TypeKey};
+
+        // Check for Promise<T> or PromiseLike<T> type application
+        if let Some(TypeKey::Application(app_id)) = self.ctx.types.lookup(type_id) {
+            let app = self.ctx.types.type_application(app_id);
+            return self.type_ref_is_promise_like(app.base);
+        }
+
+        // Check for direct Promise or PromiseLike reference (this also handles type aliases)
+        if let Some(TypeKey::Ref(SymbolRef(sym_id))) = self.ctx.types.lookup(type_id) {
+            if let Some(symbol) = self.ctx.binder.get_symbol(SymbolId(sym_id)) {
+                return self.is_promise_like_name(symbol.escaped_name.as_str());
+            }
+        }
+
+        false
     }
 
     fn is_null_or_undefined_only(&self, return_type: TypeId) -> bool {
