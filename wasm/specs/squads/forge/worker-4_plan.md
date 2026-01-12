@@ -1,65 +1,74 @@
 # Worker 4 Plan - Squad Forge
 
 ## Mission
-Fix TS7006: Parameter Implicitly Has 'Any' Type
+Fix TS2322: Type Not Assignable
 
 Status: Active
 Priority: P1 (HIGH)
 
 ## Current Assignment
-**Implement TS7006 Error: Parameter implicitly has 'any' type (42 occurrences)**
+**Fix TS2322 Missing Errors: Type not assignable (19 occurrences - some missing)**
 
 ### Background
-TypeScript should emit TS7006 when a function parameter has an implicit 'any' type and the `noImplicitAny` compiler option is enabled.
+TypeScript is missing TS2322 "Type not assignable" errors in some cases. This is a type compatibility issue where the assignability checker isn't catching all invalid type assignments.
 
 ### Success Criteria
-- Emit TS7006 for function/method parameters without type annotations when noImplicitAny is true
-- Handle all function types: function declarations, expressions, arrow functions, methods
-- Don't emit when parameter has explicit type annotation
-- Don't emit when parameter has default value
-- Don't emit when noImplicitAny is false
+- Emit TS2322 for all invalid type assignments
+- Handle type compatibility checking for:
+  - Interface implementations
+  - Class inheritance
+  - Generic type constraints
+  - Union/intersection types
+- Don't emit false positives for valid assignments
+- Fix missing TS2322 detections (19 occurrences)
 
 ### Implementation Steps
 1. [ ] Sync from origin/rust: `git fetch origin && git merge origin/rust --no-edit`
-2. [ ] Search for parameter type checking code in `src/thin_checker.rs`
-3. [ ] Find where implicit any is detected for parameters
-4. [ ] Implement TS7006 emission when noImplicitAny is true and parameter has no type annotation
-5. [ ] Test with various function patterns
-6. [ ] Run conformance to verify TS7006 is emitted correctly
+2. [ ] Search for TS2322 emission code in `src/solver/operations.rs` or `src/thin_checker.rs`
+3. [ ] Investigate assignability checking logic
+4. [ ] Find cases where TS2322 should be emitted but isn't
+5. [ ] Fix type compatibility checking
+6. [ ] Test with various assignability patterns
+7. [ ] Run conformance to verify TS2322 is emitted correctly
 
 ### Key Code Locations
-- `src/thin_checker.rs` - function parameter type checking
-- `src/checker/types/diagnostics.rs` - TS7006 error code
-- `src/cli/args.rs` - noImplicitAny flag
+- `src/solver/operations.rs` - type assignability checking
+- `src/thin_checker.rs` - assignment expression checking
+- `src/checker/types/diagnostics.rs` - TS2322 error code
 
 ### Test Cases
 ```typescript
-// @noImplicitAny: true
+// Should emit TS2322
+let x: string = 42; // Error: Type 'number' is not assignable to type 'string'
 
-// Should emit TS7006
-function foo(x) { } // Error: Parameter 'x' implicitly has 'any' type
+interface Foo {
+  x: number;
+}
 
-const bar = (y) => { }; // Error: Parameter 'y' implicitly has 'any' type
+class Bar implements Foo {
+  x: string; // Error: Type 'string' is not assignable to type 'number'
+}
 
-class Baz {
-  method(z) { } // Error: Parameter 'z' implicitly has 'any' type
+function baz<T extends number>(arg: T): T {
+  return "hello" as T; // Error: Type 'string' is not assignable to type 'T'
 }
 
 // Should NOT emit
-function qux(a: number) { } // OK - explicit type
-function quux(b = 5) { } // OK - has default value
+let y: number = 42; // OK
+
+class Qux implements Foo {
+  x: number; // OK
+}
 ```
 
 ## Completed
-- [x] TS2792 - Module resolution (reassigned)
-- [x] TS7010 - Implicit any return type - Merged to squad/forge ✅
+- [x] TS7010 Implicit Any Return - Merged to squad/forge
+- [x] TS7006 Parameter 'Any' Type - Basic implementation complete, committed
 
 ## Ready for Merge
 No
 
 ## Notes
-- Follow `wasm/specs/WASM_ARCHITECTURE.md`
-- Use Docker for Rust tests: `./wasm/test.sh`
-- Commit format: `[wasm] checker: Implement TS7006 implicit any parameter errors`
+- Commit format: `[wasm] checker: Fix TS2322 missing type assignability errors`
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/forge-4`
