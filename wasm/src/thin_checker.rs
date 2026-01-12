@@ -8090,8 +8090,9 @@ impl<'a> ThinCheckerState<'a> {
                 return_type = self.infer_return_type_from_body(body, return_context);
             }
 
-            // TS7011 (implicit any return) is only emitted for ambient functions
-            // (declare modifier or .d.ts file), matching TypeScript's behavior
+            // TS7010 (implicit any return) is emitted for:
+            // 1. Ambient functions/methods (declare modifier or .d.ts file)
+            // 2. Non-ambient function expressions, arrow functions, and object literal methods when @noImplicitAny is true
             if !is_function_declaration {
                 let is_ambient = if let Some(func) = self.ctx.arena.get_function(node) {
                     self.has_declare_modifier(&func.modifiers)
@@ -8109,7 +8110,8 @@ impl<'a> ThinCheckerState<'a> {
                     is_ambient
                 };
 
-                if is_ambient {
+                // Check TS7010 if ambient OR if @noImplicitAny is true
+                if is_ambient || self.ctx.no_implicit_any {
                     self.maybe_report_implicit_any_return(
                         name_for_error,
                         name_node,
@@ -12181,12 +12183,13 @@ impl<'a> ThinCheckerState<'a> {
                             return_type = self.infer_return_type_from_body(func.body, None);
                         }
 
-                        // TS7010 (implicit any return) is only emitted for ambient functions
-                        // (declare modifier or .d.ts file), matching TypeScript's behavior
+                        // TS7010 (implicit any return) is emitted for:
+                        // 1. Ambient functions (declare modifier or .d.ts file)
+                        // 2. Non-ambient functions when @noImplicitAny is true
                         let is_ambient = self.has_declare_modifier(&func.modifiers)
                             || self.ctx.file_name.ends_with(".d.ts");
 
-                        if is_ambient {
+                        if is_ambient || self.ctx.no_implicit_any {
                             let func_name = self.get_function_name_from_node(stmt_idx);
                             let name_node = if !func.name.is_none() { Some(func.name) } else { None };
                             self.maybe_report_implicit_any_return(
