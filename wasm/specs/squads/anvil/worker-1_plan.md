@@ -1,47 +1,51 @@
 # Worker 1 Plan - Squad Anvil
 
 ## Mission
-LSP Semantic Tokens Enhancement
+Source Map Implementation
 
 Status: Active
-Priority: P1 (High)
+Priority: P0 (Highest)
 
 ## Current Assignment
-**Enhance LSP Semantic Tokens Implementation**
+**Implement Source Map Generation**
 
 ### Background
-LSP semantic tokens provide IDEs with rich syntax highlighting. Current implementation needs enhancement for better TypeScript language support.
+Source maps allow debugging tools to map generated/transpiled code back to original source. Essential for debugging compiled TypeScript.
 
 ### Implementation Steps
-
-1. [ ] Read current semantic tokens implementation in `src/lsp/semantic_tokens.rs`
-2. [ ] Check which token types are missing or incorrect compared to VS Code's TypeScript server
-3. [ ] Add support for missing token types:
-   - Decorators
-   - Type parameters
-   - Namespace/module declarations
-   - Modifier keywords (readonly, static, etc.)
-4. [ ] Ensure proper token modifiers (readonly, static, async, etc.)
-5. [ ] Test: Run LSP server and verify token output matches tsserver
+1. [ ] Read current source map infrastructure in `src/source_map*.rs`
+2. [ ] Check what's missing compared to standard source map v3 spec
+3. [ ] Implement source map generation:
+   - Track mappings from output positions to source positions
+   - Generate VLQ-encoded mappings
+   - Create .map file alongside .js output
+4. [ ] Add source content to maps for better debugging
+5. [ ] Test: Compile a file and verify .map file is generated correctly
 
 ### Key Code Locations
-- `src/lsp/semantic_tokens.rs` - semantic token implementation
-- `src/lsp/mod.rs` - LSP server
+- `src/source_map*.rs` - source map implementation
+- `src/thin_emitter.rs` - add mapping tracking during emission
+- `src/cli/args.rs` --sourceMap flag already added
 
 ## Task Queue
-- [ ] After LSP semantic tokens: help with source maps or diagnostic formatting
+- [ ] After source maps: help with more LSP features or additional CLI flags
 
 ## Completed
-- [x] Fixed catch clause variable emission (65b99a3305) - MERGED to squad/anvil
-- [x] Fixed type assertion emission in ClassES5Emitter (65b99a3305) - MERGED to squad/anvil
-- [x] Fixed try-throw parentheses (test_two_phase_emission_es5_class_try_throw_parenthesized) - MERGED
+### Session 1: Emitter Edge Cases
+- [x] Fixed catch clause variable emission (65b99a3305)
+- [x] Added AS_EXPRESSION/TYPE_ASSERTION/SATISFIES_EXPRESSION handling (65b99a3305)
+
+### Session 2: LSP Semantic Tokens Enhancement
+- [x] Added semantic token support for decorators (adea84beac) - MERGED to squad/anvil
+- [x] Added semantic token support for type parameters (adea84beac) - MERGED to squad/anvil
+- [x] Added semantic token support for modifiers (adea84beac) - MERGED to squad/anvil
 
 ## Ready for Merge
-Yes - Previous work merged to squad/anvil
+Previous sessions merged to squad/anvil
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
 - Use Docker for Rust tests: `./wasm/test.sh`
-- Commit format: `[wasm] lsp: Enhance semantic tokens with decorators and modifiers`
+- Commit format: `[wasm] source_maps: Implement VLQ mapping generation`
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/anvil-1`

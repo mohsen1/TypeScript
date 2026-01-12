@@ -38,36 +38,110 @@ impl Reporter {
         let category = self.format_category(diagnostic.category);
         let code = self.format_code(diagnostic.code);
 
-        let mut line = String::new();
+        let mut output = String::new();
         if let Some(location) = location {
-            line.push_str(&location);
+            output.push_str(&location);
         } else if !diagnostic.file.is_empty() {
-            line.push_str(&diagnostic.file);
+            output.push_str(&diagnostic.file);
         } else {
-            line.push_str("<unknown>");
+            output.push_str("<unknown>");
         }
 
-        line.push_str(" - ");
-        line.push_str(&category);
+        output.push_str(" - ");
+        output.push_str(&category);
         if !code.is_empty() {
-            line.push(' ');
-            line.push_str(&code);
+            output.push(' ');
+            output.push_str(&code);
         }
-        line.push_str(": ");
-        line.push_str(&diagnostic.message_text);
+        output.push_str(": ");
+        output.push_str(&diagnostic.message_text);
+
+        // Add source code snippet with error span underline (like tsc)
+        if let Some(snippet) = self.format_snippet(&diagnostic.file, diagnostic.start, diagnostic.length) {
+            output.push_str(&snippet);
+        }
 
         if diagnostic.related_information.is_empty() {
-            return line;
+            return output;
         }
 
-        let mut combined = String::new();
-        combined.push_str(&line);
         for related in &diagnostic.related_information {
-            combined.push('\n');
-            combined.push_str(&self.format_related(related));
+            output.push('\n');
+            output.push_str(&self.format_related(related));
+            // Add source snippet for related information too
+            if let Some(snippet) = self.format_snippet(&related.file, related.start, related.length) {
+                output.push_str(&snippet);
+            }
         }
 
-        combined
+        output
+    }
+
+    /// Format a source code snippet with error span underline, matching tsc's output format.
+    /// Example:
+    ///   2   let x: number = "string";
+    ///         ~
+    fn format_snippet(&mut self, file: &str, start: u32, length: u32) -> Option<String> {
+        if file.is_empty() || length == 0 {
+            return None;
+        }
+
+        let (line_num, column) = self.position_for(file, start)?;
+        let source = self.sources.get(file)?;
+
+        // Get the line containing the error
+        let lines: Vec<&str> = source.lines().collect();
+        let line_idx = (line_num - 1) as usize;
+        if line_idx >= lines.len() {
+            return None;
+        }
+
+        let line_text = lines[line_idx];
+        let end = start + length;
+
+        // Build the underline
+        // Start with spaces up to the error position
+        let mut underline = String::new();
+        for (i, ch) in line_text.chars().enumerate() {
+            let offset = i as u32;
+            if offset < column as u32 - 1 {
+                if ch == '\t' {
+                    underline.push_str("    "); // Tabs expand to 4 spaces
+                } else {
+                    underline.push(' ');
+                }
+            } else if offset >= column as u32 - 1 && offset < end {
+                // Within the error span - use tildes (or ~ for single char)
+                if ch == '\t' {
+                    underline.push_str("~~~~");
+                } else {
+                    underline.push('~');
+                }
+            } else {
+                break;
+            }
+        }
+
+        // If underline is empty but we have a length, show at least one ~
+        if underline.is_empty() && length > 0 {
+            underline.push('~');
+        }
+
+        // Format: line number padded to 3 digits, then the source line, then the underline
+        let mut snippet = String::new();
+        snippet.push('\n');
+        snippet.push_str(&format!("  {:>3}   {}", line_num, line_text));
+        snippet.push('\n');
+
+        // Add color to the underline in color mode
+        let underline_display = if self.color {
+            underline.red().to_string()
+        } else {
+            underline
+        };
+        snippet.push_str(&format!("       {}", underline_display));
+
+        Some(snippet)
     }
 
     fn format_related(&mut self, related: &DiagnosticRelatedInformation) -> String {

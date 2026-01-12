@@ -3256,6 +3256,18 @@ pub(crate) fn apply_cli_overrides(options: &mut ResolvedCompilerOptions, args: &
     if let Some(out_dir) = args.out_dir.as_ref() {
         options.out_dir = Some(out_dir.clone());
     }
+    if let Some(root_dir) = args.root_dir.as_ref() {
+        options.root_dir = Some(root_dir.clone());
+    }
+    if args.declaration {
+        options.emit_declarations = true;
+    }
+    if args.declaration_map {
+        options.declaration_map = true;
+    }
+    if args.source_map {
+        options.source_map = true;
+    }
     if args.strict {
         options.checker.strict = true;
     }
