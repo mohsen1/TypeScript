@@ -91,6 +91,10 @@ impl<'a> FlowGraph<'a> {
     }
 }
 
+// =============================================================================
+// FlowAnalyzer
+// =============================================================================
+
 /// Flow analyzer for control flow-based type narrowing.
 ///
 /// Walks the control flow graph backwards from a reference point to determine

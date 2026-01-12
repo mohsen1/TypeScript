@@ -479,7 +479,7 @@ impl<'a> CheckerContext<'a> {
     /// * `Some(FlowNodeId)` - The flow node ID at this location
     /// * `None` - If flow graph is not available or node has no flow info
     pub fn check_flow_usage(&self, node_idx: NodeIndex) -> Option<crate::binder::FlowNodeId> {
-        if let Some(ref graph) = self.flow_graph {
+        if let Some(ref _graph) = self.flow_graph {
             // Look up the flow node for this AST node from the binder's node_flow mapping
             self.binder.node_flow.get(&node_idx.0).copied()
         } else {
