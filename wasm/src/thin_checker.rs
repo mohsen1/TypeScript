@@ -18131,13 +18131,20 @@ impl<'a> ThinCheckerState<'a> {
     fn type_ref_is_promise_like(&self, type_id: TypeId) -> bool {
         use crate::solver::{TypeKey, SymbolRef};
 
-        let Some(TypeKey::Ref(SymbolRef(sym_id))) = self.ctx.types.lookup(type_id) else {
-            return false;
-        };
-        let Some(symbol) = self.ctx.binder.get_symbol(SymbolId(sym_id)) else {
-            return false;
-        };
-        self.is_promise_like_name(symbol.escaped_name.as_str())
+        match self.ctx.types.lookup(type_id) {
+            Some(TypeKey::Ref(SymbolRef(sym_id))) => {
+                if let Some(symbol) = self.ctx.binder.get_symbol(SymbolId(sym_id)) {
+                    return self.is_promise_like_name(symbol.escaped_name.as_str());
+                }
+            }
+            Some(TypeKey::Application(app_id)) => {
+                // Check if the base type of the application is a Promise-like type
+                let app = self.ctx.types.type_application(app_id);
+                return self.type_ref_is_promise_like(app.base);
+            }
+            _ => {}
+        }
+        false
     }
 
     fn promise_like_type_argument_from_base(
