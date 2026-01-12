@@ -7300,7 +7300,10 @@ impl<'a> ThinCheckerState<'a> {
                     // FALLBACK: Manually check if the property exists in the callable type
                     // This fixes cases where property_access_type fails due to atom comparison issues
                     // The property IS in the type (as shown by error messages), but the lookup fails
-                    if let Some(TypeKey::Callable(shape_id)) = self.ctx.types.lookup(object_type_for_check) {
+                    //
+                    // Important: We need to resolve TypeKey::Ref to get the actual Callable type
+                    let resolved_type = self.resolve_type_for_property_access(object_type_for_check);
+                    if let Some(TypeKey::Callable(shape_id)) = self.ctx.types.lookup(resolved_type) {
                         let shape = self.ctx.types.callable_shape(shape_id);
                         let prop_atom = self.ctx.types.intern_string(&property_name);
                         for prop in &shape.properties {
