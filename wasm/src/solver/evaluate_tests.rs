@@ -124,6 +124,7 @@ fn test_rest_unknown_bivariant_conditional_evaluate_strict() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let source = interner.function(FunctionShape {
@@ -138,6 +139,7 @@ fn test_rest_unknown_bivariant_conditional_evaluate_strict() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let lit_true = interner.literal_boolean(true);
@@ -1309,6 +1311,7 @@ fn test_conditional_infer_object_property_function_return_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let extends_obj = interner.object(vec![PropertyInfo {
         name: interner.intern_string("a"),
@@ -1335,6 +1338,7 @@ fn test_conditional_infer_object_property_function_return_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let number_fn = interner.function(FunctionShape {
         params: Vec::new(),
@@ -1343,6 +1347,7 @@ fn test_conditional_infer_object_property_function_return_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let obj_string = interner.object(vec![PropertyInfo {
         name: interner.intern_string("a"),
@@ -5263,6 +5268,7 @@ fn test_conditional_infer_function_param_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let cond = ConditionalType {
         check_type: t_param,
@@ -5286,6 +5292,7 @@ fn test_conditional_infer_function_param_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let number_fn = interner.function(FunctionShape {
         params: vec![ParamInfo {
@@ -5299,6 +5306,7 @@ fn test_conditional_infer_function_param_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     subst.insert(t_name, interner.union(vec![string_fn, number_fn]));
 
@@ -5341,6 +5349,7 @@ fn test_conditional_infer_function_optional_param_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let cond = ConditionalType {
         check_type: t_param,
@@ -5364,6 +5373,7 @@ fn test_conditional_infer_function_optional_param_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let number_fn = interner.function(FunctionShape {
         params: vec![ParamInfo {
@@ -5377,6 +5387,7 @@ fn test_conditional_infer_function_optional_param_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     subst.insert(t_name, interner.union(vec![string_fn, number_fn]));
 
@@ -5419,6 +5430,7 @@ fn test_conditional_infer_function_optional_param_non_distributive_union_input()
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let cond = ConditionalType {
         check_type: interner.tuple(vec![TupleElement {
@@ -5452,6 +5464,7 @@ fn test_conditional_infer_function_optional_param_non_distributive_union_input()
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let number_fn = interner.function(FunctionShape {
         params: vec![ParamInfo {
@@ -5465,6 +5478,7 @@ fn test_conditional_infer_function_optional_param_non_distributive_union_input()
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     subst.insert(t_name, interner.union(vec![string_fn, number_fn]));
 
@@ -5506,6 +5520,7 @@ fn test_conditional_infer_function_param_non_function_union_branch() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let cond = ConditionalType {
         check_type: t_param,
@@ -5529,6 +5544,7 @@ fn test_conditional_infer_function_param_non_function_union_branch() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     subst.insert(t_name, interner.union(vec![string_fn, TypeId::NUMBER]));
 
@@ -5570,6 +5586,7 @@ fn test_conditional_infer_function_param_non_distributive_union_input() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let cond = ConditionalType {
         check_type: interner.tuple(vec![TupleElement {
@@ -5603,6 +5620,7 @@ fn test_conditional_infer_function_param_non_distributive_union_input() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let number_fn = interner.function(FunctionShape {
         params: vec![ParamInfo {
@@ -5616,6 +5634,7 @@ fn test_conditional_infer_function_param_non_distributive_union_input() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     subst.insert(t_name, interner.union(vec![string_fn, number_fn]));
 
@@ -5657,6 +5676,7 @@ fn test_conditional_infer_function_param_non_distributive_union_branch() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let cond = ConditionalType {
         check_type: interner.tuple(vec![TupleElement {
@@ -5690,6 +5710,7 @@ fn test_conditional_infer_function_param_non_distributive_union_branch() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     subst.insert(t_name, interner.union(vec![string_fn, TypeId::NUMBER]));
 
@@ -5731,6 +5752,7 @@ fn test_conditional_infer_function_rest_param_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let cond = ConditionalType {
         check_type: t_param,
@@ -5754,6 +5776,7 @@ fn test_conditional_infer_function_rest_param_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let number_fn = interner.function(FunctionShape {
         params: vec![ParamInfo {
@@ -5767,6 +5790,7 @@ fn test_conditional_infer_function_rest_param_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     subst.insert(t_name, interner.union(vec![string_fn, number_fn]));
 
@@ -5812,6 +5836,7 @@ fn test_conditional_infer_function_rest_param_non_distributive_union_input() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let cond = ConditionalType {
         check_type: interner.tuple(vec![TupleElement {
@@ -5845,6 +5870,7 @@ fn test_conditional_infer_function_rest_param_non_distributive_union_input() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let number_fn = interner.function(FunctionShape {
         params: vec![ParamInfo {
@@ -5858,6 +5884,7 @@ fn test_conditional_infer_function_rest_param_non_distributive_union_input() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     subst.insert(t_name, interner.union(vec![string_fn, number_fn]));
 
@@ -5903,6 +5930,7 @@ fn test_conditional_infer_function_rest_param_non_distributive_union_branch() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let cond = ConditionalType {
         check_type: interner.tuple(vec![TupleElement {
@@ -5936,6 +5964,7 @@ fn test_conditional_infer_function_rest_param_non_distributive_union_branch() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     subst.insert(t_name, interner.union(vec![string_fn, TypeId::NUMBER]));
 
@@ -5972,6 +6001,7 @@ fn test_conditional_infer_function_this_param_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let cond = ConditionalType {
         check_type: t_param,
@@ -5990,6 +6020,7 @@ fn test_conditional_infer_function_this_param_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let number_fn = interner.function(FunctionShape {
         params: Vec::new(),
@@ -5998,6 +6029,7 @@ fn test_conditional_infer_function_this_param_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     subst.insert(t_name, interner.union(vec![string_fn, number_fn]));
 
@@ -6035,6 +6067,7 @@ fn test_conditional_infer_function_this_param_non_distributive_union_input() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let cond = ConditionalType {
         check_type: interner.tuple(vec![TupleElement {
@@ -6063,6 +6096,7 @@ fn test_conditional_infer_function_this_param_non_distributive_union_input() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let number_fn = interner.function(FunctionShape {
         params: Vec::new(),
@@ -6071,6 +6105,7 @@ fn test_conditional_infer_function_this_param_non_distributive_union_input() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     subst.insert(t_name, interner.union(vec![string_fn, number_fn]));
 
@@ -6108,6 +6143,7 @@ fn test_conditional_infer_function_this_param_non_distributive_union_branch() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let cond = ConditionalType {
         check_type: interner.tuple(vec![TupleElement {
@@ -6136,6 +6172,7 @@ fn test_conditional_infer_function_this_param_non_distributive_union_branch() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     subst.insert(t_name, interner.union(vec![string_fn, TypeId::NUMBER]));
 
@@ -6171,6 +6208,7 @@ fn test_conditional_infer_function_return_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let cond = ConditionalType {
         check_type: t_param,
@@ -6189,6 +6227,7 @@ fn test_conditional_infer_function_return_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let number_fn = interner.function(FunctionShape {
         params: Vec::new(),
@@ -6197,6 +6236,7 @@ fn test_conditional_infer_function_return_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     subst.insert(t_name, interner.union(vec![string_fn, number_fn]));
 
@@ -6233,6 +6273,7 @@ fn test_conditional_infer_function_return_non_distributive_union_input() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let cond = ConditionalType {
         check_type: interner.tuple(vec![TupleElement {
@@ -6261,6 +6302,7 @@ fn test_conditional_infer_function_return_non_distributive_union_input() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let number_fn = interner.function(FunctionShape {
         params: Vec::new(),
@@ -6269,6 +6311,7 @@ fn test_conditional_infer_function_return_non_distributive_union_input() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     subst.insert(t_name, interner.union(vec![string_fn, number_fn]));
 
@@ -6318,6 +6361,7 @@ fn test_conditional_infer_function_param_and_return_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let true_tuple = interner.tuple(vec![
         TupleElement {
@@ -6355,6 +6399,7 @@ fn test_conditional_infer_function_param_and_return_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let boolean_string_fn = interner.function(FunctionShape {
         params: vec![ParamInfo {
@@ -6368,6 +6413,7 @@ fn test_conditional_infer_function_param_and_return_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     subst.insert(t_name, interner.union(vec![string_number_fn, boolean_string_fn]));
 
@@ -6432,6 +6478,7 @@ fn test_conditional_infer_function_return_non_distributive_union_branch() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let cond = ConditionalType {
         check_type: interner.tuple(vec![TupleElement {
@@ -6460,6 +6507,7 @@ fn test_conditional_infer_function_return_non_distributive_union_branch() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     subst.insert(t_name, interner.union(vec![string_fn, TypeId::NUMBER]));
 
@@ -6508,6 +6556,7 @@ fn test_conditional_infer_function_param_and_return_non_distributive_union_input
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let true_tuple = interner.tuple(vec![
         TupleElement {
@@ -6555,6 +6604,7 @@ fn test_conditional_infer_function_param_and_return_non_distributive_union_input
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let boolean_string_fn = interner.function(FunctionShape {
         params: vec![ParamInfo {
@@ -6568,6 +6618,7 @@ fn test_conditional_infer_function_param_and_return_non_distributive_union_input
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     subst.insert(t_name, interner.union(vec![string_number_fn, boolean_string_fn]));
 
@@ -6738,6 +6789,7 @@ fn test_conditional_infer_call_signature_param_from_function_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let number_fn = interner.function(FunctionShape {
         params: vec![ParamInfo {
@@ -6751,6 +6803,7 @@ fn test_conditional_infer_call_signature_param_from_function_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     subst.insert(t_name, interner.union(vec![string_fn, number_fn]));
 
@@ -6808,6 +6861,7 @@ fn test_conditional_infer_call_signature_return_from_function_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let number_fn = interner.function(FunctionShape {
         params: Vec::new(),
@@ -6816,6 +6870,7 @@ fn test_conditional_infer_call_signature_return_from_function_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     subst.insert(t_name, interner.union(vec![string_fn, number_fn]));
 
@@ -11567,6 +11622,7 @@ fn test_keyof_function_type() {
         type_params: vec![],
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let result = evaluate_keyof(&interner, func);
@@ -11703,6 +11759,7 @@ fn test_keyof_with_method_property() {
         type_params: vec![],
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let obj = interner.object(vec![
@@ -13571,6 +13628,7 @@ fn test_mapped_type_as_template_literal() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let mapped = MappedType {
@@ -13958,6 +14016,7 @@ fn test_conditional_function_extends_function() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // () => void extends () => void ? true : false
@@ -14188,6 +14247,7 @@ fn test_conditional_infer_extract_state_pattern() {
         return_type: infer_s,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // The concrete Reducer type: (state: number | undefined, action: AnyAction) => number
@@ -14213,6 +14273,7 @@ fn test_conditional_infer_extract_state_pattern() {
         return_type: concrete_state,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Conditional: concrete_reducer extends extends_fn ? S : never
@@ -14267,6 +14328,7 @@ fn test_conditional_infer_extract_action_pattern() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Concrete action type: { type: "inc" } | { type: "dec" }
@@ -14310,6 +14372,7 @@ fn test_conditional_infer_extract_action_pattern() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Conditional: concrete_reducer extends extends_fn ? A : never
@@ -14374,6 +14437,7 @@ fn test_conditional_infer_extract_state_non_matching() {
         return_type: infer_s,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Non-Reducer type: just a plain string
@@ -14428,6 +14492,7 @@ fn test_conditional_infer_extract_state_union_distributive() {
         return_type: infer_s,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Two reducer-like functions
@@ -14443,6 +14508,7 @@ fn test_conditional_infer_extract_state_union_distributive() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let reducer_string = interner.function(FunctionShape {
         type_params: vec![],
@@ -14456,6 +14522,7 @@ fn test_conditional_infer_extract_state_union_distributive() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Conditional: T extends (x: infer S) => S ? S : never
@@ -14606,6 +14673,7 @@ fn test_application_ref_expansion_reducer_function() {
         return_type: s_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Create Ref(1) for Reducer type alias
@@ -14655,6 +14723,7 @@ fn test_application_ref_expansion_reducer_function() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // TODO: When Application expansion is implemented (Worker 2/3 fix),
@@ -15779,6 +15848,7 @@ fn test_application_ref_expansion_with_method() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Define: type WithMethod<T> = { get(): T }
@@ -15813,6 +15883,7 @@ fn test_application_ref_expansion_with_method() {
         return_type: TypeId::BOOLEAN,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Expected: { get(): boolean }
@@ -15869,6 +15940,7 @@ fn test_application_ref_expansion_with_rest_param() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Create Ref(1) for VarArgs type alias
@@ -15900,6 +15972,7 @@ fn test_application_ref_expansion_with_rest_param() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     assert_eq!(
@@ -16452,6 +16525,7 @@ fn test_application_ref_expansion_with_this_param() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Create Ref(1) for BoundMethod type alias
@@ -16486,6 +16560,7 @@ fn test_application_ref_expansion_with_this_param() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     assert_eq!(
@@ -16528,6 +16603,7 @@ fn test_application_ref_expansion_with_optional_param() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Create Ref(1) for OptionalFn type alias
@@ -16556,6 +16632,7 @@ fn test_application_ref_expansion_with_optional_param() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     assert_eq!(
@@ -18890,6 +18967,7 @@ fn test_generator_function_return_type_extraction() {
         return_type: infer_r,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let cond = ConditionalType {
@@ -18911,6 +18989,7 @@ fn test_generator_function_return_type_extraction() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     subst.insert(t_name, input_fn);
 
@@ -19096,6 +19175,7 @@ fn test_generator_function_next_param_type() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let cond = ConditionalType {
@@ -19123,6 +19203,7 @@ fn test_generator_function_next_param_type() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     subst.insert(t_name, input_fn);
 
@@ -19167,6 +19248,7 @@ fn test_generator_function_multiple_params() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let cond = ConditionalType {
@@ -19203,6 +19285,7 @@ fn test_generator_function_multiple_params() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     subst.insert(t_name, input_fn);
 
@@ -19325,6 +19408,7 @@ fn test_module_augmentation_function_overload() {
         return_type: infer_r,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let cond = ConditionalType {
@@ -19346,6 +19430,7 @@ fn test_module_augmentation_function_overload() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     subst.insert(t_name, input_fn);
 
@@ -19382,6 +19467,7 @@ fn test_module_augmentation_namespace_merge() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let utils_obj = interner.object(vec![PropertyInfo {
         name: format_prop,
@@ -19778,6 +19864,7 @@ fn test_return_type_generic_function() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Source: generic function <U>(x: U) => U
@@ -19803,6 +19890,7 @@ fn test_return_type_generic_function() {
         return_type: u_param, // returns U
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let cond = ConditionalType {
@@ -19847,6 +19935,7 @@ fn test_return_type_overloaded_function() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Overloaded function: { (x: string): number; (x: number): boolean; }
@@ -19923,6 +20012,7 @@ fn test_return_type_type_predicate_function() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Source: (x: unknown) => x is string (type guard)
@@ -19943,6 +20033,7 @@ fn test_return_type_type_predicate_function() {
             asserts: false,
         }),
         is_constructor: false,
+                                is_method: false,
     });
 
     let cond = ConditionalType {
@@ -19985,6 +20076,7 @@ fn test_parameters_rest_param_function() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Source: (...args: string[]) => void
@@ -20000,6 +20092,7 @@ fn test_parameters_rest_param_function() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let cond = ConditionalType {
@@ -20043,6 +20136,7 @@ fn test_parameters_optional_and_rest_combination() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Source: (a: string, b?: number, ...rest: boolean[]) => void
@@ -20072,6 +20166,7 @@ fn test_parameters_optional_and_rest_combination() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let cond = ConditionalType {
@@ -20251,6 +20346,7 @@ fn test_return_type_union_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let cond = ConditionalType {
@@ -20272,6 +20368,7 @@ fn test_return_type_union_distributive() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let fn_number = interner.function(FunctionShape {
         type_params: Vec::new(),
@@ -20280,6 +20377,7 @@ fn test_return_type_union_distributive() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     subst.insert(t_name, interner.union(vec![fn_string, fn_number]));
 
@@ -20603,6 +20701,7 @@ fn test_infer_function_signature_param_and_return() {
         return_type: infer_r,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Input: (x: string) => number
@@ -20618,6 +20717,7 @@ fn test_infer_function_signature_param_and_return() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Extract P (parameter type)
@@ -20683,6 +20783,7 @@ fn test_infer_function_multiple_params() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Input: (a: boolean, b: string) => void
@@ -20706,6 +20807,7 @@ fn test_infer_function_multiple_params() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Extract A
@@ -20921,6 +21023,7 @@ fn test_infer_contravariant_single_param() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Input: (x: string | number) => void
@@ -20937,6 +21040,7 @@ fn test_infer_contravariant_single_param() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let cond = ConditionalType {
@@ -20988,6 +21092,7 @@ fn test_infer_contravariant_intersection_from_multiple_candidates() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Input: (a: string, b: string) => void
@@ -21011,6 +21116,7 @@ fn test_infer_contravariant_intersection_from_multiple_candidates() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let cond = ConditionalType {
@@ -21052,6 +21158,7 @@ fn test_infer_contravariant_callback_param() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Outer pattern: (callback: CallbackPattern) => any
@@ -21067,6 +21174,7 @@ fn test_infer_contravariant_callback_param() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Input callback: (x: number) => void
@@ -21082,6 +21190,7 @@ fn test_infer_contravariant_callback_param() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Input: (callback: InputCallback) => void
@@ -21097,6 +21206,7 @@ fn test_infer_contravariant_callback_param() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let cond = ConditionalType {
@@ -22299,6 +22409,7 @@ fn test_infer_with_extends_constraint() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Input: (x: "hello") => void - literal string satisfies constraint
@@ -22315,6 +22426,7 @@ fn test_infer_with_extends_constraint() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let cond = ConditionalType {
@@ -22355,6 +22467,7 @@ fn test_infer_with_constraint_violation() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Input: (x: number) => void - number does NOT satisfy string constraint
@@ -22370,6 +22483,7 @@ fn test_infer_with_constraint_violation() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let cond = ConditionalType {
@@ -22405,6 +22519,7 @@ fn test_infer_multiple_same_name_covariant() {
         return_type: infer_r, // covariant position
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Pattern object with getter
@@ -22425,6 +22540,7 @@ fn test_infer_multiple_same_name_covariant() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let input = interner.object(vec![PropertyInfo {
@@ -22808,6 +22924,7 @@ fn test_iterable_with_symbol_iterator() {
         return_type: iter_result,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Iterator<number> = { next(): IteratorResult<number> }
@@ -22867,6 +22984,7 @@ fn test_symbol_keyed_property() {
         return_type: TypeId::ANY, // Simplified
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Note: In the actual implementation, symbol-keyed properties would need
@@ -23168,6 +23286,7 @@ fn test_extract_function_types() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Test: (() => void) extends (() => void) ? T : never
@@ -23553,6 +23672,7 @@ fn test_noinfer_in_function_param_position() {
         return_type: t_param,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Verify function structure
@@ -23770,6 +23890,7 @@ fn test_noinfer_default_parameter() {
         return_type: t_param,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     match interner.lookup(func) {
@@ -23848,6 +23969,7 @@ fn test_noinfer_multiple_type_params() {
         return_type: result_tuple,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     match interner.lookup(func) {
@@ -23908,6 +24030,7 @@ fn test_noinfer_in_return_position() {
         return_type: t_param, // NoInfer<T> = T
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     match interner.lookup(func) {
@@ -24554,6 +24677,7 @@ fn test_partial_with_methods() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let partial_obj = interner.object(vec![PropertyInfo {
@@ -25179,6 +25303,7 @@ fn test_omit_this_parameter_basic() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Function without this parameter (result of OmitThisParameter)
@@ -25194,6 +25319,7 @@ fn test_omit_this_parameter_basic() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Verify original has this
@@ -25233,6 +25359,7 @@ fn test_omit_this_parameter_no_this() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     match interner.lookup(fn_no_this) {
@@ -25275,6 +25402,7 @@ fn test_omit_this_preserves_generics() {
         return_type: u_param,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     match interner.lookup(fn_result) {
@@ -25697,6 +25825,7 @@ fn test_this_parameter_type() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     match interner.lookup(fn_with_this) {
@@ -25720,6 +25849,7 @@ fn test_return_type_simple() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     match interner.lookup(func) {
@@ -28684,6 +28814,7 @@ fn test_multiple_infers_both_constrained() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Input: (a: "hello", b: 42) => void
@@ -28709,6 +28840,7 @@ fn test_multiple_infers_both_constrained() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Result: [A, B]
@@ -28771,6 +28903,7 @@ fn test_multiple_infers_constraint_violation() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Input: (a: "hello", b: 42) => void - b violates string constraint
@@ -28796,6 +28929,7 @@ fn test_multiple_infers_constraint_violation() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let result_tuple = interner.tuple(vec![
@@ -29154,6 +29288,7 @@ fn test_typeof_function_type() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let sym = SymbolRef(1);
@@ -29194,6 +29329,7 @@ fn test_typeof_function_multiple_params() {
         return_type: TypeId::BOOLEAN,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let sym = SymbolRef(1);
@@ -30350,6 +30486,7 @@ fn test_mapped_type_template_literal_keys() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let mapped = MappedType {
@@ -34434,6 +34571,7 @@ fn test_distributive_function_types() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let cond = ConditionalType {
@@ -34454,6 +34592,7 @@ fn test_distributive_function_types() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let fn2 = interner.function(FunctionShape {
         params: vec![ParamInfo {
@@ -34467,6 +34606,7 @@ fn test_distributive_function_types() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     subst.insert(t_name, interner.union(vec![fn1, TypeId::STRING, fn2]));
@@ -35039,6 +35179,7 @@ fn test_distributive_infer_return_type() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let cond = ConditionalType {
@@ -35059,6 +35200,7 @@ fn test_distributive_infer_return_type() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let fn_number = interner.function(FunctionShape {
         params: Vec::new(),
@@ -35067,6 +35209,7 @@ fn test_distributive_infer_return_type() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     subst.insert(t_name, interner.union(vec![fn_string, fn_number, TypeId::STRING]));
@@ -36253,6 +36396,7 @@ fn test_distributive_promise_like_unwrap() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // then method: (onfulfilled: callback) => any
@@ -36268,6 +36412,7 @@ fn test_distributive_promise_like_unwrap() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let then_prop = interner.intern_string("then");
@@ -36303,6 +36448,7 @@ fn test_distributive_promise_like_unwrap() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let string_then = interner.function(FunctionShape {
@@ -36317,6 +36463,7 @@ fn test_distributive_promise_like_unwrap() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let promise_string = interner.object(vec![PropertyInfo {
@@ -36366,6 +36513,7 @@ fn test_return_type_async_promise_unwrapping() {
         return_type: promise_string,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     match interner.lookup(async_func) {
@@ -36389,6 +36537,7 @@ fn test_return_type_void_function() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     match interner.lookup(void_func) {
@@ -36413,6 +36562,7 @@ fn test_return_type_never_function() {
         return_type: TypeId::NEVER,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     match interner.lookup(never_func) {
@@ -36437,6 +36587,7 @@ fn test_return_type_union_of_functions() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let func_number = interner.function(FunctionShape {
@@ -36446,6 +36597,7 @@ fn test_return_type_union_of_functions() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let union_funcs = interner.union(vec![func_string, func_number]);
@@ -36505,6 +36657,7 @@ fn test_return_type_conditional_return() {
         return_type: cond_return,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     match interner.lookup(generic_func) {
@@ -36587,6 +36740,7 @@ fn test_parameters_this_parameter() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     match interner.lookup(func_with_this) {
@@ -36788,6 +36942,7 @@ fn test_return_type_with_infer_in_conditional() {
         return_type: infer_r,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // When T is a function, the infer R should capture return type
@@ -36798,6 +36953,7 @@ fn test_return_type_with_infer_in_conditional() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Substitute T with the actual function
@@ -36840,6 +36996,7 @@ fn test_parameters_with_infer_in_conditional() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Test with a function that has specific params
@@ -36863,6 +37020,7 @@ fn test_parameters_with_infer_in_conditional() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let cond = ConditionalType {
@@ -36897,6 +37055,7 @@ fn test_return_type_generic_with_constraint() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
@@ -36967,6 +37126,7 @@ fn test_return_type_intersection_of_functions() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let func_number = interner.function(FunctionShape {
@@ -36976,6 +37136,7 @@ fn test_return_type_intersection_of_functions() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let intersection = interner.intersection(vec![func_string, func_number]);
@@ -37007,6 +37168,7 @@ fn test_parameters_union_of_functions_with_different_arities() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let func2 = interner.function(FunctionShape {
@@ -37029,6 +37191,7 @@ fn test_parameters_union_of_functions_with_different_arities() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let union_funcs = interner.union(vec![func1, func2]);
@@ -37114,6 +37277,7 @@ fn test_this_parameter_type_extraction() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     match interner.lookup(func_with_this) {
@@ -37153,6 +37317,7 @@ fn test_omit_this_parameter() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Function without this parameter (result of OmitThisParameter)
@@ -37168,6 +37333,7 @@ fn test_omit_this_parameter() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     match interner.lookup(func_with_this) {
@@ -37202,6 +37368,7 @@ fn test_instance_type_from_constructor() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let instance_type = interner.object(vec![
         PropertyInfo {
@@ -37324,6 +37491,7 @@ fn test_awaited_with_nested_promises() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let inner_promise = interner.object(vec![PropertyInfo {
         name: interner.intern_string("then"),
@@ -37341,6 +37509,7 @@ fn test_awaited_with_nested_promises() {
         return_type: inner_promise,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let outer_promise = interner.object(vec![PropertyInfo {
         name: interner.intern_string("then"),
@@ -37929,6 +38098,7 @@ fn test_distributive_function_type_union() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let func2 = interner.function(FunctionShape {
@@ -37938,6 +38108,7 @@ fn test_distributive_function_type_union() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let source = interner.union(vec![func1, func2, TypeId::BOOLEAN]);
@@ -37954,6 +38125,7 @@ fn test_distributive_function_type_union() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let cond = ConditionalType {
@@ -38150,6 +38322,7 @@ fn test_infer_from_overloaded_callable() {
         return_type: infer_r,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Input: { (x: string): number; (x: number): string }
@@ -38380,6 +38553,7 @@ fn test_infer_promise_like_unwrap() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let then_fn = interner.function(FunctionShape {
@@ -38394,6 +38568,7 @@ fn test_infer_promise_like_unwrap() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let pattern = interner.object(vec![PropertyInfo {
@@ -38418,6 +38593,7 @@ fn test_infer_promise_like_unwrap() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let input_then = interner.function(FunctionShape {
@@ -38432,6 +38608,7 @@ fn test_infer_promise_like_unwrap() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let input = interner.object(vec![PropertyInfo {
@@ -39564,6 +39741,7 @@ fn test_callable_param_infer_union_of_signatures() {
         this_type: None,
         type_params: Vec::new(),
         is_constructor: false,
+                                is_method: false,
     });
 
     let cond = ConditionalType {
@@ -39589,6 +39767,7 @@ fn test_callable_param_infer_union_of_signatures() {
         this_type: None,
         type_params: Vec::new(),
         is_constructor: false,
+                                is_method: false,
     });
     let fn_number = interner.function(FunctionShape {
         params: vec![ParamInfo {
@@ -39602,6 +39781,7 @@ fn test_callable_param_infer_union_of_signatures() {
         this_type: None,
         type_params: Vec::new(),
         is_constructor: false,
+                                is_method: false,
     });
     let fn_union = interner.union(vec![fn_string, fn_number]);
 
@@ -39741,6 +39921,7 @@ fn test_callable_param_infer_mixed_union() {
         this_type: None,
         type_params: Vec::new(),
         is_constructor: false,
+                                is_method: false,
     });
 
     let cond = ConditionalType {
@@ -39765,6 +39946,7 @@ fn test_callable_param_infer_mixed_union() {
         this_type: None,
         type_params: Vec::new(),
         is_constructor: false,
+                                is_method: false,
     });
     let mixed_union = interner.union(vec![fn_string, TypeId::NUMBER]);
 
@@ -39816,6 +39998,7 @@ fn test_callable_return_and_param_infer_separately() {
         this_type: None,
         type_params: Vec::new(),
         is_constructor: false,
+                                is_method: false,
     });
 
     // True type: tuple [P, R]
@@ -39856,6 +40039,7 @@ fn test_callable_return_and_param_infer_separately() {
         this_type: None,
         type_params: Vec::new(),
         is_constructor: false,
+                                is_method: false,
     });
 
     let mut subst = TypeSubstitution::new();
@@ -39927,6 +40111,7 @@ fn test_callable_multiple_params_infer() {
         this_type: None,
         type_params: Vec::new(),
         is_constructor: false,
+                                is_method: false,
     });
 
     let tuple_type = interner.tuple(vec![
@@ -39974,6 +40159,7 @@ fn test_callable_multiple_params_infer() {
         this_type: None,
         type_params: Vec::new(),
         is_constructor: false,
+                                is_method: false,
     });
 
     let mut subst = TypeSubstitution::new();
@@ -40613,6 +40799,7 @@ fn test_infer_return_void_vs_undefined() {
         this_type: None,
         type_params: Vec::new(),
         is_constructor: false,
+                                is_method: false,
     });
 
     let cond = ConditionalType {
@@ -40632,6 +40819,7 @@ fn test_infer_return_void_vs_undefined() {
         this_type: None,
         type_params: Vec::new(),
         is_constructor: false,
+                                is_method: false,
     });
 
     let mut subst = TypeSubstitution::new();
@@ -40670,6 +40858,7 @@ fn test_infer_return_promise_like() {
         this_type: None,
         type_params: Vec::new(),
         is_constructor: false,
+                                is_method: false,
     });
 
     let cond = ConditionalType {
@@ -40700,6 +40889,7 @@ fn test_infer_return_promise_like() {
         this_type: None,
         type_params: Vec::new(),
         is_constructor: false,
+                                is_method: false,
     });
 
     let mut subst = TypeSubstitution::new();
@@ -40738,6 +40928,7 @@ fn test_infer_return_union() {
         this_type: None,
         type_params: Vec::new(),
         is_constructor: false,
+                                is_method: false,
     });
 
     let cond = ConditionalType {
@@ -40758,6 +40949,7 @@ fn test_infer_return_union() {
         this_type: None,
         type_params: Vec::new(),
         is_constructor: false,
+                                is_method: false,
     });
 
     let mut subst = TypeSubstitution::new();
@@ -40798,6 +40990,7 @@ fn test_infer_return_never() {
         this_type: None,
         type_params: Vec::new(),
         is_constructor: false,
+                                is_method: false,
     });
 
     let cond = ConditionalType {
@@ -40817,6 +41010,7 @@ fn test_infer_return_never() {
         this_type: None,
         type_params: Vec::new(),
         is_constructor: false,
+                                is_method: false,
     });
 
     let mut subst = TypeSubstitution::new();
@@ -41286,6 +41480,7 @@ fn test_distribution_with_function_types() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let fn1 = interner.function(FunctionShape {
@@ -41300,6 +41495,7 @@ fn test_distribution_with_function_types() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let fn2 = interner.function(FunctionShape {
@@ -41314,6 +41510,7 @@ fn test_distribution_with_function_types() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let check_union = interner.union(vec![fn1, TypeId::STRING, fn2]);
@@ -41884,6 +42081,7 @@ fn test_indexed_access_function_property() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let obj = interner.object(vec![PropertyInfo {

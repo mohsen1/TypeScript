@@ -604,6 +604,7 @@ impl<'a> NarrowingContext<'a> {
             type_params: Vec::new(),
             type_predicate: None,
             is_constructor: false,
+            is_method: false,
         })
     }
 

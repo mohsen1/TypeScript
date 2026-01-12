@@ -48,10 +48,14 @@ When accessing `obj["prop"]` where `"prop"` is a string literal, TypeScript trea
 - [ ] After element access: help with optional chaining issues
 
 ## Completed
-- [x] (Move finished items here)
+- [x] Fix Element Access Type Resolution (5 failing tests)
+  - Fixed definite assignment check to skip variables with literal types
+  - Fixed definite assignment check to skip variables whose types include `undefined`
+  - All 5 tests now pass: literal_key_type, literal_key_union, mixed_literal_key_union,
+    numeric_literal_union, optional_chain_nullable_object
 
 ## Ready for Merge
-No
+Yes
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
