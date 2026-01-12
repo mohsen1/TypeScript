@@ -1,60 +1,60 @@
 # Worker 2 Plan - Squad Forge
 
 ## Mission
-Fix TS2304: Cannot Find Name
+Fix TS2705: Async Function Must Return Promise
 
 Status: Active
-Priority: P0 (CRITICAL)
+Priority: P1 (HIGH)
 
 ## Current Assignment
-**Implement TS2304 Error: Cannot find name**
+**Implement TS2705 Error: Async function must return Promise (37 occurrences)**
 
 ### Background
-TypeScript should emit TS2304 error when an identifier is used but not declared in scope. This includes:
-1. Undefined variables
-2. Undefined functions
-3. Undefined classes/interfaces
-4. Undefined types
-5. Case sensitivity (foo vs Foo)
+TypeScript should emit TS2705 when an async function is declared with a return type that is not a Promise. Async functions always return Promises, so the return type must reflect that.
 
 ### Success Criteria
-- Emit TS2304 for undefined identifiers
-- Don't emit for global/builtin types (Array, Object, etc.)
-- Handle case sensitivity correctly
-- Provide helpful error messages
+- Emit TS2705 when async function has non-Promise return type annotation
+- Handle all async function types: function declarations, expressions, arrow functions, methods
+- Don't emit when return type is Promise or generic Promise<T>
+- Don't emit when return type is omitted (inferred as Promise)
+- Handle async arrow functions correctly
 
 ### Implementation Steps
-1. [ ] Find identifier resolution in checker
-2. [ ] Implement check: if identifier not found in scope, emit TS2304
-3. [ ] Test with various undefined patterns
-4. [ ] Ensure no false positives for valid references
+1. [ ] Sync from origin/rust: `git fetch origin && git merge origin/rust --no-edit`
+2. [ ] Search for async function type checking in `src/thin_checker.rs`
+3. [ ] Find where function return types are validated
+4. [ ] Implement TS2705 emission: if function is async and return type is not Promise, emit error
+5. [ ] Test with various async function patterns
+6. [ ] Run conformance to verify TS2705 is emitted correctly
 
 ### Key Code Locations
-- `src/thin_checker.rs` - identifier resolution
-- `src/binder.rs` - symbol table lookup
-- `src/checker/types/diagnostics.rs` - TS2304 error code
+- `src/thin_checker.rs` - async function type checking
+- `src/checker/types/diagnostics.rs` - TS2705 error code
+- `src/checker/types.rs` - Promise type definition
 
-### Test Cases to Implement
+### Test Cases
 ```typescript
-// Should emit TS2304
-console.log(undefinedVar); // Error: Cannot find name 'undefinedVar'
-let x: NotDefined; // Error: Cannot find name 'NotDefined'
+// Should emit TS2705
+async function foo(): number { } // Error: Async function must return Promise
+async function bar(): string { return "x"; } // Error: return type is string, not Promise<string>
 
-// Should NOT emit (defined)
-let y = 42;
-console.log(y); // OK
-let z: string = "hello"; // OK
+const baz = async (): boolean => false; // Error: Async arrow function must return Promise
+
+class Qux {
+  async method(): void { } // Error: Async method must return Promise
+}
+
+// Should NOT emit
+async function qux(): Promise<number> { } // OK - explicit Promise
+async function quux() { } // OK - inferred as Promise<any>
+async function corge(): Promise<void> { } // OK - Promise<void>
 ```
 
 ## Completed
-- [x] Namespace merging binder implementation (committed)
-
-## Ready for Merge
-No
+- [x] Namespace merging enum/function work
+- [x] TS2322 investigation (already implemented)
 
 ## Notes
-- Follow `wasm/specs/WASM_ARCHITECTURE.md`
-- Use Docker for Rust tests: `./wasm/test.sh`
-- Commit format: `[wasm] checker: Implement TS2304 undefined identifier errors`
+- Commit format: `[wasm] checker: Implement TS2705 async function return type errors`
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/forge-2`
