@@ -99,6 +99,9 @@ fn default_args() -> CliArgs {
         declaration: false,
         declaration_map: false,
         source_map: false,
+        incremental: false,
+        out_file: None,
+        ts_build_info_file: None,
     }
 }
 
