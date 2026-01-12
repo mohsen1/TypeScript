@@ -49,12 +49,52 @@ Priority: P1 (HIGH)
 
 ## Current Status
 
+### Active Task: Namespace Merging (GOALS.md Objective #1)
+**Commit**: `9485b8b320`
+**Status**: 5/13 tests passing (partial implementation)
+
+#### Implementation
+Enhanced namespace merging for class/enum/function + namespace symbols with same name:
+
+1. **Modified `resolve_qualified_name`** (thin_checker.rs:1934-1963):
+   - Added symbol-based lookup for merged symbols before type-based lookup
+   - Handles type access like `Foo.Bar` when Foo is both a class and namespace
+   - Resolves member from merged symbol's exports table
+
+2. **Modified `type_reference_symbol_type`** (thin_checker.rs:975-1008):
+   - For merged class+namespace symbols, returns constructor type (with exports)
+   - Instead of instance type, to allow type member access
+
+3. **Enhanced `merge_namespace_exports_into_constructor`** (thin_checker.rs:1010-1055):
+   - Now includes type-only exports (interfaces, type aliases)
+   - Previously only merged value exports
+
+#### Test Results (5/13 passing)
+**Passing (5)**:
+- `namespace_merges_with_class_exports` - type access (normal order)
+- `namespace_merges_with_enum_type_exports` - type access (normal+reverse order)
+- `namespace_merges_with_function_type_exports` - type access (normal+reverse order)
+
+**Failing (8)**:
+- `namespace_merges_with_class_exports_reverse_order` - type access (reverse order)
+- `namespace_merges_with_class_value_exports` - value access (normal+reverse order)
+- `namespace_merges_with_enum_value_exports` - value access (normal+reverse order)
+- `namespace_merges_with_function_value_exports` - value access (normal+reverse order)
+- `namespace_merges_with_class_element_access` - element access
+
+#### Remaining Work
+Value access failures require deeper integration with solver's `property_access_type`:
+- Callable types need to expose their merged symbol's exports
+- Element access `Foo["value"]` needs special handling
+- Reverse order issues need investigation
+
 ### Test Results
-- **5082+ tests passing**
+- **5087+ tests passing** (+5 from namespace merging)
 - TS2304: 7/7 tests passing
 - TS2355: 7/7 tests passing
 - TS2564: 7/7 tests passing
 - TS7010: 5/5 tests passing
+- Namespace merging: 5/13 tests passing
 
 ### Key Implementation Locations
 - `src/thin_checker.rs` - Main type checker with all error code implementations
@@ -65,4 +105,4 @@ Priority: P1 (HIGH)
 ## Notes
 - All sync/merge operations completed successfully
 - Changes pushed to `origin/worker/forge-2`
-- Implementation is ready for next task assignment
+- Namespace merging requires additional work to handle value position access (8 tests remaining)

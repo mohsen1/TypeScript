@@ -976,7 +976,11 @@ impl<'a> ThinCheckerState<'a> {
         use crate::solver::TypeLowering;
 
         if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
-            if symbol.flags & symbol_flags::CLASS != 0 {
+            // For merged class+namespace symbols, return the constructor type (with namespace exports)
+            // instead of the instance type. This allows accessing namespace members via Foo.Bar.
+            if symbol.flags & symbol_flags::CLASS != 0
+                && symbol.flags & (symbol_flags::NAMESPACE_MODULE | symbol_flags::VALUE_MODULE) == 0
+            {
                 if let Some(instance_type) = self.class_instance_type_from_symbol(sym_id) {
                     return instance_type;
                 }
@@ -1028,14 +1032,10 @@ impl<'a> ThinCheckerState<'a> {
             .map(|prop| (prop.name, prop.clone()))
             .collect();
 
+        // Merge ALL exports from the namespace into the constructor type.
+        // This includes both value exports (consts, functions) and type-only exports (interfaces, type aliases).
+        // For merged class+namespace symbols, TypeScript allows accessing both value and type members.
         for (name, member_id) in exports.iter() {
-            if let Some(member_symbol) = self.ctx.binder.get_symbol(*member_id) {
-                if member_symbol.flags & symbol_flags::VALUE == 0
-                    && member_symbol.flags & symbol_flags::ALIAS == 0
-                {
-                    continue;
-                }
-            }
             let type_id = self.get_type_of_symbol(*member_id);
             let name_atom = self.ctx.types.intern_string(name);
             props.entry(name_atom).or_insert(PropertyInfo {
@@ -1935,6 +1935,38 @@ impl<'a> ThinCheckerState<'a> {
             return TypeId::ANY;
         };
 
+        // First, try to resolve the left side as a symbol and check its exports.
+        // This handles merged class+namespace, function+namespace, and enum+namespace symbols.
+        let mut member_sym_id_from_symbol = None;
+        if let Some(left_node) = self.ctx.arena.get(qn.left) {
+            if left_node.kind == SyntaxKind::Identifier as u16 {
+                if let Some(sym_id) = self.resolve_identifier_symbol(qn.left) {
+                    if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
+                        if let Some(ref exports) = symbol.exports {
+                            if let Some(member_id) = exports.get(&right_name) {
+                                member_sym_id_from_symbol = Some(member_id);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // If found via symbol resolution, use it
+        if let Some(member_sym_id) = member_sym_id_from_symbol {
+            if let Some(member_symbol) = self.ctx.binder.get_symbol(member_sym_id) {
+                let is_namespace = member_symbol.flags & symbol_flags::MODULE != 0;
+                if !is_namespace {
+                    if self.alias_resolves_to_value_only(member_sym_id) || self.symbol_is_value_only(member_sym_id) {
+                        self.error_value_only_type_at(&right_name, qn.right);
+                        return TypeId::ERROR;
+                    }
+                }
+            }
+            return self.type_reference_symbol_type(member_sym_id);
+        }
+
+        // Otherwise, fall back to type-based lookup for pure namespace/module types
         // Look up the member in the left side's exports
         if let Some(crate::solver::TypeKey::Ref(crate::solver::SymbolRef(sym_id))) = self.ctx.types.lookup(left_type) {
             if let Some(symbol) = self.ctx.binder.get_symbol(crate::binder::SymbolId(sym_id)) {
@@ -7136,6 +7168,36 @@ impl<'a> ThinCheckerState<'a> {
         // Don't report errors for any/error types
         if object_type == TypeId::ANY || object_type == TypeId::ERROR {
             return TypeId::ANY;
+        }
+
+        // Check for merged class/enum/function + namespace symbols
+        // When a class/enum/function merges with a namespace (same name), the symbol has both
+        // value constructor flags and MODULE flags. We need to check the symbol's exports.
+        if let Some(expr_node) = self.ctx.arena.get(access.expression) {
+            if let Some(expr_ident) = self.ctx.arena.get_identifier(expr_node) {
+                let expr_name = &expr_ident.escaped_text;
+                if let Some(sym_id) = self.ctx.binder.file_locals.get(expr_name) {
+                    if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
+                        // Check if this is a merged symbol (has both MODULE and value constructor flags)
+                        let is_merged = (symbol.flags & symbol_flags::MODULE) != 0
+                            && (symbol.flags & (symbol_flags::CLASS | symbol_flags::FUNCTION | symbol_flags::REGULAR_ENUM)) != 0;
+
+                        if is_merged {
+                            if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
+                                let property_name = &ident.escaped_text;
+                                if let Some(exports) = symbol.exports.as_ref() {
+                                    if let Some(member_id) = exports.get(property_name) {
+                                        // For merged symbols, we return the type for any exported member
+                                        // This handles both value exports and type-only exports (interfaces, type aliases)
+                                        let member_type = self.get_type_of_symbol(member_id);
+                                        return self.apply_flow_narrowing(idx, member_type);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         // If it's an identifier, look up the property
