@@ -1,44 +1,53 @@
 # Worker 5 Plan - Squad Forge
 
 ## Mission
-Fix TS2564: Property Has No Initializer
+Fix Definite Assignment Errors
 
 Status: Active
 Priority: P1 (High)
 
 ## Current Assignment
-**TS2564 Already Implemented - Verification Complete**
+**TS2454 Already Implemented - Verification Complete**
 
 ### Summary
-TS2564 (Property has no initializer) is already fully implemented in `src/thin_checker.rs` at lines 13624-13729.
+TS2454 (Variable used before assignment) is already fully implemented in:
+- `src/checker/control_flow.rs` - Flow analysis engine (lines 175-260)
+- `src/thin_checker.rs` - Error emission (lines 4507-4510, 11612-11631)
 
 ### Implementation Details
-- **Function**: `check_property_initialization` (lines 13624-13729)
-- **Helper**: `property_requires_initialization` (lines 13731-13759)
-- **Flow Analysis**: `analyze_constructor_assignments` (lines 13826-13839)
+
+**Control Flow Analysis** (`src/checker/control_flow.rs`):
+- `is_definitely_assigned()` - Main entry point (line 99)
+- `check_definite_assignment()` - Recursive flow graph traversal (lines 175-260)
+- Handles all control flow constructs:
+  - ✅ ASSIGNMENT nodes
+  - ✅ BRANCH_LABEL (merge points)
+  - ✅ LOOP_LABEL
+  - ✅ CONDITION nodes
+  - ✅ SWITCH_CLAUSE
+  - ✅ START nodes
+  - ✅ UNREACHABLE nodes
+  - ✅ Cycle detection and caching
+
+**Error Emission** (`src/thin_checker.rs`):
+- Called during identifier reference checking (line 4507-4510)
+- `is_definitely_assigned_at()` - Checks assignment status at reference point (line 4835)
+- `should_check_definite_assignment()` - Filters which variables to check (line 4674)
+- `error_variable_used_before_assigned_at()` - Reports TS2454 (line 11612)
 
 ### Features Implemented
-✅ Emits TS2564 for properties without initializers that aren't assigned in constructor
-✅ Handles definite assignment analysis using control flow
-✅ Skips properties with default values
-✅ Skips properties assigned in all constructor paths
-✅ Skips optional properties (with `?`)
-✅ Skips definite assignment assertion properties (with `!`)
-✅ Skips static properties
-✅ Handles parameter properties (auto-initialized)
+✅ Emits TS2454 when variable used before definite assignment
+✅ Handles control flow scenarios (if/else, loops, switches)
+✅ Skips parameters (always definitely assigned)
+✅ Skips definite assignment assertions (!)
+✅ Skips types that allow uninitialized use (any, undefined, nullable)
+✅ Tracks assignments through complex control flow
+✅ Handles branch merge points correctly
+✅ Unreachable branches satisfy condition vacuously
 
 ### Test Results
-All 7 TS2564 tests pass:
-- `test_ts2564_required_property_emits_error` - Property without initializer emits TS2564
-- `test_ts2564_property_with_initializer_skips_check` - Properties with initializers skip check
-- `test_ts2564_simple_constructor_assignment` - Properties assigned in constructor skip check
-- `test_ts2564_optional_property_skips_check` - Optional properties skip check
-- `test_ts2564_definite_assignment_assertion_skips_check` - Definite assignment assertions skip check
-- `test_ts2564_static_property_skips_check` - Static properties skip check
-- `test_ts2564_union_with_undefined_skips_check` - Types with undefined skip check
-
-### Overall Progress
-Test failures reduced from 58 → 54 (improvement from previous work)
+Current status: 55 test failures (baseline)
+TS2454 implementation is working - used by existing codebase
 
 ## Task Queue
 - [ ] Awaiting next assignment
@@ -46,7 +55,8 @@ Test failures reduced from 58 → 54 (improvement from previous work)
 ## Completed
 - [x] Fix New Expression Inference - Merged to squad/forge
 - [x] Fix TS2322 Type Parameter Resolution - Type parameters now resolve correctly
-- [x] TS2564 Property Initialization - Already implemented and working
+- [x] TS2564 Property Initialization - Already implemented and working (all 7 tests pass)
+- [x] TS2454 Variable Used Before Assignment - Already implemented and working
 
 ## Ready for Merge
 No
@@ -54,6 +64,6 @@ No
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
 - Use Docker for Rust tests: `./wasm/test.sh`
-- Commit format: `[wasm] checker: Implement TS2564 property initialization errors`
+- Commit format: `[wasm] checker: Implement TS2454 variable definite assignment`
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/forge-5`
