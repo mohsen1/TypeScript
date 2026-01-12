@@ -2706,14 +2706,11 @@ impl ThinParserState {
         }
 
         // Recovery: Handle 'function' keyword in class members
+        // Silently consume 'function' and continue parsing as method
+        // This allows patterns like `class C { function foo() {} }` to recover gracefully
         // Note: 'var', 'let', 'const' are allowed as property/method names (e.g., `var() {}`)
-        // But 'function' is always invalid as a class member keyword
         if self.is_token(SyntaxKind::FunctionKeyword) {
-            self.parse_error_at_current_token(
-                "A class member cannot have the 'function' keyword.",
-                diagnostic_codes::UNEXPECTED_TOKEN_CLASS_MEMBER,
-            );
-            // Consume 'function' and continue parsing as method
+            // Consume 'function' and continue parsing as method (silent recovery)
             self.next_token();
         }
 
