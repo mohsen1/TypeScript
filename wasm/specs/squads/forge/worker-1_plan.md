@@ -40,8 +40,30 @@ TypeScript is emitting TS2339 "Property does not exist" errors too aggressively.
 6. [ ] Test with various property access patterns
 7. [ ] Run conformance to verify reduction in extra errors
 
+### Investigation Results
+
+**Confirmed**: Private static members ARE being added to class constructor types correctly.
+
+Evidence from differential test after WASM rebuild:
+```
+Property '#field' does not exist on type '{ new (): { ... }; #field: number; ... }'
+```
+The type display shows `#field: number` is present, but property lookup still fails.
+
+**Root Cause**: Property access resolution fails despite property existing in type.
+- The atom comparison `prop.name == prop_atom` in `src/solver/operations.rs:1788` fails
+- Occurs specifically in destructuring assignment contexts: `({ x: A.#field, y } = ...)`
+- NOT an issue with type construction or `get_property_name`
+
+**Test Results**:
+- Running via `cargo run` does NOT emit TS2339 for simple destructuring cases
+- Differential test using WASM package DOES emit TS2339
+- Suggests there may be a difference between cargo and WASM code paths
+
 ### Remaining Work
-- Fix property lookup for private members in destructuring contexts
+- Fix atom comparison issue in solver property access resolution
+- Debug why `prop.name == prop_atom` fails when both represent `#field`
+- Investigate potential difference between cargo and WASM behavior
 - Investigate mixin class instance types
 - Verify no regressions in existing tests
 
