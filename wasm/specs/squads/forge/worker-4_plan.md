@@ -1,44 +1,65 @@
 # Worker 4 Plan - Squad Forge
 
 ## Mission
-Fix TS7010: Implicit Any Return Type
+Fix TS7006: Parameter Implicitly Has 'Any' Type
 
 Status: Active
-Priority: P0 (CRITICAL)
+Priority: P1 (HIGH)
 
 ## Current Assignment
-**Implement TS7010 Error: Function implicitly has 'any' return type**
+**Implement TS7006 Error: Parameter implicitly has 'any' type (42 occurrences)**
 
 ### Background
-TypeScript should emit TS7010 when a function's return type cannot be inferred and is implicitly 'any'.
+TypeScript should emit TS7006 when a function parameter has an implicit 'any' type and the `noImplicitAny` compiler option is enabled.
 
 ### Success Criteria
-- Emit TS7010 when return type cannot be inferred
-- Don't emit when return type can be inferred from return statements
-- Handle void return (no return statements)
-- Handle async functions (return Promise wrapper)
+- Emit TS7006 for function/method parameters without type annotations when noImplicitAny is true
+- Handle all function types: function declarations, expressions, arrow functions, methods
+- Don't emit when parameter has explicit type annotation
+- Don't emit when parameter has default value
+- Don't emit when noImplicitAny is false
 
 ### Implementation Steps
-1. [ ] Find return type inference code in `src/thin_checker.rs`
-2. [ ] Implement check: if return type is any and cannot be inferred, emit TS7010
-3. [ ] Test with various function patterns
-4. [ ] Ensure no false positives
+1. [ ] Sync from origin/rust: `git fetch origin && git merge origin/rust --no-edit`
+2. [ ] Search for parameter type checking code in `src/thin_checker.rs`
+3. [ ] Find where implicit any is detected for parameters
+4. [ ] Implement TS7006 emission when noImplicitAny is true and parameter has no type annotation
+5. [ ] Test with various function patterns
+6. [ ] Run conformance to verify TS7006 is emitted correctly
+
+### Key Code Locations
+- `src/thin_checker.rs` - function parameter type checking
+- `src/checker/types/diagnostics.rs` - TS7006 error code
+- `src/cli/args.rs` - noImplicitAny flag
 
 ### Test Cases
 ```typescript
-// Should emit TS7010
-function foo() { } // Error: Implicit 'any' return
+// @noImplicitAny: true
+
+// Should emit TS7006
+function foo(x) { } // Error: Parameter 'x' implicitly has 'any' type
+
+const bar = (y) => { }; // Error: Parameter 'y' implicitly has 'any' type
+
+class Baz {
+  method(z) { } // Error: Parameter 'z' implicitly has 'any' type
+}
 
 // Should NOT emit
-function bar() { return 42; } // OK - inferred number
-function baz() { console.log('x'); } // OK - inferred void
+function qux(a: number) { } // OK - explicit type
+function quux(b = 5) { } // OK - has default value
 ```
 
 ## Completed
-- [x] Fix Element Access Literal Keys - Merged to squad/forge
-- [x] TS7006 - Production ready
-- [x] TS2792 - Production ready
+- [x] TS2792 - Module resolution (reassigned)
+- [x] TS7010 - Implicit any return type - Merged to squad/forge ✅
+
+## Ready for Merge
+No
 
 ## Notes
-- Commit format: `[wasm] checker: Implement TS7010 implicit any return type errors`
+- Follow `wasm/specs/WASM_ARCHITECTURE.md`
+- Use Docker for Rust tests: `./wasm/test.sh`
+- Commit format: `[wasm] checker: Implement TS7006 implicit any parameter errors`
+- Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/forge-4`
