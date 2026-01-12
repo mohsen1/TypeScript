@@ -43,6 +43,7 @@ use crate::transforms::async_es5::AsyncES5Emitter;
 use crate::transforms::emit_utils;
 use crate::transforms::private_fields_es5::{PrivateFieldInfo, collect_private_fields, is_private_identifier};
 use memchr;
+use std::collections::HashMap;
 
 struct ParamTransform {
     name: String,
@@ -73,6 +74,23 @@ struct TemplateParts {
     expressions: Vec<NodeIndex>,
 }
 
+/// Information about a private accessor (get/set) in a class
+#[derive(Debug, Clone)]
+pub struct PrivateAccessorInfo {
+    /// The private accessor name without # (e.g., "value" for "#value")
+    pub name: String,
+    /// Whether this accessor is static
+    pub is_static: bool,
+    /// WeakMap variable name for getter (e.g., "_Person_name_get")
+    pub get_var_name: Option<String>,
+    /// WeakMap variable name for setter (e.g., "_Person_name_set")
+    pub set_var_name: Option<String>,
+    /// The node index of the getter body (if any)
+    pub getter_body_idx: Option<NodeIndex>,
+    /// The node index of the setter body (if any)
+    pub setter_body_idx: Option<NodeIndex>,
+}
+
 /// ES5 class emitter - emits ES5 IIFE pattern for classes
 pub struct ClassES5Emitter<'a> {
     arena: &'a ThinNodeArena,
@@ -93,6 +111,8 @@ pub struct ClassES5Emitter<'a> {
     temp_var_counter: u32,
     /// Private fields for the current class
     private_fields: Vec<PrivateFieldInfo>,
+    /// Private accessors for the current class
+    private_accessors: Vec<PrivateAccessorInfo>,
     /// Current class name (for private field WeakMap names)
     class_name: String,
 }
@@ -113,6 +133,7 @@ impl<'a> ClassES5Emitter<'a> {
             suppress_this_capture: false,
             temp_var_counter: 0,
             private_fields: Vec::new(),
+            private_accessors: Vec::new(),
             class_name: String::new(),
         }
     }
@@ -216,6 +237,9 @@ impl<'a> ClassES5Emitter<'a> {
 
         // Collect private fields from the class
         self.private_fields = collect_private_fields(self.arena, class_idx, &class_name);
+
+        // Collect private accessors from the class
+        self.private_accessors = self.collect_private_accessors(class_data, &class_name);
 
         // Check for extends clause and get base class name
         let base_class_name = self.get_extends_class_name(&class_data.heritage_clauses);
@@ -3910,6 +3934,89 @@ impl<'a> ClassES5Emitter<'a> {
             }
         }
         false
+    }
+
+    /// Collect private accessor information from class members
+    /// Scans for GetAccessor and SetAccessor declarations with PrivateIdentifier names
+    fn collect_private_accessors(&self, class_data: &ClassData, class_name: &str) -> Vec<PrivateAccessorInfo> {
+        let mut accessors = Vec::new();
+        let mut name_to_index: HashMap<String, usize> = HashMap::new();
+
+        for &member_idx in &class_data.members.nodes {
+            let Some(member_node) = self.arena.get(member_idx) else {
+                continue;
+            };
+
+            // Check if this is a GetAccessor or SetAccessor
+            let is_getter = member_node.kind == syntax_kind_ext::GET_ACCESSOR;
+            let is_setter = member_node.kind == syntax_kind_ext::SET_ACCESSOR;
+
+            if !is_getter && !is_setter {
+                continue;
+            }
+
+            let Some(accessor_data) = self.arena.get_accessor(member_node) else {
+                continue;
+            };
+
+            // Check if the name is a PrivateIdentifier
+            let Some(name_node) = self.arena.get(accessor_data.name) else {
+                continue;
+            };
+
+            if name_node.kind != SyntaxKind::PrivateIdentifier as u16 {
+                continue;
+            }
+
+            // Extract the name (e.g., "#foo" -> "foo")
+            let raw_text = self.get_identifier_text(accessor_data.name);
+            let clean_name = raw_text.trim_start_matches('#').to_string();
+
+            // Check if this accessor is static
+            let is_static = self.is_static(&accessor_data.modifiers);
+
+            // Merge with existing accessor entry or create a new one
+            if let Some(&idx) = name_to_index.get(&clean_name) {
+                // Merge into existing entry
+                let info: &mut PrivateAccessorInfo = &mut accessors[idx];
+                if is_getter {
+                    info.getter_body_idx = Some(accessor_data.body);
+                } else {
+                    info.setter_body_idx = Some(accessor_data.body);
+                }
+            } else {
+                // Create new entry
+                let mut info = PrivateAccessorInfo {
+                    name: clean_name.clone(),
+                    is_static,
+                    get_var_name: None,
+                    set_var_name: None,
+                    getter_body_idx: None,
+                    setter_body_idx: None,
+                };
+
+                if is_getter {
+                    info.getter_body_idx = Some(accessor_data.body);
+                } else {
+                    info.setter_body_idx = Some(accessor_data.body);
+                }
+
+                name_to_index.insert(clean_name, accessors.len());
+                accessors.push(info);
+            }
+        }
+
+        // Final pass: generate variable names for any accessors that have them
+        for info in &mut accessors {
+            if info.getter_body_idx.is_some() && info.get_var_name.is_none() {
+                info.get_var_name = Some(format!("_{}_{}_get", class_name, info.name));
+            }
+            if info.setter_body_idx.is_some() && info.set_var_name.is_none() {
+                info.set_var_name = Some(format!("_{}_{}_set", class_name, info.name));
+            }
+        }
+
+        accessors
     }
 
     /// Check if heritage clauses contain an `extends` clause (not just `implements`)
