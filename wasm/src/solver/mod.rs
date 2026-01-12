@@ -28,6 +28,7 @@ mod narrowing;
 mod diagnostics;
 mod operations;
 mod apparent;
+mod lawyer;
 
 pub use db::*;
 pub use types::*;
@@ -42,4 +43,5 @@ pub use contextual::*;
 pub use narrowing::*;
 pub use diagnostics::*;
 pub use operations::*;
+pub use lawyer::*;
 pub(crate) use apparent::*;
