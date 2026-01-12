@@ -1,47 +1,48 @@
 # Worker 1 Plan - Squad Anvil
 
 ## Mission
-Import Equals Emission Fix
+Additional CLI Features
 
 Status: Active
 Priority: P0 (Highest)
 
 ## Current Assignment
-**Fix Import Equals Emission**
+**Add More CLI Flags**
 
 ### Background
-`import x = require('y')` is TypeScript-specific syntax for CommonJS imports. Current implementation has issues.
-
-### Failing Test
-`cli::driver_tests::invalidate_paths_with_dependents_symbols_handles_import_equals`
+TypeScript compiler has many CLI flags. Add more commonly-used flags for better compatibility.
 
 ### Implementation Steps
-1. [ ] Read the failing test to understand expected behavior
-2. [ ] Find import equals handling in `src/thin_emitter.rs` or `src/transforms/`
-3. [ ] Ensure proper transformation: `import x = require('y')` → `var x = require('y')`
-4. [ ] Fix type inference - should be `any` type, not `string`
-5. [ ] Test: `./wasm/test.sh invalidate_paths_with_dependents_symbols_handles_import_equals`
+1. [ ] Read current CLI implementation in `src/cli/args.rs`
+2. [ ] Check which flags from `tsc --help` are still missing
+3. [ ] Add support for important flags:
+   - `--outFile`: Concatenate and emit output to single file
+   - `--outDir`: Output directory (may already exist)
+   - `--tsBuildInfoFile`: Specify .tsbuildinfo file
+   - `--incremental`: Enable incremental compilation
+4. [ ] Update argument parsing in clap configuration
+5. [ ] Test: Run `./wasm/target/release/tsz --help` and verify flags are listed
 
 ### Key Code Locations
-- `src/thin_emitter.rs` - main emission
-- `src/thin_checker.rs` - type checking (fix to return any for import equals)
-- `src/binder.rs` - symbol binding (declare_in_persistent_scope)
+- `src/cli/args.rs` - CLI argument definitions
+- `src/cli/driver.rs` - compilation driver
 
 ## Task Queue
-- [ ] After import equals: help with other CLI/Driver issues
+- [ ] After CLI flags: help with LSP features or emitter work
 
 ## Completed
 - [x] Fixed catch clause variable emission - MERGED to squad/anvil
 - [x] Added AS_EXPRESSION/TYPE_ASSERTION/SATISFIES_EXPRESSION handling - MERGED to squad/anvil
 - [x] LSP Semantic Tokens (decorators, type parameters, modifiers) - MERGED to squad/anvil
 - [x] Source Map Implementation - Verified complete (905 tests passing)
+- [x] Import Equals Emission Fix - Test passes (commit 8271a07cb1)
 
 ## Ready for Merge
-Previous work merged to squad/anvil
+Previous work merged to squad/anvil, latest ready for merge
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
 - Use Docker for Rust tests: `./wasm/test.sh`
-- Commit format: `[wasm] emitter: Fix import equals transformation`
+- Commit format: `[wasm] cli: Add --outFile and --incremental flags`
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/anvil-1`
