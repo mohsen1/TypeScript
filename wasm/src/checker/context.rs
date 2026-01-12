@@ -14,6 +14,7 @@ use crate::parser::thin_node::ThinNodeArena;
 use crate::thin_binder::ThinBinderState;
 use crate::solver::{TypeEnvironment, TypeId, TypeInterner};
 use crate::checker::types::diagnostics::Diagnostic;
+use crate::checker::control_flow::FlowGraph;
 use crate::binder::SymbolId;
 
 /// Info about the enclosing class for static member suggestions and abstract property checks.
@@ -246,6 +247,10 @@ pub struct CheckerContext<'a> {
     /// Each entry is a (arena, binder) pair from a pre-parsed lib file.
     /// Used as a fallback when resolving type references not found in the main file.
     pub lib_contexts: Vec<LibContext>,
+
+    /// Control flow graph for definite assignment analysis and type narrowing.
+    /// This is built during the binding phase and used by the checker.
+    pub flow_graph: Option<FlowGraph<'a>>,
 }
 
 /// Context for a lib file (arena + binder) for global type resolution.
@@ -264,6 +269,9 @@ impl<'a> CheckerContext<'a> {
         types: &'a TypeInterner,
         file_name: String,
     ) -> Self {
+        // Create flow graph from the binder's flow nodes
+        let flow_graph = Some(FlowGraph::new(&binder.flow_nodes));
+
         CheckerContext {
             arena,
             binder,
@@ -307,6 +315,7 @@ impl<'a> CheckerContext<'a> {
             all_arenas: None,
             resolved_modules: None,
             lib_contexts: Vec::new(),
+            flow_graph,
         }
     }
 
@@ -319,6 +328,9 @@ impl<'a> CheckerContext<'a> {
         file_name: String,
         cache: TypeCache,
     ) -> Self {
+        // Create flow graph from the binder's flow nodes
+        let flow_graph = Some(FlowGraph::new(&binder.flow_nodes));
+
         CheckerContext {
             arena,
             binder,
@@ -362,6 +374,7 @@ impl<'a> CheckerContext<'a> {
             all_arenas: None,
             resolved_modules: None,
             lib_contexts: Vec::new(),
+            flow_graph,
         }
     }
 
@@ -448,5 +461,34 @@ impl<'a> CheckerContext<'a> {
             }
         }
         false
+    }
+
+    // =========================================================================
+    // Flow Graph Queries
+    // =========================================================================
+
+    /// Check flow usage at a specific AST node.
+    ///
+    /// This method queries the control flow graph to determine flow-sensitive
+    /// information at a given node. Returns `None` if flow graph is not available.
+    ///
+    /// # Arguments
+    /// * `node_idx` - The AST node to query flow information for
+    ///
+    /// # Returns
+    /// * `Some(FlowNodeId)` - The flow node ID at this location
+    /// * `None` - If flow graph is not available or node has no flow info
+    pub fn check_flow_usage(&self, node_idx: NodeIndex) -> Option<crate::binder::FlowNodeId> {
+        if let Some(ref graph) = self.flow_graph {
+            // Look up the flow node for this AST node from the binder's node_flow mapping
+            self.binder.node_flow.get(&node_idx.0).copied()
+        } else {
+            None
+        }
+    }
+
+    /// Get a reference to the flow graph.
+    pub fn flow_graph(&self) -> Option<&FlowGraph<'a>> {
+        self.flow_graph.as_ref()
     }
 }
