@@ -7173,22 +7173,26 @@ impl<'a> ThinCheckerState<'a> {
         // Check for merged class/enum/function + namespace symbols
         // When a class/enum/function merges with a namespace (same name), the symbol has both
         // value constructor flags and MODULE flags. We need to check the symbol's exports.
-        if let Some(expr_node) = self.ctx.arena.get(access.expression) {
-            if let Some(expr_ident) = self.ctx.arena.get_identifier(expr_node) {
-                let expr_name = &expr_ident.escaped_text;
-                if let Some(sym_id) = self.ctx.binder.file_locals.get(expr_name) {
-                    if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
-                        // Check if this is a merged symbol (has both MODULE and value constructor flags)
-                        let is_merged = (symbol.flags & symbol_flags::MODULE) != 0
-                            && (symbol.flags & (symbol_flags::CLASS | symbol_flags::FUNCTION | symbol_flags::REGULAR_ENUM)) != 0;
+        // This handles value access like `Foo.value` when Foo is both a class and namespace.
+        if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
+            let property_name = &ident.escaped_text;
 
-                        if is_merged {
-                            if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
-                                let property_name = &ident.escaped_text;
+            // For value access to merged symbols, check the exports directly
+            // This is needed because the type system doesn't track which symbol a Callable came from
+            if let Some(expr_node) = self.ctx.arena.get(access.expression) {
+                if let Some(expr_ident) = self.ctx.arena.get_identifier(expr_node) {
+                    let expr_name = &expr_ident.escaped_text;
+                    // Try file_locals first (fast path for top-level symbols)
+                    if let Some(sym_id) = self.ctx.binder.file_locals.get(expr_name) {
+                        if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
+                            // Check if this is a merged symbol (has both MODULE and value constructor flags)
+                            let is_merged = (symbol.flags & symbol_flags::MODULE) != 0
+                                && (symbol.flags & (symbol_flags::CLASS | symbol_flags::FUNCTION | symbol_flags::REGULAR_ENUM)) != 0;
+
+                            if is_merged {
                                 if let Some(exports) = symbol.exports.as_ref() {
                                     if let Some(member_id) = exports.get(property_name) {
                                         // For merged symbols, we return the type for any exported member
-                                        // This handles both value exports and type-only exports (interfaces, type aliases)
                                         let member_type = self.get_type_of_symbol(member_id);
                                         return self.apply_flow_narrowing(idx, member_type);
                                     }
