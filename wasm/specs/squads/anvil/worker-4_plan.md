@@ -1,48 +1,49 @@
 # Worker 4 Plan - Squad Anvil
 
 ## Mission
-Diagnostic Formatting Enhancement
+Module System Emission Enhancement
 
 Status: Active
 Priority: P1 (High)
 
 ## Current Assignment
-**Enhance Diagnostic Error Messages**
+**Fix Module System Transformations**
 
 ### Background
-TypeScript's error messages are detailed and helpful. Our diagnostic messages should match tsc's format and quality.
+Module transformations (ES modules ↔ CommonJS) need work. Import equals is tricky - assign to W5 instead.
 
 ### Implementation Steps
 
-1. [ ] Read current diagnostic implementation in `src/checker/types/diagnostics/`
-2. [ ] Check which error messages differ from tsc
-3. [ ] Enhance error messages with:
-   - Better context information
-   - Suggestions for fixes
-   - Related code locations
-4. [ ] Format error messages to match tsc output:
-   - File location (line:column)
-   - Error code TS#####: Message
-   - Underlined error span
-5. [ ] Test: Compare output with `npx tsc --noEmit`
+1. [ ] Read current module transforms in `src/transforms/`
+2. [ ] Focus on ES module emission:
+   - export statements
+   - import statements
+   - re-exports (export { x } from './y')
+3. [ ] Fix CommonJS wrapper:
+   - Module wrapper function
+   - exports object handling
+   - require() resolution
+4. [ ] Test: Compile with different module settings and verify output
 
 ### Key Code Locations
-- `src/checker/types/diagnostics/` - diagnostic messages and codes
-- `src/checker/types/diagnostics/diagnostic_messages.rs` - message templates
+- `src/transforms/` - module transformations
+- `src/thin_emitter.rs` - emission
+- `src/cli/args.rs` - module flag
 
 ## Task Queue
-- [ ] After diagnostic formatting: help with source maps or CLI flags
+- [ ] After module transforms: help with decorator metadata or source maps
 
 ## Completed
-- [x] Fixed shorthand methods binding in object literals (fc2b39a217) - MERGED to squad/anvil
-- [x] Fixed declare_symbol persistence for scope_chain updates (fc2b39a217)
+- [x] Fixed shorthand methods binding (fc2b39a217) - MERGED to squad/anvil
+- [x] Diagnostic formatting with snippets (97167d3e5e) - MERGED to squad/anvil
+- [x] Parser recovery: JSX-like syntax and type assertion in new - MERGED to squad/anvil
 
 ## Ready for Merge
-Yes - Previous work merged to squad/anvil
+Previous work merged to squad/anvil
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
 - Use Docker for Rust tests: `./wasm/test.sh`
-- Commit format: `[wasm] diagnostics: Enhance error message formatting with context`
+- Commit format: `[wasm] transforms: Fix ES module emission`
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
-- Push to: `origin/worker/anvil-4`
+- Push to: `origin/worker/anvil-3`

@@ -1,55 +1,49 @@
 # Worker 3 Plan - Squad Anvil
 
 ## Mission
-Fix ES5 Private Accessors - Part 2: Emission
+LSP Go-To-Definition Implementation
 
-Status: Complete
+Status: Active
 Priority: P1 (High)
 
 ## Current Assignment
-**[COMPLETED] Implement ES5 Private Accessor Transform - Phase 2**
+**Implement LSP Go-To-Definition**
 
 ### Background
-Continuation of Worker 2's work. This handles the actual emission of private accessor code.
+Go-to-definition allows users to navigate to where symbols are defined. Critical IDE feature.
 
-### Implementation Completed
+### Implementation Steps
 
-1. [x] Added `PrivateAccessorInfo` struct to track private accessor data
-2. [x] Added `collect_private_accessors()` function in `private_fields_es5.rs`
-3. [x] Modified `ClassES5Emitter` to include `private_accessors` field
-4. [x] Modified `emit_constructor_body` to emit WeakMap.set() calls for accessors
-5. [x] Modified `emit_class_epilogue` to emit WeakMap initializations
-6. [x] Skip private accessors from being emitted as regular accessors in `emit_methods` and `emit_static_members`
-
-### Test Results
-All 7 private accessor parity tests now pass:
-- test_parity_es5_private_accessor_getter
-- test_parity_es5_private_accessor_setter
-- test_parity_es5_private_accessor_pair
-- test_parity_es5_private_accessor_static
-- test_parity_es5_private_accessor_complex
-- test_parity_es5_private_accessor_computed_values
-- test_parity_es5_private_accessor_validation
+1. [ ] Read current go-to-definition in `src/lsp/definition.rs`
+2. [ ] Implement definition lookup:
+   - Find symbol at cursor position
+   - Look up symbol declaration in binder
+   - Return location (file, line, column)
+3. [ ] Handle different symbol types:
+   - Variables and functions
+   - Class members
+   - Import/export declarations
+   - Type aliases
+4. [ ] Test: Start LSP server and verify F12/ Cmd+Click navigates to definitions
 
 ### Key Code Locations
-- `src/transforms/class_es5.rs` - class transformation (added 122 lines)
-- `src/transforms/private_fields_es5.rs` - `PrivateAccessorInfo` and collection function (added 95 lines)
-
-### The "a" Flag
-The `"a"` flag in `__classPrivateFieldGet(obj, map, "a")` tells the helper this is an accessor (call the function) vs a field (return the value directly).
+- `src/lsp/definition.rs` - go-to-definition implementation
+- `src/lsp/mod.rs` - LSP server
+- `src/binder/` - symbol resolution
 
 ## Task Queue
-- [ ] Help with parser error recovery if time
+- [ ] After go-to-definition: help with find-references or document symbols
 
 ## Completed
-- [x] Implement ES5 Private Accessor Transform - Phase 2 (Emission)
+- [x] ES5 Private Accessor Emission (7 tests passing) - MERGED to squad/anvil
+- [x] Parser error recovery: function keyword in class - MERGED to squad/anvil
 
 ## Ready for Merge
-Yes
+Previous work merged to squad/anvil
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
 - Use Docker for Rust tests: `./wasm/test.sh`
-- Commit format: `[wasm] transforms: Implement ES5 private accessor emission`
+- Commit format: `[wasm] lsp: Implement go-to-definition navigation`
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/anvil-3`
