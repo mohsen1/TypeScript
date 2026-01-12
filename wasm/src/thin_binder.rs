@@ -661,6 +661,13 @@ impl ThinBinderState {
                 self.bind_function_declaration(arena, node, idx);
             }
 
+            // Method declarations (in object literals)
+            k if k == syntax_kind_ext::METHOD_DECLARATION => {
+                if let Some(method) = arena.get_method_decl(node) {
+                    self.bind_callable_body(arena, &method.parameters, method.body, idx);
+                }
+            }
+
             // Class declarations
             k if k == syntax_kind_ext::CLASS_DECLARATION => {
                 self.bind_class_declaration(arena, node, idx);
@@ -1728,6 +1735,7 @@ impl ThinBinderState {
             }
 
             self.node_symbols.insert(declaration.0, existing_id);
+            self.declare_in_persistent_scope(name.to_string(), existing_id);
             return existing_id;
         }
 
@@ -1741,6 +1749,7 @@ impl ThinBinderState {
         }
         self.current_scope.set(name.to_string(), sym_id);
         self.node_symbols.insert(declaration.0, sym_id);
+        self.declare_in_persistent_scope(name.to_string(), sym_id);
         sym_id
     }
 
