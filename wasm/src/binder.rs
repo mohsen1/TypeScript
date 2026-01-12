@@ -12,6 +12,7 @@ use crate::parser::NodeIndex;
 use crate::parser::node_flags;
 use crate::parser::thin_node::NodeAccess;
 use crate::scanner::SyntaxKind;
+use crate::parser::syntax_kind_ext; // For syntax kind constants like MODULE_BLOCK, etc.
 
 // =============================================================================
 // Symbol Flags
@@ -1599,18 +1600,142 @@ impl BinderState {
                 arena.get_literal_text(module.name)
                     .map(str::to_string)
             });
+
+        let mut module_symbol_id = SymbolId::NONE;
         if let Some(name) = name {
             // Determine if this is a namespace (value) or module (ambient)
             // For simplicity, treat as namespace module (can contain values)
             let flags = symbol_flags::NAMESPACE_MODULE | symbol_flags::VALUE_MODULE;
-            self.declare_symbol(name, flags, module_idx);
+            module_symbol_id = self.declare_symbol(name, flags, module_idx);
         }
 
         // Bind module body in new scope
         if !module.body.is_none() {
             self.enter_scope(ContainerKind::Module, module_idx);
             self.bind_node(arena, module.body);
+
+            // Populate exports for the module symbol
+            if !module_symbol_id.is_none() {
+                self.populate_module_exports(arena, module.body, module_symbol_id);
+            }
+
             self.exit_scope();
+        }
+    }
+
+    /// Check if a modifier list contains the export keyword.
+    fn has_export_modifier(&self, arena: &NodeArena, modifiers: &Option<crate::parser::NodeList>) -> bool {
+        if let Some(mods) = modifiers {
+            for &mod_idx in &mods.nodes {
+                if let Some(Node::Token(base)) = arena.get(mod_idx) {
+                    if base.kind == SyntaxKind::ExportKeyword as u16 {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    /// Populate the exports table of a module/namespace symbol based on exported declarations in its body.
+    fn populate_module_exports(&mut self, arena: &NodeArena, body_idx: NodeIndex, module_symbol_id: SymbolId) {
+        let Some(node) = arena.get(body_idx) else { return };
+
+        // Body can be a Block (ModuleBlock) or another ModuleDeclaration (nested namespace)
+        let statements = if node.kind() == syntax_kind_ext::MODULE_BLOCK {
+            if let Some(Node::ModuleBlock(block)) = arena.get(body_idx) {
+                &block.statements.nodes
+            } else {
+                return;
+            }
+        } else if let Some(Node::ModuleBlock(block)) = arena.get(body_idx) {
+            &block.statements.nodes
+        } else {
+            return;
+        };
+
+        for &stmt_idx in statements {
+            if let Some(stmt_node) = arena.get(stmt_idx) {
+                // Check for export modifier
+                let is_exported = match stmt_node {
+                    Node::VariableStatement(v) => self.has_export_modifier(arena, &v.modifiers),
+                    Node::FunctionDeclaration(f) => self.has_export_modifier(arena, &f.modifiers),
+                    Node::ClassDeclaration(c) => self.has_export_modifier(arena, &c.modifiers),
+                    Node::InterfaceDeclaration(i) => self.has_export_modifier(arena, &i.modifiers),
+                    Node::TypeAliasDeclaration(t) => self.has_export_modifier(arena, &t.modifiers),
+                    Node::EnumDeclaration(e) => self.has_export_modifier(arena, &e.modifiers),
+                    Node::ModuleDeclaration(m) => self.has_export_modifier(arena, &m.modifiers),
+                    Node::ExportDeclaration(_) => true, // export { x }
+                    _ => false,
+                };
+
+                if is_exported {
+                    // Collect the exported names first
+                    let mut exported_names = Vec::new();
+
+                    match stmt_node {
+                        Node::VariableStatement(stmt) => {
+                            if let Some(Node::VariableDeclarationList(list)) = arena.get(stmt.declaration_list) {
+                                for &decl_idx in &list.declarations.nodes {
+                                    if let Some(Node::VariableDeclaration(decl)) = arena.get(decl_idx) {
+                                        if let Some(name) = self.get_identifier_name(arena, decl.name) {
+                                            exported_names.push(name.to_string());
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        Node::FunctionDeclaration(func) => {
+                            if let Some(name) = self.get_identifier_name(arena, func.name) {
+                                exported_names.push(name.to_string());
+                            }
+                        },
+                        Node::ClassDeclaration(class) => {
+                            if let Some(name) = self.get_identifier_name(arena, class.name) {
+                                exported_names.push(name.to_string());
+                            }
+                        },
+                        Node::EnumDeclaration(enm) => {
+                            if let Some(name) = self.get_identifier_name(arena, enm.name) {
+                                exported_names.push(name.to_string());
+                            }
+                        },
+                        Node::InterfaceDeclaration(iface) => {
+                            if let Some(name) = self.get_identifier_name(arena, iface.name) {
+                                exported_names.push(name.to_string());
+                            }
+                        },
+                        Node::TypeAliasDeclaration(alias) => {
+                            if let Some(name) = self.get_identifier_name(arena, alias.name) {
+                                exported_names.push(name.to_string());
+                            }
+                        },
+                        Node::ModuleDeclaration(module) => {
+                            let name = self.get_identifier_name(arena, module.name)
+                                .map(|n| n.to_string())
+                                .or_else(|| arena.get_literal_text(module.name).map(str::to_string));
+                            if let Some(name) = name {
+                                exported_names.push(name);
+                            }
+                        },
+                        _ => {}
+                    }
+
+                    // Now add them to exports
+                    for name in &exported_names {
+                        if let Some(sym_id) = self.current_scope.get(name) {
+                            if let Some(module_sym) = self.symbols.get_mut(module_symbol_id) {
+                                let exports = module_sym.exports.get_or_insert_with(|| Box::new(SymbolTable::new()));
+                                exports.set(name.clone(), sym_id);
+                            }
+                            // Mark the child symbol as exported
+                            if let Some(child_sym) = self.symbols.get_mut(sym_id) {
+                                child_sym.is_exported = true;
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
