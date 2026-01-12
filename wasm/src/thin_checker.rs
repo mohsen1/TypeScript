@@ -15900,8 +15900,8 @@ impl<'a> ThinCheckerState<'a> {
 
         // Collect getter return types and setter parameter types
         struct AccessorTypeInfo {
-            getter: Option<(NodeIndex, TypeId, NodeIndex, bool)>,  // (accessor_idx, return_type, body_or_return_pos, is_abstract)
-            setter: Option<(NodeIndex, TypeId, bool)>,  // (accessor_idx, param_type, is_abstract)
+            getter: Option<(NodeIndex, TypeId, NodeIndex, bool, bool)>,  // (accessor_idx, return_type, body_or_return_pos, is_abstract, is_declared)
+            setter: Option<(NodeIndex, TypeId, bool, bool)>,  // (accessor_idx, param_type, is_abstract, is_declared)
         }
 
         let mut accessors: HashMap<String, AccessorTypeInfo> = HashMap::new();
@@ -15914,8 +15914,9 @@ impl<'a> ThinCheckerState<'a> {
             if node.kind == syntax_kind_ext::GET_ACCESSOR {
                 if let Some(accessor) = self.ctx.arena.get_accessor(node) {
                     if let Some(name) = self.get_property_name(accessor.name) {
-                        // Check if this accessor is abstract
+                        // Check if this accessor is abstract or declared
                         let is_abstract = self.has_abstract_modifier(&accessor.modifiers);
+                        let is_declared = self.has_declare_modifier(&accessor.modifiers);
 
                         // Get the return type - check explicit annotation first
                         let return_type = if !accessor.type_annotation.is_none() {
@@ -15933,14 +15934,15 @@ impl<'a> ThinCheckerState<'a> {
                             getter: None,
                             setter: None,
                         });
-                        info.getter = Some((member_idx, return_type, error_pos, is_abstract));
+                        info.getter = Some((member_idx, return_type, error_pos, is_abstract, is_declared));
                     }
                 }
             } else if node.kind == syntax_kind_ext::SET_ACCESSOR {
                 if let Some(accessor) = self.ctx.arena.get_accessor(node) {
                     if let Some(name) = self.get_property_name(accessor.name) {
-                        // Check if this accessor is abstract
+                        // Check if this accessor is abstract or declared
                         let is_abstract = self.has_abstract_modifier(&accessor.modifiers);
+                        let is_declared = self.has_declare_modifier(&accessor.modifiers);
 
                         // Get the parameter type from the setter's first parameter
                         let param_type = if let Some(&first_param_idx) = accessor.parameters.nodes.first() {
@@ -15965,7 +15967,7 @@ impl<'a> ThinCheckerState<'a> {
                             getter: None,
                             setter: None,
                         });
-                        info.setter = Some((member_idx, param_type, is_abstract));
+                        info.setter = Some((member_idx, param_type, is_abstract, is_declared));
                     }
                 }
             }
@@ -15973,11 +15975,17 @@ impl<'a> ThinCheckerState<'a> {
 
         // Check type compatibility for each accessor pair
         for (_, info) in accessors {
-            if let (Some((_getter_idx, getter_type, error_pos, getter_abstract)), Some((_setter_idx, setter_type, setter_abstract))) =
+            if let (Some((_getter_idx, getter_type, error_pos, getter_abstract, getter_declared)),
+                    Some((_setter_idx, setter_type, setter_abstract, setter_declared))) =
                 (info.getter, info.setter)
             {
                 // Skip if either accessor is abstract - abstract accessors don't need type compatibility checks
                 if getter_abstract || setter_abstract {
+                    continue;
+                }
+
+                // Skip if either accessor is declared - declared accessors don't need type compatibility checks
+                if getter_declared || setter_declared {
                     continue;
                 }
 
