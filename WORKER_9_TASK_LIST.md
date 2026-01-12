@@ -1,21 +1,18 @@
-# Worker 9 Task List - Solver Squad
+# Worker 9 Task List
 
 ## Current Task
-- [ ] **SOLV-3: Strengthen union type checking**
-  - Audit `solve_union_subtype` implementation
-  - Fix: Union A is subtype of Union B only if all A's members are in B
-  - Don't accept `any` as universal subtype in unions
-  - Add tests for: `type A = 1 | 2; type B = 1 | 2 | 3; let a: A = 1 as B;`
+- [ ] **SOLVER-5: Fix missing TS2322 (Type not assignable) errors**
+  - Audit 310 missing TS2322 cases from conformance report
+  - Categorize by pattern (generics, unions, literals, etc.)
+  - Fix the top 5 most common patterns
+  - Add regression tests for each fix
 
 ## Queue
-- [ ] **SOLV-6: Fix intersection type checking**
-  - Implement `solve_intersection_subtype` correctly
-  - Intersection A is subtype of B if ANY member of A is subtype of B
-  - Test: `type A = { x: number } & { y: string };`
-- [ ] **SOLV-9: Test generic constraint violations**
-  - Create tests for bounded generics: `<T extends number>`
-  - Ensure `f<string>(123)` errors when string doesn't extend number
-  - Test default type parameter inference behavior
+- [ ] **SOLVER-6: Fix missing TS7006 (Implicit Any) errors**
+  - Audit 357 missing TS7006 cases from conformance report
+  - Find where parameters implicitly get `Any` without error
+  - Add `check_implicit_any` function in checker
+  - Emit error when parameter type cannot be inferred
 
 ## Completed
 (none yet)

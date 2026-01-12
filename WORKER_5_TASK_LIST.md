@@ -1,22 +1,18 @@
-# Worker 5 Task List - Binder Squad
+# Worker 5 Task List
 
 ## Current Task
-- [ ] **BIND-2: Implement lib.d.ts parsing and loading**
-  - Create `src/binder/lib_loader.rs`
-  - Parse `lib.d.ts` into AST
-  - Extract interface/type/variable declarations
-  - Build `LibSymbols` struct for global injection
+- [ ] **BINDER-3: Fix module augmentation resolution**
+  - Trace how `interface Window` is merged across files
+  - Implement proper symbol merging for global augmentations
+  - Handle `declare global` blocks correctly
+  - Add tests for multi-file interface merging
 
 ## Queue
-- [ ] **BIND-5: Fix module augmentation resolution**
-  - Implement `merge_interface_declarations` for cross-file interfaces
-  - Handle `interface Window` merging across multiple files
-  - Support `declare global` augmentation in modules
-  - Test: File1: `interface Window { custom: string }` File2: `window.custom` should work
-- [ ] **BIND-8: Handle ambient module contexts**
-  - Fix `declare module "node"` resolution
-  - Ensure module-scoped symbols don't leak to global
-  - Test import resolution for ambient modules
+- [ ] **BINDER-4: Eliminate false positive TS2304 errors**
+  - Run conformance tests and identify remaining TS2304 issues
+  - Categorize: missing globals vs. legitimate errors
+  - Fix the root causes of false positives
+  - Goal: reduce TS2304 extra errors to < 50
 
 ## Completed
 (none yet)

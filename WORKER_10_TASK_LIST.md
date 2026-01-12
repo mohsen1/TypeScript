@@ -1,23 +1,20 @@
-# Worker 10 Task List - Solver Squad
+# Worker 10 Task List
 
 ## Current Task
-- [ ] **SOLV-10: Write comprehensive conformance tests for Solver**
-  - Create test file: `tests/conformance/solver_tests.ts`
-  - Add 100+ cases covering: assignments, generics, unions, intersections, any/unknown
-  - Include all TS2322 and TS7006 variations
-  - Verify error output matches tsc exactly
+- [ ] **SOLVER-7: Verify error message parity with tsc**
+  - Compare our TS2322 error messages with TypeScript compiler
+  - Fix message format to match tsc output
+  - Ensure error spans are correct for conformance testing
+  - Add tests for message content matching
 
 ## Queue
-- [ ] **SOLV-11: Run full conformance suite and analyze results**
-  - Execute `cargo test --test conformance`
-  - Compare error counts against baseline
-  - Generate report: missing errors reduced from 68.2% to <40%
-  - Document remaining gaps in `docs/conformance_gap_report.md`
-- [ ] **SOLV-12: Verify squad goals achieved**
-  - Confirm Exact Match increased from 23.4% to 35%
-  - Confirm Missing Errors decreased below 40%
-  - Confirm TS2304 false positives eliminated
-  - Tag release if all metrics met
+- [ ] **SOLVER-8: Run conformance suite and measure improvement**
+  - Run full test suite after all Solver fixes
+  - Verify TS2322 missing errors are reduced
+  - Verify TS7006 missing errors are reduced
+  - Coordinate with other squads to measure overall metrics:
+    - Exact Match: 23.4% -> 35%
+    - Missing Errors: 68.2% -> <40%
 
 ## Completed
 (none yet)
