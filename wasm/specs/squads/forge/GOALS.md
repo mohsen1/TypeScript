@@ -117,11 +117,11 @@ Updated: 2026-01-11
 
 | Worker | Priority | Assignment | Status |
 |--------|----------|------------|--------|
-| W1 | HIGH | TS2339 Property Does Not Exist | Syncing - fixing 35 extra errors |
-| W2 | HIGH | TS2705 Async Function Return | Syncing - 37 occurrences |
-| W3 | HIGH | TS2304 Cannot Find Name | Syncing - fixing 129 extra errors |
-| W4 | HIGH | TS7006 Parameter 'Any' Type | Syncing - 42 occurrences |
-| W5 | HIGH | TS2564 Property No Initializer | Syncing - continuing implementation |
+| W1 | HIGH | TS2339 Property Does Not Exist | Syncing - 35 extra errors |
+| W2 | HIGH | TS2355 Function Return Value | Syncing - 82 extra errors |
+| W3 | HIGH | TS2304 Cannot Find Name | Active - creating test cases |
+| W4 | HIGH | TS7006 Parameter 'Any' Type | Active - investigating false positives |
+| W5 | HIGH | TS2564 Property No Initializer | Syncing - 64 occurrences |
 
 **MERGED WORKERS (to squad/forge):**
 - ✅ W1: Method bivariance (4/4 tests pass)
@@ -132,16 +132,16 @@ Updated: 2026-01-11
 
 **REASSIGNMENT HISTORY:**
 - W1: Method bivariance → TS7010 → TS2339 (3rd task)
-- W2: TS7010 → TS2454 → TS2322 → TS2564 → TS2705 (5th task)
+- W2: TS7010 → TS2454 → TS2322 → TS2564 → TS2705 → TS2355 (6th task)
 - W3: TS2322 → TS2454 → TS2304 (3rd task)
 - W4: Namespace debug → TS2322 → TS2792 → TS7010 → TS7006 (5th task)
-- W5: New expression → TS2564 (2nd task)
+- W5: New expression → TS2322 → TS2564 (3rd task)
 
 **PRIORITY ORDER:**
 1. **W3** - TS2304 cannot find name (129 extra errors)
 2. **W5** - TS2564 property initialization (64 occurrences)
-3. **W1** - TS2339 property does not exist (35 extra errors)
-4. **W2** - TS2705 async function return (37 occurrences)
+3. **W2** - TS2355 function return value (82 extra errors)
+4. **W1** - TS2339 property does not exist (35 extra errors)
 5. **W4** - TS7006 parameter 'any' (42 occurrences)
 
 ### Before Starting Any Task

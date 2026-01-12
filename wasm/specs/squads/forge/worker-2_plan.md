@@ -1,60 +1,67 @@
 # Worker 2 Plan - Squad Forge
 
 ## Mission
-Fix TS2705: Async Function Must Return Promise
+Fix TS2355: Function Must Return Value
 
 Status: Active
 Priority: P1 (HIGH)
 
 ## Current Assignment
-**Implement TS2705 Error: Async function must return Promise (37 occurrences)**
+**Fix TS2355 Extra Errors: Function must return value (82 extra errors)**
 
 ### Background
-TypeScript should emit TS2705 when an async function is declared with a return type that is not a Promise. Async functions always return Promises, so the return type must reflect that.
+TypeScript is emitting TS2355 "Function must return value" errors too aggressively (82 extra errors). This is likely a control flow analysis issue where code paths are incorrectly flagged as not returning a value.
 
 ### Success Criteria
-- Emit TS2705 when async function has non-Promise return type annotation
-- Handle all async function types: function declarations, expressions, arrow functions, methods
-- Don't emit when return type is Promise or generic Promise<T>
-- Don't emit when return type is omitted (inferred as Promise)
-- Handle async arrow functions correctly
+- Don't emit TS2355 for functions that return in all code paths
+- Fix control flow analysis to recognize all return paths
+- Handle early returns, conditional returns, throw statements correctly
+- Reduce extra TS2355 errors significantly
 
 ### Implementation Steps
 1. [ ] Sync from origin/rust: `git fetch origin && git merge origin/rust --no-edit`
-2. [ ] Search for async function type checking in `src/thin_checker.rs`
-3. [ ] Find where function return types are validated
-4. [ ] Implement TS2705 emission: if function is async and return type is not Promise, emit error
-5. [ ] Test with various async function patterns
-6. [ ] Run conformance to verify TS2705 is emitted correctly
+2. [ ] Search for TS2355 emission code in `src/thin_checker.rs`
+3. [ ] Investigate control flow analysis for return statements
+4. [ ] Fix cases where valid returns are incorrectly flagged as missing
+5. [ ] Test with various return patterns (early returns, conditionals, throws)
+6. [ ] Run conformance to verify reduction in extra errors
 
 ### Key Code Locations
-- `src/thin_checker.rs` - async function type checking
-- `src/checker/types/diagnostics.rs` - TS2705 error code
-- `src/checker/types.rs` - Promise type definition
+- `src/thin_checker.rs` - function return checking, TS2355 emission
+- `src/checker/control_flow.rs` - control flow analysis
+- `src/checker/types/diagnostics.rs` - TS2355 error code
 
 ### Test Cases
 ```typescript
-// Should emit TS2705
-async function foo(): number { } // Error: Async function must return Promise
-async function bar(): string { return "x"; } // Error: return type is string, not Promise<string>
-
-const baz = async (): boolean => false; // Error: Async arrow function must return Promise
-
-class Qux {
-  async method(): void { } // Error: Async method must return Promise
+// Should NOT emit TS2355 (returns in all paths)
+function foo(x: number): number {
+  if (x > 0) {
+    return x;
+  }
+  return 0; // OK - all paths return
 }
 
-// Should NOT emit
-async function qux(): Promise<number> { } // OK - explicit Promise
-async function quux() { } // OK - inferred as Promise<any>
-async function corge(): Promise<void> { } // OK - Promise<void>
+function bar(flag: boolean): number {
+  if (flag) {
+    return 1;
+  } else {
+    return 2;
+  }
+} // OK - all conditional paths return
+
+// Should emit TS2355
+function baz(): number {
+  if (Math.random() > 0.5) {
+    return 1;
+  }
+  // Error: Not all code paths return a value
+}
 ```
 
 ## Completed
-- [x] Namespace merging enum/function work
-- [x] TS2322 investigation (already implemented)
+- [x] TS2564 property no initializer investigation (found existing implementation)
 
 ## Notes
-- Commit format: `[wasm] checker: Implement TS2705 async function return type errors`
+- Commit format: `[wasm] checker: Fix TS2355 false positives in return analysis`
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/forge-2`
