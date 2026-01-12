@@ -117,11 +117,11 @@ Updated: 2026-01-11
 
 | Worker | Priority | Assignment | Status |
 |--------|----------|------------|--------|
-| W1 | HIGH | TS2339 Property Does Not Exist | Active - fixing private static members |
-| W2 | HIGH | TS2355 Function Return Value | Active - running differential tests |
-| W3 | HIGH | TS2304 Cannot Find Name | Active - finding test cases |
-| W4 | HIGH | TS7006 Parameter 'Any' Type | Active - investigating false positives |
-| W5 | HIGH | TS2454 Variable Assignment | Syncing - 43 occurrences |
+| W1 | HIGH | TS2339 Property Does Not Exist | Syncing - 35 extra errors |
+| W2 | HIGH | TS2355 Function Return Value | Active - TS2355 fix complete |
+| W3 | HIGH | TS2705 Async Function Return | Syncing - 37 occurrences |
+| W4 | HIGH | TS2322 Type Not Assignable | Syncing - 19 missing |
+| W5 | HIGH | TS2454 Variable Assignment | Active - TS2454 complete |
 
 **MERGED WORKERS (to squad/forge):**
 - ✅ W1: Method bivariance (4/4 tests pass)
@@ -133,16 +133,16 @@ Updated: 2026-01-11
 **REASSIGNMENT HISTORY:**
 - W1: Method bivariance → TS7010 → TS2339 (3rd task)
 - W2: TS7010 → TS2454 → TS2322 → TS2564 → TS2705 → TS2355 (6th task)
-- W3: TS2322 → TS2454 → TS2304 (3rd task)
-- W4: Namespace debug → TS2322 → TS2792 → TS7010 → TS7006 (5th task)
+- W3: TS2322 → TS2454 → TS2304 → TS2705 (4th task)
+- W4: Namespace debug → TS2322 → TS2792 → TS7010 → TS7006 → TS2322 (6th task)
 - W5: New expression → TS2322 → TS2564 → TS2454 (4th task)
 
 **PRIORITY ORDER:**
-1. **W3** - TS2304 cannot find name (129 extra errors)
-2. **W2** - TS2355 function return value (82 extra errors)
-3. **W5** - TS2454 variable assignment (43 occurrences)
+1. **W2** - TS2355 function return value (82 extra errors) - fix complete, needs rebuild
+2. **W3** - TS2705 async function return (37 occurrences)
+3. **W5** - TS2454 variable assignment (43 occurrences) - complete, needs review
 4. **W1** - TS2339 property does not exist (35 extra errors)
-5. **W4** - TS7006 parameter 'any' (42 occurrences)
+5. **W4** - TS2322 type not assignable (19 missing)
 
 ### Before Starting Any Task
 **IMPORTANT:** Workers must consult Gemini before starting work:
