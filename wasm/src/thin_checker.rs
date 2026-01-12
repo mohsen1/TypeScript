@@ -4665,7 +4665,7 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
-    fn should_check_definite_assignment(&self, sym_id: SymbolId, idx: NodeIndex) -> bool {
+    fn should_check_definite_assignment(&mut self, sym_id: SymbolId, idx: NodeIndex) -> bool {
         let Some(symbol) = self.ctx.binder.get_symbol(sym_id) else {
             return false;
         };
@@ -4699,6 +4699,14 @@ impl<'a> ThinCheckerState<'a> {
             return false;
         }
 
+        // Skip definite assignment check for variables whose types allow uninitialized use:
+        // - Literal types: `let key: "a"` - the type restricts to a single literal
+        // - Union of literals: `let key: "a" | "b"` - all possible values are literals
+        // - Types with undefined: `let obj: Foo | undefined` - undefined is the default
+        if self.symbol_type_allows_uninitialized(sym_id) {
+            return false;
+        }
+
         true
     }
 
@@ -4725,6 +4733,50 @@ impl<'a> ThinCheckerState<'a> {
                 if (node.flags as u32) & crate::parser::node_flags::AMBIENT != 0 {
                     return true;
                 }
+            }
+        }
+
+        false
+    }
+
+    /// Check if a variable symbol can be used without initialization.
+    /// This includes:
+    /// 1. Literal types (e.g., `let key: "a"`)
+    /// 2. Unions of literals (e.g., `let key: "a" | "b"`)
+    /// 3. Types that include `undefined` (e.g., `let obj: Foo | undefined`)
+    fn symbol_type_allows_uninitialized(&mut self, sym_id: SymbolId) -> bool {
+        use crate::solver::{LiteralValue, TypeKey};
+
+        let declared_type = self.get_type_of_symbol(sym_id);
+        let Some(type_key) = self.ctx.types.lookup(declared_type) else {
+            return false;
+        };
+
+        // Check if it's a single literal type
+        if matches!(type_key, TypeKey::Literal(_)) {
+            return true;
+        }
+
+        // Check if it's undefined type
+        if declared_type == TypeId::UNDEFINED {
+            return true;
+        }
+
+        // Check if it's a union
+        if let TypeKey::Union(members) = type_key {
+            let member_ids = self.ctx.types.type_list(members);
+
+            // Union of only literal types - allowed without initialization
+            let all_literals = member_ids.iter().all(|&member_id| {
+                matches!(self.ctx.types.lookup(member_id), Some(TypeKey::Literal(_)))
+            });
+            if all_literals {
+                return true;
+            }
+
+            // If union includes undefined, allowed without initialization
+            if member_ids.contains(&TypeId::UNDEFINED) {
+                return true;
             }
         }
 
