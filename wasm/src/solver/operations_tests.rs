@@ -24,6 +24,7 @@ fn test_call_simple_function() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Call with correct args
@@ -53,6 +54,7 @@ fn test_call_argument_count_mismatch() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Call with no args
@@ -85,6 +87,7 @@ fn test_call_argument_type_mismatch() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Call with wrong type
@@ -145,6 +148,7 @@ fn test_call_assignability_respects_strict_function_types_toggle() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
     let fn_dog = interner.function(FunctionShape {
         params: vec![ParamInfo {
@@ -158,6 +162,7 @@ fn test_call_assignability_respects_strict_function_types_toggle() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let accepts_fn = interner.function(FunctionShape {
@@ -172,6 +177,7 @@ fn test_call_assignability_respects_strict_function_types_toggle() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let mut checker = CompatChecker::new(&interner);
@@ -215,6 +221,7 @@ fn test_call_weak_type_with_compat_checker() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let arg = interner.object(vec![PropertyInfo {
@@ -250,6 +257,7 @@ fn test_call_rest_parameter_allows_zero_args() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let result = evaluator.resolve_call(func, &[]);
@@ -287,6 +295,7 @@ fn test_call_rest_parameter_min_args_with_required() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let result = evaluator.resolve_call(func, &[]);
@@ -487,6 +496,7 @@ fn test_call_rest_parameter_type_match() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let result = evaluator.resolve_call(func, &[TypeId::NUMBER, TypeId::NUMBER]);
@@ -516,6 +526,7 @@ fn test_call_rest_parameter_type_mismatch() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let result = evaluator.resolve_call(func, &[TypeId::NUMBER, TypeId::STRING]);
@@ -552,6 +563,7 @@ fn test_call_tuple_rest_argument_count_mismatch() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let result = evaluator.resolve_call(func, &[TypeId::NUMBER]);
@@ -587,6 +599,7 @@ fn test_call_tuple_rest_argument_type_mismatch() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let result = evaluator.resolve_call(func, &[TypeId::NUMBER, TypeId::BOOLEAN]);
@@ -623,6 +636,7 @@ fn test_call_tuple_rest_argument_success() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let result = evaluator.resolve_call(func, &[TypeId::NUMBER, TypeId::STRING]);
@@ -656,6 +670,7 @@ fn test_call_tuple_rest_with_fixed_tail() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let result = evaluator.resolve_call(func, &[TypeId::NUMBER]);
@@ -733,6 +748,7 @@ fn test_property_access_function_members() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let result = evaluator.resolve_property_access(func, "call");
@@ -1275,6 +1291,7 @@ fn test_call_generic_function_identity() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Call identity(42) -> should infer T = number
@@ -1312,6 +1329,7 @@ fn test_call_generic_function_with_string() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Call identity("hello") -> should infer T = string
@@ -1348,6 +1366,7 @@ fn test_call_generic_argument_type_mismatch_with_default() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let result = evaluator.resolve_call(func, &[TypeId::STRING]);
@@ -1386,6 +1405,7 @@ fn test_call_generic_argument_count_mismatch() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let result = evaluator.resolve_call(func, &[]);
@@ -1427,6 +1447,7 @@ fn test_call_generic_rest_tuple_constraint_count_mismatch() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let result = evaluator.resolve_call(func, &[]);
@@ -1469,6 +1490,7 @@ fn test_call_generic_default_rest_tuple_count_mismatch() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let result = evaluator.resolve_call(func, &[]);
@@ -1510,6 +1532,7 @@ fn test_call_generic_default_rest_tuple_optional_allows_empty() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let result = evaluator.resolve_call(func, &[]);
@@ -1553,6 +1576,7 @@ fn test_call_generic_argument_type_mismatch_non_generic_param() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let result = evaluator.resolve_call(func, &[TypeId::STRING, TypeId::NUMBER]);
@@ -1631,6 +1655,7 @@ fn test_call_generic_array_function() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     // Call first(number[]) -> should infer T = number
@@ -1695,6 +1720,7 @@ fn test_infer_generic_function_identity() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let result = infer_generic_function(&interner, &mut subtype, &func, &[TypeId::STRING]);
@@ -1720,6 +1746,7 @@ fn test_infer_generic_function_this_type_param() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let func = FunctionShape {
@@ -1734,6 +1761,7 @@ fn test_infer_generic_function_this_type_param() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let arg_func = interner.function(FunctionShape {
@@ -1743,6 +1771,7 @@ fn test_infer_generic_function_this_type_param() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let result = infer_generic_function(&interner, &mut subtype, &func, &[arg_func]);
@@ -1790,6 +1819,7 @@ fn test_infer_generic_callable_param_from_function() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let arg_func = interner.function(FunctionShape {
@@ -1804,6 +1834,7 @@ fn test_infer_generic_callable_param_from_function() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let result = infer_generic_function(&interner, &mut subtype, &func, &[arg_func]);
@@ -1834,6 +1865,7 @@ fn test_infer_generic_function_param_from_callable() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let func = FunctionShape {
@@ -1848,6 +1880,7 @@ fn test_infer_generic_function_param_from_callable() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let callable_arg = interner.callable(CallableShape {
@@ -1895,6 +1928,7 @@ fn test_infer_generic_function_param_from_overloaded_callable() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let func = FunctionShape {
@@ -1909,6 +1943,7 @@ fn test_infer_generic_function_param_from_overloaded_callable() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let callable_arg = interner.callable(CallableShape {
@@ -1995,6 +2030,7 @@ fn test_infer_generic_callable_param_from_callable() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let callable_arg = interner.callable(CallableShape {
@@ -2059,6 +2095,7 @@ fn test_infer_generic_construct_signature_param() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let ctor_arg = interner.callable(CallableShape {
@@ -2107,6 +2144,7 @@ fn test_infer_generic_keyof_param_from_keyof_arg() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let obj = interner.object(vec![PropertyInfo {
@@ -2154,6 +2192,7 @@ fn test_infer_generic_index_access_param_from_index_access_arg() {
         return_type: index_access_param,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let key_literal = interner.literal_string("value");
@@ -2206,6 +2245,7 @@ fn test_infer_generic_index_access_param_from_object_property_arg() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let result = infer_generic_function(&interner, &mut subtype, &func, &[TypeId::NUMBER]);
@@ -2242,6 +2282,7 @@ fn test_infer_generic_template_literal_param() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let arg_template = interner.template_literal(vec![
@@ -2287,6 +2328,7 @@ fn test_infer_generic_conditional_param_from_arg() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let result = infer_generic_function(&interner, &mut subtype, &func, &[TypeId::NUMBER]);
@@ -2336,6 +2378,7 @@ fn test_infer_generic_mapped_param_from_object_arg() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let arg_object = interner.object(vec![
@@ -2393,6 +2436,7 @@ fn test_infer_generic_array_map() {
         return_type: u_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let map_func = FunctionShape {
@@ -2415,6 +2459,7 @@ fn test_infer_generic_array_map() {
         return_type: array_u,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let number_array = interner.array(TypeId::NUMBER);
@@ -2430,6 +2475,7 @@ fn test_infer_generic_array_map() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let result = infer_generic_function(
@@ -2467,6 +2513,7 @@ fn test_infer_generic_array_param_from_tuple_arg() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let tuple_arg = interner.tuple(vec![
@@ -2513,6 +2560,7 @@ fn test_infer_generic_readonly_array_param() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let readonly_number_array =
@@ -2553,6 +2601,7 @@ fn test_infer_generic_readonly_tuple_param() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let readonly_tuple_number = interner.intern(TypeKey::ReadonlyType(interner.tuple(vec![
@@ -2594,6 +2643,7 @@ fn test_infer_generic_constructor_instantiation() {
         return_type: box_t,
         type_predicate: None,
         is_constructor: true,
+        is_method: false,
     };
 
     let result = infer_generic_function(&interner, &mut subtype, &ctor, &[TypeId::NUMBER]);
@@ -2628,6 +2678,7 @@ fn test_infer_generic_application_param() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let arg = interner.application(promise_base, vec![TypeId::NUMBER]);
@@ -2668,6 +2719,7 @@ fn test_infer_generic_object_property() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let arg = interner.object(vec![PropertyInfo {
@@ -2713,6 +2765,7 @@ fn test_infer_generic_optional_property_value() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let arg = interner.object(vec![PropertyInfo {
@@ -2759,6 +2812,7 @@ fn test_infer_generic_optional_property_undefined_value() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let arg = interner.object(vec![PropertyInfo {
@@ -2805,6 +2859,7 @@ fn test_infer_generic_optional_property_missing() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let arg = interner.object(Vec::new());
@@ -2846,6 +2901,7 @@ fn test_infer_generic_required_property_from_optional_argument() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let arg = interner.object(vec![PropertyInfo {
@@ -2893,6 +2949,7 @@ fn test_infer_generic_required_property_missing_argument() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let arg = interner.object(Vec::new());
@@ -2933,6 +2990,7 @@ fn test_infer_generic_readonly_property_mismatch() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let arg = interner.object(vec![PropertyInfo {
@@ -2988,6 +3046,7 @@ fn test_infer_generic_readonly_property_mismatch_with_index_signature() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let arg = interner.object_with_index(ObjectShape {
@@ -3044,6 +3103,7 @@ fn test_infer_generic_readonly_index_signature_mismatch() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let arg = interner.object_with_index(ObjectShape {
@@ -3093,6 +3153,7 @@ fn test_infer_generic_readonly_number_index_signature_mismatch() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let arg = interner.object_with_index(ObjectShape {
@@ -3134,6 +3195,7 @@ fn test_infer_generic_method_property_bivariant_param() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let func = FunctionShape {
@@ -3155,6 +3217,7 @@ fn test_infer_generic_method_property_bivariant_param() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let literal_a = interner.literal_string("a");
@@ -3170,6 +3233,7 @@ fn test_infer_generic_method_property_bivariant_param() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let arg = interner.object(vec![PropertyInfo {
@@ -3209,6 +3273,7 @@ fn test_infer_generic_function_property_contravariant_param() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let func = FunctionShape {
@@ -3230,6 +3295,7 @@ fn test_infer_generic_function_property_contravariant_param() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let literal_a = interner.literal_string("a");
@@ -3245,6 +3311,7 @@ fn test_infer_generic_function_property_contravariant_param() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let arg = interner.object(vec![PropertyInfo {
@@ -3285,6 +3352,7 @@ fn test_infer_generic_method_property_bivariant_optional_param() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let func = FunctionShape {
@@ -3306,6 +3374,7 @@ fn test_infer_generic_method_property_bivariant_optional_param() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let literal_a = interner.literal_string("a");
@@ -3321,6 +3390,7 @@ fn test_infer_generic_method_property_bivariant_optional_param() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let arg = interner.object(vec![PropertyInfo {
@@ -3367,6 +3437,7 @@ fn test_infer_generic_missing_property_uses_index_signature() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let arg = interner.object_with_index(ObjectShape {
@@ -3414,6 +3485,7 @@ fn test_infer_generic_missing_numeric_property_uses_number_index_signature() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let arg = interner.object_with_index(ObjectShape {
@@ -3459,6 +3531,7 @@ fn test_infer_generic_tuple_element() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let tuple_arg = interner.tuple(vec![
@@ -3499,6 +3572,7 @@ fn test_infer_generic_tuple_rest_elements() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let tuple_arg = interner.tuple(vec![
@@ -3539,6 +3613,7 @@ fn test_infer_generic_tuple_rest_parameter() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let result = infer_generic_function(
@@ -3581,6 +3656,7 @@ fn test_infer_generic_tuple_rest_from_rest_argument() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let string_array = interner.array(TypeId::STRING);
@@ -3628,6 +3704,7 @@ fn test_infer_generic_index_signature() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let indexed_number = interner.object_with_index(ObjectShape {
@@ -3678,6 +3755,7 @@ fn test_infer_generic_index_signature_from_object_literal() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let object_literal = interner.object(vec![PropertyInfo {
@@ -3727,6 +3805,7 @@ fn test_infer_generic_index_signature_from_optional_property() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let object_literal = interner.object(vec![PropertyInfo {
@@ -3777,6 +3856,7 @@ fn test_infer_generic_number_index_from_optional_property() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let object_literal = interner.object(vec![PropertyInfo {
@@ -3827,6 +3907,7 @@ fn test_infer_generic_number_index_from_numeric_property() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let object_literal = interner.object(vec![PropertyInfo {
@@ -3876,6 +3957,7 @@ fn test_infer_generic_number_index_ignores_noncanonical_numeric_property() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let object_literal = interner.object(vec![PropertyInfo {
@@ -3925,6 +4007,7 @@ fn test_infer_generic_number_index_ignores_negative_zero_property() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let object_literal = interner.object(vec![PropertyInfo {
@@ -3974,6 +4057,7 @@ fn test_infer_generic_number_index_from_nan_property() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let object_literal = interner.object(vec![PropertyInfo {
@@ -4023,6 +4107,7 @@ fn test_infer_generic_number_index_from_exponent_property() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let object_literal = interner.object(vec![PropertyInfo {
@@ -4072,6 +4157,7 @@ fn test_infer_generic_number_index_from_negative_infinity_property() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let object_literal = interner.object(vec![PropertyInfo {
@@ -4134,6 +4220,7 @@ fn test_infer_generic_index_signatures_from_mixed_properties() {
         ]),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let object_literal = interner.object(vec![
@@ -4211,6 +4298,7 @@ fn test_infer_generic_index_signatures_from_optional_mixed_properties() {
         ]),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let object_literal = interner.object(vec![
@@ -4289,6 +4377,7 @@ fn test_infer_generic_index_signatures_ignore_optional_noncanonical_numeric_prop
         ]),
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let object_literal = interner.object(vec![
@@ -4350,6 +4439,7 @@ fn test_infer_generic_property_from_source_index_signature() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let indexed_number = interner.object_with_index(ObjectShape {
@@ -4397,6 +4487,7 @@ fn test_infer_generic_property_from_number_index_signature_infinity() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let indexed_number = interner.object_with_index(ObjectShape {
@@ -4446,6 +4537,7 @@ fn test_infer_generic_union_source() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let boxed_number = interner.object(vec![PropertyInfo {
@@ -4496,6 +4588,7 @@ fn test_infer_generic_union_target_with_placeholder_member() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let result = infer_generic_function(&interner, &mut subtype, &func, &[TypeId::NUMBER]);
@@ -4527,6 +4620,7 @@ fn test_infer_generic_union_target_with_placeholder_and_optional_member() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let result = infer_generic_function(&interner, &mut subtype, &func, &[TypeId::NUMBER]);
@@ -4558,6 +4652,7 @@ fn test_infer_generic_optional_union_target() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let result = infer_generic_function(&interner, &mut subtype, &func, &[TypeId::NUMBER]);
@@ -4589,6 +4684,7 @@ fn test_infer_generic_optional_union_target_with_null() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let result = infer_generic_function(&interner, &mut subtype, &func, &[TypeId::NUMBER]);
@@ -4620,6 +4716,7 @@ fn test_infer_generic_rest_parameters() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let result = infer_generic_function(
@@ -4656,6 +4753,7 @@ fn test_infer_generic_rest_tuple_type_param() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let result = infer_generic_function(
@@ -4700,6 +4798,7 @@ fn test_infer_generic_tuple_rest_type_param() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let result = infer_generic_function(
@@ -4747,6 +4846,7 @@ fn test_infer_generic_tuple_rest_in_tuple_param() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let tuple_arg = interner.tuple(vec![
@@ -4792,6 +4892,7 @@ fn test_infer_generic_tuple_rest_in_tuple_param_from_rest_argument() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let string_array = interner.array(TypeId::STRING);
@@ -4842,6 +4943,7 @@ fn test_infer_generic_tuple_rest_in_tuple_param_from_rest_argument_with_fixed_ta
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let boolean_array = interner.array(TypeId::BOOLEAN);
@@ -4888,6 +4990,7 @@ fn test_infer_generic_tuple_rest_in_tuple_param_empty_tail() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let tuple_arg = interner.tuple(vec![TupleElement {
@@ -4926,6 +5029,7 @@ fn test_infer_generic_default_type_param() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let result = infer_generic_function(&interner, &mut subtype, &func, &[]);
@@ -4963,6 +5067,7 @@ fn test_infer_generic_default_depends_on_prior_param() {
         return_type: u_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let result = infer_generic_function(&interner, &mut subtype, &func, &[TypeId::NUMBER]);
@@ -4993,6 +5098,7 @@ fn test_infer_generic_constraint_fallback() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let result = infer_generic_function(&interner, &mut subtype, &func, &[]);
@@ -5023,6 +5129,7 @@ fn test_infer_generic_constraint_violation() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let result = infer_generic_function(&interner, &mut subtype, &func, &[TypeId::NUMBER]);
@@ -5069,6 +5176,7 @@ fn test_infer_generic_constraint_depends_on_prior_param() {
         return_type: u_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     let result = infer_generic_function(
@@ -5111,6 +5219,7 @@ fn test_rest_param_spreading_homogeneous_args() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     // All args are number -> T inferred as number
@@ -5150,6 +5259,7 @@ fn test_rest_param_spreading_heterogeneous_args() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     // Mixed args -> T inferred as union
@@ -5210,6 +5320,7 @@ fn test_rest_param_with_leading_fixed() {
         return_type: return_tuple,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     // first: string, rest: number, number -> [string, number]
@@ -5261,6 +5372,7 @@ fn test_tuple_rest_captures_remaining() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     // args: [1, "a", true] -> T = [string, boolean]
@@ -5313,6 +5425,7 @@ fn test_tuple_rest_with_multiple_prefix() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     // args: [1, "a", true, false] -> T = [boolean, boolean]
@@ -5363,6 +5476,7 @@ fn test_tuple_rest_single_capture() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     // args: [1, "a"] -> T = [string]
@@ -5413,6 +5527,7 @@ fn test_variadic_with_constraint() {
         return_type: array_t,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     // All strings -> T[] = string[]
@@ -5474,6 +5589,7 @@ fn test_variadic_zip_pattern() {
         return_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     // Call with [number, string], [number, string]
@@ -5527,6 +5643,7 @@ fn test_variadic_empty_args_uses_constraint() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     };
 
     // No args -> T inferred from constraint (unknown)

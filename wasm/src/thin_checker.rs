@@ -2433,6 +2433,7 @@ impl<'a> ThinCheckerState<'a> {
                                 return_type,
                                 type_predicate,
                                 is_constructor: false,
+                                is_method: true,
                             };
                             let method_type = self.ctx.types.function(shape);
                             self.pop_type_parameters(type_param_updates);
@@ -6457,6 +6458,7 @@ impl<'a> ThinCheckerState<'a> {
                 type_params: sig.type_params.clone(),
                 type_predicate: sig.type_predicate.clone(),
                 is_constructor: false,
+                is_method: false,
             };
             let func_type = self.ctx.types.function(func_shape);
             let ctx_helper = ContextualTypeContext::with_expected(self.ctx.types, func_type);
@@ -8167,6 +8169,7 @@ impl<'a> ThinCheckerState<'a> {
             return_type,
             type_predicate,
             is_constructor: false,
+            is_method: false,
         };
 
         self.pop_type_parameters(type_param_updates);
@@ -9242,6 +9245,7 @@ impl<'a> ThinCheckerState<'a> {
                 return_type,
                 type_predicate: None,
                 is_constructor: false,
+                is_method: false,
             };
             Some(checker.ctx.types.function(shape))
         }
@@ -10160,6 +10164,7 @@ impl<'a> ThinCheckerState<'a> {
                         return_type,
                         type_predicate,
                         is_constructor: shape.is_constructor,
+                        is_method: shape.is_method,
                     })
                 } else {
                     type_id
@@ -16613,6 +16618,7 @@ impl<'a> ThinCheckerState<'a> {
                     return_type,
                     type_predicate,
                     is_constructor: false,
+                    is_method: true,
                 };
                 self.pop_type_parameters(type_param_updates);
                 let method_type = self.ctx.types.function(shape);

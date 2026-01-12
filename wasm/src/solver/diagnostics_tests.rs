@@ -90,6 +90,7 @@ fn test_format_function_type() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let formatted = formatter.format(func);
@@ -111,6 +112,7 @@ fn test_format_function_type_with_this() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
+                                is_method: false,
     });
 
     let formatted = formatter.format(func);
