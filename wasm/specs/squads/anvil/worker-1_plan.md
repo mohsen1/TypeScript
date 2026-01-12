@@ -1,51 +1,48 @@
 # Worker 1 Plan - Squad Anvil
 
 ## Mission
-Source Map Implementation
+Additional CLI Features
 
 Status: Active
 Priority: P0 (Highest)
 
 ## Current Assignment
-**Implement Source Map Generation**
+**Add More CLI Flags**
 
 ### Background
-Source maps allow debugging tools to map generated/transpiled code back to original source. Essential for debugging compiled TypeScript.
+TypeScript compiler has many CLI flags. Add more commonly-used flags for better compatibility.
 
 ### Implementation Steps
-1. [ ] Read current source map infrastructure in `src/source_map*.rs`
-2. [ ] Check what's missing compared to standard source map v3 spec
-3. [ ] Implement source map generation:
-   - Track mappings from output positions to source positions
-   - Generate VLQ-encoded mappings
-   - Create .map file alongside .js output
-4. [ ] Add source content to maps for better debugging
-5. [ ] Test: Compile a file and verify .map file is generated correctly
+1. [ ] Read current CLI implementation in `src/cli/args.rs`
+2. [ ] Check which flags from `tsc --help` are still missing
+3. [ ] Add support for important flags:
+   - `--outFile`: Concatenate and emit output to single file
+   - `--outDir`: Output directory (may already exist)
+   - `--tsBuildInfoFile`: Specify .tsbuildinfo file
+   - `--incremental`: Enable incremental compilation
+4. [ ] Update argument parsing in clap configuration
+5. [ ] Test: Run `./wasm/target/release/tsz --help` and verify flags are listed
 
 ### Key Code Locations
-- `src/source_map*.rs` - source map implementation
-- `src/thin_emitter.rs` - add mapping tracking during emission
-- `src/cli/args.rs` --sourceMap flag already added
+- `src/cli/args.rs` - CLI argument definitions
+- `src/cli/driver.rs` - compilation driver
 
 ## Task Queue
-- [ ] After source maps: help with more LSP features or additional CLI flags
+- [ ] After CLI flags: help with LSP features or emitter work
 
 ## Completed
-### Session 1: Emitter Edge Cases
-- [x] Fixed catch clause variable emission (65b99a3305)
-- [x] Added AS_EXPRESSION/TYPE_ASSERTION/SATISFIES_EXPRESSION handling (65b99a3305)
-
-### Session 2: LSP Semantic Tokens Enhancement
-- [x] Added semantic token support for decorators (adea84beac) - MERGED to squad/anvil
-- [x] Added semantic token support for type parameters (adea84beac) - MERGED to squad/anvil
-- [x] Added semantic token support for modifiers (adea84beac) - MERGED to squad/anvil
+- [x] Fixed catch clause variable emission - MERGED to squad/anvil
+- [x] Added AS_EXPRESSION/TYPE_ASSERTION/SATISFIES_EXPRESSION handling - MERGED to squad/anvil
+- [x] LSP Semantic Tokens (decorators, type parameters, modifiers) - MERGED to squad/anvil
+- [x] Source Map Implementation - Verified complete (905 tests passing)
+- [x] Import Equals Emission Fix - Test passes (commit 8271a07cb1)
 
 ## Ready for Merge
-Previous sessions merged to squad/anvil
+Previous work merged to squad/anvil, latest ready for merge
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
 - Use Docker for Rust tests: `./wasm/test.sh`
-- Commit format: `[wasm] source_maps: Implement VLQ mapping generation`
+- Commit format: `[wasm] cli: Add --outFile and --incremental flags`
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/anvil-1`
