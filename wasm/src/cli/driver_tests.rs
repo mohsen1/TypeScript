@@ -95,6 +95,10 @@ fn default_args() -> CliArgs {
         types_versions_compiler_version: None,
         watch: false,
         files: Vec::new(),
+        root_dir: None,
+        declaration: false,
+        declaration_map: false,
+        source_map: false,
     }
 }
 
