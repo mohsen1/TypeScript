@@ -1,50 +1,44 @@
 # Worker 4 Plan - Squad Forge
 
 ## Mission
-Fix Namespace Merging
+Fix TS7010: Implicit Any Return Type
 
 Status: Active
-Priority: P1 (High)
+Priority: P0 (CRITICAL)
 
 ## Current Assignment
-**Help W2 with Namespace Merging (12 failing tests)**
+**Implement TS7010 Error: Function implicitly has 'any' return type**
 
-W2 has made changes to `bind_enum_declaration` to add enum members to exports, but tests are still failing.
+### Background
+TypeScript should emit TS7010 when a function's return type cannot be inferred and is implicitly 'any'.
 
-### Failing Tests
-1. `test_checker_namespace_merges_with_class_element_access`
-2. `test_checker_namespace_merges_with_class_exports`
-3. `test_checker_namespace_merges_with_class_exports_reverse_order`
-4. And 9 more namespace_merges_with_* tests
+### Success Criteria
+- Emit TS7010 when return type cannot be inferred
+- Don't emit when return type can be inferred from return statements
+- Handle void return (no return statements)
+- Handle async functions (return Promise wrapper)
 
-### Next Steps
-1. [ ] Review W2's pane output for specific test failures
-2. [ ] Coordinate with W2 - don't duplicate work
-3. [ ] Check if exports are properly combined when namespace merges with class
-4. [ ] Verify class static members are added to namespace exports
-5. [ ] Test: `./wasm/test.sh 2>&1 | grep namespace_merges_with_class`
+### Implementation Steps
+1. [ ] Find return type inference code in `src/thin_checker.rs`
+2. [ ] Implement check: if return type is any and cannot be inferred, emit TS7010
+3. [ ] Test with various function patterns
+4. [ ] Ensure no false positives
 
-### Key Code Locations
-- `src/binder.rs` - `can_merge_flags()`, `bind_module_declaration()`, namespace exports
-- `src/thin_checker.rs` - namespace member resolution
+### Test Cases
+```typescript
+// Should emit TS7010
+function foo() { } // Error: Implicit 'any' return
 
-## Task Queue
-- [ ] After namespace merging: element access literal keys (if W3 hasn't completed)
+// Should NOT emit
+function bar() { return 42; } // OK - inferred number
+function baz() { console.log('x'); } // OK - inferred void
+```
 
 ## Completed
-- [x] Fix Element Access Type Resolution (5 failing tests)
-  - Fixed definite assignment check to skip variables with literal types
-  - Fixed definite assignment check to skip variables whose types include `undefined`
-  - All 5 tests now pass: literal_key_type, literal_key_union, mixed_literal_key_union,
-    numeric_literal_union, optional_chain_nullable_object
-
-## Ready for Merge
-Yes
+- [x] Fix Element Access Literal Keys - Merged to squad/forge
+- [x] TS7006 - Production ready
+- [x] TS2792 - Production ready
 
 ## Notes
-- Follow `wasm/specs/WASM_ARCHITECTURE.md`
-- Use Docker for Rust tests: `./wasm/test.sh`
-- Commit format: `[wasm] binder: Fix namespace+class merge exports`
-- Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
+- Commit format: `[wasm] checker: Implement TS7010 implicit any return type errors`
 - Push to: `origin/worker/forge-4`
-- COORDINATE with W2 - this is a collaborative task

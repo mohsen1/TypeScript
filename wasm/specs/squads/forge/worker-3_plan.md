@@ -1,64 +1,44 @@
 # Worker 3 Plan - Squad Forge
 
 ## Mission
-Fix Namespace Merging - Part 2: Enum and Function merging
+Fix TS2454: Variable Used Before Assignment
 
 Status: Active
-Priority: P1 (High)
+Priority: P0 (CRITICAL)
 
 ## Current Assignment
-**Implement Enum/Function + Namespace Merging (7 failing tests)**
+**Implement TS2454 Error: Variable used before assignment**
 
 ### Background
-Enums and functions can also merge with namespaces. This is complementary to Worker 2's class merging work.
+TypeScript should emit TS2454 error when a variable is used before it's definitely assigned.
 
-### Failing Tests (your subset)
-1. `test_checker_namespace_merges_with_enum_value_exports`
-2. `test_checker_namespace_merges_with_enum_value_exports_reverse_order`
-3. `test_checker_namespace_merges_with_function_value_exports`
-4. `test_checker_namespace_merges_with_function_value_exports_reverse_order`
-5. `test_checker_namespace_merges_across_decls_value_access`
-6. `test_enum_namespace_merging`
-7. `test_checker_typeof_namespace_alias_member`
+### Success Criteria
+- Emit TS2454 for variables used before definite assignment
+- Handle control flow branches correctly
+- Don't emit false positives
 
 ### Implementation Steps
-1. [ ] Read failing tests to understand expected behavior
-2. [ ] Update `bind_enum_declaration()` in `src/binder.rs`:
-   - Put enum members into `symbol.exports` (enums act like namespaces with constants)
-3. [ ] Update `bind_function_declaration()` to support namespace merging:
-   - When function has same name as namespace, merge exports
-4. [ ] Ensure `can_merge_flags()` handles ENUM + MODULE and FUNCTION + MODULE
-5. [ ] Test with: `./wasm/test.sh 2>&1 | grep -E "namespace_merges_with_(enum|function)|enum_namespace"`
+1. [ ] Find definite assignment code in `src/thin_checker.rs`
+2. [ ] Implement check for variable usage before assignment
+3. [ ] Test with control flow scenarios
+4. [ ] Ensure no false positives
 
-### Key Code Locations
-- `src/binder.rs` - `bind_enum_declaration()`, `bind_function_declaration()`
-- `src/binder.rs` - `symbol_flags::ENUM`, `symbol_flags::FUNCTION`
+### Test Cases
+```typescript
+// Should emit TS2454
+let x;
+console.log(x); // Error: 'x' used before assignment
 
-### Enum Special Handling
-Enums are special - their members should go to `symbol.exports`:
-```rust
-// In bind_enum_declaration
-for member in &enum_decl.members {
-    let member_id = self.declare_symbol(member_name, symbol_flags::ENUM_MEMBER, member_idx);
-    if let Some(sym) = self.symbols.get_mut(enum_symbol_id) {
-        sym.exports.get_or_insert_with(|| Box::new(SymbolTable::new()))
-           .set(member_name.clone(), member_id);
-    }
-}
+// Should NOT emit
+let y;
+if (c) { y = 1; } else { y = 2; }
+console.log(y); // OK
 ```
 
-## Task Queue
-- [ ] After enum/function: coordinate with Worker 2 on checker resolution
-
 ## Completed
-- [x] (Move finished items here)
-
-## Ready for Merge
-No
+- [x] Namespace merging enum/function work
+- [x] TS2322 investigation (already implemented)
 
 ## Notes
-- Follow `wasm/specs/WASM_ARCHITECTURE.md`
-- Use Docker for Rust tests: `./wasm/test.sh`
-- Commit format: `[wasm] binder: Implement enum/function + namespace merging`
-- Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
+- Commit format: `[wasm] checker: Implement TS2454 definite assignment errors`
 - Push to: `origin/worker/forge-3`
