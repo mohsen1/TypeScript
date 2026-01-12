@@ -4992,6 +4992,13 @@ impl<'a> ThinCheckerState<'a> {
             return (self.ctx.types.intern(TypeKey::Ref(SymbolRef(sym_id.0))), Vec::new());
         }
 
+        // Enum member - determine type from parent enum
+        if flags & symbol_flags::ENUM_MEMBER != 0 {
+            // Find the parent enum by walking up to find the containing enum declaration
+            let member_type = self.enum_member_type_from_decl(value_decl);
+            return (member_type, Vec::new());
+        }
+
         // Function - build function type or callable overload set
         if flags & symbol_flags::FUNCTION != 0 {
             use crate::solver::CallableShape;
@@ -8710,6 +8717,72 @@ impl<'a> ThinCheckerState<'a> {
         } else {
             Some(EnumKind::Numeric)
         }
+    }
+
+    /// Get the type of an enum member (STRING or NUMBER) by finding its parent enum.
+    /// This is used when enum members are accessed through namespace exports.
+    fn enum_member_type_from_decl(&self, member_decl: NodeIndex) -> TypeId {
+        use crate::parser::node_flags;
+
+        // Get the extended node to find parent
+        let Some(ext) = self.ctx.arena.get_extended(member_decl) else {
+            return TypeId::ANY;
+        };
+        let parent_idx = ext.parent;
+        if parent_idx.is_none() {
+            return TypeId::ANY;
+        }
+
+        // Walk up to find the enum declaration
+        let mut current = parent_idx;
+        let max_depth = 10; // Prevent infinite loops
+        for _ in 0..max_depth {
+            let Some(parent_node) = self.ctx.arena.get(current) else {
+                break;
+            };
+
+            // Found the enum declaration
+            if parent_node.kind == syntax_kind_ext::ENUM_DECLARATION {
+                let Some(enum_decl) = self.ctx.arena.get_enum(parent_node) else {
+                    break;
+                };
+
+                // Check if any member has a string initializer
+                for &member_idx in &enum_decl.members.nodes {
+                    let Some(member_node) = self.ctx.arena.get(member_idx) else {
+                        continue;
+                    };
+                    let Some(member) = self.ctx.arena.get_enum_member(member_node) else {
+                        continue;
+                    };
+                    if member.initializer.is_none() {
+                        continue;
+                    }
+                    let Some(init_node) = self.ctx.arena.get(member.initializer) else {
+                        continue;
+                    };
+                    if init_node.kind == SyntaxKind::StringLiteral as u16
+                        || init_node.kind == SyntaxKind::NoSubstitutionTemplateLiteral as u16
+                    {
+                        return TypeId::STRING;
+                    }
+                }
+
+                // No string initializer found, so it's a numeric enum
+                return TypeId::NUMBER;
+            }
+
+            // Move to parent
+            let Some(ext) = self.ctx.arena.get_extended(current) else {
+                break;
+            };
+            current = ext.parent;
+            if current.is_none() {
+                break;
+            }
+        }
+
+        TypeId::ANY
     }
 
     fn enum_assignability_override(
