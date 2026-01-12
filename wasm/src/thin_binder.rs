@@ -2654,6 +2654,7 @@ impl ThinBinderState {
                         .map(|lit| lit.text.clone())
                 });
             let mut prior_exports: Option<SymbolTable> = None;
+            let mut module_symbol_id = SymbolId::NONE;
             if let Some(name) = name {
                 let mut is_exported = self.has_export_modifier(arena, &module.modifiers);
                 if !is_exported {
@@ -2671,10 +2672,10 @@ impl ThinBinderState {
                     }
                 }
                 let flags = symbol_flags::VALUE_MODULE | symbol_flags::NAMESPACE_MODULE;
-                let sym_id = self.declare_symbol(&name, flags, idx, is_exported);
+                module_symbol_id = self.declare_symbol(&name, flags, idx, is_exported);
                 prior_exports = self
                     .symbols
-                    .get(sym_id)
+                    .get(module_symbol_id)
                     .and_then(|symbol| symbol.exports.as_ref())
                     .map(|exports| exports.as_ref().clone());
             }
@@ -2696,8 +2697,174 @@ impl ThinBinderState {
             }
 
             self.bind_node(arena, module.body);
+
+            // Populate exports for the module symbol
+            if !module_symbol_id.is_none() && !module.body.is_none() {
+                self.populate_module_exports(arena, module.body, module_symbol_id);
+            }
+
             self.exit_scope(arena);
         }
+    }
+
+    /// Populate the exports table of a module/namespace symbol based on exported declarations in its body.
+    fn populate_module_exports(&mut self, arena: &ThinNodeArena, body_idx: NodeIndex, module_symbol_id: SymbolId) {
+        let Some(node) = arena.get(body_idx) else { return };
+
+        // Get the module block statements
+        let statements = if let Some(module_block) = arena.get_module_block(node) {
+            if let Some(stmts) = &module_block.statements {
+                &stmts.nodes
+            } else {
+                return;
+            }
+        } else {
+            return;
+        };
+
+        for &stmt_idx in statements {
+            if let Some(stmt_node) = arena.get(stmt_idx) {
+                // Check for export modifier
+                let is_exported = match stmt_node.kind {
+                    syntax_kind_ext::VARIABLE_STATEMENT => {
+                        arena.get_variable(stmt_node)
+                            .and_then(|v| v.modifiers.as_ref())
+                            .map_or(false, |mods| self.has_export_modifier_any(arena, mods))
+                    },
+                    syntax_kind_ext::FUNCTION_DECLARATION => {
+                        arena.get_function(stmt_node)
+                            .and_then(|f| f.modifiers.as_ref())
+                            .map_or(false, |mods| self.has_export_modifier_any(arena, mods))
+                    },
+                    syntax_kind_ext::CLASS_DECLARATION => {
+                        arena.get_class(stmt_node)
+                            .and_then(|c| c.modifiers.as_ref())
+                            .map_or(false, |mods| self.has_export_modifier_any(arena, mods))
+                    },
+                    syntax_kind_ext::INTERFACE_DECLARATION => {
+                        arena.get_interface(stmt_node)
+                            .and_then(|i| i.modifiers.as_ref())
+                            .map_or(false, |mods| self.has_export_modifier_any(arena, mods))
+                    },
+                    syntax_kind_ext::TYPE_ALIAS_DECLARATION => {
+                        arena.get_type_alias(stmt_node)
+                            .and_then(|t| t.modifiers.as_ref())
+                            .map_or(false, |mods| self.has_export_modifier_any(arena, mods))
+                    },
+                    syntax_kind_ext::ENUM_DECLARATION => {
+                        arena.get_enum(stmt_node)
+                            .and_then(|e| e.modifiers.as_ref())
+                            .map_or(false, |mods| self.has_export_modifier_any(arena, mods))
+                    },
+                    syntax_kind_ext::MODULE_DECLARATION => {
+                        arena.get_module(stmt_node)
+                            .and_then(|m| m.modifiers.as_ref())
+                            .map_or(false, |mods| self.has_export_modifier_any(arena, mods))
+                    },
+                    syntax_kind_ext::EXPORT_DECLARATION => true, // export { x }
+                    _ => false,
+                };
+
+                if is_exported {
+                    // Collect the exported names first
+                    let mut exported_names = Vec::new();
+
+                    match stmt_node.kind {
+                        syntax_kind_ext::VARIABLE_STATEMENT => {
+                            if let Some(var_stmt) = arena.get_variable(stmt_node) {
+                                for &decl_idx in &var_stmt.declarations.nodes {
+                                    if let Some(decl_node) = arena.get(decl_idx) {
+                                        if let Some(decl) = arena.get_variable_declaration(decl_node) {
+                                            if let Some(name_node) = arena.get(decl.name) {
+                                                if let Some(ident) = arena.get_identifier(name_node) {
+                                                    exported_names.push(ident.escaped_text.to_string());
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        syntax_kind_ext::FUNCTION_DECLARATION => {
+                            if let Some(func) = arena.get_function(stmt_node) {
+                                if let Some(name) = self.get_identifier_name(arena, func.name) {
+                                    exported_names.push(name.to_string());
+                                }
+                            }
+                        },
+                        syntax_kind_ext::CLASS_DECLARATION => {
+                            if let Some(class) = arena.get_class(stmt_node) {
+                                if let Some(name) = self.get_identifier_name(arena, class.name) {
+                                    exported_names.push(name.to_string());
+                                }
+                            }
+                        },
+                        syntax_kind_ext::ENUM_DECLARATION => {
+                            if let Some(enm) = arena.get_enum(stmt_node) {
+                                if let Some(name) = self.get_identifier_name(arena, enm.name) {
+                                    exported_names.push(name.to_string());
+                                }
+                            }
+                        },
+                        syntax_kind_ext::INTERFACE_DECLARATION => {
+                            if let Some(iface) = arena.get_interface(stmt_node) {
+                                if let Some(name) = self.get_identifier_name(arena, iface.name) {
+                                    exported_names.push(name.to_string());
+                                }
+                            }
+                        },
+                        syntax_kind_ext::TYPE_ALIAS_DECLARATION => {
+                            if let Some(alias) = arena.get_type_alias(stmt_node) {
+                                if let Some(name) = self.get_identifier_name(arena, alias.name) {
+                                    exported_names.push(name.to_string());
+                                }
+                            }
+                        },
+                        syntax_kind_ext::MODULE_DECLARATION => {
+                            if let Some(module) = arena.get_module(stmt_node) {
+                                let name = self.get_identifier_name(arena, module.name)
+                                    .map(str::to_string)
+                                    .or_else(|| {
+                                        arena.get(module.name)
+                                            .and_then(|name_node| arena.get_literal(name_node))
+                                            .map(|lit| lit.text.clone())
+                                    });
+                                if let Some(name) = name {
+                                    exported_names.push(name);
+                                }
+                            }
+                        },
+                        _ => {}
+                    }
+
+                    // Now add them to exports
+                    for name in &exported_names {
+                        if let Some(sym_id) = self.current_scope.get(name) {
+                            if let Some(module_sym) = self.symbols.get_mut(module_symbol_id) {
+                                let exports = module_sym.exports.get_or_insert_with(|| Box::new(SymbolTable::new()));
+                                exports.set(name.clone(), sym_id);
+                            }
+                            // Mark the child symbol as exported
+                            if let Some(child_sym) = self.symbols.get_mut(sym_id) {
+                                child_sym.is_exported = true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Check if any modifier in a NodeList is the export keyword.
+    fn has_export_modifier_any(&self, arena: &ThinNodeArena, modifiers: &NodeList) -> bool {
+        for &mod_idx in &modifiers.nodes {
+            if let Some(mod_node) = arena.get(mod_idx) {
+                if mod_node.kind == SyntaxKind::ExportKeyword as u16 {
+                    return true;
+                }
+            }
+        }
+        false
     }
 
     // Public accessors
