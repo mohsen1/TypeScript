@@ -7,7 +7,7 @@ Status: Ready for new assignment
 Priority: TBD
 
 ## Current Assignment
-**NONE** - Method bivariance task completed and merged
+**NONE** - TS7006 task completed
 
 ## Task Queue
 - Awaiting assignment from EM
@@ -17,8 +17,12 @@ Priority: TBD
   - Commit: `79a29f026d` - [wasm] solver: Implement method bivariance for strict function types
   - Status: **MERGED** to origin/rust
 
+- [x] Fix TS7006 for Function Declarations - Removed `!is_function_declaration` condition that prevented TS7006 from being reported for function declarations when noImplicitAny is enabled.
+  - Commit: `f4934e0c5d` - [wasm] checker: Fix TS7006 for function declarations
+  - Status: Ready for merge
+
 ## Ready for Merge
-N/A - Previous work merged
+Yes - TS7006 fix (commit f4934e0c5d)
 
 ## Notes
 - Last sync: 2026-01-12
