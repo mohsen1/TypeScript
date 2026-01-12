@@ -12304,6 +12304,46 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    /// Check for duplicate enum members (TS2300).
+    fn check_enum_duplicate_members(&mut self, enum_idx: NodeIndex) {
+        use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages, format_message};
+
+        let Some(enum_node) = self.ctx.arena.get(enum_idx) else {
+            return;
+        };
+        let Some(enum_decl) = self.ctx.arena.get_enum(enum_node) else {
+            return;
+        };
+
+        let mut seen_names = FxHashSet::default();
+        for &member_idx in &enum_decl.members.nodes {
+            let Some(member_node) = self.ctx.arena.get(member_idx) else {
+                continue;
+            };
+            let Some(member) = self.ctx.arena.get_enum_member(member_node) else {
+                continue;
+            };
+
+            // Get the member name
+            let Some(name_node) = self.ctx.arena.get(member.name) else {
+                continue;
+            };
+            let name_text = if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
+                ident.escaped_text.clone()
+            } else {
+                continue;
+            };
+
+            // Check for duplicate
+            if seen_names.contains(&name_text) {
+                let message = format_message(diagnostic_messages::DUPLICATE_IDENTIFIER, &[&name_text]);
+                self.error_at_node(member.name, &message, diagnostic_codes::DUPLICATE_IDENTIFIER);
+            } else {
+                seen_names.insert(name_text);
+            }
+        }
+    }
+
     /// Recursively collect names from identifiers or binding patterns and check for duplicates.
     fn collect_and_check_parameter_names(&mut self, name_idx: NodeIndex, seen: &mut FxHashSet<String>) {
         use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages, format_message};
@@ -12637,8 +12677,11 @@ impl<'a> ThinCheckerState<'a> {
                     self.pop_type_parameters(updates);
                 }
             }
-            // Other type declarations - just register them, no expression checking needed
-            syntax_kind_ext::ENUM_DECLARATION |
+            // Enum declarations - check for duplicate enum members (TS2300)
+            syntax_kind_ext::ENUM_DECLARATION => {
+                self.check_enum_duplicate_members(stmt_idx);
+            }
+            // Other type declarations that don't need action here
             syntax_kind_ext::EMPTY_STATEMENT |
             syntax_kind_ext::DEBUGGER_STATEMENT |
             syntax_kind_ext::BREAK_STATEMENT |
