@@ -154,7 +154,12 @@ impl<'a> FlowAnalyzer<'a> {
         }
 
         if flow.has_any_flags(flow_flags::START) {
-            // Reached start of flow - return initial type
+            // For closures with captured enclosing flow, continue to antecedent
+            // This preserves narrowing from outer scope for const/let variables
+            if let Some(&ant) = flow.antecedent.first() {
+                return self.check_flow(reference, type_id, ant, visited);
+            }
+            // Reached start of flow with no antecedent - return initial type
             return type_id;
         }
 

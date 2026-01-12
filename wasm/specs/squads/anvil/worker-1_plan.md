@@ -5,33 +5,33 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 
 Status: Active
 Priority: 1
-## Current Assignment - TS7011/TS7010 (COMPLETED - Target Achieved)
+## Current Assignment - TS2339 + TS2304 (HIGH Priority - IN PROGRESS)
 
-**Status:** Target achieved - reduced from 149 to 2 (99% reduction)
+**Target:** Fix TS2339 property narrowing false positives and TS2304 namespace edge cases
+
+**Status:** IN PROGRESS - 92 errors fixed (136 → 44, 68% reduction)
 
 **Completed Fixes:**
-1. ✅ Fixed TS7011 for arrow functions/function expressions in `get_type_of_function` (149 → 65)
-2. ✅ Fixed TS7011 for methods in `check_method_declaration` (65 → 41)
-3. ✅ Fixed TS7010 for function declarations in `check_statement` (41 → 25)
-4. ✅ Fixed TS7010 for accessors in `check_accessor_declaration` (25 → 2)
+1. ✅ **Control flow narrowing in closures** (19 errors fixed)
+   - File: `wasm/src/checker/control_flow.rs`
+   - Fixed: FlowAnalyzer's check_flow() now traverses START node antecedent for closures
+   - Results: constLocalsInFunctionExpressions 5→2, controlFlowIIFE 3→0, controlFlowOptionalChain2 2→0, privateNameMethodAccess 1→0
 
-**Root Cause:** WASM was emitting TS7011/TS7010 for ALL functions/methods without return type annotations when `noImplicitAny` was enabled. TypeScript only emits these errors for **ambient functions** (declare modifier or .d.ts file).
+2. ✅ **Callable type property access** (73 errors fixed)
+   - File: `wasm/src/thin_checker.rs`
+   - Added is_callable_type() to check for TypeKey::Callable and TypeKey::Function
+   - Functions allow arbitrary property access because they're objects at runtime
+   - Results: nullPropertyName.ts 77→0, exportDefaultNamespace.ts 1→0
 
-**Fix Summary:** Added ambient context checks (`has_declare_modifier || file_name.ends_with(".d.ts")`) before emitting TS7011/TS7010 in four locations:
-1. `get_type_of_function` - arrow functions and function expressions
-2. `check_method_declaration` - class methods with bodies
-3. `check_statement` - function declarations
-4. `check_accessor_declaration` - getter accessors
+**Remaining 44 errors:**
+- Private names: 18 errors (static private fields, destructuring, derived classes)
+- Mixin classes: 15 errors (property access on mixed types)
+- Control flow: 8 errors (element access, optional chain, type guards)
+- Other: 3 errors
 
-**Remaining 2 cases** (edge cases in type literals):
-- `dependentDestructuredVariables.ts` - methods in type literals with `// @declaration: true`
-- `arraySpreadInCall.ts` - method signature in generic type literal
+**Files:** `wasm/src/thin_checker.rs`, `wasm/src/checker/control_flow.rs`
 
-**Note:** Success criteria <5 ✅ ACHIEVED. 99% reduction from 149 to 2 false positives.
-
-**Files:** `wasm/src/thin_checker.rs`
-
-**Scanner:** Added `wasm/differential-test/find-ts7011.mjs` for detecting false positives
+**Scanner:** `wasm/differential-test/find-ts2339.mjs`
 
 ## Previous Assignment - TS2300 (INVESTIGATED - Not False Positives)
 
