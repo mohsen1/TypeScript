@@ -76,11 +76,20 @@ fn emit_modifier(&mut self, modifier: SyntaxKind) {
 - [ ] After emitter edge cases: help with private identifier control flow
 
 ## Completed
+
+### Session 1: Emitter Edge Cases
 - [x] Fixed catch clause variable emission (65b99a3305)
 - [x] Added AS_EXPRESSION/TYPE_ASSERTION/SATISFIES_EXPRESSION handling (65b99a3305)
 
+### Session 2: LSP Semantic Tokens Enhancement
+- [x] Added semantic token support for decorators (adea84beac)
+- [x] Added semantic token support for type parameters (adea84beac)
+- [x] Added semantic token support for modifiers (adea84beac)
+- [x] Updated visit_children() to handle modifiers on all declaration types
+- [x] Added TYPE_PARAMETER, PROPERTY_DECLARATION, PARAMETER, GET_ACCESSOR, SET_ACCESSOR, CONSTRUCTOR, TYPE_ALIAS_DECLARATION cases
+
 ## Ready for Merge
-Yes (65b99a3305)
+Yes (adea84beac)
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
