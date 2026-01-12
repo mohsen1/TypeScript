@@ -1,19 +1,13 @@
 # Worker 1 Task List - CFA Squad (Lead)
 
 ## Current Task
-- [ ] **CFA-4: Implement definite assignment analysis algorithm**
-  - Add `DefiniteAssignmentAnalyzer` struct to `src/checker/flow_analyzer.rs`
-  - Implement forward dataflow analysis over FlowGraph
-  - Track variable states: DefinitelyAssigned, MaybeAssigned, Unassigned
-  - Add union/merge operations for join points
-  - Write unit tests for analysis algorithm
-
-## Queue
 - [ ] **CFA-7: Check for use-before-definite-assignment (TS2454)**
   - Add `check_variable_usage` in Checker
   - Query FlowGraph for variable state at usage point
   - Emit TS2454 error for variables used before definite assignment
   - Test with cases: `let x; console.log(x);` and `let x; x = 1; console.log(x);`
+
+## Queue
 - [ ] **CFA-11: Merge and coordinate CFA Squad work**
   - Review Workers 2-3 implementations for consistency
   - Merge completed FlowGraph components into main branch
@@ -25,6 +19,12 @@
   - Document remaining gaps
 
 ## Completed
+- [x] **CFA-4: Implement definite assignment analysis algorithm**
+  - Created `DefiniteAssignmentAnalyzer` in `wasm/src/checker/flow_analyzer.rs` (401 lines)
+  - Implemented forward dataflow analysis over FlowGraph
+  - Three assignment states: Unassigned, MaybeAssigned, DefinitelyAssigned
+  - Added merge operations for control flow join points
+  - Exported types: AssignmentState, AssignmentStateMap, DefiniteAssignmentResult
 - [x] **CFA-1: Design Flow Graph data structure**
   - Created `FlowGraph` struct in `wasm/src/checker/flow_graph.rs`
   - Designed nodes for: BlockEntry, BlockExit, Assignment, Condition, Branch
