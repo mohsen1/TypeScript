@@ -396,6 +396,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             (TypeKey::Union(members), _) => {
                 let members = self.interner.type_list(*members);
                 for &member in members.iter() {
+                    // Don't accept `any` as universal subtype in union checks
+                    // `any` is only a subtype of `any` in this context
+                    if member == TypeId::ANY && target != TypeId::ANY {
+                        return SubtypeResult::False;
+                    }
                     if !self.check_subtype(member, target).is_true() {
                         return SubtypeResult::False;
                     }
@@ -412,6 +417,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 }
                 let members = self.interner.type_list(*members);
                 for &member in members.iter() {
+                    // Don't accept `any` as universal subtype in union checks
+                    // `any` only accepts `any` as a subtype in this context
+                    if member == TypeId::ANY && source != TypeId::ANY {
+                        continue;
+                    }
                     if self.check_subtype(source, member).is_true() {
                         return SubtypeResult::True;
                     }
@@ -3473,3 +3483,7 @@ mod index_signature_tests;
 #[cfg(test)]
 #[path = "callable_tests.rs"]
 mod callable_tests;
+
+#[cfg(test)]
+#[path = "union_tests.rs"]
+mod union_tests;
