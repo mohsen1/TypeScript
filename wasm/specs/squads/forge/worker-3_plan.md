@@ -1,57 +1,55 @@
 # Worker 3 Plan - Squad Forge
 
 ## Mission
-Fix Namespace Merging - Part 2: Enum and Function merging
+Fix TS2339: Property Does Not Exist
 
 Status: Active
-Priority: P1 (High)
+Priority: P0 (CRITICAL)
 
 ## Current Assignment
-**Implement Enum/Function + Namespace Merging (7 failing tests)**
+**Implement TS2339 Error: Property does not exist on type**
 
 ### Background
-Enums and functions can also merge with namespaces. This is complementary to Worker 2's class merging work.
+TypeScript should emit TS2339 error when accessing a property that doesn't exist on a type. This includes:
+1. Property access on objects
+2. Method access on objects
+3. Index signatures
+4. Optional chaining (?.)
+5. Nested property access
 
-### Failing Tests (your subset)
-1. `test_checker_namespace_merges_with_enum_value_exports`
-2. `test_checker_namespace_merges_with_enum_value_exports_reverse_order`
-3. `test_checker_namespace_merges_with_function_value_exports`
-4. `test_checker_namespace_merges_with_function_value_exports_reverse_order`
-5. `test_checker_namespace_merges_across_decls_value_access`
-6. `test_enum_namespace_merging`
-7. `test_checker_typeof_namespace_alias_member`
+### Success Criteria
+- Emit TS2339 for non-existent properties
+- Don't emit for existing properties
+- Handle optional chaining correctly
+- Handle index signatures
+- Suggest typos if similar property exists
 
 ### Implementation Steps
-1. [ ] Read failing tests to understand expected behavior
-2. [ ] Update `bind_enum_declaration()` in `src/binder.rs`:
-   - Put enum members into `symbol.exports` (enums act like namespaces with constants)
-3. [ ] Update `bind_function_declaration()` to support namespace merging:
-   - When function has same name as namespace, merge exports
-4. [ ] Ensure `can_merge_flags()` handles ENUM + MODULE and FUNCTION + MODULE
-5. [ ] Test with: `./wasm/test.sh 2>&1 | grep -E "namespace_merges_with_(enum|function)|enum_namespace"`
+1. [ ] Find property access checking in `src/thin_checker.rs`
+2. [ ] Implement check: if property not found on type, emit TS2339
+3. [ ] Test with various property access patterns
+4. [ ] Ensure no false positives for valid properties
 
 ### Key Code Locations
-- `src/binder.rs` - `bind_enum_declaration()`, `bind_function_declaration()`
-- `src/binder.rs` - `symbol_flags::ENUM`, `symbol_flags::FUNCTION`
+- `src/thin_checker.rs` - property access checking
+- `src/solver/operations.rs` - property lookup operations
+- `src/checker/types/diagnostics.rs` - TS2339 error code
 
-### Enum Special Handling
-Enums are special - their members should go to `symbol.exports`:
-```rust
-// In bind_enum_declaration
-for member in &enum_decl.members {
-    let member_id = self.declare_symbol(member_name, symbol_flags::ENUM_MEMBER, member_idx);
-    if let Some(sym) = self.symbols.get_mut(enum_symbol_id) {
-        sym.exports.get_or_insert_with(|| Box::new(SymbolTable::new()))
-           .set(member_name.clone(), member_id);
-    }
-}
+### Test Cases to Implement
+```typescript
+// Should emit TS2339
+const obj = { x: 1 };
+console.log(obj.y); // Error: Property 'y' does not exist on type '{ x: number }'
+
+// Should NOT emit (property exists)
+console.log(obj.x); // OK
+
+// Should handle optional chaining
+console.log(obj?.z); // Error: Property 'z' does not exist
 ```
 
-## Task Queue
-- [ ] After enum/function: coordinate with Worker 2 on checker resolution
-
 ## Completed
-- [x] (Move finished items here)
+- [x] Namespace merging enum/function work (committed)
 
 ## Ready for Merge
 No
@@ -59,6 +57,6 @@ No
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
 - Use Docker for Rust tests: `./wasm/test.sh`
-- Commit format: `[wasm] binder: Implement enum/function + namespace merging`
+- Commit format: `[wasm] checker: Implement TS2339 property access errors`
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/forge-3`
