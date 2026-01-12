@@ -1,12 +1,6 @@
 # Worker 7 Task List - Solver Squad (Lead)
 
 ## Current Task
-- [ ] **SOLV-7: Test TS2322 fixes**
-  - Create test file for assignment type mismatches
-  - Verify errors are emitted for: `let x: string = 123`, generics with wrong types
-  - Goal: Convert 310 missing TS2322 errors to actual errors or extra errors
-
-## Queue
 - [ ] **SOLV-11: Coordinate Solver Squad integration**
   - Review Workers 8-9 implementations for consistency
   - Ensure Lawyer layer integration is correct across all solver components
@@ -18,6 +12,14 @@
   - Document final solver conformance metrics
 
 ## Completed
+- [x] **SOLV-7: Test TS2322 fixes**
+  - Created test file `tests/cases/conformance/solver/ts2322_assignment_tests.ts`
+  - Comprehensive coverage (30 sections, 508 lines, 90+ test cases)
+  - Tests primitive assignments: `let x: string = 123`
+  - Tests generic type mismatches: `Box<number> = { value: "string" }`
+  - Tests unknown type strictness (not assignable unlike Any)
+  - Tests union/intersection, arrays, tuples, functions, classes, async/await, etc.
+  - Verifies solver fallback from Any to Unknown/ERROR emits TS2322 correctly
 - [x] **SOLV-1: Audit current solve_subtype implementation**
   - Read `wasm/src/solver/subtype.rs` completely
   - Identified all locations that return `Any` or `True` as fallback
