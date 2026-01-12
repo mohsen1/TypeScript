@@ -1167,6 +1167,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             type_params: Vec::new(),
             type_predicate: None,
             is_constructor: false,
+            is_method: false,
         })
     }
 
@@ -1737,6 +1738,12 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
     /// In legacy mode (bivariant): target_type <: source_type OR source_type <: target_type
     /// See https://github.com/microsoft/TypeScript/issues/18654.
     fn are_parameters_compatible(&mut self, source_type: TypeId, target_type: TypeId) -> bool {
+        self.are_parameters_compatible_impl(source_type, target_type, false)
+    }
+
+    /// Check parameter compatibility with method bivariance support.
+    /// Methods are bivariant even when strict_function_types is enabled.
+    fn are_parameters_compatible_impl(&mut self, source_type: TypeId, target_type: TypeId, is_method: bool) -> bool {
         let contains_this = self.type_contains_this_type(source_type)
             || self.type_contains_this_type(target_type);
 
@@ -1745,7 +1752,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         // Because Cat <: Animal (target <: source)
         let is_contravariant = self.check_subtype(target_type, source_type).is_true();
 
-        if self.strict_function_types {
+        // Methods are bivariant regardless of strict_function_types setting
+        // This matches TypeScript's behavior for method parameters
+        let use_bivariance = is_method || !self.strict_function_types;
+
+        if !use_bivariance {
             if contains_this {
                 return self.check_subtype(source_type, target_type).is_true();
             }
@@ -2049,6 +2060,9 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             return SubtypeResult::False;
         }
 
+        // Method bivariance: if either source or target is a method, use bivariance for parameters
+        let is_method = source.is_method || target.is_method;
+
         // Check if target has a rest parameter
         let target_has_rest = target.params.last().map_or(false, |p| p.rest);
         let source_has_rest = source.params.last().map_or(false, |p| p.rest);
@@ -2083,7 +2097,8 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             let s_param = &source.params[i];
             let t_param = &target.params[i];
             // Check parameter compatibility (contravariant in strict mode, bivariant in legacy)
-            if !self.are_parameters_compatible(s_param.type_id, t_param.type_id) {
+            // Methods use bivariance even in strict mode
+            if !self.are_parameters_compatible_impl(s_param.type_id, t_param.type_id, is_method) {
                 return SubtypeResult::False;
             }
         }
@@ -2099,7 +2114,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             for i in target_fixed_count..source_fixed_count {
                 let s_param = &source.params[i];
                 // Check parameter compatibility against rest element type
-                if !self.are_parameters_compatible(s_param.type_id, rest_elem_type) {
+                if !self.are_parameters_compatible_impl(s_param.type_id, rest_elem_type, is_method) {
                     return SubtypeResult::False;
                 }
             }
@@ -2109,7 +2124,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 let s_rest_param = source.params.last().unwrap();
                 let s_rest_elem = self.get_array_element_type(s_rest_param.type_id);
                 // Check rest-to-rest parameter compatibility
-                if !self.are_parameters_compatible(s_rest_elem, rest_elem_type) {
+                if !self.are_parameters_compatible_impl(s_rest_elem, rest_elem_type, is_method) {
                     return SubtypeResult::False;
                 }
             }
@@ -2124,7 +2139,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             if !rest_is_top {
                 for i in source_fixed_count..target_fixed_count {
                     let t_param = &target.params[i];
-                    if !self.are_parameters_compatible(rest_elem_type, t_param.type_id) {
+                    if !self.are_parameters_compatible_impl(rest_elem_type, t_param.type_id, is_method) {
                         return SubtypeResult::False;
                     }
                 }

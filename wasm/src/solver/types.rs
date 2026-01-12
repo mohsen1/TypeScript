@@ -313,6 +313,8 @@ pub struct FunctionShape {
     pub return_type: TypeId,
     pub type_predicate: Option<TypePredicate>,
     pub is_constructor: bool,
+    /// Whether this function is a method (bivariant parameters) vs a standalone function (contravariant when strictFunctionTypes)
+    pub is_method: bool,
 }
 
 /// Call signature for overloaded functions

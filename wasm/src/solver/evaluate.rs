@@ -2190,6 +2190,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             type_params: Vec::new(),
             type_predicate: None,
             is_constructor: false,
+            is_method: false,
         })
     }
 
@@ -4653,6 +4654,7 @@ impl<'a> InferSubstitutor<'a> {
                         type_params: shape.type_params.clone(),
                         type_predicate: shape.type_predicate.clone(),
                         is_constructor: shape.is_constructor,
+                        is_method: shape.is_method,
                     })
                 } else {
                     type_id
