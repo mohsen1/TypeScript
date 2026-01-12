@@ -8547,6 +8547,7 @@ impl<'a> ThinCheckerState<'a> {
     /// Get type of object literal.
     fn get_type_of_object_literal(&mut self, idx: NodeIndex) -> TypeId {
         use crate::solver::{PropertyInfo, QueryDatabase};
+        use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages, format_message};
         use rustc_hash::FxHashMap;
 
         let Some(node) = self.ctx.arena.get(idx) else {
@@ -8580,6 +8581,13 @@ impl<'a> ThinCheckerState<'a> {
                     self.ctx.contextual_type = prev_context;
 
                     let name_atom = self.ctx.types.intern_string(&name);
+
+                    // Check for duplicate property
+                    if properties.contains_key(&name_atom) {
+                        let message = format_message(diagnostic_messages::OBJECT_LITERAL_DUPLICATE_PROPERTY, &[&name]);
+                        self.error_at_node(prop.name, &message, diagnostic_codes::OBJECT_LITERAL_DUPLICATE_PROPERTY);
+                    }
+
                     properties.insert(name_atom, PropertyInfo {
                         name: name_atom,
                         type_id: value_type,
@@ -8594,7 +8602,15 @@ impl<'a> ThinCheckerState<'a> {
             else if elem_node.kind == syntax_kind_ext::SHORTHAND_PROPERTY_ASSIGNMENT {
                 if let Some(ident) = self.ctx.arena.get_identifier(elem_node) {
                     let value_type = self.get_type_of_node(elem_idx);
-                    let name_atom = self.ctx.types.intern_string(&ident.escaped_text);
+                    let name = ident.escaped_text.clone();
+                    let name_atom = self.ctx.types.intern_string(&name);
+
+                    // Check for duplicate property
+                    if properties.contains_key(&name_atom) {
+                        let message = format_message(diagnostic_messages::OBJECT_LITERAL_DUPLICATE_PROPERTY, &[&name]);
+                        self.error_at_node(elem_idx, &message, diagnostic_codes::OBJECT_LITERAL_DUPLICATE_PROPERTY);
+                    }
+
                     properties.insert(name_atom, PropertyInfo {
                         name: name_atom,
                         type_id: value_type,
@@ -8620,6 +8636,13 @@ impl<'a> ThinCheckerState<'a> {
                     self.ctx.contextual_type = prev_context;
 
                     let name_atom = self.ctx.types.intern_string(&name);
+
+                    // Check for duplicate property
+                    if properties.contains_key(&name_atom) {
+                        let message = format_message(diagnostic_messages::OBJECT_LITERAL_DUPLICATE_PROPERTY, &[&name]);
+                        self.error_at_node(method.name, &message, diagnostic_codes::OBJECT_LITERAL_DUPLICATE_PROPERTY);
+                    }
+
                     properties.insert(name_atom, PropertyInfo {
                         name: name_atom,
                         type_id: method_type,
@@ -8652,6 +8675,13 @@ impl<'a> ThinCheckerState<'a> {
                         TypeId::VOID
                     };
                     let name_atom = self.ctx.types.intern_string(&name);
+
+                    // Check for duplicate property
+                    if properties.contains_key(&name_atom) {
+                        let message = format_message(diagnostic_messages::OBJECT_LITERAL_DUPLICATE_PROPERTY, &[&name]);
+                        self.error_at_node(accessor.name, &message, diagnostic_codes::OBJECT_LITERAL_DUPLICATE_PROPERTY);
+                    }
+
                     properties.insert(name_atom, PropertyInfo {
                         name: name_atom,
                         type_id: accessor_type,
@@ -17554,6 +17584,11 @@ impl<'a> ThinCheckerState<'a> {
                 continue;
             };
 
+            // Check for TS7006 in nested function expressions within the default value
+            if !param.initializer.is_none() {
+                self.check_for_nested_function_ts7006(param.initializer);
+            }
+
             // Only check if there's both a type annotation and an initializer
             if param.type_annotation.is_none() || param.initializer.is_none() {
                 continue;
@@ -17577,6 +17612,97 @@ impl<'a> ThinCheckerState<'a> {
                     declared_type,
                     param_idx,
                 );
+            }
+        }
+    }
+
+    /// Recursively check for TS7006 in nested function/arrow expressions within a node.
+    /// This handles cases like `async function foo(a = x => x)` where the nested arrow function
+    /// parameter `x` should trigger TS7006 if it lacks a type annotation.
+    fn check_for_nested_function_ts7006(&mut self, node_idx: NodeIndex) {
+        let Some(node) = self.ctx.arena.get(node_idx) else {
+            return;
+        };
+
+        // Check if this is a function or arrow expression
+        let is_function = match node.kind {
+            k if k == syntax_kind_ext::FUNCTION_EXPRESSION => true,
+            k if k == syntax_kind_ext::ARROW_FUNCTION => true,
+            _ => false,
+        };
+
+        if is_function {
+            // Check all parameters of this function for TS7006
+            if let Some(func) = self.ctx.arena.get_function(node) {
+                for &param_idx in &func.parameters.nodes {
+                    if let Some(param_node) = self.ctx.arena.get(param_idx) {
+                        if let Some(param) = self.ctx.arena.get_parameter(param_node) {
+                            // Nested functions in default values don't have contextual types
+                            self.maybe_report_implicit_any_parameter(param, false);
+                        }
+                    }
+                }
+            }
+
+            // Recursively check the function body for more nested functions
+            if let Some(func) = self.ctx.arena.get_function(node) {
+                if !func.body.is_none() {
+                    self.check_for_nested_function_ts7006(func.body);
+                }
+            }
+        } else {
+            // Recursively check child nodes for function expressions
+            match node.kind {
+                // Binary expressions - check both sides
+                k if k == syntax_kind_ext::BINARY_EXPRESSION => {
+                    if let Some(bin_expr) = self.ctx.arena.get_binary_expr(node) {
+                        self.check_for_nested_function_ts7006(bin_expr.left);
+                        self.check_for_nested_function_ts7006(bin_expr.right);
+                    }
+                }
+                // Conditional expressions - check condition, then/else branches
+                k if k == syntax_kind_ext::CONDITIONAL_EXPRESSION => {
+                    if let Some(cond) = self.ctx.arena.get_conditional_expr(node) {
+                        self.check_for_nested_function_ts7006(cond.condition);
+                        self.check_for_nested_function_ts7006(cond.when_true);
+                        if !cond.when_false.is_none() {
+                            self.check_for_nested_function_ts7006(cond.when_false);
+                        }
+                    }
+                }
+                // Call expressions - check arguments
+                k if k == syntax_kind_ext::CALL_EXPRESSION => {
+                    if let Some(call) = self.ctx.arena.get_call_expr(node) {
+                        self.check_for_nested_function_ts7006(call.expression);
+                        if let Some(args) = &call.arguments {
+                            for &arg in &args.nodes {
+                                self.check_for_nested_function_ts7006(arg);
+                            }
+                        }
+                    }
+                }
+                // Parenthesized expression - check contents
+                k if k == syntax_kind_ext::PARENTHESIZED_EXPRESSION => {
+                    if let Some(paren) = self.ctx.arena.get_parenthesized(node) {
+                        self.check_for_nested_function_ts7006(paren.expression);
+                    }
+                }
+                // Type assertion - check expression
+                k if k == syntax_kind_ext::TYPE_ASSERTION => {
+                    if let Some(assertion) = self.ctx.arena.get_type_assertion(node) {
+                        self.check_for_nested_function_ts7006(assertion.expression);
+                    }
+                }
+                // Spread element - check expression
+                k if k == syntax_kind_ext::SPREAD_ELEMENT => {
+                    if let Some(spread) = self.ctx.arena.get_spread(node) {
+                        self.check_for_nested_function_ts7006(spread.expression);
+                    }
+                }
+                _ => {
+                    // For other node types, we don't recursively check
+                    // This covers literals, identifiers, array/object literals, etc.
+                }
             }
         }
     }
