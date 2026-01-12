@@ -1521,6 +1521,7 @@ fn resolve_node_module_specifier(
     let mut current = from_file.parent().unwrap_or(base_dir);
 
     loop {
+        // 1. Look for the package itself in node_modules
         let package_root = current.join("node_modules").join(&package_name);
         if package_root.is_dir() {
             let package_json = read_package_json(&package_root.join("package.json"));
@@ -1533,6 +1534,34 @@ fn resolve_node_module_specifier(
             );
             if resolved.is_some() {
                 return resolved;
+            }
+        }
+
+        // 2. Look for @types package (if not already looking for one)
+        // TypeScript looks up @types/foo for 'foo', and @types/scope__pkg for '@scope/pkg'
+        if !package_name.starts_with("@types/") {
+            let types_package_name = if package_name.starts_with('@') {
+                // Scoped package: @scope/pkg -> @types/scope__pkg
+                // Skip the '@' (1 char) and replace '/' with '__'
+                let scope_pkg = &package_name[1..];
+                format!("@types/{}", scope_pkg.replace('/', "__"))
+            } else {
+                format!("@types/{}", package_name)
+            };
+
+            let types_root = current.join("node_modules").join(&types_package_name);
+            if types_root.is_dir() {
+                let package_json = read_package_json(&types_root.join("package.json"));
+                let resolved = resolve_package_specifier(
+                    &types_root,
+                    subpath.as_deref(),
+                    package_json.as_ref(),
+                    &conditions,
+                    options,
+                );
+                if resolved.is_some() {
+                    return resolved;
+                }
             }
         }
 
@@ -3255,6 +3284,18 @@ pub(crate) fn apply_cli_overrides(options: &mut ResolvedCompilerOptions, args: &
     }
     if let Some(out_dir) = args.out_dir.as_ref() {
         options.out_dir = Some(out_dir.clone());
+    }
+    if let Some(root_dir) = args.root_dir.as_ref() {
+        options.root_dir = Some(root_dir.clone());
+    }
+    if args.declaration {
+        options.emit_declarations = true;
+    }
+    if args.declaration_map {
+        options.declaration_map = true;
+    }
+    if args.source_map {
+        options.source_map = true;
     }
     if args.strict {
         options.checker.strict = true;

@@ -8090,35 +8090,19 @@ impl<'a> ThinCheckerState<'a> {
                 return_type = self.infer_return_type_from_body(body, return_context);
             }
 
-            // TS7011 (implicit any return) is only emitted for ambient functions
-            // (declare modifier or .d.ts file), matching TypeScript's behavior
+            // TS7010/TS7011 (implicit any return) is emitted for functions without
+            // return type annotations when noImplicitAny is enabled and the return
+            // type cannot be inferred (e.g., is 'any' or only returns undefined)
+            // maybe_report_implicit_any_return handles the noImplicitAny check internally
             if !is_function_declaration {
-                let is_ambient = if let Some(func) = self.ctx.arena.get_function(node) {
-                    self.has_declare_modifier(&func.modifiers)
-                        || self.ctx.file_name.ends_with(".d.ts")
-                } else {
-                    self.ctx.file_name.ends_with(".d.ts")
-                };
-
-                // For methods, check if enclosing class is ambient
-                let is_ambient = if node.kind == syntax_kind_ext::METHOD_DECLARATION {
-                    is_ambient || self.ctx.enclosing_class.as_ref()
-                        .map(|c| c.is_declared)
-                        .unwrap_or(false)
-                } else {
-                    is_ambient
-                };
-
-                if is_ambient {
-                    self.maybe_report_implicit_any_return(
-                        name_for_error,
-                        name_node,
-                        return_type,
-                        has_type_annotation,
-                        has_contextual_return,
-                        idx,
-                    );
-                }
+                self.maybe_report_implicit_any_return(
+                    name_for_error,
+                    name_node,
+                    return_type,
+                    has_type_annotation,
+                    has_contextual_return,
+                    idx,
+                );
             }
 
             // TS2366 (not all code paths return value) for function expressions and arrow functions
@@ -12181,23 +12165,20 @@ impl<'a> ThinCheckerState<'a> {
                             return_type = self.infer_return_type_from_body(func.body, None);
                         }
 
-                        // TS7010 (implicit any return) is only emitted for ambient functions
-                        // (declare modifier or .d.ts file), matching TypeScript's behavior
-                        let is_ambient = self.has_declare_modifier(&func.modifiers)
-                            || self.ctx.file_name.ends_with(".d.ts");
-
-                        if is_ambient {
-                            let func_name = self.get_function_name_from_node(stmt_idx);
-                            let name_node = if !func.name.is_none() { Some(func.name) } else { None };
-                            self.maybe_report_implicit_any_return(
-                                func_name,
-                                name_node,
-                                return_type,
-                                has_type_annotation,
-                                false,
-                                stmt_idx,
-                            );
-                        }
+                        // TS7010 (implicit any return) is emitted for functions without
+                        // return type annotations when noImplicitAny is enabled and the return
+                        // type cannot be inferred (e.g., is 'any' or only returns undefined)
+                        // maybe_report_implicit_any_return handles the noImplicitAny check internally
+                        let func_name = self.get_function_name_from_node(stmt_idx);
+                        let name_node = if !func.name.is_none() { Some(func.name) } else { None };
+                        self.maybe_report_implicit_any_return(
+                            func_name,
+                            name_node,
+                            return_type,
+                            has_type_annotation,
+                            false,
+                            stmt_idx,
+                        );
 
                         self.push_return_type(return_type);
                         self.check_statement(func.body);
@@ -13339,14 +13320,18 @@ impl<'a> ThinCheckerState<'a> {
 
         let module_name = &literal.text;
 
-        if self.ctx.binder.declared_modules.contains(module_name) {
-            return;
-        }
+        // Check if the module was resolved by the CLI driver (multi-file mode)
         if let Some(ref resolved) = self.ctx.resolved_modules {
             if resolved.contains(module_name) {
                 return;
             }
         }
+
+        // Note: We do NOT skip TS2792 for declared_modules (ambient modules).
+        // Imports from ambient modules should emit TS2792 because ambient modules
+        // don't provide runtime values - they only provide type information.
+        // If you want to use an ambient module's types, you should use `import type`
+        // or reference the types directly in a type annotation.
 
         // In single-file mode, any external import is considered unresolved.
         // This is correct because WASM checker operates on individual files
@@ -17678,16 +17663,9 @@ impl<'a> ThinCheckerState<'a> {
             self.check_property_initialization_order(member_idx, prop.initializer);
         }
 
-        // Error 7008: Member implicitly has an 'any' type
-        // Report when property has no type annotation and no initializer (can't infer type)
-        if prop.type_annotation.is_none() && prop.initializer.is_none() {
-            // Get the property name for the error message
-            if let Some(member_name) = self.get_property_name(prop.name) {
-                use crate::checker::types::diagnostics::{diagnostic_messages, format_message};
-                let message = format_message(diagnostic_messages::MEMBER_IMPLICIT_ANY, &[&member_name, "any"]);
-                self.error_at_node(prop.name, &message, diagnostic_codes::IMPLICIT_ANY_MEMBER);
-            }
-        }
+        // Note: TS7008 (Member implicitly has an 'any' type) is now checked in
+        // check_property_initialization, where we can determine if the property
+        // is assigned in the constructor (type can be inferred from assignment).
     }
 
     /// Check a method declaration.

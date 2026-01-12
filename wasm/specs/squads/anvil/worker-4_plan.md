@@ -1,67 +1,54 @@
 # Worker 4 Plan - Squad Anvil
 
 ## Mission
-Fix CLI/Driver Issues and Import Equals
+LSP Document Symbols
 
 Status: Active
 Priority: P1 (High)
 
 ## Current Assignment
-**Fix CLI/Driver Compilation Issues (3 failing tests)**
+**Implement LSP Document Symbols**
 
-### Failing Tests
-1. `cli::driver_tests::compile_generic_utility_library_type_utilities`
-2. `cli::driver_tests::compile_shorthand_methods`
-3. `cli::driver_tests::invalidate_paths_with_dependents_symbols_handles_import_equals`
+### Background
+Document symbols provides a tree outline of symbols in a file (classes, functions, variables). Essential for code navigation.
 
 ### Implementation Steps
 
-#### Part 1: Import Equals (`import x = require()`)
-1. [ ] Read the failing test `invalidate_paths_with_dependents_symbols_handles_import_equals`
-2. [ ] Find import equals handling in `src/thin_emitter.rs`
-3. [ ] Ensure CommonJS output: `import x = require('y')` -> `var x = require('y')`
-4. [ ] Test: `./wasm/test.sh 2>&1 | grep -E "import_equals"`
-
-#### Part 2: Generic Utility Library
-1. [ ] Read the failing test `compile_generic_utility_library_type_utilities`
-2. [ ] This likely tests complex generic patterns - check if it's a type inference issue or emission issue
-3. [ ] If emission: ensure generic type annotations are stripped correctly
-4. [ ] If inference: may need Forge squad help
-
-#### Part 3: Shorthand Methods
-1. [ ] Read the failing test `compile_shorthand_methods`
-2. [ ] Ensure shorthand method syntax is handled: `{ foo() {} }` vs `{ foo: function() {} }`
-3. [ ] Check both parsing and emission
+1. [ ] Read current document symbols in `src/lsp/symbols.rs` or create if missing
+2. [ ] Implement symbol extraction:
+   - Traverse AST to find all symbols
+   - Return hierarchical tree structure
+   - Include symbol kinds (class, function, variable, interface, etc.)
+3. [ ] Handle different symbol types:
+   - Namespaces and modules
+   - Classes and interfaces
+   - Functions and methods
+   - Variables and parameters
+4. [ ] Support symbol range and selection range
+5. [ ] Test: Request document symbols and verify tree structure
 
 ### Key Code Locations
-- `src/cli/driver.rs` - compilation driver
-- `src/thin_emitter.rs` - import/export emission
-- `src/thin_parser.rs` - shorthand method parsing
-
-### Import Equals Transformation
-```typescript
-// TypeScript
-import fs = require('fs');
-
-// CommonJS output
-var fs = require('fs');
-
-// ES module output (if module: esnext)
-// Keep as-is or convert to: import * as fs from 'fs';
-```
+- `src/lsp/symbols.rs` - document symbols implementation
+- `src/lsp/mod.rs` - LSP server
+- `src/binder/` - symbol resolution
 
 ## Task Queue
-- [ ] After CLI fixes: help with parser error recovery
+- [ ] After document symbols: help with rename symbol or workspace symbols
 
 ## Completed
-- [x] (Move finished items here)
+- [x] Fixed shorthand methods binding - MERGED to squad/anvil
+- [x] Diagnostic formatting with snippets - MERGED to squad/anvil
+- [x] Parser recovery: JSX-like syntax and type assertion in new - MERGED to squad/anvil
+- [x] Module System Emission review - Working correctly
+- [x] Decorator Metadata Emission - All 171 tests passing
+- [x] Generic Type Inference Fix - Test passes (commit 3cde014e51)
 
 ## Ready for Merge
-No
+Previous work merged to squad/anvil, latest ready for merge
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
 - Use Docker for Rust tests: `./wasm/test.sh`
-- Commit format: `[wasm] cli: Fix import equals emission for CommonJS`
+- Commit format: `[wasm] lsp: Implement document symbols`
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/anvil-4`

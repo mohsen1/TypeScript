@@ -85,9 +85,10 @@ Check if these are causing conformance failures:
 - Use `./scripts/ask-gemini.mjs --review` for code review
 
 ## Squad Status
-- Last EM Report: 2025-01-12 (Session start)
+- Last EM Report: 2025-01-12 (Worker merge review)
 - Workers Active: 5/5
-- Branches Pending Merge: worker/anvil-5 (ready for review)
-- Current Focus: ES5 private accessors, catch clause emission, import equals
+- Merged to squad/anvil: worker/anvil-5 (private identifier narrowing)
+- Blocked workers: worker/anvil-2 (needs worker/anvil-3 emission), worker/anvil-4 (tests failing)
+- Current Focus: ES5 private accessors, catch clause emission, parser recovery
 - Blockers: None
-- EM Actions: Fixed private identifier in `in` operator narrowing (control_flow.rs), pushed to em/anvil
+- EM Actions: Merged worker/anvil-5 to squad/anvil, pushed to origin/squad/anvil
