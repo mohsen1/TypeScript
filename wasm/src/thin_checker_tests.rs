@@ -18671,3 +18671,89 @@ class MyClass {
         "Expected 0 TS2366 errors for function overloads, got: {:?}", codes);
 }
 
+
+/// Test TS2454 - Variable used before assignment
+#[test]
+fn test_ts2454_variable_used_before_assignment() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// Should emit TS2454 - x is used before assignment
+let x;
+const temp = x;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let count = |code| codes.iter().filter(|&&c| c == code).count();
+
+    assert_eq!(count(2454), 1, "Expected one TS2454 error for variable used before assignment");
+}
+
+/// Test TS2454 - Variable used before assignment with control flow
+#[test]
+fn test_ts2454_definite_assignment_with_control_flow() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// Should NOT emit TS2454 - y is definitely assigned
+let y;
+if (true) {
+    y = 1;
+} else {
+    y = 2;
+}
+const temp = y;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let count = |code| codes.iter().filter(|&&c| c == code).count();
+
+    assert_eq!(count(2454), 0, "Expected no TS2454 errors when variable is definitely assigned");
+}
+
+/// Test TS2454 - Variable with initializer should not emit
+#[test]
+fn test_ts2454_variable_with_initializer() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+// Should NOT emit TS2454 - z has initializer
+let z = 0;
+const temp = z;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let count = |code| codes.iter().filter(|&&c| c == code).count();
+
+    assert_eq!(count(2454), 0, "Expected no TS2454 errors when variable has initializer");
+}
