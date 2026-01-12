@@ -100,6 +100,6 @@ Both LSP features were already implemented. All 48 tests passing.
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
 - Use Docker for Rust tests: `./wasm/test.sh`
-- Commit format: `[wasm] lsp: Document find-references implementation status`
+- Commit format: `[wasm] lsp: Resolve merge conflict and confirm find-references complete`
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/anvil-3`

@@ -1,43 +1,41 @@
 # Worker 2 Plan - Squad Anvil
 
 ## Mission
-LSP Signature Help Enhancement
+Declaration File Emission (.d.ts)
 
 Status: Active
 Priority: P1 (High)
 
 ## Current Assignment
-**Implement LSP Signature Help**
+**Implement Declaration File Generation**
 
 ### Background
-Signature help shows parameter hints when calling functions. Essential for IDE integration.
+TypeScript can generate .d.ts declaration files for libraries. Essential for publishing TypeScript packages.
 
 ### Implementation Steps
-1. [ ] Read current signature help implementation in `src/lsp/signature_help.rs`
-2. [ ] Check what's missing compared to VS Code's TypeScript server
-3. [ ] Implement signature help with:
-   - Function signature lookup from binder
-   - Parameter information (names, types, optional flags)
-   - Active parameter highlighting based on cursor position
-   - Overload resolution for multiple signatures
-4. [ ] Add support for:
-   - Method calls
-   - Constructor calls
-   - Callable type invocations
-5. [ ] Test: Start LSP server and verify signature help appears for function calls
+1. [ ] Read current declaration emission in `src/thin_emitter.rs` or `src/transforms/`
+2. [ ] Implement .d.ts file generation:
+   - Strip function bodies
+   - Keep type annotations
+   - Export declarations
+   - Generate for all .ts files in compilation
+3. [ ] Handle `--declaration` CLI flag (already added by W2)
+4. [ ] Handle `--declarationMap` for source maps of .d.ts files
+5. [ ] Test: Compile with `--declaration` and verify .d.ts files are created
 
 ### Key Code Locations
-- `src/lsp/signature_help.rs` - signature help implementation
-- `src/lsp/mod.rs` - LSP server
-- `src/binder/` - symbol and signature resolution
+- `src/thin_emitter.rs` - main emitter
+- `src/cli/args.rs` - --declaration flag exists
+- `src/cli/driver.rs` - compilation driver
 
 ## Task Queue
-- [ ] After signature help: help with go-to-definition or document symbols
+- [ ] After declaration files: help with source maps or CLI features
 
 ## Completed
-- [x] Private accessor collection (c76225e474) - MERGED to squad/anvil
-- [x] All 7 ES5 private accessor tests passing
-- [x] CLI flags enhancement: --declaration, --declarationMap, --sourceMap, --rootDir (2f5834504e) - MERGED to squad/anvil
+- [x] Private accessor collection - MERGED to squad/anvil
+- [x] ES5 private accessor tests passing (with W3)
+- [x] CLI flags: --declaration, --declarationMap, --sourceMap, --rootDir - MERGED to squad/anvil
+- [x] LSP Signature Help - All 21 tests passing - MERGED to squad/anvil
 
 ## Ready for Merge
 Previous work merged to squad/anvil
@@ -45,6 +43,6 @@ Previous work merged to squad/anvil
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
 - Use Docker for Rust tests: `./wasm/test.sh`
-- Commit format: `[wasm] lsp: Implement signature help with parameter hints`
+- Commit format: `[wasm] emitter: Implement .d.ts declaration file generation`
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/anvil-2`
