@@ -18517,6 +18517,13 @@ impl<'a> ThinCheckerState<'a> {
                 let app = self.ctx.types.type_application(app_id);
                 return self.type_ref_is_promise_like(app.base);
             }
+            Some(TypeKey::Object(_)) => {
+                // For Object types (interfaces from lib files), we conservatively assume
+                // they might be Promise-like. This avoids false positives for Promise<void>
+                // return types from lib files where we can't easily determine the interface name.
+                // A more precise check would require tracking the original type reference.
+                return true;
+            }
             _ => {}
         }
         false
