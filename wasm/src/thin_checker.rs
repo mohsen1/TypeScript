@@ -17608,16 +17608,9 @@ impl<'a> ThinCheckerState<'a> {
             self.check_property_initialization_order(member_idx, prop.initializer);
         }
 
-        // Error 7008: Member implicitly has an 'any' type
-        // Report when property has no type annotation and no initializer (can't infer type)
-        if prop.type_annotation.is_none() && prop.initializer.is_none() {
-            // Get the property name for the error message
-            if let Some(member_name) = self.get_property_name(prop.name) {
-                use crate::checker::types::diagnostics::{diagnostic_messages, format_message};
-                let message = format_message(diagnostic_messages::MEMBER_IMPLICIT_ANY, &[&member_name, "any"]);
-                self.error_at_node(prop.name, &message, diagnostic_codes::IMPLICIT_ANY_MEMBER);
-            }
-        }
+        // Note: TS7008 (Member implicitly has an 'any' type) is now checked in
+        // check_property_initialization, where we can determine if the property
+        // is assigned in the constructor (type can be inferred from assignment).
     }
 
     /// Check a method declaration.
