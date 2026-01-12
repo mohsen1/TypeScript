@@ -109,6 +109,7 @@ pub mod diagnostic_messages {
 
     // Object literal errors
     pub const EXCESS_PROPERTY: &str = "Object literal may only specify known properties, and '{0}' does not exist in type '{1}'.";
+    pub const OBJECT_LITERAL_DUPLICATE_PROPERTY: &str = "An object literal cannot have multiple properties with the same name '{0}'.";
 
     // Null/undefined errors
     pub const OBJECT_POSSIBLY_UNDEFINED: &str = "Object is possibly 'undefined'.";
@@ -195,6 +196,7 @@ pub mod diagnostic_codes {
     pub const TYPE_PARAMETER_LIST_CANNOT_BE_EMPTY: u32 = 1098;
     pub const EXPRESSION_EXPECTED: u32 = 1109;
     pub const TYPE_EXPECTED: u32 = 1110;
+    pub const OBJECT_LITERAL_DUPLICATE_PROPERTY: u32 = 1117;  // An object literal cannot have multiple properties with the same name.
     pub const DECLARATION_EXPECTED: u32 = 1146;
     pub const EXTENDS_CLAUSE_ALREADY_SEEN: u32 = 1172;
     pub const EXTENDS_CLAUSE_MUST_PRECEDE_IMPLEMENTS_CLAUSE: u32 = 1173;

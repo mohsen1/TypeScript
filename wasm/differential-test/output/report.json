@@ -1,55 +1,27 @@
 {
-  "timestamp": "2026-01-09T10:00:09.372Z",
+  "timestamp": "2026-01-12T09:35:32.919Z",
   "summary": {
     "total": 15,
-    "passed": 6,
-    "failed": 9,
-    "passRate": "40.0%"
+    "passed": 12,
+    "failed": 3,
+    "passRate": "80.0%"
   },
   "severity": {
-    "high": 2,
-    "medium": 7
+    "high": 0,
+    "medium": 1
   },
-  "missingErrorCodes": {
-    "2322": [
-      "unsoundness-31-inline-1"
-    ],
-    "2559": [
-      "unsoundness-13-inline-1"
-    ]
-  },
-  "prioritizedBugList": [
-    {
-      "id": "unsoundness-13-inline-1",
-      "title": "Weak Type Detection (inline example 1)",
-      "phase": 4,
-      "missingErrors": [
-        2559
-      ],
-      "code": "interface Weak { a?: number }\nconst x = { b: \"unrelated\" };\nconst y: Weak = x; // Error in TS (Safety check), but valid structurally!"
-    },
-    {
-      "id": "unsoundness-31-inline-1",
-      "title": "Base Constraint Assignability (Generic Erasure) (inline example 1)",
-      "phase": 4,
-      "missingErrors": [
-        2322
-      ],
-      "code": "function f<T extends string, U>(x: T, y: U) {\n    let s: string = x; // OK: T extends string\n    let t: T = \"hello\"; // Error: string is not T (T could be \"world\")\n}"
-    }
-  ],
+  "missingErrorCodes": {},
+  "prioritizedBugList": [],
   "results": [
     {
       "id": "unsoundness-13-inline-1",
       "passed": false,
-      "severity": "high",
+      "severity": "low",
       "tscErrors": 1,
-      "wasmErrors": 0,
-      "missingInWasm": [
-        2559
-      ],
+      "wasmErrors": 1,
+      "missingInWasm": [],
       "extraInWasm": [],
-      "duration": 429
+      "duration": 518
     },
     {
       "id": "unsoundness-16-inline-1",
@@ -59,31 +31,29 @@
       "wasmErrors": 0,
       "missingInWasm": [],
       "extraInWasm": [],
-      "duration": 205
+      "duration": 232
     },
     {
       "id": "unsoundness-19-inline-1",
-      "passed": true,
-      "severity": "low",
+      "passed": false,
+      "severity": "medium",
       "tscErrors": 0,
-      "wasmErrors": 0,
+      "wasmErrors": 1,
       "missingInWasm": [],
-      "extraInWasm": [],
-      "duration": 180
+      "extraInWasm": [
+        2345
+      ],
+      "duration": 221
     },
     {
       "id": "unsoundness-31-inline-1",
       "passed": false,
-      "severity": "high",
+      "severity": "low",
       "tscErrors": 1,
-      "wasmErrors": 3,
-      "missingInWasm": [
-        2322
-      ],
-      "extraInWasm": [
-        2304
-      ],
-      "duration": 170
+      "wasmErrors": 1,
+      "missingInWasm": [],
+      "extraInWasm": [],
+      "duration": 222
     },
     {
       "id": "custom-basic-types",
@@ -93,45 +63,37 @@
       "wasmErrors": 0,
       "missingInWasm": [],
       "extraInWasm": [],
-      "duration": 180
+      "duration": 212
     },
     {
       "id": "custom-phase1-critical-AnyTypeTests",
-      "passed": false,
-      "severity": "medium",
+      "passed": true,
+      "severity": "low",
       "tscErrors": 1,
-      "wasmErrors": 7,
+      "wasmErrors": 1,
       "missingInWasm": [],
-      "extraInWasm": [
-        2304
-      ],
-      "duration": 186
+      "extraInWasm": [],
+      "duration": 213
     },
     {
       "id": "custom-phase1-critical-ObjectTrifectaTests",
-      "passed": false,
-      "severity": "medium",
+      "passed": true,
+      "severity": "low",
       "tscErrors": 1,
-      "wasmErrors": 8,
+      "wasmErrors": 1,
       "missingInWasm": [],
-      "extraInWasm": [
-        2304,
-        2322,
-        2353
-      ],
-      "duration": 179
+      "extraInWasm": [],
+      "duration": 202
     },
     {
       "id": "custom-phase1-critical-VoidReturnTests",
-      "passed": false,
-      "severity": "medium",
+      "passed": true,
+      "severity": "low",
       "tscErrors": 1,
-      "wasmErrors": 4,
+      "wasmErrors": 1,
       "missingInWasm": [],
-      "extraInWasm": [
-        2304
-      ],
-      "duration": 165
+      "extraInWasm": [],
+      "duration": 207
     },
     {
       "id": "custom-phase1-critical-ErrorPoisoningTests",
@@ -141,20 +103,17 @@
       "wasmErrors": 1,
       "missingInWasm": [],
       "extraInWasm": [],
-      "duration": 167
+      "duration": 221
     },
     {
       "id": "custom-phase1-critical-CovariantArrayTests",
-      "passed": false,
-      "severity": "medium",
+      "passed": true,
+      "severity": "low",
       "tscErrors": 1,
-      "wasmErrors": 3,
+      "wasmErrors": 1,
       "missingInWasm": [],
-      "extraInWasm": [
-        2322,
-        2304
-      ],
-      "duration": 168
+      "extraInWasm": [],
+      "duration": 217
     },
     {
       "id": "custom-phase1-critical-FunctionBivarianceTests",
@@ -164,19 +123,17 @@
       "wasmErrors": 1,
       "missingInWasm": [],
       "extraInWasm": [],
-      "duration": 171
+      "duration": 206
     },
     {
       "id": "custom-phase1-critical-NullUndefinedTests",
-      "passed": false,
-      "severity": "medium",
+      "passed": true,
+      "severity": "low",
       "tscErrors": 1,
-      "wasmErrors": 3,
+      "wasmErrors": 1,
       "missingInWasm": [],
-      "extraInWasm": [
-        2304
-      ],
-      "duration": 193
+      "extraInWasm": [],
+      "duration": 217
     },
     {
       "id": "custom-phase1-critical-LiteralWideningTests",
@@ -186,31 +143,27 @@
       "wasmErrors": 1,
       "missingInWasm": [],
       "extraInWasm": [],
-      "duration": 162
+      "duration": 228
     },
     {
       "id": "custom-phase1-critical-OptionalityTests",
-      "passed": false,
-      "severity": "medium",
+      "passed": true,
+      "severity": "low",
       "tscErrors": 1,
-      "wasmErrors": 4,
+      "wasmErrors": 1,
       "missingInWasm": [],
-      "extraInWasm": [
-        2304
-      ],
-      "duration": 160
+      "extraInWasm": [],
+      "duration": 204
     },
     {
       "id": "custom-phase1-critical-ExcessPropertyTests",
-      "passed": false,
-      "severity": "medium",
+      "passed": true,
+      "severity": "low",
       "tscErrors": 0,
-      "wasmErrors": 4,
+      "wasmErrors": 0,
       "missingInWasm": [],
-      "extraInWasm": [
-        2304
-      ],
-      "duration": 182
+      "extraInWasm": [],
+      "duration": 207
     }
   ]
 }
