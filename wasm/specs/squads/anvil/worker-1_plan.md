@@ -1,47 +1,56 @@
 # Worker 1 Plan - Squad Anvil
 
 ## Mission
-Import Equals Emission Fix
+Type Solver Constraint Enhancement
 
 Status: Active
 Priority: P0 (Highest)
 
 ## Current Assignment
-**Fix Import Equals Emission**
+**Fix Generic Type Parameter Constraint Checking**
 
 ### Background
-`import x = require('y')` is TypeScript-specific syntax for CommonJS imports. Current implementation has issues.
+The test `compile_generic_utility_library_type_utilities` fails with TS2345 when T extends object. Type parameter constraints aren't being properly handled.
 
 ### Failing Test
-`cli::driver_tests::invalidate_paths_with_dependents_symbols_handles_import_equals`
+`cli::driver_tests::compile_generic_utility_library_type_utilities`
+
+### Error
+```
+TS2345: Argument of type 'T' is not assignable to parameter of type 'object'.
+```
 
 ### Implementation Steps
-1. [ ] Read the failing test to understand expected behavior
-2. [ ] Find import equals handling in `src/thin_emitter.rs` or `src/transforms/`
-3. [ ] Ensure proper transformation: `import x = require('y')` → `var x = require('y')`
-4. [ ] Fix type inference - should be `any` type, not `string`
-5. [ ] Test: `./wasm/test.sh invalidate_paths_with_dependents_symbols_handles_import_equals`
+1. [ ] Read the failing test to understand the generic pattern
+2. [ ] Check constraint handling in `src/solver/operations.rs`
+3. [ ] Fix type parameter constraint checking:
+   - When T extends object, T should be assignable to object
+   - Check constraint resolution in subtype checks
+4. [ ] Test: `./wasm/test.sh compile_generic_utility_library_type_utilities`
 
 ### Key Code Locations
-- `src/thin_emitter.rs` - main emission
-- `src/thin_checker.rs` - type checking (fix to return any for import equals)
-- `src/binder.rs` - symbol binding (declare_in_persistent_scope)
+- `src/solver/operations.rs` - constraint checking
+- `src/solver/infer.rs` - type inference
+- `src/solver/subtype.rs` - type compatibility
 
 ## Task Queue
-- [ ] After import equals: help with other CLI/Driver issues
+- [ ] After constraint fix: help with other solver or emitter issues
 
 ## Completed
 - [x] Fixed catch clause variable emission - MERGED to squad/anvil
 - [x] Added AS_EXPRESSION/TYPE_ASSERTION/SATISFIES_EXPRESSION handling - MERGED to squad/anvil
-- [x] LSP Semantic Tokens (decorators, type parameters, modifiers) - MERGED to squad/anvil
-- [x] Source Map Implementation - Verified complete (905 tests passing)
+- [x] LSP Semantic Tokens - MERGED to squad/anvil
+- [x] Source Map Implementation - Verified complete
+- [x] Import Equals Emission Fix - Test passes
+- [x] CLI Flags (--outFile, --tsBuildInfoFile, --incremental) - Complete
+- [x] Emitter Fixes - All 756/756 emitter tests pass (commit 0e3b0b935f)
 
 ## Ready for Merge
-Previous work merged to squad/anvil
+Previous work merged, latest ready for merge
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
 - Use Docker for Rust tests: `./wasm/test.sh`
-- Commit format: `[wasm] emitter: Fix import equals transformation`
+- Commit format: `[wasm] solver: Fix generic type parameter constraint checking`
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/anvil-1`

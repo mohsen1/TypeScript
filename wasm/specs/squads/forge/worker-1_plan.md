@@ -1,51 +1,62 @@
 # Worker 1 Plan - Squad Forge
 
 ## Mission
-Fix TS7006 - Parameter implicitly has 'any' type
+Fix TS2339: Property Does Not Exist
 
 Status: Active
-Priority: P0 (CRITICAL)
+Priority: P1 (HIGH)
 
 ## Current Assignment
-**Implement TS7006 Error: Parameter implicitly has 'any' type**
+**Fix TS2339 False Positives: Property does not exist (35 extra errors)**
 
 ### Background
-TypeScript should emit TS7006 error when function parameters have no type annotation and type cannot be inferred. This includes:
-1. Function declarations without parameter types
-2. Arrow functions without parameter types
-3. Method declarations without parameter types
-4. Only emit when noImplicitAny is enabled
+TypeScript is emitting TS2339 "Property does not exist" errors too aggressively (35 extra errors). This is likely a type narrowing issue where valid property accesses are incorrectly flagged.
 
 ### Success Criteria
-- Emit TS7006 for untyped parameters when no inference source exists
-- Don't emit when types can be inferred from context
-- Handle function declarations, arrow functions, methods
+- Don't emit TS2339 for valid property accesses on narrowed types
+- Only emit TS2339 when property truly doesn't exist on type
+- Fix type narrowing in property access expressions
+
+### Implementation Steps
+1. [ ] Sync from origin/rust: `git fetch origin && git merge origin/rust --no-edit`
+2. [ ] Search for TS2339 emission code in `src/thin_checker.rs`
+3. [ ] Investigate type narrowing logic for property access
+4. [ ] Fix cases where valid properties are incorrectly flagged
+5. [ ] Test with various property access patterns
+6. [ ] Run conformance to verify reduction in extra errors
+
+### Key Code Locations
+- `src/thin_checker.rs` - property access checking, TS2339 emission
+- `src/checker/control_flow.rs` - type narrowing
+- `src/checker/types/diagnostics.rs` - TS2339 error code
 
 ### Test Cases
 ```typescript
-// Should emit TS7006
-function foo(x) { } // Error: Parameter 'x' implicitly has 'any' type
+// Should NOT emit TS2339 (type narrowing)
+interface Foo { x: number; }
+interface Bar { y: string; }
 
-// Should NOT emit (has type annotation)
-function bar(y: number) { }
+function foo(obj: Foo | Bar) {
+  if ('x' in obj) {
+    console.log(obj.x); // OK - narrowed to Foo
+  }
+}
 
-// Should NOT emit (contextual typing)
-[1,2,3].forEach(n => console.log(n));
+// Should emit TS2339
+const obj = { x: 1 };
+console.log(obj.y); // Error: Property 'y' does not exist
 ```
 
 ## Completed
-- [x] Fix Method Bivariance - Added `is_method` field to `FunctionShape`, updated lowering logic to set the flag for methods, and modified parameter compatibility checking to use bivariance for methods regardless of `strict_function_types` setting. All tests pass.
-  - Commit: `79a29f026d` - [wasm] solver: Implement method bivariance for strict function types
-  - Status: **MERGED** to origin/rust
-
-- [x] Fix TS7006 for Function Declarations - Removed `!is_function_declaration` condition that prevented TS7006 from being reported for function declarations when noImplicitAny is enabled.
-  - Commit: `f4934e0c5d` - [wasm] checker: Fix TS7006 for function declarations
-  - Status: Ready for merge
+- [x] Fix Method Bivariance - Merged to squad/forge
+- [x] TS7010/TS7011 - Implemented and pushed to origin/worker/forge-1
 
 ## Ready for Merge
-Yes - TS7006 fix (commit f4934e0c5d)
+No
 
 ## Notes
-- Last sync: 2026-01-12
-- Branch: worker/forge-1
-- Working on TS7006 improvements
+- Follow `wasm/specs/WASM_ARCHITECTURE.md`
+- Use Docker for Rust tests: `./wasm/test.sh`
+- Commit format: `[wasm] checker: Fix TS2339 false positives in property access`
+- Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
+- Push to: `origin/worker/forge-1`

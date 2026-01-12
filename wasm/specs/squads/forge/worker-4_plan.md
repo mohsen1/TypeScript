@@ -1,54 +1,58 @@
 # Worker 4 Plan - Squad Forge
 
 ## Mission
-Fix TS7006: Parameter Implicitly Has 'any' Type
+Fix TS7006: Parameter Implicitly Has 'Any' Type
 
 Status: Active
-Priority: P0 (CRITICAL)
+Priority: P1 (HIGH)
 
 ## Current Assignment
-**Implement TS7006 Error: Parameter implicitly has 'any' type**
+**Implement TS7006 Error: Parameter implicitly has 'any' type (42 occurrences)**
 
 ### Background
-TypeScript should emit TS7006 error when a function parameter has no type annotation and its type cannot be inferred. This commonly happens when:
-1. Function parameters lack type annotations
-2. No contextual type is available for inference
-3. The `noImplicitAny` compiler option is enabled
+TypeScript should emit TS7006 when a function parameter has an implicit 'any' type and the `noImplicitAny` compiler option is enabled.
 
 ### Success Criteria
-- Emit TS7006 for parameters without type annotations when type cannot be inferred
-- Don't emit when type can be inferred from context
-- Handle all function types: function declarations, arrow functions, method signatures
-- Account for contextual type inference
+- Emit TS7006 for function/method parameters without type annotations when noImplicitAny is true
+- Handle all function types: function declarations, expressions, arrow functions, methods
+- Don't emit when parameter has explicit type annotation
+- Don't emit when parameter has default value
+- Don't emit when noImplicitAny is false
 
 ### Implementation Steps
-1. [ ] Read existing parameter type checking code in `src/thin_checker.rs`
-2. [ ] Find where parameter types are checked
-3. [ ] Implement check: if parameter has no type and no inference source, emit TS7006
-4. [ ] Test with various function patterns
-5. [ ] Ensure no false positives when types can be inferred
+1. [ ] Sync from origin/rust: `git fetch origin && git merge origin/rust --no-edit`
+2. [ ] Search for parameter type checking code in `src/thin_checker.rs`
+3. [ ] Find where implicit any is detected for parameters
+4. [ ] Implement TS7006 emission when noImplicitAny is true and parameter has no type annotation
+5. [ ] Test with various function patterns
+6. [ ] Run conformance to verify TS7006 is emitted correctly
 
 ### Key Code Locations
-- `src/thin_checker.rs` - parameter type checking
-- `src/solver/infer.rs` - type inference
+- `src/thin_checker.rs` - function parameter type checking
 - `src/checker/types/diagnostics.rs` - TS7006 error code
+- `src/cli/args.rs` - noImplicitAny flag
 
-### Test Cases to Implement
+### Test Cases
 ```typescript
+// @noImplicitAny: true
+
 // Should emit TS7006
 function foo(x) { } // Error: Parameter 'x' implicitly has 'any' type
+
 const bar = (y) => { }; // Error: Parameter 'y' implicitly has 'any' type
 
-// Should NOT emit (type can be inferred)
-function baz(x: number) { } // OK
-const qux = (z: string) => { }; // OK
+class Baz {
+  method(z) { } // Error: Parameter 'z' implicitly has 'any' type
+}
 
-// Should NOT emit (contextual type)
-[1, 2, 3].forEach(n => console.log(n)); // OK - 'n' inferred as number
+// Should NOT emit
+function qux(a: number) { } // OK - explicit type
+function quux(b = 5) { } // OK - has default value
 ```
 
 ## Completed
-- [x] Fix Element Access Literal Keys - Merged to squad/forge
+- [x] TS2792 - Module resolution (reassigned)
+- [x] TS7010 - Implicit any return type - Merged to squad/forge ✅
 
 ## Ready for Merge
 No

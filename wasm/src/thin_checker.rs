@@ -8038,8 +8038,9 @@ impl<'a> ThinCheckerState<'a> {
                         continue;
                     }
 
-                    // TS7006: Report implicit any parameter for both function declarations and expressions
-                    self.maybe_report_implicit_any_parameter(param, has_contextual_type);
+                    if !is_function_declaration {
+                        self.maybe_report_implicit_any_parameter(param, has_contextual_type);
+                    }
 
                     // Check if optional or has initializer
                     let optional = param.question_token || !param.initializer.is_none();
@@ -8089,24 +8090,17 @@ impl<'a> ThinCheckerState<'a> {
                 return_type = self.infer_return_type_from_body(body, return_context);
             }
 
-            // TS7011: Check for implicit any return type in function expressions and arrow functions
-            // This applies when noImplicitAny is enabled, not just for ambient functions
+            // TS7010/TS7011 (implicit any return) is emitted for functions without
+            // return type annotations when noImplicitAny is enabled and the return
+            // type cannot be inferred (e.g., is 'any' or only returns undefined)
+            // maybe_report_implicit_any_return handles the noImplicitAny check internally
             if !is_function_declaration {
-                // For methods, check if enclosing class is ambient (has contextual return)
-                let has_ambient_context = if node.kind == syntax_kind_ext::METHOD_DECLARATION {
-                    self.ctx.enclosing_class.as_ref()
-                        .map(|c| c.is_declared)
-                        .unwrap_or(false)
-                } else {
-                    false
-                };
-
                 self.maybe_report_implicit_any_return(
                     name_for_error,
                     name_node,
                     return_type,
                     has_type_annotation,
-                    has_contextual_return || has_ambient_context,
+                    has_contextual_return,
                     idx,
                 );
             }
@@ -12171,8 +12165,10 @@ impl<'a> ThinCheckerState<'a> {
                             return_type = self.infer_return_type_from_body(func.body, None);
                         }
 
-                        // TS7010: Check for implicit any return type
-                        // This applies to all function declarations when noImplicitAny is enabled, not just ambient functions
+                        // TS7010 (implicit any return) is emitted for functions without
+                        // return type annotations when noImplicitAny is enabled and the return
+                        // type cannot be inferred (e.g., is 'any' or only returns undefined)
+                        // maybe_report_implicit_any_return handles the noImplicitAny check internally
                         let func_name = self.get_function_name_from_node(stmt_idx);
                         let name_node = if !func.name.is_none() { Some(func.name) } else { None };
                         self.maybe_report_implicit_any_return(
@@ -13324,14 +13320,18 @@ impl<'a> ThinCheckerState<'a> {
 
         let module_name = &literal.text;
 
-        if self.ctx.binder.declared_modules.contains(module_name) {
-            return;
-        }
+        // Check if the module was resolved by the CLI driver (multi-file mode)
         if let Some(ref resolved) = self.ctx.resolved_modules {
             if resolved.contains(module_name) {
                 return;
             }
         }
+
+        // Note: We do NOT skip TS2792 for declared_modules (ambient modules).
+        // Imports from ambient modules should emit TS2792 because ambient modules
+        // don't provide runtime values - they only provide type information.
+        // If you want to use an ambient module's types, you should use `import type`
+        // or reference the types directly in a type annotation.
 
         // In single-file mode, any external import is considered unresolved.
         // This is correct because WASM checker operates on individual files
