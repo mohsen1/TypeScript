@@ -132,7 +132,14 @@ impl Reporter {
         snippet.push('\n');
         snippet.push_str(&format!("  {:>3}   {}", line_num, line_text));
         snippet.push('\n');
-        snippet.push_str(&format!("       {}", underline));
+
+        // Add color to the underline in color mode
+        let underline_display = if self.color {
+            underline.red().to_string()
+        } else {
+            underline
+        };
+        snippet.push_str(&format!("       {}", underline_display));
 
         Some(snippet)
     }
