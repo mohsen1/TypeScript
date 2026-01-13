@@ -6,10 +6,9 @@
 ## Completed
 - [x] **SOLV-45: Add function bivariance configuration** (already implemented)
   - Lawyer layer in lawyer.rs for function parameter checking
-  - strict_function_types field in compat.rs and subtype.rs
-  - is_method field distinguishes methods (bivariant) from functions (contravariant)
-  - 39 bivariance tests, 58 callback tests passing
-
+  - strict_function_types in compat.rs and subtype.rs
+  - is_method distinguishes methods (bivariant) from functions (contravariant)
+  - 39 bivariance tests passing
 
 - [x] **SOLV-44: Implement mapped type evaluation** (already implemented)
   - evaluate_mapped handles `{ [K in Keys]: Transform<K> }` lowering
