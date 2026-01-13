@@ -147,7 +147,42 @@ impl<'a> FlowGraphBuilder<'a> {
         &self.graph
     }
 
-    /// Build flow graph for a single statement.
+    /// Build the flow graph for a list of statements.
+    ///
+    /// This is a general entry point that can be used for:
+    /// - Source files
+    /// - Function bodies
+    /// - Block statements
+    /// - Any list of statements
+    ///
+    /// This is an alias for `build_source_file()` but with a more general name.
+    pub fn build_flow_graph(&mut self, statements: &NodeList) -> &FlowGraph {
+        self.build_source_file(statements)
+    }
+
+    /// Build the flow graph for a function body.
+    ///
+    /// Entry point for building flow graphs for function bodies.
+    /// Resets the builder state and creates a new START node for the function.
+    ///
+    /// # Arguments
+    /// * `body` - The block statement representing the function body
+    ///
+    /// # Returns
+    /// Reference to the built flow graph
+    pub fn build_function_body(&mut self, body: &crate::parser::thin_node::BlockData) -> &FlowGraph {
+        // Reset the builder state for a new function
+        self.graph = FlowGraph::new();
+        self.current_flow = self.graph.nodes.alloc(flow_flags::START);
+        self.flow_stack.clear();
+        self.async_depth = 0;
+
+        // Build the function body
+        self.build_block(body);
+        &self.graph
+    }
+
+    /// Build the flow graph for a single statement.
     fn build_statement(&mut self, stmt_idx: NodeIndex) {
         let Some(node) = self.arena.get(stmt_idx) else {
             return;
@@ -323,7 +358,13 @@ impl<'a> FlowGraphBuilder<'a> {
     }
 
     /// Build flow graph for a block.
-    fn build_block(&mut self, block: &crate::parser::thin_node::BlockData) {
+    ///
+    /// Entry point for building flow graphs for block statements.
+    /// Processes all statements in the block sequentially.
+    ///
+    /// # Arguments
+    /// * `block` - The block statement to build flow graph for
+    pub fn build_block(&mut self, block: &crate::parser::thin_node::BlockData) {
         for &stmt_idx in &block.statements.nodes {
             if !stmt_idx.is_none() {
                 self.build_statement(stmt_idx);
