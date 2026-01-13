@@ -7,6 +7,13 @@
 (none yet)
 
 ## Completed
+- [x] **SOLV-44: Fix more ANY fallbacks in thin_checker.rs type resolution**
+  - Changed resolve_qualified_name fallbacks from ANY to ERROR (thin_checker.rs:2011-2044)
+  - Changed get_type_from_type_reference_by_name fallbacks from ANY to ERROR (thin_checker.rs:2122, 2137)
+  - Changed get_type_from_union_type fallbacks from ANY to ERROR (thin_checker.rs:2143, 2164)
+  - Changed get_type_from_intersection_type fallbacks from ANY to ERROR/UNKNOWN (thin_checker.rs:2170, 2182, 2191)
+  - Changed get_type_from_type_query fallbacks from ANY to ERROR (thin_checker.rs:2201, 2205)
+  - These were fallback cases where missing data was silently accepted
 - [x] **SOLV-43: Fix ANY fallbacks in thin_checker.rs type resolution**
   - Changed compute_type_of_node catch-all fallback from ANY to ERROR (thin_checker.rs:680)
   - Changed circular reference fallback from ANY to ERROR (thin_checker.rs:460)
