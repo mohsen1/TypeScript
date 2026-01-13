@@ -1,14 +1,12 @@
 # Worker 8 Task List - Solver Squad
 
 ## Current Task
-- [ ] **SOLV-16: Strengthen generic inference**
-  - Fix generic type inference from context
-  - Handle conditional types with generics
-  - Implement proper generic variance checking
-  - Test complex generic scenarios
+- [ ] **SOLV-17: Coordinate with Worker 7 on integration**
+  - Work with Worker 7 to merge Lawyer layer changes
+  - Ensure generic checking works with Unknown fallback
+  - Verify all solver components integrate correctly
 
 ## Queue
-- [ ] **SOLV-17: Coordinate with Worker 7 on integration**
   - Work with Worker 7 to merge Lawyer layer changes
   - Ensure generic checking works with Unknown fallback
   - Verify all solver components integrate correctly
@@ -26,6 +24,12 @@
   - Handle function types in generic contexts
 
 ## Completed
+- [x] **SOLV-16: Strengthen generic inference**
+  - Fixed generic type inference from context
+  - Handled conditional types with generics
+  - Implemented proper generic variance checking
+  - Tested complex generic scenarios
+  - Modified wasm/src/solver/infer.rs and infer_tests.rs
 - [x] **SOLV-8: Handle implicit any parameters (TS7006)**
   - Checked function parameters with no annotation
   - When inferred type is implicitly any, emit TS7006
