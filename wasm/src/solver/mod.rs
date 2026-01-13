@@ -80,3 +80,5 @@ mod subtype_tests;
 mod types_tests;
 #[cfg(test)]
 mod union_tests;
+#[cfg(test)]
+mod integration_tests;
