@@ -3,16 +3,15 @@
 ## Squad: Binder Squad (Builtins)
 
 ## Current Task
-- [ ] Debug why basic globals like `console`, `Array`, `Promise` still fail to resolve in some cases
+- [ ] Add detailed logging to `resolve_identifier_symbol` in thin_checker.rs
 
 ## Queue
-- [ ] Add detailed logging to `resolve_identifier_symbol` in thin_checker.rs
 - [ ] Trace symbol table lookup chain: local -> module -> global
 - [ ] Verify lib.d.ts injection populates correct symbol IDs for builtins
 - [ ] Test with minimal examples that should resolve to global types
 
 ## Completed
-(Previous phase work archived)
+- [x] Debug why basic globals like `console`, `Array`, `Promise` still fail to resolve in some cases
 
 ## Context
 - **Goal:** Ensure all standard library globals resolve correctly
