@@ -7,6 +7,11 @@
 (none yet)
 
 ## Completed
+- [x] **SOLV-45: Fix type literal ANY fallbacks in thin_checker.rs**
+  - Changed get_type_from_type_node_in_type_literal missing node fallback from ANY to ERROR (thin_checker.rs:2320)
+  - Changed get_type_from_type_node_in_type_literal array fallback from ANY to ERROR (thin_checker.rs:2347)
+  - Changed get_type_from_type_reference_in_type_literal missing node/type_ref fallbacks from ANY to ERROR (thin_checker.rs:2360, 2364)
+  - These were fallback cases where missing data was silently accepted
 - [x] **SOLV-44: Fix more ANY fallbacks in thin_checker.rs type resolution**
   - Changed resolve_qualified_name fallbacks from ANY to ERROR (thin_checker.rs:2011-2044)
   - Changed get_type_from_type_reference_by_name fallbacks from ANY to ERROR (thin_checker.rs:2122, 2137)
