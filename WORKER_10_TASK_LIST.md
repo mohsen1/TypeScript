@@ -1,11 +1,6 @@
 # Worker 10 Task List - Solver Squad
 
 ## Current Task
-- [ ] **SOLV-38: Add optional chaining type checking**
-  - Implement `obj?.prop` type checking
-  - Handle `obj?.method()` return types
-  - Test optional chaining with null/undefined
-  - Verify `obj?.[key]` indexed access types
 - [ ] **SOLV-39: Coordinate with CFA and Binder squads on cross-cutting issues**
   - Ensure solver strictness works with CFA improvements
   - Verify Unknown fallback doesn't conflict with fixed global scope
@@ -15,6 +10,15 @@
 (none yet)
 
 ## Completed
+- [x] **SOLV-38: Add optional chaining type checking**
+  - Verified existing implementation for `obj?.prop` type checking
+  - Verified `obj?.method()` return types handling (returns T | undefined)
+  - Created comprehensive test file: `tests/cases/conformance/solver/optional_chaining_tests.ts`
+  - Tested `obj?.[key]` indexed access types
+  - Tested optional chaining with null/undefined values
+  - Tested optional chaining with nullish coalescing (??)
+  - Tested optional chaining type narrowing
+  - Tested optional chaining with generics and classes
 - [x] **SOLV-37: Implement discriminated union narrowing**
   - Narrow union types based on discriminant property
   - Test: `type Shape = { kind: "circle", radius: number } | { kind: "square", side: number }`
