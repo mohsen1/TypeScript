@@ -1,12 +1,5 @@
 # Worker 4 Task List - Binder Squad
 
-## Current Task
-- [ ] **BIND-4: Fix Global SymbolTable initialization**
-  - Modify `Binder::new` to inject lib symbols into root scope
-  - Load `lib.d.ts` types from `stdlib/lib.d.ts`
-  - Ensure symbols are merged correctly at module level
-  - Test: `console.log("hello")` should not produce TS2304
-
 ## Queue
 - [ ] **BIND-7: Test TS2304 fixes**
   - Create test file for all previously failing global symbols
@@ -27,3 +20,8 @@
   - Identified how `lib.d.ts` symbols are (not) loaded
   - Found where global symbols like `console`, `Array`, `Promise` should be defined
   - Documented the gap in `docs/binder_gap_analysis.md`
+- [x] **BIND-4: Fix Global SymbolTable initialization**
+  - Added `LibContext` struct to `thin_binder.rs`
+  - Added `inject_lib_symbols` method to copy lib file symbols into `file_locals`
+  - Modified `bind_source_file` in `lib.rs` to inject lib symbols after binding
+  - Tracks symbol arenas for cross-file resolution
