@@ -9501,15 +9501,26 @@ impl<'a> ThinCheckerState<'a> {
                                 diagnostic_messages::FUNCTION_LACKS_ENDING_RETURN_STATEMENT,
                                 diagnostic_codes::NOT_ALL_CODE_PATHS_RETURN_VALUE,
                             );
-                        } else if self.ctx.no_implicit_returns && has_return && falls_through {
+                        } else if self.ctx.no_implicit_returns && falls_through {
                             // TS7030: noImplicitReturns - not all code paths return a value
-                            use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
-                            let error_node = if !func.name.is_none() { func.name } else { func.body };
-                            self.error_at_node(
-                                error_node,
-                                diagnostic_messages::NOT_ALL_CODE_PATHS_RETURN,
-                                diagnostic_codes::NOT_ALL_CODE_PATHS_RETURN,
-                            );
+                            // Check if function should be excluded based on return type or return values
+                            let should_check = if has_type_annotation {
+                                // With explicit return type: check if type is excluded
+                                !self.is_excluded_from_implicit_returns(return_type)
+                            } else {
+                                // Without explicit return type: check if any return produces non-excluded value
+                                self.body_has_non_excluded_return(func.body)
+                            };
+
+                            if should_check {
+                                use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
+                                let error_node = if !func.name.is_none() { func.name } else { func.body };
+                                self.error_at_node(
+                                    error_node,
+                                    diagnostic_messages::NOT_ALL_CODE_PATHS_RETURN,
+                                    diagnostic_codes::NOT_ALL_CODE_PATHS_RETURN,
+                                );
+                            }
                         }
 
                         self.pop_return_type();
@@ -14500,7 +14511,7 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
-    /// Check if a return type requires a return value.
+    /// Check if a return type requires a return value (for TS2355/TS2366).
     /// Returns false for void, undefined, any, and never.
     fn requires_return_value(&self, return_type: TypeId) -> bool {
         use crate::solver::TypeKey;
@@ -14510,7 +14521,6 @@ impl<'a> ThinCheckerState<'a> {
             || return_type == TypeId::UNDEFINED
             || return_type == TypeId::ANY
             || return_type == TypeId::NEVER
-            || return_type == TypeId::UNKNOWN
         {
             return false;
         }
@@ -14526,6 +14536,34 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         true
+    }
+
+    /// Check if a return type is excluded from noImplicitReturns (TS7030) checks.
+    /// Excluded types: void, undefined, any, and unions containing void.
+    /// Note: `unknown` is NOT excluded, `string | undefined` is NOT excluded.
+    fn is_excluded_from_implicit_returns(&self, return_type: TypeId) -> bool {
+        use crate::solver::TypeKey;
+
+        // void, undefined, any are excluded
+        if return_type == TypeId::VOID
+            || return_type == TypeId::UNDEFINED
+            || return_type == TypeId::ANY
+        {
+            return true;
+        }
+
+        // Check for union types containing void (not just undefined)
+        if let Some(TypeKey::Union(members)) = self.ctx.types.lookup(return_type) {
+            let members = self.ctx.types.type_list(members);
+            for &member in members.iter() {
+                // Only void in union excludes, not undefined
+                if member == TypeId::VOID {
+                    return true;
+                }
+            }
+        }
+
+        false
     }
 
     fn is_null_or_undefined_only(&self, return_type: TypeId) -> bool {
@@ -15341,6 +15379,156 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         false
+    }
+
+    /// Check if a function body has at least one return with a non-excluded type.
+    /// For noImplicitReturns, we exclude returns that produce void, undefined, or any.
+    /// Returns true if any return produces a "real value" (not void/undefined/any).
+    fn body_has_non_excluded_return(&mut self, body_idx: NodeIndex) -> bool {
+        let Some(node) = self.ctx.arena.get(body_idx) else {
+            return false;
+        };
+
+        if node.kind == syntax_kind_ext::BLOCK {
+            if let Some(block) = self.ctx.arena.get_block(node) {
+                return self.statements_have_non_excluded_return(&block.statements.nodes);
+            }
+        }
+
+        false
+    }
+
+    /// Check if any statement contains a return with a non-excluded type.
+    fn statements_have_non_excluded_return(&mut self, statements: &[NodeIndex]) -> bool {
+        for &stmt_idx in statements.iter() {
+            if self.statement_has_non_excluded_return(stmt_idx) {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Check if a statement contains a return with a non-excluded type.
+    fn statement_has_non_excluded_return(&mut self, stmt_idx: NodeIndex) -> bool {
+        let Some(node) = self.ctx.arena.get(stmt_idx) else {
+            return false;
+        };
+
+        match node.kind {
+            syntax_kind_ext::RETURN_STATEMENT => {
+                if let Some(return_data) = self.ctx.arena.get_return_statement(node) {
+                    // Empty return - excluded
+                    if return_data.expression.is_none() {
+                        return false;
+                    }
+                    // Check the type of the return expression
+                    let expr_type = self.get_type_of_node(return_data.expression);
+                    // If the expression type is void, undefined, or any, it's excluded
+                    !self.is_excluded_from_implicit_returns(expr_type)
+                } else {
+                    false
+                }
+            }
+            syntax_kind_ext::BLOCK => {
+                if let Some(block) = self.ctx.arena.get_block(node) {
+                    let stmts: Vec<_> = block.statements.nodes.clone();
+                    return self.statements_have_non_excluded_return(&stmts);
+                }
+                false
+            }
+            syntax_kind_ext::IF_STATEMENT => {
+                if let Some(if_data) = self.ctx.arena.get_if_statement(node) {
+                    let then_stmt = if_data.then_statement;
+                    let else_stmt = if_data.else_statement;
+                    let then_has = self.statement_has_non_excluded_return(then_stmt);
+                    let else_has = if !else_stmt.is_none() {
+                        self.statement_has_non_excluded_return(else_stmt)
+                    } else {
+                        false
+                    };
+                    return then_has || else_has;
+                }
+                false
+            }
+            syntax_kind_ext::SWITCH_STATEMENT => {
+                if let Some(switch_data) = self.ctx.arena.get_switch(node) {
+                    let case_block_idx = switch_data.case_block;
+                    if let Some(case_block_node) = self.ctx.arena.get(case_block_idx) {
+                        if let Some(case_block) = self.ctx.arena.get_block(case_block_node) {
+                            let clauses: Vec<_> = case_block.statements.nodes.clone();
+                            for clause_idx in clauses {
+                                if let Some(clause_node) = self.ctx.arena.get(clause_idx) {
+                                    if let Some(clause) = self.ctx.arena.get_case_clause(clause_node) {
+                                        let stmts: Vec<_> = clause.statements.nodes.clone();
+                                        if self.statements_have_non_excluded_return(&stmts) {
+                                            return true;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                false
+            }
+            syntax_kind_ext::TRY_STATEMENT => {
+                if let Some(try_data) = self.ctx.arena.get_try(node) {
+                    let try_block = try_data.try_block;
+                    let catch_clause = try_data.catch_clause;
+                    let finally_block = try_data.finally_block;
+                    let try_has = self.statement_has_non_excluded_return(try_block);
+                    let catch_has = if !catch_clause.is_none() {
+                        self.statement_has_non_excluded_return(catch_clause)
+                    } else {
+                        false
+                    };
+                    let finally_has = if !finally_block.is_none() {
+                        self.statement_has_non_excluded_return(finally_block)
+                    } else {
+                        false
+                    };
+                    return try_has || catch_has || finally_has;
+                }
+                false
+            }
+            syntax_kind_ext::CATCH_CLAUSE => {
+                if let Some(catch_data) = self.ctx.arena.get_catch_clause(node) {
+                    let block = catch_data.block;
+                    return self.statement_has_non_excluded_return(block);
+                }
+                false
+            }
+            syntax_kind_ext::WHILE_STATEMENT
+            | syntax_kind_ext::DO_STATEMENT
+            | syntax_kind_ext::FOR_STATEMENT
+            | syntax_kind_ext::FOR_IN_STATEMENT
+            | syntax_kind_ext::FOR_OF_STATEMENT => {
+                if let Some(loop_data) = self.ctx.arena.get_loop(node) {
+                    let stmt = loop_data.statement;
+                    return self.statement_has_non_excluded_return(stmt);
+                }
+                if let Some(for_data) = self.ctx.arena.get_for_in_of(node) {
+                    let stmt = for_data.statement;
+                    return self.statement_has_non_excluded_return(stmt);
+                }
+                false
+            }
+            syntax_kind_ext::WITH_STATEMENT => {
+                if let Some(with_data) = self.ctx.arena.get_with_statement(node) {
+                    let stmt = with_data.statement;
+                    return self.statement_has_non_excluded_return(stmt);
+                }
+                false
+            }
+            syntax_kind_ext::LABELED_STATEMENT => {
+                if let Some(labeled_data) = self.ctx.arena.get_labeled_statement(node) {
+                    let stmt = labeled_data.statement;
+                    return self.statement_has_non_excluded_return(stmt);
+                }
+                false
+            }
+            _ => false,
+        }
     }
 
     /// Check if any statement in the list contains a return with a value.
