@@ -5,6 +5,8 @@
   - Work with Worker 1 to merge FlowGraph integration
   - Ensure Checker integration is complete
   - Verify all CFA components work together
+
+## Queue
 - [ ] **CFA-29: Add loop-induced definite assignment tests**
   - Test `for (let x of arr) { }` definite assignment in loop body
   - Verify `for (const x of arr)` is always definitely assigned
@@ -20,9 +22,6 @@
   - Create before/after comparison with tsc
   - List any remaining edge cases or known limitations
   - Provide recommendations for future enhancements
-
-## Queue
-*No tasks in queue*
 
 ## Completed
 - [x] **CFA-13: Test complex control flow scenarios**
