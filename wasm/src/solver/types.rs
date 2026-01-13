@@ -26,6 +26,9 @@ impl TypeId {
     pub const BIGINT: TypeId = TypeId(11);
     pub const SYMBOL: TypeId = TypeId(12);
     pub const OBJECT: TypeId = TypeId(13);
+    pub const BOOLEAN_TRUE: TypeId = TypeId(14);
+    pub const BOOLEAN_FALSE: TypeId = TypeId(15);
+    pub const FUNCTION: TypeId = TypeId(16);
 
     /// First user-defined type ID (after built-in intrinsics)
     pub const FIRST_USER: u32 = 100;
