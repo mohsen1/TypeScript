@@ -1911,6 +1911,148 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    /// Collect all infer type parameter indices from a type node (recursively).
+    /// This is used to find `infer X` clauses in conditional type extends clauses.
+    fn collect_infer_type_params(&self, type_idx: NodeIndex, out: &mut Vec<NodeIndex>) {
+        let Some(node) = self.ctx.arena.get(type_idx) else {
+            return;
+        };
+
+        match node.kind {
+            k if k == syntax_kind_ext::INFER_TYPE => {
+                // Found an infer type - add its type parameter to the list
+                if let Some(infer) = self.ctx.arena.get_infer_type(node) {
+                    out.push(infer.type_parameter);
+                }
+            }
+            k if k == syntax_kind_ext::TYPE_REFERENCE => {
+                // Check type arguments
+                if let Some(type_ref) = self.ctx.arena.get_type_ref(node) {
+                    if let Some(args) = &type_ref.type_arguments {
+                        for &arg_idx in &args.nodes {
+                            self.collect_infer_type_params(arg_idx, out);
+                        }
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::UNION_TYPE || k == syntax_kind_ext::INTERSECTION_TYPE => {
+                if let Some(composite) = self.ctx.arena.get_composite_type(node) {
+                    for &member_idx in &composite.types.nodes {
+                        self.collect_infer_type_params(member_idx, out);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::ARRAY_TYPE => {
+                if let Some(arr) = self.ctx.arena.get_array_type(node) {
+                    self.collect_infer_type_params(arr.element_type, out);
+                }
+            }
+            k if k == syntax_kind_ext::TUPLE_TYPE => {
+                if let Some(tuple) = self.ctx.arena.get_tuple_type(node) {
+                    for &elem_idx in &tuple.elements.nodes {
+                        self.collect_infer_type_params(elem_idx, out);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::OPTIONAL_TYPE
+                || k == syntax_kind_ext::REST_TYPE
+                || k == syntax_kind_ext::PARENTHESIZED_TYPE =>
+            {
+                if let Some(wrapped) = self.ctx.arena.get_wrapped_type(node) {
+                    self.collect_infer_type_params(wrapped.type_node, out);
+                }
+            }
+            k if k == syntax_kind_ext::CONDITIONAL_TYPE => {
+                if let Some(cond) = self.ctx.arena.get_conditional_type(node) {
+                    self.collect_infer_type_params(cond.check_type, out);
+                    self.collect_infer_type_params(cond.extends_type, out);
+                    self.collect_infer_type_params(cond.true_type, out);
+                    self.collect_infer_type_params(cond.false_type, out);
+                }
+            }
+            k if k == syntax_kind_ext::TYPE_OPERATOR => {
+                if let Some(op) = self.ctx.arena.get_type_operator(node) {
+                    self.collect_infer_type_params(op.type_node, out);
+                }
+            }
+            k if k == syntax_kind_ext::INDEXED_ACCESS_TYPE => {
+                if let Some(indexed) = self.ctx.arena.get_indexed_access_type(node) {
+                    self.collect_infer_type_params(indexed.object_type, out);
+                    self.collect_infer_type_params(indexed.index_type, out);
+                }
+            }
+            k if k == syntax_kind_ext::MAPPED_TYPE => {
+                if let Some(mapped) = self.ctx.arena.get_mapped_type(node) {
+                    if !mapped.name_type.is_none() {
+                        self.collect_infer_type_params(mapped.name_type, out);
+                    }
+                    if !mapped.type_node.is_none() {
+                        self.collect_infer_type_params(mapped.type_node, out);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::FUNCTION_TYPE || k == syntax_kind_ext::CONSTRUCTOR_TYPE => {
+                if let Some(func_type) = self.ctx.arena.get_function_type(node) {
+                    for &param_idx in &func_type.parameters.nodes {
+                        if let Some(param_node) = self.ctx.arena.get(param_idx) {
+                            if let Some(param) = self.ctx.arena.get_parameter(param_node) {
+                                if !param.type_annotation.is_none() {
+                                    self.collect_infer_type_params(param.type_annotation, out);
+                                }
+                            }
+                        }
+                    }
+                    if !func_type.type_annotation.is_none() {
+                        self.collect_infer_type_params(func_type.type_annotation, out);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::TYPE_LITERAL => {
+                if let Some(type_lit) = self.ctx.arena.get_type_literal(node) {
+                    for &member_idx in &type_lit.members.nodes {
+                        if let Some(member_node) = self.ctx.arena.get(member_idx) {
+                            if let Some(sig) = self.ctx.arena.get_signature(member_node) {
+                                if !sig.type_annotation.is_none() {
+                                    self.collect_infer_type_params(sig.type_annotation, out);
+                                }
+                                if let Some(ref params) = sig.parameters {
+                                    for &param_idx in &params.nodes {
+                                        if let Some(param_node) = self.ctx.arena.get(param_idx) {
+                                            if let Some(param) = self.ctx.arena.get_parameter(param_node) {
+                                                if !param.type_annotation.is_none() {
+                                                    self.collect_infer_type_params(param.type_annotation, out);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Push infer type parameters to the type parameter scope.
+    /// Returns updates for later restoration via pop_type_parameters.
+    fn push_infer_type_parameters(&mut self, infer_param_indices: &[NodeIndex]) -> Vec<(String, Option<TypeId>)> {
+        use crate::solver::TypeKey;
+
+        let mut updates = Vec::new();
+
+        for &param_idx in infer_param_indices {
+            if let Some((info, name)) = self.lower_type_parameter_info(param_idx) {
+                let type_id = self.ctx.types.intern(TypeKey::TypeParameter(info));
+                let previous = self.ctx.type_parameter_scope.insert(name.clone(), type_id);
+                updates.push((name, previous));
+            }
+        }
+
+        updates
+    }
+
     /// Get type of an interface declaration.
     /// This extracts call signatures, construct signatures, and properties
     /// to build a callable type if the interface has call signatures.
@@ -12165,10 +12307,25 @@ impl<'a> ThinCheckerState<'a> {
             }
             k if k == syntax_kind_ext::CONDITIONAL_TYPE => {
                 if let Some(cond) = self.ctx.arena.get_conditional_type(node) {
+                    // Check check_type first (no infer params visible yet)
                     self.check_type_for_missing_names(cond.check_type);
+
+                    // Collect infer type parameters from extends_type
+                    let mut infer_params = Vec::new();
+                    self.collect_infer_type_params(cond.extends_type, &mut infer_params);
+
+                    // Check extends_type (infer params are being declared here, not used)
                     self.check_type_for_missing_names(cond.extends_type);
+
+                    // Push infer params to scope for true/false branches
+                    let updates = self.push_infer_type_parameters(&infer_params);
+
+                    // Check true and false branches with infer params in scope
                     self.check_type_for_missing_names(cond.true_type);
                     self.check_type_for_missing_names(cond.false_type);
+
+                    // Pop infer params from scope
+                    self.pop_type_parameters(updates);
                 }
             }
             k if k == syntax_kind_ext::INFER_TYPE => {
