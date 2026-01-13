@@ -1445,12 +1445,18 @@ impl ThinNodeArena {
 
     /// Add an object/array literal expression node
     pub fn add_literal_expr(&mut self, kind: u16, pos: u32, end: u32, data: LiteralExprData) -> NodeIndex {
+        let elements = data.elements.clone();
+
         let data_index = self.literal_exprs.len() as u32;
         self.literal_exprs.push(data);
         let index = self.nodes.len() as u32;
         self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
-        NodeIndex(index)
+
+        let parent = NodeIndex(index);
+        self.set_parent_list(&elements, parent);
+
+        parent
     }
 
     /// Add a parenthesized expression node
@@ -2358,12 +2364,23 @@ impl ThinNodeArena {
 
     /// Add a property assignment node
     pub fn add_property_assignment(&mut self, kind: u16, pos: u32, end: u32, data: PropertyAssignmentData) -> NodeIndex {
+        let name = data.name;
+        let initializer = data.initializer;
+
         let data_index = self.property_assignments.len() as u32;
         self.property_assignments.push(data);
         let index = self.nodes.len() as u32;
         self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
-        NodeIndex(index)
+
+        let parent = NodeIndex(index);
+        self.set_parent(name, parent);
+        // For shorthand properties, name == initializer, so only set parent once
+        if initializer != name {
+            self.set_parent(initializer, parent);
+        }
+
+        parent
     }
 
     /// Add a shorthand property assignment node

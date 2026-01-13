@@ -734,7 +734,9 @@ impl<'a> ThinCheckerState<'a> {
                     "WeakMap" | "WeakSet" | "Iterator" | "IterableIterator" | "AsyncIterator" |
                     "AsyncIterableIterator" | "Generator" | "AsyncGenerator" | "Iterable" |
                     "AsyncIterable" | "ArrayLike" | "PropertyKey" | "RegExp" | "Error" |
-                    "Date" | "JSON" | "Math" | "Console" => {
+                    "Date" | "JSON" | "Math" | "Console" |
+                    // Context-sensitive keywords that can be used as type names
+                    "await" | "async" | "yield" => {
                         return TypeId::UNKNOWN
                     }
                     _ => {}
@@ -3693,7 +3695,10 @@ impl<'a> ThinCheckerState<'a> {
             | "TextEncoder" | "TextDecoder" | "AbortController" | "AbortSignal"
             | "fetch" | "setTimeout" | "setInterval" | "clearTimeout" | "clearInterval"
             | "queueMicrotask" | "structuredClone" | "atob" | "btoa"
-            | "performance" | "crypto" | "navigator" | "location" | "history" => TypeId::ANY,
+            | "performance" | "crypto" | "navigator" | "location" | "history"
+            // Function-scoped builtins and context-sensitive keywords
+            | "arguments" | "async" | "eval" | "require" | "module" | "exports"
+            | "__dirname" | "__filename" => TypeId::ANY,
             _ => {
                 // Check if we're inside a class and the name matches a static member (error 2662)
                 // Clone values to avoid borrow issues
@@ -6393,16 +6398,23 @@ impl<'a> ThinCheckerState<'a> {
             }
             // Shorthand property: { x } - identifier is both name and value
             else if elem_node.kind == syntax_kind_ext::SHORTHAND_PROPERTY_ASSIGNMENT {
-                if let Some(ident) = self.ctx.arena.get_identifier(elem_node) {
-                    let value_type = self.get_type_of_node(elem_idx);
-                    properties.push(PropertyInfo {
-                        name: self.ctx.types.intern_string(&ident.escaped_text),
-                        type_id: value_type,
-                        write_type: value_type,
-                        optional: false,
-                        readonly: false,
-                        is_method: false,
-                    });
+                if let Some(shorthand) = self.ctx.arena.get_shorthand_property(elem_node) {
+                    // Get the identifier from the name field
+                    if let Some(name_node) = self.ctx.arena.get(shorthand.name) {
+                        if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
+                            let name = ident.escaped_text.clone();
+                            // Resolve the identifier's type
+                            let value_type = self.get_type_of_node(shorthand.name);
+                            properties.push(PropertyInfo {
+                                name: self.ctx.types.intern_string(&name),
+                                type_id: value_type,
+                                write_type: value_type,
+                                optional: false,
+                                readonly: false,
+                                is_method: false,
+                            });
+                        }
+                    }
                 }
             }
             // Method shorthand: { foo() {} }
