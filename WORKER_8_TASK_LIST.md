@@ -1,18 +1,19 @@
 # Worker 8 Task List
 
 ## Current Task
-- [ ] Harden generic subtype checking
-  - Fix cases where generic type parameters are incorrectly unified
-  - Handle covariant/contravariant variance correctly
-  - Test with complex generic constraints
-
-## Queue
 - [ ] Add subtype strictness flags
   - Allow strict mode that rejects borderline cases
   - Use this for lib.d.ts type checking
   - Verify no regressions in valid code
 
+## Queue
+(none yet)
+
 ## Completed
+- [x] Harden generic subtype checking
+  - Fix cases where generic type parameters are incorrectly unified
+  - Handle covariant/contravariant variance correctly
+  - Test with complex generic constraints
 - [x] Implement "Lawyer" layer for Any propagation (referenced in specs/SOLVER.md)
   - Read `specs/SOLVER.md` to understand requirements
   - Create `wasm/crates/swc_typescript/src/solver/lawyer.rs`
