@@ -2278,6 +2278,7 @@ fn collect_diagnostics(
         let cached = cache
             .as_deref_mut()
             .and_then(|cache| cache.type_caches.remove(&file_path));
+        let strict = options.checker.strict;
         let mut checker = if let Some(cached) = cached {
             ThinCheckerState::with_cache(
                 &file.arena,
@@ -2285,6 +2286,7 @@ fn collect_diagnostics(
                 &program.type_interner,
                 file.file_name.clone(),
                 cached,
+                strict,
             )
         } else {
             ThinCheckerState::new(
@@ -2292,6 +2294,7 @@ fn collect_diagnostics(
                 &binder,
                 &program.type_interner,
                 file.file_name.clone(),
+                strict,
             )
         };
         checker.ctx.report_unresolved_imports = false;

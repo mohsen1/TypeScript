@@ -105,6 +105,7 @@ impl<'a> HoverProvider<'a> {
 
         // 3. Compute Type Information
         // Use persistent cache if available for O(1) lookups on repeated queries
+        let strict = false;  // TODO: get from tsconfig
         let mut checker = if let Some(cache) = type_cache.take() {
             ThinCheckerState::with_cache(
                 self.arena,
@@ -112,6 +113,7 @@ impl<'a> HoverProvider<'a> {
                 self.interner,
                 self.file_name.clone(),
                 cache,
+                strict,
             )
         } else {
             ThinCheckerState::new(
@@ -119,6 +121,7 @@ impl<'a> HoverProvider<'a> {
                 self.binder,
                 self.interner,
                 self.file_name.clone(),
+                strict,
             )
         };
 

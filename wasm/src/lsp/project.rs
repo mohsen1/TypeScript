@@ -402,6 +402,7 @@ impl ProjectFile {
     pub fn get_diagnostics(&mut self) -> Vec<LspDiagnostic> {
         let file_name = self.file_name.clone();
         let source_text = self.parser.get_source_text();
+        let strict = false;  // TODO: get from tsconfig
 
         let mut checker = if let Some(cache) = self.type_cache.take() {
             ThinCheckerState::with_cache(
@@ -410,6 +411,7 @@ impl ProjectFile {
                 &self.type_interner,
                 file_name,
                 cache,
+                strict,
             )
         } else {
             ThinCheckerState::new(
@@ -417,6 +419,7 @@ impl ProjectFile {
                 &self.binder,
                 &self.type_interner,
                 file_name,
+                strict,
             )
         };
 

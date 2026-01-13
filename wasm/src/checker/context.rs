@@ -268,6 +268,7 @@ impl<'a> CheckerContext<'a> {
         binder: &'a ThinBinderState,
         types: &'a TypeInterner,
         file_name: String,
+        strict: bool,
     ) -> Self {
         // Create flow graph from the binder's flow nodes
         let flow_graph = Some(FlowGraph::new(&binder.flow_nodes));
@@ -277,12 +278,12 @@ impl<'a> CheckerContext<'a> {
             binder,
             types,
             file_name,
-            no_implicit_any: true,
+            no_implicit_any: strict,
             no_implicit_returns: false,
-            use_unknown_in_catch_variables: true,
+            use_unknown_in_catch_variables: strict,
             report_unresolved_imports: true,
-            strict_function_types: true,  // Enable by default for modern TypeScript behavior
-            strict_property_initialization: true,  // Enable by default for strict mode behavior
+            strict_function_types: strict,
+            strict_property_initialization: strict,
             symbol_types: FxHashMap::default(),
             var_decl_types: FxHashMap::default(),
             node_types: FxHashMap::default(),
@@ -327,6 +328,7 @@ impl<'a> CheckerContext<'a> {
         types: &'a TypeInterner,
         file_name: String,
         cache: TypeCache,
+        strict: bool,
     ) -> Self {
         // Create flow graph from the binder's flow nodes
         let flow_graph = Some(FlowGraph::new(&binder.flow_nodes));
@@ -336,12 +338,12 @@ impl<'a> CheckerContext<'a> {
             binder,
             types,
             file_name,
-            no_implicit_any: true,
+            no_implicit_any: strict,
             no_implicit_returns: false,
-            use_unknown_in_catch_variables: true,
+            use_unknown_in_catch_variables: strict,
             report_unresolved_imports: true,
-            strict_function_types: true,  // Enable by default for modern TypeScript behavior
-            strict_property_initialization: true,  // Enable by default for strict mode behavior
+            strict_function_types: strict,
+            strict_property_initialization: strict,
             symbol_types: cache.symbol_types,
             var_decl_types: FxHashMap::default(),
             node_types: cache.node_types,

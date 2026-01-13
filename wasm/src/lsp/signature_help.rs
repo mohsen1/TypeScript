@@ -160,6 +160,7 @@ impl<'a> SignatureHelpProvider<'a> {
         };
 
         // 5. Create checker with persistent cache if available
+        let strict = false;  // TODO: get from tsconfig
         let mut checker = if let Some(cache) = type_cache.take() {
             ThinCheckerState::with_cache(
                 self.arena,
@@ -167,6 +168,7 @@ impl<'a> SignatureHelpProvider<'a> {
                 self.interner,
                 self.file_name.clone(),
                 cache,
+                strict,
             )
         } else {
             ThinCheckerState::new(
@@ -174,6 +176,7 @@ impl<'a> SignatureHelpProvider<'a> {
                 self.binder,
                 self.interner,
                 self.file_name.clone(),
+                strict,
             )
         };
 
