@@ -1,14 +1,12 @@
 # Worker 5 Task List - Binder Squad
 
 ## Current Task
-- [ ] **BIND-14: Write Binder integration tests**
-  - Create test file: `tests/conformance/binder_integration.ts`
-  - Test full binder pipeline: lib loading -> binding -> symbol resolution
-  - Verify all global symbols resolve correctly
-  - Goal: TS2304 errors < 50
+- [ ] **BIND-16: Fix module namespace symbol access**
+  - Ensure `import * as ns` creates proper namespace object
+  - Test: `ns.function()` access patterns
+  - Handle namespace member lookup correctly
 
 ## Queue
-- [ ] **BIND-16: Fix module namespace symbol access**
   - Ensure `import * as ns` creates proper namespace object
   - Test: `ns.function()` access patterns
   - Handle namespace member lookup correctly
@@ -26,6 +24,10 @@
   - Ensure DOM types from lib.d.ts work: `window`, `document`, `navigator`
 
 ## Completed
+- [x] **BIND-14: Write Binder integration tests**
+  - Created test file: `tests/cases/conformance/binder_integration.ts`
+  - Tested full binder pipeline: lib loading -> binding -> symbol resolution
+  - Verified all global symbols resolve correctly
 - [x] **BIND-13: Fix import/export symbol resolution**
   - Ensured re-exported symbols are properly bound
   - Handled `export { X } from "module"` correctly
