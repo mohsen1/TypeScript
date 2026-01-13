@@ -901,10 +901,22 @@ impl TypeInterner {
         self.intern(TypeKey::Array(element))
     }
 
+    /// Intern a readonly array type (currently same as array - readonly semantics TBD)
+    pub fn readonly_array(&self, element: TypeId) -> TypeId {
+        // TODO: Implement proper readonly array type
+        self.array(element)
+    }
+
     /// Intern a tuple type
     pub fn tuple(&self, elements: Vec<TupleElement>) -> TypeId {
         let list_id = self.intern_tuple_list(elements);
         self.intern(TypeKey::Tuple(list_id))
+    }
+
+    /// Intern a readonly tuple type (currently same as tuple - readonly semantics TBD)
+    pub fn readonly_tuple(&self, elements: Vec<TupleElement>) -> TypeId {
+        // TODO: Implement proper readonly tuple type
+        self.tuple(elements)
     }
 
     /// Intern an object type with properties
