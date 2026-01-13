@@ -37,6 +37,9 @@ pub mod thin_binder;
 #[cfg(test)]
 mod thin_binder_tests;
 
+// Lib Loader - Load and merge lib.d.ts symbols into the binder (BIND-10)
+pub mod lib_loader;
+
 // Checker types and implementation (Phase 5)
 pub mod checker;
 
@@ -139,6 +142,7 @@ use crate::transform_context::TransformContext;
 use crate::solver::TypeInterner;
 use crate::lsp::position::{LineMap, Position, Range};
 use crate::lsp::resolver::ScopeCache;
+use crate::lib_loader::LibFile;
 use crate::checker::context::LibContext;
 use crate::parser::thin_node::ThinNodeArena;
 use crate::lsp::{
@@ -225,19 +229,7 @@ pub struct ThinParser {
     /// Invalidated when the file changes.
     scope_cache: ScopeCache,
     /// Pre-loaded lib files (parsed and bound) for global type resolution
-    lib_files: Vec<LibFile>,
-}
-
-/// Represents a pre-loaded lib file with its AST and symbols
-struct LibFile {
-    #[allow(dead_code)]
-    file_name: String,
-    /// The arena (shared via Arc for use in LibContext)
-    arena: Arc<ThinNodeArena>,
-    /// The binder state (shared via Arc for use in LibContext)
-    binder: Arc<ThinBinderState>,
-    #[allow(dead_code)]
-    source_file_idx: parser::NodeIndex,
+    lib_files: Vec<Arc<LibFile>>,
 }
 
 #[wasm_bindgen]
@@ -259,7 +251,7 @@ impl ThinParser {
 
     /// Add a lib file (e.g., lib.es5.d.ts) for global type resolution.
     /// The lib file will be parsed and bound, and its global symbols will be
-    /// available during type checking.
+    /// available during binding and type checking.
     #[wasm_bindgen(js_name = addLibFile)]
     pub fn add_lib_file(&mut self, file_name: String, source_text: String) {
         let mut lib_parser = ThinParserState::new(file_name.clone(), source_text);
@@ -272,12 +264,10 @@ impl ThinParser {
         let arena = Arc::new(lib_parser.into_arena());
         let binder = Arc::new(lib_binder);
 
-        self.lib_files.push(LibFile {
-            file_name,
-            arena,
-            binder,
-            source_file_idx,
-        });
+        // Create lib_loader::LibFile
+        let lib_file = Arc::new(LibFile::new(file_name, arena, binder));
+
+        self.lib_files.push(lib_file);
 
         // Invalidate binder since we have new global symbols
         self.binder = None;
@@ -322,7 +312,8 @@ impl ThinParser {
     pub fn bind_source_file(&mut self) -> String {
         if let Some(root_idx) = self.source_file_idx {
             let mut binder = ThinBinderState::new();
-            binder.bind_source_file(self.parser.get_arena(), root_idx);
+            // Use bind_source_file_with_libs to merge lib symbols into the binder
+            binder.bind_source_file_with_libs(self.parser.get_arena(), root_idx, &self.lib_files);
 
             // Collect symbol names for the result
             let symbols: std::collections::HashMap<String, u32> = binder.file_locals
