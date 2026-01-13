@@ -1,18 +1,13 @@
 # Worker 14 Task List - Solver Squad
 
 ## Current Task
-- [ ] **SOLV-43: Add index access type evaluation**
-  - Implement `T[K]` type resolution
-  - Handle literal key access: `Person["age"]`
-  - Handle union key access: `Person["age" | "name"]`
-  - Distribute over union types: `(A | B)[K]` -> `A[K] | B[K]`
-
-## Queue
 - [ ] **SOLV-44: Implement mapped type evaluation**
   - Add `{ [K in Keys]: Transform<K> }` lowering
   - Handle readonly/optional modifiers
   - Support key remapping with `as` clause
   - Test with `Partial<T>`, `Required<T>`, `Readonly<T>`
+
+## Queue
 
 - [ ] **SOLV-45: Add function bivariance configuration**
   - Implement the "Lawyer" layer for function parameter checking
@@ -21,6 +16,13 @@
   - Test: callback assignment compatibility
 
 ## Completed
+- [x] **SOLV-43: Add index access type evaluation** (already implemented)
+  - evaluate_index_access handles T[K] type resolution
+  - evaluate_object_index handles literal key access
+  - Union key access returns union of property types
+  - Union distribution (A | B)[K] -> A[K] | B[K] implemented
+  - 63 index access tests passing
+
 - [x] **SOLV-42: Implement tuple type checking** (already implemented)
   - TypeKey::Tuple exists with TupleElement support
   - check_tuple_subtype handles length/type mismatches
