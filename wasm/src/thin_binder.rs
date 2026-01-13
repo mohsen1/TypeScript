@@ -2562,6 +2562,8 @@ impl ThinBinderState {
                             }
                             self.current_scope.set(name.to_string(), sym_id);
                             self.node_symbols.insert(clause.name.0, sym_id);
+                            // Add to persistent scope for stateless checking
+                            self.declare_in_persistent_scope(name.to_string(), sym_id);
                         }
                     }
 
@@ -2577,6 +2579,8 @@ impl ThinBinderState {
                                     }
                                     self.current_scope.set(name.to_string(), sym_id);
                                     self.node_symbols.insert(clause.named_bindings.0, sym_id);
+                                    // Add to persistent scope for stateless checking
+                                    self.declare_in_persistent_scope(name.to_string(), sym_id);
                                 }
                             } else if let Some(named) = arena.get_named_imports(bindings_node) {
                                 for &spec_idx in &named.elements.nodes {
@@ -2599,6 +2603,8 @@ impl ThinBinderState {
                                                 self.current_scope.set(name.to_string(), sym_id);
                                                 self.node_symbols.insert(spec_idx.0, sym_id);
                                                 self.node_symbols.insert(local_ident.0, sym_id);
+                                                // Add to persistent scope for stateless checking
+                                                self.declare_in_persistent_scope(name.to_string(), sym_id);
                                             }
                                         }
                                     }
