@@ -7,6 +7,11 @@
 (none yet)
 
 ## Completed
+- [x] **SOLV-42: Fix additional ANY fallbacks in lower.rs**
+  - Changed IndexSignatureResolver to return ERROR instead of ANY (lower.rs:60)
+  - Changed array type lowering fallback from ANY to ERROR (lower.rs:503)
+  - Changed mapped type parameter fallbacks from ANY to ERROR (lower.rs:1615, 1661)
+  - These were fallback cases where missing data was silently accepted
 - [x] **SOLV-41: Fix error-case fallbacks in lower.rs**
   - Changed operand retrieval failure from ANY to ERROR (lower.rs:1914)
   - Changed unknown operand kind fallback from ANY to ERROR (lower.rs:1957)

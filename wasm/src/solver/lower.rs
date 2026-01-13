@@ -57,7 +57,7 @@ struct IndexSignatureResolver;
 
 impl TypeResolver for IndexSignatureResolver {
     fn resolve_ref(&self, _symbol: SymbolRef, _interner: &dyn TypeDatabase) -> Option<TypeId> {
-        Some(TypeId::ANY)
+        Some(TypeId::ERROR) // Unresolved symbol during index signature checking - propagate error
     }
 }
 
@@ -500,7 +500,7 @@ impl<'a> TypeLowering<'a> {
             let element_type = self.lower_type(data.element_type);
             self.interner.array(element_type)
         } else {
-            self.interner.array(TypeId::ANY)
+            TypeId::ERROR // Missing array type data - propagate error
         }
     }
 
@@ -1612,7 +1612,7 @@ impl<'a> TypeLowering<'a> {
                         constraint: None,
                         default: None,
                     },
-                    TypeId::ANY,
+                    TypeId::ERROR, // Missing node - propagate error
                 );
             }
         };
@@ -1658,7 +1658,7 @@ impl<'a> TypeLowering<'a> {
                     constraint: None,
                     default: None,
                 },
-                TypeId::ANY,
+                TypeId::ERROR, // Missing type parameter data - propagate error
             )
         }
     }
