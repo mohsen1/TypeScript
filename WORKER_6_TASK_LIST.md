@@ -1,56 +1,24 @@
-# Worker 6 Task List - Binder Squad
+# Worker 6 Task List
 
 ## Current Task
-- [ ] **BIND-17: Fix value namespace vs type namespace collision**
-  - Handle cases where same name is used as value and type
-  - Test: `interface X { } const X: number;`
-  - Ensure proper namespace separation during binding
+- [ ] Implement scope chain traversal for symbol resolution
+  - Ensure Binder walks scope chain correctly: local -> module -> global
+  - Add tests for shadowing scenarios
+  - Verify block-scoped declarations (let/const) are handled
 
 ## Queue
-- [ ] **BIND-24: Test enum member resolution across imports**
-  - Verify `import { Enum }` resolves enum members correctly
-  - Test: `Enum.Value` access patterns
-  - Handle const enum vs regular enum differences
-- [ ] **BIND-25: Write final Binder conformance report**
-  - Document all TS2304 improvements
-  - Create before/after comparison with tsc
-  - List any remaining edge cases or known limitations
-  - Provide recommendations for future enhancements
-- [ ] **BIND-26: Coordinate with CFA and Solver squads on cross-cutting issues**
-  - Ensure global symbols work correctly with CFA
-  - Verify fixed binding enables proper solver strictness
-  - Test end-to-end type checking with all improvements integrated
+- [ ] Fix import/export symbol visibility
+  - Ensure imported symbols are visible in importing module
+  - Handle re-exports correctly
+  - Test with circular imports
+- [ ] Add symbol table validation
+  - Run post-binding validation checks
+  - Detect orphaned symbols or broken links
+  - Ensure all referenced symbols have valid declarations
+- [ ] Integrate with Solver to prevent Error Poisoning
+  - When TS2304 occurs, don't default to `Any`
+  - Propagate error type instead of silencing downstream errors
+  - This should reveal missing TS2322/TS7006 errors
 
 ## Completed
-- [x] **BIND-12: Test namespace and enum resolution**
-  - Created test file: `tests/cases/conformance/enums/namespaceMemberResolution.ts`
-  - Created test file: `tests/cases/conformance/enums/enumAccessibilityAcrossImports.ts`
-  - Added 11 Rust unit tests in `wasm/src/thin_binder_tests.rs`:
-    - test_namespace_member_resolution_basic
-    - test_namespace_member_resolution_nested
-    - test_namespace_member_resolution_non_exported
-    - test_namespace_deep_chain_resolution
-    - test_enum_member_access
-    - test_enum_namespace_merging_access
-    - test_enum_with_initialized_members
-    - test_const_enum_declaration
-    - test_namespace_reopening_exports
-    - test_enum_namespace_merging_with_exports
-- [x] **BIND-9: Write conformance tests for Binder**
-  - Created test file: `tests/conformance/binder_tests.ts`
-  - Added cases for global symbols, module augmentation, ambient contexts
-  - Verified TS2304 counts match tsc output
-  - Created 3 comprehensive test files covering ES6 import shadowing scenarios
-- [x] **BIND-6: Fix symbol lookup order**
-  - Verified correct scope chain: local -> module -> global (already implemented)
-  - Added shadowing tests for variable declarations
-  - Added tests for `import { x }` vs `let x` correctly
-  - Created 3 comprehensive test files covering ES6 import shadowing scenarios
-- [x] **BIND-3: Trace TS2304 false positives**
-  - Found 10+ specific cases where valid code produces TS2304
-  - Identified root causes:
-    - Missing lib symbol injection (~700 errors)
-    - Scope lookup order issues
-    - Module resolution problems
-  - Created minimal repro test cases
-  - Documented in `docs/ts2304_analysis.md`
+(none yet)

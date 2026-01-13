@@ -1,55 +1,24 @@
-# Worker 5 Task List - Binder Squad
+# Worker 5 Task List
 
 ## Current Task
-- [ ] **BIND-16: Fix module namespace symbol access**
-  - Ensure `import * as ns` creates proper namespace object
-  - Test: `ns.function()` access patterns
-  - Handle namespace member lookup correctly
+- [ ] Fix module augmentation resolution
+  - Handle `interface Window` merging across files
+  - Ensure module augmentations update existing declarations
+  - Test with multiple files augmenting same global interface
+- [ ] Fix namespace merging behavior
+  - Merge declarations across multiple `namespace` blocks
+  - Handle nested namespaces
+  - Ensure exported symbols are visible to augmentations
 
 ## Queue
-  - Ensure `import * as ns` creates proper namespace object
-  - Test: `ns.function()` access patterns
-  - Handle namespace member lookup correctly
-- [ ] **BIND-21: Test dynamic import() resolution**
-  - Verify `import("module")` type resolution works
-  - Handle dynamic import type inference
-  - Test promise-based import types
-- [ ] **BIND-22: Fix export default symbol binding**
-  - Ensure `export default class {}` binds correctly
-  - Test `import X from "module"` resolution
-  - Handle `export { X as default }` correctly
-- [ ] **BIND-23: Verify all global symbols resolve**
-  - Create comprehensive test for all ECMAScript globals
-  - Test: `Object`, `Array`, `String`, `Number`, `Boolean`, `Symbol`, `Promise`, `Map`, `Set`, etc.
-  - Ensure DOM types from lib.d.ts work: `window`, `document`, `navigator`
+- [ ] Add module resolution debugging
+  - Log symbol table merge operations
+  - Track which file each symbol comes from
+  - Verify module scope lookup order
+- [ ] Test with real-world lib.d.ts augmentations
+  - DOM APIs (Window, Document, etc.)
+  - Node.js globals (process, Buffer)
+  - Verify no TS2304 errors for standard library
 
 ## Completed
-- [x] **BIND-14: Write Binder integration tests**
-  - Created test file: `tests/cases/conformance/binder_integration.ts`
-  - Tested full binder pipeline: lib loading -> binding -> symbol resolution
-  - Verified all global symbols resolve correctly
-- [x] **BIND-13: Fix import/export symbol resolution**
-  - Ensured re-exported symbols are properly bound
-  - Handled `export { X } from "module"` correctly
-  - Fixed default export/import binding
-  - Tested `import X from "module"` resolution
-- [x] **BIND-10: Integrate lib loader with Binder**
-  - Called `LibLoader` during Binder initialization
-  - Merged lib symbols into root SymbolTable
-  - Verified global symbols resolve correctly
-  - Tested `console.log("hello")` no longer produces TS2304
-- [x] **BIND-2: Implement lib.d.ts parsing and loading**
-  - Created `wasm/src/lib_loader.rs`
-  - Parse `lib.d.ts` into AST using ThinParserState
-  - Extract interface/type/variable declarations
-  - Build `LibSymbols` struct for global injection
-- [x] **BIND-5: Fix module augmentation resolution**
-  - Created `wasm/src/binder/interface_merger.rs`
-  - Implemented `merge_interface_declarations` for cross-file interfaces
-  - Handle `interface Window` merging across multiple files
-  - Support `declare global` augmentation in modules
-- [x] **BIND-8: Handle ambient module contexts**
-  - Created `wasm/src/binder/ambient.rs`
-  - Fixed `declare module "node"` resolution
-  - Ensured module-scoped symbols don't leak to global
-  - Added tests for ambient module import resolution
+(none yet)
