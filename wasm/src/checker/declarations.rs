@@ -259,7 +259,7 @@ mod tests {
 
         let types = TypeInterner::new();
         let mut ctx =
-            CheckerContext::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+            CheckerContext::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
 
         // Get the variable statement
         if let Some(root_node) = parser.get_arena().get(root) {
