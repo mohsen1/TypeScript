@@ -1,13 +1,12 @@
 # Worker 4 Task List - Binder Squad
 
 ## Current Task
-- [ ] **BIND-10: Fix symbol lookup order**
-  - Ensure correct scope chain: local -> module -> global
-  - Handle `import { x }` vs `let x` shadowing correctly
-  - Test scope chain traversal
+- [ ] **BIND-15: Fix window and DOM symbol resolution**
+  - Ensure DOM types from lib.d.ts are accessible
+  - Test: `window.alert("hi")` should not produce TS2304
+  - Verify `document`, `navigator`, etc. resolve correctly
 
 ## Queue
-- [ ] **BIND-15: Fix window and DOM symbol resolution**
   - Ensure DOM types from lib.d.ts are accessible
   - Test: `window.alert("hi")` should not produce TS2304
   - Verify `document`, `navigator`, etc. resolve correctly
@@ -26,6 +25,10 @@
   - Test: `declare global { interface Window { custom: any; } }`
 
 ## Completed
+- [x] **BIND-10: Fix symbol lookup order**
+  - Ensured correct scope chain: local -> module -> global
+  - Handled `import { x }` vs `let x` shadowing correctly
+  - Tested scope chain traversal with test-scope-chain.ts
 - [x] **BIND-7: Test TS2304 fixes**
   - Created test file for all previously failing global symbols
   - Verified `console`, `Promise`, `Array`, `Object`, `String`, `Number` resolve correctly
