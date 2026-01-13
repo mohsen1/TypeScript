@@ -3560,6 +3560,62 @@ impl ThinBinderState {
 
         self.bind_node(arena, idx);
     }
+
+    /// Validation result describing issues found in the symbol table
+    #[derive(Debug, Clone, PartialEq)]
+    pub enum ValidationError {
+        BrokenSymbolLink { node_index: u32, symbol_id: u32 },
+        OrphanedSymbol { symbol_id: u32, name: String },
+        InvalidValueDeclaration { symbol_id: u32, name: String },
+    }
+
+    /// Run post-binding validation checks on the symbol table.
+    pub fn validate_symbol_table(&self) -> Vec<ValidationError> {
+        let mut errors = Vec::new();
+
+        for (&node_idx, &sym_id) in self.node_symbols.iter() {
+            if self.symbols.get(sym_id).is_none() {
+                errors.push(ValidationError::BrokenSymbolLink {
+                    node_index: node_idx,
+                    symbol_id: sym_id.0,
+                });
+            }
+        }
+
+        for i in 0..self.symbols.len() {
+            let sym_id = crate::binder::SymbolId(i as u32);
+            if let Some(sym) = self.symbols.get(sym_id) {
+                if sym.declarations.is_empty() {
+                    errors.push(ValidationError::OrphanedSymbol {
+                        symbol_id: i,
+                        name: sym.escaped_name.clone(),
+                    });
+                }
+            }
+        }
+
+        for i in 0..self.symbols.len() {
+            let sym_id = crate::binder::SymbolId(i as u32);
+            if let Some(sym) = self.symbols.get(sym_id) {
+                if !sym.value_declaration.is_none() {
+                    let has_node_mapping = self.node_symbols.contains_key(&sym.value_declaration.0);
+                    if !has_node_mapping {
+                        errors.push(ValidationError::InvalidValueDeclaration {
+                            symbol_id: i,
+                            name: sym.escaped_name.clone(),
+                        });
+                    }
+                }
+            }
+        }
+
+        errors
+    }
+
+    /// Check if the symbol table has any validation errors.
+    pub fn is_symbol_table_valid(&self) -> bool {
+        self.validate_symbol_table().is_empty()
+    }
 }
 
 impl Default for ThinBinderState {
