@@ -76,6 +76,12 @@ pub enum InferenceError {
         lower: TypeId,
         upper: TypeId,
     },
+    /// Variance violation detected
+    VarianceViolation {
+        var: InferenceVar,
+        expected_variance: &'static str,
+        position: TypeId,
+    },
 }
 
 /// Constraint set for an inference variable.
@@ -901,8 +907,89 @@ impl<'a> InferenceContext<'a> {
             return unique[0];
         }
 
+        // Try to find a more specific common type
+        // For example, if we have [string, "hello"], the result should be string
+        // If we have ["hello", "world"], the result should be the union of both literals,
+        // which widens to string
+
+        // First, check if all types are literals of the same primitive type
+        let common_base = self.find_common_base_type(&unique);
+        if let Some(base) = common_base {
+            // All types share a common base type
+            // Check if using the base type would be more specific than a union
+            if self.all_types_are_narrower_than_base(&unique, base) {
+                return base;
+            }
+        }
+
+        // Try to find the best single type that satisfies all candidates
+        // Check if one type is a supertype of all others
+        for &candidate in &unique {
+            if self.is_suitable_common_type(candidate, &unique) {
+                return candidate;
+            }
+        }
+
         // Create union of all types
         self.interner.union(unique)
+    }
+
+    /// Find a common base type for a set of types.
+    /// For example, [string, "hello"] -> Some(string)
+    fn find_common_base_type(&self, types: &[TypeId]) -> Option<TypeId> {
+        if types.is_empty() {
+            return None;
+        }
+
+        // Get the base type of the first element
+        let first_base = self.get_base_type(types[0])?;
+
+        // Check if all other types have the same base
+        for &ty in types.iter().skip(1) {
+            let base = self.get_base_type(ty)?;
+            if base != first_base {
+                return None;
+            }
+        }
+
+        Some(first_base)
+    }
+
+    /// Get the base type of a type (stripping literals, etc.)
+    fn get_base_type(&self, ty: TypeId) -> Option<TypeId> {
+        match self.interner.lookup(ty) {
+            Some(TypeKey::Literal(_)) => {
+                // Get the intrinsic type of the literal
+                match ty {
+                    TypeId::STRING | TypeId::NUMBER | TypeId::BOOLEAN | TypeId::BIGINT => Some(ty),
+                    _ => {
+                        // For literal values, extract their base type
+                        if let Some(TypeKey::Literal(lit)) = self.interner.lookup(ty) {
+                            match lit {
+                                LiteralValue::String(_) => Some(TypeId::STRING),
+                                LiteralValue::Number(_) => Some(TypeId::NUMBER),
+                                LiteralValue::Boolean(_) => Some(TypeId::BOOLEAN),
+                                LiteralValue::BigInt(_) => Some(TypeId::BIGINT),
+                            }
+                        } else {
+                            Some(ty)
+                        }
+                    }
+                }
+            }
+            _ => Some(ty),
+        }
+    }
+
+    /// Check if all types are narrower than (subtypes of) the given base type.
+    fn all_types_are_narrower_than_base(&self, types: &[TypeId], base: TypeId) -> bool {
+        types.iter().all(|&ty| self.is_subtype(ty, base))
+    }
+
+    /// Check if a candidate type is a suitable common type for all types.
+    /// A suitable common type must be a supertype of all types in the list.
+    fn is_suitable_common_type(&self, candidate: TypeId, types: &[TypeId]) -> bool {
+        types.iter().all(|&ty| self.is_subtype(ty, candidate))
     }
 
     /// Simple subtype check for bounds validation.
@@ -1763,6 +1850,430 @@ impl<'a> InferenceContext<'a> {
                 variadic: Some(type_id),
             },
         }
+    }
+
+    // =========================================================================
+    // Conditional Type Inference
+    // =========================================================================
+
+    /// Infer type parameters from a conditional type.
+    /// When a type parameter appears in a conditional type, we can sometimes
+    /// infer its value from the check and extends clauses.
+    pub fn infer_from_conditional(
+        &mut self,
+        var: InferenceVar,
+        check_type: TypeId,
+        extends_type: TypeId,
+        true_type: TypeId,
+        false_type: TypeId,
+    ) {
+        // If check_type is an inference variable, try to infer from extends_type
+        if let Some(TypeKey::TypeParameter(info)) = self.interner.lookup(check_type) {
+            if let Some(check_var) = self.find_type_param(info.name) {
+                if check_var == self.table.find(var) {
+                    // check_type is this variable
+                    // Try to infer from extends_type as an upper bound
+                    self.add_upper_bound(var, extends_type);
+                }
+            }
+        }
+
+        // Recursively infer from true/false branches
+        self.infer_from_type(var, true_type);
+        self.infer_from_type(var, false_type);
+    }
+
+    /// Infer type parameters from a type by traversing its structure.
+    fn infer_from_type(&mut self, var: InferenceVar, ty: TypeId) {
+        let root = self.table.find(var);
+
+        // Check if this type contains the inference variable
+        if !self.contains_inference_var(ty, root) {
+            return;
+        }
+
+        match self.interner.lookup(ty) {
+            Some(TypeKey::TypeParameter(info)) => {
+                if let Some(param_var) = self.find_type_param(info.name) {
+                    if self.table.find(param_var) == root {
+                        // This type is the inference variable itself
+                        // Extract bounds from constraint if present
+                        if let Some(constraint) = info.constraint {
+                            self.add_upper_bound(var, constraint);
+                        }
+                    }
+                }
+            }
+            Some(TypeKey::Array(elem)) => {
+                self.infer_from_type(var, elem);
+            }
+            Some(TypeKey::Tuple(elements)) => {
+                let elements = self.interner.tuple_list(elements);
+                for elem in elements.iter() {
+                    self.infer_from_type(var, elem.type_id);
+                }
+            }
+            Some(TypeKey::Union(members)) | Some(TypeKey::Intersection(members)) => {
+                let members = self.interner.type_list(members);
+                for &member in members.iter() {
+                    self.infer_from_type(var, member);
+                }
+            }
+            Some(TypeKey::Object(shape_id)) => {
+                let shape = self.interner.object_shape(shape_id);
+                for prop in shape.properties.iter() {
+                    self.infer_from_type(var, prop.type_id);
+                }
+            }
+            Some(TypeKey::ObjectWithIndex(shape_id)) => {
+                let shape = self.interner.object_shape(shape_id);
+                for prop in shape.properties.iter() {
+                    self.infer_from_type(var, prop.type_id);
+                }
+                if let Some(index) = shape.string_index.as_ref() {
+                    self.infer_from_type(var, index.key_type);
+                    self.infer_from_type(var, index.value_type);
+                }
+                if let Some(index) = shape.number_index.as_ref() {
+                    self.infer_from_type(var, index.key_type);
+                    self.infer_from_type(var, index.value_type);
+                }
+            }
+            Some(TypeKey::Application(app_id)) => {
+                let app = self.interner.type_application(app_id);
+                self.infer_from_type(var, app.base);
+                for &arg in app.args.iter() {
+                    self.infer_from_type(var, arg);
+                }
+            }
+            Some(TypeKey::Function(shape_id)) => {
+                let shape = self.interner.function_shape(shape_id);
+                for param in shape.params.iter() {
+                    self.infer_from_type(var, param.type_id);
+                }
+                if let Some(this_type) = shape.this_type {
+                    self.infer_from_type(var, this_type);
+                }
+                self.infer_from_type(var, shape.return_type);
+            }
+            Some(TypeKey::Conditional(cond_id)) => {
+                let cond = self.interner.conditional_type(cond_id);
+                self.infer_from_conditional(
+                    var,
+                    cond.check_type,
+                    cond.extends_type,
+                    cond.true_type,
+                    cond.false_type,
+                );
+            }
+            _ => {}
+        }
+    }
+
+    /// Check if a type contains an inference variable.
+    fn contains_inference_var(&mut self, ty: TypeId, var: InferenceVar) -> bool {
+        let root = self.table.find(var);
+
+        match self.interner.lookup(ty) {
+            Some(TypeKey::TypeParameter(info)) => {
+                if let Some(param_var) = self.find_type_param(info.name) {
+                    self.table.find(param_var) == root
+                } else {
+                    false
+                }
+            }
+            Some(TypeKey::Array(elem)) => self.contains_inference_var(elem, var),
+            Some(TypeKey::Tuple(elements)) => {
+                let elements = self.interner.tuple_list(elements);
+                elements.iter().any(|e| self.contains_inference_var(e.type_id, var))
+            }
+            Some(TypeKey::Union(members)) | Some(TypeKey::Intersection(members)) => {
+                let members = self.interner.type_list(members);
+                members.iter().any(|&m| self.contains_inference_var(m, var))
+            }
+            Some(TypeKey::Object(shape_id)) => {
+                let shape = self.interner.object_shape(shape_id);
+                shape.properties.iter().any(|p| self.contains_inference_var(p.type_id, var))
+            }
+            Some(TypeKey::ObjectWithIndex(shape_id)) => {
+                let shape = self.interner.object_shape(shape_id);
+                shape.properties.iter().any(|p| self.contains_inference_var(p.type_id, var))
+                    || shape.string_index.as_ref().is_some_and(|idx| {
+                        self.contains_inference_var(idx.key_type, var)
+                            || self.contains_inference_var(idx.value_type, var)
+                    })
+                    || shape.number_index.as_ref().is_some_and(|idx| {
+                        self.contains_inference_var(idx.key_type, var)
+                            || self.contains_inference_var(idx.value_type, var)
+                    })
+            }
+            Some(TypeKey::Application(app_id)) => {
+                let app = self.interner.type_application(app_id);
+                self.contains_inference_var(app.base, var)
+                    || app.args.iter().any(|&arg| self.contains_inference_var(arg, var))
+            }
+            Some(TypeKey::Function(shape_id)) => {
+                let shape = self.interner.function_shape(shape_id);
+                shape.params.iter().any(|p| self.contains_inference_var(p.type_id, var))
+                    || shape.this_type.is_some_and(|t| self.contains_inference_var(t, var))
+                    || self.contains_inference_var(shape.return_type, var)
+            }
+            Some(TypeKey::Conditional(cond_id)) => {
+                let cond = self.interner.conditional_type(cond_id);
+                self.contains_inference_var(cond.check_type, var)
+                    || self.contains_inference_var(cond.extends_type, var)
+                    || self.contains_inference_var(cond.true_type, var)
+                    || self.contains_inference_var(cond.false_type, var)
+            }
+            _ => false,
+        }
+    }
+
+    // =========================================================================
+    // Variance Inference
+    // =========================================================================
+
+    /// Compute the variance of a type parameter within a type.
+    /// Returns (covariant_count, contravariant_count, invariant_count, bivariant_count)
+    pub fn compute_variance(&self, ty: TypeId, target_param: Atom) -> (u32, u32, u32, u32) {
+        let mut covariant = 0u32;
+        let mut contravariant = 0u32;
+        let mut invariant = 0u32;
+        let mut bivariant = 0u32;
+
+        self.compute_variance_helper(ty, target_param, true, &mut covariant, &mut contravariant, &mut invariant, &mut bivariant);
+
+        (covariant, contravariant, invariant, bivariant)
+    }
+
+    fn compute_variance_helper(
+        &self,
+        ty: TypeId,
+        target_param: Atom,
+        polarity: bool, // true = covariant, false = contravariant
+        covariant: &mut u32,
+        contravariant: &mut u32,
+        invariant: &mut u32,
+        bivariant: &mut u32,
+    ) {
+        match self.interner.lookup(ty) {
+            Some(TypeKey::TypeParameter(info)) if info.name == target_param => {
+                if polarity {
+                    *covariant += 1;
+                } else {
+                    *contravariant += 1;
+                }
+            }
+            Some(TypeKey::Array(elem)) => {
+                self.compute_variance_helper(elem, target_param, polarity, covariant, contravariant, invariant, bivariant);
+            }
+            Some(TypeKey::Tuple(elements)) => {
+                let elements = self.interner.tuple_list(elements);
+                for elem in elements.iter() {
+                    self.compute_variance_helper(elem.type_id, target_param, polarity, covariant, contravariant, invariant, bivariant);
+                }
+            }
+            Some(TypeKey::Union(members)) | Some(TypeKey::Intersection(members)) => {
+                let members = self.interner.type_list(members);
+                for &member in members.iter() {
+                    self.compute_variance_helper(member, target_param, polarity, covariant, contravariant, invariant, bivariant);
+                }
+            }
+            Some(TypeKey::Object(shape_id)) => {
+                let shape = self.interner.object_shape(shape_id);
+                for prop in shape.properties.iter() {
+                    // Properties are covariant in their type (read position)
+                    self.compute_variance_helper(prop.type_id, target_param, polarity, covariant, contravariant, invariant, bivariant);
+                    // Properties are contravariant in their write type (write position)
+                    if prop.write_type != prop.type_id && !prop.readonly {
+                        self.compute_variance_helper(prop.write_type, target_param, !polarity, covariant, contravariant, invariant, bivariant);
+                    }
+                }
+            }
+            Some(TypeKey::ObjectWithIndex(shape_id)) => {
+                let shape = self.interner.object_shape(shape_id);
+                for prop in shape.properties.iter() {
+                    self.compute_variance_helper(prop.type_id, target_param, polarity, covariant, contravariant, invariant, bivariant);
+                    if prop.write_type != prop.type_id && !prop.readonly {
+                        self.compute_variance_helper(prop.write_type, target_param, !polarity, covariant, contravariant, invariant, bivariant);
+                    }
+                }
+                if let Some(index) = shape.string_index.as_ref() {
+                    self.compute_variance_helper(index.value_type, target_param, polarity, covariant, contravariant, invariant, bivariant);
+                }
+                if let Some(index) = shape.number_index.as_ref() {
+                    self.compute_variance_helper(index.value_type, target_param, polarity, covariant, contravariant, invariant, bivariant);
+                }
+            }
+            Some(TypeKey::Application(app_id)) => {
+                let app = self.interner.type_application(app_id);
+                // Variance depends on the generic type definition
+                // For now, assume covariant for all type arguments
+                for &arg in app.args.iter() {
+                    self.compute_variance_helper(arg, target_param, polarity, covariant, contravariant, invariant, bivariant);
+                }
+            }
+            Some(TypeKey::Function(shape_id)) => {
+                let shape = self.interner.function_shape(shape_id);
+                // Parameters are contravariant
+                for param in shape.params.iter() {
+                    self.compute_variance_helper(param.type_id, target_param, !polarity, covariant, contravariant, invariant, bivariant);
+                }
+                // Return type is covariant
+                self.compute_variance_helper(shape.return_type, target_param, polarity, covariant, contravariant, invariant, bivariant);
+            }
+            Some(TypeKey::Conditional(cond_id)) => {
+                let cond = self.interner.conditional_type(cond_id);
+                // Conditional types are invariant in their type parameters
+                self.compute_variance_helper(cond.check_type, target_param, false, covariant, contravariant, invariant, bivariant);
+                self.compute_variance_helper(cond.extends_type, target_param, false, covariant, contravariant, invariant, bivariant);
+                // But can be either in the result
+                self.compute_variance_helper(cond.true_type, target_param, polarity, covariant, contravariant, invariant, bivariant);
+                self.compute_variance_helper(cond.false_type, target_param, polarity, covariant, contravariant, invariant, bivariant);
+            }
+            _ => {}
+        }
+    }
+
+    /// Check if a type parameter is invariant at a given position.
+    pub fn is_invariant_position(&self, ty: TypeId, target_param: Atom) -> bool {
+        let (_, _, invariant, _) = self.compute_variance(ty, target_param);
+        invariant > 0
+    }
+
+    /// Check if a type parameter is bivariant at a given position.
+    pub fn is_bivariant_position(&self, ty: TypeId, target_param: Atom) -> bool {
+        let (_, _, _, bivariant) = self.compute_variance(ty, target_param);
+        bivariant > 0
+    }
+
+    /// Get the variance of a type parameter as a string.
+    pub fn get_variance(&self, ty: TypeId, target_param: Atom) -> &'static str {
+        let (covariant, contravariant, invariant, bivariant) = self.compute_variance(ty, target_param);
+
+        if invariant > 0 {
+            "invariant"
+        } else if bivariant > 0 {
+            "bivariant"
+        } else if covariant > 0 && contravariant > 0 {
+            "invariant" // Both covariant and contravariant means invariant
+        } else if covariant > 0 {
+            "covariant"
+        } else if contravariant > 0 {
+            "contravariant"
+        } else {
+            "unused"
+        }
+    }
+
+    // =========================================================================
+    // Enhanced Constraint Resolution
+    // =========================================================================
+
+    /// Try to infer a type parameter from its usage context.
+    /// This implements bidirectional type inference where the context
+    /// (e.g., return type, variable declaration) provides constraints.
+    pub fn infer_from_context(
+        &mut self,
+        var: InferenceVar,
+        context_type: TypeId,
+    ) -> Result<(), InferenceError> {
+        // Add context as an upper bound
+        self.add_upper_bound(var, context_type);
+
+        // If the context type contains this inference variable,
+        // we need to solve more carefully
+        let root = self.table.find(var);
+        if self.contains_inference_var(context_type, root) {
+            // Context contains the inference variable itself
+            // This is a recursive type - we need to handle it specially
+            return Err(InferenceError::OccursCheck { var: root, ty: context_type });
+        }
+
+        Ok(())
+    }
+
+    /// Strengthen constraints by analyzing relationships between type parameters.
+    /// For example, if T <: U and we know T = string, then U must be at least string.
+    pub fn strengthen_constraints(&mut self) -> Result<(), InferenceError> {
+        let type_params: Vec<_> = self.type_params.clone();
+
+        // Iterate multiple times to propagate constraints
+        for _ in 0..type_params.len() {
+            for (name, var) in type_params.iter() {
+                let root = self.table.find(*var);
+                let constraints = self.constraints[root.0 as usize].clone();
+
+                // Propagate lower bounds to other type parameters
+                for &lower in &constraints.lower_bounds {
+                    self.propagate_lower_bound(root, lower, *name);
+                }
+
+                // Propagate upper bounds to other type parameters
+                for &upper in &constraints.upper_bounds {
+                    self.propagate_upper_bound(root, upper, *name);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn propagate_lower_bound(&mut self, var: InferenceVar, lower: TypeId, exclude_param: Atom) {
+        if let Some(TypeKey::TypeParameter(info)) = self.interner.lookup(lower) {
+            if info.name != exclude_param {
+                if let Some(lower_var) = self.find_type_param(info.name) {
+                    let lower_root = self.table.find(lower_var);
+                    let lower_constraints = self.constraints[lower_root.0 as usize].clone();
+
+                    // Add all upper bounds of the lower param as our upper bounds
+                    for &upper in &lower_constraints.upper_bounds {
+                        self.add_upper_bound(var, upper);
+                    }
+                }
+            }
+        }
+    }
+
+    fn propagate_upper_bound(&mut self, var: InferenceVar, upper: TypeId, exclude_param: Atom) {
+        if let Some(TypeKey::TypeParameter(info)) = self.interner.lookup(upper) {
+            if info.name != exclude_param {
+                if let Some(upper_var) = self.find_type_param(info.name) {
+                    let upper_root = self.table.find(upper_var);
+                    let upper_constraints = self.constraints[upper_root.0 as usize].clone();
+
+                    // Add all lower bounds of the upper param as our lower bounds
+                    for &lower in &upper_constraints.lower_bounds {
+                        self.add_lower_bound(var, lower);
+                    }
+                }
+            }
+        }
+    }
+
+    /// Validate that resolved types respect variance constraints.
+    pub fn validate_variance(&mut self) -> Result<(), InferenceError> {
+        let type_params: Vec<_> = self.type_params.clone();
+        for (_name, var) in type_params.iter() {
+            let resolved = match self.probe(*var) {
+                Some(ty) => ty,
+                None => continue,
+            };
+
+            // Check if this type parameter appears in its own resolved type
+            // We use the occurs_in method which already exists and handles this
+            if self.occurs_in(*var, resolved) {
+                let root = self.table.find(*var);
+                // This would be a circular reference
+                return Err(InferenceError::OccursCheck { var: root, ty: resolved });
+            }
+
+            // For more advanced variance checking, we would need to know
+            // the declared variance of each type parameter in its generic type
+            // This is a placeholder for future enhancement
+        }
+
+        Ok(())
     }
 }
 
