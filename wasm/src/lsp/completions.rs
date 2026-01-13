@@ -7,19 +7,19 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use std::borrow::Cow;
 
 use crate::binder::SymbolId;
-use crate::lsp::jsdoc::jsdoc_for_node;
 use crate::checker::TypeCache;
-use crate::parser::thin_node::{NodeAccess, ThinNodeArena};
+use crate::lsp::jsdoc::jsdoc_for_node;
+use crate::lsp::position::{LineMap, Position};
+use crate::lsp::resolver::{ScopeCache, ScopeCacheStats, ScopeWalker};
+use crate::lsp::utils::find_node_at_offset;
 use crate::parser::NodeIndex;
+use crate::parser::syntax_kind_ext;
+use crate::parser::thin_node::{NodeAccess, ThinNodeArena};
 use crate::solver::{
-    apparent_primitive_members, ApparentMemberKind, IntrinsicKind, TypeId, TypeInterner, TypeKey,
+    ApparentMemberKind, IntrinsicKind, TypeId, TypeInterner, TypeKey, apparent_primitive_members,
 };
 use crate::thin_binder::ThinBinderState;
 use crate::thin_checker::ThinCheckerState;
-use crate::lsp::position::{Position, LineMap};
-use crate::lsp::resolver::{ScopeCache, ScopeCacheStats, ScopeWalker};
-use crate::lsp::utils::find_node_at_offset;
-use crate::parser::syntax_kind_ext;
 
 /// The kind of completion item.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -96,13 +96,56 @@ pub struct Completions<'a> {
 
 /// JavaScript/TypeScript keywords for completion.
 const KEYWORDS: &[&str] = &[
-    "break", "case", "catch", "class", "const", "continue", "debugger",
-    "default", "delete", "do", "else", "enum", "export", "extends",
-    "false", "finally", "for", "function", "if", "import", "in",
-    "interface", "let", "new", "null", "return", "super", "switch",
-    "this", "throw", "true", "try", "typeof", "var", "void", "while",
-    "with", "async", "await", "yield", "type", "readonly", "abstract",
-    "declare", "static", "public", "private", "protected", "get", "set"
+    "break",
+    "case",
+    "catch",
+    "class",
+    "const",
+    "continue",
+    "debugger",
+    "default",
+    "delete",
+    "do",
+    "else",
+    "enum",
+    "export",
+    "extends",
+    "false",
+    "finally",
+    "for",
+    "function",
+    "if",
+    "import",
+    "in",
+    "interface",
+    "let",
+    "new",
+    "null",
+    "return",
+    "super",
+    "switch",
+    "this",
+    "throw",
+    "true",
+    "try",
+    "typeof",
+    "var",
+    "void",
+    "while",
+    "with",
+    "async",
+    "await",
+    "yield",
+    "type",
+    "readonly",
+    "abstract",
+    "declare",
+    "static",
+    "public",
+    "private",
+    "protected",
+    "get",
+    "set",
 ];
 
 impl<'a> Completions<'a> {
@@ -146,7 +189,11 @@ impl<'a> Completions<'a> {
     ///
     /// Returns a list of completion items for identifiers visible at the cursor position.
     /// Returns None if no completions are available.
-    pub fn get_completions(&self, root: NodeIndex, position: Position) -> Option<Vec<CompletionItem>> {
+    pub fn get_completions(
+        &self,
+        root: NodeIndex,
+        position: Position,
+    ) -> Option<Vec<CompletionItem>> {
         self.get_completions_internal(root, position, None, None, None)
     }
 
@@ -168,7 +215,13 @@ impl<'a> Completions<'a> {
         scope_cache: &mut ScopeCache,
         scope_stats: Option<&mut ScopeCacheStats>,
     ) -> Option<Vec<CompletionItem>> {
-        self.get_completions_internal(root, position, Some(type_cache), Some(scope_cache), scope_stats)
+        self.get_completions_internal(
+            root,
+            position,
+            Some(type_cache),
+            Some(scope_cache),
+            scope_stats,
+        )
     }
 
     fn get_completions_internal(
@@ -180,7 +233,9 @@ impl<'a> Completions<'a> {
         scope_stats: Option<&mut ScopeCacheStats>,
     ) -> Option<Vec<CompletionItem>> {
         // 1. Convert position to byte offset
-        let offset = self.line_map.position_to_offset(position, self.source_text)?;
+        let offset = self
+            .line_map
+            .position_to_offset(position, self.source_text)?;
 
         // 2. Find the node at this offset (or use root if not found)
         let mut node_idx = find_node_at_offset(self.arena, offset);
@@ -198,7 +253,9 @@ impl<'a> Completions<'a> {
         // Check for object literal property completion (contextual completions)
         // Only if we have type information available
         if self.interner.is_some() && self.file_name.is_some() {
-            if let Some(items) = self.get_object_literal_completions(node_idx, type_cache.as_deref_mut()) {
+            if let Some(items) =
+                self.get_object_literal_completions(node_idx, type_cache.as_deref_mut())
+            {
                 return if items.is_empty() { None } else { Some(items) };
             }
         }
@@ -238,7 +295,11 @@ impl<'a> Completions<'a> {
                     let decl_node = if !symbol.value_declaration.is_none() {
                         symbol.value_declaration
                     } else {
-                        symbol.declarations.first().copied().unwrap_or(NodeIndex::NONE)
+                        symbol
+                            .declarations
+                            .first()
+                            .copied()
+                            .unwrap_or(NodeIndex::NONE)
                     };
                     if !decl_node.is_none() {
                         let doc = jsdoc_for_node(self.arena, root, decl_node, self.source_text);
@@ -257,7 +318,10 @@ impl<'a> Completions<'a> {
         for &kw in KEYWORDS {
             // Skip if keyword is already in completions (e.g., if user defined a variable named 'function')
             if !seen_names.contains(kw) {
-                completions.push(CompletionItem::new(kw.to_string(), CompletionItemKind::Keyword));
+                completions.push(CompletionItem::new(
+                    kw.to_string(),
+                    CompletionItemKind::Keyword,
+                ));
             }
         }
 
@@ -347,7 +411,7 @@ impl<'a> Completions<'a> {
         let file_name = self.file_name.as_ref()?;
 
         let mut cache_ref = type_cache;
-        let strict = false;  // TODO: get from tsconfig
+        let strict = false; // TODO: get from tsconfig
         let mut checker = if let Some(cache) = cache_ref.as_deref_mut() {
             if let Some(cache_value) = cache.take() {
                 ThinCheckerState::with_cache(
@@ -359,22 +423,10 @@ impl<'a> Completions<'a> {
                     strict,
                 )
             } else {
-                ThinCheckerState::new(
-                    self.arena,
-                    self.binder,
-                    interner,
-                    file_name.clone(),
-                    strict,
-                )
+                ThinCheckerState::new(self.arena, self.binder, interner, file_name.clone(), strict)
             }
         } else {
-            ThinCheckerState::new(
-                self.arena,
-                self.binder,
-                interner,
-                file_name.clone(),
-                strict,
-            )
+            ThinCheckerState::new(self.arena, self.binder, interner, file_name.clone(), strict)
         };
 
         let type_id = checker.get_type_of_node(expr_idx);
@@ -423,14 +475,26 @@ impl<'a> Completions<'a> {
                 let shape = interner.object_shape(shape_id);
                 for prop in shape.properties.iter() {
                     let name = interner.resolve_atom(prop.name);
-                    self.add_property_completion(props, interner, name, prop.type_id, prop.is_method);
+                    self.add_property_completion(
+                        props,
+                        interner,
+                        name,
+                        prop.type_id,
+                        prop.is_method,
+                    );
                 }
             }
             TypeKey::ObjectWithIndex(shape_id) => {
                 let shape = interner.object_shape(shape_id);
                 for prop in shape.properties.iter() {
                     let name = interner.resolve_atom(prop.name);
-                    self.add_property_completion(props, interner, name, prop.type_id, prop.is_method);
+                    self.add_property_completion(
+                        props,
+                        interner,
+                        name,
+                        prop.type_id,
+                        prop.is_method,
+                    );
                 }
             }
             TypeKey::Union(members) | TypeKey::Intersection(members) => {
@@ -485,7 +549,10 @@ impl<'a> Completions<'a> {
         }
     }
 
-    fn literal_intrinsic_kind(&self, literal: &crate::solver::LiteralValue) -> Option<IntrinsicKind> {
+    fn literal_intrinsic_kind(
+        &self,
+        literal: &crate::solver::LiteralValue,
+    ) -> Option<IntrinsicKind> {
         match literal {
             crate::solver::LiteralValue::String(_) => Some(IntrinsicKind::String),
             crate::solver::LiteralValue::Number(_) => Some(IntrinsicKind::Number),
@@ -527,7 +594,7 @@ impl<'a> Completions<'a> {
 
         // 2. Determine the contextual type (expected type)
         let mut cache_ref = type_cache;
-        let strict = false;  // TODO: get from tsconfig
+        let strict = false; // TODO: get from tsconfig
         let mut checker = if let Some(cache) = cache_ref.as_deref_mut() {
             if let Some(cache_value) = cache.take() {
                 ThinCheckerState::with_cache(
@@ -539,22 +606,10 @@ impl<'a> Completions<'a> {
                     strict,
                 )
             } else {
-                ThinCheckerState::new(
-                    self.arena,
-                    self.binder,
-                    interner,
-                    file_name.clone(),
-                    strict,
-                )
+                ThinCheckerState::new(self.arena, self.binder, interner, file_name.clone(), strict)
             }
         } else {
-            ThinCheckerState::new(
-                self.arena,
-                self.binder,
-                interner,
-                file_name.clone(),
-                strict,
-            )
+            ThinCheckerState::new(self.arena, self.binder, interner, file_name.clone(), strict)
         };
 
         let context_type = self.get_contextual_type(object_literal_idx, &mut checker)?;
@@ -567,7 +622,13 @@ impl<'a> Completions<'a> {
         let mut props: FxHashMap<String, PropertyCompletion> = FxHashMap::default();
         let mut visited = FxHashSet::default();
 
-        self.collect_properties_for_type(context_type, interner, &mut checker, &mut visited, &mut props);
+        self.collect_properties_for_type(
+            context_type,
+            interner,
+            &mut checker,
+            &mut visited,
+            &mut props,
+        );
 
         for (name, info) in props {
             // Suggest only missing properties
@@ -656,22 +717,32 @@ impl<'a> Completions<'a> {
         match node.kind {
             k if k == syntax_kind_ext::PROPERTY_ASSIGNMENT => {
                 let prop = self.arena.get_property_assignment(node)?;
-                self.arena.get_identifier_text(prop.name).map(|s| s.to_string())
+                self.arena
+                    .get_identifier_text(prop.name)
+                    .map(|s| s.to_string())
             }
             k if k == syntax_kind_ext::SHORTHAND_PROPERTY_ASSIGNMENT => {
                 let prop = self.arena.get_shorthand_property(node)?;
-                self.arena.get_identifier_text(prop.name).map(|s| s.to_string())
+                self.arena
+                    .get_identifier_text(prop.name)
+                    .map(|s| s.to_string())
             }
             k if k == syntax_kind_ext::METHOD_DECLARATION => {
                 let method = self.arena.get_method_decl(node)?;
-                self.arena.get_identifier_text(method.name).map(|s| s.to_string())
+                self.arena
+                    .get_identifier_text(method.name)
+                    .map(|s| s.to_string())
             }
             _ => None,
         }
     }
 
     /// Walk up the AST to find the expected/contextual type for a node.
-    fn get_contextual_type(&self, node_idx: NodeIndex, checker: &mut ThinCheckerState) -> Option<TypeId> {
+    fn get_contextual_type(
+        &self,
+        node_idx: NodeIndex,
+        checker: &mut ThinCheckerState,
+    ) -> Option<TypeId> {
         let ext = self.arena.get_extended(node_idx)?;
         let parent_idx = ext.parent;
         let parent = self.arena.get(parent_idx)?;
@@ -715,7 +786,9 @@ impl<'a> Completions<'a> {
             k if k == syntax_kind_ext::CALL_EXPRESSION => {
                 let call = self.arena.get_call_expr(parent)?;
                 // Find which argument position this node is at
-                let arg_index = call.arguments.as_ref()
+                let arg_index = call
+                    .arguments
+                    .as_ref()
                     .and_then(|args| args.nodes.iter().position(|&arg| arg == node_idx));
 
                 if let Some(arg_idx) = arg_index {
@@ -730,7 +803,12 @@ impl<'a> Completions<'a> {
     }
 
     /// Find the type of a property from an object type.
-    fn lookup_property_type(&self, type_id: TypeId, name: &str, checker: &mut ThinCheckerState) -> Option<TypeId> {
+    fn lookup_property_type(
+        &self,
+        type_id: TypeId,
+        name: &str,
+        checker: &mut ThinCheckerState,
+    ) -> Option<TypeId> {
         let mut props = FxHashMap::default();
         let mut visited = FxHashSet::default();
         let interner = self.interner?;
@@ -757,7 +835,12 @@ impl<'a> Completions<'a> {
     }
 
     /// Get the type of the Nth parameter of a function type.
-    fn get_parameter_type_at(&self, func_type: TypeId, param_index: usize, checker: &mut ThinCheckerState) -> Option<TypeId> {
+    fn get_parameter_type_at(
+        &self,
+        func_type: TypeId,
+        param_index: usize,
+        checker: &mut ThinCheckerState,
+    ) -> Option<TypeId> {
         let interner = self.interner?;
 
         // Look up the callable signature
@@ -785,10 +868,10 @@ struct PropertyCompletion {
 #[cfg(test)]
 mod completions_tests {
     use super::*;
-    use crate::thin_parser::ThinParserState;
-    use crate::thin_binder::ThinBinderState;
     use crate::lsp::position::LineMap;
     use crate::solver::TypeInterner;
+    use crate::thin_binder::ThinBinderState;
+    use crate::thin_parser::ThinParserState;
 
     #[test]
     fn test_completions_simple() {
@@ -854,7 +937,10 @@ mod completions_tests {
             // Should see both x (outer scope) and y (inner scope)
             assert!(names.contains(&"x"), "Should suggest 'x' from outer scope");
             assert!(names.contains(&"y"), "Should suggest 'y' from inner scope");
-            assert!(names.contains(&"foo"), "Should suggest 'foo' (the function itself)");
+            assert!(
+                names.contains(&"foo"),
+                "Should suggest 'foo' (the function itself)"
+            );
         }
     }
 
@@ -888,7 +974,10 @@ mod completions_tests {
 
             // Should only suggest 'x' once (the inner one shadows the outer one)
             let x_count = names.iter().filter(|&&n| n == "x").count();
-            assert_eq!(x_count, 1, "Should suggest 'x' only once (inner shadows outer)");
+            assert_eq!(
+                x_count, 1,
+                "Should suggest 'x' only once (inner shadows outer)"
+            );
         }
     }
 
@@ -954,7 +1043,10 @@ mod completions_tests {
         let items = items.unwrap();
         let names: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
 
-        assert!(names.contains(&"length"), "Should suggest string member 'length'");
+        assert!(
+            names.contains(&"length"),
+            "Should suggest string member 'length'"
+        );
     }
 
     #[test]
@@ -981,7 +1073,10 @@ mod completions_tests {
             let names: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
 
             // Should include keywords
-            assert!(names.contains(&"function"), "Should suggest keyword 'function'");
+            assert!(
+                names.contains(&"function"),
+                "Should suggest keyword 'function'"
+            );
             assert!(names.contains(&"const"), "Should suggest keyword 'const'");
             assert!(names.contains(&"class"), "Should suggest keyword 'class'");
         }
@@ -1014,7 +1109,9 @@ mod completions_tests {
 
             if let Some(item) = foo_item {
                 assert!(
-                    item.documentation.as_ref().map_or(false, |d| d.contains("test function")),
+                    item.documentation
+                        .as_ref()
+                        .map_or(false, |d| d.contains("test function")),
                     "Should include JSDoc documentation"
                 );
             }

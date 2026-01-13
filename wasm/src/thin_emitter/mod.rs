@@ -27,8 +27,8 @@
 
 use crate::emit_context::EmitContext;
 use crate::parser::NodeIndex;
-use crate::parser::thin_node::{ThinNode, ThinNodeArena};
 use crate::parser::syntax_kind_ext;
+use crate::parser::thin_node::{ThinNode, ThinNodeArena};
 use crate::scanner::SyntaxKind;
 use crate::source_writer::{SourcePosition, SourceWriter, source_position_from_offset};
 use crate::transform_context::{IdentifierId, TransformContext, TransformDirective};
@@ -37,24 +37,26 @@ use crate::transforms::enum_es5::EnumES5Emitter;
 use crate::transforms::namespace_es5::NamespaceES5Emitter;
 use std::sync::Arc;
 
-mod comments;
 mod comment_helpers;
+mod comments;
+mod declarations;
 mod es5_bindings;
 mod es5_helpers;
 mod es5_templates;
-mod helpers;
-mod literals;
-mod template_literals;
 mod expressions;
-mod statements;
-mod declarations;
 mod functions;
-mod types;
+mod helpers;
 mod jsx;
+mod literals;
 mod module_emission;
 mod module_wrapper;
+mod statements;
+mod template_literals;
+mod types;
 
-pub use comments::{CommentKind, CommentRange, get_leading_comment_ranges, get_trailing_comment_ranges};
+pub use comments::{
+    CommentKind, CommentRange, get_leading_comment_ranges, get_trailing_comment_ranges,
+};
 
 // =============================================================================
 // Emitter Options
@@ -167,26 +169,46 @@ struct TemplateParts {
 
 enum EmitDirective {
     Identity,
-    ES5Class { class_node: NodeIndex },
-    ES5ClassExpression { class_node: NodeIndex },
-    ES5Namespace { namespace_node: NodeIndex },
-    ES5Enum { enum_node: NodeIndex },
+    ES5Class {
+        class_node: NodeIndex,
+    },
+    ES5ClassExpression {
+        class_node: NodeIndex,
+    },
+    ES5Namespace {
+        namespace_node: NodeIndex,
+    },
+    ES5Enum {
+        enum_node: NodeIndex,
+    },
     CommonJSExport {
         names: Arc<[IdentifierId]>,
         is_default: bool,
         inner: Box<EmitDirective>,
     },
     CommonJSExportDefaultExpr,
-    CommonJSExportDefaultClassES5 { class_node: NodeIndex },
+    CommonJSExportDefaultClassES5 {
+        class_node: NodeIndex,
+    },
     ES5ArrowFunction {
         arrow_node: NodeIndex,
         captures_this: bool,
     },
-    ES5AsyncFunction { function_node: NodeIndex },
-    ES5ForOf { for_of_node: NodeIndex },
-    ES5ObjectLiteral { object_literal: NodeIndex },
-    ES5VariableDeclarationList { decl_list: NodeIndex },
-    ES5FunctionParameters { function_node: NodeIndex },
+    ES5AsyncFunction {
+        function_node: NodeIndex,
+    },
+    ES5ForOf {
+        for_of_node: NodeIndex,
+    },
+    ES5ObjectLiteral {
+        object_literal: NodeIndex,
+    },
+    ES5VariableDeclarationList {
+        decl_list: NodeIndex,
+    },
+    ES5FunctionParameters {
+        function_node: NodeIndex,
+    },
     ES5TemplateLiteral,
     ModuleWrapper {
         format: crate::transform_context::ModuleFormat,
@@ -251,7 +273,11 @@ impl<'a> ThinPrinter<'a> {
     }
 
     /// Create a new ThinPrinter with pre-allocated capacity and options.
-    pub fn with_capacity_and_options(arena: &'a ThinNodeArena, capacity: usize, options: PrinterOptions) -> Self {
+    pub fn with_capacity_and_options(
+        arena: &'a ThinNodeArena,
+        capacity: usize,
+        options: PrinterOptions,
+    ) -> Self {
         let mut writer = SourceWriter::with_capacity(capacity);
         writer.set_new_line_kind(options.new_line);
 
@@ -401,20 +427,20 @@ impl<'a> ThinPrinter<'a> {
     fn emit_directive_from_transform(directive: &TransformDirective) -> EmitDirective {
         match directive {
             TransformDirective::Identity => EmitDirective::Identity,
-            TransformDirective::ES5Class { class_node, .. } => {
-                EmitDirective::ES5Class { class_node: *class_node }
-            }
+            TransformDirective::ES5Class { class_node, .. } => EmitDirective::ES5Class {
+                class_node: *class_node,
+            },
             TransformDirective::ES5ClassExpression { class_node } => {
-                EmitDirective::ES5ClassExpression { class_node: *class_node }
-            }
-            TransformDirective::ES5Namespace { namespace_node } => {
-                EmitDirective::ES5Namespace {
-                    namespace_node: *namespace_node,
+                EmitDirective::ES5ClassExpression {
+                    class_node: *class_node,
                 }
             }
-            TransformDirective::ES5Enum { enum_node } => {
-                EmitDirective::ES5Enum { enum_node: *enum_node }
-            }
+            TransformDirective::ES5Namespace { namespace_node } => EmitDirective::ES5Namespace {
+                namespace_node: *namespace_node,
+            },
+            TransformDirective::ES5Enum { enum_node } => EmitDirective::ES5Enum {
+                enum_node: *enum_node,
+            },
             TransformDirective::CommonJSExport {
                 names,
                 is_default,
@@ -424,7 +450,9 @@ impl<'a> ThinPrinter<'a> {
                 is_default: *is_default,
                 inner: Box::new(Self::emit_directive_from_transform(inner.as_ref())),
             },
-            TransformDirective::CommonJSExportDefaultExpr => EmitDirective::CommonJSExportDefaultExpr,
+            TransformDirective::CommonJSExportDefaultExpr => {
+                EmitDirective::CommonJSExportDefaultExpr
+            }
             TransformDirective::CommonJSExportDefaultClassES5 { class_node } => {
                 EmitDirective::CommonJSExportDefaultClassES5 {
                     class_node: *class_node,
@@ -442,18 +470,18 @@ impl<'a> ThinPrinter<'a> {
                     function_node: *function_node,
                 }
             }
-            TransformDirective::ES5ForOf { for_of_node } => {
-                EmitDirective::ES5ForOf {
-                    for_of_node: *for_of_node,
-                }
-            }
+            TransformDirective::ES5ForOf { for_of_node } => EmitDirective::ES5ForOf {
+                for_of_node: *for_of_node,
+            },
             TransformDirective::ES5ObjectLiteral { object_literal } => {
                 EmitDirective::ES5ObjectLiteral {
                     object_literal: *object_literal,
                 }
             }
             TransformDirective::ES5VariableDeclarationList { decl_list } => {
-                EmitDirective::ES5VariableDeclarationList { decl_list: *decl_list }
+                EmitDirective::ES5VariableDeclarationList {
+                    decl_list: *decl_list,
+                }
             }
             TransformDirective::ES5FunctionParameters { function_node } => {
                 EmitDirective::ES5FunctionParameters {
@@ -534,7 +562,8 @@ impl<'a> ThinPrinter<'a> {
             }
 
             EmitDirective::ES5Namespace { namespace_node } => {
-                let mut ns_emitter = NamespaceES5Emitter::with_commonjs(self.arena, self.ctx.is_commonjs());
+                let mut ns_emitter =
+                    NamespaceES5Emitter::with_commonjs(self.arena, self.ctx.is_commonjs());
                 let output = ns_emitter.emit_namespace(namespace_node);
                 self.write(&output);
             }
@@ -671,7 +700,6 @@ impl<'a> ThinPrinter<'a> {
         }
     }
 
-
     fn emit_commonjs_inner(
         &mut self,
         node: &ThinNode,
@@ -708,7 +736,8 @@ impl<'a> ThinPrinter<'a> {
                 self.emit_class_expression_es5(*class_node);
             }
             EmitDirective::ES5Namespace { namespace_node } => {
-                let mut ns_emitter = NamespaceES5Emitter::with_commonjs(self.arena, self.ctx.is_commonjs());
+                let mut ns_emitter =
+                    NamespaceES5Emitter::with_commonjs(self.arena, self.ctx.is_commonjs());
                 let output = ns_emitter.emit_namespace(*namespace_node);
                 self.write(&output);
             }
@@ -1657,7 +1686,10 @@ impl<'a> ThinPrinter<'a> {
         }
 
         // Emit header comments AFTER "use strict" but BEFORE helpers
-        let first_stmt_pos = source.statements.nodes.first()
+        let first_stmt_pos = source
+            .statements
+            .nodes
+            .first()
             .and_then(|&idx| self.arena.get(idx))
             .map(|n| n.pos)
             .unwrap_or(node.end);
@@ -1755,7 +1787,8 @@ impl<'a> ThinPrinter<'a> {
             }
 
             // Collect and emit exports initialization
-            let export_names = module_commonjs::collect_export_names(self.arena, &source.statements.nodes);
+            let export_names =
+                module_commonjs::collect_export_names(self.arena, &source.statements.nodes);
             if !export_names.is_empty() {
                 for (i, name) in export_names.iter().enumerate() {
                     if i > 0 {
@@ -1815,8 +1848,6 @@ impl<'a> ThinPrinter<'a> {
         }
     }
 
-
-
     // =========================================================================
     // Binding Patterns (Destructuring)
     // =========================================================================
@@ -1871,7 +1902,10 @@ impl<'a> ThinPrinter<'a> {
 
     /// Get the next temporary variable name (_a, _b, _c, etc.)
     fn get_temp_var_name(&mut self) -> String {
-        let name = format!("_{}", (b'a' + (self.ctx.destructuring_state.temp_var_counter % 26) as u8) as char);
+        let name = format!(
+            "_{}",
+            (b'a' + (self.ctx.destructuring_state.temp_var_counter % 26) as u8) as char
+        );
         self.ctx.destructuring_state.temp_var_counter += 1;
         name
     }
@@ -1940,7 +1974,6 @@ fn get_operator_text(op: u16) -> &'static str {
     }
 }
 
-
 #[cfg(test)]
 mod comment_tests {
     use super::*;
@@ -1952,7 +1985,10 @@ mod comment_tests {
         //                                       position 29 (after the closing brace)
         let comments = get_trailing_comment_ranges(text, 29);
         assert_eq!(comments.len(), 1);
-        assert_eq!(&text[comments[0].pos as usize..comments[0].end as usize], "// OK");
+        assert_eq!(
+            &text[comments[0].pos as usize..comments[0].end as usize],
+            "// OK"
+        );
     }
 
     #[test]
@@ -1960,7 +1996,9 @@ mod comment_tests {
         let text = "} // OK\n";
         let comments = get_trailing_comment_ranges(text, 1); // after }
         assert_eq!(comments.len(), 1);
-        assert_eq!(&text[comments[0].pos as usize..comments[0].end as usize], "// OK");
+        assert_eq!(
+            &text[comments[0].pos as usize..comments[0].end as usize],
+            "// OK"
+        );
     }
-
 }

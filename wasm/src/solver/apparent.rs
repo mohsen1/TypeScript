@@ -1,5 +1,5 @@
-use crate::solver::types::{IntrinsicKind, TypeId};
 use crate::solver::TypeDatabase;
+use crate::solver::types::{IntrinsicKind, TypeId};
 
 pub enum ApparentMemberKind {
     Value(TypeId),
@@ -58,7 +58,8 @@ const STRING_METHODS_RETURN_NUMBER: &[&str] = &[
     "localeCompare",
     "search",
 ];
-const STRING_METHODS_RETURN_BOOLEAN: &[&str] = &["endsWith", "includes", "isWellFormed", "startsWith"];
+const STRING_METHODS_RETURN_BOOLEAN: &[&str] =
+    &["endsWith", "includes", "isWellFormed", "startsWith"];
 const STRING_METHODS_RETURN_ANY: &[&str] = &["match", "matchAll"];
 const STRING_METHODS_RETURN_STRING_ARRAY: &[&str] = &["split"];
 
@@ -74,11 +75,8 @@ const BOOLEAN_METHODS_RETURN_STRING: &[&str] = &["toLocaleString", "toString"];
 
 const BIGINT_METHODS_RETURN_STRING: &[&str] = &["toLocaleString", "toString"];
 
-const OBJECT_METHODS_RETURN_BOOLEAN: &[&str] = &[
-    "hasOwnProperty",
-    "isPrototypeOf",
-    "propertyIsEnumerable",
-];
+const OBJECT_METHODS_RETURN_BOOLEAN: &[&str] =
+    &["hasOwnProperty", "isPrototypeOf", "propertyIsEnumerable"];
 const OBJECT_METHODS_RETURN_STRING: &[&str] = &["toString"];
 const OBJECT_METHODS_RETURN_ANY: &[&str] = &["valueOf"];
 

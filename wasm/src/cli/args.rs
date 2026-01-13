@@ -5,7 +5,11 @@ use crate::thin_emitter::{ModuleKind, ScriptTarget};
 
 /// CLI arguments for the tsz binary.
 #[derive(Parser, Debug)]
-#[command(name = "tsz", version, about = "Codename Zang (Persian for rust) - TypeScript in Rust")]
+#[command(
+    name = "tsz",
+    version,
+    about = "Codename Zang (Persian for rust) - TypeScript in Rust"
+)]
 pub struct CliArgs {
     /// ECMAScript target version.
     #[arg(long, value_enum)]

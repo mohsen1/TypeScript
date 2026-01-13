@@ -76,7 +76,12 @@ pub fn get_comment_ranges(source: &str) -> Vec<CommentRange> {
                 }
 
                 let has_trailing_new_line = pos < len;
-                comments.push(CommentRange::new(start, pos as u32, false, has_trailing_new_line));
+                comments.push(CommentRange::new(
+                    start,
+                    pos as u32,
+                    false,
+                    has_trailing_new_line,
+                ));
 
                 // Skip the newline
                 if pos < len && bytes[pos] == b'\r' {
@@ -107,9 +112,15 @@ pub fn get_comment_ranges(source: &str) -> Vec<CommentRange> {
                 }
 
                 // Check for trailing newline
-                let has_trailing_new_line = pos < len && (bytes[pos] == b'\n' || bytes[pos] == b'\r');
+                let has_trailing_new_line =
+                    pos < len && (bytes[pos] == b'\n' || bytes[pos] == b'\r');
 
-                comments.push(CommentRange::new(start, pos as u32, true, has_trailing_new_line));
+                comments.push(CommentRange::new(
+                    start,
+                    pos as u32,
+                    true,
+                    has_trailing_new_line,
+                ));
                 continue;
             }
         }
@@ -126,7 +137,11 @@ pub fn get_comment_ranges(source: &str) -> Vec<CommentRange> {
 /// Get leading comments before a position.
 ///
 /// Returns comments that appear before `pos` and after any previous code.
-pub fn get_leading_comments(_source: &str, pos: u32, all_comments: &[CommentRange]) -> Vec<CommentRange> {
+pub fn get_leading_comments(
+    _source: &str,
+    pos: u32,
+    all_comments: &[CommentRange],
+) -> Vec<CommentRange> {
     all_comments
         .iter()
         .filter(|c| c.end <= pos)
@@ -137,7 +152,11 @@ pub fn get_leading_comments(_source: &str, pos: u32, all_comments: &[CommentRang
 /// Get trailing comments after a position.
 ///
 /// Returns comments that appear after `pos` on the same line.
-pub fn get_trailing_comments(source: &str, pos: u32, all_comments: &[CommentRange]) -> Vec<CommentRange> {
+pub fn get_trailing_comments(
+    source: &str,
+    pos: u32,
+    all_comments: &[CommentRange],
+) -> Vec<CommentRange> {
     let bytes = source.as_bytes();
 
     // Find the next newline after pos
@@ -232,7 +251,11 @@ pub fn get_jsdoc_content(comment: &CommentRange, source: &str) -> String {
 /// Vector of comment ranges that appear before the given position.
 /// Comments are filtered to only include those immediately preceding
 /// the position (with at most one line of whitespace between).
-pub fn get_leading_comments_from_cache(comments: &[CommentRange], pos: u32, source: &str) -> Vec<CommentRange> {
+pub fn get_leading_comments_from_cache(
+    comments: &[CommentRange],
+    pos: u32,
+    source: &str,
+) -> Vec<CommentRange> {
     if comments.is_empty() {
         return Vec::new();
     }
@@ -254,7 +277,11 @@ pub fn get_leading_comments_from_cache(comments: &[CommentRange], pos: u32, sour
 
         // Check if there's too much whitespace between comment and target position
         // For the first comment, check against `pos`; for subsequent ones, check against previous comment
-        let check_pos = if result.is_empty() { pos } else { result.last().unwrap().pos };
+        let check_pos = if result.is_empty() {
+            pos
+        } else {
+            result.last().unwrap().pos
+        };
         let text_between = &source[comment.end as usize..check_pos as usize];
         let newline_count = text_between.chars().filter(|&c| c == '\n').count();
 
@@ -275,4 +302,3 @@ pub fn get_leading_comments_from_cache(comments: &[CommentRange], pos: u32, sour
     result.reverse(); // Restore original order
     result
 }
-

@@ -29,21 +29,23 @@
 //! };
 //! ```
 
-use crate::parser::thin_node::ThinNodeArena;
 use crate::parser::NodeIndex;
 use crate::parser::syntax_kind_ext;
+use crate::parser::thin_node::ThinNodeArena;
 
 /// Checks if a node or its descendants contain `this` references
 pub fn contains_this_reference(arena: &ThinNodeArena, node_idx: NodeIndex) -> bool {
-    let Some(node) = arena.get(node_idx) else { return false };
-    
+    let Some(node) = arena.get(node_idx) else {
+        return false;
+    };
+
     // Check if this node is `this`
     if node.kind == crate::scanner::SyntaxKind::ThisKeyword as u16
         || node.kind == crate::scanner::SyntaxKind::SuperKeyword as u16
     {
         return true;
     }
-    
+
     // Check children recursively based on node type
     match node.kind {
         k if k == syntax_kind_ext::BLOCK => {
@@ -116,9 +118,7 @@ pub fn contains_this_reference(arena: &ThinNodeArena, node_idx: NodeIndex) -> bo
                 if contains_this_reference(arena, prop.name) {
                     return true;
                 }
-                if !prop.initializer.is_none()
-                    && contains_this_reference(arena, prop.initializer)
-                {
+                if !prop.initializer.is_none() && contains_this_reference(arena, prop.initializer) {
                     return true;
                 }
             }
@@ -136,9 +136,7 @@ pub fn contains_this_reference(arena: &ThinNodeArena, node_idx: NodeIndex) -> bo
                 }
             }
         }
-        k if k == syntax_kind_ext::SPREAD_ELEMENT
-            || k == syntax_kind_ext::SPREAD_ASSIGNMENT =>
-        {
+        k if k == syntax_kind_ext::SPREAD_ELEMENT || k == syntax_kind_ext::SPREAD_ASSIGNMENT => {
             if let Some(spread) = arena.get_spread(node) {
                 if contains_this_reference(arena, spread.expression) {
                     return true;
@@ -229,9 +227,7 @@ pub fn contains_this_reference(arena: &ThinNodeArena, node_idx: NodeIndex) -> bo
             || k == syntax_kind_ext::NON_NULL_EXPRESSION =>
         {
             if let Some(unary) = arena.get_unary_expr_ex(node) {
-                if !unary.expression.is_none()
-                    && contains_this_reference(arena, unary.expression)
-                {
+                if !unary.expression.is_none() && contains_this_reference(arena, unary.expression) {
                     return true;
                 }
             }
@@ -267,8 +263,12 @@ pub fn contains_this_reference(arena: &ThinNodeArena, node_idx: NodeIndex) -> bo
         k if k == syntax_kind_ext::ARROW_FUNCTION => {
             if let Some(func) = arena.get_function(node) {
                 for &param_idx in &func.parameters.nodes {
-                    let Some(param_node) = arena.get(param_idx) else { continue };
-                    let Some(param) = arena.get_parameter(param_node) else { continue };
+                    let Some(param_node) = arena.get(param_idx) else {
+                        continue;
+                    };
+                    let Some(param) = arena.get_parameter(param_node) else {
+                        continue;
+                    };
                     if !param.initializer.is_none()
                         && contains_this_reference(arena, param.initializer)
                     {
@@ -282,14 +282,15 @@ pub fn contains_this_reference(arena: &ThinNodeArena, node_idx: NodeIndex) -> bo
             }
             return false;
         }
-        k if k == syntax_kind_ext::FUNCTION_EXPRESSION || 
-             k == syntax_kind_ext::FUNCTION_DECLARATION => {
+        k if k == syntax_kind_ext::FUNCTION_EXPRESSION
+            || k == syntax_kind_ext::FUNCTION_DECLARATION =>
+        {
             // Regular functions have their own `this`, so don't recurse
             return false;
         }
         _ => {}
     }
-    
+
     false
 }
 
@@ -305,12 +306,16 @@ impl ArrowTransformContext {
             needs_this_capture: false,
         }
     }
-    
+
     /// Analyze an arrow function to determine if `this` capture is needed
     pub fn analyze_arrow(&mut self, arena: &ThinNodeArena, func_idx: NodeIndex) {
-        let Some(func_node) = arena.get(func_idx) else { return };
-        let Some(func_data) = arena.get_function(func_node) else { return };
-        
+        let Some(func_node) = arena.get(func_idx) else {
+            return;
+        };
+        let Some(func_data) = arena.get_function(func_node) else {
+            return;
+        };
+
         // Check if body contains `this` references
         if !func_data.body.is_none() && contains_this_reference(arena, func_data.body) {
             self.needs_this_capture = true;
@@ -321,17 +326,20 @@ impl ArrowTransformContext {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::thin_parser::ThinParserState;
     use crate::scanner::SyntaxKind;
+    use crate::thin_parser::ThinParserState;
 
     #[test]
     fn test_detect_this_in_arrow() {
         let source = "const f = () => this.x;";
         let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
         let _root = parser.parse_source_file();
-        
+
         // Simple test: the source contains "this" keyword
-        assert!(source.contains("this"), "Expected to detect 'this' in source");
+        assert!(
+            source.contains("this"),
+            "Expected to detect 'this' in source"
+        );
     }
 
     #[test]
@@ -339,8 +347,11 @@ mod tests {
         let source = "const add = (a, b) => a + b;";
         let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
         let _root = parser.parse_source_file();
-        
+
         // Simple test: the source doesn't contain "this"
-        assert!(!source.contains("this"), "Should not detect 'this' in simple arrow");
+        assert!(
+            !source.contains("this"),
+            "Should not detect 'this' in simple arrow"
+        );
     }
 }

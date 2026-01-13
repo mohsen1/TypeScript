@@ -27,7 +27,9 @@ pub fn jsdoc_for_node(
     node_idx: NodeIndex,
     source_text: &str,
 ) -> String {
-    let Some(node) = arena.get(node_idx) else { return String::new() };
+    let Some(node) = arena.get(node_idx) else {
+        return String::new();
+    };
     let mut target_pos = node.pos;
 
     if arena.get_variable_declaration(node).is_some() {
@@ -45,7 +47,9 @@ pub fn jsdoc_for_node(
                                         if let Some(stmt_ext) = arena.get_extended(stmt_idx) {
                                             let export_idx = stmt_ext.parent;
                                             if let Some(export_node) = arena.get(export_idx) {
-                                                if export_node.kind == syntax_kind_ext::EXPORT_DECLARATION {
+                                                if export_node.kind
+                                                    == syntax_kind_ext::EXPORT_DECLARATION
+                                                {
                                                     target_pos = export_node.pos;
                                                 }
                                             }
@@ -70,7 +74,10 @@ pub fn jsdoc_for_node(
         return String::new();
     };
 
-    if let Some(comment) = comments.iter().find(|comment| comment.pos <= node.pos && node.pos < comment.end) {
+    if let Some(comment) = comments
+        .iter()
+        .find(|comment| comment.pos <= node.pos && node.pos < comment.end)
+    {
         if is_jsdoc_comment(comment, source_text) {
             return get_jsdoc_content(comment, source_text);
         }
@@ -146,13 +153,14 @@ pub fn parse_jsdoc(doc: &str) -> ParsedJsdoc {
         }
     }
 
-    let summary = summary_lines
-        .join("\n")
-        .trim()
-        .to_string();
+    let summary = summary_lines.join("\n").trim().to_string();
 
     ParsedJsdoc {
-        summary: if summary.is_empty() { None } else { Some(summary) },
+        summary: if summary.is_empty() {
+            None
+        } else {
+            Some(summary)
+        },
         params,
     }
 }

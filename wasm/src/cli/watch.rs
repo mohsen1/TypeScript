@@ -1,4 +1,4 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::collections::{BTreeSet, HashSet};
 use std::io::IsTerminal;
@@ -7,9 +7,9 @@ use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
 use crate::cli::args::CliArgs;
-use crate::cli::config::{resolve_compiler_options, ResolvedCompilerOptions};
+use crate::cli::config::{ResolvedCompilerOptions, resolve_compiler_options};
 use crate::cli::driver::{self, CompilationCache};
-use crate::cli::fs::{is_ts_file, DEFAULT_EXCLUDES};
+use crate::cli::fs::{DEFAULT_EXCLUDES, is_ts_file};
 use crate::cli::reporter::Reporter;
 
 const DEFAULT_DEBOUNCE: Duration = Duration::from_millis(200);
@@ -185,8 +185,11 @@ fn load_project_state(args: &CliArgs, cwd: &Path) -> Result<ProjectState> {
     let tsconfig_path = driver::resolve_tsconfig_path(cwd, args.project.as_deref())?;
     let config = driver::load_config(tsconfig_path.as_deref())?;
 
-    let mut resolved =
-        resolve_compiler_options(config.as_ref().and_then(|cfg| cfg.compiler_options.as_ref()))?;
+    let mut resolved = resolve_compiler_options(
+        config
+            .as_ref()
+            .and_then(|cfg| cfg.compiler_options.as_ref()),
+    )?;
     driver::apply_cli_overrides(&mut resolved, args);
 
     let base_dir = driver::config_base_dir(cwd, tsconfig_path.as_deref());
@@ -230,10 +233,7 @@ fn collect_watch_roots(base_dir: &Path, explicit_files: Option<&HashSet<PathBuf>
     roots.into_iter().collect()
 }
 
-fn resolve_explicit_files(
-    base_dir: &Path,
-    files: &[PathBuf],
-) -> Option<HashSet<PathBuf>> {
+fn resolve_explicit_files(base_dir: &Path, files: &[PathBuf]) -> Option<HashSet<PathBuf>> {
     if files.is_empty() {
         return None;
     }

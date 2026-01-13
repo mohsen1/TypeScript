@@ -1,7 +1,7 @@
 use super::{ParamTransformPlan, ThinPrinter};
 use crate::parser::NodeIndex;
-use crate::parser::thin_node::ThinNode;
 use crate::parser::syntax_kind_ext;
+use crate::parser::thin_node::ThinNode;
 use crate::transforms::arrow_es5::contains_this_reference;
 
 impl<'a> ThinPrinter<'a> {
@@ -104,7 +104,9 @@ impl<'a> ThinPrinter<'a> {
 
     /// Check if a statement is a simple return statement (for single-line emission)
     pub(super) fn is_simple_return_statement(&self, stmt_idx: NodeIndex) -> bool {
-        let Some(node) = self.arena.get(stmt_idx) else { return false };
+        let Some(node) = self.arena.get(stmt_idx) else {
+            return false;
+        };
         if node.kind != syntax_kind_ext::RETURN_STATEMENT {
             return false;
         }
@@ -117,8 +119,12 @@ impl<'a> ThinPrinter<'a> {
 
     /// Emit a block on a single line: { return expr; }
     pub(super) fn emit_single_line_block(&mut self, block_idx: NodeIndex) {
-        let Some(block_node) = self.arena.get(block_idx) else { return };
-        let Some(block) = self.arena.get_block(block_node) else { return };
+        let Some(block_node) = self.arena.get(block_idx) else {
+            return;
+        };
+        let Some(block) = self.arena.get_block(block_node) else {
+            return;
+        };
 
         self.write("{ ");
         for (i, &stmt_idx) in block.statements.nodes.iter().enumerate() {
@@ -135,8 +141,12 @@ impl<'a> ThinPrinter<'a> {
         block_idx: NodeIndex,
         transforms: &ParamTransformPlan,
     ) {
-        let Some(block_node) = self.arena.get(block_idx) else { return };
-        let Some(block) = self.arena.get_block(block_node) else { return };
+        let Some(block_node) = self.arena.get(block_idx) else {
+            return;
+        };
+        let Some(block) = self.arena.get_block(block_node) else {
+            return;
+        };
 
         self.write("{");
         self.write_line();
@@ -206,5 +216,4 @@ impl<'a> ThinPrinter<'a> {
             self.emit_expression(param.initializer);
         }
     }
-
 }

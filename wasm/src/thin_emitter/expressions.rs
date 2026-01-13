@@ -1,4 +1,4 @@
-use super::{get_operator_text, ThinPrinter};
+use super::{ThinPrinter, get_operator_text};
 use crate::parser::{syntax_kind_ext, thin_node::ThinNode};
 use crate::scanner::SyntaxKind;
 

@@ -1,7 +1,7 @@
 use super::*;
-use crate::solver::intern::PROPERTY_MAP_THRESHOLD;
-use crate::parser::ThinNodeArena;
 use crate::parser::NodeIndex;
+use crate::parser::ThinNodeArena;
+use crate::solver::intern::PROPERTY_MAP_THRESHOLD;
 
 #[test]
 fn test_interner_intrinsics() {
@@ -31,7 +31,9 @@ fn test_interner_bigint_literal() {
     let interner = TypeInterner::new();
 
     let id = interner.literal_bigint("123");
-    let key = interner.lookup(id).expect("bigint literal should be interned");
+    let key = interner
+        .lookup(id)
+        .expect("bigint literal should be interned");
 
     match key {
         TypeKey::Literal(LiteralValue::BigInt(atom)) => {
@@ -270,16 +272,40 @@ fn test_interner_object_sorting() {
 
     // Properties in different order should produce same TypeId
     let props1 = vec![
-        PropertyInfo { name: interner.intern_string("a"), type_id: TypeId::STRING,
- write_type: TypeId::STRING, optional: false, readonly: false, is_method: false },
-        PropertyInfo { name: interner.intern_string("b"), type_id: TypeId::NUMBER,
- write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
     ];
     let props2 = vec![
-        PropertyInfo { name: interner.intern_string("b"), type_id: TypeId::NUMBER,
- write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
-        PropertyInfo { name: interner.intern_string("a"), type_id: TypeId::STRING,
- write_type: TypeId::STRING, optional: false, readonly: false, is_method: false },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
     ];
 
     let id1 = interner.object(props1);
@@ -364,8 +390,18 @@ fn test_tuple_list_interning_deduplication() {
 
     let interner = TypeInterner::new();
     let elements = vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ];
 
     let tuple_a = interner.tuple(elements.clone());

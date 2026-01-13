@@ -394,7 +394,10 @@ mod tests {
 
         let cloned = directive.clone();
         match cloned {
-            TransformDirective::CommonJSExport { names: cloned_names, .. } => {
+            TransformDirective::CommonJSExport {
+                names: cloned_names,
+                ..
+            } => {
                 assert!(Arc::ptr_eq(&names, &cloned_names));
             }
             _ => panic!("Expected CommonJSExport directive"),

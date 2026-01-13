@@ -3,7 +3,6 @@
 //! LSP uses line/column positions, while our AST uses byte offsets.
 //! This module provides conversion utilities.
 
-
 /// A position in a source file (0-indexed line and column).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Position {
@@ -59,7 +58,11 @@ pub struct SourceLocation {
 
 impl SourceLocation {
     pub fn new(offset: u32, line: u32, character: u32) -> Self {
-        SourceLocation { offset, line, character }
+        SourceLocation {
+            offset,
+            line,
+            character,
+        }
     }
 }
 
@@ -123,7 +126,9 @@ impl LineMap {
         } else {
             source.len() as u32
         };
-        let slice = source.get(line_start as usize..line_limit as usize).unwrap_or("");
+        let slice = source
+            .get(line_start as usize..line_limit as usize)
+            .unwrap_or("");
         let mut utf16_count = 0u32;
         let mut byte_count = 0u32;
 

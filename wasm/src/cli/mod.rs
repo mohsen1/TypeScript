@@ -12,9 +12,9 @@ mod args_tests;
 #[cfg(test)]
 mod config_tests;
 #[cfg(test)]
-mod fs_tests;
-#[cfg(test)]
 mod driver_tests;
+#[cfg(test)]
+mod fs_tests;
 #[cfg(test)]
 mod reporter_tests;
 #[cfg(test)]

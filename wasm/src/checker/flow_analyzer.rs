@@ -11,9 +11,9 @@
 //! This is used to implement TypeScript's definite assignment checking for
 //! block-scoped variables (let/const) and detect use-before-definite-assignment errors.
 
-use crate::binder::{FlowNode, FlowNodeId, FlowNodeArena, flow_flags};
+use crate::binder::{FlowNode, FlowNodeArena, FlowNodeId, flow_flags};
+use crate::parser::thin_node::{NodeAccess, ThinNodeArena};
 use crate::parser::{NodeIndex, syntax_kind_ext};
-use crate::parser::thin_node::{ThinNodeArena, NodeAccess};
 use crate::scanner::SyntaxKind;
 use rustc_hash::FxHashMap;
 use rustc_hash::FxHashSet;
@@ -70,7 +70,10 @@ impl AssignmentStateMap {
 
     /// Get the assignment state for a variable.
     pub fn get(&self, var_id: NodeIndex) -> AssignmentState {
-        self.states.get(&var_id.0).copied().unwrap_or(AssignmentState::Unassigned)
+        self.states
+            .get(&var_id.0)
+            .copied()
+            .unwrap_or(AssignmentState::Unassigned)
     }
 
     /// Set the assignment state for a variable.
@@ -102,7 +105,10 @@ impl AssignmentStateMap {
 
     /// Check if all variables are in a definite state (no MaybeAssigned).
     pub fn is_definite(&self) -> bool {
-        !self.states.values().any(|&s| s == AssignmentState::MaybeAssigned)
+        !self
+            .states
+            .values()
+            .any(|&s| s == AssignmentState::MaybeAssigned)
     }
 }
 
@@ -149,10 +155,7 @@ pub struct DefiniteAssignmentAnalyzer<'a> {
 
 impl<'a> DefiniteAssignmentAnalyzer<'a> {
     /// Create a new definite assignment analyzer.
-    pub fn new(
-        arena: &'a ThinNodeArena,
-        flow_arena: &'a FlowNodeArena,
-    ) -> Self {
+    pub fn new(arena: &'a ThinNodeArena, flow_arena: &'a FlowNodeArena) -> Self {
         Self {
             arena,
             flow_arena,
@@ -188,7 +191,9 @@ impl<'a> DefiniteAssignmentAnalyzer<'a> {
             };
 
             // Get or create state for this node
-            let state_before = self.node_states.get(&flow_id)
+            let state_before = self
+                .node_states
+                .get(&flow_id)
                 .cloned()
                 .unwrap_or_else(|| initial_state.clone());
 
@@ -241,7 +246,8 @@ impl<'a> DefiniteAssignmentAnalyzer<'a> {
         } else if flow_node.has_any_flags(flow_flags::LOOP_LABEL) {
             // At a loop label, we need to handle loop entry and back-edges
             // For now, just propagate the state
-        } else if flow_node.has_any_flags(flow_flags::TRUE_CONDITION | flow_flags::FALSE_CONDITION) {
+        } else if flow_node.has_any_flags(flow_flags::TRUE_CONDITION | flow_flags::FALSE_CONDITION)
+        {
             // Condition nodes - propagate state without changes
             // The narrowing/branching logic is handled by the flow graph structure
         }

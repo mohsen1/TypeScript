@@ -1,4 +1,4 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -6,7 +6,8 @@ use walkdir::{DirEntry, WalkDir};
 
 use crate::cli::config::TsConfig;
 
-pub(crate) const DEFAULT_EXCLUDES: [&str; 3] = ["node_modules", "bower_components", "jspm_packages"];
+pub(crate) const DEFAULT_EXCLUDES: [&str; 3] =
+    ["node_modules", "bower_components", "jspm_packages"];
 
 #[derive(Debug, Clone)]
 pub struct FileDiscoveryOptions {
@@ -55,8 +56,8 @@ pub fn discover_ts_files(options: &FileDiscoveryOptions) -> Result<Vec<PathBuf>>
 
     let include_patterns = build_include_patterns(options);
     if !include_patterns.is_empty() {
-        let include_set = build_globset(&include_patterns)
-            .context("failed to build include globset")?;
+        let include_set =
+            build_globset(&include_patterns).context("failed to build include globset")?;
         let exclude_patterns = build_exclude_patterns(options);
         let exclude_set = if exclude_patterns.is_empty() {
             None
@@ -118,7 +119,12 @@ fn build_include_patterns(options: &FileDiscoveryOptions) -> Vec<String> {
 fn build_exclude_patterns(options: &FileDiscoveryOptions) -> Vec<String> {
     let mut patterns = match options.exclude.as_ref() {
         Some(patterns) => normalize_patterns(patterns),
-        None => normalize_patterns(&DEFAULT_EXCLUDES.iter().map(|s| s.to_string()).collect::<Vec<_>>()),
+        None => normalize_patterns(
+            &DEFAULT_EXCLUDES
+                .iter()
+                .map(|s| s.to_string())
+                .collect::<Vec<_>>(),
+        ),
     };
 
     if options.exclude.is_none() {
@@ -163,8 +169,8 @@ fn contains_glob_meta(pattern: &str) -> bool {
 fn build_globset(patterns: &[String]) -> Result<GlobSet> {
     let mut builder = GlobSetBuilder::new();
     for pattern in patterns {
-        let glob = Glob::new(pattern)
-            .with_context(|| format!("invalid glob pattern '{}'", pattern))?;
+        let glob =
+            Glob::new(pattern).with_context(|| format!("invalid glob pattern '{}'", pattern))?;
         builder.add(glob);
     }
 
@@ -229,9 +235,5 @@ fn path_to_pattern(base_dir: &Path, path: &Path) -> Option<String> {
         path.to_path_buf()
     };
     let value = rel.to_string_lossy().replace('\\', "/");
-    if value.is_empty() {
-        None
-    } else {
-        Some(value)
-    }
+    if value.is_empty() { None } else { Some(value) }
 }

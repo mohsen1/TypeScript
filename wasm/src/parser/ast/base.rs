@@ -1,16 +1,16 @@
 //! Base types for AST nodes.
 
-use wasm_bindgen::prelude::*;
-use serde::Serialize;
 use crate::scanner::SyntaxKind;
+use serde::Serialize;
+use wasm_bindgen::prelude::*;
 
 /// A text range with start and end positions.
 /// All positions are character indices (not byte indices).
 #[wasm_bindgen]
 #[derive(Clone, Copy, Debug, Default, Serialize)]
 pub struct TextRange {
-    pub pos: u32,  // Start position
-    pub end: u32,  // End position
+    pub pos: u32, // Start position
+    pub end: u32, // End position
 }
 
 #[wasm_bindgen]
@@ -85,14 +85,14 @@ impl NodeList {
 /// and extended node kinds (from syntax_kind_ext constants).
 #[derive(Clone, Debug, Serialize)]
 pub struct NodeBase {
-    pub kind: u16,              // SyntaxKind value (u16 to support extended kinds)
-    pub flags: u32,             // NodeFlags
-    pub modifier_flags: u32,    // ModifierFlags (cached)
-    pub transform_flags: u32,   // TransformFlags
-    pub pos: u32,               // Start position (character index)
-    pub end: u32,               // End position (character index)
-    pub parent: NodeIndex,      // Parent node index
-    pub id: u32,                // Unique node ID (assigned by parser)
+    pub kind: u16,            // SyntaxKind value (u16 to support extended kinds)
+    pub flags: u32,           // NodeFlags
+    pub modifier_flags: u32,  // ModifierFlags (cached)
+    pub transform_flags: u32, // TransformFlags
+    pub pos: u32,             // Start position (character index)
+    pub end: u32,             // End position (character index)
+    pub parent: NodeIndex,    // Parent node index
+    pub id: u32,              // Unique node ID (assigned by parser)
 }
 
 impl Default for NodeBase {

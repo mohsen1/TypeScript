@@ -2,11 +2,8 @@
 //!
 //! Measures emitter throughput (bytes/sec) for Phase 6.1 performance analysis.
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use wasm::{
-    thin_parser::ThinParserState,
-    thin_emitter::ThinPrinter,
-};
+use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
+use wasm::{thin_emitter::ThinPrinter, thin_parser::ThinParserState};
 
 // =============================================================================
 // Test Sources
@@ -128,12 +125,10 @@ fn generate_large_source(functions: usize, statements_per_fn: usize) -> String {
 fn bench_emit_simple(c: &mut Criterion) {
     c.bench_function("emit_simple", |b| {
         b.iter(|| {
-            let mut parser = ThinParserState::new(
-                "bench.ts".to_string(),
-                SIMPLE_SOURCE.to_string(),
-            );
+            let mut parser =
+                ThinParserState::new("bench.ts".to_string(), SIMPLE_SOURCE.to_string());
             let root = parser.parse_source_file();
-            
+
             let mut printer = ThinPrinter::new(&parser.arena);
             printer.emit(root);
             black_box(printer.take_output())
@@ -145,12 +140,10 @@ fn bench_emit_simple(c: &mut Criterion) {
 fn bench_emit_medium(c: &mut Criterion) {
     c.bench_function("emit_medium", |b| {
         b.iter(|| {
-            let mut parser = ThinParserState::new(
-                "bench.ts".to_string(),
-                MEDIUM_SOURCE.to_string(),
-            );
+            let mut parser =
+                ThinParserState::new("bench.ts".to_string(), MEDIUM_SOURCE.to_string());
             let root = parser.parse_source_file();
-            
+
             let mut printer = ThinPrinter::new(&parser.arena);
             printer.emit(root);
             black_box(printer.take_output())
@@ -162,12 +155,10 @@ fn bench_emit_medium(c: &mut Criterion) {
 fn bench_emit_complex(c: &mut Criterion) {
     c.bench_function("emit_complex", |b| {
         b.iter(|| {
-            let mut parser = ThinParserState::new(
-                "bench.ts".to_string(),
-                COMPLEX_SOURCE.to_string(),
-            );
+            let mut parser =
+                ThinParserState::new("bench.ts".to_string(), COMPLEX_SOURCE.to_string());
             let root = parser.parse_source_file();
-            
+
             let mut printer = ThinPrinter::new(&parser.arena);
             printer.emit(root);
             black_box(printer.take_output())
@@ -185,19 +176,20 @@ fn bench_emit_throughput(c: &mut Criterion) {
         let label = format!("{}fn_{}stmt", functions, statements);
 
         group.throughput(Throughput::Bytes(bytes));
-        group.bench_with_input(BenchmarkId::new("thin_emit", &label), &source, |b, source| {
-            b.iter(|| {
-                let mut parser = ThinParserState::new(
-                    "bench.ts".to_string(),
-                    source.clone(),
-                );
-                let root = parser.parse_source_file();
-                
-                let mut printer = ThinPrinter::new(&parser.arena);
-                printer.emit(root);
-                black_box(printer.take_output())
-            })
-        });
+        group.bench_with_input(
+            BenchmarkId::new("thin_emit", &label),
+            &source,
+            |b, source| {
+                b.iter(|| {
+                    let mut parser = ThinParserState::new("bench.ts".to_string(), source.clone());
+                    let root = parser.parse_source_file();
+
+                    let mut printer = ThinPrinter::new(&parser.arena);
+                    printer.emit(root);
+                    black_box(printer.take_output())
+                })
+            },
+        );
     }
 
     group.finish();
@@ -209,15 +201,12 @@ fn bench_emit_write_performance(c: &mut Criterion) {
 
     // Pre-parse to isolate emit time
     let source = generate_large_source(50, 10);
-    
+
     group.bench_function("emit_only", |b| {
         // Parse once outside the benchmark loop
-        let mut parser = ThinParserState::new(
-            "bench.ts".to_string(),
-            source.clone(),
-        );
+        let mut parser = ThinParserState::new("bench.ts".to_string(), source.clone());
         let root = parser.parse_source_file();
-        
+
         b.iter(|| {
             let mut printer = ThinPrinter::new(&parser.arena);
             printer.emit(root);
@@ -242,12 +231,9 @@ fn bench_emit_with_sourcemap(c: &mut Criterion) {
     // Without source map
     group.bench_function("without_sourcemap", |b| {
         b.iter(|| {
-            let mut parser = ThinParserState::new(
-                "bench.ts".to_string(),
-                source.clone(),
-            );
+            let mut parser = ThinParserState::new("bench.ts".to_string(), source.clone());
             let root = parser.parse_source_file();
-            
+
             let mut printer = ThinPrinter::new(&parser.arena);
             printer.emit(root);
             black_box(printer.take_output())
@@ -257,12 +243,9 @@ fn bench_emit_with_sourcemap(c: &mut Criterion) {
     // With source map tracking (position tracking is always on in ThinPrinter)
     group.bench_function("with_position_tracking", |b| {
         b.iter(|| {
-            let mut parser = ThinParserState::new(
-                "bench.ts".to_string(),
-                source.clone(),
-            );
+            let mut parser = ThinParserState::new("bench.ts".to_string(), source.clone());
             let root = parser.parse_source_file();
-            
+
             let mut printer = ThinPrinter::new(&parser.arena);
             printer.emit(root);
             let output = printer.take_output();

@@ -1,10 +1,10 @@
 use super::FlowAnalyzer;
+use crate::parser::NodeIndex;
+use crate::parser::thin_node::ThinNodeArena;
 use crate::solver::{PropertyInfo, TypeId, TypeInterner};
 use crate::thin_binder::ThinBinderState;
 use crate::thin_checker::ThinCheckerState;
 use crate::thin_parser::ThinParserState;
-use crate::parser::thin_node::ThinNodeArena;
-use crate::parser::NodeIndex;
 
 fn get_switch_statement(arena: &ThinNodeArena, root: NodeIndex, stmt_index: usize) -> NodeIndex {
     let root_node = arena.get(root).expect("root node");
@@ -32,11 +32,7 @@ fn get_switch_clause_expression(
         .expect("case clause");
     let clause_node = arena.get(clause_idx).expect("clause node");
     let clause = arena.get_case_clause(clause_node).expect("clause data");
-    let stmt_idx = *clause
-        .statements
-        .nodes
-        .first()
-        .expect("clause statement");
+    let stmt_idx = *clause.statements.nodes.first().expect("clause statement");
     let stmt_node = arena.get(stmt_idx).expect("statement node");
     let expr_stmt = arena
         .get_expression_statement(stmt_node)
@@ -71,11 +67,7 @@ fn get_if_branch_expression(
 fn extract_expression_from_statement(arena: &ThinNodeArena, stmt_idx: NodeIndex) -> NodeIndex {
     let stmt_node = arena.get(stmt_idx).expect("statement node");
     if let Some(block) = arena.get_block(stmt_node) {
-        let inner_idx = *block
-            .statements
-            .nodes
-            .first()
-            .expect("block statement");
+        let inner_idx = *block.statements.nodes.first().expect("block statement");
         return extract_expression_from_statement(arena, inner_idx);
     }
 
@@ -144,7 +136,9 @@ switch (x) {
     let expected_b = types.union(vec![lit_a, lit_b]);
     assert_eq!(narrowed_b, expected_b);
 
-    let flow_default = binder.get_node_flow(ident_default).expect("flow for default");
+    let flow_default = binder
+        .get_node_flow(ident_default)
+        .expect("flow for default");
     let narrowed_default = analyzer.get_flow_type(ident_default, union, flow_default);
     assert_eq!(narrowed_default, lit_c);
 }
@@ -203,7 +197,9 @@ switch (x.kind) {
     let narrowed_case_a = analyzer.get_flow_type(ident_case_a, union, flow_case_a);
     assert_eq!(narrowed_case_a, member_a);
 
-    let flow_default = binder.get_node_flow(ident_default).expect("flow for default");
+    let flow_default = binder
+        .get_node_flow(ident_default)
+        .expect("flow for default");
     let narrowed_default = analyzer.get_flow_type(ident_default, union, flow_default);
     assert_eq!(narrowed_default, member_b);
 }
@@ -511,18 +507,32 @@ if (guard(x)) {
 
     // Check if callee type is in node_types
     let callee_type_opt = checker.ctx.node_types.get(&callee_idx.0);
-    assert!(callee_type_opt.is_some(), "Callee type should be in node_types, callee_idx.0 = {}", callee_idx.0);
+    assert!(
+        callee_type_opt.is_some(),
+        "Callee type should be in node_types, callee_idx.0 = {}",
+        callee_idx.0
+    );
     let callee_type = *callee_type_opt.unwrap();
 
     // Check that callee type is a function with a type predicate
     let callee_key = types.lookup(callee_type);
-    assert!(callee_key.is_some(), "Callee type {} should have a key", callee_type.0);
+    assert!(
+        callee_key.is_some(),
+        "Callee type {} should have a key",
+        callee_type.0
+    );
     match callee_key.unwrap() {
         crate::solver::TypeKey::Function(shape_id) => {
             let shape = types.function_shape(shape_id);
-            assert!(shape.type_predicate.is_some(), "Function should have a type predicate");
+            assert!(
+                shape.type_predicate.is_some(),
+                "Function should have a type predicate"
+            );
         }
-        other => panic!("Expected TypeKey::Function, got {:?}. callee_type = {}", other, callee_type.0),
+        other => panic!(
+            "Expected TypeKey::Function, got {:?}. callee_type = {}",
+            other, callee_type.0
+        ),
     }
 
     assert_eq!(narrowed_then, TypeId::STRING);
@@ -724,11 +734,7 @@ class Foo {
 
     let root_node = arena.get(root).expect("root node");
     let source_file = arena.get_source_file(root_node).expect("source file");
-    let class_idx = *source_file
-        .statements
-        .nodes
-        .first()
-        .expect("class decl");
+    let class_idx = *source_file.statements.nodes.first().expect("class decl");
     let class_node = arena.get(class_idx).expect("class node");
     let class_decl = arena.get_class(class_node).expect("class data");
     let method_idx = *class_decl.members.nodes.get(1).expect("method decl");
@@ -846,10 +852,7 @@ while (true) {
     let ident_before = get_block_expression(arena, body_idx, 0);
 
     let declared = types.union(vec![TypeId::STRING, TypeId::NUMBER]);
-    let expected = types.union(vec![
-        types.literal_string("a"),
-        types.literal_number(1.0),
-    ]);
+    let expected = types.union(vec![types.literal_string("a"), types.literal_number(1.0)]);
 
     let flow_before = binder.get_node_flow(ident_before).expect("flow before");
     let narrowed_before = analyzer.get_flow_type(ident_before, declared, flow_before);

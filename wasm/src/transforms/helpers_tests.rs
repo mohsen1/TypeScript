@@ -37,7 +37,9 @@ fn test_emit_awaiter_before_generator() {
     helpers.generator = true;
     let output = emit_helpers(&helpers);
     let awaiter_pos = output.find("__awaiter").expect("Expected __awaiter helper");
-    let generator_pos = output.find("__generator").expect("Expected __generator helper");
+    let generator_pos = output
+        .find("__generator")
+        .expect("Expected __generator helper");
     assert!(
         awaiter_pos < generator_pos,
         "__awaiter should be emitted before __generator"
@@ -207,12 +209,30 @@ fn test_emit_all_helpers() {
     assert!(output.contains("__values"), "missing __values");
     assert!(output.contains("__read"), "missing __read");
     assert!(output.contains("__spreadArray"), "missing __spreadArray");
-    assert!(output.contains("__importDefault"), "missing __importDefault");
+    assert!(
+        output.contains("__importDefault"),
+        "missing __importDefault"
+    );
     assert!(output.contains("__importStar"), "missing __importStar");
     assert!(output.contains("__exportStar"), "missing __exportStar");
-    assert!(output.contains("__makeTemplateObject"), "missing __makeTemplateObject");
-    assert!(output.contains("__classPrivateFieldGet"), "missing __classPrivateFieldGet");
-    assert!(output.contains("__classPrivateFieldSet"), "missing __classPrivateFieldSet");
-    assert!(output.contains("__classPrivateFieldIn"), "missing __classPrivateFieldIn");
-    assert!(output.contains("__createBinding"), "missing __createBinding");
+    assert!(
+        output.contains("__makeTemplateObject"),
+        "missing __makeTemplateObject"
+    );
+    assert!(
+        output.contains("__classPrivateFieldGet"),
+        "missing __classPrivateFieldGet"
+    );
+    assert!(
+        output.contains("__classPrivateFieldSet"),
+        "missing __classPrivateFieldSet"
+    );
+    assert!(
+        output.contains("__classPrivateFieldIn"),
+        "missing __classPrivateFieldIn"
+    );
+    assert!(
+        output.contains("__createBinding"),
+        "missing __createBinding"
+    );
 }

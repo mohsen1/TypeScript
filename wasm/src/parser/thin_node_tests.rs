@@ -4,11 +4,18 @@ use std::mem::size_of;
 #[test]
 fn test_thin_node_size() {
     // This is the critical test - ThinNode MUST be 16 bytes
-    assert_eq!(size_of::<ThinNode>(), 16, "ThinNode must be exactly 16 bytes");
+    assert_eq!(
+        size_of::<ThinNode>(),
+        16,
+        "ThinNode must be exactly 16 bytes"
+    );
 
     // 4 nodes per cache line
     let nodes_per_cache_line = 64 / size_of::<ThinNode>();
-    assert_eq!(nodes_per_cache_line, 4, "Should fit 4 ThinNodes per 64-byte cache line");
+    assert_eq!(
+        nodes_per_cache_line, 4,
+        "Should fit 4 ThinNodes per 64-byte cache line"
+    );
 }
 
 #[test]
@@ -52,10 +59,16 @@ fn test_thin_node_arena_basic() {
 #[test]
 fn test_data_pool_sizes() {
     // Verify data pool element sizes are reasonable
-    assert!(size_of::<IdentifierData>() <= 120, "IdentifierData too large");
+    assert!(
+        size_of::<IdentifierData>() <= 120,
+        "IdentifierData too large"
+    );
     assert!(size_of::<FunctionData>() <= 168, "FunctionData too large");
     assert!(size_of::<ClassData>() <= 200, "ClassData too large");
-    assert!(size_of::<SourceFileData>() <= 200, "SourceFileData too large");
+    assert!(
+        size_of::<SourceFileData>() <= 200,
+        "SourceFileData too large"
+    );
 }
 
 #[test]
@@ -89,8 +102,8 @@ fn test_node_view() {
 
 #[test]
 fn test_node_kind_utilities() {
-    use crate::scanner::SyntaxKind;
     use super::super::syntax_kind_ext::*;
+    use crate::scanner::SyntaxKind;
 
     let ident = ThinNode::new(SyntaxKind::Identifier as u16, 0, 5);
     assert!(ident.is_identifier());
@@ -147,8 +160,8 @@ fn test_node_access_trait() {
 
 #[test]
 fn test_parent_mapping() {
-    use crate::scanner::SyntaxKind;
     use crate::parser::syntax_kind_ext::BINARY_EXPRESSION;
+    use crate::scanner::SyntaxKind;
 
     let mut arena = ThinNodeArena::new();
 
@@ -189,23 +202,29 @@ fn test_parent_mapping() {
 
     // Verify parent mapping
     let left_extended = arena.get_extended(left_ident).unwrap();
-    assert_eq!(left_extended.parent, binary_expr,
-        "Left identifier should have binary expression as parent");
+    assert_eq!(
+        left_extended.parent, binary_expr,
+        "Left identifier should have binary expression as parent"
+    );
 
     let right_extended = arena.get_extended(right_ident).unwrap();
-    assert_eq!(right_extended.parent, binary_expr,
-        "Right identifier should have binary expression as parent");
+    assert_eq!(
+        right_extended.parent, binary_expr,
+        "Right identifier should have binary expression as parent"
+    );
 
     // Verify binary expression has no parent (it's the root)
     let binary_extended = arena.get_extended(binary_expr).unwrap();
-    assert!(binary_extended.parent.is_none(),
-        "Binary expression should have no parent (it's the root)");
+    assert!(
+        binary_extended.parent.is_none(),
+        "Binary expression should have no parent (it's the root)"
+    );
 }
 
 #[test]
 fn test_parent_mapping_nested() {
-    use crate::scanner::SyntaxKind;
     use crate::parser::syntax_kind_ext::BINARY_EXPRESSION;
+    use crate::scanner::SyntaxKind;
 
     let mut arena = ThinNodeArena::new();
 
@@ -219,29 +238,54 @@ fn test_parent_mapping_nested() {
 
     let a = arena.add_identifier(
         SyntaxKind::Identifier as u16,
-        0, 1,
-        IdentifierData { escaped_text: "a".to_string(), original_text: None, type_arguments: None },
+        0,
+        1,
+        IdentifierData {
+            escaped_text: "a".to_string(),
+            original_text: None,
+            type_arguments: None,
+        },
     );
     let b = arena.add_identifier(
         SyntaxKind::Identifier as u16,
-        4, 5,
-        IdentifierData { escaped_text: "b".to_string(), original_text: None, type_arguments: None },
+        4,
+        5,
+        IdentifierData {
+            escaped_text: "b".to_string(),
+            original_text: None,
+            type_arguments: None,
+        },
     );
     let add = arena.add_binary_expr(
         BINARY_EXPRESSION,
-        0, 5,
-        BinaryExprData { left: a, operator_token: SyntaxKind::PlusToken as u16, right: b },
+        0,
+        5,
+        BinaryExprData {
+            left: a,
+            operator_token: SyntaxKind::PlusToken as u16,
+            right: b,
+        },
     );
 
     let c = arena.add_identifier(
         SyntaxKind::Identifier as u16,
-        9, 10,
-        IdentifierData { escaped_text: "c".to_string(), original_text: None, type_arguments: None },
+        9,
+        10,
+        IdentifierData {
+            escaped_text: "c".to_string(),
+            original_text: None,
+            type_arguments: None,
+        },
     );
     let multiply = arena.add_binary_expr(
         BINARY_EXPRESSION,
-        0, 10,
-        BinaryExprData { left: add, operator_token: SyntaxKind::AsteriskToken as u16, right: c },
+        0,
+        10,
+        BinaryExprData {
+            left: add,
+            operator_token: SyntaxKind::AsteriskToken as u16,
+            right: c,
+        },
     );
 
     // Verify parent chain: a -> add -> multiply
@@ -254,50 +298,75 @@ fn test_parent_mapping_nested() {
 
 #[test]
 fn test_parent_mapping_function() {
-    use crate::scanner::SyntaxKind;
-    use crate::parser::syntax_kind_ext::{BLOCK, FUNCTION_DECLARATION, RETURN_STATEMENT};
     use crate::parser::NodeList;
+    use crate::parser::syntax_kind_ext::{BLOCK, FUNCTION_DECLARATION, RETURN_STATEMENT};
+    use crate::scanner::SyntaxKind;
 
     let mut arena = ThinNodeArena::new();
 
     // Create a simple function: function foo() { return 42; }
     let name = arena.add_identifier(
         SyntaxKind::Identifier as u16,
-        9, 12,
-        IdentifierData { escaped_text: "foo".to_string(), original_text: None, type_arguments: None },
+        9,
+        12,
+        IdentifierData {
+            escaped_text: "foo".to_string(),
+            original_text: None,
+            type_arguments: None,
+        },
     );
 
     let literal = arena.add_literal(
         SyntaxKind::NumericLiteral as u16,
-        23, 25,
-        LiteralData { text: "42".to_string(), raw_text: None, value: Some(42.0) },
+        23,
+        25,
+        LiteralData {
+            text: "42".to_string(),
+            raw_text: None,
+            value: Some(42.0),
+        },
     );
 
     let return_stmt = arena.add_return(
         RETURN_STATEMENT,
-        16, 26,
-        ReturnData { expression: literal },
+        16,
+        26,
+        ReturnData {
+            expression: literal,
+        },
     );
 
     let block = arena.add_block(
         BLOCK,
-        14, 28,
+        14,
+        28,
         BlockData {
-            statements: NodeList { nodes: vec![return_stmt], pos: 16, end: 26, has_trailing_comma: false },
+            statements: NodeList {
+                nodes: vec![return_stmt],
+                pos: 16,
+                end: 26,
+                has_trailing_comma: false,
+            },
             multi_line: true,
         },
     );
 
     let func = arena.add_function(
         FUNCTION_DECLARATION,
-        0, 28,
+        0,
+        28,
         FunctionData {
             modifiers: None,
             is_async: false,
             asterisk_token: false,
             name,
             type_parameters: None,
-            parameters: NodeList { nodes: vec![], pos: 13, end: 14, has_trailing_comma: false },
+            parameters: NodeList {
+                nodes: vec![],
+                pos: 13,
+                end: 14,
+                has_trailing_comma: false,
+            },
             type_annotation: NodeIndex::NONE,
             body: block,
             equals_greater_than_token: false,
@@ -305,9 +374,28 @@ fn test_parent_mapping_function() {
     );
 
     // Verify parent chain
-    assert_eq!(arena.get_extended(name).unwrap().parent, func, "Function name should have function as parent");
-    assert_eq!(arena.get_extended(block).unwrap().parent, func, "Function body should have function as parent");
-    assert_eq!(arena.get_extended(return_stmt).unwrap().parent, block, "Return statement should have block as parent");
-    assert_eq!(arena.get_extended(literal).unwrap().parent, return_stmt, "Literal should have return statement as parent");
-    assert!(arena.get_extended(func).unwrap().parent.is_none(), "Function should have no parent");
+    assert_eq!(
+        arena.get_extended(name).unwrap().parent,
+        func,
+        "Function name should have function as parent"
+    );
+    assert_eq!(
+        arena.get_extended(block).unwrap().parent,
+        func,
+        "Function body should have function as parent"
+    );
+    assert_eq!(
+        arena.get_extended(return_stmt).unwrap().parent,
+        block,
+        "Return statement should have block as parent"
+    );
+    assert_eq!(
+        arena.get_extended(literal).unwrap().parent,
+        return_stmt,
+        "Literal should have return statement as parent"
+    );
+    assert!(
+        arena.get_extended(func).unwrap().parent.is_none(),
+        "Function should have no parent"
+    );
 }

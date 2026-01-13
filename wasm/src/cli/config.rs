@@ -1,4 +1,4 @@
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{Context, Result, anyhow, bail};
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::{Path, PathBuf};
@@ -191,7 +191,9 @@ impl Default for ResolvedCompilerOptions {
     }
 }
 
-pub fn resolve_compiler_options(options: Option<&CompilerOptions>) -> Result<ResolvedCompilerOptions> {
+pub fn resolve_compiler_options(
+    options: Option<&CompilerOptions>,
+) -> Result<ResolvedCompilerOptions> {
     let mut resolved = ResolvedCompilerOptions::default();
     let Some(options) = options else {
         return Ok(resolved);
@@ -508,7 +510,10 @@ fn build_path_mappings(paths: &HashMap<String, Vec<String>>) -> Vec<PathMapping>
             continue;
         }
         let pattern = normalize_path_pattern(pattern);
-        let targets = targets.iter().map(|target| normalize_path_pattern(target)).collect();
+        let targets = targets
+            .iter()
+            .map(|target| normalize_path_pattern(target))
+            .collect();
         let (prefix, suffix) = split_path_pattern(&pattern);
         mappings.push(PathMapping {
             pattern,

@@ -8,7 +8,7 @@ fn test_node_flags() {
     assert_eq!(node_flags::NONE, 0);
     assert_eq!(node_flags::LET, 1);
     assert_eq!(node_flags::CONST, 2);
-    assert_eq!(node_flags::AWAIT_USING, 6);  // Const | Using
+    assert_eq!(node_flags::AWAIT_USING, 6); // Const | Using
 }
 
 #[test]

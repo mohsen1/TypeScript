@@ -63,7 +63,11 @@ pub struct LspDiagnosticRelatedInformation {
 }
 
 /// Convert a checker diagnostic to an LSP diagnostic.
-pub fn convert_diagnostic(diag: &CheckerDiagnostic, line_map: &LineMap, source: &str) -> LspDiagnostic {
+pub fn convert_diagnostic(
+    diag: &CheckerDiagnostic,
+    line_map: &LineMap,
+    source: &str,
+) -> LspDiagnostic {
     let start = line_map.offset_to_position(diag.start, source);
     let end = line_map.offset_to_position(diag.start.saturating_add(diag.length), source);
     let severity = match diag.category {
@@ -76,12 +80,14 @@ pub fn convert_diagnostic(diag: &CheckerDiagnostic, line_map: &LineMap, source: 
     let related_information = if diag.related_information.is_empty() {
         None
     } else {
-        let items: Vec<_> = diag.related_information
+        let items: Vec<_> = diag
+            .related_information
             .iter()
             .filter(|related| related.file == diag.file)
             .map(|related| {
                 let related_start = line_map.offset_to_position(related.start, source);
-                let related_end = line_map.offset_to_position(related.start.saturating_add(related.length), source);
+                let related_end = line_map
+                    .offset_to_position(related.start.saturating_add(related.length), source);
                 LspDiagnosticRelatedInformation {
                     location: Location {
                         file_path: related.file.clone(),
@@ -108,7 +114,9 @@ pub fn convert_diagnostic(diag: &CheckerDiagnostic, line_map: &LineMap, source: 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::checker::types::diagnostics::{Diagnostic, DiagnosticCategory, DiagnosticRelatedInformation};
+    use crate::checker::types::diagnostics::{
+        Diagnostic, DiagnosticCategory, DiagnosticRelatedInformation,
+    };
     use crate::lsp::position::LineMap;
 
     #[test]

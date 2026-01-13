@@ -3,8 +3,8 @@
 //! These tests verify that the LSP features work correctly together.
 
 use super::*;
-use crate::thin_parser::ThinParserState;
 use crate::thin_binder::ThinBinderState;
+use crate::thin_parser::ThinParserState;
 
 #[test]
 fn test_lsp_workflow_simple() {
@@ -20,13 +20,15 @@ fn test_lsp_workflow_simple() {
     let line_map = position::LineMap::build(source);
 
     // Test Go-to-Definition
-    let goto_def = definition::GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+    let goto_def =
+        definition::GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
     let position = Position::new(1, 0); // First 'x' in "x + x"
     let def = goto_def.get_definition(root, position);
     assert!(def.is_some(), "Should find definition");
 
     // Test Find References
-    let find_refs = references::FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+    let find_refs =
+        references::FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
     let refs = find_refs.find_references(root, position);
     assert!(refs.is_some(), "Should find references");
 }
@@ -45,7 +47,8 @@ fn test_lsp_with_function() {
     let line_map = position::LineMap::build(source);
 
     // Test Go-to-Definition on the call
-    let goto_def = definition::GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+    let goto_def =
+        definition::GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
     let position = Position::new(1, 0); // 'foo' in "foo()"
     let def = goto_def.get_definition(root, position);
 
@@ -106,7 +109,7 @@ fn test_lsp_diagnostic_conversion() {
     binder.bind_source_file(arena, root);
 
     let types = crate::solver::TypeInterner::new();
-    let strict = false;  // default for tests
+    let strict = false; // default for tests
     let mut checker = crate::thin_checker::ThinCheckerState::new(
         arena,
         &binder,
@@ -127,5 +130,8 @@ fn test_lsp_diagnostic_conversion() {
     assert!(!lsp_diags.is_empty(), "Should produce LSP diagnostics");
     let diag = &lsp_diags[0];
     assert_eq!(diag.range.start.line, 0);
-    assert_eq!(diag.severity, Some(crate::lsp::diagnostics::DiagnosticSeverity::Error));
+    assert_eq!(
+        diag.severity,
+        Some(crate::lsp::diagnostics::DiagnosticSeverity::Error)
+    );
 }

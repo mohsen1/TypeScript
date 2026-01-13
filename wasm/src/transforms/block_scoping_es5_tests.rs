@@ -28,8 +28,7 @@ fn parse_first_loop(source: &str) -> (ThinParserState, NodeIndex, NodeIndex) {
 
 #[test]
 fn test_collect_loop_vars_from_initializer() {
-    let (parser, initializer_idx, _) =
-        parse_first_loop("for (let i = 0, j = 1; i < 3; i++) { }");
+    let (parser, initializer_idx, _) = parse_first_loop("for (let i = 0, j = 1; i < 3; i++) { }");
     let vars = collect_loop_vars(&parser.arena, initializer_idx);
 
     assert_eq!(vars, vec!["i".to_string(), "j".to_string()]);
@@ -40,14 +39,16 @@ fn test_collect_loop_vars_expression_initializer() {
     let (parser, initializer_idx, _) = parse_first_loop("for (i = 0; i < 3; i++) { }");
     let vars = collect_loop_vars(&parser.arena, initializer_idx);
 
-    assert!(vars.is_empty(), "Expected no vars from expression initializer");
+    assert!(
+        vars.is_empty(),
+        "Expected no vars from expression initializer"
+    );
 }
 
 #[test]
 fn test_analyze_loop_capture_detects_capture() {
-    let (parser, initializer_idx, body_idx) = parse_first_loop(
-        "for (let i = 0; i < 3; i++) { setTimeout(() => i, 0); }",
-    );
+    let (parser, initializer_idx, body_idx) =
+        parse_first_loop("for (let i = 0; i < 3; i++) { setTimeout(() => i, 0); }");
     let loop_vars = collect_loop_vars(&parser.arena, initializer_idx);
     let info = analyze_loop_capture(&parser.arena, body_idx, &loop_vars);
 

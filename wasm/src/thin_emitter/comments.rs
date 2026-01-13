@@ -78,7 +78,8 @@ pub fn get_trailing_comment_ranges(text: &str, pos: usize) -> Vec<CommentRange> 
                     pos: start as u32,
                     end: i as u32,
                     kind: CommentKind::SingleLine,
-                    has_trailing_newline: i < len && is_line_break(char_at(text, i).unwrap_or('\0')),
+                    has_trailing_newline: i < len
+                        && is_line_break(char_at(text, i).unwrap_or('\0')),
                 });
                 continue;
             } else if next_byte == b'*' {

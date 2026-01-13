@@ -57,7 +57,9 @@ impl Reporter {
         output.push_str(&diagnostic.message_text);
 
         // Add source code snippet with error span underline (like tsc)
-        if let Some(snippet) = self.format_snippet(&diagnostic.file, diagnostic.start, diagnostic.length) {
+        if let Some(snippet) =
+            self.format_snippet(&diagnostic.file, diagnostic.start, diagnostic.length)
+        {
             output.push_str(&snippet);
         }
 
@@ -69,7 +71,8 @@ impl Reporter {
             output.push('\n');
             output.push_str(&self.format_related(related));
             // Add source snippet for related information too
-            if let Some(snippet) = self.format_snippet(&related.file, related.start, related.length) {
+            if let Some(snippet) = self.format_snippet(&related.file, related.start, related.length)
+            {
                 output.push_str(&snippet);
             }
         }

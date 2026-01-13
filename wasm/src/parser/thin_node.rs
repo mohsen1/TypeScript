@@ -25,9 +25,9 @@
 //! 3. **No heap allocation per node**: All storage in arena vectors
 //! 4. **O(1) node access**: Direct index into typed pool
 
-use serde::Serialize;
-use super::base::NodeIndex;
 use super::ast::NodeList;
+use super::base::NodeIndex;
+use serde::Serialize;
 
 /// A thin 16-byte node header for cache-efficient AST storage.
 ///
@@ -81,7 +81,13 @@ impl ThinNode {
 
     /// Create a new thin node with data index and flags
     #[inline]
-    pub fn with_data_and_flags(kind: u16, pos: u32, end: u32, data_index: u32, flags: u16) -> ThinNode {
+    pub fn with_data_and_flags(
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data_index: u32,
+        flags: u16,
+    ) -> ThinNode {
         ThinNode {
             kind,
             flags,
@@ -155,14 +161,14 @@ pub struct LiteralData {
 #[derive(Clone, Debug, Serialize)]
 pub struct BinaryExprData {
     pub left: NodeIndex,
-    pub operator_token: u16,  // SyntaxKind
+    pub operator_token: u16, // SyntaxKind
     pub right: NodeIndex,
 }
 
 /// Data for unary expressions (prefix/postfix)
 #[derive(Clone, Debug, Serialize)]
 pub struct UnaryExprData {
-    pub operator: u16,  // SyntaxKind
+    pub operator: u16, // SyntaxKind
     pub operand: NodeIndex,
 }
 
@@ -186,14 +192,14 @@ pub struct AccessExprData {
 #[derive(Clone, Debug, Serialize)]
 pub struct FunctionData {
     pub modifiers: Option<NodeList>,
-    pub is_async: bool,           // Async function
-    pub asterisk_token: bool,     // Generator function
+    pub is_async: bool,       // Async function
+    pub asterisk_token: bool, // Generator function
     pub name: NodeIndex,
     pub type_parameters: Option<NodeList>,
     pub parameters: NodeList,
     pub type_annotation: NodeIndex,
     pub body: NodeIndex,
-    pub equals_greater_than_token: bool,  // For arrows
+    pub equals_greater_than_token: bool, // For arrows
 }
 
 /// Data for class declarations
@@ -281,7 +287,7 @@ pub struct ParenthesizedData {
 #[derive(Clone, Debug, Serialize)]
 pub struct UnaryExprDataEx {
     pub expression: NodeIndex,
-    pub asterisk_token: bool,  // For yield*
+    pub asterisk_token: bool, // For yield*
 }
 
 /// Data for as/satisfies/type assertion expressions
@@ -313,7 +319,7 @@ pub struct SwitchData {
 /// Data for case/default clauses
 #[derive(Clone, Debug, Serialize)]
 pub struct CaseClauseData {
-    pub expression: NodeIndex,  // NONE for default clause
+    pub expression: NodeIndex, // NONE for default clause
     pub statements: NodeList,
 }
 
@@ -492,7 +498,7 @@ pub struct DecoratorData {
 /// Data for heritage clauses
 #[derive(Clone, Debug, Serialize)]
 pub struct HeritageData {
-    pub token: u16,  // ExtendsKeyword or ImplementsKeyword
+    pub token: u16, // ExtendsKeyword or ImplementsKeyword
     pub types: NodeList,
 }
 
@@ -523,8 +529,8 @@ pub struct ImportClauseData {
 /// Data for namespace/named imports
 #[derive(Clone, Debug, Serialize)]
 pub struct NamedImportsData {
-    pub name: NodeIndex,       // For namespace import
-    pub elements: NodeList,    // For named imports
+    pub name: NodeIndex,    // For namespace import
+    pub elements: NodeList, // For named imports
 }
 
 /// Data for import/export specifiers
@@ -611,19 +617,19 @@ pub struct SpreadData {
 /// Data for variable declarations (individual)
 #[derive(Clone, Debug, Serialize)]
 pub struct VariableDeclarationData {
-    pub name: NodeIndex,             // Identifier or BindingPattern
-    pub exclamation_token: bool,     // Definite assignment assertion
-    pub type_annotation: NodeIndex,  // TypeNode (optional)
-    pub initializer: NodeIndex,      // Expression (optional)
+    pub name: NodeIndex,            // Identifier or BindingPattern
+    pub exclamation_token: bool,    // Definite assignment assertion
+    pub type_annotation: NodeIndex, // TypeNode (optional)
+    pub initializer: NodeIndex,     // Expression (optional)
 }
 
 /// Data for for-in/for-of statements
 #[derive(Clone, Debug, Serialize)]
 pub struct ForInOfData {
-    pub await_modifier: bool,        // For for-await-of
-    pub initializer: NodeIndex,      // Variable declaration or expression
-    pub expression: NodeIndex,       // The iterable expression
-    pub statement: NodeIndex,        // The loop body
+    pub await_modifier: bool,   // For for-await-of
+    pub initializer: NodeIndex, // Variable declaration or expression
+    pub expression: NodeIndex,  // The iterable expression
+    pub statement: NodeIndex,   // The loop body
 }
 
 /// Data for debugger/empty statements (no data needed, use token)
@@ -1039,16 +1045,16 @@ impl ThinNodeArena {
         // Pre-allocate the most commonly used pools
         arena.nodes = Vec::with_capacity(capacity);
         arena.extended_info = Vec::with_capacity(capacity);
-        arena.identifiers = Vec::with_capacity(capacity / 4);       // ~25% identifiers
-        arena.literals = Vec::with_capacity(capacity / 8);          // ~12% literals
-        arena.binary_exprs = Vec::with_capacity(capacity / 8);      // ~12% binary
-        arena.call_exprs = Vec::with_capacity(capacity / 8);        // ~12% calls
-        arena.access_exprs = Vec::with_capacity(capacity / 8);      // ~12% property access
-        arena.blocks = Vec::with_capacity(capacity / 8);            // ~12% blocks
-        arena.variables = Vec::with_capacity(capacity / 16);        // ~6% variables
-        arena.functions = Vec::with_capacity(capacity / 16);        // ~6% functions
-        arena.type_refs = Vec::with_capacity(capacity / 8);         // ~12% type refs
-        arena.source_files = Vec::with_capacity(1);                 // Usually 1
+        arena.identifiers = Vec::with_capacity(capacity / 4); // ~25% identifiers
+        arena.literals = Vec::with_capacity(capacity / 8); // ~12% literals
+        arena.binary_exprs = Vec::with_capacity(capacity / 8); // ~12% binary
+        arena.call_exprs = Vec::with_capacity(capacity / 8); // ~12% calls
+        arena.access_exprs = Vec::with_capacity(capacity / 8); // ~12% property access
+        arena.blocks = Vec::with_capacity(capacity / 8); // ~12% blocks
+        arena.variables = Vec::with_capacity(capacity / 16); // ~6% variables
+        arena.functions = Vec::with_capacity(capacity / 16); // ~6% functions
+        arena.type_refs = Vec::with_capacity(capacity / 8); // ~12% type refs
+        arena.source_files = Vec::with_capacity(1); // Usually 1
 
         arena
     }
@@ -1206,30 +1212,38 @@ impl ThinNodeArena {
     pub fn create_modifier(&mut self, kind: crate::scanner::SyntaxKind, pos: u32) -> NodeIndex {
         // Modifiers are simple tokens, their kind IS the modifier type
         // End position is pos + keyword length
-        let end = pos + match kind {
-            crate::scanner::SyntaxKind::StaticKeyword => 6,    // "static"
-            crate::scanner::SyntaxKind::PublicKeyword => 6,    // "public"
-            crate::scanner::SyntaxKind::PrivateKeyword => 7,   // "private"
-            crate::scanner::SyntaxKind::ProtectedKeyword => 9, // "protected"
-            crate::scanner::SyntaxKind::ReadonlyKeyword => 8,  // "readonly"
-            crate::scanner::SyntaxKind::AbstractKeyword => 8,  // "abstract"
-            crate::scanner::SyntaxKind::OverrideKeyword => 8,  // "override"
-            crate::scanner::SyntaxKind::AsyncKeyword => 5,     // "async"
-            crate::scanner::SyntaxKind::DeclareKeyword => 7,   // "declare"
-            crate::scanner::SyntaxKind::ExportKeyword => 6,    // "export"
-            crate::scanner::SyntaxKind::DefaultKeyword => 7,   // "default"
-            crate::scanner::SyntaxKind::ConstKeyword => 5,     // "const"
-            _ => 0,
-        };
+        let end = pos
+            + match kind {
+                crate::scanner::SyntaxKind::StaticKeyword => 6, // "static"
+                crate::scanner::SyntaxKind::PublicKeyword => 6, // "public"
+                crate::scanner::SyntaxKind::PrivateKeyword => 7, // "private"
+                crate::scanner::SyntaxKind::ProtectedKeyword => 9, // "protected"
+                crate::scanner::SyntaxKind::ReadonlyKeyword => 8, // "readonly"
+                crate::scanner::SyntaxKind::AbstractKeyword => 8, // "abstract"
+                crate::scanner::SyntaxKind::OverrideKeyword => 8, // "override"
+                crate::scanner::SyntaxKind::AsyncKeyword => 5,  // "async"
+                crate::scanner::SyntaxKind::DeclareKeyword => 7, // "declare"
+                crate::scanner::SyntaxKind::ExportKeyword => 6, // "export"
+                crate::scanner::SyntaxKind::DefaultKeyword => 7, // "default"
+                crate::scanner::SyntaxKind::ConstKeyword => 5,  // "const"
+                _ => 0,
+            };
         self.add_token(kind as u16, pos, end)
     }
 
     /// Add an identifier node
-    pub fn add_identifier(&mut self, kind: u16, pos: u32, end: u32, data: IdentifierData) -> NodeIndex {
+    pub fn add_identifier(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: IdentifierData,
+    ) -> NodeIndex {
         let data_index = self.identifiers.len() as u32;
         self.identifiers.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         NodeIndex(index)
     }
@@ -1239,20 +1253,28 @@ impl ThinNodeArena {
         let data_index = self.literals.len() as u32;
         self.literals.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         NodeIndex(index)
     }
 
     /// Add a binary expression
-    pub fn add_binary_expr(&mut self, kind: u16, pos: u32, end: u32, data: BinaryExprData) -> NodeIndex {
+    pub fn add_binary_expr(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: BinaryExprData,
+    ) -> NodeIndex {
         let left = data.left;
         let right = data.right;
 
         let data_index = self.binary_exprs.len() as u32;
         self.binary_exprs.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
 
         let parent = NodeIndex(index);
@@ -1263,7 +1285,13 @@ impl ThinNodeArena {
     }
 
     /// Add a call expression
-    pub fn add_call_expr(&mut self, kind: u16, pos: u32, end: u32, data: CallExprData) -> NodeIndex {
+    pub fn add_call_expr(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: CallExprData,
+    ) -> NodeIndex {
         let expression = data.expression;
         let type_arguments = data.type_arguments.clone();
         let arguments = data.arguments.clone();
@@ -1271,7 +1299,8 @@ impl ThinNodeArena {
         let data_index = self.call_exprs.len() as u32;
         self.call_exprs.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
 
         let parent = NodeIndex(index);
@@ -1294,7 +1323,8 @@ impl ThinNodeArena {
         let data_index = self.functions.len() as u32;
         self.functions.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
 
         let parent = NodeIndex(index);
@@ -1319,7 +1349,8 @@ impl ThinNodeArena {
         let data_index = self.classes.len() as u32;
         self.classes.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
 
         let parent = NodeIndex(index);
@@ -1339,7 +1370,8 @@ impl ThinNodeArena {
         let data_index = self.blocks.len() as u32;
         self.blocks.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
 
         let parent = NodeIndex(index);
@@ -1357,7 +1389,8 @@ impl ThinNodeArena {
         let data_index = self.source_files.len() as u32;
         self.source_files.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(SOURCE_FILE, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(SOURCE_FILE, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
 
         let parent = NodeIndex(index);
@@ -1372,14 +1405,21 @@ impl ThinNodeArena {
     // ==========================================================================
 
     /// Add a qualified name node
-    pub fn add_qualified_name(&mut self, kind: u16, pos: u32, end: u32, data: QualifiedNameData) -> NodeIndex {
+    pub fn add_qualified_name(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: QualifiedNameData,
+    ) -> NodeIndex {
         let left = data.left;
         let right = data.right;
 
         let data_index = self.qualified_names.len() as u32;
         self.qualified_names.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
 
         let parent = NodeIndex(index);
@@ -1390,13 +1430,20 @@ impl ThinNodeArena {
     }
 
     /// Add a computed property name node
-    pub fn add_computed_property(&mut self, kind: u16, pos: u32, end: u32, data: ComputedPropertyData) -> NodeIndex {
+    pub fn add_computed_property(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: ComputedPropertyData,
+    ) -> NodeIndex {
         let expression = data.expression;
 
         let data_index = self.computed_properties.len() as u32;
         self.computed_properties.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         let parent = NodeIndex(index);
         self.set_parent(expression, parent);
@@ -1404,13 +1451,20 @@ impl ThinNodeArena {
     }
 
     /// Add a unary expression node
-    pub fn add_unary_expr(&mut self, kind: u16, pos: u32, end: u32, data: UnaryExprData) -> NodeIndex {
+    pub fn add_unary_expr(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: UnaryExprData,
+    ) -> NodeIndex {
         let operand = data.operand;
 
         let data_index = self.unary_exprs.len() as u32;
         self.unary_exprs.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
 
         let parent = NodeIndex(index);
@@ -1420,14 +1474,21 @@ impl ThinNodeArena {
     }
 
     /// Add a property/element access expression node
-    pub fn add_access_expr(&mut self, kind: u16, pos: u32, end: u32, data: AccessExprData) -> NodeIndex {
+    pub fn add_access_expr(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: AccessExprData,
+    ) -> NodeIndex {
         let expression = data.expression;
         let name_or_argument = data.name_or_argument;
 
         let data_index = self.access_exprs.len() as u32;
         self.access_exprs.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
 
         let parent = NodeIndex(index);
@@ -1438,7 +1499,13 @@ impl ThinNodeArena {
     }
 
     /// Add a conditional expression node (a ? b : c)
-    pub fn add_conditional_expr(&mut self, kind: u16, pos: u32, end: u32, data: ConditionalExprData) -> NodeIndex {
+    pub fn add_conditional_expr(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: ConditionalExprData,
+    ) -> NodeIndex {
         let condition = data.condition;
         let when_true = data.when_true;
         let when_false = data.when_false;
@@ -1446,7 +1513,8 @@ impl ThinNodeArena {
         let data_index = self.conditional_exprs.len() as u32;
         self.conditional_exprs.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         let parent = NodeIndex(index);
         self.set_parent(condition, parent);
@@ -1456,13 +1524,20 @@ impl ThinNodeArena {
     }
 
     /// Add an object/array literal expression node
-    pub fn add_literal_expr(&mut self, kind: u16, pos: u32, end: u32, data: LiteralExprData) -> NodeIndex {
+    pub fn add_literal_expr(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: LiteralExprData,
+    ) -> NodeIndex {
         let elements = data.elements.clone();
 
         let data_index = self.literal_exprs.len() as u32;
         self.literal_exprs.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         let parent = NodeIndex(index);
         self.set_parent_list(&elements, parent);
@@ -1470,12 +1545,19 @@ impl ThinNodeArena {
     }
 
     /// Add a parenthesized expression node
-    pub fn add_parenthesized(&mut self, kind: u16, pos: u32, end: u32, data: ParenthesizedData) -> NodeIndex {
+    pub fn add_parenthesized(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: ParenthesizedData,
+    ) -> NodeIndex {
         let expression = data.expression;
         let data_index = self.parenthesized.len() as u32;
         self.parenthesized.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         let parent = NodeIndex(index);
         self.set_parent(expression, parent);
@@ -1483,12 +1565,19 @@ impl ThinNodeArena {
     }
 
     /// Add a spread/await/yield expression node
-    pub fn add_unary_expr_ex(&mut self, kind: u16, pos: u32, end: u32, data: UnaryExprDataEx) -> NodeIndex {
+    pub fn add_unary_expr_ex(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: UnaryExprDataEx,
+    ) -> NodeIndex {
         let expression = data.expression;
         let data_index = self.unary_exprs_ex.len() as u32;
         self.unary_exprs_ex.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         let parent = NodeIndex(index);
         self.set_parent(expression, parent);
@@ -1496,24 +1585,38 @@ impl ThinNodeArena {
     }
 
     /// Add a type assertion expression node
-    pub fn add_type_assertion(&mut self, kind: u16, pos: u32, end: u32, data: TypeAssertionData) -> NodeIndex {
+    pub fn add_type_assertion(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: TypeAssertionData,
+    ) -> NodeIndex {
         let data_index = self.type_assertions.len() as u32;
         self.type_assertions.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         NodeIndex(index)
     }
 
     /// Add a template expression node
-    pub fn add_template_expr(&mut self, kind: u16, pos: u32, end: u32, data: TemplateExprData) -> NodeIndex {
+    pub fn add_template_expr(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: TemplateExprData,
+    ) -> NodeIndex {
         let head = data.head;
         let template_spans = data.template_spans.clone();
 
         let data_index = self.template_exprs.len() as u32;
         self.template_exprs.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
 
         let parent = NodeIndex(index);
@@ -1524,14 +1627,21 @@ impl ThinNodeArena {
     }
 
     /// Add a template span node
-    pub fn add_template_span(&mut self, kind: u16, pos: u32, end: u32, data: TemplateSpanData) -> NodeIndex {
+    pub fn add_template_span(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: TemplateSpanData,
+    ) -> NodeIndex {
         let expression = data.expression;
         let literal = data.literal;
 
         let data_index = self.template_spans.len() as u32;
         self.template_spans.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
 
         let parent = NodeIndex(index);
@@ -1542,7 +1652,13 @@ impl ThinNodeArena {
     }
 
     /// Add a tagged template expression node
-    pub fn add_tagged_template(&mut self, kind: u16, pos: u32, end: u32, data: TaggedTemplateData) -> NodeIndex {
+    pub fn add_tagged_template(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: TaggedTemplateData,
+    ) -> NodeIndex {
         let tag = data.tag;
         let type_arguments = data.type_arguments.clone();
         let template = data.template;
@@ -1550,7 +1666,8 @@ impl ThinNodeArena {
         let data_index = self.tagged_templates.len() as u32;
         self.tagged_templates.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
 
         let parent = NodeIndex(index);
@@ -1562,7 +1679,13 @@ impl ThinNodeArena {
     }
 
     /// Add an interface declaration node
-    pub fn add_interface(&mut self, kind: u16, pos: u32, end: u32, data: InterfaceData) -> NodeIndex {
+    pub fn add_interface(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: InterfaceData,
+    ) -> NodeIndex {
         let modifiers = data.modifiers.clone();
         let name = data.name;
         let type_parameters = data.type_parameters.clone();
@@ -1572,7 +1695,8 @@ impl ThinNodeArena {
         let data_index = self.interfaces.len() as u32;
         self.interfaces.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
 
         let parent = NodeIndex(index);
@@ -1586,7 +1710,13 @@ impl ThinNodeArena {
     }
 
     /// Add a type alias declaration node
-    pub fn add_type_alias(&mut self, kind: u16, pos: u32, end: u32, data: TypeAliasData) -> NodeIndex {
+    pub fn add_type_alias(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: TypeAliasData,
+    ) -> NodeIndex {
         let modifiers = data.modifiers.clone();
         let name = data.name;
         let type_parameters = data.type_parameters.clone();
@@ -1595,7 +1725,8 @@ impl ThinNodeArena {
         let data_index = self.type_aliases.len() as u32;
         self.type_aliases.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
 
         let parent = NodeIndex(index);
@@ -1616,7 +1747,8 @@ impl ThinNodeArena {
         let data_index = self.enums.len() as u32;
         self.enums.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
 
         let parent = NodeIndex(index);
@@ -1628,14 +1760,21 @@ impl ThinNodeArena {
     }
 
     /// Add an enum member node
-    pub fn add_enum_member(&mut self, kind: u16, pos: u32, end: u32, data: EnumMemberData) -> NodeIndex {
+    pub fn add_enum_member(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: EnumMemberData,
+    ) -> NodeIndex {
         let name = data.name;
         let initializer = data.initializer;
 
         let data_index = self.enum_members.len() as u32;
         self.enum_members.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
 
         let parent = NodeIndex(index);
@@ -1654,7 +1793,8 @@ impl ThinNodeArena {
         let data_index = self.modules.len() as u32;
         self.modules.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
 
         let parent = NodeIndex(index);
@@ -1666,13 +1806,20 @@ impl ThinNodeArena {
     }
 
     /// Add a module block node: { statements }
-    pub fn add_module_block(&mut self, kind: u16, pos: u32, end: u32, data: ModuleBlockData) -> NodeIndex {
+    pub fn add_module_block(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: ModuleBlockData,
+    ) -> NodeIndex {
         let statements = data.statements.clone();
 
         let data_index = self.module_blocks.len() as u32;
         self.module_blocks.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
 
         let parent = NodeIndex(index);
@@ -1682,7 +1829,13 @@ impl ThinNodeArena {
     }
 
     /// Add a signature node (property/method signature)
-    pub fn add_signature(&mut self, kind: u16, pos: u32, end: u32, data: SignatureData) -> NodeIndex {
+    pub fn add_signature(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: SignatureData,
+    ) -> NodeIndex {
         let modifiers = data.modifiers.clone();
         let name = data.name;
         let type_parameters = data.type_parameters.clone();
@@ -1692,7 +1845,8 @@ impl ThinNodeArena {
         let data_index = self.signatures.len() as u32;
         self.signatures.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
 
         let parent = NodeIndex(index);
@@ -1706,7 +1860,13 @@ impl ThinNodeArena {
     }
 
     /// Add an index signature node
-    pub fn add_index_signature(&mut self, kind: u16, pos: u32, end: u32, data: IndexSignatureData) -> NodeIndex {
+    pub fn add_index_signature(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: IndexSignatureData,
+    ) -> NodeIndex {
         let modifiers = data.modifiers.clone();
         let parameters = data.parameters.clone();
         let type_annotation = data.type_annotation;
@@ -1714,7 +1874,8 @@ impl ThinNodeArena {
         let data_index = self.index_signatures.len() as u32;
         self.index_signatures.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
 
         let parent = NodeIndex(index);
@@ -1726,7 +1887,13 @@ impl ThinNodeArena {
     }
 
     /// Add a property declaration node
-    pub fn add_property_decl(&mut self, kind: u16, pos: u32, end: u32, data: PropertyDeclData) -> NodeIndex {
+    pub fn add_property_decl(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: PropertyDeclData,
+    ) -> NodeIndex {
         let modifiers = data.modifiers.clone();
         let name = data.name;
         let type_annotation = data.type_annotation;
@@ -1735,7 +1902,8 @@ impl ThinNodeArena {
         let data_index = self.property_decls.len() as u32;
         self.property_decls.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         let parent = NodeIndex(index);
         self.set_parent_opt_list(&modifiers, parent);
@@ -1746,7 +1914,13 @@ impl ThinNodeArena {
     }
 
     /// Add a method declaration node
-    pub fn add_method_decl(&mut self, kind: u16, pos: u32, end: u32, data: MethodDeclData) -> NodeIndex {
+    pub fn add_method_decl(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: MethodDeclData,
+    ) -> NodeIndex {
         let modifiers = data.modifiers.clone();
         let name = data.name;
         let type_parameters = data.type_parameters.clone();
@@ -1757,7 +1931,8 @@ impl ThinNodeArena {
         let data_index = self.method_decls.len() as u32;
         self.method_decls.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         let parent = NodeIndex(index);
         self.set_parent_opt_list(&modifiers, parent);
@@ -1770,7 +1945,13 @@ impl ThinNodeArena {
     }
 
     /// Add a constructor declaration node
-    pub fn add_constructor(&mut self, kind: u16, pos: u32, end: u32, data: ConstructorData) -> NodeIndex {
+    pub fn add_constructor(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: ConstructorData,
+    ) -> NodeIndex {
         let modifiers = data.modifiers.clone();
         let type_parameters = data.type_parameters.clone();
         let parameters = data.parameters.clone();
@@ -1779,7 +1960,8 @@ impl ThinNodeArena {
         let data_index = self.constructors.len() as u32;
         self.constructors.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         let parent = NodeIndex(index);
         self.set_parent_opt_list(&modifiers, parent);
@@ -1801,7 +1983,8 @@ impl ThinNodeArena {
         let data_index = self.accessors.len() as u32;
         self.accessors.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
 
         let parent = NodeIndex(index);
@@ -1816,7 +1999,13 @@ impl ThinNodeArena {
     }
 
     /// Add a parameter declaration node
-    pub fn add_parameter(&mut self, kind: u16, pos: u32, end: u32, data: ParameterData) -> NodeIndex {
+    pub fn add_parameter(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: ParameterData,
+    ) -> NodeIndex {
         let name = data.name;
         let type_annotation = data.type_annotation;
         let initializer = data.initializer;
@@ -1824,7 +2013,8 @@ impl ThinNodeArena {
         let data_index = self.parameters.len() as u32;
         self.parameters.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         let parent = NodeIndex(index);
         // Set parent pointers for children
@@ -1836,7 +2026,13 @@ impl ThinNodeArena {
     }
 
     /// Add a type parameter declaration node
-    pub fn add_type_parameter(&mut self, kind: u16, pos: u32, end: u32, data: TypeParameterData) -> NodeIndex {
+    pub fn add_type_parameter(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: TypeParameterData,
+    ) -> NodeIndex {
         let modifiers = data.modifiers.clone();
         let name = data.name;
         let constraint = data.constraint;
@@ -1845,7 +2041,8 @@ impl ThinNodeArena {
         let data_index = self.type_parameters.len() as u32;
         self.type_parameters.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
 
         let parent = NodeIndex(index);
@@ -1858,11 +2055,18 @@ impl ThinNodeArena {
     }
 
     /// Add a decorator node
-    pub fn add_decorator(&mut self, kind: u16, pos: u32, end: u32, data: DecoratorData) -> NodeIndex {
+    pub fn add_decorator(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: DecoratorData,
+    ) -> NodeIndex {
         let data_index = self.decorators.len() as u32;
         self.decorators.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         NodeIndex(index)
     }
@@ -1873,7 +2077,8 @@ impl ThinNodeArena {
         let data_index = self.heritage_clauses.len() as u32;
         self.heritage_clauses.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         let parent = NodeIndex(index);
         self.set_parent_list(&types, parent);
@@ -1881,13 +2086,20 @@ impl ThinNodeArena {
     }
 
     /// Add an expression with type arguments node
-    pub fn add_expr_with_type_args(&mut self, kind: u16, pos: u32, end: u32, data: ExprWithTypeArgsData) -> NodeIndex {
+    pub fn add_expr_with_type_args(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: ExprWithTypeArgsData,
+    ) -> NodeIndex {
         let expression = data.expression;
         let type_arguments = data.type_arguments.clone();
         let data_index = self.expr_with_type_args.len() as u32;
         self.expr_with_type_args.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         let parent = NodeIndex(index);
         self.set_parent(expression, parent);
@@ -1896,7 +2108,13 @@ impl ThinNodeArena {
     }
 
     /// Add an if statement node
-    pub fn add_if_statement(&mut self, kind: u16, pos: u32, end: u32, data: IfStatementData) -> NodeIndex {
+    pub fn add_if_statement(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: IfStatementData,
+    ) -> NodeIndex {
         let expression = data.expression;
         let then_statement = data.then_statement;
         let else_statement = data.else_statement;
@@ -1904,7 +2122,8 @@ impl ThinNodeArena {
         let data_index = self.if_statements.len() as u32;
         self.if_statements.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
 
         let parent = NodeIndex(index);
@@ -1924,7 +2143,8 @@ impl ThinNodeArena {
         let data_index = self.loops.len() as u32;
         self.loops.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         let parent = NodeIndex(index);
         self.set_parent(initializer, parent);
@@ -1940,14 +2160,23 @@ impl ThinNodeArena {
     }
 
     /// Add a variable statement/declaration list node with flags
-    pub fn add_variable_with_flags(&mut self, kind: u16, pos: u32, end: u32, data: VariableData, flags: u16) -> NodeIndex {
+    pub fn add_variable_with_flags(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: VariableData,
+        flags: u16,
+    ) -> NodeIndex {
         let modifiers = data.modifiers.clone();
         let declarations = data.declarations.clone();
 
         let data_index = self.variables.len() as u32;
         self.variables.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data_and_flags(kind, pos, end, data_index, flags));
+        self.nodes.push(ThinNode::with_data_and_flags(
+            kind, pos, end, data_index, flags,
+        ));
         self.extended_info.push(ExtendedNodeInfo::default());
 
         let parent = NodeIndex(index);
@@ -1964,7 +2193,8 @@ impl ThinNodeArena {
         let data_index = self.return_data.len() as u32;
         self.return_data.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
 
         let parent = NodeIndex(index);
@@ -1974,12 +2204,19 @@ impl ThinNodeArena {
     }
 
     /// Add an expression statement node
-    pub fn add_expr_statement(&mut self, kind: u16, pos: u32, end: u32, data: ExprStatementData) -> NodeIndex {
+    pub fn add_expr_statement(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: ExprStatementData,
+    ) -> NodeIndex {
         let expression = data.expression;
         let data_index = self.expr_statements.len() as u32;
         self.expr_statements.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         let parent = NodeIndex(index);
         self.set_parent(expression, parent);
@@ -1993,7 +2230,8 @@ impl ThinNodeArena {
         let data_index = self.switch_data.len() as u32;
         self.switch_data.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         let parent = NodeIndex(index);
         self.set_parent(expression, parent);
@@ -2002,13 +2240,20 @@ impl ThinNodeArena {
     }
 
     /// Add a case/default clause node
-    pub fn add_case_clause(&mut self, kind: u16, pos: u32, end: u32, data: CaseClauseData) -> NodeIndex {
+    pub fn add_case_clause(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: CaseClauseData,
+    ) -> NodeIndex {
         let expression = data.expression;
         let statements = data.statements.clone();
         let data_index = self.case_clauses.len() as u32;
         self.case_clauses.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         let parent = NodeIndex(index);
         self.set_parent(expression, parent);
@@ -2021,19 +2266,27 @@ impl ThinNodeArena {
         let data_index = self.try_data.len() as u32;
         self.try_data.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         NodeIndex(index)
     }
 
     /// Add a catch clause node
-    pub fn add_catch_clause(&mut self, kind: u16, pos: u32, end: u32, data: CatchClauseData) -> NodeIndex {
+    pub fn add_catch_clause(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: CatchClauseData,
+    ) -> NodeIndex {
         let variable_declaration = data.variable_declaration;
         let block = data.block;
         let data_index = self.catch_clauses.len() as u32;
         self.catch_clauses.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
 
         let parent = NodeIndex(index);
@@ -2048,7 +2301,8 @@ impl ThinNodeArena {
         let data_index = self.labeled_data.len() as u32;
         self.labeled_data.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         NodeIndex(index)
     }
@@ -2058,7 +2312,8 @@ impl ThinNodeArena {
         let data_index = self.jump_data.len() as u32;
         self.jump_data.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         NodeIndex(index)
     }
@@ -2068,7 +2323,8 @@ impl ThinNodeArena {
         let data_index = self.with_data.len() as u32;
         self.with_data.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         NodeIndex(index)
     }
@@ -2080,7 +2336,8 @@ impl ThinNodeArena {
         let data_index = self.type_refs.len() as u32;
         self.type_refs.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         let parent = NodeIndex(index);
         self.set_parent(type_name, parent);
@@ -2089,13 +2346,20 @@ impl ThinNodeArena {
     }
 
     /// Add a union/intersection type node
-    pub fn add_composite_type(&mut self, kind: u16, pos: u32, end: u32, data: CompositeTypeData) -> NodeIndex {
+    pub fn add_composite_type(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: CompositeTypeData,
+    ) -> NodeIndex {
         let types = data.types.clone();
 
         let data_index = self.composite_types.len() as u32;
         self.composite_types.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
 
         let parent = NodeIndex(index);
@@ -2105,7 +2369,13 @@ impl ThinNodeArena {
     }
 
     /// Add a function/constructor type node
-    pub fn add_function_type(&mut self, kind: u16, pos: u32, end: u32, data: FunctionTypeData) -> NodeIndex {
+    pub fn add_function_type(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: FunctionTypeData,
+    ) -> NodeIndex {
         let type_parameters = data.type_parameters.clone();
         let parameters = data.parameters.clone();
         let type_annotation = data.type_annotation;
@@ -2113,7 +2383,8 @@ impl ThinNodeArena {
         let data_index = self.function_types.len() as u32;
         self.function_types.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
 
         let parent = NodeIndex(index);
@@ -2125,13 +2396,20 @@ impl ThinNodeArena {
     }
 
     /// Add a type query node (typeof)
-    pub fn add_type_query(&mut self, kind: u16, pos: u32, end: u32, data: TypeQueryData) -> NodeIndex {
+    pub fn add_type_query(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: TypeQueryData,
+    ) -> NodeIndex {
         let expr_name = data.expr_name;
         let type_arguments = data.type_arguments.clone();
         let data_index = self.type_queries.len() as u32;
         self.type_queries.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         let parent = NodeIndex(index);
         self.set_parent(expr_name, parent);
@@ -2140,12 +2418,19 @@ impl ThinNodeArena {
     }
 
     /// Add a type literal node
-    pub fn add_type_literal(&mut self, kind: u16, pos: u32, end: u32, data: TypeLiteralData) -> NodeIndex {
+    pub fn add_type_literal(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: TypeLiteralData,
+    ) -> NodeIndex {
         let members = data.members.clone();
         let data_index = self.type_literals.len() as u32;
         self.type_literals.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         let parent = NodeIndex(index);
         self.set_parent_list(&members, parent);
@@ -2153,12 +2438,19 @@ impl ThinNodeArena {
     }
 
     /// Add an array type node
-    pub fn add_array_type(&mut self, kind: u16, pos: u32, end: u32, data: ArrayTypeData) -> NodeIndex {
+    pub fn add_array_type(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: ArrayTypeData,
+    ) -> NodeIndex {
         let element_type = data.element_type;
         let data_index = self.array_types.len() as u32;
         self.array_types.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         let parent = NodeIndex(index);
         self.set_parent(element_type, parent);
@@ -2166,12 +2458,19 @@ impl ThinNodeArena {
     }
 
     /// Add a tuple type node
-    pub fn add_tuple_type(&mut self, kind: u16, pos: u32, end: u32, data: TupleTypeData) -> NodeIndex {
+    pub fn add_tuple_type(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: TupleTypeData,
+    ) -> NodeIndex {
         let elements = data.elements.clone();
         let data_index = self.tuple_types.len() as u32;
         self.tuple_types.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         let parent = NodeIndex(index);
         self.set_parent_list(&elements, parent);
@@ -2179,12 +2478,19 @@ impl ThinNodeArena {
     }
 
     /// Add an optional/rest type node
-    pub fn add_wrapped_type(&mut self, kind: u16, pos: u32, end: u32, data: WrappedTypeData) -> NodeIndex {
+    pub fn add_wrapped_type(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: WrappedTypeData,
+    ) -> NodeIndex {
         let type_node = data.type_node;
         let data_index = self.wrapped_types.len() as u32;
         self.wrapped_types.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         let parent = NodeIndex(index);
         self.set_parent(type_node, parent);
@@ -2192,7 +2498,13 @@ impl ThinNodeArena {
     }
 
     /// Add a conditional type node
-    pub fn add_conditional_type(&mut self, kind: u16, pos: u32, end: u32, data: ConditionalTypeData) -> NodeIndex {
+    pub fn add_conditional_type(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: ConditionalTypeData,
+    ) -> NodeIndex {
         let check_type = data.check_type;
         let extends_type = data.extends_type;
         let true_type = data.true_type;
@@ -2200,7 +2512,8 @@ impl ThinNodeArena {
         let data_index = self.conditional_types.len() as u32;
         self.conditional_types.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         let parent = NodeIndex(index);
         self.set_parent(check_type, parent);
@@ -2211,12 +2524,19 @@ impl ThinNodeArena {
     }
 
     /// Add an infer type node
-    pub fn add_infer_type(&mut self, kind: u16, pos: u32, end: u32, data: InferTypeData) -> NodeIndex {
+    pub fn add_infer_type(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: InferTypeData,
+    ) -> NodeIndex {
         let type_parameter = data.type_parameter;
         let data_index = self.infer_types.len() as u32;
         self.infer_types.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         let parent = NodeIndex(index);
         self.set_parent(type_parameter, parent);
@@ -2224,12 +2544,19 @@ impl ThinNodeArena {
     }
 
     /// Add a type operator node (keyof, unique, readonly)
-    pub fn add_type_operator(&mut self, kind: u16, pos: u32, end: u32, data: TypeOperatorData) -> NodeIndex {
+    pub fn add_type_operator(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: TypeOperatorData,
+    ) -> NodeIndex {
         let type_node = data.type_node;
         let data_index = self.type_operators.len() as u32;
         self.type_operators.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         let parent = NodeIndex(index);
         self.set_parent(type_node, parent);
@@ -2237,13 +2564,20 @@ impl ThinNodeArena {
     }
 
     /// Add an indexed access type node
-    pub fn add_indexed_access_type(&mut self, kind: u16, pos: u32, end: u32, data: IndexedAccessTypeData) -> NodeIndex {
+    pub fn add_indexed_access_type(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: IndexedAccessTypeData,
+    ) -> NodeIndex {
         let object_type = data.object_type;
         let index_type = data.index_type;
         let data_index = self.indexed_access_types.len() as u32;
         self.indexed_access_types.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         let parent = NodeIndex(index);
         self.set_parent(object_type, parent);
@@ -2252,7 +2586,13 @@ impl ThinNodeArena {
     }
 
     /// Add a mapped type node
-    pub fn add_mapped_type(&mut self, kind: u16, pos: u32, end: u32, data: MappedTypeData) -> NodeIndex {
+    pub fn add_mapped_type(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: MappedTypeData,
+    ) -> NodeIndex {
         let readonly_token = data.readonly_token;
         let type_parameter = data.type_parameter;
         let name_type = data.name_type;
@@ -2262,7 +2602,8 @@ impl ThinNodeArena {
         let data_index = self.mapped_types.len() as u32;
         self.mapped_types.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         let parent = NodeIndex(index);
         self.set_parent(readonly_token, parent);
@@ -2275,12 +2616,19 @@ impl ThinNodeArena {
     }
 
     /// Add a literal type node
-    pub fn add_literal_type(&mut self, kind: u16, pos: u32, end: u32, data: LiteralTypeData) -> NodeIndex {
+    pub fn add_literal_type(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: LiteralTypeData,
+    ) -> NodeIndex {
         let literal = data.literal;
         let data_index = self.literal_types.len() as u32;
         self.literal_types.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         let parent = NodeIndex(index);
         self.set_parent(literal, parent);
@@ -2288,13 +2636,20 @@ impl ThinNodeArena {
     }
 
     /// Add a template literal type node
-    pub fn add_template_literal_type(&mut self, kind: u16, pos: u32, end: u32, data: TemplateLiteralTypeData) -> NodeIndex {
+    pub fn add_template_literal_type(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: TemplateLiteralTypeData,
+    ) -> NodeIndex {
         let head = data.head;
         let template_spans = data.template_spans.clone();
         let data_index = self.template_literal_types.len() as u32;
         self.template_literal_types.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         let parent = NodeIndex(index);
         self.set_parent(head, parent);
@@ -2303,14 +2658,21 @@ impl ThinNodeArena {
     }
 
     /// Add a named tuple member node
-    pub fn add_named_tuple_member(&mut self, kind: u16, pos: u32, end: u32, data: NamedTupleMemberData) -> NodeIndex {
+    pub fn add_named_tuple_member(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: NamedTupleMemberData,
+    ) -> NodeIndex {
         let name = data.name;
         let type_node = data.type_node;
 
         let data_index = self.named_tuple_members.len() as u32;
         self.named_tuple_members.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         let parent = NodeIndex(index);
         self.set_parent(name, parent);
@@ -2319,14 +2681,21 @@ impl ThinNodeArena {
     }
 
     /// Add a type predicate node
-    pub fn add_type_predicate(&mut self, kind: u16, pos: u32, end: u32, data: TypePredicateData) -> NodeIndex {
+    pub fn add_type_predicate(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: TypePredicateData,
+    ) -> NodeIndex {
         let parameter_name = data.parameter_name;
         let type_node = data.type_node;
 
         let data_index = self.type_predicates.len() as u32;
         self.type_predicates.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         let parent = NodeIndex(index);
         self.set_parent(parameter_name, parent);
@@ -2335,7 +2704,13 @@ impl ThinNodeArena {
     }
 
     /// Add an import declaration node
-    pub fn add_import_decl(&mut self, kind: u16, pos: u32, end: u32, data: ImportDeclData) -> NodeIndex {
+    pub fn add_import_decl(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: ImportDeclData,
+    ) -> NodeIndex {
         let modifiers = data.modifiers.clone();
         let import_clause = data.import_clause;
         let module_specifier = data.module_specifier;
@@ -2344,7 +2719,8 @@ impl ThinNodeArena {
         let data_index = self.import_decls.len() as u32;
         self.import_decls.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         let parent = NodeIndex(index);
         self.set_parent_opt_list(&modifiers, parent);
@@ -2355,14 +2731,21 @@ impl ThinNodeArena {
     }
 
     /// Add an import clause node
-    pub fn add_import_clause(&mut self, kind: u16, pos: u32, end: u32, data: ImportClauseData) -> NodeIndex {
+    pub fn add_import_clause(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: ImportClauseData,
+    ) -> NodeIndex {
         let name = data.name;
         let named_bindings = data.named_bindings;
 
         let data_index = self.import_clauses.len() as u32;
         self.import_clauses.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         let parent = NodeIndex(index);
         self.set_parent(name, parent);
@@ -2371,14 +2754,21 @@ impl ThinNodeArena {
     }
 
     /// Add a namespace/named imports node
-    pub fn add_named_imports(&mut self, kind: u16, pos: u32, end: u32, data: NamedImportsData) -> NodeIndex {
+    pub fn add_named_imports(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: NamedImportsData,
+    ) -> NodeIndex {
         let name = data.name;
         let elements = data.elements.clone();
 
         let data_index = self.named_imports.len() as u32;
         self.named_imports.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         let parent = NodeIndex(index);
         self.set_parent(name, parent);
@@ -2387,14 +2777,21 @@ impl ThinNodeArena {
     }
 
     /// Add an import/export specifier node
-    pub fn add_specifier(&mut self, kind: u16, pos: u32, end: u32, data: SpecifierData) -> NodeIndex {
+    pub fn add_specifier(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: SpecifierData,
+    ) -> NodeIndex {
         let property_name = data.property_name;
         let name = data.name;
 
         let data_index = self.specifiers.len() as u32;
         self.specifiers.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         let parent = NodeIndex(index);
         self.set_parent(property_name, parent);
@@ -2403,7 +2800,13 @@ impl ThinNodeArena {
     }
 
     /// Add an export declaration node
-    pub fn add_export_decl(&mut self, kind: u16, pos: u32, end: u32, data: ExportDeclData) -> NodeIndex {
+    pub fn add_export_decl(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: ExportDeclData,
+    ) -> NodeIndex {
         let modifiers = data.modifiers.clone();
         let export_clause = data.export_clause;
         let module_specifier = data.module_specifier;
@@ -2412,7 +2815,8 @@ impl ThinNodeArena {
         let data_index = self.export_decls.len() as u32;
         self.export_decls.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         let parent = NodeIndex(index);
         self.set_parent_opt_list(&modifiers, parent);
@@ -2422,14 +2826,21 @@ impl ThinNodeArena {
         parent
     }
     /// Add an export assignment node
-    pub fn add_export_assignment(&mut self, kind: u16, pos: u32, end: u32, data: ExportAssignmentData) -> NodeIndex {
+    pub fn add_export_assignment(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: ExportAssignmentData,
+    ) -> NodeIndex {
         let modifiers = data.modifiers.clone();
         let expression = data.expression;
 
         let data_index = self.export_assignments.len() as u32;
         self.export_assignments.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         let parent = NodeIndex(index);
         self.set_parent_opt_list(&modifiers, parent);
@@ -2438,13 +2849,20 @@ impl ThinNodeArena {
     }
 
     /// Add an import attributes node
-    pub fn add_import_attributes(&mut self, kind: u16, pos: u32, end: u32, data: ImportAttributesData) -> NodeIndex {
+    pub fn add_import_attributes(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: ImportAttributesData,
+    ) -> NodeIndex {
         let elements = data.elements.clone();
 
         let data_index = self.import_attributes.len() as u32;
         self.import_attributes.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         let parent = NodeIndex(index);
         self.set_parent_list(&elements, parent);
@@ -2452,14 +2870,21 @@ impl ThinNodeArena {
     }
 
     /// Add an import attribute node
-    pub fn add_import_attribute(&mut self, kind: u16, pos: u32, end: u32, data: ImportAttributeData) -> NodeIndex {
+    pub fn add_import_attribute(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: ImportAttributeData,
+    ) -> NodeIndex {
         let name = data.name;
         let value = data.value;
 
         let data_index = self.import_attribute.len() as u32;
         self.import_attribute.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         let parent = NodeIndex(index);
         self.set_parent(name, parent);
@@ -2468,13 +2893,20 @@ impl ThinNodeArena {
     }
 
     /// Add a binding pattern node
-    pub fn add_binding_pattern(&mut self, kind: u16, pos: u32, end: u32, data: BindingPatternData) -> NodeIndex {
+    pub fn add_binding_pattern(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: BindingPatternData,
+    ) -> NodeIndex {
         let elements = data.elements.clone();
 
         let data_index = self.binding_patterns.len() as u32;
         self.binding_patterns.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         let parent = NodeIndex(index);
         self.set_parent_list(&elements, parent);
@@ -2482,7 +2914,13 @@ impl ThinNodeArena {
     }
 
     /// Add a binding element node
-    pub fn add_binding_element(&mut self, kind: u16, pos: u32, end: u32, data: BindingElementData) -> NodeIndex {
+    pub fn add_binding_element(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: BindingElementData,
+    ) -> NodeIndex {
         let property_name = data.property_name;
         let name = data.name;
         let initializer = data.initializer;
@@ -2490,7 +2928,8 @@ impl ThinNodeArena {
         let data_index = self.binding_elements.len() as u32;
         self.binding_elements.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         let parent = NodeIndex(index);
         self.set_parent(property_name, parent);
@@ -2500,7 +2939,13 @@ impl ThinNodeArena {
     }
 
     /// Add a property assignment node
-    pub fn add_property_assignment(&mut self, kind: u16, pos: u32, end: u32, data: PropertyAssignmentData) -> NodeIndex {
+    pub fn add_property_assignment(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: PropertyAssignmentData,
+    ) -> NodeIndex {
         let modifiers = data.modifiers.clone();
         let name = data.name;
         let initializer = data.initializer;
@@ -2508,7 +2953,8 @@ impl ThinNodeArena {
         let data_index = self.property_assignments.len() as u32;
         self.property_assignments.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         let parent = NodeIndex(index);
         self.set_parent_opt_list(&modifiers, parent);
@@ -2518,7 +2964,13 @@ impl ThinNodeArena {
     }
 
     /// Add a shorthand property assignment node
-    pub fn add_shorthand_property(&mut self, kind: u16, pos: u32, end: u32, data: ShorthandPropertyData) -> NodeIndex {
+    pub fn add_shorthand_property(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: ShorthandPropertyData,
+    ) -> NodeIndex {
         let modifiers = data.modifiers.clone();
         let name = data.name;
         let object_assignment_initializer = data.object_assignment_initializer;
@@ -2526,7 +2978,8 @@ impl ThinNodeArena {
         let data_index = self.shorthand_properties.len() as u32;
         self.shorthand_properties.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         let parent = NodeIndex(index);
         self.set_parent_opt_list(&modifiers, parent);
@@ -2542,7 +2995,8 @@ impl ThinNodeArena {
         let data_index = self.spread_data.len() as u32;
         self.spread_data.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         let parent = NodeIndex(index);
         self.set_parent(expression, parent);
@@ -2550,7 +3004,13 @@ impl ThinNodeArena {
     }
 
     /// Add a JSX element node
-    pub fn add_jsx_element(&mut self, kind: u16, pos: u32, end: u32, data: JsxElementData) -> NodeIndex {
+    pub fn add_jsx_element(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: JsxElementData,
+    ) -> NodeIndex {
         let opening_element = data.opening_element;
         let children = data.children.clone();
         let closing_element = data.closing_element;
@@ -2558,7 +3018,8 @@ impl ThinNodeArena {
         let data_index = self.jsx_elements.len() as u32;
         self.jsx_elements.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
 
         let parent = NodeIndex(index);
@@ -2569,7 +3030,13 @@ impl ThinNodeArena {
     }
 
     /// Add a JSX opening/self-closing element node
-    pub fn add_jsx_opening(&mut self, kind: u16, pos: u32, end: u32, data: JsxOpeningData) -> NodeIndex {
+    pub fn add_jsx_opening(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: JsxOpeningData,
+    ) -> NodeIndex {
         let tag_name = data.tag_name;
         let type_arguments = data.type_arguments.clone();
         let attributes = data.attributes;
@@ -2577,7 +3044,8 @@ impl ThinNodeArena {
         let data_index = self.jsx_opening.len() as u32;
         self.jsx_opening.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
 
         let parent = NodeIndex(index);
@@ -2588,13 +3056,20 @@ impl ThinNodeArena {
     }
 
     /// Add a JSX closing element node
-    pub fn add_jsx_closing(&mut self, kind: u16, pos: u32, end: u32, data: JsxClosingData) -> NodeIndex {
+    pub fn add_jsx_closing(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: JsxClosingData,
+    ) -> NodeIndex {
         let tag_name = data.tag_name;
 
         let data_index = self.jsx_closing.len() as u32;
         self.jsx_closing.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
 
         let parent = NodeIndex(index);
@@ -2603,7 +3078,13 @@ impl ThinNodeArena {
     }
 
     /// Add a JSX fragment node
-    pub fn add_jsx_fragment(&mut self, kind: u16, pos: u32, end: u32, data: JsxFragmentData) -> NodeIndex {
+    pub fn add_jsx_fragment(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: JsxFragmentData,
+    ) -> NodeIndex {
         let opening_fragment = data.opening_fragment;
         let children = data.children.clone();
         let closing_fragment = data.closing_fragment;
@@ -2611,7 +3092,8 @@ impl ThinNodeArena {
         let data_index = self.jsx_fragments.len() as u32;
         self.jsx_fragments.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
 
         let parent = NodeIndex(index);
@@ -2622,13 +3104,20 @@ impl ThinNodeArena {
     }
 
     /// Add a JSX attributes node
-    pub fn add_jsx_attributes(&mut self, kind: u16, pos: u32, end: u32, data: JsxAttributesData) -> NodeIndex {
+    pub fn add_jsx_attributes(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: JsxAttributesData,
+    ) -> NodeIndex {
         let properties = data.properties.clone();
 
         let data_index = self.jsx_attributes.len() as u32;
         self.jsx_attributes.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
 
         let parent = NodeIndex(index);
@@ -2637,14 +3126,21 @@ impl ThinNodeArena {
     }
 
     /// Add a JSX attribute node
-    pub fn add_jsx_attribute(&mut self, kind: u16, pos: u32, end: u32, data: JsxAttributeData) -> NodeIndex {
+    pub fn add_jsx_attribute(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: JsxAttributeData,
+    ) -> NodeIndex {
         let name = data.name;
         let initializer = data.initializer;
 
         let data_index = self.jsx_attribute.len() as u32;
         self.jsx_attribute.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
 
         let parent = NodeIndex(index);
@@ -2654,13 +3150,20 @@ impl ThinNodeArena {
     }
 
     /// Add a JSX spread attribute node
-    pub fn add_jsx_spread_attribute(&mut self, kind: u16, pos: u32, end: u32, data: JsxSpreadAttributeData) -> NodeIndex {
+    pub fn add_jsx_spread_attribute(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: JsxSpreadAttributeData,
+    ) -> NodeIndex {
         let expression = data.expression;
 
         let data_index = self.jsx_spread_attributes.len() as u32;
         self.jsx_spread_attributes.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
 
         let parent = NodeIndex(index);
@@ -2669,13 +3172,20 @@ impl ThinNodeArena {
     }
 
     /// Add a JSX expression node
-    pub fn add_jsx_expression(&mut self, kind: u16, pos: u32, end: u32, data: JsxExpressionData) -> NodeIndex {
+    pub fn add_jsx_expression(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: JsxExpressionData,
+    ) -> NodeIndex {
         let expression = data.expression;
 
         let data_index = self.jsx_expressions.len() as u32;
         self.jsx_expressions.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
 
         let parent = NodeIndex(index);
@@ -2688,20 +3198,28 @@ impl ThinNodeArena {
         let data_index = self.jsx_text.len() as u32;
         self.jsx_text.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         NodeIndex(index)
     }
 
     /// Add a JSX namespaced name node
-    pub fn add_jsx_namespaced_name(&mut self, kind: u16, pos: u32, end: u32, data: JsxNamespacedNameData) -> NodeIndex {
+    pub fn add_jsx_namespaced_name(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: JsxNamespacedNameData,
+    ) -> NodeIndex {
         let namespace = data.namespace;
         let name = data.name;
 
         let data_index = self.jsx_namespaced_names.len() as u32;
         self.jsx_namespaced_names.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
 
         let parent = NodeIndex(index);
@@ -2711,7 +3229,13 @@ impl ThinNodeArena {
     }
 
     /// Add a variable declaration node (individual)
-    pub fn add_variable_declaration(&mut self, kind: u16, pos: u32, end: u32, data: VariableDeclarationData) -> NodeIndex {
+    pub fn add_variable_declaration(
+        &mut self,
+        kind: u16,
+        pos: u32,
+        end: u32,
+        data: VariableDeclarationData,
+    ) -> NodeIndex {
         let name = data.name;
         let type_annotation = data.type_annotation;
         let initializer = data.initializer;
@@ -2719,7 +3243,8 @@ impl ThinNodeArena {
         let data_index = self.variable_declarations.len() as u32;
         self.variable_declarations.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
 
         let parent = NodeIndex(index);
@@ -2738,7 +3263,8 @@ impl ThinNodeArena {
         let data_index = self.for_in_of.len() as u32;
         self.for_in_of.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes
+            .push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
         let parent = NodeIndex(index);
         self.set_parent(initializer, parent);
@@ -2792,8 +3318,10 @@ impl ThinNodeArena {
     #[inline]
     pub fn get_identifier(&self, node: &ThinNode) -> Option<&IdentifierData> {
         use crate::scanner::SyntaxKind;
-        if node.has_data() && (node.kind == SyntaxKind::Identifier as u16 ||
-                               node.kind == SyntaxKind::PrivateIdentifier as u16) {
+        if node.has_data()
+            && (node.kind == SyntaxKind::Identifier as u16
+                || node.kind == SyntaxKind::PrivateIdentifier as u16)
+        {
             self.identifiers.get(node.data_index as usize)
         } else {
             None
@@ -2805,16 +3333,18 @@ impl ThinNodeArena {
     #[inline]
     pub fn get_literal(&self, node: &ThinNode) -> Option<&LiteralData> {
         use crate::scanner::SyntaxKind;
-        if node.has_data() && matches!(node.kind,
-            k if k == SyntaxKind::StringLiteral as u16 ||
-                 k == SyntaxKind::NumericLiteral as u16 ||
-                 k == SyntaxKind::BigIntLiteral as u16 ||
-                 k == SyntaxKind::RegularExpressionLiteral as u16 ||
-                 k == SyntaxKind::NoSubstitutionTemplateLiteral as u16 ||
-                 k == SyntaxKind::TemplateHead as u16 ||
-                 k == SyntaxKind::TemplateMiddle as u16 ||
-                 k == SyntaxKind::TemplateTail as u16
-        ) {
+        if node.has_data()
+            && matches!(node.kind,
+                k if k == SyntaxKind::StringLiteral as u16 ||
+                     k == SyntaxKind::NumericLiteral as u16 ||
+                     k == SyntaxKind::BigIntLiteral as u16 ||
+                     k == SyntaxKind::RegularExpressionLiteral as u16 ||
+                     k == SyntaxKind::NoSubstitutionTemplateLiteral as u16 ||
+                     k == SyntaxKind::TemplateHead as u16 ||
+                     k == SyntaxKind::TemplateMiddle as u16 ||
+                     k == SyntaxKind::TemplateTail as u16
+            )
+        {
             self.literals.get(node.data_index as usize)
         } else {
             None
@@ -2849,8 +3379,10 @@ impl ThinNodeArena {
     /// Returns None if node is not an access expression or has no data.
     #[inline]
     pub fn get_access_expr(&self, node: &ThinNode) -> Option<&AccessExprData> {
-        use super::syntax_kind_ext::{PROPERTY_ACCESS_EXPRESSION, ELEMENT_ACCESS_EXPRESSION};
-        if node.has_data() && (node.kind == PROPERTY_ACCESS_EXPRESSION || node.kind == ELEMENT_ACCESS_EXPRESSION) {
+        use super::syntax_kind_ext::{ELEMENT_ACCESS_EXPRESSION, PROPERTY_ACCESS_EXPRESSION};
+        if node.has_data()
+            && (node.kind == PROPERTY_ACCESS_EXPRESSION || node.kind == ELEMENT_ACCESS_EXPRESSION)
+        {
             self.access_exprs.get(node.data_index as usize)
         } else {
             None
@@ -2886,7 +3418,9 @@ impl ThinNodeArena {
     #[inline]
     pub fn get_literal_expr(&self, node: &ThinNode) -> Option<&LiteralExprData> {
         use super::syntax_kind_ext::{ARRAY_LITERAL_EXPRESSION, OBJECT_LITERAL_EXPRESSION};
-        if node.has_data() && (node.kind == ARRAY_LITERAL_EXPRESSION || node.kind == OBJECT_LITERAL_EXPRESSION) {
+        if node.has_data()
+            && (node.kind == ARRAY_LITERAL_EXPRESSION || node.kind == OBJECT_LITERAL_EXPRESSION)
+        {
             self.literal_exprs.get(node.data_index as usize)
         } else {
             None
@@ -2925,8 +3459,10 @@ impl ThinNodeArena {
     /// Returns None if node is not a unary expression or has no data.
     #[inline]
     pub fn get_unary_expr(&self, node: &ThinNode) -> Option<&UnaryExprData> {
-        use super::syntax_kind_ext::{PREFIX_UNARY_EXPRESSION, POSTFIX_UNARY_EXPRESSION};
-        if node.has_data() && (node.kind == PREFIX_UNARY_EXPRESSION || node.kind == POSTFIX_UNARY_EXPRESSION) {
+        use super::syntax_kind_ext::{POSTFIX_UNARY_EXPRESSION, PREFIX_UNARY_EXPRESSION};
+        if node.has_data()
+            && (node.kind == PREFIX_UNARY_EXPRESSION || node.kind == POSTFIX_UNARY_EXPRESSION)
+        {
             self.unary_exprs.get(node.data_index as usize)
         } else {
             None
@@ -2957,9 +3493,12 @@ impl ThinNodeArena {
     #[inline]
     pub fn get_function(&self, node: &ThinNode) -> Option<&FunctionData> {
         use super::syntax_kind_ext::*;
-        if node.has_data() && matches!(node.kind,
-            FUNCTION_DECLARATION | FUNCTION_EXPRESSION | ARROW_FUNCTION
-        ) {
+        if node.has_data()
+            && matches!(
+                node.kind,
+                FUNCTION_DECLARATION | FUNCTION_EXPRESSION | ARROW_FUNCTION
+            )
+        {
             self.functions.get(node.data_index as usize)
         } else {
             None
@@ -3009,8 +3548,10 @@ impl ThinNodeArena {
     /// Get variable data (VariableStatement or VariableDeclarationList).
     #[inline]
     pub fn get_variable(&self, node: &ThinNode) -> Option<&VariableData> {
-        use super::syntax_kind_ext::{VARIABLE_STATEMENT, VARIABLE_DECLARATION_LIST};
-        if node.has_data() && (node.kind == VARIABLE_STATEMENT || node.kind == VARIABLE_DECLARATION_LIST) {
+        use super::syntax_kind_ext::{VARIABLE_DECLARATION_LIST, VARIABLE_STATEMENT};
+        if node.has_data()
+            && (node.kind == VARIABLE_STATEMENT || node.kind == VARIABLE_DECLARATION_LIST)
+        {
             self.variables.get(node.data_index as usize)
         } else {
             None
@@ -3108,8 +3649,12 @@ impl ThinNodeArena {
     /// Get loop data (while, for, do-while).
     #[inline]
     pub fn get_loop(&self, node: &ThinNode) -> Option<&LoopData> {
-        use super::syntax_kind_ext::{WHILE_STATEMENT, DO_STATEMENT, FOR_STATEMENT};
-        if node.has_data() && (node.kind == WHILE_STATEMENT || node.kind == DO_STATEMENT || node.kind == FOR_STATEMENT) {
+        use super::syntax_kind_ext::{DO_STATEMENT, FOR_STATEMENT, WHILE_STATEMENT};
+        if node.has_data()
+            && (node.kind == WHILE_STATEMENT
+                || node.kind == DO_STATEMENT
+                || node.kind == FOR_STATEMENT)
+        {
             self.loops.get(node.data_index as usize)
         } else {
             None
@@ -3197,7 +3742,9 @@ impl ThinNodeArena {
     #[inline]
     pub fn get_import_decl(&self, node: &ThinNode) -> Option<&ImportDeclData> {
         use super::syntax_kind_ext::{IMPORT_DECLARATION, IMPORT_EQUALS_DECLARATION};
-        if node.has_data() && (node.kind == IMPORT_DECLARATION || node.kind == IMPORT_EQUALS_DECLARATION) {
+        if node.has_data()
+            && (node.kind == IMPORT_DECLARATION || node.kind == IMPORT_EQUALS_DECLARATION)
+        {
             self.import_decls.get(node.data_index as usize)
         } else {
             None
@@ -3220,7 +3767,11 @@ impl ThinNodeArena {
     #[inline]
     pub fn get_named_imports(&self, node: &ThinNode) -> Option<&NamedImportsData> {
         use super::syntax_kind_ext::{NAMED_EXPORTS, NAMED_IMPORTS, NAMESPACE_IMPORT};
-        if node.has_data() && (node.kind == NAMED_IMPORTS || node.kind == NAMED_EXPORTS || node.kind == NAMESPACE_IMPORT) {
+        if node.has_data()
+            && (node.kind == NAMED_IMPORTS
+                || node.kind == NAMED_EXPORTS
+                || node.kind == NAMESPACE_IMPORT)
+        {
             self.named_imports.get(node.data_index as usize)
         } else {
             None
@@ -3230,7 +3781,7 @@ impl ThinNodeArena {
     /// Get import/export specifier data.
     #[inline]
     pub fn get_specifier(&self, node: &ThinNode) -> Option<&SpecifierData> {
-        use super::syntax_kind_ext::{IMPORT_SPECIFIER, EXPORT_SPECIFIER};
+        use super::syntax_kind_ext::{EXPORT_SPECIFIER, IMPORT_SPECIFIER};
         if node.has_data() && (node.kind == IMPORT_SPECIFIER || node.kind == EXPORT_SPECIFIER) {
             self.specifiers.get(node.data_index as usize)
         } else {
@@ -3374,7 +3925,9 @@ impl ThinNodeArena {
     #[inline]
     pub fn get_jsx_opening(&self, node: &ThinNode) -> Option<&JsxOpeningData> {
         use super::syntax_kind_ext::{JSX_OPENING_ELEMENT, JSX_SELF_CLOSING_ELEMENT};
-        if node.has_data() && (node.kind == JSX_OPENING_ELEMENT || node.kind == JSX_SELF_CLOSING_ELEMENT) {
+        if node.has_data()
+            && (node.kind == JSX_OPENING_ELEMENT || node.kind == JSX_SELF_CLOSING_ELEMENT)
+        {
             self.jsx_opening.get(node.data_index as usize)
         } else {
             None
@@ -3472,9 +4025,15 @@ impl ThinNodeArena {
     /// Get signature data (call, construct, method, property signatures).
     #[inline]
     pub fn get_signature(&self, node: &ThinNode) -> Option<&SignatureData> {
-        use super::syntax_kind_ext::{CALL_SIGNATURE, CONSTRUCT_SIGNATURE, METHOD_SIGNATURE, PROPERTY_SIGNATURE};
-        if node.has_data() && (node.kind == CALL_SIGNATURE || node.kind == CONSTRUCT_SIGNATURE ||
-                               node.kind == METHOD_SIGNATURE || node.kind == PROPERTY_SIGNATURE) {
+        use super::syntax_kind_ext::{
+            CALL_SIGNATURE, CONSTRUCT_SIGNATURE, METHOD_SIGNATURE, PROPERTY_SIGNATURE,
+        };
+        if node.has_data()
+            && (node.kind == CALL_SIGNATURE
+                || node.kind == CONSTRUCT_SIGNATURE
+                || node.kind == METHOD_SIGNATURE
+                || node.kind == PROPERTY_SIGNATURE)
+        {
             self.signatures.get(node.data_index as usize)
         } else {
             None
@@ -3506,7 +4065,7 @@ impl ThinNodeArena {
     /// Get composite type data (union or intersection).
     #[inline]
     pub fn get_composite_type(&self, node: &ThinNode) -> Option<&CompositeTypeData> {
-        use super::syntax_kind_ext::{UNION_TYPE, INTERSECTION_TYPE};
+        use super::syntax_kind_ext::{INTERSECTION_TYPE, UNION_TYPE};
         if node.has_data() && (node.kind == UNION_TYPE || node.kind == INTERSECTION_TYPE) {
             self.composite_types.get(node.data_index as usize)
         } else {
@@ -3605,8 +4164,12 @@ impl ThinNodeArena {
     /// Get wrapped type data (parenthesized, optional, rest types).
     #[inline]
     pub fn get_wrapped_type(&self, node: &ThinNode) -> Option<&WrappedTypeData> {
-        use super::syntax_kind_ext::{PARENTHESIZED_TYPE, OPTIONAL_TYPE, REST_TYPE};
-        if node.has_data() && (node.kind == PARENTHESIZED_TYPE || node.kind == OPTIONAL_TYPE || node.kind == REST_TYPE) {
+        use super::syntax_kind_ext::{OPTIONAL_TYPE, PARENTHESIZED_TYPE, REST_TYPE};
+        if node.has_data()
+            && (node.kind == PARENTHESIZED_TYPE
+                || node.kind == OPTIONAL_TYPE
+                || node.kind == REST_TYPE)
+        {
             self.wrapped_types.get(node.data_index as usize)
         } else {
             None
@@ -3760,7 +4323,7 @@ impl ThinNodeArena {
     /// Get spread element/assignment data.
     #[inline]
     pub fn get_spread(&self, node: &ThinNode) -> Option<&SpreadData> {
-        use super::syntax_kind_ext::{SPREAD_ELEMENT, SPREAD_ASSIGNMENT};
+        use super::syntax_kind_ext::{SPREAD_ASSIGNMENT, SPREAD_ELEMENT};
         if node.has_data() && (node.kind == SPREAD_ELEMENT || node.kind == SPREAD_ASSIGNMENT) {
             self.spread_data.get(node.data_index as usize)
         } else {
@@ -3782,8 +4345,10 @@ impl ThinNodeArena {
     /// Get binding pattern data (ObjectBindingPattern or ArrayBindingPattern).
     #[inline]
     pub fn get_binding_pattern(&self, node: &ThinNode) -> Option<&BindingPatternData> {
-        use super::syntax_kind_ext::{OBJECT_BINDING_PATTERN, ARRAY_BINDING_PATTERN};
-        if node.has_data() && (node.kind == OBJECT_BINDING_PATTERN || node.kind == ARRAY_BINDING_PATTERN) {
+        use super::syntax_kind_ext::{ARRAY_BINDING_PATTERN, OBJECT_BINDING_PATTERN};
+        if node.has_data()
+            && (node.kind == OBJECT_BINDING_PATTERN || node.kind == ARRAY_BINDING_PATTERN)
+        {
             self.binding_patterns.get(node.data_index as usize)
         } else {
             None
@@ -3995,8 +4560,13 @@ impl ThinNode {
         use super::syntax_kind_ext::*;
         matches!(
             self.kind,
-            FUNCTION_DECLARATION | FUNCTION_EXPRESSION | ARROW_FUNCTION |
-            METHOD_DECLARATION | CONSTRUCTOR | GET_ACCESSOR | SET_ACCESSOR
+            FUNCTION_DECLARATION
+                | FUNCTION_EXPRESSION
+                | ARROW_FUNCTION
+                | METHOD_DECLARATION
+                | CONSTRUCTOR
+                | GET_ACCESSOR
+                | SET_ACCESSOR
         )
     }
 
@@ -4004,8 +4574,7 @@ impl ThinNode {
     #[inline]
     pub fn is_statement(&self) -> bool {
         use super::syntax_kind_ext::*;
-        (BLOCK..=DEBUGGER_STATEMENT).contains(&self.kind) ||
-        self.kind == VARIABLE_STATEMENT
+        (BLOCK..=DEBUGGER_STATEMENT).contains(&self.kind) || self.kind == VARIABLE_STATEMENT
     }
 
     /// Check if this is a declaration

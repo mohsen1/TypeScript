@@ -1,7 +1,7 @@
 use super::ThinPrinter;
-use crate::parser::{NodeIndex, NodeList};
-use crate::parser::thin_node::ThinNode;
 use crate::parser::syntax_kind_ext;
+use crate::parser::thin_node::ThinNode;
+use crate::parser::{NodeIndex, NodeList};
 use crate::scanner::SyntaxKind;
 use crate::transforms::class_es5::ClassES5Emitter;
 
@@ -81,8 +81,12 @@ impl<'a> ThinPrinter<'a> {
         let mut force_void_0 = false;
         let keyword = if is_const {
             let has_missing_initializer = decl_list.declarations.nodes.iter().any(|decl_idx| {
-                let Some(decl_node) = self.arena.get(*decl_idx) else { return false };
-                let Some(decl) = self.arena.get_variable_declaration(decl_node) else { return false };
+                let Some(decl_node) = self.arena.get(*decl_idx) else {
+                    return false;
+                };
+                let Some(decl) = self.arena.get_variable_declaration(decl_node) else {
+                    return false;
+                };
                 decl.initializer.is_none()
             });
             if has_missing_initializer {
@@ -158,7 +162,8 @@ impl<'a> ThinPrinter<'a> {
                 self.writer.write("");
                 let base_line = self.writer.current_line();
                 let base_column = self.writer.current_column();
-                self.writer.add_offset_mappings(base_line, base_column, &mappings);
+                self.writer
+                    .add_offset_mappings(base_line, base_column, &mappings);
                 self.writer.write(&output);
             } else {
                 self.write(&output);

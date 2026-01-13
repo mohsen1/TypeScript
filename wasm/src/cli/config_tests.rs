@@ -1,5 +1,5 @@
 use super::config::{
-    load_tsconfig, parse_tsconfig, resolve_compiler_options, JsxEmit, ModuleResolutionKind,
+    JsxEmit, ModuleResolutionKind, load_tsconfig, parse_tsconfig, resolve_compiler_options,
 };
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -144,7 +144,10 @@ fn resolve_compiler_options_overrides() {
 
     assert_eq!(resolved.printer.target, ScriptTarget::ES2020);
     assert_eq!(resolved.printer.module, ModuleKind::CommonJS);
-    assert_eq!(resolved.module_resolution, Some(ModuleResolutionKind::Bundler));
+    assert_eq!(
+        resolved.module_resolution,
+        Some(ModuleResolutionKind::Bundler)
+    );
     assert_eq!(resolved.jsx, Some(JsxEmit::Preserve));
     assert!(resolved.lib_files.is_empty());
     assert_eq!(resolved.root_dir, Some(PathBuf::from("src")));
@@ -188,7 +191,10 @@ fn resolve_compiler_options_rejects_unknown_module_resolution() {
     let err = resolve_compiler_options(config.compiler_options.as_ref())
         .expect_err("unknown moduleResolution should error");
     let message = err.to_string();
-    assert!(message.contains("compilerOptions.moduleResolution"), "{message}");
+    assert!(
+        message.contains("compilerOptions.moduleResolution"),
+        "{message}"
+    );
 }
 
 #[test]

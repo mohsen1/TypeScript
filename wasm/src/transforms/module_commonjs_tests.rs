@@ -62,12 +62,18 @@ fn test_collect_export_names_with_parsed_ast() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let Some(source_file) = parser.arena.get_source_file(parser.arena.get(root).unwrap()) else {
+    let Some(source_file) = parser
+        .arena
+        .get_source_file(parser.arena.get(root).unwrap())
+    else {
         panic!("Failed to get source file");
     };
 
     // Debug: print the statements
-    eprintln!("Source file has {} statements", source_file.statements.nodes.len());
+    eprintln!(
+        "Source file has {} statements",
+        source_file.statements.nodes.len()
+    );
     for (i, &stmt_idx) in source_file.statements.nodes.iter().enumerate() {
         if let Some(node) = parser.arena.get(stmt_idx) {
             eprintln!(
@@ -125,7 +131,10 @@ fn test_collect_export_names_with_destructuring() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let Some(source_file) = parser.arena.get_source_file(parser.arena.get(root).unwrap()) else {
+    let Some(source_file) = parser
+        .arena
+        .get_source_file(parser.arena.get(root).unwrap())
+    else {
         panic!("Failed to get source file");
     };
 
@@ -146,13 +155,20 @@ fn test_collect_export_names_with_default_export() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let Some(source_file) = parser.arena.get_source_file(parser.arena.get(root).unwrap()) else {
+    let Some(source_file) = parser
+        .arena
+        .get_source_file(parser.arena.get(root).unwrap())
+    else {
         panic!("Failed to get source file");
     };
 
     let export_names = collect_export_names(&parser.arena, &source_file.statements.nodes);
 
-    assert_eq!(export_names, vec!["default"], "Expected default export name");
+    assert_eq!(
+        export_names,
+        vec!["default"],
+        "Expected default export name"
+    );
 }
 
 #[test]
@@ -163,7 +179,10 @@ fn test_collect_export_names_with_default_class_export() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let Some(source_file) = parser.arena.get_source_file(parser.arena.get(root).unwrap()) else {
+    let Some(source_file) = parser
+        .arena
+        .get_source_file(parser.arena.get(root).unwrap())
+    else {
         panic!("Failed to get source file");
     };
 
@@ -184,7 +203,10 @@ fn test_collect_export_names_with_named_exports() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let Some(source_file) = parser.arena.get_source_file(parser.arena.get(root).unwrap()) else {
+    let Some(source_file) = parser
+        .arena
+        .get_source_file(parser.arena.get(root).unwrap())
+    else {
         panic!("Failed to get source file");
     };
 
@@ -205,7 +227,10 @@ fn test_collect_export_names_ignores_type_only_specifiers() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let Some(source_file) = parser.arena.get_source_file(parser.arena.get(root).unwrap()) else {
+    let Some(source_file) = parser
+        .arena
+        .get_source_file(parser.arena.get(root).unwrap())
+    else {
         panic!("Failed to get source file");
     };
 
@@ -226,7 +251,10 @@ fn test_collect_export_names_ignores_type_only_named_exports() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let Some(source_file) = parser.arena.get_source_file(parser.arena.get(root).unwrap()) else {
+    let Some(source_file) = parser
+        .arena
+        .get_source_file(parser.arena.get(root).unwrap())
+    else {
         panic!("Failed to get source file");
     };
 
@@ -246,7 +274,10 @@ fn test_collect_export_names_with_multiple_named_exports() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let Some(source_file) = parser.arena.get_source_file(parser.arena.get(root).unwrap()) else {
+    let Some(source_file) = parser
+        .arena
+        .get_source_file(parser.arena.get(root).unwrap())
+    else {
         panic!("Failed to get source file");
     };
 
@@ -267,7 +298,10 @@ fn test_collect_export_names_with_export_import_equals() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let Some(source_file) = parser.arena.get_source_file(parser.arena.get(root).unwrap()) else {
+    let Some(source_file) = parser
+        .arena
+        .get_source_file(parser.arena.get(root).unwrap())
+    else {
         panic!("Failed to get source file");
     };
 
@@ -288,7 +322,10 @@ fn test_collect_export_names_ignores_type_only_declarations() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let Some(source_file) = parser.arena.get_source_file(parser.arena.get(root).unwrap()) else {
+    let Some(source_file) = parser
+        .arena
+        .get_source_file(parser.arena.get(root).unwrap())
+    else {
         panic!("Failed to get source file");
     };
 
@@ -308,7 +345,10 @@ fn test_collect_export_names_ignores_declare_exports() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let Some(source_file) = parser.arena.get_source_file(parser.arena.get(root).unwrap()) else {
+    let Some(source_file) = parser
+        .arena
+        .get_source_file(parser.arena.get(root).unwrap())
+    else {
         panic!("Failed to get source file");
     };
 
@@ -328,7 +368,10 @@ fn test_collect_export_names_ignores_reexports() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let Some(source_file) = parser.arena.get_source_file(parser.arena.get(root).unwrap()) else {
+    let Some(source_file) = parser
+        .arena
+        .get_source_file(parser.arena.get(root).unwrap())
+    else {
         panic!("Failed to get source file");
     };
 
@@ -348,7 +391,10 @@ fn test_collect_export_names_ignores_default_reexport() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let Some(source_file) = parser.arena.get_source_file(parser.arena.get(root).unwrap()) else {
+    let Some(source_file) = parser
+        .arena
+        .get_source_file(parser.arena.get(root).unwrap())
+    else {
         panic!("Failed to get source file");
     };
 
@@ -368,7 +414,10 @@ fn test_collect_export_names_ignores_const_enum() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let Some(source_file) = parser.arena.get_source_file(parser.arena.get(root).unwrap()) else {
+    let Some(source_file) = parser
+        .arena
+        .get_source_file(parser.arena.get(root).unwrap())
+    else {
         panic!("Failed to get source file");
     };
 

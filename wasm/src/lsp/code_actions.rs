@@ -16,17 +16,17 @@
 //! Future features:
 //! - Remove Unused Declarations (diagnostic-based quick fix)
 
-use crate::binder::{symbol_flags, ScopeId, SymbolId};
-use crate::parser::NodeIndex;
-use crate::parser::thin_node::{NodeAccess, ThinNode, ThinNodeArena};
-use crate::parser::syntax_kind_ext;
+use crate::binder::{ScopeId, SymbolId, symbol_flags};
 use crate::comments::get_leading_comments_from_cache;
-use crate::thin_binder::ThinBinderState;
-use crate::lsp::position::{Position, Range, LineMap};
 use crate::lsp::diagnostics::LspDiagnostic;
-use crate::lsp::rename::{WorkspaceEdit, TextEdit};
+use crate::lsp::position::{LineMap, Position, Range};
+use crate::lsp::rename::{TextEdit, WorkspaceEdit};
 use crate::lsp::utils::find_node_at_offset;
+use crate::parser::NodeIndex;
+use crate::parser::syntax_kind_ext;
+use crate::parser::thin_node::{NodeAccess, ThinNode, ThinNodeArena};
 use crate::scanner::SyntaxKind;
+use crate::thin_binder::ThinBinderState;
 use rustc_hash::FxHashSet;
 use serde::{Deserialize, Serialize};
 
@@ -176,14 +176,18 @@ impl<'a> CodeActionProvider<'a> {
                 if let Some(action) = self.missing_property_quickfix(diag) {
                     actions.push(action);
                 }
-                actions.extend(self.missing_import_quickfixes(root, diag, &context.import_candidates));
+                actions.extend(self.missing_import_quickfixes(
+                    root,
+                    diag,
+                    &context.import_candidates,
+                ));
             }
         }
 
         // Source Actions (file-level)
-        let request_organize = context.only
-            .as_ref()
-            .map_or(true, |kinds| kinds.contains(&CodeActionKind::SourceOrganizeImports));
+        let request_organize = context.only.as_ref().map_or(true, |kinds| {
+            kinds.contains(&CodeActionKind::SourceOrganizeImports)
+        });
         if request_organize {
             if let Some(action) = self.organize_imports(root) {
                 actions.push(action);
@@ -207,7 +211,9 @@ impl<'a> CodeActionProvider<'a> {
             return None;
         }
 
-        let start_offset = self.line_map.position_to_offset(diag.range.start, self.source)?;
+        let start_offset = self
+            .line_map
+            .position_to_offset(diag.range.start, self.source)?;
         let node_idx = find_node_at_offset(self.arena, start_offset);
         if node_idx.is_none() {
             return None;
@@ -229,11 +235,15 @@ impl<'a> CodeActionProvider<'a> {
 
     fn missing_property_quickfix(&self, diag: &LspDiagnostic) -> Option<CodeAction> {
         let code = diag.code?;
-        if code != crate::checker::types::diagnostics::diagnostic_codes::PROPERTY_DOES_NOT_EXIST_ON_TYPE {
+        if code
+            != crate::checker::types::diagnostics::diagnostic_codes::PROPERTY_DOES_NOT_EXIST_ON_TYPE
+        {
             return None;
         }
 
-        let start_offset = self.line_map.position_to_offset(diag.range.start, self.source)?;
+        let start_offset = self
+            .line_map
+            .position_to_offset(diag.range.start, self.source)?;
         let node_idx = find_node_at_offset(self.arena, start_offset);
         if node_idx.is_none() {
             return None;
@@ -268,7 +278,8 @@ impl<'a> CodeActionProvider<'a> {
                 }
 
                 let literal = self.arena.get_literal_expr(init_node)?;
-                let edits = self.object_literal_property_edits(init_node, literal, &info.property_text)?;
+                let edits =
+                    self.object_literal_property_edits(init_node, literal, &info.property_text)?;
                 let title = format!("Add property '{}' to object literal", info.property_name);
                 result = Some((edits, title));
                 break;
@@ -361,7 +372,9 @@ impl<'a> CodeActionProvider<'a> {
             let end_idx = i;
 
             if end_idx > start_idx + 1 {
-                if let Some(edit) = self.sort_imports_range(&statements[start_idx..end_idx], &source_file.comments) {
+                if let Some(edit) =
+                    self.sort_imports_range(&statements[start_idx..end_idx], &source_file.comments)
+                {
                     edits.push(edit);
                 }
             }
@@ -387,9 +400,9 @@ impl<'a> CodeActionProvider<'a> {
     }
 
     fn is_import_declaration(&self, node_idx: NodeIndex) -> bool {
-        self.arena
-            .get(node_idx)
-            .map_or(false, |node| node.kind == syntax_kind_ext::IMPORT_DECLARATION)
+        self.arena.get(node_idx).map_or(false, |node| {
+            node.kind == syntax_kind_ext::IMPORT_DECLARATION
+        })
     }
 
     fn sort_imports_range(
@@ -421,7 +434,10 @@ impl<'a> CodeActionProvider<'a> {
             let import_decl = self.arena.get_import_decl(node)?;
             let is_side_effect = import_decl.import_clause.is_none();
             let specifier = self.get_module_specifier(node_idx).unwrap_or_default();
-            let text = self.source.get(start as usize..node.end as usize)?.to_string();
+            let text = self
+                .source
+                .get(start as usize..node.end as usize)?
+                .to_string();
             imports.push(ImportInfo {
                 start,
                 end: node.end,
@@ -443,7 +459,10 @@ impl<'a> CodeActionProvider<'a> {
             let mut info = imports[idx].clone();
             if idx + 1 < imports.len() {
                 let next_start = imports[idx + 1].start;
-                let between = self.source.get(info.end as usize..next_start as usize).unwrap_or("");
+                let between = self
+                    .source
+                    .get(info.end as usize..next_start as usize)
+                    .unwrap_or("");
                 let has_blank_line = between.contains("\n\n")
                     || between.contains("\r\n\r\n")
                     || between.contains("\r\r");
@@ -468,7 +487,9 @@ impl<'a> CodeActionProvider<'a> {
             let mut pending = Vec::new();
             for info in group {
                 if info.is_side_effect {
-                    pending.sort_by(|a: &ImportInfo, b: &ImportInfo| a.module_specifier.cmp(&b.module_specifier));
+                    pending.sort_by(|a: &ImportInfo, b: &ImportInfo| {
+                        a.module_specifier.cmp(&b.module_specifier)
+                    });
                     for sorted in pending.drain(..) {
                         new_chunks.push(sorted.text);
                     }
@@ -534,7 +555,13 @@ impl<'a> CodeActionProvider<'a> {
             if node.kind == syntax_kind_ext::IMPORT_SPECIFIER {
                 let name = self.specifier_local_name(current)?;
                 let import_decl = self.find_import_decl(current)?;
-                return Some((import_decl, ImportRemoval::Named { specifier: current, name }));
+                return Some((
+                    import_decl,
+                    ImportRemoval::Named {
+                        specifier: current,
+                        name,
+                    },
+                ));
             }
 
             if node.kind == SyntaxKind::Identifier as u16 {
@@ -585,7 +612,9 @@ impl<'a> CodeActionProvider<'a> {
         } else {
             spec.property_name
         };
-        self.arena.get_identifier_text(local_ident).map(|name| name.to_string())
+        self.arena
+            .get_identifier_text(local_ident)
+            .map(|name| name.to_string())
     }
 
     fn build_import_removal_edit(
@@ -603,7 +632,9 @@ impl<'a> CodeActionProvider<'a> {
         let clause = self.arena.get_import_clause(clause_node)?;
 
         let mut default_name = if !clause.name.is_none() {
-            self.arena.get_identifier_text(clause.name).map(|name| name.to_string())
+            self.arena
+                .get_identifier_text(clause.name)
+                .map(|name| name.to_string())
         } else {
             None
         };
@@ -757,7 +788,9 @@ impl<'a> CodeActionProvider<'a> {
     }
 
     fn diagnostic_identifier_usage(&self, diag: &LspDiagnostic) -> Option<(String, ImportUsage)> {
-        let start_offset = self.line_map.position_to_offset(diag.range.start, self.source)?;
+        let start_offset = self
+            .line_map
+            .position_to_offset(diag.range.start, self.source)?;
         let node_idx = find_node_at_offset(self.arena, start_offset);
         if node_idx.is_none() {
             return None;
@@ -877,9 +910,14 @@ impl<'a> CodeActionProvider<'a> {
         None
     }
 
-    fn build_import_edit(&self, root: NodeIndex, candidate: &ImportCandidate) -> Option<Vec<TextEdit>> {
+    fn build_import_edit(
+        &self,
+        root: NodeIndex,
+        candidate: &ImportCandidate,
+    ) -> Option<Vec<TextEdit>> {
         match &candidate.kind {
-            ImportCandidateKind::Named { .. } => match self.try_merge_named_import(root, candidate) {
+            ImportCandidateKind::Named { .. } => match self.try_merge_named_import(root, candidate)
+            {
                 MergeNamedImport::Edits(edits) => return Some(edits),
                 MergeNamedImport::AlreadyImported => return None,
                 MergeNamedImport::NoMatch => {}
@@ -932,7 +970,11 @@ impl<'a> CodeActionProvider<'a> {
         }])
     }
 
-    fn try_merge_default_import(&self, root: NodeIndex, candidate: &ImportCandidate) -> MergeDefaultImport {
+    fn try_merge_default_import(
+        &self,
+        root: NodeIndex,
+        candidate: &ImportCandidate,
+    ) -> MergeDefaultImport {
         let ImportCandidateKind::Default = &candidate.kind else {
             return MergeDefaultImport::NoMatch;
         };
@@ -945,25 +987,34 @@ impl<'a> CodeActionProvider<'a> {
         };
 
         for &stmt_idx in &source_file.statements.nodes {
-            let Some(stmt_node) = self.arena.get(stmt_idx) else { continue; };
+            let Some(stmt_node) = self.arena.get(stmt_idx) else {
+                continue;
+            };
             if stmt_node.kind != syntax_kind_ext::IMPORT_DECLARATION {
                 continue;
             }
 
-            let Some(import_decl) = self.arena.get_import_decl(stmt_node) else { continue; };
+            let Some(import_decl) = self.arena.get_import_decl(stmt_node) else {
+                continue;
+            };
             if import_decl.import_clause.is_none() {
                 continue;
             }
 
-            let Some(module_text) = self.arena.get_literal_text(import_decl.module_specifier) else {
+            let Some(module_text) = self.arena.get_literal_text(import_decl.module_specifier)
+            else {
                 continue;
             };
             if module_text != candidate.module_specifier {
                 continue;
             }
 
-            let Some(clause_node) = self.arena.get(import_decl.import_clause) else { continue; };
-            let Some(clause) = self.arena.get_import_clause(clause_node) else { continue; };
+            let Some(clause_node) = self.arena.get(import_decl.import_clause) else {
+                continue;
+            };
+            let Some(clause) = self.arena.get_import_clause(clause_node) else {
+                continue;
+            };
             if clause.is_type_only != candidate.is_type_only {
                 continue;
             }
@@ -981,7 +1032,9 @@ impl<'a> CodeActionProvider<'a> {
                 continue;
             }
 
-            if let Some(edit) = self.build_default_import_insertion_edit(clause_node, clause, candidate) {
+            if let Some(edit) =
+                self.build_default_import_insertion_edit(clause_node, clause, candidate)
+            {
                 return MergeDefaultImport::Edits(vec![edit]);
             }
         }
@@ -989,7 +1042,11 @@ impl<'a> CodeActionProvider<'a> {
         MergeDefaultImport::NoMatch
     }
 
-    fn try_merge_named_import(&self, root: NodeIndex, candidate: &ImportCandidate) -> MergeNamedImport {
+    fn try_merge_named_import(
+        &self,
+        root: NodeIndex,
+        candidate: &ImportCandidate,
+    ) -> MergeNamedImport {
         let ImportCandidateKind::Named { .. } = &candidate.kind else {
             return MergeNamedImport::NoMatch;
         };
@@ -1004,32 +1061,43 @@ impl<'a> CodeActionProvider<'a> {
         let mut default_target = None;
 
         for &stmt_idx in &source_file.statements.nodes {
-            let Some(stmt_node) = self.arena.get(stmt_idx) else { continue; };
+            let Some(stmt_node) = self.arena.get(stmt_idx) else {
+                continue;
+            };
             if stmt_node.kind != syntax_kind_ext::IMPORT_DECLARATION {
                 continue;
             }
 
-            let Some(import_decl) = self.arena.get_import_decl(stmt_node) else { continue; };
+            let Some(import_decl) = self.arena.get_import_decl(stmt_node) else {
+                continue;
+            };
             if import_decl.import_clause.is_none() {
                 continue;
             }
 
-            let Some(module_text) = self.arena.get_literal_text(import_decl.module_specifier) else {
+            let Some(module_text) = self.arena.get_literal_text(import_decl.module_specifier)
+            else {
                 continue;
             };
             if module_text != candidate.module_specifier {
                 continue;
             }
 
-            let Some(clause_node) = self.arena.get(import_decl.import_clause) else { continue; };
-            let Some(clause) = self.arena.get_import_clause(clause_node) else { continue; };
+            let Some(clause_node) = self.arena.get(import_decl.import_clause) else {
+                continue;
+            };
+            let Some(clause) = self.arena.get_import_clause(clause_node) else {
+                continue;
+            };
             if clause.is_type_only && !candidate.is_type_only {
                 continue;
             }
 
             if !clause.named_bindings.is_none() {
                 let bindings_idx = clause.named_bindings;
-                let Some(bindings_node) = self.arena.get(bindings_idx) else { continue; };
+                let Some(bindings_node) = self.arena.get(bindings_idx) else {
+                    continue;
+                };
                 if bindings_node.kind == SyntaxKind::Identifier as u16 {
                     continue;
                 }
@@ -1038,10 +1106,14 @@ impl<'a> CodeActionProvider<'a> {
                     if self.named_imports_has_local_name(named, &candidate.local_name) {
                         return MergeNamedImport::AlreadyImported;
                     }
-                    let Some(spec_text) = self.named_import_spec_text(candidate, clause.is_type_only) else {
+                    let Some(spec_text) =
+                        self.named_import_spec_text(candidate, clause.is_type_only)
+                    else {
                         return MergeNamedImport::NoMatch;
                     };
-                    if let Some(edits) = self.build_named_import_insertion_edits(bindings_idx, named, &spec_text) {
+                    if let Some(edits) =
+                        self.build_named_import_insertion_edits(bindings_idx, named, &spec_text)
+                    {
                         return MergeNamedImport::Edits(edits);
                     }
                     return MergeNamedImport::NoMatch;
@@ -1066,8 +1138,12 @@ impl<'a> CodeActionProvider<'a> {
         local_name: &str,
     ) -> bool {
         for &spec_idx in &named.elements.nodes {
-            let Some(spec_node) = self.arena.get(spec_idx) else { continue; };
-            let Some(spec) = self.arena.get_specifier(spec_node) else { continue; };
+            let Some(spec_node) = self.arena.get(spec_idx) else {
+                continue;
+            };
+            let Some(spec) = self.arena.get_specifier(spec_node) else {
+                continue;
+            };
             let local_ident = if !spec.name.is_none() {
                 spec.name
             } else {
@@ -1113,7 +1189,9 @@ impl<'a> CodeActionProvider<'a> {
     ) -> Option<Vec<TextEdit>> {
         let named_node = self.arena.get(named_idx)?;
         let close_offset = self.find_closing_brace_offset(named_node)?;
-        let open_pos = self.line_map.offset_to_position(named_node.pos, self.source);
+        let open_pos = self
+            .line_map
+            .offset_to_position(named_node.pos, self.source);
         let close_pos = self.line_map.offset_to_position(close_offset, self.source);
         let is_single_line = open_pos.line == close_pos.line;
         let elements = &named.elements.nodes;
@@ -1185,7 +1263,9 @@ impl<'a> CodeActionProvider<'a> {
             }
             line.push('\n');
 
-            let insert_pos = self.line_map.offset_to_position(close_line_start, self.source);
+            let insert_pos = self
+                .line_map
+                .offset_to_position(close_line_start, self.source);
             edits.push(TextEdit {
                 range: Range::new(insert_pos, insert_pos),
                 new_text: line,
@@ -1197,7 +1277,9 @@ impl<'a> CodeActionProvider<'a> {
         line.push_str(&spec_indent);
         line.push_str(spec_text);
         line.push('\n');
-        let insert_pos = self.line_map.offset_to_position(close_line_start, self.source);
+        let insert_pos = self
+            .line_map
+            .offset_to_position(close_line_start, self.source);
         Some(vec![TextEdit {
             range: Range::new(insert_pos, insert_pos),
             new_text: line,
@@ -1308,7 +1390,9 @@ impl<'a> CodeActionProvider<'a> {
 
         let mut last_import = None;
         for &stmt_idx in &source_file.statements.nodes {
-            let Some(stmt_node) = self.arena.get(stmt_idx) else { continue; };
+            let Some(stmt_node) = self.arena.get(stmt_idx) else {
+                continue;
+            };
             if stmt_node.kind == syntax_kind_ext::IMPORT_DECLARATION
                 || stmt_node.kind == syntax_kind_ext::IMPORT_EQUALS_DECLARATION
             {
@@ -1336,7 +1420,10 @@ impl<'a> CodeActionProvider<'a> {
                 if name_node.kind != SyntaxKind::Identifier as u16 {
                     return None;
                 }
-                let property_name = self.arena.get_identifier_text(access.name_or_argument)?.to_string();
+                let property_name = self
+                    .arena
+                    .get_identifier_text(access.name_or_argument)?
+                    .to_string();
                 return Some(PropertyAccessInfo {
                     access_node: current,
                     target: access.expression,
@@ -1352,7 +1439,10 @@ impl<'a> CodeActionProvider<'a> {
                     k if k == SyntaxKind::StringLiteral as u16
                         || k == SyntaxKind::NumericLiteral as u16 =>
                     {
-                        let name = self.arena.get_literal_text(access.name_or_argument)?.to_string();
+                        let name = self
+                            .arena
+                            .get_literal_text(access.name_or_argument)?
+                            .to_string();
                         let text = self
                             .source
                             .get(arg_node.pos as usize..arg_node.end as usize)?
@@ -1381,7 +1471,9 @@ impl<'a> CodeActionProvider<'a> {
         property_text: &str,
     ) -> Option<Vec<TextEdit>> {
         let close_offset = self.find_closing_brace_offset(object_node)?;
-        let open_pos = self.line_map.offset_to_position(object_node.pos, self.source);
+        let open_pos = self
+            .line_map
+            .offset_to_position(object_node.pos, self.source);
         let close_pos = self.line_map.offset_to_position(close_offset, self.source);
         let is_single_line = open_pos.line == close_pos.line;
 
@@ -1401,7 +1493,10 @@ impl<'a> CodeActionProvider<'a> {
             let had_trailing_ws = insert_offset != close_offset;
             let trailing_space = if had_trailing_ws { "" } else { " " };
             let last_char = if insert_offset > object_node.pos {
-                self.source.as_bytes().get((insert_offset - 1) as usize).copied()
+                self.source
+                    .as_bytes()
+                    .get((insert_offset - 1) as usize)
+                    .copied()
             } else {
                 None
             };
@@ -1476,7 +1571,9 @@ impl<'a> CodeActionProvider<'a> {
             }
             line.push('\n');
 
-            let insert_pos = self.line_map.offset_to_position(close_line_start, self.source);
+            let insert_pos = self
+                .line_map
+                .offset_to_position(close_line_start, self.source);
             edits.push(TextEdit {
                 range: Range::new(insert_pos, insert_pos),
                 new_text: line,
@@ -1488,7 +1585,9 @@ impl<'a> CodeActionProvider<'a> {
         line.push_str(&prop_indent);
         line.push_str(property_text);
         line.push_str(": undefined\n");
-        let insert_pos = self.line_map.offset_to_position(close_line_start, self.source);
+        let insert_pos = self
+            .line_map
+            .offset_to_position(close_line_start, self.source);
         edits.push(TextEdit {
             range: Range::new(insert_pos, insert_pos),
             new_text: line,
@@ -1497,13 +1596,19 @@ impl<'a> CodeActionProvider<'a> {
         Some(edits)
     }
 
-    fn class_property_edits(&self, node_idx: NodeIndex, property_text: &str) -> Option<Vec<TextEdit>> {
+    fn class_property_edits(
+        &self,
+        node_idx: NodeIndex,
+        property_text: &str,
+    ) -> Option<Vec<TextEdit>> {
         let class_idx = self.find_enclosing_class(node_idx)?;
         let class_node = self.arena.get(class_idx)?;
         let class_data = self.arena.get_class(class_node)?;
 
         let close_offset = self.find_closing_brace_offset(class_node)?;
-        let open_pos = self.line_map.offset_to_position(class_node.pos, self.source);
+        let open_pos = self
+            .line_map
+            .offset_to_position(class_node.pos, self.source);
         let close_pos = self.line_map.offset_to_position(close_offset, self.source);
         let is_single_line = open_pos.line == close_pos.line;
 
@@ -1544,7 +1649,9 @@ impl<'a> CodeActionProvider<'a> {
         line.push_str(property_text);
         line.push_str(": any;\n");
 
-        let insert_pos = self.line_map.offset_to_position(close_line_start, self.source);
+        let insert_pos = self
+            .line_map
+            .offset_to_position(close_line_start, self.source);
         edits.push(TextEdit {
             range: Range::new(insert_pos, insert_pos),
             new_text: line,
@@ -1790,8 +1897,12 @@ impl<'a> CodeActionProvider<'a> {
             return false;
         }
 
-        let Some(paren) = self.arena.get_parenthesized(expr_node) else { return true; };
-        let Some(inner) = self.arena.get(paren.expression) else { return true; };
+        let Some(paren) = self.arena.get_parenthesized(expr_node) else {
+            return true;
+        };
+        let Some(inner) = self.arena.get(paren.expression) else {
+            return true;
+        };
 
         !self.is_comma_expression(inner)
     }
@@ -1845,7 +1956,11 @@ impl<'a> CodeActionProvider<'a> {
             || parent_node.kind == syntax_kind_ext::JSX_FRAGMENT
     }
 
-    fn expression_and_statement_share_scope(&self, expr_idx: NodeIndex, stmt_idx: NodeIndex) -> bool {
+    fn expression_and_statement_share_scope(
+        &self,
+        expr_idx: NodeIndex,
+        stmt_idx: NodeIndex,
+    ) -> bool {
         let expr_scope = match self.find_enclosing_scope_id(expr_idx) {
             Some(scope_id) => scope_id,
             None => return true,
@@ -1909,8 +2024,7 @@ impl<'a> CodeActionProvider<'a> {
     }
 
     fn symbol_is_lexical(&self, flags: u32) -> bool {
-        (flags & symbol_flags::BLOCK_SCOPED_VARIABLE) != 0
-            || (flags & symbol_flags::CLASS) != 0
+        (flags & symbol_flags::BLOCK_SCOPED_VARIABLE) != 0 || (flags & symbol_flags::CLASS) != 0
     }
 
     fn collect_identifier_uses_in_expression(&self, expr_idx: NodeIndex, out: &mut Vec<NodeIndex>) {
@@ -1954,7 +2068,8 @@ impl<'a> CodeActionProvider<'a> {
                 }
             }
             k if k == syntax_kind_ext::PREFIX_UNARY_EXPRESSION
-                || k == syntax_kind_ext::POSTFIX_UNARY_EXPRESSION => {
+                || k == syntax_kind_ext::POSTFIX_UNARY_EXPRESSION =>
+            {
                 if let Some(unary) = self.arena.get_unary_expr(node) {
                     self.collect_identifier_uses_in_expression(unary.operand, out);
                 }
@@ -1963,7 +2078,8 @@ impl<'a> CodeActionProvider<'a> {
                 || k == syntax_kind_ext::YIELD_EXPRESSION
                 || k == syntax_kind_ext::NON_NULL_EXPRESSION
                 || k == syntax_kind_ext::SPREAD_ELEMENT
-                || k == syntax_kind_ext::SPREAD_ASSIGNMENT => {
+                || k == syntax_kind_ext::SPREAD_ASSIGNMENT =>
+            {
                 if node.has_data() {
                     if let Some(unary) = self.arena.unary_exprs_ex.get(node.data_index as usize) {
                         self.collect_identifier_uses_in_expression(unary.expression, out);
@@ -1998,7 +2114,8 @@ impl<'a> CodeActionProvider<'a> {
             }
             k if k == syntax_kind_ext::TAGGED_TEMPLATE_EXPRESSION => {
                 if node.has_data() {
-                    if let Some(tagged) = self.arena.tagged_templates.get(node.data_index as usize) {
+                    if let Some(tagged) = self.arena.tagged_templates.get(node.data_index as usize)
+                    {
                         self.collect_identifier_uses_in_expression(tagged.tag, out);
                         self.collect_identifier_uses_in_expression(tagged.template, out);
                     }
@@ -2007,7 +2124,9 @@ impl<'a> CodeActionProvider<'a> {
             k if k == syntax_kind_ext::TEMPLATE_EXPRESSION => {
                 if let Some(template) = self.arena.get_template_expr(node) {
                     for &span_idx in &template.template_spans.nodes {
-                        let Some(span_node) = self.arena.get(span_idx) else { continue };
+                        let Some(span_node) = self.arena.get(span_idx) else {
+                            continue;
+                        };
                         if let Some(span) = self.arena.get_template_span(span_node) {
                             self.collect_identifier_uses_in_expression(span.expression, out);
                         }
@@ -2016,9 +2135,12 @@ impl<'a> CodeActionProvider<'a> {
             }
             k if k == syntax_kind_ext::TYPE_ASSERTION
                 || k == syntax_kind_ext::AS_EXPRESSION
-                || k == syntax_kind_ext::SATISFIES_EXPRESSION => {
+                || k == syntax_kind_ext::SATISFIES_EXPRESSION =>
+            {
                 if node.has_data() {
-                    if let Some(assertion) = self.arena.type_assertions.get(node.data_index as usize) {
+                    if let Some(assertion) =
+                        self.arena.type_assertions.get(node.data_index as usize)
+                    {
                         self.collect_identifier_uses_in_expression(assertion.expression, out);
                     }
                 }
@@ -2043,7 +2165,8 @@ impl<'a> CodeActionProvider<'a> {
             }
             k if k == syntax_kind_ext::FUNCTION_EXPRESSION
                 || k == syntax_kind_ext::ARROW_FUNCTION
-                || k == syntax_kind_ext::CLASS_EXPRESSION => {
+                || k == syntax_kind_ext::CLASS_EXPRESSION =>
+            {
                 // Skip nested scopes to avoid capturing non-evaluated identifiers.
             }
             _ => {}
@@ -2114,7 +2237,11 @@ impl<'a> CodeActionProvider<'a> {
         self.collect_identifier_uses_in_jsx_attributes(opening.attributes, out);
     }
 
-    fn collect_identifier_uses_in_jsx_tag_name(&self, tag_idx: NodeIndex, out: &mut Vec<NodeIndex>) {
+    fn collect_identifier_uses_in_jsx_tag_name(
+        &self,
+        tag_idx: NodeIndex,
+        out: &mut Vec<NodeIndex>,
+    ) {
         let Some(tag_node) = self.arena.get(tag_idx) else {
             return;
         };
@@ -2158,7 +2285,10 @@ impl<'a> CodeActionProvider<'a> {
                         if attr.initializer.is_none() {
                             continue;
                         }
-                        self.collect_identifier_uses_in_jsx_attribute_initializer(attr.initializer, out);
+                        self.collect_identifier_uses_in_jsx_attribute_initializer(
+                            attr.initializer,
+                            out,
+                        );
                     }
                 }
                 k if k == syntax_kind_ext::JSX_SPREAD_ATTRIBUTE => {
@@ -2203,7 +2333,8 @@ impl<'a> CodeActionProvider<'a> {
             }
             k if k == syntax_kind_ext::JSX_ELEMENT
                 || k == syntax_kind_ext::JSX_SELF_CLOSING_ELEMENT
-                || k == syntax_kind_ext::JSX_FRAGMENT => {
+                || k == syntax_kind_ext::JSX_FRAGMENT =>
+            {
                 self.collect_identifier_uses_in_expression(child_idx, out);
             }
             _ => {}

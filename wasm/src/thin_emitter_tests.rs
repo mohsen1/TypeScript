@@ -2,13 +2,13 @@
 
 use crate::emit_context::EmitContext;
 use crate::lowering_pass::LoweringPass;
-use crate::thin_emitter::{ModuleKind, PrinterOptions, ScriptTarget, ThinPrinter};
-use crate::thin_parser::ThinParserState;
-use crate::thin_binder::ThinBinderState;
-use crate::thin_checker::ThinCheckerState;
-use crate::solver::TypeInterner;
 use crate::parser::NodeIndex;
 use crate::parser::syntax_kind_ext;
+use crate::solver::TypeInterner;
+use crate::thin_binder::ThinBinderState;
+use crate::thin_checker::ThinCheckerState;
+use crate::thin_emitter::{ModuleKind, PrinterOptions, ScriptTarget, ThinPrinter};
+use crate::thin_parser::ThinParserState;
 use serde_json::Value;
 
 fn make_printer_with_transforms<'a>(
@@ -20,8 +20,7 @@ fn make_printer_with_transforms<'a>(
     let mut ctx = EmitContext::with_options(options.clone());
     ctx.auto_detect_module = auto_detect_module;
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_auto_detect_module(ctx.auto_detect_module);
     printer
@@ -126,7 +125,11 @@ fn test_thin_emit_variable_declaration() {
 
     let output = printer.get_output();
     // ES5 target emits 'var' instead of 'let'
-    assert!(output.contains("var"), "Expected 'var' in output: {}", output);
+    assert!(
+        output.contains("var"),
+        "Expected 'var' in output: {}",
+        output
+    );
     assert!(output.contains("x"), "Expected 'x' in output: {}", output);
     assert!(output.contains("42"), "Expected '42' in output: {}", output);
 }
@@ -141,8 +144,16 @@ fn test_thin_emit_variable_declaration_esnext() {
     printer.emit(root);
 
     let output = printer.get_output();
-    assert!(output.contains("let x"), "Expected 'let' in output: {}", output);
-    assert!(!output.contains("var x"), "Did not expect 'var' in output: {}", output);
+    assert!(
+        output.contains("let x"),
+        "Expected 'let' in output: {}",
+        output
+    );
+    assert!(
+        !output.contains("var x"),
+        "Did not expect 'var' in output: {}",
+        output
+    );
 }
 
 #[test]
@@ -155,9 +166,21 @@ fn test_thin_emit_function_declaration() {
     printer.emit(root);
 
     let output = printer.get_output();
-    assert!(output.contains("function"), "Expected 'function' in output: {}", output);
-    assert!(output.contains("add"), "Expected 'add' in output: {}", output);
-    assert!(output.contains("return"), "Expected 'return' in output: {}", output);
+    assert!(
+        output.contains("function"),
+        "Expected 'function' in output: {}",
+        output
+    );
+    assert!(
+        output.contains("add"),
+        "Expected 'add' in output: {}",
+        output
+    );
+    assert!(
+        output.contains("return"),
+        "Expected 'return' in output: {}",
+        output
+    );
 }
 
 #[test]
@@ -247,8 +270,16 @@ fn test_thin_emit_while_statement() {
     printer.emit(root);
 
     let output = printer.get_output();
-    assert!(output.contains("while ("), "Expected 'while' in output: {}", output);
-    assert!(output.contains("x++"), "Expected increment in output: {}", output);
+    assert!(
+        output.contains("while ("),
+        "Expected 'while' in output: {}",
+        output
+    );
+    assert!(
+        output.contains("x++"),
+        "Expected increment in output: {}",
+        output
+    );
 }
 
 #[test]
@@ -261,9 +292,21 @@ fn test_thin_emit_switch_statement() {
     printer.emit(root);
 
     let output = printer.get_output();
-    assert!(output.contains("switch (x)"), "Expected switch in output: {}", output);
-    assert!(output.contains("case 1:"), "Expected case clause in output: {}", output);
-    assert!(output.contains("default:"), "Expected default clause in output: {}", output);
+    assert!(
+        output.contains("switch (x)"),
+        "Expected switch in output: {}",
+        output
+    );
+    assert!(
+        output.contains("case 1:"),
+        "Expected case clause in output: {}",
+        output
+    );
+    assert!(
+        output.contains("default:"),
+        "Expected default clause in output: {}",
+        output
+    );
 }
 
 #[test]
@@ -308,8 +351,16 @@ fn test_thin_emit_class_declaration() {
     printer.emit(root);
 
     let output = printer.get_output();
-    assert!(output.contains("class"), "Expected 'class' in output: {}", output);
-    assert!(output.contains("Foo"), "Expected 'Foo' in output: {}", output);
+    assert!(
+        output.contains("class"),
+        "Expected 'class' in output: {}",
+        output
+    );
+    assert!(
+        output.contains("Foo"),
+        "Expected 'Foo' in output: {}",
+        output
+    );
 }
 
 #[test]
@@ -737,8 +788,16 @@ fn test_thin_emit_arrow_function() {
 
     let output = printer.get_output();
     // ES5 emit: arrow functions become regular function expressions
-    assert!(output.contains("function"), "Expected 'function' in ES5 output: {}", output);
-    assert!(output.contains("return x * 2"), "Expected 'return x * 2' in ES5 output: {}", output);
+    assert!(
+        output.contains("function"),
+        "Expected 'function' in ES5 output: {}",
+        output
+    );
+    assert!(
+        output.contains("return x * 2"),
+        "Expected 'return x * 2' in ES5 output: {}",
+        output
+    );
 }
 
 #[test]
@@ -753,7 +812,11 @@ fn test_thin_emit_interface_declaration() {
 
     let output = printer.get_output();
     // For JavaScript emit, interface should NOT be in output
-    assert!(!output.contains("interface"), "JavaScript output should NOT contain 'interface': {}", output);
+    assert!(
+        !output.contains("interface"),
+        "JavaScript output should NOT contain 'interface': {}",
+        output
+    );
 }
 
 #[test]
@@ -767,7 +830,11 @@ fn test_thin_emit_type_alias_declaration() {
     printer.emit(root);
 
     let output = printer.get_output();
-    assert!(!output.contains("type"), "JavaScript output should NOT contain 'type': {}", output);
+    assert!(
+        !output.contains("type"),
+        "JavaScript output should NOT contain 'type': {}",
+        output
+    );
 }
 
 #[test]
@@ -788,7 +855,9 @@ fn test_thin_emit_union_type() {
             continue;
         };
         if stmt_node.kind == syntax_kind_ext::TYPE_ALIAS_DECLARATION {
-            let alias = arena.get_type_alias(stmt_node).expect("expected type alias data");
+            let alias = arena
+                .get_type_alias(stmt_node)
+                .expect("expected type alias data");
             type_node = Some(alias.type_node);
             break;
         }
@@ -1276,9 +1345,21 @@ fn test_thin_emit_enum_declaration() {
 
     let output = printer.get_output();
     // ES5 output should be IIFE pattern, not raw 'enum' keyword
-    assert!(output.contains("var Color;"), "Expected 'var Color;' in ES5 output: {}", output);
-    assert!(output.contains("(function (Color)"), "Expected IIFE pattern in ES5 output: {}", output);
-    assert!(output.contains("Color[Color[\"Red\"]"), "Expected reverse mapping for Red in ES5 output: {}", output);
+    assert!(
+        output.contains("var Color;"),
+        "Expected 'var Color;' in ES5 output: {}",
+        output
+    );
+    assert!(
+        output.contains("(function (Color)"),
+        "Expected IIFE pattern in ES5 output: {}",
+        output
+    );
+    assert!(
+        output.contains("Color[Color[\"Red\"]"),
+        "Expected reverse mapping for Red in ES5 output: {}",
+        output
+    );
 }
 
 #[test]
@@ -1292,9 +1373,21 @@ fn test_thin_emit_enum_declaration_es6() {
     printer.emit(root);
 
     let output = printer.get_output();
-    assert!(output.contains("enum"), "Expected 'enum' in ES6 output: {}", output);
-    assert!(output.contains("Color"), "Expected 'Color' in ES6 output: {}", output);
-    assert!(output.contains("Red"), "Expected 'Red' in ES6 output: {}", output);
+    assert!(
+        output.contains("enum"),
+        "Expected 'enum' in ES6 output: {}",
+        output
+    );
+    assert!(
+        output.contains("Color"),
+        "Expected 'Color' in ES6 output: {}",
+        output
+    );
+    assert!(
+        output.contains("Red"),
+        "Expected 'Red' in ES6 output: {}",
+        output
+    );
 }
 
 #[test]
@@ -1307,7 +1400,11 @@ fn test_thin_emit_const_enum_erased_es6() {
     printer.emit(root);
 
     let output = printer.get_output();
-    assert!(output.trim().is_empty(), "Const enums should be erased: {}", output);
+    assert!(
+        output.trim().is_empty(),
+        "Const enums should be erased: {}",
+        output
+    );
 }
 
 #[test]
@@ -1320,7 +1417,11 @@ fn test_thin_emit_declare_enum_erased() {
     printer.emit(root);
 
     let output = printer.get_output();
-    assert!(output.trim().is_empty(), "Declare enums should be erased: {}", output);
+    assert!(
+        output.trim().is_empty(),
+        "Declare enums should be erased: {}",
+        output
+    );
 }
 
 /// Full ThinNode pipeline integration test:
@@ -1345,11 +1446,16 @@ fn test_thin_pipeline_integration() {
     binder.bind_source_file(&parser.arena, source_file);
     // Verify symbols were created
     let symbol_count = binder.symbols.len();
-    assert!(symbol_count >= 2, "Expected at least 2 symbols (add, result), got {}", symbol_count);
+    assert!(
+        symbol_count >= 2,
+        "Expected at least 2 symbols (add, result), got {}",
+        symbol_count
+    );
 
     // Step 3: Check (type inference)
     let types = TypeInterner::new();
-    let checker = ThinCheckerState::new(&parser.arena, &binder, &types, "test.ts".to_string(), false);
+    let checker =
+        ThinCheckerState::new(&parser.arena, &binder, &types, "test.ts".to_string(), false);
     // Basic check - the checker exists and can be created
     let _ = &checker.ctx.types; // Access types arena to verify it exists
 
@@ -1358,14 +1464,38 @@ fn test_thin_pipeline_integration() {
     printer.emit(source_file);
 
     let output = printer.get_output();
-    assert!(output.contains("function"), "Output should contain 'function': {}", output);
-    assert!(output.contains("add"), "Output should contain 'add': {}", output);
+    assert!(
+        output.contains("function"),
+        "Output should contain 'function': {}",
+        output
+    );
+    assert!(
+        output.contains("add"),
+        "Output should contain 'add': {}",
+        output
+    );
     // JavaScript emit strips types, so "number" should NOT be in output
-    assert!(!output.contains("number"), "JavaScript output should NOT contain 'number' (types are stripped): {}", output);
-    assert!(output.contains("return"), "Output should contain 'return': {}", output);
+    assert!(
+        !output.contains("number"),
+        "JavaScript output should NOT contain 'number' (types are stripped): {}",
+        output
+    );
+    assert!(
+        output.contains("return"),
+        "Output should contain 'return': {}",
+        output
+    );
     // ES5 target emits 'var' instead of 'let'
-    assert!(output.contains("var"), "Output should contain 'var': {}", output);
-    assert!(output.contains("result"), "Output should contain 'result': {}", output);
+    assert!(
+        output.contains("var"),
+        "Output should contain 'var': {}",
+        output
+    );
+    assert!(
+        output.contains("result"),
+        "Output should contain 'result': {}",
+        output
+    );
 }
 
 #[test]
@@ -1378,9 +1508,21 @@ fn test_thin_emit_import() {
     printer.emit(root);
 
     let output = printer.get_output();
-    assert!(output.contains("import"), "Output should contain 'import': {}", output);
-    assert!(output.contains("foo"), "Output should contain 'foo': {}", output);
-    assert!(output.contains("from"), "Output should contain 'from': {}", output);
+    assert!(
+        output.contains("import"),
+        "Output should contain 'import': {}",
+        output
+    );
+    assert!(
+        output.contains("foo"),
+        "Output should contain 'foo': {}",
+        output
+    );
+    assert!(
+        output.contains("from"),
+        "Output should contain 'from': {}",
+        output
+    );
 }
 
 #[test]
@@ -1410,8 +1552,16 @@ fn test_thin_emit_import_type_only_erased() {
     printer.emit(root);
 
     let output = printer.get_output();
-    assert!(!output.contains("import"), "Type-only imports should be erased: {}", output);
-    assert!(output.contains("x = 1"), "Output should retain value statement: {}", output);
+    assert!(
+        !output.contains("import"),
+        "Type-only imports should be erased: {}",
+        output
+    );
+    assert!(
+        output.contains("x = 1"),
+        "Output should retain value statement: {}",
+        output
+    );
 }
 
 #[test]
@@ -1429,7 +1579,11 @@ fn test_thin_emit_import_type_specifier_filtered() {
         "Output should keep value imports only: {}",
         output
     );
-    assert!(!output.contains("Foo"), "Type-only specifier should be omitted: {}", output);
+    assert!(
+        !output.contains("Foo"),
+        "Type-only specifier should be omitted: {}",
+        output
+    );
 }
 
 #[test]
@@ -1476,9 +1630,21 @@ fn test_thin_emit_export() {
     printer.emit(root);
 
     let output = printer.get_output();
-    assert!(output.contains("export"), "Output should contain 'export': {}", output);
-    assert!(output.contains("function"), "Output should contain 'function': {}", output);
-    assert!(output.contains("greet"), "Output should contain 'greet': {}", output);
+    assert!(
+        output.contains("export"),
+        "Output should contain 'export': {}",
+        output
+    );
+    assert!(
+        output.contains("function"),
+        "Output should contain 'function': {}",
+        output
+    );
+    assert!(
+        output.contains("greet"),
+        "Output should contain 'greet': {}",
+        output
+    );
 }
 
 #[test]
@@ -1530,8 +1696,16 @@ fn test_thin_emit_export_type_only_erased() {
     printer.emit(root);
 
     let output = printer.get_output();
-    assert!(!output.contains("export"), "Type-only exports should be erased: {}", output);
-    assert!(output.contains("x = 1"), "Output should retain value statement: {}", output);
+    assert!(
+        !output.contains("export"),
+        "Type-only exports should be erased: {}",
+        output
+    );
+    assert!(
+        output.contains("x = 1"),
+        "Output should retain value statement: {}",
+        output
+    );
 }
 
 #[test]
@@ -1549,7 +1723,11 @@ fn test_thin_emit_export_type_specifier_filtered() {
         "Output should keep value exports only: {}",
         output
     );
-    assert!(!output.contains("Foo"), "Type-only specifier should be omitted: {}", output);
+    assert!(
+        !output.contains("Foo"),
+        "Type-only specifier should be omitted: {}",
+        output
+    );
 }
 
 #[test]
@@ -1562,8 +1740,16 @@ fn test_thin_emit_get_accessor() {
     printer.emit(root);
 
     let output = printer.get_output();
-    assert!(output.contains("get"), "Output should contain 'get': {}", output);
-    assert!(output.contains("value"), "Output should contain 'value': {}", output);
+    assert!(
+        output.contains("get"),
+        "Output should contain 'get': {}",
+        output
+    );
+    assert!(
+        output.contains("value"),
+        "Output should contain 'value': {}",
+        output
+    );
 }
 
 #[test]
@@ -1576,8 +1762,16 @@ fn test_thin_emit_set_accessor() {
     printer.emit(root);
 
     let output = printer.get_output();
-    assert!(output.contains("set"), "Output should contain 'set': {}", output);
-    assert!(output.contains("value"), "Output should contain 'value': {}", output);
+    assert!(
+        output.contains("set"),
+        "Output should contain 'set': {}",
+        output
+    );
+    assert!(
+        output.contains("value"),
+        "Output should contain 'value': {}",
+        output
+    );
 }
 
 #[test]
@@ -1590,9 +1784,21 @@ fn test_thin_emit_decorator() {
     printer.emit(root);
 
     let output = printer.get_output();
-    assert!(output.contains("@"), "Output should contain '@': {}", output);
-    assert!(output.contains("Component"), "Output should contain 'Component': {}", output);
-    assert!(output.contains("class"), "Output should contain 'class': {}", output);
+    assert!(
+        output.contains("@"),
+        "Output should contain '@': {}",
+        output
+    );
+    assert!(
+        output.contains("Component"),
+        "Output should contain 'Component': {}",
+        output
+    );
+    assert!(
+        output.contains("class"),
+        "Output should contain 'class': {}",
+        output
+    );
 }
 
 #[test]
@@ -1606,7 +1812,11 @@ fn test_thin_emit_static_property() {
 
     let output = printer.get_output();
     // ES5 emit: static properties become ClassName.propName = value;
-    assert!(output.contains("Foo.count = 0"), "ES5 output should contain 'Foo.count = 0': {}", output);
+    assert!(
+        output.contains("Foo.count = 0"),
+        "ES5 output should contain 'Foo.count = 0': {}",
+        output
+    );
 }
 
 #[test]
@@ -1620,8 +1830,16 @@ fn test_thin_emit_private_method() {
     printer.emit(root);
 
     let output = printer.get_output();
-    assert!(!output.contains("private"), "JavaScript output should NOT contain 'private': {}", output);
-    assert!(output.contains("doSomething"), "Output should contain 'doSomething': {}", output);
+    assert!(
+        !output.contains("private"),
+        "JavaScript output should NOT contain 'private': {}",
+        output
+    );
+    assert!(
+        output.contains("doSomething"),
+        "Output should contain 'doSomething': {}",
+        output
+    );
 }
 
 #[test]
@@ -1636,8 +1854,16 @@ fn test_thin_emit_static_readonly() {
 
     let output = printer.get_output();
     // ES5 emit: static properties become ClassName.propName = value;
-    assert!(output.contains("Foo.MAX = 100"), "ES5 output should contain 'Foo.MAX = 100': {}", output);
-    assert!(!output.contains("readonly"), "JavaScript output should NOT contain 'readonly': {}", output);
+    assert!(
+        output.contains("Foo.MAX = 100"),
+        "ES5 output should contain 'Foo.MAX = 100': {}",
+        output
+    );
+    assert!(
+        !output.contains("readonly"),
+        "JavaScript output should NOT contain 'readonly': {}",
+        output
+    );
 }
 
 #[test]
@@ -1651,8 +1877,16 @@ fn test_thin_emit_protected_constructor() {
 
     let output = printer.get_output();
     // ES5 emit: classes become IIFEs, protected is stripped
-    assert!(!output.contains("protected"), "ES5 output should NOT contain 'protected': {}", output);
-    assert!(output.contains("function Singleton"), "ES5 output should contain constructor function: {}", output);
+    assert!(
+        !output.contains("protected"),
+        "ES5 output should NOT contain 'protected': {}",
+        output
+    );
+    assert!(
+        output.contains("function Singleton"),
+        "ES5 output should contain constructor function: {}",
+        output
+    );
 }
 
 #[test]
@@ -1667,8 +1901,16 @@ fn test_thin_emit_static_get_accessor() {
     let output = printer.get_output();
     // ES5 emit: class becomes IIFE (static accessors may be handled differently)
     // For now, just verify the class wrapper is emitted
-    assert!(output.contains("var Foo"), "ES5 output should contain 'var Foo': {}", output);
-    assert!(output.contains("function Foo"), "ES5 output should contain 'function Foo': {}", output);
+    assert!(
+        output.contains("var Foo"),
+        "ES5 output should contain 'var Foo': {}",
+        output
+    );
+    assert!(
+        output.contains("function Foo"),
+        "ES5 output should contain 'function Foo': {}",
+        output
+    );
 }
 
 #[test]
@@ -1683,7 +1925,11 @@ fn test_thin_emit_call_signature() {
 
     let output = printer.get_output();
     // For JavaScript emit, interface should NOT be in output
-    assert!(!output.contains("interface"), "JavaScript output should NOT contain 'interface': {}", output);
+    assert!(
+        !output.contains("interface"),
+        "JavaScript output should NOT contain 'interface': {}",
+        output
+    );
 }
 
 #[test]
@@ -1698,7 +1944,11 @@ fn test_thin_emit_construct_signature() {
 
     let output = printer.get_output();
     // For JavaScript emit, interface should NOT be in output
-    assert!(!output.contains("interface"), "JavaScript output should NOT contain 'interface': {}", output);
+    assert!(
+        !output.contains("interface"),
+        "JavaScript output should NOT contain 'interface': {}",
+        output
+    );
 }
 
 #[test]
@@ -1723,7 +1973,9 @@ fn test_thin_emit_generic_call_construct_signatures() {
         if stmt_node.kind != syntax_kind_ext::INTERFACE_DECLARATION {
             continue;
         }
-        let iface = arena.get_interface(stmt_node).expect("expected interface data");
+        let iface = arena
+            .get_interface(stmt_node)
+            .expect("expected interface data");
         for &member_idx in &iface.members.nodes {
             let Some(member_node) = arena.get(member_idx) else {
                 continue;
@@ -1785,8 +2037,16 @@ fn test_thin_emit_readonly_property_signature() {
 
     let output = printer.get_output();
     // For JavaScript emit, interface should NOT be in output
-    assert!(!output.contains("interface"), "JavaScript output should NOT contain 'interface': {}", output);
-    assert!(!output.contains("readonly"), "JavaScript output should NOT contain 'readonly': {}", output);
+    assert!(
+        !output.contains("interface"),
+        "JavaScript output should NOT contain 'interface': {}",
+        output
+    );
+    assert!(
+        !output.contains("readonly"),
+        "JavaScript output should NOT contain 'readonly': {}",
+        output
+    );
 }
 
 #[test]
@@ -1801,14 +2061,21 @@ fn test_thin_emit_readonly_index_signature() {
 
     let output = printer.get_output();
     // For JavaScript emit, interface should NOT be in output
-    assert!(!output.contains("interface"), "JavaScript output should NOT contain 'interface': {}", output);
-    assert!(!output.contains("readonly"), "JavaScript output should NOT contain 'readonly': {}", output);
+    assert!(
+        !output.contains("interface"),
+        "JavaScript output should NOT contain 'interface': {}",
+        output
+    );
+    assert!(
+        !output.contains("readonly"),
+        "JavaScript output should NOT contain 'readonly': {}",
+        output
+    );
 }
 
 // =============================================================================
 // CommonJS Module Tests
 // =============================================================================
-
 
 #[test]
 fn test_commonjs_preamble() {
@@ -1824,10 +2091,18 @@ fn test_commonjs_preamble() {
     printer.emit(root);
 
     let output = printer.get_output();
-    assert!(output.contains("\"use strict\";"), "Expected 'use strict' in CommonJS output: {}", output);
+    assert!(
+        output.contains("\"use strict\";"),
+        "Expected 'use strict' in CommonJS output: {}",
+        output
+    );
     // TypeScript doesn't emit __esModule in its baseline format, so we don't either
     // Just verify the preamble is there with exports init
-    assert!(output.contains("exports.x"), "Expected exports.x in CommonJS output: {}", output);
+    assert!(
+        output.contains("exports.x"),
+        "Expected exports.x in CommonJS output: {}",
+        output
+    );
 }
 
 // =============================================================================
@@ -1855,7 +2130,11 @@ fn test_auto_detect_skips_type_only_imports() {
         "Type-only imports should not emit exports assignments: {}",
         output
     );
-    assert!(output.contains("const x = 1"), "Expected value statement in output: {}", output);
+    assert!(
+        output.contains("const x = 1"),
+        "Expected value statement in output: {}",
+        output
+    );
 }
 
 #[test]
@@ -1879,7 +2158,11 @@ fn test_auto_detect_skips_type_only_exports() {
         "Type-only exports should not emit exports assignments: {}",
         output
     );
-    assert!(output.contains("const x = 1"), "Expected value statement in output: {}", output);
+    assert!(
+        output.contains("const x = 1"),
+        "Expected value statement in output: {}",
+        output
+    );
 }
 
 #[test]
@@ -1924,10 +2207,26 @@ fn test_commonjs_import_named() {
     printer.emit(root);
 
     let output = printer.get_output();
-    assert!(output.contains("require(\"./module\")"), "Expected require() in CommonJS output: {}", output);
-    assert!(output.contains("__esModule"), "Expected __esModule marker in CommonJS output: {}", output);
-    assert!(output.contains("var foo = module_1.foo;"), "Expected foo binding in output: {}", output);
-    assert!(output.contains("var bar = module_1.bar;"), "Expected bar binding in output: {}", output);
+    assert!(
+        output.contains("require(\"./module\")"),
+        "Expected require() in CommonJS output: {}",
+        output
+    );
+    assert!(
+        output.contains("__esModule"),
+        "Expected __esModule marker in CommonJS output: {}",
+        output
+    );
+    assert!(
+        output.contains("var foo = module_1.foo;"),
+        "Expected foo binding in output: {}",
+        output
+    );
+    assert!(
+        output.contains("var bar = module_1.bar;"),
+        "Expected bar binding in output: {}",
+        output
+    );
 }
 
 #[test]
@@ -1949,7 +2248,11 @@ fn test_commonjs_import_type_only_is_erased() {
         "Type-only import should not emit require: {}",
         output
     );
-    assert!(output.contains("const x = 1"), "Expected value statement in output: {}", output);
+    assert!(
+        output.contains("const x = 1"),
+        "Expected value statement in output: {}",
+        output
+    );
 }
 
 #[test]
@@ -2018,8 +2321,16 @@ fn test_commonjs_import_namespace() {
     printer.emit(root);
 
     let output = printer.get_output();
-    assert!(output.contains("require(\"./module\")"), "Expected require() in CommonJS output: {}", output);
-    assert!(output.contains("__esModule"), "Expected __esModule marker in CommonJS output: {}", output);
+    assert!(
+        output.contains("require(\"./module\")"),
+        "Expected require() in CommonJS output: {}",
+        output
+    );
+    assert!(
+        output.contains("__esModule"),
+        "Expected __esModule marker in CommonJS output: {}",
+        output
+    );
     assert!(
         output.contains("var ns = __importStar(module_1);"),
         "Expected namespace binding in output: {}",
@@ -2051,7 +2362,11 @@ fn test_commonjs_type_only_namespace_import_is_erased() {
         "Type-only namespace import should not emit helpers: {}",
         output
     );
-    assert!(output.contains("const x = 1"), "Expected value statement in output: {}", output);
+    assert!(
+        output.contains("const x = 1"),
+        "Expected value statement in output: {}",
+        output
+    );
 }
 
 #[test]
@@ -2132,9 +2447,21 @@ fn test_commonjs_import_default() {
     printer.emit(root);
 
     let output = printer.get_output();
-    assert!(output.contains("require(\"./module\")"), "Expected require() in CommonJS output: {}", output);
-    assert!(output.contains("__esModule"), "Expected __esModule marker in CommonJS output: {}", output);
-    assert!(output.contains("var myDefault = module_1.default;"), "Expected default binding in output: {}", output);
+    assert!(
+        output.contains("require(\"./module\")"),
+        "Expected require() in CommonJS output: {}",
+        output
+    );
+    assert!(
+        output.contains("__esModule"),
+        "Expected __esModule marker in CommonJS output: {}",
+        output
+    );
+    assert!(
+        output.contains("var myDefault = module_1.default;"),
+        "Expected default binding in output: {}",
+        output
+    );
 }
 
 #[test]
@@ -2151,9 +2478,21 @@ fn test_commonjs_reexport() {
     printer.emit(root);
 
     let output = printer.get_output();
-    assert!(output.contains("require(\"./module\")"), "Expected require() in CommonJS output: {}", output);
-    assert!(output.contains("__esModule"), "Expected __esModule marker in CommonJS output: {}", output);
-    assert!(output.contains("Object.defineProperty(exports, \"foo\""), "Expected Object.defineProperty for re-export: {}", output);
+    assert!(
+        output.contains("require(\"./module\")"),
+        "Expected require() in CommonJS output: {}",
+        output
+    );
+    assert!(
+        output.contains("__esModule"),
+        "Expected __esModule marker in CommonJS output: {}",
+        output
+    );
+    assert!(
+        output.contains("Object.defineProperty(exports, \"foo\""),
+        "Expected Object.defineProperty for re-export: {}",
+        output
+    );
 }
 
 #[test]
@@ -2180,7 +2519,11 @@ fn test_commonjs_export_type_only_reexport_is_erased() {
         "Type-only re-export should not emit exports: {}",
         output
     );
-    assert!(output.contains("const x = 1"), "Expected value statement in output: {}", output);
+    assert!(
+        output.contains("const x = 1"),
+        "Expected value statement in output: {}",
+        output
+    );
 }
 
 #[test]
@@ -2197,9 +2540,21 @@ fn test_commonjs_export_star() {
     printer.emit(root);
 
     let output = printer.get_output();
-    assert!(output.contains("require(\"./module\")"), "Expected require() in CommonJS output: {}", output);
-    assert!(output.contains("__esModule"), "Expected __esModule marker in CommonJS output: {}", output);
-    assert!(output.contains("__exportStar("), "Expected __exportStar call in CommonJS output: {}", output);
+    assert!(
+        output.contains("require(\"./module\")"),
+        "Expected require() in CommonJS output: {}",
+        output
+    );
+    assert!(
+        output.contains("__esModule"),
+        "Expected __esModule marker in CommonJS output: {}",
+        output
+    );
+    assert!(
+        output.contains("__exportStar("),
+        "Expected __exportStar call in CommonJS output: {}",
+        output
+    );
 }
 
 #[test]
@@ -2320,9 +2675,21 @@ fn test_commonjs_export_const() {
     printer.emit(root);
 
     let output = printer.get_output();
-    assert!(output.contains("__esModule"), "Expected __esModule marker in CommonJS output: {}", output);
-    assert!(output.contains("const x = 42;"), "Expected 'const x = 42;' in CommonJS output: {}", output);
-    assert!(output.contains("exports.x = x;"), "Expected 'exports.x = x;' in CommonJS output: {}", output);
+    assert!(
+        output.contains("__esModule"),
+        "Expected __esModule marker in CommonJS output: {}",
+        output
+    );
+    assert!(
+        output.contains("const x = 42;"),
+        "Expected 'const x = 42;' in CommonJS output: {}",
+        output
+    );
+    assert!(
+        output.contains("exports.x = x;"),
+        "Expected 'exports.x = x;' in CommonJS output: {}",
+        output
+    );
 }
 
 #[test]
@@ -2339,7 +2706,11 @@ fn test_commonjs_export_const_destructuring() {
     printer.emit(root);
 
     let output = printer.get_output();
-    assert!(output.contains("__esModule"), "Expected __esModule marker in CommonJS output: {}", output);
+    assert!(
+        output.contains("__esModule"),
+        "Expected __esModule marker in CommonJS output: {}",
+        output
+    );
     assert!(
         output.contains("exports.a = exports.c = void 0;"),
         "Expected CommonJS exports init for destructured names: {}",
@@ -2371,7 +2742,11 @@ fn test_commonjs_export_default_function() {
     printer.emit(root);
 
     let output = printer.get_output();
-    assert!(output.contains("__esModule"), "Expected __esModule marker in CommonJS output: {}", output);
+    assert!(
+        output.contains("__esModule"),
+        "Expected __esModule marker in CommonJS output: {}",
+        output
+    );
     assert!(
         output.contains("exports.default ="),
         "Expected default export assignment in CommonJS output: {}",
@@ -2398,7 +2773,11 @@ fn test_commonjs_export_default_expression() {
     printer.emit(root);
 
     let output = printer.get_output();
-    assert!(output.contains("__esModule"), "Expected __esModule marker in CommonJS output: {}", output);
+    assert!(
+        output.contains("__esModule"),
+        "Expected __esModule marker in CommonJS output: {}",
+        output
+    );
     assert!(
         output.contains("exports.default = 1;"),
         "Expected default export assignment in CommonJS output: {}",
@@ -2425,7 +2804,11 @@ fn test_commonjs_export_default_arrow() {
     printer.emit(root);
 
     let output = printer.get_output();
-    assert!(output.contains("__esModule"), "Expected __esModule marker in CommonJS output: {}", output);
+    assert!(
+        output.contains("__esModule"),
+        "Expected __esModule marker in CommonJS output: {}",
+        output
+    );
     assert!(
         output.contains("exports.default ="),
         "Expected default export assignment in CommonJS output: {}",
@@ -2452,9 +2835,21 @@ fn test_commonjs_export_function() {
     printer.emit(root);
 
     let output = printer.get_output();
-    assert!(output.contains("__esModule"), "Expected __esModule marker in CommonJS output: {}", output);
-    assert!(output.contains("function add"), "Expected 'function add' in CommonJS output: {}", output);
-    assert!(output.contains("exports.add = add;"), "Expected 'exports.add = add;' in CommonJS output: {}", output);
+    assert!(
+        output.contains("__esModule"),
+        "Expected __esModule marker in CommonJS output: {}",
+        output
+    );
+    assert!(
+        output.contains("function add"),
+        "Expected 'function add' in CommonJS output: {}",
+        output
+    );
+    assert!(
+        output.contains("exports.add = add;"),
+        "Expected 'exports.add = add;' in CommonJS output: {}",
+        output
+    );
 }
 
 #[test]
@@ -2471,7 +2866,11 @@ fn test_commonjs_export_import_equals() {
     printer.emit(root);
 
     let output = printer.get_output();
-    assert!(output.contains("__esModule"), "Expected __esModule marker in CommonJS output: {}", output);
+    assert!(
+        output.contains("__esModule"),
+        "Expected __esModule marker in CommonJS output: {}",
+        output
+    );
     assert!(
         output.contains("exports.Foo = void 0;"),
         "Expected exports preamble for import equals: {}",
@@ -2503,11 +2902,22 @@ fn test_commonjs_export_class() {
     printer.emit(root);
 
     let output = printer.get_output();
-    assert!(output.contains("__esModule"), "Expected __esModule marker in CommonJS output: {}", output);
+    assert!(
+        output.contains("__esModule"),
+        "Expected __esModule marker in CommonJS output: {}",
+        output
+    );
     // ES5 emits class as IIFE, so check for var Foo
-    assert!(output.contains("var Foo") || output.contains("class Foo"),
-            "Expected class Foo definition in CommonJS output: {}", output);
-    assert!(output.contains("exports.Foo = Foo;"), "Expected 'exports.Foo = Foo;' in CommonJS output: {}", output);
+    assert!(
+        output.contains("var Foo") || output.contains("class Foo"),
+        "Expected class Foo definition in CommonJS output: {}",
+        output
+    );
+    assert!(
+        output.contains("exports.Foo = Foo;"),
+        "Expected 'exports.Foo = Foo;' in CommonJS output: {}",
+        output
+    );
 }
 
 #[test]
@@ -2524,14 +2934,21 @@ fn test_commonjs_export_namespace() {
     printer.emit(root);
 
     let output = printer.get_output();
-    assert!(output.contains("__esModule"), "Expected __esModule marker in CommonJS output: {}", output);
+    assert!(
+        output.contains("__esModule"),
+        "Expected __esModule marker in CommonJS output: {}",
+        output
+    );
     assert!(
         output.contains("(function (N)") || output.contains("namespace N"),
         "Expected namespace emit in CommonJS output: {}",
         output
     );
-    assert!(output.contains("exports.N = N;"),
-            "Expected 'exports.N = N;' in CommonJS output: {}", output);
+    assert!(
+        output.contains("exports.N = N;"),
+        "Expected 'exports.N = N;' in CommonJS output: {}",
+        output
+    );
 }
 
 // =============================================================================

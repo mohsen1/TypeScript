@@ -1,5 +1,5 @@
 use super::*;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::JsValue;
 
@@ -93,7 +93,10 @@ fn test_normalize_slashes() {
     assert_eq!(normalize_slashes("path/to/file"), "path/to/file");
     assert_eq!(normalize_slashes("path\\to\\file"), "path/to/file");
     assert_eq!(normalize_slashes("path\\to/file"), "path/to/file");
-    assert_eq!(normalize_slashes("c:\\windows\\system32"), "c:/windows/system32");
+    assert_eq!(
+        normalize_slashes("c:\\windows\\system32"),
+        "c:/windows/system32"
+    );
 }
 
 #[test]
@@ -119,15 +122,27 @@ fn test_path_is_relative() {
 
 #[test]
 fn test_remove_trailing_directory_separator() {
-    assert_eq!(remove_trailing_directory_separator("/path/to/dir/"), "/path/to/dir");
-    assert_eq!(remove_trailing_directory_separator("/path/to/file"), "/path/to/file");
+    assert_eq!(
+        remove_trailing_directory_separator("/path/to/dir/"),
+        "/path/to/dir"
+    );
+    assert_eq!(
+        remove_trailing_directory_separator("/path/to/file"),
+        "/path/to/file"
+    );
     assert_eq!(remove_trailing_directory_separator("/"), "/");
 }
 
 #[test]
 fn test_ensure_trailing_directory_separator() {
-    assert_eq!(ensure_trailing_directory_separator("/path/to/dir"), "/path/to/dir/");
-    assert_eq!(ensure_trailing_directory_separator("/path/to/dir/"), "/path/to/dir/");
+    assert_eq!(
+        ensure_trailing_directory_separator("/path/to/dir"),
+        "/path/to/dir/"
+    );
+    assert_eq!(
+        ensure_trailing_directory_separator("/path/to/dir/"),
+        "/path/to/dir/"
+    );
 }
 
 #[test]
@@ -237,8 +252,8 @@ fn test_is_word_character() {
 
 #[test]
 fn test_type_sizes() {
-    use std::mem::size_of;
     use crate::parser::ast::*;
+    use std::mem::size_of;
 
     // =========================================================================
     // SIZE ANALYSIS: Node enum variant sizes
@@ -247,7 +262,11 @@ fn test_type_sizes() {
 
     // Building blocks (exact values verified)
     assert_eq!(size_of::<NodeIndex>(), 4, "NodeIndex should be 4 bytes");
-    assert_eq!(size_of::<crate::interner::Atom>(), 4, "Atom should be 4 bytes");
+    assert_eq!(
+        size_of::<crate::interner::Atom>(),
+        4,
+        "Atom should be 4 bytes"
+    );
 
     // Capture sizes for analysis
     let sizes = [
@@ -290,7 +309,8 @@ fn test_type_sizes() {
 
     report.push_str(&format!(
         "\n📏 Node: {} bytes = {:.2} nodes/cache-line (target: 4)",
-        node_size, 64.0 / node_size as f64
+        node_size,
+        64.0 / node_size as f64
     ));
     report.push_str(&format!("\n📏 Type: {} bytes\n", type_size));
 
@@ -298,7 +318,12 @@ fn test_type_sizes() {
     // panic!("{}", report);
 
     // Verify constraints
-    assert!(node_size <= 256, "Node enum too large: {} bytes{}", node_size, report);
+    assert!(
+        node_size <= 256,
+        "Node enum too large: {} bytes{}",
+        node_size,
+        report
+    );
     assert!(type_size <= 256, "Type enum too large: {} bytes", type_size);
 }
 
@@ -307,30 +332,54 @@ fn test_type_sizes() {
 #[test]
 #[ignore]
 fn test_print_type_sizes() {
-    use std::mem::size_of;
-    use crate::parser::ast::*;
     use crate::checker::types::type_def as types;
+    use crate::parser::ast::*;
+    use std::mem::size_of;
 
     eprintln!("\n=== NODE BUILDING BLOCKS ===");
     eprintln!("NodeBase:         {:4} bytes", size_of::<NodeBase>());
     eprintln!("NodeList:         {:4} bytes", size_of::<NodeList>());
     eprintln!("NodeIndex:        {:4} bytes", size_of::<NodeIndex>());
     eprintln!("String:           {:4} bytes", size_of::<String>());
-    eprintln!("Option<NodeList>: {:4} bytes", size_of::<Option<NodeList>>());
+    eprintln!(
+        "Option<NodeList>: {:4} bytes",
+        size_of::<Option<NodeList>>()
+    );
     eprintln!("Vec<String>:      {:4} bytes", size_of::<Vec<String>>());
 
     eprintln!("\n=== NODE LARGEST VARIANTS ===");
     eprintln!("SourceFile:          {:4} bytes", size_of::<SourceFile>());
     eprintln!("Identifier:          {:4} bytes", size_of::<Identifier>());
-    eprintln!("FunctionDeclaration: {:4} bytes", size_of::<FunctionDeclaration>());
-    eprintln!("FunctionExpression:  {:4} bytes", size_of::<FunctionExpression>());
-    eprintln!("ClassDeclaration:    {:4} bytes", size_of::<ClassDeclaration>());
-    eprintln!("MethodDeclaration:   {:4} bytes", size_of::<MethodDeclaration>());
-    eprintln!("ArrowFunction:       {:4} bytes", size_of::<ArrowFunction>());
-    eprintln!("StringLiteral:       {:4} bytes", size_of::<StringLiteral>());
+    eprintln!(
+        "FunctionDeclaration: {:4} bytes",
+        size_of::<FunctionDeclaration>()
+    );
+    eprintln!(
+        "FunctionExpression:  {:4} bytes",
+        size_of::<FunctionExpression>()
+    );
+    eprintln!(
+        "ClassDeclaration:    {:4} bytes",
+        size_of::<ClassDeclaration>()
+    );
+    eprintln!(
+        "MethodDeclaration:   {:4} bytes",
+        size_of::<MethodDeclaration>()
+    );
+    eprintln!(
+        "ArrowFunction:       {:4} bytes",
+        size_of::<ArrowFunction>()
+    );
+    eprintln!(
+        "StringLiteral:       {:4} bytes",
+        size_of::<StringLiteral>()
+    );
 
     eprintln!("\n=== NODE MEDIUM VARIANTS ===");
-    eprintln!("BinaryExpression: {:4} bytes", size_of::<BinaryExpression>());
+    eprintln!(
+        "BinaryExpression: {:4} bytes",
+        size_of::<BinaryExpression>()
+    );
     eprintln!("CallExpression:   {:4} bytes", size_of::<CallExpression>());
     eprintln!("IfStatement:      {:4} bytes", size_of::<IfStatement>());
     eprintln!("Block:            {:4} bytes", size_of::<Block>());
@@ -340,31 +389,96 @@ fn test_print_type_sizes() {
     eprintln!("EmptyStatement:  {:4} bytes", size_of::<EmptyStatement>());
 
     eprintln!("\n=== TYPE VARIANTS (determines enum size) ===");
-    eprintln!("IntrinsicType:       {:4} bytes  (NOT boxed)", size_of::<types::IntrinsicType>());
-    eprintln!("LiteralType:         {:4} bytes  (NOT boxed)", size_of::<types::LiteralType>());
-    eprintln!("LiteralValue:        {:4} bytes", size_of::<types::LiteralValue>());
-    eprintln!("ObjectType:          {:4} bytes  (boxed → 8)", size_of::<types::ObjectType>());
-    eprintln!("TypeReference:       {:4} bytes  (boxed → 8)", size_of::<types::TypeReference>());
-    eprintln!("UnionType:           {:4} bytes  (boxed → 8)", size_of::<types::UnionType>());
-    eprintln!("IntersectionType:    {:4} bytes  (boxed → 8)", size_of::<types::IntersectionType>());
-    eprintln!("TypeParameter:       {:4} bytes  (boxed → 8)", size_of::<types::TypeParameter>());
-    eprintln!("ConditionalType:     {:4} bytes  (boxed → 8)", size_of::<types::ConditionalType>());
-    eprintln!("MappedType:          {:4} bytes  (boxed → 8)", size_of::<types::MappedType>());
-    eprintln!("IndexedAccessType:   {:4} bytes  (boxed → 8)", size_of::<types::IndexedAccessType>());
-    eprintln!("IndexType:           {:4} bytes  (boxed → 8)", size_of::<types::IndexType>());
-    eprintln!("TemplateLiteralType: {:4} bytes  (boxed → 8)", size_of::<types::TemplateLiteralType>());
-    eprintln!("FunctionType:        {:4} bytes  (boxed → 8)", size_of::<types::FunctionType>());
-    eprintln!("ArrayTypeInfo:       {:4} bytes  (boxed → 8)", size_of::<types::ArrayTypeInfo>());
-    eprintln!("TupleTypeInfo:       {:4} bytes  (boxed → 8)", size_of::<types::TupleTypeInfo>());
-    eprintln!("EnumTypeInfo:        {:4} bytes  (boxed → 8)", size_of::<types::EnumTypeInfo>());
-    eprintln!("ThisTypeMarker:      {:4} bytes  (boxed → 8)", size_of::<types::ThisTypeMarker>());
-    eprintln!("UniqueSymbolType:    {:4} bytes  (boxed → 8)", size_of::<types::UniqueSymbolType>());
+    eprintln!(
+        "IntrinsicType:       {:4} bytes  (NOT boxed)",
+        size_of::<types::IntrinsicType>()
+    );
+    eprintln!(
+        "LiteralType:         {:4} bytes  (NOT boxed)",
+        size_of::<types::LiteralType>()
+    );
+    eprintln!(
+        "LiteralValue:        {:4} bytes",
+        size_of::<types::LiteralValue>()
+    );
+    eprintln!(
+        "ObjectType:          {:4} bytes  (boxed → 8)",
+        size_of::<types::ObjectType>()
+    );
+    eprintln!(
+        "TypeReference:       {:4} bytes  (boxed → 8)",
+        size_of::<types::TypeReference>()
+    );
+    eprintln!(
+        "UnionType:           {:4} bytes  (boxed → 8)",
+        size_of::<types::UnionType>()
+    );
+    eprintln!(
+        "IntersectionType:    {:4} bytes  (boxed → 8)",
+        size_of::<types::IntersectionType>()
+    );
+    eprintln!(
+        "TypeParameter:       {:4} bytes  (boxed → 8)",
+        size_of::<types::TypeParameter>()
+    );
+    eprintln!(
+        "ConditionalType:     {:4} bytes  (boxed → 8)",
+        size_of::<types::ConditionalType>()
+    );
+    eprintln!(
+        "MappedType:          {:4} bytes  (boxed → 8)",
+        size_of::<types::MappedType>()
+    );
+    eprintln!(
+        "IndexedAccessType:   {:4} bytes  (boxed → 8)",
+        size_of::<types::IndexedAccessType>()
+    );
+    eprintln!(
+        "IndexType:           {:4} bytes  (boxed → 8)",
+        size_of::<types::IndexType>()
+    );
+    eprintln!(
+        "TemplateLiteralType: {:4} bytes  (boxed → 8)",
+        size_of::<types::TemplateLiteralType>()
+    );
+    eprintln!(
+        "FunctionType:        {:4} bytes  (boxed → 8)",
+        size_of::<types::FunctionType>()
+    );
+    eprintln!(
+        "ArrayTypeInfo:       {:4} bytes  (boxed → 8)",
+        size_of::<types::ArrayTypeInfo>()
+    );
+    eprintln!(
+        "TupleTypeInfo:       {:4} bytes  (boxed → 8)",
+        size_of::<types::TupleTypeInfo>()
+    );
+    eprintln!(
+        "EnumTypeInfo:        {:4} bytes  (boxed → 8)",
+        size_of::<types::EnumTypeInfo>()
+    );
+    eprintln!(
+        "ThisTypeMarker:      {:4} bytes  (boxed → 8)",
+        size_of::<types::ThisTypeMarker>()
+    );
+    eprintln!(
+        "UniqueSymbolType:    {:4} bytes  (boxed → 8)",
+        size_of::<types::UniqueSymbolType>()
+    );
 
     eprintln!("\n=== TOTAL ===");
     let node_size = size_of::<crate::parser::Node>();
     let type_size = size_of::<crate::checker::Type>();
-    eprintln!("📏 Node enum: {:4} bytes ({:.2} nodes/cache-line)", node_size, 64.0 / node_size as f64);
-    eprintln!("📏 Type enum: {:4} bytes ({:.2} types/cache-line)", type_size, 64.0 / type_size as f64);
+    eprintln!(
+        "📏 Node enum: {:4} bytes ({:.2} nodes/cache-line)",
+        node_size,
+        64.0 / node_size as f64
+    );
+    eprintln!(
+        "📏 Type enum: {:4} bytes ({:.2} types/cache-line)",
+        type_size,
+        64.0 / type_size as f64
+    );
     eprintln!("   Node target: 16 bytes (4 nodes/cache-line) - use ThinNode");
     eprintln!("   Type is OK: already boxed, 48 bytes = 1.33 types/cache-line\n");
 }

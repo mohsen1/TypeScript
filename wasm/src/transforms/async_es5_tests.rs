@@ -29,9 +29,18 @@ fn parse_and_emit_async(source: &str) -> String {
 #[test]
 fn test_simple_async_empty() {
     let output = parse_and_emit_async("async function foo() { }");
-    assert!(output.contains("return __generator"), "Should have generator wrapper");
-    assert!(output.contains("[2 /*return*/]"), "Should have return instruction");
-    assert!(!output.contains("switch"), "Empty body should not have switch");
+    assert!(
+        output.contains("return __generator"),
+        "Should have generator wrapper"
+    );
+    assert!(
+        output.contains("[2 /*return*/]"),
+        "Should have return instruction"
+    );
+    assert!(
+        !output.contains("switch"),
+        "Empty body should not have switch"
+    );
 }
 
 #[test]
@@ -65,8 +74,14 @@ fn test_simple_async_multiple_statements() {
 #[test]
 fn test_async_with_await() {
     let output = parse_and_emit_async("async function foo() { await bar(); }");
-    assert!(output.contains("switch (_a.label)"), "Should have switch statement");
-    assert!(output.contains("[4 /*yield*/"), "Should have yield instruction");
+    assert!(
+        output.contains("switch (_a.label)"),
+        "Should have switch statement"
+    );
+    assert!(
+        output.contains("[4 /*yield*/"),
+        "Should have yield instruction"
+    );
     assert!(output.contains("_a.sent()"), "Should call _a.sent()");
 }
 
@@ -112,8 +127,10 @@ fn test_async_await_in_variable_initializer() {
 
 #[test]
 fn test_body_contains_await_detection() {
-    let mut parser =
-        ThinParserState::new("test.ts".to_string(), "async function foo() { await x; }".to_string());
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "async function foo() { await x; }".to_string(),
+    );
     let root = parser.parse_source_file();
 
     if let Some(root_node) = parser.arena.get(root) {
@@ -122,7 +139,10 @@ fn test_body_contains_await_detection() {
                 if let Some(func_node) = parser.arena.get(func_idx) {
                     if let Some(func) = parser.arena.get_function(func_node) {
                         let emitter = AsyncES5Emitter::new(&parser.arena);
-                        assert!(emitter.body_contains_await(func.body), "Should detect await");
+                        assert!(
+                            emitter.body_contains_await(func.body),
+                            "Should detect await"
+                        );
                     }
                 }
             }
@@ -134,7 +154,8 @@ fn test_body_contains_await_detection() {
 fn test_body_contains_await_ignores_nested_async() {
     let mut parser = ThinParserState::new(
         "test.ts".to_string(),
-        "async function foo() { const inner = async () => { await bar(); }; return 1; }".to_string(),
+        "async function foo() { const inner = async () => { await bar(); }; return 1; }"
+            .to_string(),
     );
     let root = parser.parse_source_file();
 
@@ -144,7 +165,10 @@ fn test_body_contains_await_ignores_nested_async() {
                 if let Some(func_node) = parser.arena.get(func_idx) {
                     if let Some(func) = parser.arena.get_function(func_node) {
                         let emitter = AsyncES5Emitter::new(&parser.arena);
-                        assert!(!emitter.body_contains_await(func.body), "Should ignore nested await");
+                        assert!(
+                            !emitter.body_contains_await(func.body),
+                            "Should ignore nested await"
+                        );
                     }
                 }
             }
@@ -230,8 +254,10 @@ fn test_body_contains_await_in_try_finally() {
 
 #[test]
 fn test_no_await_in_simple_function() {
-    let mut parser =
-        ThinParserState::new("test.ts".to_string(), "async function foo() { return 1; }".to_string());
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "async function foo() { return 1; }".to_string(),
+    );
     let root = parser.parse_source_file();
 
     if let Some(root_node) = parser.arena.get(root) {
@@ -240,7 +266,10 @@ fn test_no_await_in_simple_function() {
                 if let Some(func_node) = parser.arena.get(func_idx) {
                     if let Some(func) = parser.arena.get_function(func_node) {
                         let emitter = AsyncES5Emitter::new(&parser.arena);
-                        assert!(!emitter.body_contains_await(func.body), "Should not detect await");
+                        assert!(
+                            !emitter.body_contains_await(func.body),
+                            "Should not detect await"
+                        );
                     }
                 }
             }
@@ -292,9 +321,7 @@ fn test_async_with_sequential_awaits() {
 
 #[test]
 fn test_async_with_throw() {
-    let output = parse_and_emit_async(
-        "async function mayThrow() { throw new Error('fail'); }",
-    );
+    let output = parse_and_emit_async("async function mayThrow() { throw new Error('fail'); }");
     // Async functions with throw should still wrap in generator
     assert!(
         output.contains("__generator"),
@@ -401,7 +428,8 @@ fn test_body_contains_await_detects_for_await_of_with_defaults() {
     // Test for-await-of with destructuring and default values
     let mut parser = ThinParserState::new(
         "test.ts".to_string(),
-        "async function foo() { for await (const { x = 1, y = 2 } of stream) { use(x, y); } }".to_string(),
+        "async function foo() { for await (const { x = 1, y = 2 } of stream) { use(x, y); } }"
+            .to_string(),
     );
     let root = parser.parse_source_file();
 
@@ -482,7 +510,8 @@ fn test_body_contains_await_detects_for_await_of_renamed_properties() {
     // Test for-await-of with renamed object properties
     let mut parser = ThinParserState::new(
         "test.ts".to_string(),
-        "async function foo() { for await (const { name: n, value: v } of stream) { use(n, v); } }".to_string(),
+        "async function foo() { for await (const { name: n, value: v } of stream) { use(n, v); } }"
+            .to_string(),
     );
     let root = parser.parse_source_file();
 
@@ -509,7 +538,8 @@ fn test_body_contains_await_detects_for_await_of_mixed_nested() {
     // Test for-await-of with mixed array/object nested destructuring
     let mut parser = ThinParserState::new(
         "test.ts".to_string(),
-        "async function foo() { for await (const [{ a, b }, { c }] of stream) { use(a, b, c); } }".to_string(),
+        "async function foo() { for await (const [{ a, b }, { c }] of stream) { use(a, b, c); } }"
+            .to_string(),
     );
     let root = parser.parse_source_file();
 
@@ -536,7 +566,8 @@ fn test_body_contains_await_detects_for_await_of_with_await_in_body() {
     // Test for-await-of with await expression inside loop body
     let mut parser = ThinParserState::new(
         "test.ts".to_string(),
-        "async function foo() { for await (const item of stream) { await process(item); } }".to_string(),
+        "async function foo() { for await (const item of stream) { await process(item); } }"
+            .to_string(),
     );
     let root = parser.parse_source_file();
 
@@ -563,7 +594,8 @@ fn test_body_contains_await_detects_for_await_of_let_binding() {
     // Test for-await-of with let instead of const
     let mut parser = ThinParserState::new(
         "test.ts".to_string(),
-        "async function foo() { for await (let { x, y } of stream) { x++; use(x, y); } }".to_string(),
+        "async function foo() { for await (let { x, y } of stream) { x++; use(x, y); } }"
+            .to_string(),
     );
     let root = parser.parse_source_file();
 
@@ -645,9 +677,7 @@ fn test_body_contains_await_detects_for_await_of_deep_nesting() {
 
 #[test]
 fn test_async_multiple_sequential_awaits() {
-    let output = parse_and_emit_async(
-        "async function foo() { await a(); await b(); await c(); }",
-    );
+    let output = parse_and_emit_async("async function foo() { await a(); await b(); await c(); }");
     assert!(
         output.contains("switch (_a.label)"),
         "Should have switch for multiple awaits: {}",
@@ -667,9 +697,7 @@ fn test_async_multiple_sequential_awaits() {
 fn test_async_await_with_binary_expression() {
     // Test await in binary expression context - note that the current emitter
     // doesn't fully transform nested await in parenthesized expressions within return
-    let output = parse_and_emit_async(
-        "async function foo() { return (await a()) + (await b()); }",
-    );
+    let output = parse_and_emit_async("async function foo() { return (await a()) + (await b()); }");
     assert!(
         output.contains("__generator"),
         "Should have generator wrapper: {}",
@@ -685,9 +713,8 @@ fn test_async_await_with_binary_expression() {
 
 #[test]
 fn test_async_await_in_conditional_expression() {
-    let output = parse_and_emit_async(
-        "async function foo() { return cond ? await a() : await b(); }",
-    );
+    let output =
+        parse_and_emit_async("async function foo() { return cond ? await a() : await b(); }");
     assert!(
         output.contains("__generator"),
         "Should have generator wrapper for conditional await: {}",
@@ -874,7 +901,8 @@ fn test_body_contains_await_in_switch_case() {
 fn test_body_contains_await_in_catch_block() {
     let mut parser = ThinParserState::new(
         "test.ts".to_string(),
-        "async function foo() { try { throw new Error(); } catch (e) { await report(e); } }".to_string(),
+        "async function foo() { try { throw new Error(); } catch (e) { await report(e); } }"
+            .to_string(),
     );
     let root = parser.parse_source_file();
 
@@ -981,7 +1009,8 @@ fn test_body_contains_await_ignores_nested_async_function_expression() {
     // Outer function should not detect await inside nested async function expression
     let mut parser = ThinParserState::new(
         "test.ts".to_string(),
-        "async function outer() { const inner = async function() { await bar(); }; return 1; }".to_string(),
+        "async function outer() { const inner = async function() { await bar(); }; return 1; }"
+            .to_string(),
     );
     let root = parser.parse_source_file();
 
@@ -1008,7 +1037,8 @@ fn test_body_contains_await_with_sync_closure_containing_await() {
     // But this tests that we detect await at outer level, not in nested sync function
     let mut parser = ThinParserState::new(
         "test.ts".to_string(),
-        "async function outer() { await foo(); const sync = function() { return 1; }; }".to_string(),
+        "async function outer() { await foo(); const sync = function() { return 1; }; }"
+            .to_string(),
     );
     let root = parser.parse_source_file();
 
@@ -1084,9 +1114,8 @@ fn test_body_contains_await_mixed_nested_sync_and_async() {
 #[test]
 fn test_async_iife_emit() {
     // Test async IIFE (Immediately Invoked Function Expression)
-    let output = parse_and_emit_async(
-        "async function wrapper() { await (async () => { return 42; })(); }",
-    );
+    let output =
+        parse_and_emit_async("async function wrapper() { await (async () => { return 42; })(); }");
     assert!(
         output.contains("__generator"),
         "Should have generator wrapper for async IIFE: {}",
@@ -1122,7 +1151,8 @@ fn test_async_method_in_object_literal() {
     // Test that we can parse async methods in object literals
     let mut parser = ThinParserState::new(
         "test.ts".to_string(),
-        "async function outer() { const obj = { async method() { await bar(); } }; return obj; }".to_string(),
+        "async function outer() { const obj = { async method() { await bar(); } }; return obj; }"
+            .to_string(),
     );
     let root = parser.parse_source_file();
 
@@ -1706,14 +1736,19 @@ fn parse_and_emit_async_class_method(source: &str) -> String {
                         for &member_idx in &class_data.members.nodes {
                             if let Some(member_node) = parser.arena.get(member_idx) {
                                 if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
-                                    if let Some(method_data) = parser.arena.get_method_decl(member_node) {
+                                    if let Some(method_data) =
+                                        parser.arena.get_method_decl(member_node)
+                                    {
                                         let emitter = AsyncES5Emitter::new(&parser.arena);
-                                        let has_await = emitter.body_contains_await(method_data.body);
+                                        let has_await =
+                                            emitter.body_contains_await(method_data.body);
                                         let mut emitter = AsyncES5Emitter::new(&parser.arena);
                                         if has_await {
-                                            return emitter.emit_generator_body_with_await(method_data.body);
+                                            return emitter
+                                                .emit_generator_body_with_await(method_data.body);
                                         } else {
-                                            return emitter.emit_simple_generator_body(method_data.body);
+                                            return emitter
+                                                .emit_simple_generator_body(method_data.body);
                                         }
                                     }
                                 }
@@ -1742,7 +1777,9 @@ fn class_method_contains_await(source: &str) -> bool {
                         for &member_idx in &class_data.members.nodes {
                             if let Some(member_node) = parser.arena.get(member_idx) {
                                 if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
-                                    if let Some(method_data) = parser.arena.get_method_decl(member_node) {
+                                    if let Some(method_data) =
+                                        parser.arena.get_method_decl(member_node)
+                                    {
                                         let emitter = AsyncES5Emitter::new(&parser.arena);
                                         return emitter.body_contains_await(method_data.body);
                                     }
@@ -1759,9 +1796,7 @@ fn class_method_contains_await(source: &str) -> bool {
 
 #[test]
 fn test_async_class_method_basic() {
-    let output = parse_and_emit_async_class_method(
-        "class Foo { async bar() { await baz(); } }",
-    );
+    let output = parse_and_emit_async_class_method("class Foo { async bar() { await baz(); } }");
     assert!(
         output.contains("switch (_a.label)"),
         "Async class method should have switch statement: {}",
@@ -1793,9 +1828,7 @@ fn test_async_class_method_with_return() {
 
 #[test]
 fn test_async_class_method_no_await() {
-    let output = parse_and_emit_async_class_method(
-        "class Foo { async simple() { return 42; } }",
-    );
+    let output = parse_and_emit_async_class_method("class Foo { async simple() { return 42; } }");
     assert!(
         output.contains("[2 /*return*/, 42]"),
         "Simple async method should return 42: {}",
@@ -1935,21 +1968,42 @@ fn parse_and_emit_async_arrow(source: &str) -> String {
                             // First level: declarations contains VariableDeclarationList
                             if let Some(&decl_list_idx) = var_stmt.declarations.nodes.first() {
                                 if let Some(decl_list_node) = parser.arena.get(decl_list_idx) {
-                                    if let Some(decl_list) = parser.arena.get_variable(decl_list_node) {
+                                    if let Some(decl_list) =
+                                        parser.arena.get_variable(decl_list_node)
+                                    {
                                         // Second level: get the actual VariableDeclaration
-                                        if let Some(&decl_idx) = decl_list.declarations.nodes.first() {
+                                        if let Some(&decl_idx) =
+                                            decl_list.declarations.nodes.first()
+                                        {
                                             if let Some(decl_node) = parser.arena.get(decl_idx) {
-                                                if let Some(var_decl) = parser.arena.get_variable_declaration(decl_node) {
-                                                    if let Some(init_node) = parser.arena.get(var_decl.initializer) {
-                                                        if init_node.kind == syntax_kind_ext::ARROW_FUNCTION {
-                                                            if let Some(func) = parser.arena.get_function(init_node) {
-                                                                let emitter = AsyncES5Emitter::new(&parser.arena);
-                                                                let has_await = emitter.body_contains_await(func.body);
-                                                                let mut emitter = AsyncES5Emitter::new(&parser.arena);
+                                                if let Some(var_decl) =
+                                                    parser.arena.get_variable_declaration(decl_node)
+                                                {
+                                                    if let Some(init_node) =
+                                                        parser.arena.get(var_decl.initializer)
+                                                    {
+                                                        if init_node.kind
+                                                            == syntax_kind_ext::ARROW_FUNCTION
+                                                        {
+                                                            if let Some(func) =
+                                                                parser.arena.get_function(init_node)
+                                                            {
+                                                                let emitter = AsyncES5Emitter::new(
+                                                                    &parser.arena,
+                                                                );
+                                                                let has_await = emitter
+                                                                    .body_contains_await(func.body);
+                                                                let mut emitter =
+                                                                    AsyncES5Emitter::new(
+                                                                        &parser.arena,
+                                                                    );
                                                                 if has_await {
                                                                     return emitter.emit_generator_body_with_await(func.body);
                                                                 } else {
-                                                                    return emitter.emit_simple_generator_body(func.body);
+                                                                    return emitter
+                                                                        .emit_simple_generator_body(
+                                                                            func.body,
+                                                                        );
                                                                 }
                                                             }
                                                         }
@@ -1985,16 +2039,33 @@ fn arrow_body_contains_await(source: &str) -> bool {
                             // First level: declarations contains VariableDeclarationList
                             if let Some(&decl_list_idx) = var_stmt.declarations.nodes.first() {
                                 if let Some(decl_list_node) = parser.arena.get(decl_list_idx) {
-                                    if let Some(decl_list) = parser.arena.get_variable(decl_list_node) {
+                                    if let Some(decl_list) =
+                                        parser.arena.get_variable(decl_list_node)
+                                    {
                                         // Second level: get the actual VariableDeclaration
-                                        if let Some(&decl_idx) = decl_list.declarations.nodes.first() {
+                                        if let Some(&decl_idx) =
+                                            decl_list.declarations.nodes.first()
+                                        {
                                             if let Some(decl_node) = parser.arena.get(decl_idx) {
-                                                if let Some(var_decl) = parser.arena.get_variable_declaration(decl_node) {
-                                                    if let Some(init_node) = parser.arena.get(var_decl.initializer) {
-                                                        if init_node.kind == syntax_kind_ext::ARROW_FUNCTION {
-                                                            if let Some(func) = parser.arena.get_function(init_node) {
-                                                                let emitter = AsyncES5Emitter::new(&parser.arena);
-                                                                return emitter.body_contains_await(func.body);
+                                                if let Some(var_decl) =
+                                                    parser.arena.get_variable_declaration(decl_node)
+                                                {
+                                                    if let Some(init_node) =
+                                                        parser.arena.get(var_decl.initializer)
+                                                    {
+                                                        if init_node.kind
+                                                            == syntax_kind_ext::ARROW_FUNCTION
+                                                        {
+                                                            if let Some(func) =
+                                                                parser.arena.get_function(init_node)
+                                                            {
+                                                                let emitter = AsyncES5Emitter::new(
+                                                                    &parser.arena,
+                                                                );
+                                                                return emitter
+                                                                    .body_contains_await(
+                                                                        func.body,
+                                                                    );
                                                             }
                                                         }
                                                     }
@@ -2015,9 +2086,7 @@ fn arrow_body_contains_await(source: &str) -> bool {
 
 #[test]
 fn test_async_arrow_basic_block_body() {
-    let output = parse_and_emit_async_arrow(
-        "const foo = async () => { await bar(); };",
-    );
+    let output = parse_and_emit_async_arrow("const foo = async () => { await bar(); };");
     assert!(
         output.contains("switch (_a.label)"),
         "Async arrow with block body should have switch: {}",
@@ -2032,9 +2101,7 @@ fn test_async_arrow_basic_block_body() {
 
 #[test]
 fn test_async_arrow_expression_body() {
-    let output = parse_and_emit_async_arrow(
-        "const foo = async () => await bar();",
-    );
+    let output = parse_and_emit_async_arrow("const foo = async () => await bar();");
     assert!(
         output.contains("[4 /*yield*/"),
         "Async arrow expression body should yield: {}",
@@ -2044,9 +2111,7 @@ fn test_async_arrow_expression_body() {
 
 #[test]
 fn test_async_arrow_no_await() {
-    let output = parse_and_emit_async_arrow(
-        "const foo = async () => { return 42; };",
-    );
+    let output = parse_and_emit_async_arrow("const foo = async () => { return 42; };");
     assert!(
         output.contains("[2 /*return*/, 42]"),
         "Simple async arrow should return 42: {}",
@@ -2061,9 +2126,8 @@ fn test_async_arrow_no_await() {
 
 #[test]
 fn test_async_arrow_with_parameters() {
-    let output = parse_and_emit_async_arrow(
-        "const add = async (a, b) => { return await compute(a, b); };",
-    );
+    let output =
+        parse_and_emit_async_arrow("const add = async (a, b) => { return await compute(a, b); };");
     assert!(
         output.contains("return [4 /*yield*/, compute(a, b)]"),
         "Arrow should yield compute with params: {}",
@@ -2180,11 +2244,19 @@ fn parse_and_emit_async_method_expr(source: &str) -> String {
                         if let Some(var_stmt) = parser.arena.get_variable(stmt_node) {
                             if let Some(&decl_list_idx) = var_stmt.declarations.nodes.first() {
                                 if let Some(decl_list_node) = parser.arena.get(decl_list_idx) {
-                                    if let Some(decl_list) = parser.arena.get_variable(decl_list_node) {
-                                        if let Some(&decl_idx) = decl_list.declarations.nodes.first() {
+                                    if let Some(decl_list) =
+                                        parser.arena.get_variable(decl_list_node)
+                                    {
+                                        if let Some(&decl_idx) =
+                                            decl_list.declarations.nodes.first()
+                                        {
                                             if let Some(decl_node) = parser.arena.get(decl_idx) {
-                                                if let Some(var_decl) = parser.arena.get_variable_declaration(decl_node) {
-                                                    if let Some(init_node) = parser.arena.get(var_decl.initializer) {
+                                                if let Some(var_decl) =
+                                                    parser.arena.get_variable_declaration(decl_node)
+                                                {
+                                                    if let Some(init_node) =
+                                                        parser.arena.get(var_decl.initializer)
+                                                    {
                                                         if init_node.kind == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION {
                                                             if let Some(obj_lit) = parser.arena.get_literal_expr(init_node) {
                                                                 // Find the first method declaration
@@ -2237,11 +2309,19 @@ fn method_expr_body_contains_await(source: &str) -> bool {
                         if let Some(var_stmt) = parser.arena.get_variable(stmt_node) {
                             if let Some(&decl_list_idx) = var_stmt.declarations.nodes.first() {
                                 if let Some(decl_list_node) = parser.arena.get(decl_list_idx) {
-                                    if let Some(decl_list) = parser.arena.get_variable(decl_list_node) {
-                                        if let Some(&decl_idx) = decl_list.declarations.nodes.first() {
+                                    if let Some(decl_list) =
+                                        parser.arena.get_variable(decl_list_node)
+                                    {
+                                        if let Some(&decl_idx) =
+                                            decl_list.declarations.nodes.first()
+                                        {
                                             if let Some(decl_node) = parser.arena.get(decl_idx) {
-                                                if let Some(var_decl) = parser.arena.get_variable_declaration(decl_node) {
-                                                    if let Some(init_node) = parser.arena.get(var_decl.initializer) {
+                                                if let Some(var_decl) =
+                                                    parser.arena.get_variable_declaration(decl_node)
+                                                {
+                                                    if let Some(init_node) =
+                                                        parser.arena.get(var_decl.initializer)
+                                                    {
                                                         if init_node.kind == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION {
                                                             if let Some(obj_lit) = parser.arena.get_literal_expr(init_node) {
                                                                 for &elem_idx in &obj_lit.elements.nodes {
@@ -2274,9 +2354,8 @@ fn method_expr_body_contains_await(source: &str) -> bool {
 
 #[test]
 fn test_async_method_expr_basic() {
-    let output = parse_and_emit_async_method_expr(
-        "const obj = { async fetch() { await getData(); } };",
-    );
+    let output =
+        parse_and_emit_async_method_expr("const obj = { async fetch() { await getData(); } };");
     assert!(
         output.contains("switch (_a.label)"),
         "Async method expression should have switch: {}",
@@ -2308,9 +2387,7 @@ fn test_async_method_expr_with_return() {
 
 #[test]
 fn test_async_method_expr_no_await() {
-    let output = parse_and_emit_async_method_expr(
-        "const obj = { async simple() { return 42; } };",
-    );
+    let output = parse_and_emit_async_method_expr("const obj = { async simple() { return 42; } };");
     assert!(
         output.contains("[2 /*return*/, 42]"),
         "Simple async method should return 42: {}",
@@ -2495,9 +2572,7 @@ fn async_generator_body_contains_await(source: &str) -> bool {
 
 #[test]
 fn test_async_generator_basic_yield() {
-    let output = parse_and_emit_async_generator(
-        "async function* gen() { yield 1; yield 2; }",
-    );
+    let output = parse_and_emit_async_generator("async function* gen() { yield 1; yield 2; }");
     assert!(
         output.contains("__generator"),
         "Async generator should have generator wrapper: {}",
@@ -2525,9 +2600,8 @@ fn test_async_generator_with_await() {
 #[test]
 fn test_async_generator_yield_await() {
     // yield await pattern - emitter produces generator wrapper
-    let output = parse_and_emit_async_generator(
-        "async function* stream() { yield await getData(); }",
-    );
+    let output =
+        parse_and_emit_async_generator("async function* stream() { yield await getData(); }");
     assert!(
         output.contains("__generator"),
         "yield await should have generator wrapper: {}",
@@ -2537,9 +2611,8 @@ fn test_async_generator_yield_await() {
 
 #[test]
 fn test_async_generator_multiple_yields() {
-    let output = parse_and_emit_async_generator(
-        "async function* numbers() { yield 1; yield 2; yield 3; }",
-    );
+    let output =
+        parse_and_emit_async_generator("async function* numbers() { yield 1; yield 2; yield 3; }");
     assert!(
         output.contains("__generator"),
         "Multiple yields should have generator: {}",
@@ -2563,9 +2636,7 @@ fn test_async_generator_yield_in_loop() {
 #[test]
 fn test_async_generator_body_contains_await() {
     assert!(
-        async_generator_body_contains_await(
-            "async function* gen() { await setup(); yield 1; }"
-        ),
+        async_generator_body_contains_await("async function* gen() { await setup(); yield 1; }"),
         "Should detect await in async generator body"
     );
 }
@@ -2573,9 +2644,7 @@ fn test_async_generator_body_contains_await() {
 #[test]
 fn test_async_generator_body_no_await() {
     assert!(
-        !async_generator_body_contains_await(
-            "async function* gen() { yield 1; yield 2; }"
-        ),
+        !async_generator_body_contains_await("async function* gen() { yield 1; yield 2; }"),
         "Should not detect await when only yields present"
     );
 }
@@ -2619,9 +2688,8 @@ fn test_async_generator_try_catch() {
 
 #[test]
 fn test_async_generator_yield_star() {
-    let output = parse_and_emit_async_generator(
-        "async function* delegate() { yield* otherGen(); }",
-    );
+    let output =
+        parse_and_emit_async_generator("async function* delegate() { yield* otherGen(); }");
     assert!(
         output.contains("__generator"),
         "yield* should have generator wrapper: {}",
@@ -2662,10 +2730,18 @@ fn parse_and_emit_async_iife(source: &str) -> String {
                             if let Some(call_node) = parser.arena.get(expr_stmt.expression) {
                                 if call_node.kind == syntax_kind_ext::CALL_EXPRESSION {
                                     if let Some(call_data) = parser.arena.get_call_expr(call_node) {
-                                        if let Some(paren_node) = parser.arena.get(call_data.expression) {
-                                            if paren_node.kind == syntax_kind_ext::PARENTHESIZED_EXPRESSION {
-                                                if let Some(paren_data) = parser.arena.get_parenthesized(paren_node) {
-                                                    if let Some(func_node) = parser.arena.get(paren_data.expression) {
+                                        if let Some(paren_node) =
+                                            parser.arena.get(call_data.expression)
+                                        {
+                                            if paren_node.kind
+                                                == syntax_kind_ext::PARENTHESIZED_EXPRESSION
+                                            {
+                                                if let Some(paren_data) =
+                                                    parser.arena.get_parenthesized(paren_node)
+                                                {
+                                                    if let Some(func_node) =
+                                                        parser.arena.get(paren_data.expression)
+                                                    {
                                                         if func_node.kind == syntax_kind_ext::ARROW_FUNCTION
                                                             || func_node.kind == syntax_kind_ext::FUNCTION_EXPRESSION
                                                         {
@@ -2712,10 +2788,18 @@ fn iife_body_contains_await(source: &str) -> bool {
                             if let Some(call_node) = parser.arena.get(expr_stmt.expression) {
                                 if call_node.kind == syntax_kind_ext::CALL_EXPRESSION {
                                     if let Some(call_data) = parser.arena.get_call_expr(call_node) {
-                                        if let Some(paren_node) = parser.arena.get(call_data.expression) {
-                                            if paren_node.kind == syntax_kind_ext::PARENTHESIZED_EXPRESSION {
-                                                if let Some(paren_data) = parser.arena.get_parenthesized(paren_node) {
-                                                    if let Some(func_node) = parser.arena.get(paren_data.expression) {
+                                        if let Some(paren_node) =
+                                            parser.arena.get(call_data.expression)
+                                        {
+                                            if paren_node.kind
+                                                == syntax_kind_ext::PARENTHESIZED_EXPRESSION
+                                            {
+                                                if let Some(paren_data) =
+                                                    parser.arena.get_parenthesized(paren_node)
+                                                {
+                                                    if let Some(func_node) =
+                                                        parser.arena.get(paren_data.expression)
+                                                    {
                                                         if func_node.kind == syntax_kind_ext::ARROW_FUNCTION
                                                             || func_node.kind == syntax_kind_ext::FUNCTION_EXPRESSION
                                                         {
@@ -2742,9 +2826,7 @@ fn iife_body_contains_await(source: &str) -> bool {
 
 #[test]
 fn test_async_iife_arrow_basic() {
-    let output = parse_and_emit_async_iife(
-        "(async () => { await init(); })();",
-    );
+    let output = parse_and_emit_async_iife("(async () => { await init(); })();");
     assert!(
         output.contains("switch (_a.label)"),
         "Async arrow IIFE should have switch: {}",
@@ -2759,9 +2841,7 @@ fn test_async_iife_arrow_basic() {
 
 #[test]
 fn test_async_iife_function_expression() {
-    let output = parse_and_emit_async_iife(
-        "(async function() { await setup(); })();",
-    );
+    let output = parse_and_emit_async_iife("(async function() { await setup(); })();");
     assert!(
         output.contains("switch (_a.label)"),
         "Async function IIFE should have switch: {}",
@@ -2771,9 +2851,7 @@ fn test_async_iife_function_expression() {
 
 #[test]
 fn test_async_iife_with_return() {
-    let output = parse_and_emit_async_iife(
-        "(async () => { return await getValue(); })();",
-    );
+    let output = parse_and_emit_async_iife("(async () => { return await getValue(); })();");
     assert!(
         output.contains("return [4 /*yield*/, getValue()]"),
         "IIFE should yield getValue(): {}",
@@ -2788,9 +2866,7 @@ fn test_async_iife_with_return() {
 
 #[test]
 fn test_async_iife_no_await() {
-    let output = parse_and_emit_async_iife(
-        "(async () => { return 42; })();",
-    );
+    let output = parse_and_emit_async_iife("(async () => { return 42; })();");
     assert!(
         output.contains("[2 /*return*/, 42]"),
         "Simple async IIFE should return 42: {}",
@@ -2805,9 +2881,8 @@ fn test_async_iife_no_await() {
 
 #[test]
 fn test_async_iife_with_arguments() {
-    let output = parse_and_emit_async_iife(
-        "(async (x, y) => { return await compute(x, y); })(1, 2);",
-    );
+    let output =
+        parse_and_emit_async_iife("(async (x, y) => { return await compute(x, y); })(1, 2);");
     assert!(
         output.contains("return [4 /*yield*/, compute(x, y)]"),
         "IIFE with args should yield compute: {}",
@@ -2912,17 +2987,30 @@ fn parse_and_emit_async_callback(source: &str) -> String {
                                         if let Some(args) = &call_data.arguments {
                                             if let Some(&arg_idx) = args.nodes.first() {
                                                 if let Some(arg_node) = parser.arena.get(arg_idx) {
-                                                    if arg_node.kind == syntax_kind_ext::ARROW_FUNCTION
-                                                        || arg_node.kind == syntax_kind_ext::FUNCTION_EXPRESSION
+                                                    if arg_node.kind
+                                                        == syntax_kind_ext::ARROW_FUNCTION
+                                                        || arg_node.kind
+                                                            == syntax_kind_ext::FUNCTION_EXPRESSION
                                                     {
-                                                        if let Some(func) = parser.arena.get_function(arg_node) {
-                                                            let emitter = AsyncES5Emitter::new(&parser.arena);
-                                                            let has_await = emitter.body_contains_await(func.body);
-                                                            let mut emitter = AsyncES5Emitter::new(&parser.arena);
+                                                        if let Some(func) =
+                                                            parser.arena.get_function(arg_node)
+                                                        {
+                                                            let emitter =
+                                                                AsyncES5Emitter::new(&parser.arena);
+                                                            let has_await = emitter
+                                                                .body_contains_await(func.body);
+                                                            let mut emitter =
+                                                                AsyncES5Emitter::new(&parser.arena);
                                                             if has_await {
-                                                                return emitter.emit_generator_body_with_await(func.body);
+                                                                return emitter
+                                                                    .emit_generator_body_with_await(
+                                                                        func.body,
+                                                                    );
                                                             } else {
-                                                                return emitter.emit_simple_generator_body(func.body);
+                                                                return emitter
+                                                                    .emit_simple_generator_body(
+                                                                        func.body,
+                                                                    );
                                                             }
                                                         }
                                                     }
@@ -2960,12 +3048,18 @@ fn callback_body_contains_await(source: &str) -> bool {
                                         if let Some(args) = &call_data.arguments {
                                             if let Some(&arg_idx) = args.nodes.first() {
                                                 if let Some(arg_node) = parser.arena.get(arg_idx) {
-                                                    if arg_node.kind == syntax_kind_ext::ARROW_FUNCTION
-                                                        || arg_node.kind == syntax_kind_ext::FUNCTION_EXPRESSION
+                                                    if arg_node.kind
+                                                        == syntax_kind_ext::ARROW_FUNCTION
+                                                        || arg_node.kind
+                                                            == syntax_kind_ext::FUNCTION_EXPRESSION
                                                     {
-                                                        if let Some(func) = parser.arena.get_function(arg_node) {
-                                                            let emitter = AsyncES5Emitter::new(&parser.arena);
-                                                            return emitter.body_contains_await(func.body);
+                                                        if let Some(func) =
+                                                            parser.arena.get_function(arg_node)
+                                                        {
+                                                            let emitter =
+                                                                AsyncES5Emitter::new(&parser.arena);
+                                                            return emitter
+                                                                .body_contains_await(func.body);
                                                         }
                                                     }
                                                 }
@@ -2985,9 +3079,7 @@ fn callback_body_contains_await(source: &str) -> bool {
 
 #[test]
 fn test_async_callback_arrow_basic() {
-    let output = parse_and_emit_async_callback(
-        "process(async (x) => { await handle(x); });",
-    );
+    let output = parse_and_emit_async_callback("process(async (x) => { await handle(x); });");
     assert!(
         output.contains("switch (_a.label)"),
         "Async callback should have switch: {}",
@@ -3002,9 +3094,8 @@ fn test_async_callback_arrow_basic() {
 
 #[test]
 fn test_async_callback_function_expression() {
-    let output = parse_and_emit_async_callback(
-        "run(async function(data) { await process(data); });",
-    );
+    let output =
+        parse_and_emit_async_callback("run(async function(data) { await process(data); });");
     assert!(
         output.contains("switch (_a.label)"),
         "Async function callback should have switch: {}",
@@ -3014,9 +3105,8 @@ fn test_async_callback_function_expression() {
 
 #[test]
 fn test_async_callback_with_return() {
-    let output = parse_and_emit_async_callback(
-        "map(async (item) => { return await transform(item); });",
-    );
+    let output =
+        parse_and_emit_async_callback("map(async (item) => { return await transform(item); });");
     assert!(
         output.contains("return [4 /*yield*/, transform(item)]"),
         "Callback should yield transform: {}",
@@ -3031,9 +3121,7 @@ fn test_async_callback_with_return() {
 
 #[test]
 fn test_async_callback_no_await() {
-    let output = parse_and_emit_async_callback(
-        "forEach(async (x) => { return x * 2; });",
-    );
+    let output = parse_and_emit_async_callback("forEach(async (x) => { return x * 2; });");
     assert!(
         output.contains("[2 /*return*/"),
         "Simple async callback should have return: {}",
@@ -3154,14 +3242,22 @@ fn parse_and_emit_async_super_method(source: &str) -> String {
                                 for &member_idx in &class_data.members.nodes {
                                     if let Some(member_node) = parser.arena.get(member_idx) {
                                         if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
-                                            if let Some(method_data) = parser.arena.get_method_decl(member_node) {
+                                            if let Some(method_data) =
+                                                parser.arena.get_method_decl(member_node)
+                                            {
                                                 let emitter = AsyncES5Emitter::new(&parser.arena);
-                                                let has_await = emitter.body_contains_await(method_data.body);
-                                                let mut emitter = AsyncES5Emitter::new(&parser.arena);
+                                                let has_await =
+                                                    emitter.body_contains_await(method_data.body);
+                                                let mut emitter =
+                                                    AsyncES5Emitter::new(&parser.arena);
                                                 if has_await {
-                                                    return emitter.emit_generator_body_with_await(method_data.body);
+                                                    return emitter.emit_generator_body_with_await(
+                                                        method_data.body,
+                                                    );
                                                 } else {
-                                                    return emitter.emit_simple_generator_body(method_data.body);
+                                                    return emitter.emit_simple_generator_body(
+                                                        method_data.body,
+                                                    );
                                                 }
                                             }
                                         }
@@ -3194,9 +3290,12 @@ fn super_method_contains_await(source: &str) -> bool {
                                 for &member_idx in &class_data.members.nodes {
                                     if let Some(member_node) = parser.arena.get(member_idx) {
                                         if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
-                                            if let Some(method_data) = parser.arena.get_method_decl(member_node) {
+                                            if let Some(method_data) =
+                                                parser.arena.get_method_decl(member_node)
+                                            {
                                                 let emitter = AsyncES5Emitter::new(&parser.arena);
-                                                return emitter.body_contains_await(method_data.body);
+                                                return emitter
+                                                    .body_contains_await(method_data.body);
                                             }
                                         }
                                     }
@@ -3385,14 +3484,20 @@ fn parse_and_emit_async_private_field(source: &str) -> String {
                             for &member_idx in &class_data.members.nodes {
                                 if let Some(member_node) = parser.arena.get(member_idx) {
                                     if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
-                                        if let Some(method_data) = parser.arena.get_method_decl(member_node) {
+                                        if let Some(method_data) =
+                                            parser.arena.get_method_decl(member_node)
+                                        {
                                             let emitter = AsyncES5Emitter::new(&parser.arena);
-                                            let has_await = emitter.body_contains_await(method_data.body);
+                                            let has_await =
+                                                emitter.body_contains_await(method_data.body);
                                             let mut emitter = AsyncES5Emitter::new(&parser.arena);
                                             if has_await {
-                                                return emitter.emit_generator_body_with_await(method_data.body);
+                                                return emitter.emit_generator_body_with_await(
+                                                    method_data.body,
+                                                );
                                             } else {
-                                                return emitter.emit_simple_generator_body(method_data.body);
+                                                return emitter
+                                                    .emit_simple_generator_body(method_data.body);
                                             }
                                         }
                                     }
@@ -3423,7 +3528,9 @@ fn private_field_method_contains_await(source: &str) -> bool {
                             for &member_idx in &class_data.members.nodes {
                                 if let Some(member_node) = parser.arena.get(member_idx) {
                                     if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
-                                        if let Some(method_data) = parser.arena.get_method_decl(member_node) {
+                                        if let Some(method_data) =
+                                            parser.arena.get_method_decl(member_node)
+                                        {
                                             let emitter = AsyncES5Emitter::new(&parser.arena);
                                             return emitter.body_contains_await(method_data.body);
                                         }
@@ -3576,7 +3683,9 @@ fn test_async_private_field_conditional() {
         "class Foo { #value = 0; async bar(cond: boolean) { if (cond) { return await Promise.resolve(this.#value); } return 0; } }",
     );
     assert!(
-        output.contains("[4 /*yield*/") || output.contains("case 1:") || output.contains("switch (_a.label)"),
+        output.contains("[4 /*yield*/")
+            || output.contains("case 1:")
+            || output.contains("switch (_a.label)"),
         "Conditional async private field should have yield, case or switch: {}",
         output
     );
@@ -3603,14 +3712,20 @@ fn parse_and_emit_async_decorated(source: &str) -> String {
                             for &member_idx in &class_data.members.nodes {
                                 if let Some(member_node) = parser.arena.get(member_idx) {
                                     if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
-                                        if let Some(method_data) = parser.arena.get_method_decl(member_node) {
+                                        if let Some(method_data) =
+                                            parser.arena.get_method_decl(member_node)
+                                        {
                                             let emitter = AsyncES5Emitter::new(&parser.arena);
-                                            let has_await = emitter.body_contains_await(method_data.body);
+                                            let has_await =
+                                                emitter.body_contains_await(method_data.body);
                                             let mut emitter = AsyncES5Emitter::new(&parser.arena);
                                             if has_await {
-                                                return emitter.emit_generator_body_with_await(method_data.body);
+                                                return emitter.emit_generator_body_with_await(
+                                                    method_data.body,
+                                                );
                                             } else {
-                                                return emitter.emit_simple_generator_body(method_data.body);
+                                                return emitter
+                                                    .emit_simple_generator_body(method_data.body);
                                             }
                                         }
                                     }
@@ -3641,7 +3756,9 @@ fn decorated_method_contains_await(source: &str) -> bool {
                             for &member_idx in &class_data.members.nodes {
                                 if let Some(member_node) = parser.arena.get(member_idx) {
                                     if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
-                                        if let Some(method_data) = parser.arena.get_method_decl(member_node) {
+                                        if let Some(method_data) =
+                                            parser.arena.get_method_decl(member_node)
+                                        {
                                             let emitter = AsyncES5Emitter::new(&parser.arena);
                                             return emitter.body_contains_await(method_data.body);
                                         }
@@ -3683,9 +3800,8 @@ fn test_async_decorated_method_with_return() {
 
 #[test]
 fn test_async_decorated_method_no_await() {
-    let output = parse_and_emit_async_decorated(
-        "class Foo { @memoize async bar() { return 42; } }",
-    );
+    let output =
+        parse_and_emit_async_decorated("class Foo { @memoize async bar() { return 42; } }");
     assert!(
         output.contains("[2 /*return*/"),
         "Decorated sync async method should have return: {}",
@@ -3723,9 +3839,7 @@ fn test_async_decorated_method_body_contains_await() {
 #[test]
 fn test_async_decorated_method_body_no_await() {
     assert!(
-        !decorated_method_contains_await(
-            "class Foo { @decorator async bar() { return 1; } }"
-        ),
+        !decorated_method_contains_await("class Foo { @decorator async bar() { return 1; } }"),
         "Should not detect await when none present"
     );
 }
@@ -3819,14 +3933,20 @@ fn parse_and_emit_async_computed_prop(source: &str) -> String {
                             for &member_idx in &class_data.members.nodes {
                                 if let Some(member_node) = parser.arena.get(member_idx) {
                                     if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
-                                        if let Some(method_data) = parser.arena.get_method_decl(member_node) {
+                                        if let Some(method_data) =
+                                            parser.arena.get_method_decl(member_node)
+                                        {
                                             let emitter = AsyncES5Emitter::new(&parser.arena);
-                                            let has_await = emitter.body_contains_await(method_data.body);
+                                            let has_await =
+                                                emitter.body_contains_await(method_data.body);
                                             let mut emitter = AsyncES5Emitter::new(&parser.arena);
                                             if has_await {
-                                                return emitter.emit_generator_body_with_await(method_data.body);
+                                                return emitter.emit_generator_body_with_await(
+                                                    method_data.body,
+                                                );
                                             } else {
-                                                return emitter.emit_simple_generator_body(method_data.body);
+                                                return emitter
+                                                    .emit_simple_generator_body(method_data.body);
                                             }
                                         }
                                     }
@@ -3857,7 +3977,9 @@ fn computed_prop_method_contains_await(source: &str) -> bool {
                             for &member_idx in &class_data.members.nodes {
                                 if let Some(member_node) = parser.arena.get(member_idx) {
                                     if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
-                                        if let Some(method_data) = parser.arena.get_method_decl(member_node) {
+                                        if let Some(method_data) =
+                                            parser.arena.get_method_decl(member_node)
+                                        {
                                             let emitter = AsyncES5Emitter::new(&parser.arena);
                                             return emitter.body_contains_await(method_data.body);
                                         }
@@ -3899,9 +4021,8 @@ fn test_async_computed_prop_with_return() {
 
 #[test]
 fn test_async_computed_prop_no_await() {
-    let output = parse_and_emit_async_computed_prop(
-        "class Foo { async ['sync']() { return 42; } }",
-    );
+    let output =
+        parse_and_emit_async_computed_prop("class Foo { async ['sync']() { return 42; } }");
     assert!(
         output.contains("[2 /*return*/"),
         "Computed property sync async should have return: {}",
@@ -3939,9 +4060,7 @@ fn test_async_computed_prop_body_contains_await() {
 #[test]
 fn test_async_computed_prop_body_no_await() {
     assert!(
-        !computed_prop_method_contains_await(
-            "class Foo { async ['method']() { return 1; } }"
-        ),
+        !computed_prop_method_contains_await("class Foo { async ['method']() { return 1; } }"),
         "Should not detect await when none present"
     );
 }
@@ -3962,7 +4081,9 @@ fn test_async_computed_prop_template_literal() {
         "class Foo { async [`method_${version}`]() { await process(); } }",
     );
     assert!(
-        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/") || output.contains("__generator"),
+        output.contains("switch (_a.label)")
+            || output.contains("[4 /*yield*/")
+            || output.contains("__generator"),
         "Template literal computed property should have generator output: {}",
         output
     );
@@ -4034,21 +4155,35 @@ fn parse_and_emit_async_field_initializer(source: &str) -> String {
                             for &member_idx in &class_data.members.nodes {
                                 if let Some(member_node) = parser.arena.get(member_idx) {
                                     if member_node.kind == syntax_kind_ext::PROPERTY_DECLARATION {
-                                        if let Some(prop_data) = parser.arena.get_property_decl(member_node) {
+                                        if let Some(prop_data) =
+                                            parser.arena.get_property_decl(member_node)
+                                        {
                                             let init_idx = prop_data.initializer;
                                             if let Some(init_node) = parser.arena.get(init_idx) {
                                                 // Check for arrow function or function expression
                                                 if init_node.kind == syntax_kind_ext::ARROW_FUNCTION
-                                                    || init_node.kind == syntax_kind_ext::FUNCTION_EXPRESSION
+                                                    || init_node.kind
+                                                        == syntax_kind_ext::FUNCTION_EXPRESSION
                                                 {
-                                                    if let Some(func) = parser.arena.get_function(init_node) {
-                                                        let emitter = AsyncES5Emitter::new(&parser.arena);
-                                                        let has_await = emitter.body_contains_await(func.body);
-                                                        let mut emitter = AsyncES5Emitter::new(&parser.arena);
+                                                    if let Some(func) =
+                                                        parser.arena.get_function(init_node)
+                                                    {
+                                                        let emitter =
+                                                            AsyncES5Emitter::new(&parser.arena);
+                                                        let has_await =
+                                                            emitter.body_contains_await(func.body);
+                                                        let mut emitter =
+                                                            AsyncES5Emitter::new(&parser.arena);
                                                         if has_await {
-                                                            return emitter.emit_generator_body_with_await(func.body);
+                                                            return emitter
+                                                                .emit_generator_body_with_await(
+                                                                    func.body,
+                                                                );
                                                         } else {
-                                                            return emitter.emit_simple_generator_body(func.body);
+                                                            return emitter
+                                                                .emit_simple_generator_body(
+                                                                    func.body,
+                                                                );
                                                         }
                                                     }
                                                 }
@@ -4082,15 +4217,22 @@ fn async_field_initializer_contains_await(source: &str) -> bool {
                             for &member_idx in &class_data.members.nodes {
                                 if let Some(member_node) = parser.arena.get(member_idx) {
                                     if member_node.kind == syntax_kind_ext::PROPERTY_DECLARATION {
-                                        if let Some(prop_data) = parser.arena.get_property_decl(member_node) {
+                                        if let Some(prop_data) =
+                                            parser.arena.get_property_decl(member_node)
+                                        {
                                             let init_idx = prop_data.initializer;
                                             if let Some(init_node) = parser.arena.get(init_idx) {
                                                 if init_node.kind == syntax_kind_ext::ARROW_FUNCTION
-                                                    || init_node.kind == syntax_kind_ext::FUNCTION_EXPRESSION
+                                                    || init_node.kind
+                                                        == syntax_kind_ext::FUNCTION_EXPRESSION
                                                 {
-                                                    if let Some(func) = parser.arena.get_function(init_node) {
-                                                        let emitter = AsyncES5Emitter::new(&parser.arena);
-                                                        return emitter.body_contains_await(func.body);
+                                                    if let Some(func) =
+                                                        parser.arena.get_function(init_node)
+                                                    {
+                                                        let emitter =
+                                                            AsyncES5Emitter::new(&parser.arena);
+                                                        return emitter
+                                                            .body_contains_await(func.body);
                                                     }
                                                 }
                                             }
@@ -4133,9 +4275,8 @@ fn test_async_field_arrow_with_return() {
 
 #[test]
 fn test_async_field_arrow_no_await() {
-    let output = parse_and_emit_async_field_initializer(
-        "class Foo { sync = async () => { return 42; }; }",
-    );
+    let output =
+        parse_and_emit_async_field_initializer("class Foo { sync = async () => { return 42; }; }");
     assert!(
         output.contains("[2 /*return*/"),
         "Sync async field should have return: {}",
@@ -4238,11 +4379,12 @@ fn test_async_field_multiple_awaits() {
 
 #[test]
 fn test_async_field_expression_body() {
-    let output = parse_and_emit_async_field_initializer(
-        "class Foo { getter = async () => await fetch(); }",
-    );
+    let output =
+        parse_and_emit_async_field_initializer("class Foo { getter = async () => await fetch(); }");
     assert!(
-        output.contains("[4 /*yield*/") || output.contains("switch (_a.label)") || output.contains("__generator"),
+        output.contains("[4 /*yield*/")
+            || output.contains("switch (_a.label)")
+            || output.contains("__generator"),
         "Async arrow expression body should have generator output: {}",
         output
     );
@@ -4270,14 +4412,22 @@ fn parse_and_emit_async_super_property(source: &str) -> String {
                                 for &member_idx in &class_data.members.nodes {
                                     if let Some(member_node) = parser.arena.get(member_idx) {
                                         if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
-                                            if let Some(method_data) = parser.arena.get_method_decl(member_node) {
+                                            if let Some(method_data) =
+                                                parser.arena.get_method_decl(member_node)
+                                            {
                                                 let emitter = AsyncES5Emitter::new(&parser.arena);
-                                                let has_await = emitter.body_contains_await(method_data.body);
-                                                let mut emitter = AsyncES5Emitter::new(&parser.arena);
+                                                let has_await =
+                                                    emitter.body_contains_await(method_data.body);
+                                                let mut emitter =
+                                                    AsyncES5Emitter::new(&parser.arena);
                                                 if has_await {
-                                                    return emitter.emit_generator_body_with_await(method_data.body);
+                                                    return emitter.emit_generator_body_with_await(
+                                                        method_data.body,
+                                                    );
                                                 } else {
-                                                    return emitter.emit_simple_generator_body(method_data.body);
+                                                    return emitter.emit_simple_generator_body(
+                                                        method_data.body,
+                                                    );
                                                 }
                                             }
                                         }
@@ -4310,9 +4460,12 @@ fn super_property_method_contains_await(source: &str) -> bool {
                                 for &member_idx in &class_data.members.nodes {
                                     if let Some(member_node) = parser.arena.get(member_idx) {
                                         if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
-                                            if let Some(method_data) = parser.arena.get_method_decl(member_node) {
+                                            if let Some(method_data) =
+                                                parser.arena.get_method_decl(member_node)
+                                            {
                                                 let emitter = AsyncES5Emitter::new(&parser.arena);
-                                                return emitter.body_contains_await(method_data.body);
+                                                return emitter
+                                                    .body_contains_await(method_data.body);
                                             }
                                         }
                                     }
@@ -4488,14 +4641,20 @@ fn parse_and_emit_async_private_access(source: &str) -> String {
                             for &member_idx in &class_data.members.nodes {
                                 if let Some(member_node) = parser.arena.get(member_idx) {
                                     if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
-                                        if let Some(method_data) = parser.arena.get_method_decl(member_node) {
+                                        if let Some(method_data) =
+                                            parser.arena.get_method_decl(member_node)
+                                        {
                                             let emitter = AsyncES5Emitter::new(&parser.arena);
-                                            let has_await = emitter.body_contains_await(method_data.body);
+                                            let has_await =
+                                                emitter.body_contains_await(method_data.body);
                                             let mut emitter = AsyncES5Emitter::new(&parser.arena);
                                             if has_await {
-                                                return emitter.emit_generator_body_with_await(method_data.body);
+                                                return emitter.emit_generator_body_with_await(
+                                                    method_data.body,
+                                                );
                                             } else {
-                                                return emitter.emit_simple_generator_body(method_data.body);
+                                                return emitter
+                                                    .emit_simple_generator_body(method_data.body);
                                             }
                                         }
                                     }
@@ -4526,7 +4685,9 @@ fn private_access_method_contains_await(source: &str) -> bool {
                             for &member_idx in &class_data.members.nodes {
                                 if let Some(member_node) = parser.arena.get(member_idx) {
                                     if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
-                                        if let Some(method_data) = parser.arena.get_method_decl(member_node) {
+                                        if let Some(method_data) =
+                                            parser.arena.get_method_decl(member_node)
+                                        {
                                             let emitter = AsyncES5Emitter::new(&parser.arena);
                                             return emitter.body_contains_await(method_data.body);
                                         }
@@ -4701,14 +4862,20 @@ fn parse_and_emit_async_static_access(source: &str) -> String {
                             for &member_idx in &class_data.members.nodes {
                                 if let Some(member_node) = parser.arena.get(member_idx) {
                                     if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
-                                        if let Some(method_data) = parser.arena.get_method_decl(member_node) {
+                                        if let Some(method_data) =
+                                            parser.arena.get_method_decl(member_node)
+                                        {
                                             let emitter = AsyncES5Emitter::new(&parser.arena);
-                                            let has_await = emitter.body_contains_await(method_data.body);
+                                            let has_await =
+                                                emitter.body_contains_await(method_data.body);
                                             let mut emitter = AsyncES5Emitter::new(&parser.arena);
                                             if has_await {
-                                                return emitter.emit_generator_body_with_await(method_data.body);
+                                                return emitter.emit_generator_body_with_await(
+                                                    method_data.body,
+                                                );
                                             } else {
-                                                return emitter.emit_simple_generator_body(method_data.body);
+                                                return emitter
+                                                    .emit_simple_generator_body(method_data.body);
                                             }
                                         }
                                     }
@@ -4736,7 +4903,9 @@ fn static_access_method_contains_await(source: &str) -> bool {
                             for &member_idx in &class_data.members.nodes {
                                 if let Some(member_node) = parser.arena.get(member_idx) {
                                     if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
-                                        if let Some(method_data) = parser.arena.get_method_decl(member_node) {
+                                        if let Some(method_data) =
+                                            parser.arena.get_method_decl(member_node)
+                                        {
                                             let emitter = AsyncES5Emitter::new(&parser.arena);
                                             return emitter.body_contains_await(method_data.body);
                                         }
@@ -5011,9 +5180,7 @@ fn test_async_optional_chaining_body_contains_await() {
 #[test]
 fn test_async_optional_chaining_body_no_await() {
     assert!(
-        !optional_chaining_contains_await(
-            "async function foo(obj: any) { return obj?.value; }"
-        ),
+        !optional_chaining_contains_await("async function foo(obj: any) { return obj?.value; }"),
         "Should not detect await when none present"
     );
 }
@@ -5562,9 +5729,8 @@ fn test_async_spread_function_call() {
 
 #[test]
 fn test_async_spread_no_await() {
-    let output = parse_and_emit_async_spread(
-        "async function foo(arr: number[]) { return [...arr]; }",
-    );
+    let output =
+        parse_and_emit_async_spread("async function foo(arr: number[]) { return [...arr]; }");
     assert!(
         output.contains("[2 /*return*/"),
         "Sync spread should have return: {}",
@@ -5590,9 +5756,7 @@ fn test_async_spread_body_contains_await() {
 #[test]
 fn test_async_spread_body_no_await() {
     assert!(
-        !spread_contains_await(
-            "async function foo(arr: any[]) { return [...arr, 1]; }"
-        ),
+        !spread_contains_await("async function foo(arr: any[]) { return [...arr, 1]; }"),
         "Should not detect await when none present"
     );
 }
@@ -5966,9 +6130,7 @@ fn test_async_template_literal_multiple_expressions() {
 #[test]
 fn test_async_template_literal_body_contains_await() {
     assert!(
-        template_literal_contains_await(
-            "async function foo() { await process(); return `done`; }"
-        ),
+        template_literal_contains_await("async function foo() { await process(); return `done`; }"),
         "Should detect await with template literal"
     );
 }
@@ -5976,9 +6138,7 @@ fn test_async_template_literal_body_contains_await() {
 #[test]
 fn test_async_template_literal_body_no_await() {
     assert!(
-        !template_literal_contains_await(
-            "async function foo(x: number) { return `value: ${x}`; }"
-        ),
+        !template_literal_contains_await("async function foo(x: number) { return `value: ${x}`; }"),
         "Should not detect await when none present"
     );
 }
@@ -6941,7 +7101,10 @@ fn test_async_function_expression_body_no_await() {
     let result = async_function_expression_contains_await(
         "async function foo() { const fn = async function() { return 1; }; return fn; }",
     );
-    assert!(!result, "Should not detect await when only in nested async function expression");
+    assert!(
+        !result,
+        "Should not detect await when only in nested async function expression"
+    );
 }
 
 #[test]
@@ -6949,7 +7112,10 @@ fn test_async_function_expression_ignores_nested_await() {
     let result = async_function_expression_contains_await(
         "async function foo() { const fn = async function() { await nested(); }; return fn; }",
     );
-    assert!(!result, "Should not detect await inside nested async function expression");
+    assert!(
+        !result,
+        "Should not detect await inside nested async function expression"
+    );
 }
 
 #[test]
@@ -7029,14 +7195,20 @@ fn parse_and_emit_async_method_decorator(source: &str) -> String {
                             for &member_idx in &class_data.members.nodes {
                                 if let Some(member_node) = parser.arena.get(member_idx) {
                                     if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
-                                        if let Some(method_data) = parser.arena.get_method_decl(member_node) {
+                                        if let Some(method_data) =
+                                            parser.arena.get_method_decl(member_node)
+                                        {
                                             let emitter = AsyncES5Emitter::new(&parser.arena);
-                                            let has_await = emitter.body_contains_await(method_data.body);
+                                            let has_await =
+                                                emitter.body_contains_await(method_data.body);
                                             let mut emitter = AsyncES5Emitter::new(&parser.arena);
                                             if has_await {
-                                                return emitter.emit_generator_body_with_await(method_data.body);
+                                                return emitter.emit_generator_body_with_await(
+                                                    method_data.body,
+                                                );
                                             } else {
-                                                return emitter.emit_simple_generator_body(method_data.body);
+                                                return emitter
+                                                    .emit_simple_generator_body(method_data.body);
                                             }
                                         }
                                     }
@@ -7064,7 +7236,9 @@ fn async_method_decorator_contains_await(source: &str) -> bool {
                             for &member_idx in &class_data.members.nodes {
                                 if let Some(member_node) = parser.arena.get(member_idx) {
                                     if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
-                                        if let Some(method_data) = parser.arena.get_method_decl(member_node) {
+                                        if let Some(method_data) =
+                                            parser.arena.get_method_decl(member_node)
+                                        {
                                             let emitter = AsyncES5Emitter::new(&parser.arena);
                                             return emitter.body_contains_await(method_data.body);
                                         }
@@ -7106,10 +7280,12 @@ fn test_async_method_decorator_with_await() {
 
 #[test]
 fn test_async_method_decorator_no_await() {
-    let result = async_method_decorator_contains_await(
-        "class Foo { @memo async bar() { return 42; } }",
+    let result =
+        async_method_decorator_contains_await("class Foo { @memo async bar() { return 42; } }");
+    assert!(
+        !result,
+        "Should not detect await in decorated async method without await"
     );
-    assert!(!result, "Should not detect await in decorated async method without await");
 }
 
 #[test]
@@ -7134,10 +7310,12 @@ fn test_async_method_decorator_body_contains_await() {
 
 #[test]
 fn test_async_method_decorator_body_no_await() {
-    let result = async_method_decorator_contains_await(
-        "class Foo { @log async bar() { return 1; } }",
+    let result =
+        async_method_decorator_contains_await("class Foo { @log async bar() { return 1; } }");
+    assert!(
+        !result,
+        "Should not detect await when decorated async method has no await"
     );
-    assert!(!result, "Should not detect await when decorated async method has no await");
 }
 
 #[test]
@@ -7145,7 +7323,10 @@ fn test_async_method_decorator_ignores_nested_async() {
     let result = async_method_decorator_contains_await(
         "class Foo { @log async bar() { const inner = async () => { await x; }; return 1; } }",
     );
-    assert!(!result, "Should not detect await inside nested async in decorated method");
+    assert!(
+        !result,
+        "Should not detect await inside nested async in decorated method"
+    );
 }
 
 #[test]
@@ -7225,14 +7406,20 @@ fn parse_and_emit_async_class_method_extra(source: &str) -> String {
                             for &member_idx in &class_data.members.nodes {
                                 if let Some(member_node) = parser.arena.get(member_idx) {
                                     if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
-                                        if let Some(method_data) = parser.arena.get_method_decl(member_node) {
+                                        if let Some(method_data) =
+                                            parser.arena.get_method_decl(member_node)
+                                        {
                                             let emitter = AsyncES5Emitter::new(&parser.arena);
-                                            let has_await = emitter.body_contains_await(method_data.body);
+                                            let has_await =
+                                                emitter.body_contains_await(method_data.body);
                                             let mut emitter = AsyncES5Emitter::new(&parser.arena);
                                             if has_await {
-                                                return emitter.emit_generator_body_with_await(method_data.body);
+                                                return emitter.emit_generator_body_with_await(
+                                                    method_data.body,
+                                                );
                                             } else {
-                                                return emitter.emit_simple_generator_body(method_data.body);
+                                                return emitter
+                                                    .emit_simple_generator_body(method_data.body);
                                             }
                                         }
                                     }
@@ -7260,7 +7447,9 @@ fn async_class_method_extra_contains_await(source: &str) -> bool {
                             for &member_idx in &class_data.members.nodes {
                                 if let Some(member_node) = parser.arena.get(member_idx) {
                                     if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
-                                        if let Some(method_data) = parser.arena.get_method_decl(member_node) {
+                                        if let Some(method_data) =
+                                            parser.arena.get_method_decl(member_node)
+                                        {
                                             let emitter = AsyncES5Emitter::new(&parser.arena);
                                             return emitter.body_contains_await(method_data.body);
                                         }
@@ -7314,18 +7503,19 @@ fn test_async_class_method_multiple_returns() {
 
 #[test]
 fn test_async_class_method_body_contains_await_extra() {
-    let result = async_class_method_extra_contains_await(
-        "class Foo { async bar() { await getData(); } }",
-    );
+    let result =
+        async_class_method_extra_contains_await("class Foo { async bar() { await getData(); } }");
     assert!(result, "Should detect await in async class method");
 }
 
 #[test]
 fn test_async_class_method_body_no_await_extra() {
-    let result = async_class_method_extra_contains_await(
-        "class Foo { async bar() { return 42; } }",
+    let result =
+        async_class_method_extra_contains_await("class Foo { async bar() { return 42; } }");
+    assert!(
+        !result,
+        "Should not detect await in async class method without await"
     );
-    assert!(!result, "Should not detect await in async class method without await");
 }
 
 #[test]
@@ -7333,7 +7523,10 @@ fn test_async_class_method_ignores_nested_async_extra() {
     let result = async_class_method_extra_contains_await(
         "class Foo { async bar() { const inner = async () => { await x; }; return 1; } }",
     );
-    assert!(!result, "Should not detect await inside nested async in class method");
+    assert!(
+        !result,
+        "Should not detect await inside nested async in class method"
+    );
 }
 
 #[test]
@@ -7425,14 +7618,20 @@ fn parse_and_emit_async_with_accessor(source: &str) -> String {
                             for &member_idx in &class_data.members.nodes {
                                 if let Some(member_node) = parser.arena.get(member_idx) {
                                     if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
-                                        if let Some(method_data) = parser.arena.get_method_decl(member_node) {
+                                        if let Some(method_data) =
+                                            parser.arena.get_method_decl(member_node)
+                                        {
                                             let emitter = AsyncES5Emitter::new(&parser.arena);
-                                            let has_await = emitter.body_contains_await(method_data.body);
+                                            let has_await =
+                                                emitter.body_contains_await(method_data.body);
                                             let mut emitter = AsyncES5Emitter::new(&parser.arena);
                                             if has_await {
-                                                return emitter.emit_generator_body_with_await(method_data.body);
+                                                return emitter.emit_generator_body_with_await(
+                                                    method_data.body,
+                                                );
                                             } else {
-                                                return emitter.emit_simple_generator_body(method_data.body);
+                                                return emitter
+                                                    .emit_simple_generator_body(method_data.body);
                                             }
                                         }
                                     }
@@ -7460,7 +7659,9 @@ fn async_with_accessor_contains_await(source: &str) -> bool {
                             for &member_idx in &class_data.members.nodes {
                                 if let Some(member_node) = parser.arena.get(member_idx) {
                                     if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
-                                        if let Some(method_data) = parser.arena.get_method_decl(member_node) {
+                                        if let Some(method_data) =
+                                            parser.arena.get_method_decl(member_node)
+                                        {
                                             let emitter = AsyncES5Emitter::new(&parser.arena);
                                             return emitter.body_contains_await(method_data.body);
                                         }
@@ -7505,7 +7706,10 @@ fn test_async_getter_setter_no_await() {
     let result = async_with_accessor_contains_await(
         "class Foo { get value() { return 1; } async bar() { return 42; } }",
     );
-    assert!(!result, "Should not detect await in async method without await");
+    assert!(
+        !result,
+        "Should not detect await in async method without await"
+    );
 }
 
 #[test]
@@ -7533,7 +7737,10 @@ fn test_async_getter_setter_body_no_await() {
     let result = async_with_accessor_contains_await(
         "class Foo { set data(v) { this._d = v; } async bar() { return 1; } }",
     );
-    assert!(!result, "Should not detect await when async method has no await");
+    assert!(
+        !result,
+        "Should not detect await when async method has no await"
+    );
 }
 
 #[test]
@@ -7541,7 +7748,10 @@ fn test_async_getter_setter_ignores_nested_async() {
     let result = async_with_accessor_contains_await(
         "class Foo { get fn() { return async () => { await x; }; } async bar() { return 1; } }",
     );
-    assert!(!result, "Should not detect await inside nested async in getter");
+    assert!(
+        !result,
+        "Should not detect await inside nested async in getter"
+    );
 }
 
 #[test]
@@ -7585,7 +7795,10 @@ fn test_async_getter_setter_private() {
     let result = async_with_accessor_contains_await(
         "class Foo { get data() { return this.#value; } async load() { await fetch(); } }",
     );
-    assert!(result, "Should detect await in async method with getter accessing private field");
+    assert!(
+        result,
+        "Should detect await in async method with getter accessing private field"
+    );
 }
 
 #[test]
@@ -7617,14 +7830,20 @@ fn parse_and_emit_async_static_method(source: &str) -> String {
                             for &member_idx in &class_data.members.nodes {
                                 if let Some(member_node) = parser.arena.get(member_idx) {
                                     if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
-                                        if let Some(method_data) = parser.arena.get_method_decl(member_node) {
+                                        if let Some(method_data) =
+                                            parser.arena.get_method_decl(member_node)
+                                        {
                                             let emitter = AsyncES5Emitter::new(&parser.arena);
-                                            let has_await = emitter.body_contains_await(method_data.body);
+                                            let has_await =
+                                                emitter.body_contains_await(method_data.body);
                                             let mut emitter = AsyncES5Emitter::new(&parser.arena);
                                             if has_await {
-                                                return emitter.emit_generator_body_with_await(method_data.body);
+                                                return emitter.emit_generator_body_with_await(
+                                                    method_data.body,
+                                                );
                                             } else {
-                                                return emitter.emit_simple_generator_body(method_data.body);
+                                                return emitter
+                                                    .emit_simple_generator_body(method_data.body);
                                             }
                                         }
                                     }
@@ -7652,7 +7871,9 @@ fn async_static_method_contains_await(source: &str) -> bool {
                             for &member_idx in &class_data.members.nodes {
                                 if let Some(member_node) = parser.arena.get(member_idx) {
                                     if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
-                                        if let Some(method_data) = parser.arena.get_method_decl(member_node) {
+                                        if let Some(method_data) =
+                                            parser.arena.get_method_decl(member_node)
+                                        {
                                             let emitter = AsyncES5Emitter::new(&parser.arena);
                                             return emitter.body_contains_await(method_data.body);
                                         }
@@ -7682,10 +7903,12 @@ fn test_async_static_method_with_await() {
 
 #[test]
 fn test_async_static_method_no_await() {
-    let result = async_static_method_contains_await(
-        "class Foo { static async bar() { return 42; } }",
+    let result =
+        async_static_method_contains_await("class Foo { static async bar() { return 42; } }");
+    assert!(
+        !result,
+        "Should not detect await in static async method without await"
     );
-    assert!(!result, "Should not detect await in static async method without await");
 }
 
 #[test]
@@ -7710,10 +7933,12 @@ fn test_async_static_method_body_contains_await() {
 
 #[test]
 fn test_async_static_method_body_no_await() {
-    let result = async_static_method_contains_await(
-        "class Foo { static async bar() { return 1; } }",
+    let result =
+        async_static_method_contains_await("class Foo { static async bar() { return 1; } }");
+    assert!(
+        !result,
+        "Should not detect await when static async method has no await"
     );
-    assert!(!result, "Should not detect await when static async method has no await");
 }
 
 #[test]
@@ -7721,7 +7946,10 @@ fn test_async_static_method_ignores_nested_async() {
     let result = async_static_method_contains_await(
         "class Foo { static async bar() { const inner = async () => { await x; }; return 1; } }",
     );
-    assert!(!result, "Should not detect await inside nested async in static method");
+    assert!(
+        !result,
+        "Should not detect await inside nested async in static method"
+    );
 }
 
 #[test]
@@ -7850,9 +8078,8 @@ fn async_generator_delegation_contains_await(source: &str) -> bool {
 
 #[test]
 fn test_async_generator_delegation_basic() {
-    let output = parse_and_emit_async_generator_delegation(
-        "async function* foo() { yield* otherGen(); }",
-    );
+    let output =
+        parse_and_emit_async_generator_delegation("async function* foo() { yield* otherGen(); }");
     assert!(
         output.contains("__generator"),
         "Async generator delegation should have generator wrapper: {}",
@@ -7874,9 +8101,8 @@ fn test_async_generator_delegation_with_await() {
 
 #[test]
 fn test_async_generator_delegation_no_await() {
-    let result = async_generator_delegation_contains_await(
-        "async function* foo() { yield* otherGen(); }",
-    );
+    let result =
+        async_generator_delegation_contains_await("async function* foo() { yield* otherGen(); }");
     assert!(!result, "Should not detect await in pure yield* delegation");
 }
 
@@ -7905,7 +8131,10 @@ fn test_async_generator_delegation_body_no_await() {
     let result = async_generator_delegation_contains_await(
         "async function* foo() { yield 1; yield* otherGen(); yield 2; }",
     );
-    assert!(!result, "Should not detect await when only yield and yield* present");
+    assert!(
+        !result,
+        "Should not detect await when only yield and yield* present"
+    );
 }
 
 #[test]
@@ -7913,7 +8142,10 @@ fn test_async_generator_delegation_ignores_nested_async() {
     let result = async_generator_delegation_contains_await(
         "async function* foo() { const inner = async () => { await x; }; yield* otherGen(); }",
     );
-    assert!(!result, "Should not detect await inside nested async in generator delegation");
+    assert!(
+        !result,
+        "Should not detect await inside nested async in generator delegation"
+    );
 }
 
 #[test]
@@ -7922,7 +8154,9 @@ fn test_async_generator_delegation_with_for_await() {
         "async function* foo() { for await (const item of asyncIterable) { yield item; } yield* otherGen(); }",
     );
     assert!(
-        output.contains("switch (_a.label)") || output.contains("[4 /*yield*/") || output.contains("__generator"),
+        output.contains("switch (_a.label)")
+            || output.contains("[4 /*yield*/")
+            || output.contains("__generator"),
         "For-await-of with yield* should have generator structure: {}",
         output
     );
@@ -8177,14 +8411,20 @@ fn parse_and_emit_async_class_inheritance(source: &str) -> String {
                             for &member_idx in &class_data.members.nodes {
                                 if let Some(member_node) = parser.arena.get(member_idx) {
                                     if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
-                                        if let Some(method_data) = parser.arena.get_method_decl(member_node) {
+                                        if let Some(method_data) =
+                                            parser.arena.get_method_decl(member_node)
+                                        {
                                             let emitter = AsyncES5Emitter::new(&parser.arena);
-                                            let has_await = emitter.body_contains_await(method_data.body);
+                                            let has_await =
+                                                emitter.body_contains_await(method_data.body);
                                             let mut emitter = AsyncES5Emitter::new(&parser.arena);
                                             if has_await {
-                                                return emitter.emit_generator_body_with_await(method_data.body);
+                                                return emitter.emit_generator_body_with_await(
+                                                    method_data.body,
+                                                );
                                             } else {
-                                                return emitter.emit_simple_generator_body(method_data.body);
+                                                return emitter
+                                                    .emit_simple_generator_body(method_data.body);
                                             }
                                         }
                                     }
@@ -8212,7 +8452,9 @@ fn async_class_inheritance_contains_await(source: &str) -> bool {
                             for &member_idx in &class_data.members.nodes {
                                 if let Some(member_node) = parser.arena.get(member_idx) {
                                     if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
-                                        if let Some(method_data) = parser.arena.get_method_decl(member_node) {
+                                        if let Some(method_data) =
+                                            parser.arena.get_method_decl(member_node)
+                                        {
                                             let emitter = AsyncES5Emitter::new(&parser.arena);
                                             return emitter.body_contains_await(method_data.body);
                                         }
@@ -8277,7 +8519,10 @@ fn test_async_class_inheritance_body_no_await() {
     let result = async_class_inheritance_contains_await(
         "class Child extends Base { async bar() { return super.getValue(); } }",
     );
-    assert!(!result, "Should not detect await when super call is not awaited");
+    assert!(
+        !result,
+        "Should not detect await when super call is not awaited"
+    );
 }
 
 #[test]
@@ -8457,7 +8702,10 @@ fn test_async_for_of_loop_body_no_await() {
     let result = async_for_of_loop_contains_await(
         "async function foo(items: any[]) { for (const item of items) { console.log(item); } }",
     );
-    assert!(!result, "Should not detect await when for-of body has no await");
+    assert!(
+        !result,
+        "Should not detect await when for-of body has no await"
+    );
 }
 
 #[test]
@@ -8465,7 +8713,10 @@ fn test_async_for_of_loop_ignores_nested_async() {
     let result = async_for_of_loop_contains_await(
         "async function foo(items: any[]) { for (const item of items) { const inner = async () => { await x; }; } }",
     );
-    assert!(!result, "Should not detect await inside nested async in for-of");
+    assert!(
+        !result,
+        "Should not detect await inside nested async in for-of"
+    );
 }
 
 #[test]
@@ -8618,9 +8869,8 @@ fn test_async_while_loop_with_result() {
 
 #[test]
 fn test_async_while_loop_no_await() {
-    let output = parse_and_emit_async_while_loop(
-        "async function foo() { while (x < 10) { x++; } }",
-    );
+    let output =
+        parse_and_emit_async_while_loop("async function foo() { while (x < 10) { x++; } }");
     assert!(
         output.contains("[2 /*return*/]"),
         "Async while loop without await should have simple return: {}",
@@ -8641,7 +8891,10 @@ fn test_async_while_loop_body_no_await() {
     let result = async_while_loop_contains_await(
         "async function foo() { while (condition) { console.log('loop'); } }",
     );
-    assert!(!result, "Should not detect await when while body has no await");
+    assert!(
+        !result,
+        "Should not detect await when while body has no await"
+    );
 }
 
 #[test]
@@ -8649,7 +8902,10 @@ fn test_async_while_loop_ignores_nested_async() {
     let result = async_while_loop_contains_await(
         "async function foo() { while (condition) { const inner = async () => { await x; }; } }",
     );
-    assert!(!result, "Should not detect await inside nested async in while loop");
+    assert!(
+        !result,
+        "Should not detect await inside nested async in while loop"
+    );
 }
 
 #[test]
@@ -8802,9 +9058,8 @@ fn test_async_do_while_loop_with_result() {
 
 #[test]
 fn test_async_do_while_loop_no_await() {
-    let output = parse_and_emit_async_do_while_loop(
-        "async function foo() { do { x++; } while (x < 10); }",
-    );
+    let output =
+        parse_and_emit_async_do_while_loop("async function foo() { do { x++; } while (x < 10); }");
     assert!(
         output.contains("[2 /*return*/]"),
         "Async do-while loop without await should have simple return: {}",
@@ -8825,7 +9080,10 @@ fn test_async_do_while_loop_body_no_await() {
     let result = async_do_while_loop_contains_await(
         "async function foo() { do { console.log('loop'); } while (condition); }",
     );
-    assert!(!result, "Should not detect await when do-while body has no await");
+    assert!(
+        !result,
+        "Should not detect await when do-while body has no await"
+    );
 }
 
 #[test]
@@ -8833,7 +9091,10 @@ fn test_async_do_while_loop_ignores_nested_async() {
     let result = async_do_while_loop_contains_await(
         "async function foo() { do { const inner = async () => { await x; }; } while (condition); }",
     );
-    assert!(!result, "Should not detect await inside nested async in do-while loop");
+    assert!(
+        !result,
+        "Should not detect await inside nested async in do-while loop"
+    );
 }
 
 #[test]
@@ -9017,7 +9278,10 @@ fn test_async_switch_statement_ignores_nested_async() {
     let result = async_switch_statement_contains_await(
         "async function foo(x: number) { switch (x) { case 1: const inner = async () => { await y; }; break; } }",
     );
-    assert!(!result, "Should not detect await inside nested async in switch");
+    assert!(
+        !result,
+        "Should not detect await inside nested async in switch"
+    );
 }
 
 #[test]
@@ -9197,7 +9461,10 @@ fn test_async_ternary_ignores_nested_async() {
     let result = async_conditional_expression_contains_await(
         "async function foo(cond: boolean) { return cond ? async () => await x : async () => await y; }",
     );
-    assert!(!result, "Should not detect await inside nested async in ternary");
+    assert!(
+        !result,
+        "Should not detect await inside nested async in ternary"
+    );
 }
 
 #[test]
@@ -9337,7 +9604,10 @@ fn test_async_labeled_continue_basic() {
     let result = async_labeled_statement_contains_await(
         "async function foo() { outer: for (let i = 0; i < 10; i++) { for (let j = 0; j < 10; j++) { if (await shouldSkip(i, j)) continue outer; } } }",
     );
-    assert!(result, "Should detect await in labeled for loop with continue");
+    assert!(
+        result,
+        "Should detect await in labeled for loop with continue"
+    );
 }
 
 #[test]
@@ -9345,7 +9615,10 @@ fn test_async_labeled_statement_no_await() {
     let result = async_labeled_statement_contains_await(
         "async function foo() { outer: for (let i = 0; i < 10; i++) { if (i > 5) break outer; } }",
     );
-    assert!(!result, "Should not detect await when labeled statement has no await");
+    assert!(
+        !result,
+        "Should not detect await when labeled statement has no await"
+    );
 }
 
 #[test]
@@ -9361,7 +9634,10 @@ fn test_async_labeled_statement_body_no_await() {
     let result = async_labeled_statement_contains_await(
         "async function foo() { myLabel: { console.log('in label'); } }",
     );
-    assert!(!result, "Should not detect await when labeled block has no await");
+    assert!(
+        !result,
+        "Should not detect await when labeled block has no await"
+    );
 }
 
 #[test]
@@ -9369,7 +9645,10 @@ fn test_async_labeled_statement_ignores_nested_async() {
     let result = async_labeled_statement_contains_await(
         "async function foo() { myLabel: { const inner = async () => { await x; }; } }",
     );
-    assert!(!result, "Should not detect await inside nested async in labeled statement");
+    assert!(
+        !result,
+        "Should not detect await inside nested async in labeled statement"
+    );
 }
 
 #[test]
@@ -9401,7 +9680,10 @@ fn test_async_labeled_with_try_catch() {
     let result = async_labeled_statement_contains_await(
         "async function foo() { outer: for (let i = 0; i < 10; i++) { try { if (await shouldBreak(i)) break outer; } catch (e) { continue outer; } } }",
     );
-    assert!(result, "Should detect await in labeled statement with try/catch");
+    assert!(
+        result,
+        "Should detect await in labeled statement with try/catch"
+    );
 }
 
 #[test]
@@ -9458,7 +9740,10 @@ fn test_async_with_block_no_await() {
     let result = async_with_statement_contains_await(
         "async function foo(obj: any) { with (obj) { console.log(value); } }",
     );
-    assert!(!result, "Should not detect await when with block has no await");
+    assert!(
+        !result,
+        "Should not detect await when with block has no await"
+    );
 }
 
 #[test]
@@ -9490,7 +9775,10 @@ fn test_async_with_ignores_nested_async() {
     let result = async_with_statement_contains_await(
         "async function foo(obj: any) { with (obj) { const inner = async () => { await x; }; } }",
     );
-    assert!(!result, "Should not detect await inside nested async in with block");
+    assert!(
+        !result,
+        "Should not detect await inside nested async in with block"
+    );
 }
 
 #[test]
@@ -9554,7 +9842,10 @@ fn test_async_arrow_pattern_with_sync_callback() {
     let result = async_function_expression_contains_await(
         "async function foo(items: any[]) { const mapped = items.map(x => x.value); return await process(mapped); }",
     );
-    assert!(result, "Should detect await in function with sync arrow callback");
+    assert!(
+        result,
+        "Should detect await in function with sync arrow callback"
+    );
 }
 
 #[test]
@@ -9608,7 +9899,10 @@ fn test_async_arrow_pattern_then_chain() {
     let result = async_function_expression_contains_await(
         "async function foo() { return await getData().then(x => x.value); }",
     );
-    assert!(result, "Should detect await on then chain with sync callback");
+    assert!(
+        result,
+        "Should detect await on then chain with sync callback"
+    );
 }
 
 #[test]
@@ -9666,7 +9960,10 @@ fn test_async_method_pattern_getter_simulation() {
     let result = async_class_method_extra_contains_await(
         "class Foo { async getValue() { return await this.fetchValue(); } }",
     );
-    assert!(result, "Should detect await in async getter simulation method");
+    assert!(
+        result,
+        "Should detect await in async getter simulation method"
+    );
 }
 
 #[test]
@@ -9706,7 +10003,10 @@ fn test_async_method_pattern_private_field_read() {
     let result = async_class_method_extra_contains_await(
         "class Foo { async getValue() { return await this.fetch(); } }",
     );
-    assert!(result, "Should detect await in method reading private-like field");
+    assert!(
+        result,
+        "Should detect await in method reading private-like field"
+    );
 }
 
 #[test]
@@ -9746,7 +10046,10 @@ fn test_async_method_pattern_ignores_nested_async() {
     let result = async_class_method_extra_contains_await(
         "class Foo { async process() { const handler = async () => await inner(); } }",
     );
-    assert!(!result, "Should not detect await inside nested async in method");
+    assert!(
+        !result,
+        "Should not detect await inside nested async in method"
+    );
 }
 
 #[test]
@@ -9849,7 +10152,10 @@ fn test_async_error_pattern_no_await() {
     let result = async_error_propagation_contains_await(
         "async function foo() { try { doWork(); } catch (e) { log(e); } }",
     );
-    assert!(!result, "Should not detect await when try/catch has no await");
+    assert!(
+        !result,
+        "Should not detect await when try/catch has no await"
+    );
 }
 
 #[test]
@@ -9857,7 +10163,10 @@ fn test_async_error_pattern_ignores_nested_async() {
     let result = async_error_propagation_contains_await(
         "async function foo() { try { const handler = async () => await inner(); } catch (e) { } }",
     );
-    assert!(!result, "Should not detect await inside nested async in error handling");
+    assert!(
+        !result,
+        "Should not detect await inside nested async in error handling"
+    );
 }
 
 // ============================================================================
@@ -9928,7 +10237,10 @@ fn test_async_iteration_pattern_for_of_array_destructure() {
     let result = async_for_of_loop_contains_await(
         "async function foo() { for (const [first, second] of pairs) { await log(first); } }",
     );
-    assert!(result, "Should detect await in for-of with array destructuring");
+    assert!(
+        result,
+        "Should detect await in for-of with array destructuring"
+    );
 }
 
 #[test]
@@ -9960,7 +10272,10 @@ fn test_async_iteration_pattern_ignores_nested_async() {
     let result = async_for_of_loop_contains_await(
         "async function foo() { for (const x of arr) { const handler = async () => await process(x); } }",
     );
-    assert!(!result, "Should not detect await inside nested async in iteration");
+    assert!(
+        !result,
+        "Should not detect await inside nested async in iteration"
+    );
 }
 
 // ============================================================================
@@ -9977,7 +10292,10 @@ fn test_async_class_pattern_constructor_simulation() {
     let result = async_static_method_contains_await(
         "class Foo { static async create() { const instance = new Foo(); await instance.init(); return instance; } }",
     );
-    assert!(result, "Should detect await in async constructor simulation");
+    assert!(
+        result,
+        "Should detect await in async constructor simulation"
+    );
 }
 
 #[test]
@@ -10025,7 +10343,10 @@ fn test_async_class_pattern_lifecycle_destroy() {
     let result = async_class_method_extra_contains_await(
         "class Component { async onDestroy() { await this.cleanup(); await this.saveState(); } }",
     );
-    assert!(result, "Should detect await in async lifecycle destroy hook");
+    assert!(
+        result,
+        "Should detect await in async lifecycle destroy hook"
+    );
 }
 
 #[test]
@@ -10057,7 +10378,10 @@ fn test_async_class_pattern_no_await() {
     let result = async_class_method_extra_contains_await(
         "class Foo { async getValue() { return this.cachedValue; } }",
     );
-    assert!(!result, "Should not detect await when class method has no await");
+    assert!(
+        !result,
+        "Should not detect await when class method has no await"
+    );
 }
 
 #[test]
@@ -10065,7 +10389,10 @@ fn test_async_class_pattern_ignores_nested_async() {
     let result = async_class_method_extra_contains_await(
         "class Foo { async setup() { const loader = async () => await loadData(); } }",
     );
-    assert!(!result, "Should not detect await inside nested async in class");
+    assert!(
+        !result,
+        "Should not detect await inside nested async in class"
+    );
 }
 
 // ============================================================================
@@ -10088,7 +10415,10 @@ fn test_async_decorator_pattern_method_multiple() {
     let result = async_method_decorator_contains_await(
         "class Foo { @log @cache async getData() { return await fetch('/api'); } }",
     );
-    assert!(result, "Should detect await in method with multiple decorators");
+    assert!(
+        result,
+        "Should detect await in method with multiple decorators"
+    );
 }
 
 #[test]
@@ -10096,7 +10426,10 @@ fn test_async_decorator_pattern_method_with_params() {
     let result = async_method_decorator_contains_await(
         "class Foo { @timeout async fetchData(id: string) { return await api.get(id); } }",
     );
-    assert!(result, "Should detect await in decorated method with params");
+    assert!(
+        result,
+        "Should detect await in decorated method with params"
+    );
 }
 
 #[test]
@@ -10104,7 +10437,10 @@ fn test_async_decorator_pattern_static_method() {
     let result = async_method_decorator_contains_await(
         "class Foo { @memoize static async getInstance() { return await Foo.create(); } }",
     );
-    assert!(result, "Should detect await in decorated static async method");
+    assert!(
+        result,
+        "Should detect await in decorated static async method"
+    );
 }
 
 #[test]
@@ -10112,7 +10448,10 @@ fn test_async_decorator_pattern_class_with_async_method() {
     let result = async_method_decorator_contains_await(
         "@injectable class Service { async init() { await this.configure(); } }",
     );
-    assert!(result, "Should detect await in async method of decorated class");
+    assert!(
+        result,
+        "Should detect await in async method of decorated class"
+    );
 }
 
 #[test]
@@ -10120,7 +10459,10 @@ fn test_async_decorator_pattern_property_initializer() {
     let result = async_field_initializer_contains_await(
         "class Foo { @observable data = async () => await loadData(); }",
     );
-    assert!(result, "Should detect await in decorated property with async initializer");
+    assert!(
+        result,
+        "Should detect await in decorated property with async initializer"
+    );
 }
 
 #[test]
@@ -10129,7 +10471,10 @@ fn test_async_decorator_pattern_accessor_simulation() {
     let result = async_method_decorator_contains_await(
         "class Foo { @computed async getValue() { return await this.compute(); } }",
     );
-    assert!(result, "Should detect await in decorated getter simulation method");
+    assert!(
+        result,
+        "Should detect await in decorated getter simulation method"
+    );
 }
 
 #[test]
@@ -10145,7 +10490,10 @@ fn test_async_decorator_pattern_factory() {
     let result = async_method_decorator_contains_await(
         "class Foo { @inject async process() { return await this.service.run(); } }",
     );
-    assert!(result, "Should detect await in method with factory decorator");
+    assert!(
+        result,
+        "Should detect await in method with factory decorator"
+    );
 }
 
 #[test]
@@ -10153,7 +10501,10 @@ fn test_async_decorator_pattern_validation() {
     let result = async_method_decorator_contains_await(
         "class Foo { @validate async save(data: any) { await this.repo.save(data); } }",
     );
-    assert!(result, "Should detect await in method with validation decorator");
+    assert!(
+        result,
+        "Should detect await in method with validation decorator"
+    );
 }
 
 #[test]
@@ -10161,7 +10512,10 @@ fn test_async_decorator_pattern_no_await() {
     let result = async_method_decorator_contains_await(
         "class Foo { @log async getValue() { return this.cached; } }",
     );
-    assert!(!result, "Should not detect await when decorated method has no await");
+    assert!(
+        !result,
+        "Should not detect await when decorated method has no await"
+    );
 }
 
 #[test]
@@ -10169,7 +10523,10 @@ fn test_async_decorator_pattern_ignores_nested_async() {
     let result = async_method_decorator_contains_await(
         "class Foo { @log async setup() { const loader = async () => await inner(); } }",
     );
-    assert!(!result, "Should not detect await inside nested async in decorated method");
+    assert!(
+        !result,
+        "Should not detect await inside nested async in decorated method"
+    );
 }
 
 // ============================================================================
@@ -10192,7 +10549,10 @@ fn test_async_module_pattern_dynamic_import_call() {
     let result = async_error_propagation_contains_await(
         "async function loadModule() { return (await import('./module')).default; }",
     );
-    assert!(result, "Should detect await in dynamic import with property access");
+    assert!(
+        result,
+        "Should detect await in dynamic import with property access"
+    );
 }
 
 #[test]
@@ -10206,9 +10566,8 @@ fn test_async_module_pattern_conditional_import() {
 #[test]
 fn test_async_module_pattern_top_level_simulation() {
     // Simulating top-level await via wrapper function
-    let result = async_error_propagation_contains_await(
-        "async function main() { await loadConfig(); }",
-    );
+    let result =
+        async_error_propagation_contains_await("async function main() { await loadConfig(); }");
     assert!(result, "Should detect await in top-level await simulation");
 }
 
@@ -10265,7 +10624,10 @@ fn test_async_module_pattern_no_await() {
     let result = async_error_propagation_contains_await(
         "async function getModule() { return cachedModule; }",
     );
-    assert!(!result, "Should not detect await when module function has no await");
+    assert!(
+        !result,
+        "Should not detect await when module function has no await"
+    );
 }
 
 #[test]
@@ -10273,7 +10635,10 @@ fn test_async_module_pattern_ignores_nested_async() {
     let result = async_error_propagation_contains_await(
         "async function setup() { const loader = async () => await import('./mod'); }",
     );
-    assert!(!result, "Should not detect await inside nested async in module function");
+    assert!(
+        !result,
+        "Should not detect await inside nested async in module function"
+    );
 }
 
 // ============================================================================
@@ -10376,7 +10741,10 @@ fn test_async_resource_pattern_ignores_nested_async() {
     let result = async_error_propagation_contains_await(
         "async function outer() { const cleanup = async () => await resource.dispose(); }",
     );
-    assert!(!result, "Should not detect await inside nested async in resource function");
+    assert!(
+        !result,
+        "Should not detect await inside nested async in resource function"
+    );
 }
 
 // ============================================================================
@@ -10471,7 +10839,10 @@ fn test_async_context_pattern_no_await() {
     let result = async_error_propagation_contains_await(
         "async function syncContext() { return context.get(); }",
     );
-    assert!(!result, "Should not detect await when context access is sync");
+    assert!(
+        !result,
+        "Should not detect await when context access is sync"
+    );
 }
 
 #[test]
@@ -10479,7 +10850,10 @@ fn test_async_context_pattern_ignores_nested_async() {
     let result = async_error_propagation_contains_await(
         "async function outer() { const runner = async () => await context.run(fn); }",
     );
-    assert!(!result, "Should not detect await inside nested async in context function");
+    assert!(
+        !result,
+        "Should not detect await inside nested async in context function"
+    );
 }
 
 // ============================================================================
@@ -10574,7 +10948,10 @@ fn test_async_stream_pattern_no_await() {
     let result = async_error_propagation_contains_await(
         "async function syncStream() { return stream.getReader(); }",
     );
-    assert!(!result, "Should not detect await when stream access is sync");
+    assert!(
+        !result,
+        "Should not detect await when stream access is sync"
+    );
 }
 
 #[test]
@@ -10582,7 +10959,10 @@ fn test_async_stream_pattern_ignores_nested_async() {
     let result = async_error_propagation_contains_await(
         "async function outer() { const reader = async () => await stream.read(); }",
     );
-    assert!(!result, "Should not detect await inside nested async in stream function");
+    assert!(
+        !result,
+        "Should not detect await inside nested async in stream function"
+    );
 }
 
 // ============================================================================
@@ -10650,17 +11030,15 @@ fn test_async_queue_pattern_backpressure() {
 
 #[test]
 fn test_async_queue_pattern_drain() {
-    let result = async_error_propagation_contains_await(
-        "async function drain() { await queue.drain(); }",
-    );
+    let result =
+        async_error_propagation_contains_await("async function drain() { await queue.drain(); }");
     assert!(result, "Should detect await in queue drain");
 }
 
 #[test]
 fn test_async_queue_pattern_flush() {
-    let result = async_error_propagation_contains_await(
-        "async function flush() { await queue.flush(); }",
-    );
+    let result =
+        async_error_propagation_contains_await("async function flush() { await queue.flush(); }");
     assert!(result, "Should detect await in queue flush");
 }
 
@@ -10685,7 +11063,10 @@ fn test_async_queue_pattern_ignores_nested_async() {
     let result = async_error_propagation_contains_await(
         "async function outer() { const worker = async () => await queue.take(); }",
     );
-    assert!(!result, "Should not detect await inside nested async in queue function");
+    assert!(
+        !result,
+        "Should not detect await inside nested async in queue function"
+    );
 }
 
 // ============================================================================
@@ -10762,7 +11143,10 @@ fn test_async_retry_pattern_fallback() {
     let result = async_error_propagation_contains_await(
         "async function withFallback() { return await fallbackService.handle(request); }",
     );
-    assert!(result, "Should detect await in fallback after retry failure");
+    assert!(
+        result,
+        "Should detect await in fallback after retry failure"
+    );
 }
 
 #[test]
@@ -10786,7 +11170,10 @@ fn test_async_retry_pattern_ignores_nested_async() {
     let result = async_error_propagation_contains_await(
         "async function outer() { const retry = async () => await backoff(); }",
     );
-    assert!(!result, "Should not detect await inside nested async in retry function");
+    assert!(
+        !result,
+        "Should not detect await inside nested async in retry function"
+    );
 }
 
 // ============================================================================
@@ -10804,17 +11191,15 @@ fn test_async_state_machine_transition() {
 
 #[test]
 fn test_async_state_machine_enter() {
-    let result = async_error_propagation_contains_await(
-        "async function onEnter() { await state.enter(); }",
-    );
+    let result =
+        async_error_propagation_contains_await("async function onEnter() { await state.enter(); }");
     assert!(result, "Should detect await in state enter handler");
 }
 
 #[test]
 fn test_async_state_machine_exit() {
-    let result = async_error_propagation_contains_await(
-        "async function onExit() { await state.exit(); }",
-    );
+    let result =
+        async_error_propagation_contains_await("async function onExit() { await state.exit(); }");
     assert!(result, "Should detect await in state exit handler");
 }
 
@@ -10887,7 +11272,10 @@ fn test_async_state_machine_ignores_nested_async() {
     let result = async_error_propagation_contains_await(
         "async function outer() { const handler = async () => await machine.transition(); }",
     );
-    assert!(!result, "Should not detect await inside nested async in state machine function");
+    assert!(
+        !result,
+        "Should not detect await inside nested async in state machine function"
+    );
 }
 
 // ============================================================================
@@ -10980,7 +11368,10 @@ fn test_async_observable_no_await() {
     let result = async_error_propagation_contains_await(
         "async function syncObs() { return observable.pipe(take(1)); }",
     );
-    assert!(!result, "Should not detect await when observable access is sync");
+    assert!(
+        !result,
+        "Should not detect await when observable access is sync"
+    );
 }
 
 #[test]
@@ -10988,7 +11379,10 @@ fn test_async_observable_ignores_nested_async() {
     let result = async_error_propagation_contains_await(
         "async function outer() { const sub = async () => await observable.subscribe(); }",
     );
-    assert!(!result, "Should not detect await inside nested async in observable function");
+    assert!(
+        !result,
+        "Should not detect await inside nested async in observable function"
+    );
 }
 
 // ============================================================================
@@ -11030,9 +11424,8 @@ fn test_async_channel_unbuffered() {
 
 #[test]
 fn test_async_channel_close() {
-    let result = async_error_propagation_contains_await(
-        "async function close() { await channel.close(); }",
-    );
+    let result =
+        async_error_propagation_contains_await("async function close() { await channel.close(); }");
     assert!(result, "Should detect await in channel close");
 }
 
@@ -11073,7 +11466,10 @@ fn test_async_channel_timeout() {
     let result = async_error_propagation_contains_await(
         "async function receiveTimeout() { return await channel.receiveWithTimeout(5000); }",
     );
-    assert!(result, "Should detect await in channel receive with timeout");
+    assert!(
+        result,
+        "Should detect await in channel receive with timeout"
+    );
 }
 
 #[test]
@@ -11081,7 +11477,10 @@ fn test_async_channel_no_await() {
     let result = async_error_propagation_contains_await(
         "async function syncChannel() { return channel.isEmpty(); }",
     );
-    assert!(!result, "Should not detect await when channel access is sync");
+    assert!(
+        !result,
+        "Should not detect await when channel access is sync"
+    );
 }
 
 #[test]
@@ -11089,7 +11488,10 @@ fn test_async_channel_ignores_nested_async() {
     let result = async_error_propagation_contains_await(
         "async function outer() { const receiver = async () => await channel.receive(); }",
     );
-    assert!(!result, "Should not detect await inside nested async in channel function");
+    assert!(
+        !result,
+        "Should not detect await inside nested async in channel function"
+    );
 }
 
 // ============================================================================
@@ -11182,7 +11584,10 @@ fn test_async_semaphore_no_await() {
     let result = async_error_propagation_contains_await(
         "async function syncSemaphore() { return semaphore.getPermitCount(); }",
     );
-    assert!(!result, "Should not detect await when semaphore access is sync");
+    assert!(
+        !result,
+        "Should not detect await when semaphore access is sync"
+    );
 }
 
 #[test]
@@ -11190,7 +11595,10 @@ fn test_async_semaphore_ignores_nested_async() {
     let result = async_error_propagation_contains_await(
         "async function outer() { const worker = async () => await semaphore.acquire(); }",
     );
-    assert!(!result, "Should not detect await inside nested async in semaphore function");
+    assert!(
+        !result,
+        "Should not detect await inside nested async in semaphore function"
+    );
 }
 
 // ============================================================================
@@ -11200,17 +11608,15 @@ fn test_async_semaphore_ignores_nested_async() {
 
 #[test]
 fn test_async_mutex_lock() {
-    let result = async_error_propagation_contains_await(
-        "async function lock() { await mutex.lock(); }",
-    );
+    let result =
+        async_error_propagation_contains_await("async function lock() { await mutex.lock(); }");
     assert!(result, "Should detect await in mutex lock");
 }
 
 #[test]
 fn test_async_mutex_unlock() {
-    let result = async_error_propagation_contains_await(
-        "async function unlock() { await mutex.unlock(); }",
-    );
+    let result =
+        async_error_propagation_contains_await("async function unlock() { await mutex.unlock(); }");
     assert!(result, "Should detect await in mutex unlock");
 }
 
@@ -11291,7 +11697,10 @@ fn test_async_mutex_ignores_nested_async() {
     let result = async_error_propagation_contains_await(
         "async function outer() { const locker = async () => await mutex.lock(); }",
     );
-    assert!(!result, "Should not detect await inside nested async in mutex function");
+    assert!(
+        !result,
+        "Should not detect await inside nested async in mutex function"
+    );
 }
 
 // ============================================================================
@@ -11301,9 +11710,8 @@ fn test_async_mutex_ignores_nested_async() {
 
 #[test]
 fn test_async_barrier_wait() {
-    let result = async_error_propagation_contains_await(
-        "async function wait() { await barrier.wait(); }",
-    );
+    let result =
+        async_error_propagation_contains_await("async function wait() { await barrier.wait(); }");
     assert!(result, "Should detect await in barrier wait");
 }
 
@@ -11325,9 +11733,8 @@ fn test_async_barrier_count_down() {
 
 #[test]
 fn test_async_barrier_reset() {
-    let result = async_error_propagation_contains_await(
-        "async function reset() { await barrier.reset(); }",
-    );
+    let result =
+        async_error_propagation_contains_await("async function reset() { await barrier.reset(); }");
     assert!(result, "Should detect await in barrier reset");
 }
 
@@ -11384,7 +11791,10 @@ fn test_async_barrier_no_await() {
     let result = async_error_propagation_contains_await(
         "async function syncBarrier() { return barrier.getParties(); }",
     );
-    assert!(!result, "Should not detect await when barrier access is sync");
+    assert!(
+        !result,
+        "Should not detect await when barrier access is sync"
+    );
 }
 
 #[test]
@@ -11392,7 +11802,10 @@ fn test_async_barrier_ignores_nested_async() {
     let result = async_error_propagation_contains_await(
         "async function outer() { const waiter = async () => await barrier.wait(); }",
     );
-    assert!(!result, "Should not detect await inside nested async in barrier function");
+    assert!(
+        !result,
+        "Should not detect await inside nested async in barrier function"
+    );
 }
 
 // ============================================================================
@@ -11493,7 +11906,10 @@ fn test_async_pool_ignores_nested_async() {
     let result = async_error_propagation_contains_await(
         "async function outer() { const worker = async () => await pool.acquire(); }",
     );
-    assert!(!result, "Should not detect await inside nested async in pool function");
+    assert!(
+        !result,
+        "Should not detect await inside nested async in pool function"
+    );
 }
 
 // ============================================================================
@@ -11586,7 +12002,10 @@ fn test_async_scheduler_no_await() {
     let result = async_error_propagation_contains_await(
         "async function syncScheduler() { return scheduler.getPending(); }",
     );
-    assert!(!result, "Should not detect await when scheduler access is sync");
+    assert!(
+        !result,
+        "Should not detect await when scheduler access is sync"
+    );
 }
 
 #[test]
@@ -11594,7 +12013,10 @@ fn test_async_scheduler_ignores_nested_async() {
     let result = async_error_propagation_contains_await(
         "async function outer() { const job = async () => await scheduler.schedule(); }",
     );
-    assert!(!result, "Should not detect await inside nested async in scheduler function");
+    assert!(
+        !result,
+        "Should not detect await inside nested async in scheduler function"
+    );
 }
 
 // ============================================================================
@@ -11687,7 +12109,10 @@ fn test_async_event_emitter_no_await() {
     let result = async_error_propagation_contains_await(
         "async function syncEmitter() { return emitter.listenerCount(event); }",
     );
-    assert!(!result, "Should not detect await when emitter access is sync");
+    assert!(
+        !result,
+        "Should not detect await when emitter access is sync"
+    );
 }
 
 #[test]
@@ -11695,7 +12120,10 @@ fn test_async_event_emitter_ignores_nested_async() {
     let result = async_error_propagation_contains_await(
         "async function outer() { const handler = async () => await emitter.emit(); }",
     );
-    assert!(!result, "Should not detect await inside nested async in event emitter function");
+    assert!(
+        !result,
+        "Should not detect await inside nested async in event emitter function"
+    );
 }
 
 // ============================================================================
@@ -11796,7 +12224,10 @@ fn test_async_queue_ops_ignores_nested_async() {
     let result = async_error_propagation_contains_await(
         "async function outer() { const worker = async () => await queue.dequeue(); }",
     );
-    assert!(!result, "Should not detect await inside nested async in queue function");
+    assert!(
+        !result,
+        "Should not detect await inside nested async in queue function"
+    );
 }
 
 // ============================================================================
@@ -11889,7 +12320,10 @@ fn test_async_timeout_no_await() {
     let result = async_error_propagation_contains_await(
         "async function syncTimeout() { return timer.getDuration(); }",
     );
-    assert!(!result, "Should not detect await when timeout access is sync");
+    assert!(
+        !result,
+        "Should not detect await when timeout access is sync"
+    );
 }
 
 #[test]
@@ -11897,7 +12331,10 @@ fn test_async_timeout_ignores_nested_async() {
     let result = async_error_propagation_contains_await(
         "async function outer() { const handler = async () => await timeout(op, 1000); }",
     );
-    assert!(!result, "Should not detect await inside nested async in timeout function");
+    assert!(
+        !result,
+        "Should not detect await inside nested async in timeout function"
+    );
 }
 
 // ============================================================================
@@ -11990,7 +12427,10 @@ fn test_async_iterator_no_await() {
     let result = async_error_propagation_contains_await(
         "async function syncIterator() { return iterator[Symbol.asyncIterator]; }",
     );
-    assert!(!result, "Should not detect await when iterator access is sync");
+    assert!(
+        !result,
+        "Should not detect await when iterator access is sync"
+    );
 }
 
 #[test]
@@ -11998,7 +12438,10 @@ fn test_async_iterator_ignores_nested_async() {
     let result = async_error_propagation_contains_await(
         "async function outer() { const iter = async () => await iterator.next(); }",
     );
-    assert!(!result, "Should not detect await inside nested async in iterator function");
+    assert!(
+        !result,
+        "Should not detect await inside nested async in iterator function"
+    );
 }
 
 // ============================================================================
@@ -12067,7 +12510,10 @@ fn test_async_gen_delegation_multiple() {
     let result = async_error_propagation_contains_await(
         "async function multiDelegate() { await gen1(); await gen2(); }",
     );
-    assert!(result, "Should detect await in multiple delegation sequence");
+    assert!(
+        result,
+        "Should detect await in multiple delegation sequence"
+    );
 }
 
 #[test]
@@ -12099,7 +12545,10 @@ fn test_async_gen_delegation_ignores_nested_async() {
     let result = async_error_propagation_contains_await(
         "async function outer() { const gen = async () => await source(); }",
     );
-    assert!(!result, "Should not detect await inside nested async generator in function");
+    assert!(
+        !result,
+        "Should not detect await inside nested async generator in function"
+    );
 }
 
 // ============================================================================
@@ -12192,7 +12641,10 @@ fn test_async_error_no_await() {
     let result = async_error_propagation_contains_await(
         "async function syncError() { try { syncOp(); } catch (e) { handleSync(e); } }",
     );
-    assert!(!result, "Should not detect await when error handling is sync");
+    assert!(
+        !result,
+        "Should not detect await when error handling is sync"
+    );
 }
 
 #[test]
@@ -12200,7 +12652,10 @@ fn test_async_error_ignores_nested_async() {
     let result = async_error_propagation_contains_await(
         "async function outer() { const handler = async (e) => await logError(e); }",
     );
-    assert!(!result, "Should not detect await inside nested async in error handler");
+    assert!(
+        !result,
+        "Should not detect await inside nested async in error handler"
+    );
 }
 
 // ============================================================================
@@ -12301,7 +12756,10 @@ fn test_async_cancel_ignores_nested_async() {
     let result = async_error_propagation_contains_await(
         "async function outer() { const onCancel = async () => await cleanup(); }",
     );
-    assert!(!result, "Should not detect await inside nested async cancel handler");
+    assert!(
+        !result,
+        "Should not detect await inside nested async cancel handler"
+    );
 }
 
 // ============================================================================
@@ -12402,7 +12860,10 @@ fn test_async_cache_ignores_nested_async() {
     let result = async_error_propagation_contains_await(
         "async function outer() { const loader = async (key) => await fetchData(key); }",
     );
-    assert!(!result, "Should not detect await inside nested async cache loader");
+    assert!(
+        !result,
+        "Should not detect await inside nested async cache loader"
+    );
 }
 
 // ============================================================================
@@ -12503,7 +12964,10 @@ fn test_async_batch_ignores_nested_async() {
     let result = async_error_propagation_contains_await(
         "async function outer() { const processor = async (batch) => await handle(batch); }",
     );
-    assert!(!result, "Should not detect await inside nested async batch handler");
+    assert!(
+        !result,
+        "Should not detect await inside nested async batch handler"
+    );
 }
 
 // ============================================================================
@@ -12604,7 +13068,10 @@ fn test_async_retry_ignores_nested_async() {
     let result = async_error_propagation_contains_await(
         "async function outer() { const retrier = async (fn) => await fn(); }",
     );
-    assert!(!result, "Should not detect await inside nested async retry handler");
+    assert!(
+        !result,
+        "Should not detect await inside nested async retry handler"
+    );
 }
 
 // ============================================================================
@@ -12705,7 +13172,10 @@ fn test_async_stream_ignores_nested_async() {
     let result = async_error_propagation_contains_await(
         "async function outer() { const handler = async (chunk) => await process(chunk); }",
     );
-    assert!(!result, "Should not detect await inside nested async stream handler");
+    assert!(
+        !result,
+        "Should not detect await inside nested async stream handler"
+    );
 }
 
 // ============================================================================
@@ -12798,7 +13268,10 @@ fn test_async_state_no_await() {
     let result = async_error_propagation_contains_await(
         "async function syncState(event) { state = transitions[state][event]; return state; }",
     );
-    assert!(!result, "Should not detect await when state machine is sync");
+    assert!(
+        !result,
+        "Should not detect await when state machine is sync"
+    );
 }
 
 #[test]
@@ -12806,7 +13279,10 @@ fn test_async_state_ignores_nested_async() {
     let result = async_error_propagation_contains_await(
         "async function outer() { const handler = async (event) => await process(event); }",
     );
-    assert!(!result, "Should not detect await inside nested async state handler");
+    assert!(
+        !result,
+        "Should not detect await inside nested async state handler"
+    );
 }
 
 // ============================================================================
@@ -12907,7 +13383,10 @@ fn test_async_pubsub_ignores_nested_async() {
     let result = async_error_propagation_contains_await(
         "async function outer() { const handler = async (msg) => await process(msg); }",
     );
-    assert!(!result, "Should not detect await inside nested async pub/sub handler");
+    assert!(
+        !result,
+        "Should not detect await inside nested async pub/sub handler"
+    );
 }
 
 // ============================================================================
@@ -12933,9 +13412,8 @@ fn test_async_respool_release() {
 
 #[test]
 fn test_async_respool_drain() {
-    let result = async_error_propagation_contains_await(
-        "async function drain() { await pool.drain(); }",
-    );
+    let result =
+        async_error_propagation_contains_await("async function drain() { await pool.drain(); }");
     assert!(result, "Should detect await in resource pool drain");
 }
 
@@ -13000,7 +13478,10 @@ fn test_async_respool_no_await() {
     let result = async_error_propagation_contains_await(
         "async function syncPool() { return pool.available(); }",
     );
-    assert!(!result, "Should not detect await when resource pool is sync");
+    assert!(
+        !result,
+        "Should not detect await when resource pool is sync"
+    );
 }
 
 #[test]
@@ -13008,7 +13489,10 @@ fn test_async_respool_ignores_nested_async() {
     let result = async_error_propagation_contains_await(
         "async function outer() { const factory = async () => await createResource(); }",
     );
-    assert!(!result, "Should not detect await inside nested async resource pool factory");
+    assert!(
+        !result,
+        "Should not detect await inside nested async resource pool factory"
+    );
 }
 
 // ============================================================================
@@ -13026,9 +13510,8 @@ fn test_async_transaction_begin() {
 
 #[test]
 fn test_async_transaction_commit() {
-    let result = async_error_propagation_contains_await(
-        "async function commit(tx) { await tx.commit(); }",
-    );
+    let result =
+        async_error_propagation_contains_await("async function commit(tx) { await tx.commit(); }");
     assert!(result, "Should detect await in transaction commit");
 }
 
@@ -13109,7 +13592,10 @@ fn test_async_transaction_ignores_nested_async() {
     let result = async_error_propagation_contains_await(
         "async function outer() { const handler = async (tx) => await tx.commit(); }",
     );
-    assert!(!result, "Should not detect await inside nested async transaction handler");
+    assert!(
+        !result,
+        "Should not detect await inside nested async transaction handler"
+    );
 }
 
 // ============================================================================
@@ -13122,7 +13608,10 @@ fn test_async_derived_field_initializer() {
     let result = async_error_propagation_contains_await(
         "async function init() { return await fetchConfig(); }",
     );
-    assert!(result, "Should detect await in derived class field initializer");
+    assert!(
+        result,
+        "Should detect await in derived class field initializer"
+    );
 }
 
 #[test]
@@ -13138,7 +13627,10 @@ fn test_async_derived_super_method() {
     let result = async_error_propagation_contains_await(
         "async function callSuper() { return await super.method(); }",
     );
-    assert!(result, "Should detect await in async method calling super.method()");
+    assert!(
+        result,
+        "Should detect await in async method calling super.method()"
+    );
 }
 
 #[test]
@@ -13146,7 +13638,10 @@ fn test_async_derived_static_this() {
     let result = async_error_propagation_contains_await(
         "async function staticMethod() { return await this.staticHelper(); }",
     );
-    assert!(result, "Should detect await in async static method with this");
+    assert!(
+        result,
+        "Should detect await in async static method with this"
+    );
 }
 
 #[test]
@@ -13154,7 +13649,10 @@ fn test_async_derived_nested_arrow_this() {
     let result = async_error_propagation_contains_await(
         "async function nestedArrow() { const fn = () => this.value; return await process(fn()); }",
     );
-    assert!(result, "Should detect await in async field with nested arrow this");
+    assert!(
+        result,
+        "Should detect await in async field with nested arrow this"
+    );
 }
 
 #[test]
@@ -13162,7 +13660,10 @@ fn test_async_derived_param_property() {
     let result = async_error_propagation_contains_await(
         "async function withParam(value) { this.value = value; await this.init(); }",
     );
-    assert!(result, "Should detect await in derived constructor with parameter properties");
+    assert!(
+        result,
+        "Should detect await in derived constructor with parameter properties"
+    );
 }
 
 #[test]
@@ -13170,7 +13671,10 @@ fn test_async_derived_generator() {
     let result = async_error_propagation_contains_await(
         "async function derivedGen() { return await super.next(); }",
     );
-    assert!(result, "Should detect await in async method calling super in derived class");
+    assert!(
+        result,
+        "Should detect await in async method calling super in derived class"
+    );
 }
 
 #[test]
@@ -13178,7 +13682,10 @@ fn test_async_derived_multiple_fields() {
     let result = async_error_propagation_contains_await(
         "async function multiField() { await this.field1; await this.field2; }",
     );
-    assert!(result, "Should detect await in multiple async fields with super dependency");
+    assert!(
+        result,
+        "Should detect await in multiple async fields with super dependency"
+    );
 }
 
 #[test]
@@ -13186,7 +13693,10 @@ fn test_async_derived_computed_field() {
     let result = async_error_propagation_contains_await(
         "async function computedField() { return await this[key]; }",
     );
-    assert!(result, "Should detect await in computed async field with super access");
+    assert!(
+        result,
+        "Should detect await in computed async field with super access"
+    );
 }
 
 #[test]
@@ -13194,7 +13704,10 @@ fn test_async_derived_super_property() {
     let result = async_error_propagation_contains_await(
         "async function superProp() { return await super.prop; }",
     );
-    assert!(result, "Should detect await in async accessing super property");
+    assert!(
+        result,
+        "Should detect await in async accessing super property"
+    );
 }
 
 #[test]
@@ -13202,7 +13715,10 @@ fn test_async_derived_no_await() {
     let result = async_error_propagation_contains_await(
         "async function syncDerived() { super.init(); return this.value; }",
     );
-    assert!(!result, "Should not detect await when derived class is sync");
+    assert!(
+        !result,
+        "Should not detect await when derived class is sync"
+    );
 }
 
 #[test]
@@ -13210,7 +13726,10 @@ fn test_async_derived_ignores_nested_async() {
     let result = async_error_propagation_contains_await(
         "async function outer() { const init = async () => await super.init(); }",
     );
-    assert!(!result, "Should not detect await inside nested async in derived class");
+    assert!(
+        !result,
+        "Should not detect await inside nested async in derived class"
+    );
 }
 
 // ============================================================================
@@ -13247,7 +13766,10 @@ fn test_async_super_symbol() {
     let result = async_error_propagation_contains_await(
         "async function symbolKey() { return await super[Symbol.iterator](); }",
     );
-    assert!(result, "Should detect await in super[Symbol.iterator] pattern");
+    assert!(
+        result,
+        "Should detect await in super[Symbol.iterator] pattern"
+    );
 }
 
 #[test]
@@ -13279,7 +13801,10 @@ fn test_async_super_computed_chain() {
     let result = async_error_propagation_contains_await(
         "async function chain(k1, k2) { return await super[k1][k2](); }",
     );
-    assert!(result, "Should detect await in chained super[k1][k2] access");
+    assert!(
+        result,
+        "Should detect await in chained super[k1][k2] access"
+    );
 }
 
 #[test]
@@ -13295,7 +13820,10 @@ fn test_async_super_computed_template() {
     let result = async_error_propagation_contains_await(
         "async function template(name) { return await super[`get${name}`](); }",
     );
-    assert!(result, "Should detect await in super with template literal key");
+    assert!(
+        result,
+        "Should detect await in super with template literal key"
+    );
 }
 
 #[test]
@@ -13303,7 +13831,10 @@ fn test_async_super_computed_no_await() {
     let result = async_error_propagation_contains_await(
         "async function syncSuper(key) { return super[key]; }",
     );
-    assert!(!result, "Should not detect await when computed super is sync");
+    assert!(
+        !result,
+        "Should not detect await when computed super is sync"
+    );
 }
 
 #[test]
@@ -13311,7 +13842,10 @@ fn test_async_super_computed_ignores_nested() {
     let result = async_error_propagation_contains_await(
         "async function outer() { const fn = async (key) => await super[key](); }",
     );
-    assert!(!result, "Should not detect await inside nested async with super[key]");
+    assert!(
+        !result,
+        "Should not detect await inside nested async with super[key]"
+    );
 }
 
 // ============================================================================
@@ -13324,7 +13858,10 @@ fn test_async_privfield_read() {
     let result = async_error_propagation_contains_await(
         "async function readPrivate() { return await this.#field; }",
     );
-    assert!(result, "Should detect await in async method reading #privateField");
+    assert!(
+        result,
+        "Should detect await in async method reading #privateField"
+    );
 }
 
 #[test]
@@ -13332,7 +13869,10 @@ fn test_async_privfield_write() {
     let result = async_error_propagation_contains_await(
         "async function writePrivate() { this.#field = await getValue(); }",
     );
-    assert!(result, "Should detect await in async method writing #privateField");
+    assert!(
+        result,
+        "Should detect await in async method writing #privateField"
+    );
 }
 
 #[test]
@@ -13340,7 +13880,10 @@ fn test_async_privfield_method_call() {
     let result = async_error_propagation_contains_await(
         "async function callPrivate() { return await this.#privateMethod(); }",
     );
-    assert!(result, "Should detect await in async method with #privateMethod call");
+    assert!(
+        result,
+        "Should detect await in async method with #privateMethod call"
+    );
 }
 
 #[test]
@@ -13348,7 +13891,10 @@ fn test_async_privfield_static() {
     let result = async_error_propagation_contains_await(
         "async function staticPrivate() { return await this.#staticPrivate; }",
     );
-    assert!(result, "Should detect await in async static with #staticPrivate");
+    assert!(
+        result,
+        "Should detect await in async static with #staticPrivate"
+    );
 }
 
 #[test]
@@ -13356,7 +13902,10 @@ fn test_async_privfield_arrow_capture() {
     let result = async_error_propagation_contains_await(
         "async function arrowCapture() { const fn = () => this.#field; return await process(fn()); }",
     );
-    assert!(result, "Should detect await in async arrow with private field capture");
+    assert!(
+        result,
+        "Should detect await in async arrow with private field capture"
+    );
 }
 
 #[test]
@@ -13372,7 +13921,10 @@ fn test_async_privfield_try_catch() {
     let result = async_error_propagation_contains_await(
         "async function tryCatch() { try { return await this.#field; } catch { return null; } }",
     );
-    assert!(result, "Should detect await in private field in try/catch async");
+    assert!(
+        result,
+        "Should detect await in private field in try/catch async"
+    );
 }
 
 #[test]
@@ -13380,7 +13932,10 @@ fn test_async_privfield_multiple() {
     let result = async_error_propagation_contains_await(
         "async function multiple() { await this.#field1; await this.#field2; }",
     );
-    assert!(result, "Should detect await in multiple private fields in async");
+    assert!(
+        result,
+        "Should detect await in multiple private fields in async"
+    );
 }
 
 #[test]
@@ -13388,7 +13943,10 @@ fn test_async_privfield_increment() {
     let result = async_error_propagation_contains_await(
         "async function increment() { this.#count++; return await this.#save(); }",
     );
-    assert!(result, "Should detect await in private field increment in async");
+    assert!(
+        result,
+        "Should detect await in private field increment in async"
+    );
 }
 
 #[test]
@@ -13396,7 +13954,10 @@ fn test_async_privfield_compound() {
     let result = async_error_propagation_contains_await(
         "async function compound() { this.#value += await getDelta(); }",
     );
-    assert!(result, "Should detect await in private field compound assignment");
+    assert!(
+        result,
+        "Should detect await in private field compound assignment"
+    );
 }
 
 #[test]
@@ -13404,7 +13965,10 @@ fn test_async_privfield_no_await() {
     let result = async_error_propagation_contains_await(
         "async function syncPrivate() { return this.#field; }",
     );
-    assert!(!result, "Should not detect await when private field access is sync");
+    assert!(
+        !result,
+        "Should not detect await when private field access is sync"
+    );
 }
 
 #[test]
@@ -13412,7 +13976,10 @@ fn test_async_privfield_ignores_nested() {
     let result = async_error_propagation_contains_await(
         "async function outer() { const fn = async () => await this.#field; }",
     );
-    assert!(!result, "Should not detect await inside nested async with private field");
+    assert!(
+        !result,
+        "Should not detect await inside nested async with private field"
+    );
 }
 
 // ASYNC CLASS DECORATOR METHOD PATTERN TESTS
@@ -13422,7 +13989,10 @@ fn test_async_clsdecor_basic() {
     let result = async_error_propagation_contains_await(
         "async function decoratedMethod() { return await this.process(); }",
     );
-    assert!(result, "Should detect await in basic decorated async method");
+    assert!(
+        result,
+        "Should detect await in basic decorated async method"
+    );
 }
 
 #[test]
@@ -13430,7 +14000,10 @@ fn test_async_clsdecor_multiple() {
     let result = async_error_propagation_contains_await(
         "async function multiDecorated() { return await this.validate(); }",
     );
-    assert!(result, "Should detect await in multiply decorated async method");
+    assert!(
+        result,
+        "Should detect await in multiply decorated async method"
+    );
 }
 
 #[test]
@@ -13438,7 +14011,10 @@ fn test_async_clsdecor_factory() {
     let result = async_error_propagation_contains_await(
         "async function factoryDecorated() { return await config.load(); }",
     );
-    assert!(result, "Should detect await in decorator factory async method");
+    assert!(
+        result,
+        "Should detect await in decorator factory async method"
+    );
 }
 
 #[test]
@@ -13446,7 +14022,10 @@ fn test_async_clsdecor_static() {
     let result = async_error_propagation_contains_await(
         "async function staticDecorated() { return await MyClass.getInstance(); }",
     );
-    assert!(result, "Should detect await in static decorated async method");
+    assert!(
+        result,
+        "Should detect await in static decorated async method"
+    );
 }
 
 #[test]
@@ -13462,7 +14041,10 @@ fn test_async_clsdecor_super() {
     let result = async_error_propagation_contains_await(
         "async function decoratedWithSuper() { return await super.method(); }",
     );
-    assert!(result, "Should detect await in decorated async with super call");
+    assert!(
+        result,
+        "Should detect await in decorated async with super call"
+    );
 }
 
 #[test]
@@ -13470,7 +14052,10 @@ fn test_async_clsdecor_parameter() {
     let result = async_error_propagation_contains_await(
         "async function paramDecorated(id) { return await this.fetch(id); }",
     );
-    assert!(result, "Should detect await in async method with parameter decorator");
+    assert!(
+        result,
+        "Should detect await in async method with parameter decorator"
+    );
 }
 
 #[test]
@@ -13478,7 +14063,10 @@ fn test_async_clsdecor_class() {
     let result = async_error_propagation_contains_await(
         "async function classDecoratorMethod() { return await this.init(); }",
     );
-    assert!(result, "Should detect await in async method with class decorator");
+    assert!(
+        result,
+        "Should detect await in async method with class decorator"
+    );
 }
 
 #[test]
@@ -13494,7 +14082,10 @@ fn test_async_clsdecor_combined() {
     let result = async_error_propagation_contains_await(
         "async function combinedDecorators() { return await this.execute(); }",
     );
-    assert!(result, "Should detect await in combined decorator async patterns");
+    assert!(
+        result,
+        "Should detect await in combined decorator async patterns"
+    );
 }
 
 #[test]
@@ -13502,7 +14093,10 @@ fn test_async_clsdecor_no_await() {
     let result = async_error_propagation_contains_await(
         "async function syncDecorated() { return this.cached; }",
     );
-    assert!(!result, "Should not detect await when decorated method is sync");
+    assert!(
+        !result,
+        "Should not detect await when decorated method is sync"
+    );
 }
 
 #[test]
@@ -13510,7 +14104,10 @@ fn test_async_clsdecor_ignores_nested() {
     let result = async_error_propagation_contains_await(
         "async function outer() { const fn = async () => await decorated(); }",
     );
-    assert!(!result, "Should not detect await inside nested async with decorator");
+    assert!(
+        !result,
+        "Should not detect await inside nested async with decorator"
+    );
 }
 
 // ASYNC GENERATOR YIELD DELEGATION PATTERN TESTS
@@ -13520,7 +14117,10 @@ fn test_async_yielddeleg_basic() {
     let result = async_error_propagation_contains_await(
         "async function gen() { return await getIterable(); }",
     );
-    assert!(result, "Should detect await in async generator yield* basic");
+    assert!(
+        result,
+        "Should detect await in async generator yield* basic"
+    );
 }
 
 #[test]
@@ -13584,7 +14184,10 @@ fn test_async_yielddeleg_class() {
     let result = async_error_propagation_contains_await(
         "async function method() { return await this.getItems(); }",
     );
-    assert!(result, "Should detect await in async generator yield* in class");
+    assert!(
+        result,
+        "Should detect await in async generator yield* in class"
+    );
 }
 
 #[test]
@@ -13597,9 +14200,7 @@ fn test_async_yielddeleg_combined() {
 
 #[test]
 fn test_async_yielddeleg_no_await() {
-    let result = async_error_propagation_contains_await(
-        "async function gen() { return items; }",
-    );
+    let result = async_error_propagation_contains_await("async function gen() { return items; }");
     assert!(!result, "Should not detect await when yield* is sync");
 }
 
@@ -13608,7 +14209,10 @@ fn test_async_yielddeleg_ignores_nested() {
     let result = async_error_propagation_contains_await(
         "async function outer() { const fn = async () => await inner(); }",
     );
-    assert!(!result, "Should not detect await inside nested async generator");
+    assert!(
+        !result,
+        "Should not detect await inside nested async generator"
+    );
 }
 
 // FOR-AWAIT-OF EDGE CASE TESTS
@@ -13658,7 +14262,10 @@ fn test_async_forawait_edge_combined() {
     let result = async_error_propagation_contains_await(
         "async function process() { for (const x of items) { try { if (await check(x)) continue; await handle(x); } catch (e) { break; } } }",
     );
-    assert!(result, "Should detect await in combined for-await-of patterns");
+    assert!(
+        result,
+        "Should detect await in combined for-await-of patterns"
+    );
 }
 
 // PROMISE.ALLSETTLED PATTERN TESTS
@@ -13676,7 +14283,10 @@ fn test_async_allsettled_error_handling() {
     let result = async_error_propagation_contains_await(
         "async function fetch() { try { return await Promise.allSettled(tasks); } catch (e) { return []; } }",
     );
-    assert!(result, "Should detect await in Promise.allSettled with error handling");
+    assert!(
+        result,
+        "Should detect await in Promise.allSettled with error handling"
+    );
 }
 
 #[test]
@@ -13684,7 +14294,10 @@ fn test_async_allsettled_mixed_results() {
     let result = async_error_propagation_contains_await(
         "async function process() { return await Promise.allSettled([p1, p2, p3]); }",
     );
-    assert!(result, "Should detect await in Promise.allSettled with mixed results");
+    assert!(
+        result,
+        "Should detect await in Promise.allSettled with mixed results"
+    );
 }
 
 #[test]
@@ -13692,7 +14305,10 @@ fn test_async_allsettled_class_method() {
     let result = async_error_propagation_contains_await(
         "async function method() { return await Promise.allSettled(this.tasks); }",
     );
-    assert!(result, "Should detect await in Promise.allSettled in class method");
+    assert!(
+        result,
+        "Should detect await in Promise.allSettled in class method"
+    );
 }
 
 #[test]
@@ -13700,7 +14316,10 @@ fn test_async_allsettled_destructuring() {
     let result = async_error_propagation_contains_await(
         "async function fetch() { return await Promise.allSettled([p1, p2]); }",
     );
-    assert!(result, "Should detect await in Promise.allSettled with destructuring");
+    assert!(
+        result,
+        "Should detect await in Promise.allSettled with destructuring"
+    );
 }
 
 #[test]
@@ -13708,16 +14327,18 @@ fn test_async_allsettled_combined() {
     let result = async_error_propagation_contains_await(
         "async function process() { return await Promise.allSettled(items.map(i => fetch(i))); }",
     );
-    assert!(result, "Should detect await in combined Promise.allSettled patterns");
+    assert!(
+        result,
+        "Should detect await in combined Promise.allSettled patterns"
+    );
 }
 
 // ASYNC IIFE PATTERN TESTS
 
 #[test]
 fn test_async_iifepat_basic() {
-    let result = async_error_propagation_contains_await(
-        "async function run() { return await fetch(url); }",
-    );
+    let result =
+        async_error_propagation_contains_await("async function run() { return await fetch(url); }");
     assert!(result, "Should detect await in basic async IIFE");
 }
 
@@ -13758,7 +14379,10 @@ fn test_async_iifepat_combined() {
     let result = async_error_propagation_contains_await(
         "async function run() { try { await init(); return await Promise.all(tasks); } catch (e) { return []; } }",
     );
-    assert!(result, "Should detect await in combined async IIFE patterns");
+    assert!(
+        result,
+        "Should detect await in combined async IIFE patterns"
+    );
 }
 
 // ASYNC METHOD CHAINING PATTERN TESTS
@@ -13800,7 +14424,10 @@ fn test_async_methchain_error_handling() {
     let result = async_error_propagation_contains_await(
         "async function chain() { try { return await api.fetch().parse().validate(); } catch (e) { return null; } }",
     );
-    assert!(result, "Should detect await in async chain with error handling");
+    assert!(
+        result,
+        "Should detect await in async chain with error handling"
+    );
 }
 
 #[test]
@@ -13808,7 +14435,10 @@ fn test_async_methchain_combined() {
     let result = async_error_propagation_contains_await(
         "async function process() { return await this.init().configure().execute(); }",
     );
-    assert!(result, "Should detect await in combined async chain patterns");
+    assert!(
+        result,
+        "Should detect await in combined async chain patterns"
+    );
 }
 
 // ASYNC DISPOSABLE PATTERN TESTS
@@ -13858,7 +14488,10 @@ fn test_async_disposepat_combined() {
     let result = async_error_propagation_contains_await(
         "async function manage() { try { await init(); return await cleanup(); } finally { await dispose(); } }",
     );
-    assert!(result, "Should detect await in combined async disposable patterns");
+    assert!(
+        result,
+        "Should detect await in combined async disposable patterns"
+    );
 }
 
 // ASYNC WEAKREF PATTERN TESTS
@@ -13884,7 +14517,10 @@ fn test_async_weakref_finalization() {
     let result = async_error_propagation_contains_await(
         "async function cleanup() { return await registry.cleanupSome(); }",
     );
-    assert!(result, "Should detect await in async FinalizationRegistry callback");
+    assert!(
+        result,
+        "Should detect await in async FinalizationRegistry callback"
+    );
 }
 
 #[test]
@@ -13908,7 +14544,10 @@ fn test_async_weakref_combined() {
     let result = async_error_propagation_contains_await(
         "async function manage() { const obj = ref.deref(); if (obj) return await obj.process(); return await fallback(); }",
     );
-    assert!(result, "Should detect await in combined async WeakRef patterns");
+    assert!(
+        result,
+        "Should detect await in combined async WeakRef patterns"
+    );
 }
 
 // ASYNC PROXY/REFLECT PATTERN TESTS
@@ -13958,7 +14597,10 @@ fn test_async_proxy_reflect_combined() {
     let result = async_error_propagation_contains_await(
         "async function combined() { const val = await Reflect.get(proxy, key); return await process(val); }",
     );
-    assert!(result, "Should detect await in combined async Proxy/Reflect patterns");
+    assert!(
+        result,
+        "Should detect await in combined async Proxy/Reflect patterns"
+    );
 }
 
 // ASYNC MAP/SET PATTERN TESTS
@@ -13992,7 +14634,10 @@ fn test_async_set_callbacks() {
     let result = async_error_propagation_contains_await(
         "async function forEach() { for (const item of set) { await handle(item); } }",
     );
-    assert!(result, "Should detect await in async Set with async callbacks");
+    assert!(
+        result,
+        "Should detect await in async Set with async callbacks"
+    );
 }
 
 #[test]
@@ -14008,7 +14653,10 @@ fn test_async_mapset_combined() {
     let result = async_error_propagation_contains_await(
         "async function combined() { map.set(key, await fetch(key)); set.add(await getItem()); }",
     );
-    assert!(result, "Should detect await in combined async Map/Set patterns");
+    assert!(
+        result,
+        "Should detect await in combined async Map/Set patterns"
+    );
 }
 
 // ASYNC GENERATOR DELEGATION PATTERN TESTS
@@ -14026,7 +14674,10 @@ fn test_async_gendeleg_pat_sync_iterator() {
     let result = async_error_propagation_contains_await(
         "async function toSync() { return await convertToSync(asyncIter); }",
     );
-    assert!(result, "Should detect await in async yield* to sync iterator");
+    assert!(
+        result,
+        "Should detect await in async yield* to sync iterator"
+    );
 }
 
 #[test]
@@ -14058,5 +14709,8 @@ fn test_async_gendeleg_pat_combined() {
     let result = async_error_propagation_contains_await(
         "async function combined() { try { await first(); return await second(); } catch (e) { return await fallback(); } }",
     );
-    assert!(result, "Should detect await in combined delegation patterns");
+    assert!(
+        result,
+        "Should detect await in combined delegation patterns"
+    );
 }

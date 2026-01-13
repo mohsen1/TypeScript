@@ -1,21 +1,10 @@
 //! Solver microbenchmarks (subtype, evaluate, infer).
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use wasm::interner::Atom;
 use wasm::solver::{
-    evaluate_type,
-    infer_generic_function,
-    is_subtype_of,
-    CompatChecker,
-    ConditionalType,
-    FunctionShape,
-    ObjectShapeId,
-    ParamInfo,
-    PropertyInfo,
-    TypeId,
-    TypeInterner,
-    TypeKey,
-    TypeParamInfo,
+    CompatChecker, ConditionalType, FunctionShape, ObjectShapeId, ParamInfo, PropertyInfo, TypeId,
+    TypeInterner, TypeKey, TypeParamInfo, evaluate_type, infer_generic_function, is_subtype_of,
 };
 
 fn build_subtype_fixtures(interner: &TypeInterner) -> (TypeId, TypeId, TypeId) {

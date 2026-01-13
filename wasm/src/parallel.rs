@@ -26,14 +26,14 @@
 //! // results is Vec<ParseResult> with parsed ASTs
 //! ```
 
-use rayon::prelude::*;
-use std::sync::Arc;
-use crate::thin_parser::{ParseDiagnostic, ThinParserState};
-use crate::thin_binder::ThinBinderState;
 use crate::binder::{Scope, ScopeId, SymbolArena, SymbolId, SymbolTable};
 use crate::parser::NodeIndex;
 use crate::parser::thin_node::ThinNodeArena;
+use crate::thin_binder::ThinBinderState;
+use crate::thin_parser::{ParseDiagnostic, ThinParserState};
+use rayon::prelude::*;
 use rustc_hash::{FxHashMap, FxHashSet};
+use std::sync::Arc;
 
 /// Result of parsing a single file
 pub struct ParseResult {
@@ -314,17 +314,16 @@ pub fn merge_bind_results_ref(results: &[&BindResult]) -> MergedProgram {
             }
         }
 
-        let remap_symbol_table = |table: &SymbolTable,
-                                  id_remap: &FxHashMap<SymbolId, SymbolId>|
-         -> SymbolTable {
-            let mut remapped = SymbolTable::new();
-            for (name, old_sym_id) in table.iter() {
-                if let Some(&new_sym_id) = id_remap.get(old_sym_id) {
-                    remapped.set(name.clone(), new_sym_id);
+        let remap_symbol_table =
+            |table: &SymbolTable, id_remap: &FxHashMap<SymbolId, SymbolId>| -> SymbolTable {
+                let mut remapped = SymbolTable::new();
+                for (name, old_sym_id) in table.iter() {
+                    if let Some(&new_sym_id) = id_remap.get(old_sym_id) {
+                        remapped.set(name.clone(), new_sym_id);
+                    }
                 }
-            }
-            remapped
-        };
+                remapped
+            };
 
         for (old_id, &new_id) in id_remap.iter() {
             let Some(old_sym) = result.symbols.get(*old_id) else {
@@ -333,16 +332,21 @@ pub fn merge_bind_results_ref(results: &[&BindResult]) -> MergedProgram {
             if let Some(new_sym) = global_symbols.get_mut(new_id) {
                 let mut updated = old_sym.clone();
                 updated.id = new_id;
-                updated.parent = id_remap.get(&old_sym.parent).copied().unwrap_or(SymbolId::NONE);
+                updated.parent = id_remap
+                    .get(&old_sym.parent)
+                    .copied()
+                    .unwrap_or(SymbolId::NONE);
                 updated.value_declaration = old_sym.value_declaration;
                 updated.declarations = old_sym.declarations.clone();
                 updated.is_exported = old_sym.is_exported;
-                updated.exports = old_sym.exports.as_ref().map(|table| {
-                    Box::new(remap_symbol_table(table.as_ref(), &id_remap))
-                });
-                updated.members = old_sym.members.as_ref().map(|table| {
-                    Box::new(remap_symbol_table(table.as_ref(), &id_remap))
-                });
+                updated.exports = old_sym
+                    .exports
+                    .as_ref()
+                    .map(|table| Box::new(remap_symbol_table(table.as_ref(), &id_remap)));
+                updated.members = old_sym
+                    .members
+                    .as_ref()
+                    .map(|table| Box::new(remap_symbol_table(table.as_ref(), &id_remap)));
                 *new_sym = updated;
             }
         }
@@ -417,10 +421,10 @@ pub fn compile_files(files: Vec<(String, String)>) -> MergedProgram {
 // Parallel Type Checking
 // =============================================================================
 
-use crate::thin_checker::ThinCheckerState;
-use crate::solver::TypeId;
 use crate::checker::types::diagnostics::Diagnostic;
 use crate::parser::syntax_kind_ext;
+use crate::solver::TypeId;
+use crate::thin_checker::ThinCheckerState;
 
 /// Result of type checking a single function body
 #[derive(Debug)]
@@ -477,15 +481,20 @@ fn collect_functions(arena: &ThinNodeArena, source_file: NodeIndex) -> Vec<NodeI
 }
 
 /// Recursively collect functions from a node
-fn collect_functions_from_node(arena: &ThinNodeArena, node_idx: NodeIndex, functions: &mut Vec<NodeIndex>) {
+fn collect_functions_from_node(
+    arena: &ThinNodeArena,
+    node_idx: NodeIndex,
+    functions: &mut Vec<NodeIndex>,
+) {
     let Some(node) = arena.get(node_idx) else {
         return;
     };
 
     match node.kind {
-        k if k == syntax_kind_ext::FUNCTION_DECLARATION ||
-             k == syntax_kind_ext::FUNCTION_EXPRESSION ||
-             k == syntax_kind_ext::ARROW_FUNCTION => {
+        k if k == syntax_kind_ext::FUNCTION_DECLARATION
+            || k == syntax_kind_ext::FUNCTION_EXPRESSION
+            || k == syntax_kind_ext::ARROW_FUNCTION =>
+        {
             functions.push(node_idx);
             // Also collect nested functions in the body
             if let Some(func) = arena.get_function(node) {
@@ -530,7 +539,11 @@ fn collect_functions_from_node(arena: &ThinNodeArena, node_idx: NodeIndex, funct
                                 if let Some(decl_node) = arena.get(decl_idx) {
                                     if let Some(decl) = arena.get_variable_declaration(decl_node) {
                                         if !decl.initializer.is_none() {
-                                            collect_functions_from_node(arena, decl.initializer, functions);
+                                            collect_functions_from_node(
+                                                arena,
+                                                decl.initializer,
+                                                functions,
+                                            );
                                         }
                                     }
                                 }
@@ -581,7 +594,8 @@ pub fn check_functions_parallel(program: &MergedProgram) -> CheckResult {
     // Check functions in parallel
     // Note: We need to be careful here - ThinCheckerState holds mutable references
     // For now, we group by file and check each file's functions together
-    let file_results: Vec<FileCheckResult> = program.files
+    let file_results: Vec<FileCheckResult> = program
+        .files
         .par_iter()
         .enumerate()
         .map(|(file_idx, file)| {
@@ -596,7 +610,7 @@ pub fn check_functions_parallel(program: &MergedProgram) -> CheckResult {
                 &binder,
                 &program.type_interner,
                 file.file_name.clone(),
-                false,  // strict mode not applicable for internal operations
+                false, // strict mode not applicable for internal operations
             );
 
             let mut function_results = Vec::new();
@@ -625,9 +639,7 @@ pub fn check_functions_parallel(program: &MergedProgram) -> CheckResult {
         })
         .collect();
 
-    let diagnostic_count: usize = file_results.iter()
-        .map(|r| r.diagnostics.len())
-        .sum();
+    let diagnostic_count: usize = file_results.iter().map(|r| r.diagnostics.len()).sum();
 
     CheckResult {
         file_results,
@@ -637,7 +649,11 @@ pub fn check_functions_parallel(program: &MergedProgram) -> CheckResult {
 }
 
 /// Create a ThinBinderState from a BoundFile for type checking
-fn create_binder_from_bound_file(file: &BoundFile, program: &MergedProgram, file_idx: usize) -> ThinBinderState {
+fn create_binder_from_bound_file(
+    file: &BoundFile,
+    program: &MergedProgram,
+    file_idx: usize,
+) -> ThinBinderState {
     // Get file locals for this specific file
     let mut file_locals = SymbolTable::new();
 

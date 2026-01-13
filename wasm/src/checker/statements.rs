@@ -3,9 +3,9 @@
 //! Handles control flow statements and dispatches declarations.
 //! This module separates statement checking logic from the monolithic ThinCheckerState.
 
+use super::context::CheckerContext;
 use crate::parser::NodeIndex;
 use crate::parser::syntax_kind_ext;
-use super::context::CheckerContext;
 
 /// Statement type checker that operates on the shared context.
 ///
@@ -37,9 +37,7 @@ impl<'a, 'ctx> StatementChecker<'a, 'ctx> {
             k if k == syntax_kind_ext::IF_STATEMENT => {
                 self.check_if_statement(stmt_idx);
             }
-            k if k == syntax_kind_ext::WHILE_STATEMENT
-                || k == syntax_kind_ext::DO_STATEMENT =>
-            {
+            k if k == syntax_kind_ext::WHILE_STATEMENT || k == syntax_kind_ext::DO_STATEMENT => {
                 self.check_loop_statement(stmt_idx);
             }
             k if k == syntax_kind_ext::FOR_STATEMENT => {
@@ -159,9 +157,9 @@ impl<'a, 'ctx> StatementChecker<'a, 'ctx> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::thin_parser::ThinParserState;
-    use crate::thin_binder::ThinBinderState;
     use crate::solver::TypeInterner;
+    use crate::thin_binder::ThinBinderState;
+    use crate::thin_parser::ThinParserState;
 
     #[test]
     fn test_statement_checker_block() {
@@ -173,12 +171,8 @@ mod tests {
         binder.bind_source_file(parser.get_arena(), root);
 
         let types = TypeInterner::new();
-        let mut ctx = CheckerContext::new(
-            parser.get_arena(),
-            &binder,
-            &types,
-            "test.ts".to_string(),
-        );
+        let mut ctx =
+            CheckerContext::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
 
         // Get the block statement
         if let Some(root_node) = parser.get_arena().get(root) {

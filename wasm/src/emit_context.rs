@@ -205,10 +205,7 @@ impl EmitContext {
 
     /// Create a new EmitContext with the given options
     pub fn with_options(options: PrinterOptions) -> Self {
-        let target_es5 = matches!(
-            options.target,
-            ScriptTarget::ES3 | ScriptTarget::ES5
-        );
+        let target_es5 = matches!(options.target, ScriptTarget::ES3 | ScriptTarget::ES5);
 
         Self {
             options,

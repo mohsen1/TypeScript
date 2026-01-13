@@ -40,8 +40,7 @@ fn decode_mappings(mappings: &str) -> Vec<DecodedMapping> {
             }
 
             let mut rest = segment;
-            let (gen_col_delta, consumed) =
-                vlq::decode(rest).expect("decode generated column");
+            let (gen_col_delta, consumed) = vlq::decode(rest).expect("decode generated column");
             rest = &rest[consumed..];
 
             let gen_col = prev_generated_column + gen_col_delta;
@@ -51,14 +50,11 @@ fn decode_mappings(mappings: &str) -> Vec<DecodedMapping> {
                 continue;
             }
 
-            let (src_delta, consumed) =
-                vlq::decode(rest).expect("decode source index");
+            let (src_delta, consumed) = vlq::decode(rest).expect("decode source index");
             rest = &rest[consumed..];
-            let (orig_line_delta, consumed) =
-                vlq::decode(rest).expect("decode original line");
+            let (orig_line_delta, consumed) = vlq::decode(rest).expect("decode original line");
             rest = &rest[consumed..];
-            let (orig_col_delta, consumed) =
-                vlq::decode(rest).expect("decode original column");
+            let (orig_col_delta, consumed) = vlq::decode(rest).expect("decode original column");
             rest = &rest[consumed..];
 
             let source_index = prev_source_index + src_delta;
@@ -70,8 +66,7 @@ fn decode_mappings(mappings: &str) -> Vec<DecodedMapping> {
             prev_original_column = original_column;
 
             let name_index = if !rest.is_empty() {
-                let (name_delta, consumed) =
-                    vlq::decode(rest).expect("decode name index");
+                let (name_delta, consumed) = vlq::decode(rest).expect("decode name index");
                 rest = &rest[consumed..];
                 let name_index = prev_name_index + name_delta;
                 prev_name_index = name_index;
@@ -144,18 +139,18 @@ fn has_mapping_for_prefixes(
             continue;
         }
 
-        let output_line_text = match output.lines().nth(entry.generated_line as usize)
-        {
+        let output_line_text = match output.lines().nth(entry.generated_line as usize) {
             Some(line) => line,
             None => continue,
         };
-        let output_slice = match output_line_text
-            .get(entry.generated_column as usize..)
-        {
+        let output_slice = match output_line_text.get(entry.generated_column as usize..) {
             Some(slice) => slice,
             None => continue,
         };
-        if prefixes.iter().any(|prefix| output_slice.starts_with(prefix)) {
+        if prefixes
+            .iter()
+            .any(|prefix| output_slice.starts_with(prefix))
+        {
             return true;
         }
     }
@@ -200,10 +195,26 @@ fn test_source_map_simple() {
     generator.add_simple_mapping(1, 0, source_idx, 1, 0);
 
     let json = generator.to_json();
-    assert!(json.contains("\"version\":3") || json.contains("\"version\": 3"), "Should be v3 source map: {}", json);
-    assert!(json.contains("\"file\":\"output.js\"") || json.contains("\"file\": \"output.js\""), "Should have file: {}", json);
-    assert!(json.contains("\"sources\":[\"input.ts\"]") || json.contains("\"sources\": [\"input.ts\"]"), "Should have sources: {}", json);
-    assert!(json.contains("\"mappings\""), "Should have mappings: {}", json);
+    assert!(
+        json.contains("\"version\":3") || json.contains("\"version\": 3"),
+        "Should be v3 source map: {}",
+        json
+    );
+    assert!(
+        json.contains("\"file\":\"output.js\"") || json.contains("\"file\": \"output.js\""),
+        "Should have file: {}",
+        json
+    );
+    assert!(
+        json.contains("\"sources\":[\"input.ts\"]") || json.contains("\"sources\": [\"input.ts\"]"),
+        "Should have sources: {}",
+        json
+    );
+    assert!(
+        json.contains("\"mappings\""),
+        "Should have mappings: {}",
+        json
+    );
 }
 
 #[test]
@@ -227,7 +238,11 @@ fn test_source_map_with_names() {
     generator.add_named_mapping(0, 0, source_idx, 0, 0, name_idx);
 
     let json = generator.to_json();
-    assert!(json.contains("\"names\":[\"myVariable\"]") || json.contains("\"names\": [\"myVariable\"]"), "Should have names: {}", json);
+    assert!(
+        json.contains("\"names\":[\"myVariable\"]") || json.contains("\"names\": [\"myVariable\"]"),
+        "Should have names: {}",
+        json
+    );
 }
 
 #[test]
@@ -273,8 +288,7 @@ fn test_source_map_es5_transform_records_names() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -301,7 +315,9 @@ fn test_source_map_es5_transform_records_names() {
         .position(|name| name.as_str() == Some("value"))
         .expect("value not found in names");
     assert!(
-        decoded.iter().any(|entry| entry.name_index == Some(value_index as u32)),
+        decoded
+            .iter()
+            .any(|entry| entry.name_index == Some(value_index as u32)),
         "expected name mapping for value. mappings: {mappings}"
     );
 }
@@ -344,8 +360,7 @@ fn test_source_map_es5_transform_async_await_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -370,14 +385,9 @@ fn test_source_map_es5_transform_async_await_mapping() {
 
     let mapping = decoded
         .iter()
-        .find(|entry| {
-            entry.original_line == source_line
-                && entry.original_column == source_col
-        })
+        .find(|entry| entry.original_line == source_line && entry.original_column == source_col)
         .unwrap_or_else(|| {
-            panic!(
-                "expected mapping for payload. mappings: {mappings} output: {output}"
-            )
+            panic!("expected mapping for payload. mappings: {mappings} output: {output}")
         });
 
     assert_eq!(mapping.source_index, 0);
@@ -396,8 +406,7 @@ fn test_source_map_es5_transform_async_await_return_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -421,14 +430,9 @@ fn test_source_map_es5_transform_async_await_return_mapping() {
 
     let mapping = decoded
         .iter()
-        .find(|entry| {
-            entry.original_line == source_line
-                && entry.original_column == source_col
-        })
+        .find(|entry| entry.original_line == source_line && entry.original_column == source_col)
         .unwrap_or_else(|| {
-            panic!(
-                "expected mapping for value. mappings: {mappings} output: {output}"
-            )
+            panic!("expected mapping for value. mappings: {mappings} output: {output}")
         });
 
     assert_eq!(mapping.source_index, 0);
@@ -468,8 +472,7 @@ fn test_source_map_es5_transform_async_await_property_access_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -493,14 +496,9 @@ fn test_source_map_es5_transform_async_await_property_access_mapping() {
 
     let mapping = decoded
         .iter()
-        .find(|entry| {
-            entry.original_line == source_line
-                && entry.original_column == source_col
-        })
+        .find(|entry| entry.original_line == source_line && entry.original_column == source_col)
         .unwrap_or_else(|| {
-            panic!(
-                "expected mapping for user. mappings: {mappings} output: {output}"
-            )
+            panic!("expected mapping for user. mappings: {mappings} output: {output}")
         });
 
     assert_eq!(mapping.source_index, 0);
@@ -539,8 +537,7 @@ fn test_source_map_es5_transform_async_arrow_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -564,14 +561,9 @@ fn test_source_map_es5_transform_async_arrow_mapping() {
 
     let mapping = decoded
         .iter()
-        .find(|entry| {
-            entry.original_line == source_line
-                && entry.original_column == source_col
-        })
+        .find(|entry| entry.original_line == source_line && entry.original_column == source_col)
         .unwrap_or_else(|| {
-            panic!(
-                "expected mapping for value. mappings: {mappings} output: {output}"
-            )
+            panic!("expected mapping for value. mappings: {mappings} output: {output}")
         });
 
     assert_eq!(mapping.source_index, 0);
@@ -610,8 +602,7 @@ fn test_source_map_es5_transform_async_class_method_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -633,9 +624,10 @@ fn test_source_map_es5_transform_async_class_method_mapping() {
     let decoded = decode_mappings(mappings);
     let (param_line, param_col) = find_line_col(source, "value");
 
-    if let Some(mapping) = decoded.iter().find(|entry| {
-        entry.original_line == param_line && entry.original_column == param_col
-    }) {
+    if let Some(mapping) = decoded
+        .iter()
+        .find(|entry| entry.original_line == param_line && entry.original_column == param_col)
+    {
         assert_eq!(mapping.source_index, 0);
         let output_line_text = output
             .lines()
@@ -697,8 +689,7 @@ fn test_source_map_es5_transform_async_nested_function_offset_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -722,14 +713,9 @@ fn test_source_map_es5_transform_async_nested_function_offset_mapping() {
 
     let mapping = decoded
         .iter()
-        .find(|entry| {
-            entry.original_line == await_line
-                && entry.original_column == await_col
-        })
+        .find(|entry| entry.original_line == await_line && entry.original_column == await_col)
         .unwrap_or_else(|| {
-            panic!(
-                "expected mapping for payloadValue. mappings: {mappings} output: {output}"
-            )
+            panic!("expected mapping for payloadValue. mappings: {mappings} output: {output}")
         });
 
     assert_eq!(mapping.source_index, 0);
@@ -768,8 +754,7 @@ fn test_source_map_es5_transform_async_await_conditional_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -791,10 +776,10 @@ fn test_source_map_es5_transform_async_await_conditional_mapping() {
     let decoded = decode_mappings(mappings);
     let (source_line, source_col) = find_line_col(source, "value ?");
 
-    if let Some(mapping) = decoded.iter().find(|entry| {
-        entry.original_line == source_line
-            && entry.original_column == source_col
-    }) {
+    if let Some(mapping) = decoded
+        .iter()
+        .find(|entry| entry.original_line == source_line && entry.original_column == source_col)
+    {
         assert_eq!(mapping.source_index, 0);
         let output_line_text = output
             .lines()
@@ -861,8 +846,7 @@ fn test_source_map_es5_transform_async_arrow_captures_this_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -884,20 +868,16 @@ fn test_source_map_es5_transform_async_arrow_captures_this_mapping() {
     let decoded = decode_mappings(mappings);
     let (source_line, source_col) = find_line_col(source, "this.value");
 
-    let direct_mapping = decoded.iter().find(|entry| {
-        entry.original_line == source_line
-            && entry.original_column == source_col
-    });
+    let direct_mapping = decoded
+        .iter()
+        .find(|entry| entry.original_line == source_line && entry.original_column == source_col);
     let direct_valid = direct_mapping.and_then(|mapping| {
         if mapping.source_index != 0 {
             return None;
         }
 
-        let output_line_text = output
-            .lines()
-            .nth(mapping.generated_line as usize)?;
-        let output_slice = output_line_text
-            .get(mapping.generated_column as usize..)?;
+        let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+        let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
         if output_slice.starts_with("this") {
             Some(mapping)
         } else {
@@ -946,8 +926,7 @@ fn test_source_map_es5_transform_async_try_catch_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -969,20 +948,16 @@ fn test_source_map_es5_transform_async_try_catch_mapping() {
     let decoded = decode_mappings(mappings);
     let (source_line, source_col) = find_line_col(source, "foo()");
 
-    let direct_mapping = decoded.iter().find(|entry| {
-        entry.original_line == source_line
-            && entry.original_column == source_col
-    });
+    let direct_mapping = decoded
+        .iter()
+        .find(|entry| entry.original_line == source_line && entry.original_column == source_col);
     let direct_valid = direct_mapping.and_then(|mapping| {
         if mapping.source_index != 0 {
             return None;
         }
 
-        let output_line_text = output
-            .lines()
-            .nth(mapping.generated_line as usize)?;
-        let output_slice = output_line_text
-            .get(mapping.generated_column as usize..)?;
+        let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+        let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
         if output_slice.starts_with("foo") {
             Some(mapping)
         } else {
@@ -1025,8 +1000,7 @@ fn test_source_map_es5_transform_async_try_catch_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_try_catch_await_mapping() {
-    let source =
-        "async function run() { try { await foo(); } catch (err) { await bar(err); } }";
+    let source = "async function run() { try { await foo(); } catch (err) { await bar(err); } }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -1035,8 +1009,7 @@ fn test_source_map_es5_transform_async_try_catch_await_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -1062,20 +1035,16 @@ fn test_source_map_es5_transform_async_try_catch_await_mapping() {
     let targets = [("foo", foo_line, foo_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -1129,8 +1098,7 @@ fn test_source_map_es5_transform_async_try_catch_return_await_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -1156,20 +1124,16 @@ fn test_source_map_es5_transform_async_try_catch_return_await_mapping() {
     let targets = [("foo", foo_line, foo_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -1223,8 +1187,7 @@ fn test_source_map_es5_transform_async_try_catch_throw_await_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -1250,20 +1213,16 @@ fn test_source_map_es5_transform_async_try_catch_throw_await_mapping() {
     let targets = [("foo", foo_line, foo_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -1307,8 +1266,7 @@ fn test_source_map_es5_transform_async_try_catch_throw_await_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_try_catch_only_await_mapping() {
-    let source =
-        "async function run() { try { foo(); } catch (err) { await bar(err); } }";
+    let source = "async function run() { try { foo(); } catch (err) { await bar(err); } }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -1317,8 +1275,7 @@ fn test_source_map_es5_transform_async_try_catch_only_await_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -1339,17 +1296,16 @@ fn test_source_map_es5_transform_async_try_catch_only_await_mapping() {
 
     let decoded = decode_mappings(mappings);
     let (bar_line, bar_col) = find_line_col(source, "bar(");
-    let direct_mapping = decoded.iter().find(|entry| {
-        entry.original_line == bar_line && entry.original_column == bar_col
-    });
+    let direct_mapping = decoded
+        .iter()
+        .find(|entry| entry.original_line == bar_line && entry.original_column == bar_col);
 
     let mut mapped = false;
     if let Some(mapping) = direct_mapping {
         if mapping.source_index == 0 {
-            let output_line_text =
-                output.lines().nth(mapping.generated_line as usize);
-            let output_slice = output_line_text
-                .and_then(|line| line.get(mapping.generated_column as usize..));
+            let output_line_text = output.lines().nth(mapping.generated_line as usize);
+            let output_slice =
+                output_line_text.and_then(|line| line.get(mapping.generated_column as usize..));
             if let Some(output_slice) = output_slice {
                 if output_slice.starts_with("bar") {
                     mapped = true;
@@ -1403,8 +1359,7 @@ fn test_source_map_es5_transform_async_try_catch_finally_only_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -1430,20 +1385,16 @@ fn test_source_map_es5_transform_async_try_catch_finally_only_mapping() {
     let targets = [("bar", bar_line, bar_col), ("baz", baz_line, baz_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -1487,8 +1438,7 @@ fn test_source_map_es5_transform_async_try_catch_finally_only_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_if_else_mapping() {
-    let source =
-        "async function run(flag) { if (flag) { await foo(); } else { await bar(); } }";
+    let source = "async function run(flag) { if (flag) { await foo(); } else { await bar(); } }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -1497,8 +1447,7 @@ fn test_source_map_es5_transform_async_if_else_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -1524,20 +1473,16 @@ fn test_source_map_es5_transform_async_if_else_mapping() {
     let targets = [("foo", foo_line, foo_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -1591,8 +1536,7 @@ fn test_source_map_es5_transform_async_if_await_condition_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -1618,20 +1562,16 @@ fn test_source_map_es5_transform_async_if_await_condition_mapping() {
     let targets = [("foo", foo_line, foo_col), ("baz", baz_line, baz_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -1675,8 +1615,7 @@ fn test_source_map_es5_transform_async_if_await_condition_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_if_await_and_mapping() {
-    let source =
-        "async function run(flag){ if ((await foo(flag)) && await bar()) { baz(); } }";
+    let source = "async function run(flag){ if ((await foo(flag)) && await bar()) { baz(); } }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -1685,8 +1624,7 @@ fn test_source_map_es5_transform_async_if_await_and_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -1712,20 +1650,16 @@ fn test_source_map_es5_transform_async_if_await_and_mapping() {
     let targets = [("foo", foo_line, foo_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -1769,8 +1703,7 @@ fn test_source_map_es5_transform_async_if_await_and_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_while_await_condition_mapping() {
-    let source =
-        "async function run(cond){ while (await foo(cond)) { bar(); } }";
+    let source = "async function run(cond){ while (await foo(cond)) { bar(); } }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -1779,8 +1712,7 @@ fn test_source_map_es5_transform_async_while_await_condition_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -1805,20 +1737,16 @@ fn test_source_map_es5_transform_async_while_await_condition_mapping() {
     let targets = [("foo", foo_line, foo_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -1862,8 +1790,7 @@ fn test_source_map_es5_transform_async_while_await_condition_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_while_await_condition_list_mapping() {
-    let source =
-        "async function run(){ while ((await foo(), await bar())) { baz(); } }";
+    let source = "async function run(){ while ((await foo(), await bar())) { baz(); } }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -1872,8 +1799,7 @@ fn test_source_map_es5_transform_async_while_await_condition_list_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -1900,19 +1826,15 @@ fn test_source_map_es5_transform_async_while_await_condition_list_mapping() {
 
     for (label, (target_line, target_col)) in targets {
         let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == target_line
-                && entry.original_column == target_col
+            entry.original_line == target_line && entry.original_column == target_col
         });
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -1956,8 +1878,7 @@ fn test_source_map_es5_transform_async_while_await_condition_list_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_ternary_mapping() {
-    let source =
-        "async function run(flag, a, b) { return flag ? await foo(a) : await bar(b); }";
+    let source = "async function run(flag, a, b) { return flag ? await foo(a) : await bar(b); }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -1966,8 +1887,7 @@ fn test_source_map_es5_transform_async_ternary_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -1993,20 +1913,16 @@ fn test_source_map_es5_transform_async_ternary_mapping() {
     let targets = [("foo", foo_line, foo_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -2050,8 +1966,7 @@ fn test_source_map_es5_transform_async_ternary_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_ternary_await_condition_mapping() {
-    let source =
-        "async function run(){ return (await cond()) ? foo() : await bar(); }";
+    let source = "async function run(){ return (await cond()) ? foo() : await bar(); }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -2060,8 +1975,7 @@ fn test_source_map_es5_transform_async_ternary_await_condition_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -2092,20 +2006,16 @@ fn test_source_map_es5_transform_async_ternary_await_condition_mapping() {
     ];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -2158,8 +2068,7 @@ fn test_source_map_es5_transform_async_ternary_consequent_await_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -2185,20 +2094,16 @@ fn test_source_map_es5_transform_async_ternary_consequent_await_mapping() {
     let targets = [("foo", foo_line, foo_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -2242,8 +2147,7 @@ fn test_source_map_es5_transform_async_ternary_consequent_await_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_logical_and_mapping() {
-    let source =
-        "async function run() { return (await foo()) && (await bar()); }";
+    let source = "async function run() { return (await foo()) && (await bar()); }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -2252,8 +2156,7 @@ fn test_source_map_es5_transform_async_logical_and_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -2279,20 +2182,16 @@ fn test_source_map_es5_transform_async_logical_and_mapping() {
     let targets = [("foo", foo_line, foo_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -2336,8 +2235,7 @@ fn test_source_map_es5_transform_async_logical_and_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_logical_or_mapping() {
-    let source =
-        "async function run() { return (await foo()) || (await bar()); }";
+    let source = "async function run() { return (await foo()) || (await bar()); }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -2346,8 +2244,7 @@ fn test_source_map_es5_transform_async_logical_or_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -2373,20 +2270,16 @@ fn test_source_map_es5_transform_async_logical_or_mapping() {
     let targets = [("foo", foo_line, foo_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -2439,8 +2332,7 @@ fn test_source_map_es5_transform_async_logical_or_await_rhs_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -2466,20 +2358,16 @@ fn test_source_map_es5_transform_async_logical_or_await_rhs_mapping() {
     let targets = [("foo", foo_line, foo_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -2532,8 +2420,7 @@ fn test_source_map_es5_transform_async_logical_and_await_rhs_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -2559,20 +2446,16 @@ fn test_source_map_es5_transform_async_logical_and_await_rhs_mapping() {
     let targets = [("foo", foo_line, foo_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -2616,8 +2499,7 @@ fn test_source_map_es5_transform_async_logical_and_await_rhs_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_logical_or_complex_mapping() {
-    let source =
-        "async function run(a, b){ return (await foo(a)) || (bar() && await baz(b)); }";
+    let source = "async function run(a, b){ return (await foo(a)) || (bar() && await baz(b)); }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -2626,8 +2508,7 @@ fn test_source_map_es5_transform_async_logical_or_complex_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -2658,20 +2539,16 @@ fn test_source_map_es5_transform_async_logical_or_complex_mapping() {
     ];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -2715,8 +2592,7 @@ fn test_source_map_es5_transform_async_logical_or_complex_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_logical_and_both_awaits_mapping() {
-    let source =
-        "async function run() { return (await foo()) && (await bar()); }";
+    let source = "async function run() { return (await foo()) && (await bar()); }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -2725,8 +2601,7 @@ fn test_source_map_es5_transform_async_logical_and_both_awaits_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -2752,20 +2627,16 @@ fn test_source_map_es5_transform_async_logical_and_both_awaits_mapping() {
     let targets = [("foo", foo_line, foo_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -2809,8 +2680,7 @@ fn test_source_map_es5_transform_async_logical_and_both_awaits_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_binary_add_mapping() {
-    let source =
-        "async function run() { return (await foo()) + (await bar()); }";
+    let source = "async function run() { return (await foo()) + (await bar()); }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -2819,8 +2689,7 @@ fn test_source_map_es5_transform_async_binary_add_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -2846,20 +2715,16 @@ fn test_source_map_es5_transform_async_binary_add_mapping() {
     let targets = [("foo", foo_line, foo_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -2903,8 +2768,7 @@ fn test_source_map_es5_transform_async_binary_add_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_binary_multiply_mapping() {
-    let source =
-        "async function run() { return (await foo()) * (await bar()); }";
+    let source = "async function run() { return (await foo()) * (await bar()); }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -2913,8 +2777,7 @@ fn test_source_map_es5_transform_async_binary_multiply_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -2940,20 +2803,16 @@ fn test_source_map_es5_transform_async_binary_multiply_mapping() {
     let targets = [("foo", foo_line, foo_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -2997,8 +2856,7 @@ fn test_source_map_es5_transform_async_binary_multiply_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_binary_subtract_mapping() {
-    let source =
-        "async function run() { return (await foo()) - (await bar()); }";
+    let source = "async function run() { return (await foo()) - (await bar()); }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -3007,8 +2865,7 @@ fn test_source_map_es5_transform_async_binary_subtract_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -3034,20 +2891,16 @@ fn test_source_map_es5_transform_async_binary_subtract_mapping() {
     let targets = [("foo", foo_line, foo_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -3091,8 +2944,7 @@ fn test_source_map_es5_transform_async_binary_subtract_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_binary_divide_mapping() {
-    let source =
-        "async function run() { return (await foo()) / (await bar()); }";
+    let source = "async function run() { return (await foo()) / (await bar()); }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -3101,8 +2953,7 @@ fn test_source_map_es5_transform_async_binary_divide_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -3128,20 +2979,16 @@ fn test_source_map_es5_transform_async_binary_divide_mapping() {
     let targets = [("foo", foo_line, foo_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -3185,8 +3032,7 @@ fn test_source_map_es5_transform_async_binary_divide_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_binary_modulo_mapping() {
-    let source =
-        "async function run() { return (await foo()) % (await bar()); }";
+    let source = "async function run() { return (await foo()) % (await bar()); }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -3195,8 +3041,7 @@ fn test_source_map_es5_transform_async_binary_modulo_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -3222,20 +3067,16 @@ fn test_source_map_es5_transform_async_binary_modulo_mapping() {
     let targets = [("foo", foo_line, foo_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -3279,8 +3120,7 @@ fn test_source_map_es5_transform_async_binary_modulo_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_binary_less_than_mapping() {
-    let source =
-        "async function run() { return (await foo()) < (await bar()); }";
+    let source = "async function run() { return (await foo()) < (await bar()); }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -3289,8 +3129,7 @@ fn test_source_map_es5_transform_async_binary_less_than_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -3316,20 +3155,16 @@ fn test_source_map_es5_transform_async_binary_less_than_mapping() {
     let targets = [("foo", foo_line, foo_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -3373,8 +3208,7 @@ fn test_source_map_es5_transform_async_binary_less_than_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_binary_strict_equal_mapping() {
-    let source =
-        "async function run() { return (await foo()) === (await bar()); }";
+    let source = "async function run() { return (await foo()) === (await bar()); }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -3383,8 +3217,7 @@ fn test_source_map_es5_transform_async_binary_strict_equal_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -3410,20 +3243,16 @@ fn test_source_map_es5_transform_async_binary_strict_equal_mapping() {
     let targets = [("foo", foo_line, foo_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -3467,8 +3296,7 @@ fn test_source_map_es5_transform_async_binary_strict_equal_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_binary_strict_not_equal_mapping() {
-    let source =
-        "async function run() { return (await foo()) !== (await bar()); }";
+    let source = "async function run() { return (await foo()) !== (await bar()); }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -3477,8 +3305,7 @@ fn test_source_map_es5_transform_async_binary_strict_not_equal_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -3504,20 +3331,16 @@ fn test_source_map_es5_transform_async_binary_strict_not_equal_mapping() {
     let targets = [("foo", foo_line, foo_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -3561,8 +3384,7 @@ fn test_source_map_es5_transform_async_binary_strict_not_equal_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_binary_greater_equal_mapping() {
-    let source =
-        "async function run() { return (await foo()) >= (await bar()); }";
+    let source = "async function run() { return (await foo()) >= (await bar()); }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -3571,8 +3393,7 @@ fn test_source_map_es5_transform_async_binary_greater_equal_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -3598,20 +3419,16 @@ fn test_source_map_es5_transform_async_binary_greater_equal_mapping() {
     let targets = [("foo", foo_line, foo_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -3655,8 +3472,7 @@ fn test_source_map_es5_transform_async_binary_greater_equal_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_binary_less_equal_mapping() {
-    let source =
-        "async function run() { return (await foo()) <= (await bar()); }";
+    let source = "async function run() { return (await foo()) <= (await bar()); }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -3665,8 +3481,7 @@ fn test_source_map_es5_transform_async_binary_less_equal_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -3692,20 +3507,16 @@ fn test_source_map_es5_transform_async_binary_less_equal_mapping() {
     let targets = [("foo", foo_line, foo_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -3749,8 +3560,7 @@ fn test_source_map_es5_transform_async_binary_less_equal_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_binary_greater_than_mapping() {
-    let source =
-        "async function run() { return (await foo()) > (await bar()); }";
+    let source = "async function run() { return (await foo()) > (await bar()); }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -3759,8 +3569,7 @@ fn test_source_map_es5_transform_async_binary_greater_than_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -3786,20 +3595,16 @@ fn test_source_map_es5_transform_async_binary_greater_than_mapping() {
     let targets = [("foo", foo_line, foo_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -3843,8 +3648,7 @@ fn test_source_map_es5_transform_async_binary_greater_than_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_binary_equal_mapping() {
-    let source =
-        "async function run() { return (await foo()) == (await bar()); }";
+    let source = "async function run() { return (await foo()) == (await bar()); }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -3853,8 +3657,7 @@ fn test_source_map_es5_transform_async_binary_equal_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -3880,20 +3683,16 @@ fn test_source_map_es5_transform_async_binary_equal_mapping() {
     let targets = [("foo", foo_line, foo_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -3937,8 +3736,7 @@ fn test_source_map_es5_transform_async_binary_equal_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_binary_not_equal_mapping() {
-    let source =
-        "async function run() { return (await foo()) != (await bar()); }";
+    let source = "async function run() { return (await foo()) != (await bar()); }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -3947,8 +3745,7 @@ fn test_source_map_es5_transform_async_binary_not_equal_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -3974,20 +3771,16 @@ fn test_source_map_es5_transform_async_binary_not_equal_mapping() {
     let targets = [("foo", foo_line, foo_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -4031,8 +3824,7 @@ fn test_source_map_es5_transform_async_binary_not_equal_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_binary_bitwise_and_mapping() {
-    let source =
-        "async function run() { return (await foo()) & (await bar()); }";
+    let source = "async function run() { return (await foo()) & (await bar()); }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -4041,8 +3833,7 @@ fn test_source_map_es5_transform_async_binary_bitwise_and_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -4068,20 +3859,16 @@ fn test_source_map_es5_transform_async_binary_bitwise_and_mapping() {
     let targets = [("foo", foo_line, foo_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -4125,8 +3912,7 @@ fn test_source_map_es5_transform_async_binary_bitwise_and_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_binary_bitwise_or_mapping() {
-    let source =
-        "async function run() { return (await foo()) | (await bar()); }";
+    let source = "async function run() { return (await foo()) | (await bar()); }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -4135,8 +3921,7 @@ fn test_source_map_es5_transform_async_binary_bitwise_or_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -4162,20 +3947,16 @@ fn test_source_map_es5_transform_async_binary_bitwise_or_mapping() {
     let targets = [("foo", foo_line, foo_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -4219,8 +4000,7 @@ fn test_source_map_es5_transform_async_binary_bitwise_or_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_binary_bitwise_xor_mapping() {
-    let source =
-        "async function run() { return (await foo()) ^ (await bar()); }";
+    let source = "async function run() { return (await foo()) ^ (await bar()); }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -4229,8 +4009,7 @@ fn test_source_map_es5_transform_async_binary_bitwise_xor_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -4256,20 +4035,16 @@ fn test_source_map_es5_transform_async_binary_bitwise_xor_mapping() {
     let targets = [("foo", foo_line, foo_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -4313,8 +4088,7 @@ fn test_source_map_es5_transform_async_binary_bitwise_xor_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_destructuring_mapping() {
-    let source =
-        "async function run(){ const { value } = await foo(); return value; }";
+    let source = "async function run(){ const { value } = await foo(); return value; }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -4323,8 +4097,7 @@ fn test_source_map_es5_transform_async_destructuring_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -4348,23 +4121,22 @@ fn test_source_map_es5_transform_async_destructuring_mapping() {
     let (return_line, return_col) = find_line_col(source, "return value");
     let value_col = return_col + "return ".len() as u32;
 
-    let targets = [("foo", foo_line, foo_col), ("value", return_line, value_col)];
+    let targets = [
+        ("foo", foo_line, foo_col),
+        ("value", return_line, value_col),
+    ];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -4408,8 +4180,7 @@ fn test_source_map_es5_transform_async_destructuring_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_binary_shift_left_mapping() {
-    let source =
-        "async function run() { return (await foo()) << (await bar()); }";
+    let source = "async function run() { return (await foo()) << (await bar()); }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -4418,8 +4189,7 @@ fn test_source_map_es5_transform_async_binary_shift_left_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -4445,20 +4215,16 @@ fn test_source_map_es5_transform_async_binary_shift_left_mapping() {
     let targets = [("foo", foo_line, foo_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -4502,8 +4268,7 @@ fn test_source_map_es5_transform_async_binary_shift_left_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_binary_shift_right_mapping() {
-    let source =
-        "async function run() { return (await foo()) >> (await bar()); }";
+    let source = "async function run() { return (await foo()) >> (await bar()); }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -4512,8 +4277,7 @@ fn test_source_map_es5_transform_async_binary_shift_right_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -4539,20 +4303,16 @@ fn test_source_map_es5_transform_async_binary_shift_right_mapping() {
     let targets = [("foo", foo_line, foo_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -4596,8 +4356,7 @@ fn test_source_map_es5_transform_async_binary_shift_right_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_binary_unsigned_shift_right_mapping() {
-    let source =
-        "async function run() { return (await foo()) >>> (await bar()); }";
+    let source = "async function run() { return (await foo()) >>> (await bar()); }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -4606,8 +4365,7 @@ fn test_source_map_es5_transform_async_binary_unsigned_shift_right_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -4633,20 +4391,16 @@ fn test_source_map_es5_transform_async_binary_unsigned_shift_right_mapping() {
     let targets = [("foo", foo_line, foo_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -4690,8 +4444,7 @@ fn test_source_map_es5_transform_async_binary_unsigned_shift_right_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_array_literal_mapping() {
-    let source =
-        "async function run(){ return [await foo(), await bar()]; }";
+    let source = "async function run(){ return [await foo(), await bar()]; }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -4700,8 +4453,7 @@ fn test_source_map_es5_transform_async_array_literal_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -4727,20 +4479,16 @@ fn test_source_map_es5_transform_async_array_literal_mapping() {
     let targets = [("foo", foo_line, foo_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -4784,8 +4532,7 @@ fn test_source_map_es5_transform_async_array_literal_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_array_literal_spread_mapping() {
-    let source =
-        "async function run(){ return [...await foo(), await bar()]; }";
+    let source = "async function run(){ return [...await foo(), await bar()]; }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -4794,8 +4541,7 @@ fn test_source_map_es5_transform_async_array_literal_spread_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -4821,20 +4567,16 @@ fn test_source_map_es5_transform_async_array_literal_spread_mapping() {
     let targets = [("foo", foo_line, foo_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -4878,8 +4620,7 @@ fn test_source_map_es5_transform_async_array_literal_spread_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_object_literal_mapping() {
-    let source =
-        "async function run(){ return { value: await foo(), other: await bar() }; }";
+    let source = "async function run(){ return { value: await foo(), other: await bar() }; }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -4888,8 +4629,7 @@ fn test_source_map_es5_transform_async_object_literal_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -4915,20 +4655,16 @@ fn test_source_map_es5_transform_async_object_literal_mapping() {
     let targets = [("foo", foo_line, foo_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -4972,8 +4708,7 @@ fn test_source_map_es5_transform_async_object_literal_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_object_literal_spread_mapping() {
-    let source =
-        "async function run(){ return { ...await foo(), value: await bar() }; }";
+    let source = "async function run(){ return { ...await foo(), value: await bar() }; }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -4982,8 +4717,7 @@ fn test_source_map_es5_transform_async_object_literal_spread_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -5009,20 +4743,16 @@ fn test_source_map_es5_transform_async_object_literal_spread_mapping() {
     let targets = [("foo", foo_line, foo_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -5066,8 +4796,7 @@ fn test_source_map_es5_transform_async_object_literal_spread_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_object_literal_computed_mapping() {
-    let source =
-        "async function run(){ return { [await key()]: 1, other: 2 }; }";
+    let source = "async function run(){ return { [await key()]: 1, other: 2 }; }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -5076,8 +4805,7 @@ fn test_source_map_es5_transform_async_object_literal_computed_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -5099,20 +4827,16 @@ fn test_source_map_es5_transform_async_object_literal_computed_mapping() {
     let decoded = decode_mappings(mappings);
     let (key_line, key_col) = find_line_col(source, "key()");
 
-    let direct_mapping = decoded.iter().find(|entry| {
-        entry.original_line == key_line
-            && entry.original_column == key_col
-    });
+    let direct_mapping = decoded
+        .iter()
+        .find(|entry| entry.original_line == key_line && entry.original_column == key_col);
     let direct_valid = direct_mapping.and_then(|mapping| {
         if mapping.source_index != 0 {
             return None;
         }
 
-        let output_line_text = output
-            .lines()
-            .nth(mapping.generated_line as usize)?;
-        let output_slice = output_line_text
-            .get(mapping.generated_column as usize..)?;
+        let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+        let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
         if output_slice.starts_with("key") {
             Some(mapping)
         } else {
@@ -5164,8 +4888,7 @@ fn test_source_map_es5_transform_async_nested_await_call_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -5191,20 +4914,16 @@ fn test_source_map_es5_transform_async_nested_await_call_mapping() {
     let targets = [("foo", foo_line, foo_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -5257,8 +4976,7 @@ fn test_source_map_es5_transform_async_call_spread_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -5284,20 +5002,16 @@ fn test_source_map_es5_transform_async_call_spread_mapping() {
     let targets = [("foo", foo_line, foo_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -5350,8 +5064,7 @@ fn test_source_map_es5_transform_async_template_literal_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -5373,20 +5086,16 @@ fn test_source_map_es5_transform_async_template_literal_mapping() {
     let decoded = decode_mappings(mappings);
     let (foo_line, foo_col) = find_line_col(source, "foo()");
 
-    let direct_mapping = decoded.iter().find(|entry| {
-        entry.original_line == foo_line
-            && entry.original_column == foo_col
-    });
+    let direct_mapping = decoded
+        .iter()
+        .find(|entry| entry.original_line == foo_line && entry.original_column == foo_col);
     let direct_valid = direct_mapping.and_then(|mapping| {
         if mapping.source_index != 0 {
             return None;
         }
 
-        let output_line_text = output
-            .lines()
-            .nth(mapping.generated_line as usize)?;
-        let output_slice = output_line_text
-            .get(mapping.generated_column as usize..)?;
+        let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+        let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
         if output_slice.starts_with("foo") {
             Some(mapping)
         } else {
@@ -5439,8 +5148,7 @@ fn test_source_map_es5_transform_async_try_catch_return_await_in_try_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -5466,20 +5174,16 @@ fn test_source_map_es5_transform_async_try_catch_return_await_in_try_mapping() {
     let targets = [("foo", foo_line, foo_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -5532,8 +5236,7 @@ fn test_source_map_es5_transform_async_try_finally_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -5555,20 +5258,16 @@ fn test_source_map_es5_transform_async_try_finally_mapping() {
     let decoded = decode_mappings(mappings);
     let (source_line, source_col) = find_line_col(source, "foo()");
 
-    let direct_mapping = decoded.iter().find(|entry| {
-        entry.original_line == source_line
-            && entry.original_column == source_col
-    });
+    let direct_mapping = decoded
+        .iter()
+        .find(|entry| entry.original_line == source_line && entry.original_column == source_col);
     let direct_valid = direct_mapping.and_then(|mapping| {
         if mapping.source_index != 0 {
             return None;
         }
 
-        let output_line_text = output
-            .lines()
-            .nth(mapping.generated_line as usize)?;
-        let output_slice = output_line_text
-            .get(mapping.generated_column as usize..)?;
+        let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+        let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
         if output_slice.starts_with("foo") {
             Some(mapping)
         } else {
@@ -5611,8 +5310,7 @@ fn test_source_map_es5_transform_async_try_finally_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_try_finally_only_await_mapping() {
-    let source =
-        "async function run() { try { foo(); } finally { await bar(); } }";
+    let source = "async function run() { try { foo(); } finally { await bar(); } }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -5621,8 +5319,7 @@ fn test_source_map_es5_transform_async_try_finally_only_await_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -5644,20 +5341,16 @@ fn test_source_map_es5_transform_async_try_finally_only_await_mapping() {
     let decoded = decode_mappings(mappings);
     let (bar_line, bar_col) = find_line_col(source, "bar()");
 
-    let direct_mapping = decoded.iter().find(|entry| {
-        entry.original_line == bar_line
-            && entry.original_column == bar_col
-    });
+    let direct_mapping = decoded
+        .iter()
+        .find(|entry| entry.original_line == bar_line && entry.original_column == bar_col);
     let direct_valid = direct_mapping.and_then(|mapping| {
         if mapping.source_index != 0 {
             return None;
         }
 
-        let output_line_text = output
-            .lines()
-            .nth(mapping.generated_line as usize)?;
-        let output_slice = output_line_text
-            .get(mapping.generated_column as usize..)?;
+        let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+        let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
         if output_slice.starts_with("bar") {
             Some(mapping)
         } else {
@@ -5700,8 +5393,7 @@ fn test_source_map_es5_transform_async_try_finally_only_await_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_try_finally_await_mapping() {
-    let source =
-        "async function run() { try { await foo(); } finally { await bar(); } }";
+    let source = "async function run() { try { await foo(); } finally { await bar(); } }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -5710,8 +5402,7 @@ fn test_source_map_es5_transform_async_try_finally_await_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -5737,20 +5428,16 @@ fn test_source_map_es5_transform_async_try_finally_await_mapping() {
     let targets = [("foo", foo_line, foo_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -5803,8 +5490,7 @@ fn test_source_map_es5_transform_async_try_finally_await_in_finally_direct_mappi
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -5832,8 +5518,7 @@ fn test_source_map_es5_transform_async_try_finally_await_in_finally_direct_mappi
     let mut mapped = false;
 
     for (needle, prefixes) in targets {
-        if has_mapping_for_prefixes(&decoded, &output, source, needle, prefixes)
-        {
+        if has_mapping_for_prefixes(&decoded, &output, source, needle, prefixes) {
             mapped = true;
             break;
         }
@@ -5874,8 +5559,7 @@ fn test_source_map_es5_transform_async_try_finally_await_in_finally_direct_mappi
 
 #[test]
 fn test_source_map_es5_transform_async_try_finally_return_mapping() {
-    let source =
-        "async function run() { try { return await foo(); } finally { await bar(); } }";
+    let source = "async function run() { try { return await foo(); } finally { await bar(); } }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -5884,8 +5568,7 @@ fn test_source_map_es5_transform_async_try_finally_return_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -5911,20 +5594,16 @@ fn test_source_map_es5_transform_async_try_finally_return_mapping() {
     let targets = [("foo", foo_line, foo_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -5968,7 +5647,8 @@ fn test_source_map_es5_transform_async_try_finally_return_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_try_catch_finally_mapping() {
-    let source = "async function run() { try { await foo(); } catch { bar(); } finally { baz(); } }";
+    let source =
+        "async function run() { try { await foo(); } catch { bar(); } finally { baz(); } }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -5977,8 +5657,7 @@ fn test_source_map_es5_transform_async_try_catch_finally_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -6009,20 +5688,16 @@ fn test_source_map_es5_transform_async_try_catch_finally_mapping() {
     ];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -6075,8 +5750,7 @@ fn test_source_map_es5_transform_async_try_catch_finally_await_in_finally_mappin
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -6107,20 +5781,16 @@ fn test_source_map_es5_transform_async_try_catch_finally_await_in_finally_mappin
     ];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -6163,8 +5833,7 @@ fn test_source_map_es5_transform_async_try_catch_finally_await_in_finally_mappin
 }
 
 #[test]
-fn test_source_map_es5_transform_async_try_catch_finally_catch_finally_awaits_mapping(
-) {
+fn test_source_map_es5_transform_async_try_catch_finally_catch_finally_awaits_mapping() {
     let source = "async function run() { try { foo(); } catch (err) { await bar(err); } finally { await baz(); } }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
@@ -6174,8 +5843,7 @@ fn test_source_map_es5_transform_async_try_catch_finally_catch_finally_awaits_ma
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -6206,20 +5874,16 @@ fn test_source_map_es5_transform_async_try_catch_finally_catch_finally_awaits_ma
     ];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -6272,8 +5936,7 @@ fn test_source_map_es5_transform_async_try_catch_finally_awaits_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -6304,20 +5967,16 @@ fn test_source_map_es5_transform_async_try_catch_finally_awaits_mapping() {
     ];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -6361,8 +6020,7 @@ fn test_source_map_es5_transform_async_try_catch_finally_awaits_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_assignment_mapping() {
-    let source =
-        "async function run(){ let value; value = await foo(); return value; }";
+    let source = "async function run(){ let value; value = await foo(); return value; }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -6371,8 +6029,7 @@ fn test_source_map_es5_transform_async_assignment_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -6396,23 +6053,22 @@ fn test_source_map_es5_transform_async_assignment_mapping() {
     let (return_line, return_col) = find_line_col(source, "return value");
     let value_col = return_col + "return ".len() as u32;
 
-    let targets = [("foo", foo_line, foo_col), ("value", return_line, value_col)];
+    let targets = [
+        ("foo", foo_line, foo_col),
+        ("value", return_line, value_col),
+    ];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -6456,8 +6112,7 @@ fn test_source_map_es5_transform_async_assignment_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_variable_initializer_await_mapping() {
-    let source =
-        "async function run(){ let value = await foo(); return value; }";
+    let source = "async function run(){ let value = await foo(); return value; }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -6466,8 +6121,7 @@ fn test_source_map_es5_transform_async_variable_initializer_await_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -6489,20 +6143,16 @@ fn test_source_map_es5_transform_async_variable_initializer_await_mapping() {
     let decoded = decode_mappings(mappings);
     let (foo_line, foo_col) = find_line_col(source, "foo()");
 
-    let direct_mapping = decoded.iter().find(|entry| {
-        entry.original_line == foo_line
-            && entry.original_column == foo_col
-    });
+    let direct_mapping = decoded
+        .iter()
+        .find(|entry| entry.original_line == foo_line && entry.original_column == foo_col);
     let direct_valid = direct_mapping.and_then(|mapping| {
         if mapping.source_index != 0 {
             return None;
         }
 
-        let output_line_text = output
-            .lines()
-            .nth(mapping.generated_line as usize)?;
-        let output_slice = output_line_text
-            .get(mapping.generated_column as usize..)?;
+        let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+        let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
         if output_slice.starts_with("foo") {
             Some(mapping)
         } else {
@@ -6554,8 +6204,7 @@ fn test_source_map_es5_transform_async_variable_declaration_list_await_mapping()
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -6581,20 +6230,16 @@ fn test_source_map_es5_transform_async_variable_declaration_list_await_mapping()
     ];
 
     for (label, (src_line, src_col)) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -6647,8 +6292,7 @@ fn test_source_map_es5_transform_async_unary_not_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -6670,20 +6314,16 @@ fn test_source_map_es5_transform_async_unary_not_mapping() {
     let decoded = decode_mappings(mappings);
     let (foo_line, foo_col) = find_line_col(source, "foo()");
 
-    let direct_mapping = decoded.iter().find(|entry| {
-        entry.original_line == foo_line
-            && entry.original_column == foo_col
-    });
+    let direct_mapping = decoded
+        .iter()
+        .find(|entry| entry.original_line == foo_line && entry.original_column == foo_col);
     let direct_valid = direct_mapping.and_then(|mapping| {
         if mapping.source_index != 0 {
             return None;
         }
 
-        let output_line_text = output
-            .lines()
-            .nth(mapping.generated_line as usize)?;
-        let output_slice = output_line_text
-            .get(mapping.generated_column as usize..)?;
+        let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+        let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
         if output_slice.starts_with("foo") {
             Some(mapping)
         } else {
@@ -6735,8 +6375,7 @@ fn test_source_map_es5_transform_async_unary_negative_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -6758,20 +6397,16 @@ fn test_source_map_es5_transform_async_unary_negative_mapping() {
     let decoded = decode_mappings(mappings);
     let (foo_line, foo_col) = find_line_col(source, "foo()");
 
-    let direct_mapping = decoded.iter().find(|entry| {
-        entry.original_line == foo_line
-            && entry.original_column == foo_col
-    });
+    let direct_mapping = decoded
+        .iter()
+        .find(|entry| entry.original_line == foo_line && entry.original_column == foo_col);
     let direct_valid = direct_mapping.and_then(|mapping| {
         if mapping.source_index != 0 {
             return None;
         }
 
-        let output_line_text = output
-            .lines()
-            .nth(mapping.generated_line as usize)?;
-        let output_slice = output_line_text
-            .get(mapping.generated_column as usize..)?;
+        let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+        let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
         if output_slice.starts_with("foo") {
             Some(mapping)
         } else {
@@ -6823,8 +6458,7 @@ fn test_source_map_es5_transform_async_unary_bitwise_not_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -6846,20 +6480,16 @@ fn test_source_map_es5_transform_async_unary_bitwise_not_mapping() {
     let decoded = decode_mappings(mappings);
     let (foo_line, foo_col) = find_line_col(source, "foo()");
 
-    let direct_mapping = decoded.iter().find(|entry| {
-        entry.original_line == foo_line
-            && entry.original_column == foo_col
-    });
+    let direct_mapping = decoded
+        .iter()
+        .find(|entry| entry.original_line == foo_line && entry.original_column == foo_col);
     let direct_valid = direct_mapping.and_then(|mapping| {
         if mapping.source_index != 0 {
             return None;
         }
 
-        let output_line_text = output
-            .lines()
-            .nth(mapping.generated_line as usize)?;
-        let output_slice = output_line_text
-            .get(mapping.generated_column as usize..)?;
+        let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+        let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
         if output_slice.starts_with("foo") {
             Some(mapping)
         } else {
@@ -6911,8 +6541,7 @@ fn test_source_map_es5_transform_async_unary_void_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -6934,20 +6563,16 @@ fn test_source_map_es5_transform_async_unary_void_mapping() {
     let decoded = decode_mappings(mappings);
     let (foo_line, foo_col) = find_line_col(source, "foo()");
 
-    let direct_mapping = decoded.iter().find(|entry| {
-        entry.original_line == foo_line
-            && entry.original_column == foo_col
-    });
+    let direct_mapping = decoded
+        .iter()
+        .find(|entry| entry.original_line == foo_line && entry.original_column == foo_col);
     let direct_valid = direct_mapping.and_then(|mapping| {
         if mapping.source_index != 0 {
             return None;
         }
 
-        let output_line_text = output
-            .lines()
-            .nth(mapping.generated_line as usize)?;
-        let output_slice = output_line_text
-            .get(mapping.generated_column as usize..)?;
+        let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+        let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
         if output_slice.starts_with("foo") {
             Some(mapping)
         } else {
@@ -6999,8 +6624,7 @@ fn test_source_map_es5_transform_async_unary_typeof_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -7022,20 +6646,16 @@ fn test_source_map_es5_transform_async_unary_typeof_mapping() {
     let decoded = decode_mappings(mappings);
     let (foo_line, foo_col) = find_line_col(source, "foo()");
 
-    let direct_mapping = decoded.iter().find(|entry| {
-        entry.original_line == foo_line
-            && entry.original_column == foo_col
-    });
+    let direct_mapping = decoded
+        .iter()
+        .find(|entry| entry.original_line == foo_line && entry.original_column == foo_col);
     let direct_valid = direct_mapping.and_then(|mapping| {
         if mapping.source_index != 0 {
             return None;
         }
 
-        let output_line_text = output
-            .lines()
-            .nth(mapping.generated_line as usize)?;
-        let output_slice = output_line_text
-            .get(mapping.generated_column as usize..)?;
+        let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+        let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
         if output_slice.starts_with("foo") {
             Some(mapping)
         } else {
@@ -7087,8 +6707,7 @@ fn test_source_map_es5_transform_async_sequence_await_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -7114,20 +6733,16 @@ fn test_source_map_es5_transform_async_sequence_await_mapping() {
     let targets = [("foo", foo_line, foo_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -7180,8 +6795,7 @@ fn test_source_map_es5_transform_async_sequence_mixed_await_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -7207,20 +6821,16 @@ fn test_source_map_es5_transform_async_sequence_mixed_await_mapping() {
     let targets = [("foo", foo_line, foo_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -7273,8 +6883,7 @@ fn test_source_map_es5_transform_async_optional_chaining_await_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -7300,20 +6909,16 @@ fn test_source_map_es5_transform_async_optional_chaining_await_mapping() {
     let targets = [("foo", foo_line, foo_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -7366,8 +6971,7 @@ fn test_source_map_es5_transform_async_nullish_coalescing_await_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -7393,20 +6997,16 @@ fn test_source_map_es5_transform_async_nullish_coalescing_await_mapping() {
     let targets = [("foo", foo_line, foo_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -7459,8 +7059,7 @@ fn test_source_map_es5_transform_async_delete_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -7486,20 +7085,16 @@ fn test_source_map_es5_transform_async_delete_mapping() {
     let targets = [("foo", foo_line, foo_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -7552,8 +7147,7 @@ fn test_source_map_es5_transform_async_compound_assignment_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -7577,23 +7171,22 @@ fn test_source_map_es5_transform_async_compound_assignment_mapping() {
     let (return_line, return_col) = find_line_col(source, "return value");
     let value_col = return_col + "return ".len() as u32;
 
-    let targets = [("foo", foo_line, foo_col), ("value", return_line, value_col)];
+    let targets = [
+        ("foo", foo_line, foo_col),
+        ("value", return_line, value_col),
+    ];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -7646,8 +7239,7 @@ fn test_source_map_es5_transform_async_compound_assignment_multiply_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -7671,23 +7263,22 @@ fn test_source_map_es5_transform_async_compound_assignment_multiply_mapping() {
     let (return_line, return_col) = find_line_col(source, "return value");
     let value_col = return_col + "return ".len() as u32;
 
-    let targets = [("foo", foo_line, foo_col), ("value", return_line, value_col)];
+    let targets = [
+        ("foo", foo_line, foo_col),
+        ("value", return_line, value_col),
+    ];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -7740,8 +7331,7 @@ fn test_source_map_es5_transform_async_compound_assignment_divide_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -7765,23 +7355,22 @@ fn test_source_map_es5_transform_async_compound_assignment_divide_mapping() {
     let (return_line, return_col) = find_line_col(source, "return value");
     let value_col = return_col + "return ".len() as u32;
 
-    let targets = [("foo", foo_line, foo_col), ("value", return_line, value_col)];
+    let targets = [
+        ("foo", foo_line, foo_col),
+        ("value", return_line, value_col),
+    ];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -7834,8 +7423,7 @@ fn test_source_map_es5_transform_async_compound_assignment_subtract_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -7859,23 +7447,22 @@ fn test_source_map_es5_transform_async_compound_assignment_subtract_mapping() {
     let (return_line, return_col) = find_line_col(source, "return value");
     let value_col = return_col + "return ".len() as u32;
 
-    let targets = [("foo", foo_line, foo_col), ("value", return_line, value_col)];
+    let targets = [
+        ("foo", foo_line, foo_col),
+        ("value", return_line, value_col),
+    ];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -7928,8 +7515,7 @@ fn test_source_map_es5_transform_async_compound_assignment_modulo_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -7953,23 +7539,22 @@ fn test_source_map_es5_transform_async_compound_assignment_modulo_mapping() {
     let (return_line, return_col) = find_line_col(source, "return value");
     let value_col = return_col + "return ".len() as u32;
 
-    let targets = [("foo", foo_line, foo_col), ("value", return_line, value_col)];
+    let targets = [
+        ("foo", foo_line, foo_col),
+        ("value", return_line, value_col),
+    ];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -8022,8 +7607,7 @@ fn test_source_map_es5_transform_async_nested_arrow_capture_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -8043,28 +7627,25 @@ fn test_source_map_es5_transform_async_nested_arrow_capture_mapping() {
         .unwrap_or("");
 
     let decoded = decode_mappings(mappings);
-    let targets = [
-        ("this.x", &["this", "_this"][..]),
-        ("bar()", &["bar"][..]),
-    ];
+    let targets = [("this.x", &["this", "_this"][..]), ("bar()", &["bar"][..])];
     let mut mapped = false;
 
     for (needle, prefixes) in targets {
         let (target_line, target_col) = find_line_col(source, needle);
         let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == target_line
-                && entry.original_column == target_col
+            entry.original_line == target_line && entry.original_column == target_col
         });
 
         if let Some(mapping) = direct_mapping {
             if mapping.source_index == 0 {
-                let output_line_text = output
-                    .lines()
-                    .nth(mapping.generated_line as usize);
-                let output_slice = output_line_text
-                    .and_then(|line| line.get(mapping.generated_column as usize..));
+                let output_line_text = output.lines().nth(mapping.generated_line as usize);
+                let output_slice =
+                    output_line_text.and_then(|line| line.get(mapping.generated_column as usize..));
                 if let Some(output_slice) = output_slice {
-                    if prefixes.iter().any(|prefix| output_slice.starts_with(prefix)) {
+                    if prefixes
+                        .iter()
+                        .any(|prefix| output_slice.starts_with(prefix))
+                    {
                         mapped = true;
                         break;
                     }
@@ -8108,7 +7689,8 @@ fn test_source_map_es5_transform_async_nested_arrow_capture_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_try_catch_nested_arrow_mapping() {
-    let source = "async function run(){ try { const bar=()=>this.x; await bar(); } catch { baz(); } }";
+    let source =
+        "async function run(){ try { const bar=()=>this.x; await bar(); } catch { baz(); } }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -8117,8 +7699,7 @@ fn test_source_map_es5_transform_async_try_catch_nested_arrow_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -8148,19 +7729,19 @@ fn test_source_map_es5_transform_async_try_catch_nested_arrow_mapping() {
     for (needle, prefixes) in targets {
         let (target_line, target_col) = find_line_col(source, needle);
         let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == target_line
-                && entry.original_column == target_col
+            entry.original_line == target_line && entry.original_column == target_col
         });
 
         if let Some(mapping) = direct_mapping {
             if mapping.source_index == 0 {
-                let output_line_text = output
-                    .lines()
-                    .nth(mapping.generated_line as usize);
-                let output_slice = output_line_text
-                    .and_then(|line| line.get(mapping.generated_column as usize..));
+                let output_line_text = output.lines().nth(mapping.generated_line as usize);
+                let output_slice =
+                    output_line_text.and_then(|line| line.get(mapping.generated_column as usize..));
                 if let Some(output_slice) = output_slice {
-                    if prefixes.iter().any(|prefix| output_slice.starts_with(prefix)) {
+                    if prefixes
+                        .iter()
+                        .any(|prefix| output_slice.starts_with(prefix))
+                    {
                         mapped = true;
                         break;
                     }
@@ -8213,8 +7794,7 @@ fn test_source_map_es5_transform_async_object_literal_arrow_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -8234,28 +7814,25 @@ fn test_source_map_es5_transform_async_object_literal_arrow_mapping() {
         .unwrap_or("");
 
     let decoded = decode_mappings(mappings);
-    let targets = [
-        ("foo()", &["foo"][..]),
-        ("this.x", &["this", "_this"][..]),
-    ];
+    let targets = [("foo()", &["foo"][..]), ("this.x", &["this", "_this"][..])];
     let mut mapped = false;
 
     for (needle, prefixes) in targets {
         let (target_line, target_col) = find_line_col(source, needle);
         let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == target_line
-                && entry.original_column == target_col
+            entry.original_line == target_line && entry.original_column == target_col
         });
 
         if let Some(mapping) = direct_mapping {
             if mapping.source_index == 0 {
-                let output_line_text = output
-                    .lines()
-                    .nth(mapping.generated_line as usize);
-                let output_slice = output_line_text
-                    .and_then(|line| line.get(mapping.generated_column as usize..));
+                let output_line_text = output.lines().nth(mapping.generated_line as usize);
+                let output_slice =
+                    output_line_text.and_then(|line| line.get(mapping.generated_column as usize..));
                 if let Some(output_slice) = output_slice {
-                    if prefixes.iter().any(|prefix| output_slice.starts_with(prefix)) {
+                    if prefixes
+                        .iter()
+                        .any(|prefix| output_slice.starts_with(prefix))
+                    {
                         mapped = true;
                         break;
                     }
@@ -8299,7 +7876,8 @@ fn test_source_map_es5_transform_async_object_literal_arrow_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_switch_mapping() {
-    let source = "async function run(x){ switch(x){ case 1: await foo(); break; default: bar(); } }";
+    let source =
+        "async function run(x){ switch(x){ case 1: await foo(); break; default: bar(); } }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -8308,8 +7886,7 @@ fn test_source_map_es5_transform_async_switch_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -8329,28 +7906,25 @@ fn test_source_map_es5_transform_async_switch_mapping() {
         .unwrap_or("");
 
     let decoded = decode_mappings(mappings);
-    let targets = [
-        ("foo()", &["foo"][..]),
-        ("bar()", &["bar"][..]),
-    ];
+    let targets = [("foo()", &["foo"][..]), ("bar()", &["bar"][..])];
     let mut mapped = false;
 
     for (needle, prefixes) in targets {
         let (target_line, target_col) = find_line_col(source, needle);
         let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == target_line
-                && entry.original_column == target_col
+            entry.original_line == target_line && entry.original_column == target_col
         });
 
         if let Some(mapping) = direct_mapping {
             if mapping.source_index == 0 {
-                let output_line_text = output
-                    .lines()
-                    .nth(mapping.generated_line as usize);
-                let output_slice = output_line_text
-                    .and_then(|line| line.get(mapping.generated_column as usize..));
+                let output_line_text = output.lines().nth(mapping.generated_line as usize);
+                let output_slice =
+                    output_line_text.and_then(|line| line.get(mapping.generated_column as usize..));
                 if let Some(output_slice) = output_slice {
-                    if prefixes.iter().any(|prefix| output_slice.starts_with(prefix)) {
+                    if prefixes
+                        .iter()
+                        .any(|prefix| output_slice.starts_with(prefix))
+                    {
                         mapped = true;
                         break;
                     }
@@ -8403,8 +7977,7 @@ fn test_source_map_es5_transform_async_for_loop_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -8425,17 +7998,16 @@ fn test_source_map_es5_transform_async_for_loop_mapping() {
 
     let decoded = decode_mappings(mappings);
     let (target_line, target_col) = find_line_col(source, "foo()");
-    let direct_mapping = decoded.iter().find(|entry| {
-        entry.original_line == target_line && entry.original_column == target_col
-    });
+    let direct_mapping = decoded
+        .iter()
+        .find(|entry| entry.original_line == target_line && entry.original_column == target_col);
 
     let mut mapped = false;
     if let Some(mapping) = direct_mapping {
         if mapping.source_index == 0 {
-            let output_line_text =
-                output.lines().nth(mapping.generated_line as usize);
-            let output_slice = output_line_text
-                .and_then(|line| line.get(mapping.generated_column as usize..));
+            let output_line_text = output.lines().nth(mapping.generated_line as usize);
+            let output_slice =
+                output_line_text.and_then(|line| line.get(mapping.generated_column as usize..));
             if let Some(output_slice) = output_slice {
                 if output_slice.starts_with("foo") {
                     mapped = true;
@@ -8479,8 +8051,7 @@ fn test_source_map_es5_transform_async_for_loop_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_for_loop_await_condition_mapping() {
-    let source =
-        "async function run(cond){ for (; await foo(cond); ) { bar(); } }";
+    let source = "async function run(cond){ for (; await foo(cond); ) { bar(); } }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -8489,8 +8060,7 @@ fn test_source_map_es5_transform_async_for_loop_await_condition_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -8511,17 +8081,16 @@ fn test_source_map_es5_transform_async_for_loop_await_condition_mapping() {
 
     let decoded = decode_mappings(mappings);
     let (target_line, target_col) = find_line_col(source, "foo(");
-    let direct_mapping = decoded.iter().find(|entry| {
-        entry.original_line == target_line && entry.original_column == target_col
-    });
+    let direct_mapping = decoded
+        .iter()
+        .find(|entry| entry.original_line == target_line && entry.original_column == target_col);
 
     let mut mapped = false;
     if let Some(mapping) = direct_mapping {
         if mapping.source_index == 0 {
-            let output_line_text =
-                output.lines().nth(mapping.generated_line as usize);
-            let output_slice = output_line_text
-                .and_then(|line| line.get(mapping.generated_column as usize..));
+            let output_line_text = output.lines().nth(mapping.generated_line as usize);
+            let output_slice =
+                output_line_text.and_then(|line| line.get(mapping.generated_column as usize..));
             if let Some(output_slice) = output_slice {
                 if output_slice.starts_with("foo") {
                     mapped = true;
@@ -8565,8 +8134,7 @@ fn test_source_map_es5_transform_async_for_loop_await_condition_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_for_loop_await_condition_list_mapping() {
-    let source =
-        "async function run(){ for (; (await foo(), await bar()); ) { baz(); } }";
+    let source = "async function run(){ for (; (await foo(), await bar()); ) { baz(); } }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -8575,8 +8143,7 @@ fn test_source_map_es5_transform_async_for_loop_await_condition_list_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -8603,17 +8170,15 @@ fn test_source_map_es5_transform_async_for_loop_await_condition_list_mapping() {
 
     for (label, (target_line, target_col)) in targets {
         let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == target_line
-                && entry.original_column == target_col
+            entry.original_line == target_line && entry.original_column == target_col
         });
 
         let mut mapped = false;
         if let Some(mapping) = direct_mapping {
             if mapping.source_index == 0 {
-                let output_line_text =
-                    output.lines().nth(mapping.generated_line as usize);
-                let output_slice = output_line_text
-                    .and_then(|line| line.get(mapping.generated_column as usize..));
+                let output_line_text = output.lines().nth(mapping.generated_line as usize);
+                let output_slice =
+                    output_line_text.and_then(|line| line.get(mapping.generated_column as usize..));
                 if let Some(output_slice) = output_slice {
                     if output_slice.starts_with(label) {
                         mapped = true;
@@ -8658,8 +8223,7 @@ fn test_source_map_es5_transform_async_for_loop_await_condition_list_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_for_loop_await_initializer_mapping() {
-    let source =
-        "async function run(){ for (let i = await foo(); i < 1; i++) { bar(); } }";
+    let source = "async function run(){ for (let i = await foo(); i < 1; i++) { bar(); } }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -8668,8 +8232,7 @@ fn test_source_map_es5_transform_async_for_loop_await_initializer_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -8690,17 +8253,16 @@ fn test_source_map_es5_transform_async_for_loop_await_initializer_mapping() {
 
     let decoded = decode_mappings(mappings);
     let (target_line, target_col) = find_line_col(source, "foo()");
-    let direct_mapping = decoded.iter().find(|entry| {
-        entry.original_line == target_line && entry.original_column == target_col
-    });
+    let direct_mapping = decoded
+        .iter()
+        .find(|entry| entry.original_line == target_line && entry.original_column == target_col);
 
     let mut mapped = false;
     if let Some(mapping) = direct_mapping {
         if mapping.source_index == 0 {
-            let output_line_text =
-                output.lines().nth(mapping.generated_line as usize);
-            let output_slice = output_line_text
-                .and_then(|line| line.get(mapping.generated_column as usize..));
+            let output_line_text = output.lines().nth(mapping.generated_line as usize);
+            let output_slice =
+                output_line_text.and_then(|line| line.get(mapping.generated_column as usize..));
             if let Some(output_slice) = output_slice {
                 if output_slice.starts_with("foo") {
                     mapped = true;
@@ -8744,7 +8306,8 @@ fn test_source_map_es5_transform_async_for_loop_await_initializer_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_for_loop_await_initializer_list_mapping() {
-    let source = "async function run(){ for (let i = await foo(), j = await bar(); i < j; i++) { baz(); } }";
+    let source =
+        "async function run(){ for (let i = await foo(), j = await bar(); i < j; i++) { baz(); } }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -8753,8 +8316,7 @@ fn test_source_map_es5_transform_async_for_loop_await_initializer_list_mapping()
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -8781,17 +8343,15 @@ fn test_source_map_es5_transform_async_for_loop_await_initializer_list_mapping()
 
     for (label, (target_line, target_col)) in targets {
         let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == target_line
-                && entry.original_column == target_col
+            entry.original_line == target_line && entry.original_column == target_col
         });
 
         let mut mapped = false;
         if let Some(mapping) = direct_mapping {
             if mapping.source_index == 0 {
-                let output_line_text =
-                    output.lines().nth(mapping.generated_line as usize);
-                let output_slice = output_line_text
-                    .and_then(|line| line.get(mapping.generated_column as usize..));
+                let output_line_text = output.lines().nth(mapping.generated_line as usize);
+                let output_slice =
+                    output_line_text.and_then(|line| line.get(mapping.generated_column as usize..));
                 if let Some(output_slice) = output_slice {
                     if output_slice.starts_with(label) {
                         mapped = true;
@@ -8845,8 +8405,7 @@ fn test_source_map_es5_transform_async_for_loop_await_update_list_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -8873,17 +8432,15 @@ fn test_source_map_es5_transform_async_for_loop_await_update_list_mapping() {
 
     for (label, (target_line, target_col)) in targets {
         let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == target_line
-                && entry.original_column == target_col
+            entry.original_line == target_line && entry.original_column == target_col
         });
 
         let mut mapped = false;
         if let Some(mapping) = direct_mapping {
             if mapping.source_index == 0 {
-                let output_line_text =
-                    output.lines().nth(mapping.generated_line as usize);
-                let output_slice = output_line_text
-                    .and_then(|line| line.get(mapping.generated_column as usize..));
+                let output_line_text = output.lines().nth(mapping.generated_line as usize);
+                let output_slice =
+                    output_line_text.and_then(|line| line.get(mapping.generated_column as usize..));
                 if let Some(output_slice) = output_slice {
                     if output_slice.starts_with(label) {
                         mapped = true;
@@ -8928,8 +8485,7 @@ fn test_source_map_es5_transform_async_for_loop_await_update_list_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_for_loop_await_update_mapping() {
-    let source =
-        "async function run(){ for (let i = 0; i < 1; i = await foo()) { bar(); } }";
+    let source = "async function run(){ for (let i = 0; i < 1; i = await foo()) { bar(); } }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -8938,8 +8494,7 @@ fn test_source_map_es5_transform_async_for_loop_await_update_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -8960,17 +8515,16 @@ fn test_source_map_es5_transform_async_for_loop_await_update_mapping() {
 
     let decoded = decode_mappings(mappings);
     let (target_line, target_col) = find_line_col(source, "foo()");
-    let direct_mapping = decoded.iter().find(|entry| {
-        entry.original_line == target_line && entry.original_column == target_col
-    });
+    let direct_mapping = decoded
+        .iter()
+        .find(|entry| entry.original_line == target_line && entry.original_column == target_col);
 
     let mut mapped = false;
     if let Some(mapping) = direct_mapping {
         if mapping.source_index == 0 {
-            let output_line_text =
-                output.lines().nth(mapping.generated_line as usize);
-            let output_slice = output_line_text
-                .and_then(|line| line.get(mapping.generated_column as usize..));
+            let output_line_text = output.lines().nth(mapping.generated_line as usize);
+            let output_slice =
+                output_line_text.and_then(|line| line.get(mapping.generated_column as usize..));
             if let Some(output_slice) = output_slice {
                 if output_slice.starts_with("foo") {
                     mapped = true;
@@ -9023,8 +8577,7 @@ fn test_source_map_es5_transform_async_for_loop_header_awaits_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -9053,8 +8606,7 @@ fn test_source_map_es5_transform_async_for_loop_header_awaits_mapping() {
     let mut mapped = false;
 
     for (needle, prefixes) in targets {
-        if has_mapping_for_prefixes(&decoded, &output, source, needle, prefixes)
-        {
+        if has_mapping_for_prefixes(&decoded, &output, source, needle, prefixes) {
             mapped = true;
             break;
         }
@@ -9104,8 +8656,7 @@ fn test_source_map_es5_transform_async_while_loop_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -9126,17 +8677,16 @@ fn test_source_map_es5_transform_async_while_loop_mapping() {
 
     let decoded = decode_mappings(mappings);
     let (target_line, target_col) = find_line_col(source, "foo()");
-    let direct_mapping = decoded.iter().find(|entry| {
-        entry.original_line == target_line && entry.original_column == target_col
-    });
+    let direct_mapping = decoded
+        .iter()
+        .find(|entry| entry.original_line == target_line && entry.original_column == target_col);
 
     let mut mapped = false;
     if let Some(mapping) = direct_mapping {
         if mapping.source_index == 0 {
-            let output_line_text =
-                output.lines().nth(mapping.generated_line as usize);
-            let output_slice = output_line_text
-                .and_then(|line| line.get(mapping.generated_column as usize..));
+            let output_line_text = output.lines().nth(mapping.generated_line as usize);
+            let output_slice =
+                output_line_text.and_then(|line| line.get(mapping.generated_column as usize..));
             if let Some(output_slice) = output_slice {
                 if output_slice.starts_with("foo") {
                     mapped = true;
@@ -9189,8 +8739,7 @@ fn test_source_map_es5_transform_async_do_while_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -9211,17 +8760,16 @@ fn test_source_map_es5_transform_async_do_while_mapping() {
 
     let decoded = decode_mappings(mappings);
     let (target_line, target_col) = find_line_col(source, "foo()");
-    let direct_mapping = decoded.iter().find(|entry| {
-        entry.original_line == target_line && entry.original_column == target_col
-    });
+    let direct_mapping = decoded
+        .iter()
+        .find(|entry| entry.original_line == target_line && entry.original_column == target_col);
 
     let mut mapped = false;
     if let Some(mapping) = direct_mapping {
         if mapping.source_index == 0 {
-            let output_line_text =
-                output.lines().nth(mapping.generated_line as usize);
-            let output_slice = output_line_text
-                .and_then(|line| line.get(mapping.generated_column as usize..));
+            let output_line_text = output.lines().nth(mapping.generated_line as usize);
+            let output_slice =
+                output_line_text.and_then(|line| line.get(mapping.generated_column as usize..));
             if let Some(output_slice) = output_slice {
                 if output_slice.starts_with("foo") {
                     mapped = true;
@@ -9265,8 +8813,7 @@ fn test_source_map_es5_transform_async_do_while_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_do_while_await_condition_mapping() {
-    let source =
-        "async function run(cond){ do { bar(); } while (await foo(cond)); }";
+    let source = "async function run(cond){ do { bar(); } while (await foo(cond)); }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -9275,8 +8822,7 @@ fn test_source_map_es5_transform_async_do_while_await_condition_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -9297,17 +8843,16 @@ fn test_source_map_es5_transform_async_do_while_await_condition_mapping() {
 
     let decoded = decode_mappings(mappings);
     let (target_line, target_col) = find_line_col(source, "foo(");
-    let direct_mapping = decoded.iter().find(|entry| {
-        entry.original_line == target_line && entry.original_column == target_col
-    });
+    let direct_mapping = decoded
+        .iter()
+        .find(|entry| entry.original_line == target_line && entry.original_column == target_col);
 
     let mut mapped = false;
     if let Some(mapping) = direct_mapping {
         if mapping.source_index == 0 {
-            let output_line_text =
-                output.lines().nth(mapping.generated_line as usize);
-            let output_slice = output_line_text
-                .and_then(|line| line.get(mapping.generated_column as usize..));
+            let output_line_text = output.lines().nth(mapping.generated_line as usize);
+            let output_slice =
+                output_line_text.and_then(|line| line.get(mapping.generated_column as usize..));
             if let Some(output_slice) = output_slice {
                 if output_slice.starts_with("foo") {
                     mapped = true;
@@ -9351,8 +8896,7 @@ fn test_source_map_es5_transform_async_do_while_await_condition_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_do_while_await_condition_list_mapping() {
-    let source =
-        "async function run(){ do { baz(); } while ((await foo(), await bar())); }";
+    let source = "async function run(){ do { baz(); } while ((await foo(), await bar())); }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -9361,8 +8905,7 @@ fn test_source_map_es5_transform_async_do_while_await_condition_list_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -9389,19 +8932,15 @@ fn test_source_map_es5_transform_async_do_while_await_condition_list_mapping() {
 
     for (label, (target_line, target_col)) in targets {
         let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == target_line
-                && entry.original_column == target_col
+            entry.original_line == target_line && entry.original_column == target_col
         });
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -9454,8 +8993,7 @@ fn test_source_map_es5_transform_async_do_while_await_condition_direct_mapping()
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -9518,8 +9056,7 @@ fn test_source_map_es5_transform_async_do_while_await_condition_direct_mapping()
 
 #[test]
 fn test_source_map_es5_transform_async_for_of_mapping() {
-    let source =
-        "async function run(items){ for (const item of items) { await foo(item); } }";
+    let source = "async function run(items){ for (const item of items) { await foo(item); } }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -9528,8 +9065,7 @@ fn test_source_map_es5_transform_async_for_of_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -9550,17 +9086,16 @@ fn test_source_map_es5_transform_async_for_of_mapping() {
 
     let decoded = decode_mappings(mappings);
     let (target_line, target_col) = find_line_col(source, "foo(");
-    let direct_mapping = decoded.iter().find(|entry| {
-        entry.original_line == target_line && entry.original_column == target_col
-    });
+    let direct_mapping = decoded
+        .iter()
+        .find(|entry| entry.original_line == target_line && entry.original_column == target_col);
 
     let mut mapped = false;
     if let Some(mapping) = direct_mapping {
         if mapping.source_index == 0 {
-            let output_line_text =
-                output.lines().nth(mapping.generated_line as usize);
-            let output_slice = output_line_text
-                .and_then(|line| line.get(mapping.generated_column as usize..));
+            let output_line_text = output.lines().nth(mapping.generated_line as usize);
+            let output_slice =
+                output_line_text.and_then(|line| line.get(mapping.generated_column as usize..));
             if let Some(output_slice) = output_slice {
                 if output_slice.starts_with("foo") {
                     mapped = true;
@@ -9604,8 +9139,7 @@ fn test_source_map_es5_transform_async_for_of_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_for_of_await_rhs_mapping() {
-    let source =
-        "async function run(items){ for (const item of await foo(items)) { bar(item); } }";
+    let source = "async function run(items){ for (const item of await foo(items)) { bar(item); } }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -9614,8 +9148,7 @@ fn test_source_map_es5_transform_async_for_of_await_rhs_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -9636,17 +9169,16 @@ fn test_source_map_es5_transform_async_for_of_await_rhs_mapping() {
 
     let decoded = decode_mappings(mappings);
     let (target_line, target_col) = find_line_col(source, "foo(");
-    let direct_mapping = decoded.iter().find(|entry| {
-        entry.original_line == target_line && entry.original_column == target_col
-    });
+    let direct_mapping = decoded
+        .iter()
+        .find(|entry| entry.original_line == target_line && entry.original_column == target_col);
 
     let mut mapped = false;
     if let Some(mapping) = direct_mapping {
         if mapping.source_index == 0 {
-            let output_line_text =
-                output.lines().nth(mapping.generated_line as usize);
-            let output_slice = output_line_text
-                .and_then(|line| line.get(mapping.generated_column as usize..));
+            let output_line_text = output.lines().nth(mapping.generated_line as usize);
+            let output_slice =
+                output_line_text.and_then(|line| line.get(mapping.generated_column as usize..));
             if let Some(output_slice) = output_slice {
                 if output_slice.starts_with("foo") {
                     mapped = true;
@@ -9690,8 +9222,7 @@ fn test_source_map_es5_transform_async_for_of_await_rhs_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_for_in_mapping() {
-    let source =
-        "async function run(obj){ for (const key in obj) { await foo(obj[key]); } }";
+    let source = "async function run(obj){ for (const key in obj) { await foo(obj[key]); } }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -9700,8 +9231,7 @@ fn test_source_map_es5_transform_async_for_in_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -9722,17 +9252,16 @@ fn test_source_map_es5_transform_async_for_in_mapping() {
 
     let decoded = decode_mappings(mappings);
     let (target_line, target_col) = find_line_col(source, "foo(");
-    let direct_mapping = decoded.iter().find(|entry| {
-        entry.original_line == target_line && entry.original_column == target_col
-    });
+    let direct_mapping = decoded
+        .iter()
+        .find(|entry| entry.original_line == target_line && entry.original_column == target_col);
 
     let mut mapped = false;
     if let Some(mapping) = direct_mapping {
         if mapping.source_index == 0 {
-            let output_line_text =
-                output.lines().nth(mapping.generated_line as usize);
-            let output_slice = output_line_text
-                .and_then(|line| line.get(mapping.generated_column as usize..));
+            let output_line_text = output.lines().nth(mapping.generated_line as usize);
+            let output_slice =
+                output_line_text.and_then(|line| line.get(mapping.generated_column as usize..));
             if let Some(output_slice) = output_slice {
                 if output_slice.starts_with("foo") {
                     mapped = true;
@@ -9776,8 +9305,7 @@ fn test_source_map_es5_transform_async_for_in_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_for_in_await_rhs_mapping() {
-    let source =
-        "async function run(obj){ for (const key in await foo(obj)) { bar(key); } }";
+    let source = "async function run(obj){ for (const key in await foo(obj)) { bar(key); } }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -9786,8 +9314,7 @@ fn test_source_map_es5_transform_async_for_in_await_rhs_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -9808,17 +9335,16 @@ fn test_source_map_es5_transform_async_for_in_await_rhs_mapping() {
 
     let decoded = decode_mappings(mappings);
     let (target_line, target_col) = find_line_col(source, "foo(");
-    let direct_mapping = decoded.iter().find(|entry| {
-        entry.original_line == target_line && entry.original_column == target_col
-    });
+    let direct_mapping = decoded
+        .iter()
+        .find(|entry| entry.original_line == target_line && entry.original_column == target_col);
 
     let mut mapped = false;
     if let Some(mapping) = direct_mapping {
         if mapping.source_index == 0 {
-            let output_line_text =
-                output.lines().nth(mapping.generated_line as usize);
-            let output_slice = output_line_text
-                .and_then(|line| line.get(mapping.generated_column as usize..));
+            let output_line_text = output.lines().nth(mapping.generated_line as usize);
+            let output_slice =
+                output_line_text.and_then(|line| line.get(mapping.generated_column as usize..));
             if let Some(output_slice) = output_slice {
                 if output_slice.starts_with("foo") {
                     mapped = true;
@@ -9872,8 +9398,7 @@ fn test_source_map_es5_transform_async_switch_default_await_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -9894,17 +9419,16 @@ fn test_source_map_es5_transform_async_switch_default_await_mapping() {
 
     let decoded = decode_mappings(mappings);
     let (bar_line, bar_col) = find_line_col(source, "bar()");
-    let direct_mapping = decoded.iter().find(|entry| {
-        entry.original_line == bar_line && entry.original_column == bar_col
-    });
+    let direct_mapping = decoded
+        .iter()
+        .find(|entry| entry.original_line == bar_line && entry.original_column == bar_col);
 
     let mut mapped = false;
     if let Some(mapping) = direct_mapping {
         if mapping.source_index == 0 {
-            let output_line_text =
-                output.lines().nth(mapping.generated_line as usize);
-            let output_slice = output_line_text
-                .and_then(|line| line.get(mapping.generated_column as usize..));
+            let output_line_text = output.lines().nth(mapping.generated_line as usize);
+            let output_slice =
+                output_line_text.and_then(|line| line.get(mapping.generated_column as usize..));
             if let Some(output_slice) = output_slice {
                 if output_slice.starts_with("bar") {
                     mapped = true;
@@ -9948,8 +9472,7 @@ fn test_source_map_es5_transform_async_switch_default_await_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_switch_default_only_await_mapping() {
-    let source =
-        "async function run(x){ switch(x){ case 1: break; default: await bar(); } }";
+    let source = "async function run(x){ switch(x){ case 1: break; default: await bar(); } }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -9958,8 +9481,7 @@ fn test_source_map_es5_transform_async_switch_default_only_await_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -9980,17 +9502,16 @@ fn test_source_map_es5_transform_async_switch_default_only_await_mapping() {
 
     let decoded = decode_mappings(mappings);
     let (bar_line, bar_col) = find_line_col(source, "bar()");
-    let direct_mapping = decoded.iter().find(|entry| {
-        entry.original_line == bar_line && entry.original_column == bar_col
-    });
+    let direct_mapping = decoded
+        .iter()
+        .find(|entry| entry.original_line == bar_line && entry.original_column == bar_col);
 
     let mut mapped = false;
     if let Some(mapping) = direct_mapping {
         if mapping.source_index == 0 {
-            let output_line_text =
-                output.lines().nth(mapping.generated_line as usize);
-            let output_slice = output_line_text
-                .and_then(|line| line.get(mapping.generated_column as usize..));
+            let output_line_text = output.lines().nth(mapping.generated_line as usize);
+            let output_slice =
+                output_line_text.and_then(|line| line.get(mapping.generated_column as usize..));
             if let Some(output_slice) = output_slice {
                 if output_slice.starts_with("bar") {
                     mapped = true;
@@ -10034,8 +9555,7 @@ fn test_source_map_es5_transform_async_switch_default_only_await_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_switch_case_await_mapping() {
-    let source =
-        "async function run(x){ switch(x){ case 1: await foo(); break; case 2: await bar(); break; } }";
+    let source = "async function run(x){ switch(x){ case 1: await foo(); break; case 2: await bar(); break; } }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -10044,8 +9564,7 @@ fn test_source_map_es5_transform_async_switch_case_await_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -10066,17 +9585,16 @@ fn test_source_map_es5_transform_async_switch_case_await_mapping() {
 
     let decoded = decode_mappings(mappings);
     let (bar_line, bar_col) = find_line_col(source, "bar()");
-    let direct_mapping = decoded.iter().find(|entry| {
-        entry.original_line == bar_line && entry.original_column == bar_col
-    });
+    let direct_mapping = decoded
+        .iter()
+        .find(|entry| entry.original_line == bar_line && entry.original_column == bar_col);
 
     let mut mapped = false;
     if let Some(mapping) = direct_mapping {
         if mapping.source_index == 0 {
-            let output_line_text =
-                output.lines().nth(mapping.generated_line as usize);
-            let output_slice = output_line_text
-                .and_then(|line| line.get(mapping.generated_column as usize..));
+            let output_line_text = output.lines().nth(mapping.generated_line as usize);
+            let output_slice =
+                output_line_text.and_then(|line| line.get(mapping.generated_column as usize..));
             if let Some(output_slice) = output_slice {
                 if output_slice.starts_with("bar") {
                     mapped = true;
@@ -10120,8 +9638,7 @@ fn test_source_map_es5_transform_async_switch_case_await_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_switch_return_await_mapping() {
-    let source =
-        "async function run(x){ switch(x){ case 1: return await foo(); default: return await bar(); } }";
+    let source = "async function run(x){ switch(x){ case 1: return await foo(); default: return await bar(); } }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -10130,8 +9647,7 @@ fn test_source_map_es5_transform_async_switch_return_await_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -10157,20 +9673,16 @@ fn test_source_map_es5_transform_async_switch_return_await_mapping() {
     let targets = [("foo", foo_line, foo_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -10214,8 +9726,7 @@ fn test_source_map_es5_transform_async_switch_return_await_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_switch_await_discriminant_mapping() {
-    let source =
-        "async function run(payload){ switch(await payload){ case 1: await foo(); break; default: await bar(); } }";
+    let source = "async function run(payload){ switch(await payload){ case 1: await foo(); break; default: await bar(); } }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -10224,8 +9735,7 @@ fn test_source_map_es5_transform_async_switch_await_discriminant_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -10247,18 +9757,16 @@ fn test_source_map_es5_transform_async_switch_await_discriminant_mapping() {
     let decoded = decode_mappings(mappings);
     let (await_line, await_col) = find_line_col(source, "await payload");
     let payload_col = await_col + "await ".len() as u32;
-    let direct_mapping = decoded.iter().find(|entry| {
-        entry.original_line == await_line
-            && entry.original_column == payload_col
-    });
+    let direct_mapping = decoded
+        .iter()
+        .find(|entry| entry.original_line == await_line && entry.original_column == payload_col);
 
     let mut mapped = false;
     if let Some(mapping) = direct_mapping {
         if mapping.source_index == 0 {
-            let output_line_text =
-                output.lines().nth(mapping.generated_line as usize);
-            let output_slice = output_line_text
-                .and_then(|line| line.get(mapping.generated_column as usize..));
+            let output_line_text = output.lines().nth(mapping.generated_line as usize);
+            let output_slice =
+                output_line_text.and_then(|line| line.get(mapping.generated_column as usize..));
             if let Some(output_slice) = output_slice {
                 if output_slice.starts_with("payload") {
                     mapped = true;
@@ -10302,8 +9810,7 @@ fn test_source_map_es5_transform_async_switch_await_discriminant_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_switch_fallthrough_await_mapping() {
-    let source =
-        "async function run(x){ switch(x){ case 1: case 2: await foo(); break; default: await bar(); } }";
+    let source = "async function run(x){ switch(x){ case 1: case 2: await foo(); break; default: await bar(); } }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -10312,8 +9819,7 @@ fn test_source_map_es5_transform_async_switch_fallthrough_await_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -10339,20 +9845,16 @@ fn test_source_map_es5_transform_async_switch_fallthrough_await_mapping() {
     let targets = [("foo", foo_line, foo_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -10405,8 +9907,7 @@ fn test_source_map_es5_transform_class_extends_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -10431,14 +9932,9 @@ fn test_source_map_es5_transform_class_extends_mapping() {
 
     let mapping = decoded
         .iter()
-        .find(|entry| {
-            entry.original_line == source_line
-                && entry.original_column == source_col
-        })
+        .find(|entry| entry.original_line == source_line && entry.original_column == source_col)
         .unwrap_or_else(|| {
-            panic!(
-                "expected mapping for Derived class. mappings: {mappings} output: {output}"
-            )
+            panic!("expected mapping for Derived class. mappings: {mappings} output: {output}")
         });
 
     assert_eq!(mapping.source_index, 0);
@@ -10457,8 +9953,7 @@ fn test_source_map_es5_transform_class_property_initializer_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -10511,8 +10006,7 @@ fn test_source_map_es5_transform_derived_ctor_super_initializer_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -10568,8 +10062,7 @@ fn test_source_map_es5_transform_async_new_expression_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -10595,20 +10088,16 @@ fn test_source_map_es5_transform_async_new_expression_mapping() {
     let targets = [("new", foo_line, foo_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -10661,8 +10150,7 @@ fn test_source_map_es5_transform_async_tagged_template_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -10688,20 +10176,16 @@ fn test_source_map_es5_transform_async_tagged_template_mapping() {
     let targets = [("tag", tag_line, tag_col), ("bar", bar_line, bar_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -10754,8 +10238,7 @@ fn test_source_map_es5_transform_async_instanceof_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -10778,23 +10261,22 @@ fn test_source_map_es5_transform_async_instanceof_mapping() {
     let (bar_line, bar_col) = find_line_col(source, "bar()");
     let (foo_line, foo_col) = find_line_col(source, "instanceof Foo");
 
-    let targets = [("bar", bar_line, bar_col), ("instanceof", foo_line, foo_col)];
+    let targets = [
+        ("bar", bar_line, bar_col),
+        ("instanceof", foo_line, foo_col),
+    ];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -10847,8 +10329,7 @@ fn test_source_map_es5_transform_async_exponentiation_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -10874,20 +10355,16 @@ fn test_source_map_es5_transform_async_exponentiation_mapping() {
     let targets = [("base", base_line, base_col), ("exp", exp_line, exp_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -10940,8 +10417,7 @@ fn test_source_map_es5_transform_async_in_operator_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -10966,20 +10442,16 @@ fn test_source_map_es5_transform_async_in_operator_mapping() {
     let targets = [("key", key_line, key_col)];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -11032,8 +10504,7 @@ fn test_source_map_es5_transform_async_nested_try_finally_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -11064,20 +10535,16 @@ fn test_source_map_es5_transform_async_nested_try_finally_mapping() {
     ];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -11121,7 +10588,8 @@ fn test_source_map_es5_transform_async_nested_try_finally_mapping() {
 
 #[test]
 fn test_source_map_es5_transform_async_for_of_destructuring_mapping() {
-    let source = "async function run(){ for (const [a, b] of await items()) { await process(a, b); } }";
+    let source =
+        "async function run(){ for (const [a, b] of await items()) { await process(a, b); } }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -11130,8 +10598,7 @@ fn test_source_map_es5_transform_async_for_of_destructuring_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -11160,20 +10627,16 @@ fn test_source_map_es5_transform_async_for_of_destructuring_mapping() {
     ];
 
     for (label, src_line, src_col) in targets {
-        let direct_mapping = decoded.iter().find(|entry| {
-            entry.original_line == src_line
-                && entry.original_column == src_col
-        });
+        let direct_mapping = decoded
+            .iter()
+            .find(|entry| entry.original_line == src_line && entry.original_column == src_col);
         let direct_valid = direct_mapping.and_then(|mapping| {
             if mapping.source_index != 0 {
                 return None;
             }
 
-            let output_line_text = output
-                .lines()
-                .nth(mapping.generated_line as usize)?;
-            let output_slice = output_line_text
-                .get(mapping.generated_column as usize..)?;
+            let output_line_text = output.lines().nth(mapping.generated_line as usize)?;
+            let output_slice = output_line_text.get(mapping.generated_column as usize..)?;
             if output_slice.starts_with(label) {
                 Some(mapping)
             } else {
@@ -11226,8 +10689,7 @@ fn test_source_map_es5_transform_generator_yield_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -11254,9 +10716,9 @@ fn test_source_map_es5_transform_generator_yield_mapping() {
     let (yield2_line, yield2_col) = find_line_col(source, "yield second");
 
     // Verify we have mappings for the function declaration
-    let func_mapping = decoded.iter().find(|entry| {
-        entry.original_line == func_line && entry.original_column == func_col
-    });
+    let func_mapping = decoded
+        .iter()
+        .find(|entry| entry.original_line == func_line && entry.original_column == func_col);
     assert!(
         func_mapping.is_some(),
         "expected mapping for function* gen. mappings: {mappings}"
@@ -11291,8 +10753,7 @@ fn test_source_map_names_array_multiple_identifiers() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -11352,8 +10813,7 @@ console.log(result);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -11415,8 +10875,7 @@ class Example {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -11485,8 +10944,7 @@ const z = fn?.(5);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -11555,8 +11013,7 @@ c ??= "fallback";"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -11624,8 +11081,7 @@ const sum = small + large;"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -11698,8 +11154,7 @@ fn test_source_map_class_static_blocks() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -11770,8 +11225,7 @@ const conditional = true ? import("./a") : import("./b");"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -11845,8 +11299,7 @@ sum(1, 2, 3, 4, 5);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -11921,8 +11374,7 @@ async function processItems(items: string[]) {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -11947,25 +11399,25 @@ async function processItems(items: string[]) {
 
     // Verify we have mappings for both async function declarations
     let (fetch_line, _) = find_line_col(source, "async function fetchData");
-    let has_fetch_mapping = decoded.iter().any(|m| {
-        m.source_index == 0 && m.original_line == fetch_line
-    });
+    let has_fetch_mapping = decoded
+        .iter()
+        .any(|m| m.source_index == 0 && m.original_line == fetch_line);
 
     let (process_line, _) = find_line_col(source, "async function processItems");
-    let has_process_mapping = decoded.iter().any(|m| {
-        m.source_index == 0 && m.original_line == process_line
-    });
+    let has_process_mapping = decoded
+        .iter()
+        .any(|m| m.source_index == 0 && m.original_line == process_line);
 
     // Verify we have mappings for await expressions
     let (await_fetch_line, _) = find_line_col(source, "await fetch");
-    let has_await_fetch_mapping = decoded.iter().any(|m| {
-        m.source_index == 0 && m.original_line == await_fetch_line
-    });
+    let has_await_fetch_mapping = decoded
+        .iter()
+        .any(|m| m.source_index == 0 && m.original_line == await_fetch_line);
 
     let (await_json_line, _) = find_line_col(source, "await response.json");
-    let has_await_json_mapping = decoded.iter().any(|m| {
-        m.source_index == 0 && m.original_line == await_json_line
-    });
+    let has_await_json_mapping = decoded
+        .iter()
+        .any(|m| m.source_index == 0 && m.original_line == await_json_line);
 
     // We should have mappings for both function declarations
     assert!(
@@ -12021,8 +11473,7 @@ const myStatus = Status.Active;"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -12097,8 +11548,7 @@ function* infiniteSequence() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -12108,7 +11558,9 @@ function* infiniteSequence() {
 
     // Verify generator function is in output (may be __generator helper or function* syntax)
     assert!(
-        output.contains("__generator") || output.contains("numberGenerator") || output.contains("function*"),
+        output.contains("__generator")
+            || output.contains("numberGenerator")
+            || output.contains("function*"),
         "expected generator function in output: {output}"
     );
 
@@ -12123,14 +11575,14 @@ function* infiniteSequence() {
 
     // Verify we have mappings for generator function declarations
     let (num_gen_line, _) = find_line_col(source, "function* numberGenerator");
-    let has_num_gen_mapping = decoded.iter().any(|m| {
-        m.source_index == 0 && m.original_line == num_gen_line
-    });
+    let has_num_gen_mapping = decoded
+        .iter()
+        .any(|m| m.source_index == 0 && m.original_line == num_gen_line);
 
     let (inf_seq_line, _) = find_line_col(source, "function* infiniteSequence");
-    let has_inf_seq_mapping = decoded.iter().any(|m| {
-        m.source_index == 0 && m.original_line == inf_seq_line
-    });
+    let has_inf_seq_mapping = decoded
+        .iter()
+        .any(|m| m.source_index == 0 && m.original_line == inf_seq_line);
 
     // We should have mappings for both generator declarations
     assert!(
@@ -12180,8 +11632,7 @@ const swapped = swap([1, 2]);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -12276,8 +11727,7 @@ c.increment();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -12353,8 +11803,7 @@ fn test_source_map_class_static_block_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -12379,15 +11828,15 @@ fn test_source_map_class_static_block_mapping() {
 
     // Verify we have mappings for the class declaration
     let (class_line, _) = find_line_col(source, "class Config");
-    let has_class_mapping = decoded.iter().any(|m| {
-        m.source_index == 0 && m.original_line == class_line
-    });
+    let has_class_mapping = decoded
+        .iter()
+        .any(|m| m.source_index == 0 && m.original_line == class_line);
 
     // Verify we have mappings for static properties
     let (initialized_line, _) = find_line_col(source, "static initialized");
-    let has_initialized_mapping = decoded.iter().any(|m| {
-        m.source_index == 0 && m.original_line == initialized_line
-    });
+    let has_initialized_mapping = decoded
+        .iter()
+        .any(|m| m.source_index == 0 && m.original_line == initialized_line);
 
     // We should have mappings for the class and static members
     assert!(
@@ -12439,8 +11888,7 @@ const mapped = arr.map(x => x ?? 0);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -12526,8 +11974,7 @@ const result = format(["apple", "banana"]);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -12619,8 +12066,7 @@ const instance3 = new DynamicClass("test");"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -12687,8 +12133,7 @@ x **= 3;"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
     printer.emit(root);
@@ -12732,8 +12177,7 @@ const { x, ...others } = { x: 1, y: 2, z: 3 };"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
     printer.emit(root);
@@ -12783,8 +12227,7 @@ function format(value: string, options: { uppercase?: boolean } = {}): string {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
     printer.emit(root);
@@ -12806,14 +12249,14 @@ function format(value: string, options: { uppercase?: boolean } = {}): string {
 
     // Verify we have mappings for the function declarations
     let (greet_line, _) = find_line_col(source, "function greet");
-    let has_greet_mapping = decoded.iter().any(|m| {
-        m.source_index == 0 && m.original_line == greet_line
-    });
+    let has_greet_mapping = decoded
+        .iter()
+        .any(|m| m.source_index == 0 && m.original_line == greet_line);
 
     let (add_line, _) = find_line_col(source, "const add");
-    let has_add_mapping = decoded.iter().any(|m| {
-        m.source_index == 0 && m.original_line == add_line
-    });
+    let has_add_mapping = decoded
+        .iter()
+        .any(|m| m.source_index == 0 && m.original_line == add_line);
 
     assert!(
         has_greet_mapping || has_add_mapping,
@@ -12871,8 +12314,7 @@ const reduced = arr.reduce((acc, x) => acc + x, 0);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -12950,8 +12392,7 @@ class MyClass {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
     printer.emit(root);
@@ -13000,8 +12441,7 @@ const merged = { ...coords, z: 30 };"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
     printer.emit(root);
@@ -13022,14 +12462,14 @@ const merged = { ...coords, z: 30 };"#;
     let decoded = decode_mappings(mappings);
 
     let (name_line, _) = find_line_col(source, "const name");
-    let has_name_mapping = decoded.iter().any(|m| {
-        m.source_index == 0 && m.original_line == name_line
-    });
+    let has_name_mapping = decoded
+        .iter()
+        .any(|m| m.source_index == 0 && m.original_line == name_line);
 
     let (person_line, _) = find_line_col(source, "const person");
-    let has_person_mapping = decoded.iter().any(|m| {
-        m.source_index == 0 && m.original_line == person_line
-    });
+    let has_person_mapping = decoded
+        .iter()
+        .any(|m| m.source_index == 0 && m.original_line == person_line);
 
     assert!(
         has_name_mapping || has_person_mapping,
@@ -13097,8 +12537,7 @@ class Counter {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
     printer.emit(root);
@@ -13119,14 +12558,14 @@ class Counter {
     let decoded = decode_mappings(mappings);
 
     let (calc_line, _) = find_line_col(source, "const calculator");
-    let has_calc_mapping = decoded.iter().any(|m| {
-        m.source_index == 0 && m.original_line == calc_line
-    });
+    let has_calc_mapping = decoded
+        .iter()
+        .any(|m| m.source_index == 0 && m.original_line == calc_line);
 
     let (counter_line, _) = find_line_col(source, "class Counter");
-    let has_counter_mapping = decoded.iter().any(|m| {
-        m.source_index == 0 && m.original_line == counter_line
-    });
+    let has_counter_mapping = decoded
+        .iter()
+        .any(|m| m.source_index == 0 && m.original_line == counter_line);
 
     assert!(
         has_calc_mapping || has_counter_mapping,
@@ -13183,8 +12622,7 @@ async function processItems(items: number[]) {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
     printer.emit(root);
@@ -13205,14 +12643,14 @@ async function processItems(items: number[]) {
     let decoded = decode_mappings(mappings);
 
     let (numbers_line, _) = find_line_col(source, "const numbers");
-    let has_numbers_mapping = decoded.iter().any(|m| {
-        m.source_index == 0 && m.original_line == numbers_line
-    });
+    let has_numbers_mapping = decoded
+        .iter()
+        .any(|m| m.source_index == 0 && m.original_line == numbers_line);
 
     let (for_of_line, _) = find_line_col(source, "for (const num of");
-    let has_for_of_mapping = decoded.iter().any(|m| {
-        m.source_index == 0 && m.original_line == for_of_line
-    });
+    let has_for_of_mapping = decoded
+        .iter()
+        .any(|m| m.source_index == 0 && m.original_line == for_of_line);
 
     assert!(
         has_numbers_mapping || has_for_of_mapping,
@@ -13261,8 +12699,7 @@ namespace Nested.Inner {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -13329,8 +12766,7 @@ console.log(z);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -13355,14 +12791,12 @@ console.log(z);"#;
 
     // Verify we have mappings for the variable declarations
     let (let_line, _) = find_line_col(source, "let x");
-    let has_let_mapping = decoded.iter().any(|entry| {
-        entry.original_line == let_line
-    });
+    let has_let_mapping = decoded.iter().any(|entry| entry.original_line == let_line);
 
     let (const_line, _) = find_line_col(source, "const y");
-    let has_const_mapping = decoded.iter().any(|entry| {
-        entry.original_line == const_line
-    });
+    let has_const_mapping = decoded
+        .iter()
+        .any(|entry| entry.original_line == const_line);
 
     assert!(
         has_let_mapping || has_const_mapping || !decoded.is_empty(),
@@ -13393,8 +12827,7 @@ console.log(x);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -13438,8 +12871,7 @@ fn test_source_map_block_scoping_for_loop_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -13464,9 +12896,7 @@ fn test_source_map_block_scoping_for_loop_mapping() {
 
     // Verify we have mappings for the for loop
     let (for_line, _) = find_line_col(source, "for (let i");
-    let has_for_mapping = decoded.iter().any(|entry| {
-        entry.original_line == for_line
-    });
+    let has_for_mapping = decoded.iter().any(|entry| entry.original_line == for_line);
 
     assert!(
         has_for_mapping || !decoded.is_empty(),
@@ -13490,8 +12920,7 @@ fn test_source_map_block_scoping_function_scope_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -13516,9 +12945,7 @@ fn test_source_map_block_scoping_function_scope_mapping() {
 
     // Verify we have mappings for the function declaration
     let (func_line, _) = find_line_col(source, "function test");
-    let has_func_mapping = decoded.iter().any(|entry| {
-        entry.original_line == func_line
-    });
+    let has_func_mapping = decoded.iter().any(|entry| entry.original_line == func_line);
 
     assert!(
         has_func_mapping || !decoded.is_empty(),
@@ -13552,8 +12979,7 @@ fn test_source_map_enum_es5_string_enum_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -13607,8 +13033,7 @@ const current = Status.Active;"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -13633,9 +13058,7 @@ const current = Status.Active;"#;
 
     // Verify we have mappings for the enum
     let (enum_line, _) = find_line_col(source, "enum Status");
-    let has_enum_mapping = decoded.iter().any(|entry| {
-        entry.original_line == enum_line
-    });
+    let has_enum_mapping = decoded.iter().any(|entry| entry.original_line == enum_line);
 
     assert!(
         has_enum_mapping || !decoded.is_empty(),
@@ -13659,8 +13082,7 @@ fn test_source_map_enum_es5_computed_member_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -13708,8 +13130,7 @@ fn test_source_map_enum_es5_mixed_values_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -13734,9 +13155,7 @@ fn test_source_map_enum_es5_mixed_values_mapping() {
 
     // Verify we have mappings for the enum declaration
     let (enum_line, _) = find_line_col(source, "enum Mixed");
-    let has_enum_mapping = decoded.iter().any(|entry| {
-        entry.original_line == enum_line
-    });
+    let has_enum_mapping = decoded.iter().any(|entry| entry.original_line == enum_line);
 
     assert!(
         has_enum_mapping || !decoded.is_empty(),
@@ -13761,8 +13180,7 @@ console.log(foo, bar, utils, defaultExport);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -13817,8 +13235,7 @@ export class MyClass {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -13843,14 +13260,12 @@ export class MyClass {
 
     // Verify we have mappings for the export declarations
     let (value_line, _) = find_line_col(source, "export const value");
-    let has_value_mapping = decoded.iter().any(|entry| {
-        entry.original_line == value_line
-    });
+    let has_value_mapping = decoded
+        .iter()
+        .any(|entry| entry.original_line == value_line);
 
     let (func_line, _) = find_line_col(source, "export function greet");
-    let has_func_mapping = decoded.iter().any(|entry| {
-        entry.original_line == func_line
-    });
+    let has_func_mapping = decoded.iter().any(|entry| entry.original_line == func_line);
 
     assert!(
         has_value_mapping || has_func_mapping || !decoded.is_empty(),
@@ -13873,8 +13288,7 @@ export default myValue;"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -13918,8 +13332,7 @@ export * from "./utils";"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -13938,9 +13351,9 @@ export * from "./utils";"#;
 
     // Verify we have mappings for re-exports
     let (reexport_line, _) = find_line_col(source, "export { foo");
-    let has_reexport_mapping = decoded.iter().any(|entry| {
-        entry.original_line == reexport_line
-    });
+    let has_reexport_mapping = decoded
+        .iter()
+        .any(|entry| entry.original_line == reexport_line);
 
     assert!(
         has_reexport_mapping || !decoded.is_empty(),
@@ -13976,8 +13389,7 @@ const origin = { x: 0, y: 0 } as Point;"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
     printer.emit(root);
@@ -13995,14 +13407,14 @@ const origin = { x: 0, y: 0 } as Point;"#;
 
     // Verify we have mappings for variable declarations
     let (value_line, _) = find_line_col(source, "const value");
-    let has_value_mapping = decoded.iter().any(|entry| {
-        entry.original_line == value_line
-    });
+    let has_value_mapping = decoded
+        .iter()
+        .any(|entry| entry.original_line == value_line);
 
     let (config_line, _) = find_line_col(source, "const config");
-    let has_config_mapping = decoded.iter().any(|entry| {
-        entry.original_line == config_line
-    });
+    let has_config_mapping = decoded
+        .iter()
+        .any(|entry| entry.original_line == config_line);
 
     // At minimum, we should have mappings for declarations
     assert!(
@@ -14139,14 +13551,12 @@ const greeting = <h1>Hello, {name}!</h1>;"#;
 
     // Verify we have mappings for both declarations
     let (name_line, _) = find_line_col(source, "const name");
-    let has_name_mapping = decoded.iter().any(|entry| {
-        entry.original_line == name_line
-    });
+    let has_name_mapping = decoded.iter().any(|entry| entry.original_line == name_line);
 
     let (greeting_line, _) = find_line_col(source, "const greeting");
-    let has_greeting_mapping = decoded.iter().any(|entry| {
-        entry.original_line == greeting_line
-    });
+    let has_greeting_mapping = decoded
+        .iter()
+        .any(|entry| entry.original_line == greeting_line);
 
     assert!(
         has_name_mapping || has_greeting_mapping || !decoded.is_empty(),
@@ -14218,8 +13628,7 @@ fn test_source_map_namespace_es5_basic_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -14263,8 +13672,7 @@ fn test_source_map_namespace_es5_nested_mapping() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -14314,8 +13722,7 @@ class MyComponent {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -14374,8 +13781,7 @@ class Service {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -14434,8 +13840,7 @@ class Logger {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -14496,8 +13901,7 @@ class Calculator {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -14551,8 +13955,7 @@ class Container {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -14609,8 +14012,7 @@ class Service {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -14669,8 +14071,7 @@ class Entity {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -14735,8 +14136,7 @@ class Config {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -14800,8 +14200,7 @@ class Controller {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -14865,8 +14264,7 @@ class User {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -14921,8 +14319,7 @@ fn test_source_map_async_multiple_awaits() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -14980,8 +14377,7 @@ fn test_source_map_async_try_catch() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -15038,8 +14434,7 @@ fn test_source_map_async_for_of_loop() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -15092,8 +14487,7 @@ fn test_source_map_async_iife() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -15149,8 +14543,7 @@ fn test_source_map_async_rest_params() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -15204,8 +14597,7 @@ fn test_source_map_async_default_params() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -15258,8 +14650,7 @@ fn test_source_map_async_destructuring_await() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -15315,8 +14706,7 @@ fn test_source_map_async_nested_functions() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -15371,8 +14761,7 @@ fn test_source_map_async_class_static_method() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -15427,8 +14816,7 @@ fn test_source_map_async_while_loop() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -15485,8 +14873,7 @@ fn test_source_map_es5_class_basic_iife() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -15543,8 +14930,7 @@ fn test_source_map_es5_class_constructor() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -15601,8 +14987,7 @@ fn test_source_map_es5_class_instance_methods() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -15660,8 +15045,7 @@ fn test_source_map_es5_class_static_methods() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -15719,8 +15103,7 @@ fn test_source_map_es5_class_accessors() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -15782,8 +15165,7 @@ class Dog extends Animal {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -15842,8 +15224,7 @@ class Derived extends Base {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -15898,8 +15279,7 @@ class DynamicClass {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -15957,8 +15337,7 @@ class Child extends Parent {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -16013,8 +15392,7 @@ fn test_source_map_es5_class_expression() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -16070,8 +15448,7 @@ fn test_source_map_generator_basic_yield() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -16125,8 +15502,7 @@ fn test_source_map_generator_multiple_yields() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -16180,8 +15556,7 @@ fn test_source_map_generator_yield_in_loop() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -16238,8 +15613,7 @@ function* outer() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -16293,8 +15667,7 @@ fn test_source_map_generator_with_return() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -16350,8 +15723,7 @@ fn test_source_map_generator_class_method() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -16410,8 +15782,7 @@ fn test_source_map_generator_try_catch() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -16465,8 +15836,7 @@ fn test_source_map_generator_with_parameters() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -16520,8 +15890,7 @@ function* itemGenerator(): Generator<Item> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -16577,8 +15946,7 @@ fn test_source_map_generator_expression() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -16639,8 +16007,7 @@ fn test_source_map_namespace_with_function() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -16700,8 +16067,7 @@ fn test_source_map_namespace_with_class() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -16762,8 +16128,7 @@ fn test_source_map_namespace_with_enum() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -16818,8 +16183,7 @@ fn test_source_map_nested_namespace_dot_notation() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -16878,8 +16242,7 @@ namespace Merged {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -16936,8 +16299,7 @@ fn test_source_map_namespace_with_variables() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -17000,8 +16362,7 @@ fn test_source_map_exported_namespace() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -17060,8 +16421,7 @@ fn test_source_map_namespace_nested_declaration() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -17120,8 +16480,7 @@ fn test_source_map_namespace_with_interface_only() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -17182,8 +16541,7 @@ fn test_source_map_namespace_mixed_content() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -17240,8 +16598,7 @@ const result = sum(1, 2, 3, 4, 5);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -17294,8 +16651,7 @@ const greeting = concat("Hello", " ", "World");"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -17349,8 +16705,7 @@ const product = multiply(...nums);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -17402,8 +16757,7 @@ const combined = [...first, ...second, 7, 8, 9];"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -17455,8 +16809,7 @@ const merged = { ...defaults, ...overrides, custom: true };"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -17508,8 +16861,7 @@ console.log(first, second, remaining);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -17561,8 +16913,7 @@ console.log(name, age, details);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -17619,8 +16970,7 @@ fn test_source_map_rest_parameter_class_method() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -17674,8 +17024,7 @@ const point = new Point(...coords);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -17731,8 +17080,7 @@ const result = merge(a, b, c);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -17787,8 +17135,7 @@ console.log(message);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -17840,8 +17187,7 @@ console.log(greeting);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -17895,8 +17241,7 @@ console.log(info);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -17948,8 +17293,7 @@ console.log(outer);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -18004,8 +17348,7 @@ console.log(result);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -18059,8 +17402,7 @@ greet(`Welcome, ${user}! Enjoy your stay.`);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -18112,8 +17454,7 @@ console.log(result);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -18165,8 +17506,7 @@ console.log(grade);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -18222,8 +17562,7 @@ console.log(content);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -18283,8 +17622,7 @@ console.log(fmt.format("test message"));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -18340,8 +17678,7 @@ console.log(a, b, c);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -18393,8 +17730,7 @@ console.log(first, second, third);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -18446,8 +17782,7 @@ console.log(first, last);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -18499,8 +17834,7 @@ console.log(first, third, fifth);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -18555,8 +17889,7 @@ console.log(name, city, zip);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -18608,8 +17941,7 @@ console.log(a, b, c, d);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -18661,8 +17993,7 @@ console.log(host, port, protocol);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -18714,8 +18045,7 @@ console.log(x, y, z);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -18772,8 +18102,7 @@ processCoords([10, 20]);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -18828,8 +18157,7 @@ console.log(first, second, count);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -18885,8 +18213,7 @@ console.log(city);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -18940,8 +18267,7 @@ console.log(result);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -18995,8 +18321,7 @@ console.log(item, val);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -19056,8 +18381,7 @@ console.log(result);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -19110,8 +18434,7 @@ console.log(timeout, host);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -19165,8 +18488,7 @@ console.log(result);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -19218,8 +18540,7 @@ console.log(result);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -19271,8 +18592,7 @@ console.log(obj);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -19324,8 +18644,7 @@ console.log(result);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -19384,8 +18703,7 @@ console.log(name, theme);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -19441,8 +18759,7 @@ console.log(result);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -19496,8 +18813,7 @@ console.log(result);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -19549,8 +18865,7 @@ console.log(port);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -19604,8 +18919,7 @@ console.log(result);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -19660,8 +18974,7 @@ console.log(result);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -19713,8 +19026,7 @@ console.log(value);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -19767,8 +19079,7 @@ console.log(result);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -19821,8 +19132,7 @@ console.log(merged.host, merged.port);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -19877,8 +19187,7 @@ console.log(message);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -19939,8 +19248,7 @@ console.log(endpoint, timeout, retries);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -19996,8 +19304,7 @@ console.log(value);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -20049,8 +19356,7 @@ console.log(value);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -20102,8 +19408,7 @@ console.log(obj.active);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -20155,8 +19460,7 @@ console.log(config.debug);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -20208,8 +19512,7 @@ console.log(arr);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -20261,8 +19564,7 @@ console.log(flags);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -20318,8 +19620,7 @@ console.log(a, b, c);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -20375,8 +19676,7 @@ console.log(result);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -20431,8 +19731,7 @@ console.log(name);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -20491,8 +19790,7 @@ console.log(settings);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -20547,8 +19845,7 @@ console.log(result);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -20601,8 +19898,7 @@ console.log(result);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -20654,8 +19950,7 @@ console.log(value);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -20706,8 +20001,7 @@ console.log(result);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -20758,8 +20052,7 @@ console.log(result);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -20812,8 +20105,7 @@ console.log(result);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -20865,8 +20157,7 @@ console.log(a, b);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -20920,8 +20211,7 @@ console.log(result);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -20976,8 +20266,7 @@ console.log(result);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -21033,8 +20322,7 @@ console.log(accumulator, squared, cubed, complex);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -21089,8 +20377,7 @@ console.log(value);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -21143,8 +20430,7 @@ console.log(sum);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -21201,8 +20487,7 @@ console.log(add, sub, mul, div, mod);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -21257,8 +20542,7 @@ console.log(isLess, isEqual, isGreater);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -21310,8 +20594,7 @@ console.log(fromNumber, fromString);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -21366,8 +20649,7 @@ console.log(result);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -21420,8 +20702,7 @@ console.log(sum);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -21474,8 +20755,7 @@ console.log(result);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -21527,8 +20807,7 @@ console.log(arr, obj.small, obj.large);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -21585,8 +20864,7 @@ console.log(power, asNumber);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -21640,8 +20918,7 @@ fn test_source_map_dynamic_import_basic() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -21692,8 +20969,7 @@ import(modulePath);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -21745,8 +21021,7 @@ fn test_source_map_dynamic_import_then_chain() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -21799,8 +21074,7 @@ fn test_source_map_dynamic_import_await() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -21853,8 +21127,7 @@ loadLazy();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -21907,8 +21180,7 @@ fn test_source_map_dynamic_import_destructuring() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -21963,8 +21235,7 @@ if (isAdmin) {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -22015,8 +21286,7 @@ import(`./modules/${moduleName}`);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -22068,8 +21338,7 @@ fn test_source_map_dynamic_import_catch() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -22127,8 +21396,7 @@ loadModules(["a", "b", "c"]);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -22184,8 +21452,7 @@ fn test_source_map_private_field_basic() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -22239,8 +21506,7 @@ fn test_source_map_private_field_initialized() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -22297,8 +21563,7 @@ fn test_source_map_private_field_constructor() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -22358,8 +21623,7 @@ fn test_source_map_private_method() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -22414,8 +21678,7 @@ fn test_source_map_private_field_access() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -22473,8 +21736,7 @@ fn test_source_map_private_field_assignment() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -22532,8 +21794,7 @@ fn test_source_map_private_static_field() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -22590,8 +21851,7 @@ fn test_source_map_private_static_method() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -22652,8 +21912,7 @@ class Derived extends Base {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -22729,8 +21988,7 @@ fn test_source_map_private_field_combined() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -22793,8 +22051,7 @@ class Service {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -22853,8 +22110,7 @@ class Immutable {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -22913,8 +22169,7 @@ class Composed {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -22973,8 +22228,7 @@ class Utils {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -23034,8 +22288,7 @@ class Config {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -23096,8 +22349,7 @@ class Data {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -23158,8 +22410,7 @@ class Settings {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -23219,8 +22470,7 @@ class Entity {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -23281,8 +22531,7 @@ class Child extends Parent {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -23360,8 +22609,7 @@ class ApiController {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -23421,8 +22669,7 @@ const dir = Direction.Up;"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -23478,8 +22725,7 @@ fn test_source_map_enum_with_initializers() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -23542,8 +22788,7 @@ function checkStatus(s: Status) {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -23602,8 +22847,7 @@ const level = App.LogLevel.Info;"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -23662,8 +22906,7 @@ enum Color {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -23720,8 +22963,7 @@ const statusName = HttpStatus[200];"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -23774,8 +23016,7 @@ fn test_source_map_enum_heterogeneous() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -23841,8 +23082,7 @@ class Task {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -23909,8 +23149,7 @@ function getFruitColor(fruit: Fruit): string {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -23986,8 +23225,7 @@ const fileType = FileSystem.FileType.Directory;"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -24047,8 +23285,7 @@ fn test_source_map_class_expression_named() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -24101,8 +23338,7 @@ const Derived = class extends Base {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -24157,8 +23393,7 @@ fn test_source_map_class_expression_static_methods() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -24224,8 +23459,7 @@ fn test_source_map_class_expression_accessors() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -24281,8 +23515,7 @@ const instance = new DynamicClass();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -24345,8 +23578,7 @@ const rect = new Rectangle(10, 20);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -24404,8 +23636,7 @@ const Computed = class {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -24465,8 +23696,7 @@ const instance = new classes[0]();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -24534,8 +23764,7 @@ fn test_source_map_class_expression_iife() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -24617,8 +23846,7 @@ const c1 = new registry.Counter();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -24672,8 +23900,7 @@ const comp = Component;"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -24725,8 +23952,7 @@ myModule.init();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -24778,8 +24004,7 @@ const joined = path.join("a", "b");"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -24837,8 +24062,7 @@ export class Calculator {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -24891,8 +24115,7 @@ export { helper };"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -24941,8 +24164,7 @@ export * as namespace from "./namespace";"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -24992,8 +24214,7 @@ const comp = new ReactComponent();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -25043,8 +24264,7 @@ const data: MyInterface = { name: "test" };"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -25095,8 +24315,7 @@ console.log("Imports loaded");"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -25162,8 +24381,7 @@ export { helper as utilHelper };"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -25217,8 +24435,7 @@ console.log(getTime(), getEmpty(), getNull(), getUndefined());"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -25268,8 +24485,7 @@ const result = [1, 2, 3].map(double).map(stringify);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -25321,8 +24537,7 @@ const product = multiply(2, 3);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -25373,8 +24588,7 @@ const joined = concat("a", "b", "c");"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -25427,8 +24641,7 @@ const result = getXY(point) + getFirst(arr);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -25491,8 +24704,7 @@ counter.increment();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -25549,8 +24761,7 @@ console.log(result1, result2, result3, module.getValue());"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -25606,8 +24817,7 @@ const person = createPerson("Alice", 30);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -25660,8 +24870,7 @@ const result = add5(10);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -25735,8 +24944,7 @@ console.log(pipeline(5));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -25792,8 +25000,7 @@ gen.next().then(console.log);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -25847,8 +25054,7 @@ const gen = fetchSequence(urls);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -25904,8 +25110,7 @@ const gen = outerGen();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -25962,8 +25167,7 @@ const gen = safeGenerator();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -26028,8 +25232,7 @@ const gen = stream.iterate();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -26086,8 +25289,7 @@ const processed = processStream(numberStream());"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -26146,8 +25348,7 @@ async function consume() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -26204,8 +25405,7 @@ const gen2 = namedAsyncGen();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -26267,8 +25467,7 @@ async function collect() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -26349,8 +25548,7 @@ const doubled = transform(queue, async n => n * 2);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -26411,8 +25609,7 @@ processItems(numberGen());"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -26473,8 +25670,7 @@ processData();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -26538,8 +25734,7 @@ processNested();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -26602,8 +25797,7 @@ safeIterate();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -26666,8 +25860,7 @@ processWithControl();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -26730,8 +25923,7 @@ processor.process(processor.generate());"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -26792,8 +25984,7 @@ processWithFetch();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -26852,8 +26043,7 @@ labeledLoop();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -26913,8 +26103,7 @@ findFirst().then(console.log);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -26997,8 +26186,7 @@ processEvents(stream);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -27057,8 +26245,7 @@ riskyOperation();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -27121,8 +26308,7 @@ withCleanup();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -27182,8 +26368,7 @@ guaranteedCleanup();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -27247,8 +26432,7 @@ nestedTryCatch();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -27312,8 +26496,7 @@ handleTypedError();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -27374,8 +26557,7 @@ try {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -27438,8 +26620,7 @@ fetchWithRetry("https://example.com");"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -27497,8 +26678,7 @@ console.log(conditionalThrow(false));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -27573,8 +26753,7 @@ db.query("SELECT * FROM users");"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -27665,8 +26844,7 @@ manager.processWithResource("test", async (data) => {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -27735,8 +26913,7 @@ console.log(getDay(3));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -27798,8 +26975,7 @@ console.log(classify(5));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -27864,8 +27040,7 @@ console.log(isWeekend("Saturday"));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -27932,8 +27107,7 @@ process("start");"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -27997,8 +27171,7 @@ console.log(colors);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -28062,8 +27235,7 @@ console.log(classify("animal", 1));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -28131,8 +27303,7 @@ asyncHandler("load").then(console.log);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -28198,8 +27369,7 @@ console.log(checkPermission(MODE_READ | MODE_WRITE));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -28281,8 +27451,7 @@ console.log(machine.getState());"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -28386,8 +27555,7 @@ console.log(handler.handleResponse({ status: HttpStatus.OK, message: "Success" }
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -28451,8 +27619,7 @@ findValue([[1, 2], [3, 4]], 3);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -28513,8 +27680,7 @@ console.log(searchGrid(grid));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -28579,8 +27745,7 @@ console.log(processItems([[1, 2], [-1, 3], [4, 5]]));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -28644,8 +27809,7 @@ console.log(findPath([[0, 1], [2, 0]]));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -28713,8 +27877,7 @@ console.log(processData(null));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -28781,8 +27944,7 @@ handleEvent([
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -28843,8 +28005,7 @@ asyncProcessor([Promise.resolve(1), Promise.resolve(-1)]);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -28911,8 +28072,7 @@ retryOperation(5);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -28989,8 +28149,7 @@ console.log(processor.process());"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -29079,8 +28238,7 @@ console.log(runner.run(tasks));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -29134,8 +28292,7 @@ with (obj) {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.js");
@@ -29194,8 +28351,7 @@ with (config.settings) {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.js");
@@ -29250,8 +28406,7 @@ with (math) {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.js");
@@ -29309,8 +28464,7 @@ with (outer) {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.js");
@@ -29366,8 +28520,7 @@ console.log(calculate(3));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.js");
@@ -29422,8 +28575,7 @@ with (data) {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.js");
@@ -29482,8 +28634,7 @@ with (user) {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.js");
@@ -29540,8 +28691,7 @@ console.log(state.count, state.message);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.js");
@@ -29600,8 +28750,7 @@ console.log("Error count:", errorHandler.count);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.js");
@@ -29683,8 +28832,7 @@ console.log("Processed:", processApp());"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.js");
@@ -29744,8 +28892,7 @@ try {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -29803,8 +28950,7 @@ try {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -29868,8 +29014,7 @@ try {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -29929,8 +29074,7 @@ try {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -29989,8 +29133,7 @@ console.log(strictValidator(42));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -30051,8 +29194,7 @@ try {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -30124,8 +29266,7 @@ console.log(account.getBalance());"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -30189,8 +29330,7 @@ processUrl("https://example.com");"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -30263,8 +29403,7 @@ try {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -30362,8 +29501,7 @@ main();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -30417,8 +29555,7 @@ processData({ value: 42 });"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -30476,8 +29613,7 @@ main();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -30537,8 +29673,7 @@ console.log(checkValue(10));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -30602,8 +29737,7 @@ console.log(processWhile(5));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -30670,8 +29804,7 @@ console.log(calc.add(10).subtract(3).getValue());"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -30734,8 +29867,7 @@ console.log(riskyOperation(-1));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -30794,8 +29926,7 @@ console.log(process([1, 2, 3]));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -30855,8 +29986,7 @@ processUrls(["https://example.com"]);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -30922,8 +30052,7 @@ handleAction("unknown");"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -31017,8 +30146,7 @@ main();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -31068,8 +30196,7 @@ let y = 2;"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -31116,8 +30243,7 @@ let b = 2;"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -31169,8 +30295,7 @@ const output = processData(5);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -31223,8 +30348,7 @@ iterate(3);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -31279,8 +30403,7 @@ const result = checkValue(10);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -31343,8 +30466,7 @@ calc.add(5);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -31403,8 +30525,7 @@ handleCase(1);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -31454,8 +30575,7 @@ const result = a + b + c;"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -31520,8 +30640,7 @@ safeDivide(10, 2);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -31616,8 +30735,7 @@ service.process();;;"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -31670,8 +30788,7 @@ const result = getValue();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -31721,8 +30838,7 @@ doNothing();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -31771,8 +30887,7 @@ const result = calculate(10, 5);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -31827,8 +30942,7 @@ const sign = getSign(-5);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -31880,8 +30994,7 @@ const person = createPerson("Alice", 30);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -31939,8 +31052,7 @@ const matrix = getMatrix();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -32003,8 +31115,7 @@ const value = calc.getValue();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -32064,8 +31175,7 @@ const result3 = addFive(10);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -32126,8 +31236,7 @@ main();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -32227,8 +31336,7 @@ const filtered = processor.filter((n) => n > 2);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -32286,8 +31394,7 @@ const result = findFirst([1, 2, 3, 4, 5], 3);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -32343,8 +31450,7 @@ const result = sumPositive([1, -2, 3, -4, 5]);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -32402,8 +31508,7 @@ const output = readUntilEnd(["a", "b", "END", "c"]);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -32462,8 +31567,7 @@ const processed = processNonEmpty(["a", "", "b", "", "c"]);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -32519,8 +31623,7 @@ const pos = findInMatrix([[1, 2], [3, 4]], 3);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -32578,8 +31681,7 @@ const validRows = processRows([[1, 2], [-1, 2], [3, 4]]);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -32643,8 +31745,7 @@ const today = getDayName(1);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -32702,8 +31803,7 @@ const input = readInput();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -32822,8 +31922,7 @@ const sums = iterator.sumPositiveByRow();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -32878,8 +31977,7 @@ Math.random();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -32931,8 +32029,7 @@ x = y = z = 0;"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -32987,8 +32084,7 @@ arr[++i];"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -33043,8 +32139,7 @@ str.charAt(0);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -33107,8 +32202,7 @@ bits >>>= 1;"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -33162,8 +32256,7 @@ check(value);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -33220,8 +32313,7 @@ maybeCall(() => console.log("called"));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -33277,8 +32369,7 @@ widgets.push(new Widget("checkbox"));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -33332,8 +32423,7 @@ typeof undefined;"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -33422,8 +32512,7 @@ arr.reverse();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -33476,8 +32565,7 @@ console.log(z);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -33526,8 +32614,7 @@ console.log(d);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -33575,8 +32662,7 @@ console.log(a, b, c, x, y, z, m, n);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -33628,8 +32714,7 @@ console.log(num, str, bool, arr, obj, fn(5));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -33679,8 +32764,7 @@ console.log(a, b, renamed, x, y, rest);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -33731,8 +32815,7 @@ console.log(first, second, a, c, head, tail, x, y, z);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -33790,8 +32873,7 @@ const output = processData(25);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -33855,8 +32937,7 @@ console.log(sum);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -33915,8 +32996,7 @@ console.log(fn(5), arrow(10), obj.method(), arr, cond, template);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -33992,8 +33072,7 @@ console.log(count, items);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -34051,8 +33130,7 @@ sayGoodbye();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -34115,8 +33193,7 @@ console.log(processArray([1, 2, 3]));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -34177,8 +33254,7 @@ console.log(formatMessage("Hello"));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -34239,8 +33315,7 @@ logAll("[DEBUG]", "one", "two", "three");"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -34311,8 +33386,7 @@ console.log(counter());"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -34378,8 +33452,7 @@ console.log(gen.next().value);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -34442,8 +33515,7 @@ fetchData("https://example.com").then(console.log);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -34502,8 +33574,7 @@ console.log(sumArray([1, 2, 3, 4, 5]));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -34566,8 +33637,7 @@ console.log(swap<string, number>(["hello", 42]));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -34672,8 +33742,7 @@ console.log(numbers);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -34731,8 +33800,7 @@ console.log(dog.name);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -34805,8 +33873,7 @@ console.log(calc.add(5).multiply(2).getResult());"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -34874,8 +33941,7 @@ Counter.reset();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -34955,8 +34021,7 @@ console.log(person.age);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -35059,8 +34124,7 @@ console.log(rect.area());"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -35135,8 +34199,7 @@ console.log(admin.getRole());"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -35216,8 +34279,7 @@ namedLogger.log("World");"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -35319,8 +34381,7 @@ console.log(strPair.toArray());"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -35424,8 +34485,7 @@ console.log(bike.getSpeed());"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -35559,8 +34619,7 @@ console.log(cached.getFromCache(100));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -35578,7 +34637,9 @@ console.log(cached.getFromCache(100));"#;
     let decoded = decode_mappings(mappings);
 
     assert!(
-        output.contains("BaseService") || output.contains("EntityService") || output.contains("CachedService"),
+        output.contains("BaseService")
+            || output.contains("EntityService")
+            || output.contains("CachedService"),
         "expected output to contain BaseService, EntityService, or CachedService. output: {output}"
     );
     assert!(
@@ -35619,8 +34680,7 @@ console.log(person.name);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -35676,8 +34736,7 @@ console.log(value, point.x);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -35741,8 +34800,7 @@ console.log(calc.multiply(2, 6));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -35807,8 +34865,7 @@ console.log(dog.name, dog.breed);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -35874,8 +34931,7 @@ printPerson(person);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -35943,8 +34999,7 @@ console.log(pair.key, pair.value);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -36009,8 +35064,7 @@ console.log(processResult(failure));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -36082,8 +35136,7 @@ console.log(pickedUser.id, pickedUser.name);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -36144,8 +35197,7 @@ console.log(checkType(123));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -36248,8 +35300,7 @@ console.log(createEntity("user", userInput));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -36324,8 +35375,7 @@ createConnection(fullConfig);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -36394,8 +35444,7 @@ console.log(distance(point, circle.center));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -36479,8 +35528,7 @@ console.log(getValues(dict));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -36558,8 +35606,7 @@ console.log(format(42, "Number"));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -36626,8 +35673,7 @@ console.log(point.x, point.y);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -36710,8 +35756,7 @@ console.log(describeBox(heavyBox));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -36791,8 +35836,7 @@ callback(null, "success");"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -36887,8 +35931,7 @@ console.log(v1.compareTo(v2));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -36977,8 +36020,7 @@ logger("World");"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -37078,8 +36120,7 @@ console.log(config.name, config.timeout);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -37167,8 +36208,7 @@ console.log(employee.address.city);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -37250,8 +36290,7 @@ console.log(processCoord(coord));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -37339,8 +36378,7 @@ handleStatus(status);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -37428,8 +36466,7 @@ console.log(processUnknown(42));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -37532,8 +36569,7 @@ console.log(builder.getItems());"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -37617,8 +36653,7 @@ console.log(converter.convert("true", "boolean"));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -37701,8 +36736,7 @@ console.log("Service called");"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -37806,8 +36840,7 @@ console.log(obs.current, obs.previous);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -37884,8 +36917,7 @@ for (const num of range) {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -37988,8 +37020,7 @@ console.log(elemNode.tagName, elemNode.attributes);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -38077,8 +37108,7 @@ console.log(greet(person));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -38163,8 +37193,7 @@ console.log(listNode.value);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -38259,8 +37288,7 @@ console.log(handleResult(error));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -38352,8 +37380,7 @@ console.log(fish.name, bird.name);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -38433,8 +37460,7 @@ console.log(params.apply(42, "hello", "world"));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -38523,8 +37549,7 @@ console.log(counterReducer(0, { type: "increment" }));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -38622,8 +37647,7 @@ updateUser(1, update.data);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -38720,8 +37744,7 @@ myPlugin.init();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -38826,8 +37849,7 @@ console.log(query.execute());"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -38924,8 +37946,7 @@ trafficLight.transition("red");"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -38983,8 +38004,7 @@ const hasRead = (userPerms & Permission.Read) !== 0;"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -39044,8 +38064,7 @@ function handleResponse(status: HttpStatus): string {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -39099,8 +38118,7 @@ const val = Computed.Third;"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -39156,8 +38174,7 @@ const status: LocalStatus = LocalStatus.Active;"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -39216,8 +38233,7 @@ move(Direction.Up);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -39274,8 +38290,7 @@ const result = getColorName("Red");"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -39336,8 +38351,7 @@ const priority = App.Sub.Priority.High;"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -39401,8 +38415,7 @@ const task = createTask("Test task");"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -39462,8 +38475,7 @@ log(LogLevel.Error, "Something went wrong");"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -39555,8 +38567,7 @@ console.log(issue.isPriority(Priority.Medium));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -39616,8 +38627,7 @@ person.age = 30;"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -39670,8 +38680,7 @@ console.log(config.host, config.port);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -39729,8 +38738,7 @@ console.log(Counter.count);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -39784,8 +38792,7 @@ console.log(App.version, App.features);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -39840,8 +38847,7 @@ console.log(p[nameKey]);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -39904,8 +38910,7 @@ account.deposit(50);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -39967,8 +38972,7 @@ const logger = Logger.getInstance();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -40020,8 +39024,7 @@ console.log(c.PI, Constants.MAX_SIZE);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -40092,8 +39095,7 @@ rect.height = 5;"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -40177,8 +39179,7 @@ console.log(entity.name, entity.id, CompleteEntity.instances);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -40243,8 +39244,7 @@ const app = new AppComponent();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -40310,8 +39310,7 @@ calc.add(2, 3);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -40383,8 +39382,7 @@ const user = new User("john", "password123");"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -40456,8 +39454,7 @@ class UserService {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -40546,8 +39543,7 @@ class ApiClient {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -40618,8 +39614,7 @@ config.apiKey = 'secret-key';"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -40696,8 +39691,7 @@ dog.makeSound();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -40776,8 +39770,7 @@ console.log(db1 === db2);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -40858,8 +39851,7 @@ service.process({});"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -40968,8 +39960,7 @@ repo.save({});"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -41032,8 +40023,7 @@ fetchAll(['url1', 'url2', 'url3']);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -41089,8 +40079,7 @@ fetchWithTimeout('/api/data');"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -41158,8 +40147,7 @@ fetchWithRetry('/api/data').catch(console.error);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -41226,8 +40214,7 @@ async function mixed(): Promise<void> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -41291,8 +40278,7 @@ counter.increment().then(console.log);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -41362,8 +40348,7 @@ resource.initialize();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -41434,8 +40419,7 @@ useConnection();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -41507,8 +40491,7 @@ queue.add('item2');"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -41577,8 +40560,7 @@ emitter.emit('data', { value: 42 });"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -41682,8 +40664,7 @@ const processor = new DataProcessor('https://api.example.com');
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -41754,8 +40735,7 @@ console.log([...gen]);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -41819,8 +40799,7 @@ console.log(machine.next('success'));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -41890,8 +40869,7 @@ console.log([...gen1], [...gen2]);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -41962,8 +40940,7 @@ console.log([...flatten([[1, 2], [3, 4], [5]])]);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -42042,8 +41019,7 @@ console.log([...range]);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -42119,8 +41095,7 @@ console.log([...take(repeat('x'), 3)]);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -42187,8 +41162,7 @@ console.log([...people], [...names]);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -42271,8 +41245,7 @@ console.log([...traverseTree(tree)]);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -42361,8 +41334,7 @@ console.log([...result]);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -42472,8 +41444,7 @@ console.log([...stream.zip(['a', 'b', 'c'])]);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -42542,8 +41513,7 @@ const dog = new Dog("Buddy", "Labrador");"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -42627,8 +41597,7 @@ d.increment();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -42739,8 +41708,7 @@ shapes.forEach(s => console.log(s.describe(), s.area()));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -42855,8 +41823,7 @@ console.log(player.toString());"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -42950,8 +41917,7 @@ console.log(entity.serialize());"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -43047,8 +42013,7 @@ console.log(config.get("debug"), config.get("timeout"));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -43141,8 +42106,7 @@ console.log(Database.getConnectionCount());"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -43258,8 +42222,7 @@ const transports: Transport[] = [
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -43353,8 +42316,7 @@ const c = a.clone();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -43575,8 +42537,7 @@ console.log(JSON.stringify(user.toJSON(), null, 2));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -43665,8 +42626,7 @@ console.log(counter.getCount());"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -43735,8 +42695,7 @@ console.log(IdGenerator.getNextId());"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -43840,8 +42799,7 @@ console.log(result);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -43938,8 +42896,7 @@ console.log(person.age);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -44056,8 +43013,7 @@ console.log(cat.describe());"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -44158,8 +43114,7 @@ console.log(SecureStorage.getInstance(storage));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -44243,8 +43198,7 @@ console.log(container.getValue());"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -44330,8 +43284,7 @@ console.log(instance1 === instance3);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -44502,8 +43455,7 @@ console.log(EventEmitter.getEmitter(emitter) === emitter);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -44581,8 +43533,7 @@ console.log(range.toArray());"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -44675,8 +43626,7 @@ queue.close();
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -44744,8 +43694,7 @@ console.log(obj[customProperty]);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -44827,8 +43776,7 @@ console.log(Object.prototype.toString.call(named));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -44910,8 +43858,7 @@ console.log(obj2 instanceof ExtendedCustomType);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -44992,8 +43939,7 @@ console.log(doubled instanceof SpecialArray);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -45074,8 +44020,7 @@ console.log(`${total}`);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -45154,8 +44099,7 @@ console.log(combined.length);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -45301,8 +44245,7 @@ asyncCollection.add("a", "b", "c");
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -45396,8 +44339,7 @@ console.log(getMetadata("column", service, "name"));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -45494,8 +44436,7 @@ console.log(paramMetadata);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -45600,8 +44541,7 @@ console.log(config.port);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -45711,8 +44651,7 @@ console.log(calc.expensiveOperation(5));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -45818,8 +44757,7 @@ console.log(person.name, person.age);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -45932,8 +44870,7 @@ console.log(db1 === db2);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -46038,8 +44975,7 @@ console.log(typeMetadata.get(entity));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -46236,8 +45172,7 @@ console.log(methodMetadata.get(UserController.prototype));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -46334,8 +45269,7 @@ server.start(3000);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -46430,8 +45364,7 @@ loader.loadAll(['./plugin1', './plugin2']).then(() => {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -46503,8 +45436,7 @@ export { useHelper };"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -46586,8 +45518,7 @@ export const API_URL = 'https://api.example.com';"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -46683,8 +45614,7 @@ instance.link().then(() => console.log('Linked'));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -46795,8 +45725,7 @@ loadPolyfills().then(() => console.log('Polyfills loaded'));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -46878,8 +45807,7 @@ console.log(sum, unique, formatted);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -47054,8 +45982,7 @@ app.initialize().then(() => app.start(3000));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -47118,8 +46045,7 @@ fn test_source_map_jsx_es5_basic_element() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.tsx");
@@ -47168,8 +46094,7 @@ fn test_source_map_jsx_es5_fragment() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.tsx");
@@ -47216,8 +46141,7 @@ const element = <div {...props} data-testid="test">Content</div>;"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.tsx");
@@ -47264,8 +46188,7 @@ const br = <br />;"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.tsx");
@@ -47325,8 +46248,7 @@ fn test_source_map_jsx_es5_nested_elements() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.tsx");
@@ -47381,8 +46303,7 @@ const element = (
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.tsx");
@@ -47442,8 +46363,7 @@ const app = (
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.tsx");
@@ -47504,8 +46424,7 @@ const form = (
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.tsx");
@@ -47566,8 +46485,7 @@ const element = (
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.tsx");
@@ -47668,8 +46586,7 @@ const App = (
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.tsx");
@@ -47747,8 +46664,7 @@ console.log(person.name);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -47815,8 +46731,7 @@ console.log(Counter.count);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -47881,8 +46796,7 @@ obj[propName] = "test";"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -47956,8 +46870,7 @@ console.log(config.value);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -48023,8 +46936,7 @@ console.log(rect.area, rect.perimeter, rect.diagonal);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -48096,8 +47008,7 @@ logger.error = "Failed";"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -48174,8 +47085,7 @@ console.log(derived.value, derived.doubleValue);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -48262,8 +47172,7 @@ input.name = "Alice";"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -48341,8 +47250,7 @@ console.log(loader.config);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -48474,8 +47382,7 @@ console.log(Person.count);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -48549,8 +47456,7 @@ console.log(sum);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -48606,8 +47512,7 @@ console.log(keys);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -48666,8 +47571,7 @@ for (const { id, value } of entries) {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -48726,8 +47630,7 @@ console.log(settings);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -48783,8 +47686,7 @@ console.log(chars.join("-"));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -48841,8 +47743,7 @@ for (const item of set) {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -48904,8 +47805,7 @@ console.log(total);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -48976,8 +47876,7 @@ console.log(result);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -49050,8 +47949,7 @@ for (const n of generateNumbers()) {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -49166,8 +48064,7 @@ console.log("Config copy:", configCopy);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -49241,8 +48138,7 @@ fetchData("https://api.example.com/data");"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -49315,8 +48211,7 @@ processWithCleanup();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -49394,8 +48289,7 @@ getUserWithPostsChain(2);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -49467,8 +48361,7 @@ asyncWithDefault();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -49555,8 +48448,7 @@ ApiClient.create("https://api.example.com");"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -49626,8 +48518,7 @@ const asyncResult = (async () => {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -49705,8 +48596,7 @@ complexOperation();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -49789,8 +48679,7 @@ fetchFirstResponse();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -49877,8 +48766,7 @@ wrapError();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -50010,8 +48898,7 @@ initApp.then(function(result) { console.log(result); });"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -50087,8 +48974,7 @@ console.log(gen.next().value);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -50156,8 +49042,7 @@ console.log(gen2.next().value);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -50224,8 +49109,7 @@ for (const value of gen) {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -50295,8 +49179,7 @@ const gen2 = conditionalReturn(true);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -50369,8 +49252,7 @@ console.log(gen2.next().value);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -50450,8 +49332,7 @@ console.log(ids.next().value);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -50536,8 +49417,7 @@ for (const val of tree.inOrder()) {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -50625,8 +49505,7 @@ for (const n of DataProcessor.range(1, 10)) {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -50710,8 +49589,7 @@ processAsync();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -50847,8 +49725,7 @@ for (const n of collection.filter(function(x) { return x > 5; })) {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -50921,8 +49798,7 @@ console.log(x, y);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -50979,8 +49855,7 @@ console.log(host + ":" + port);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -51038,8 +49913,7 @@ console.log(one, two, three, four);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -51101,8 +49975,7 @@ console.log(theme, notifications);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -51166,8 +50039,7 @@ console.log(a, b, c, d, code);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -51227,8 +50099,7 @@ console.log(process({ value: 42 }));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -51292,8 +50163,7 @@ console.log(greet({ firstName: "John", lastName: "Doe" }));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -51364,8 +50234,7 @@ console.log(processItems([10, 20, 30, 40]));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -51435,8 +50304,7 @@ for (const [a, b, c] of matrix) {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -51594,8 +50462,7 @@ console.log(dynamicValue);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -51666,8 +50533,7 @@ console.log(flat);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -51726,8 +50592,7 @@ console.log(updated);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -51790,8 +50655,7 @@ Math.max(...[1, 5, 3, 9, 2]);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -51850,8 +50714,7 @@ console.log(alphabet);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -51909,8 +50772,7 @@ console.log(profile);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -51978,8 +50840,7 @@ console.log(formatItems("Values: ", 1, 2, 3));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -52045,8 +50906,7 @@ processArray([1, 2, 3, 4, 5]);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -52108,8 +50968,7 @@ extractUser({ username: "bob", email: "bob@example.com", verified: true });"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -52176,8 +51035,7 @@ process({ items: [1, 2, 3], debug: true, verbose: false });"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -52314,8 +51172,7 @@ console.log(point);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -52399,8 +51256,7 @@ console.log(obj.greet());"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -52470,8 +51326,7 @@ console.log(created.value);"##;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -52552,8 +51407,7 @@ logger.log("Hello");"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -52634,8 +51488,7 @@ console.log(derived.greet());"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -52716,8 +51569,7 @@ console.log(Registry.get("test"));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -52787,8 +51639,7 @@ console.log(obj.getType());"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -52866,8 +51717,7 @@ handlers.forEach(Handler => {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -52944,8 +51794,7 @@ clickHandler.execute();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -53034,8 +51883,7 @@ console.log(result);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -53203,8 +52051,7 @@ console.log(accessorInstance.doubled);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -53284,8 +52131,7 @@ console.log(toString(42));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -53357,8 +52203,7 @@ console.log(factorial(5));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -53449,8 +52294,7 @@ handler.handleHover();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -53520,8 +52364,7 @@ console.log(spread(10, 20, 30, 40));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -53597,8 +52440,7 @@ console.log(createUser("Bob"));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -53670,8 +52512,7 @@ console.log(extractValues({ a: 1, b: 2, c: 3, d: 4 }));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -53752,8 +52593,7 @@ Logger.log("Test message");"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -53836,8 +52676,7 @@ console.log(pipeline(2));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -53915,8 +52754,7 @@ console.log(names, adults, totalAge, youngest);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -54048,8 +52886,7 @@ console.log(mapArray([1, 2, 3], x => x * 2));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -54122,8 +52959,7 @@ console.log(greeting, simple, empty, withNewline);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -54177,8 +53013,7 @@ console.log(message, info, calc, nested);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -54232,8 +53067,7 @@ console.log(deep, complex, conditional);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -54295,8 +53129,7 @@ console.log(highlighted, query);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -54360,8 +53193,7 @@ console.log(html, code, json);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -54426,8 +53258,7 @@ console.log(msg1, msg2, msg3, msg4);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -54485,8 +53316,7 @@ console.log(msg1, msg2, msg3, msg4, msg5, msg6);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -54545,8 +53375,7 @@ console.log(msg1, msg2, msg3, msg4, msg5);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -54605,8 +53434,7 @@ console.log(msg1, msg2, msg3, msg4, msg5, msg6, msg7);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -54747,8 +53575,7 @@ console.log(iife);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -54825,8 +53652,7 @@ console.log(Counter.count);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -54896,8 +53722,7 @@ console.log(Config.getUrl());"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -54972,8 +53797,7 @@ console.log(InitOrder.a, InitOrder.b, InitOrder.c);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -55039,8 +53863,7 @@ console.log(SecretHolder.getSecret(), SecretHolder.getCounter());"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -55109,8 +53932,7 @@ console.log(Derived.getCombined());"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -55190,8 +54012,7 @@ console.log(Database.connection);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -55259,8 +54080,7 @@ console.log(ConfigMap.get(KEY1), ConfigMap.get(KEY2));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -55343,8 +54163,7 @@ console.log(AsyncLoader.data, EventEmitter.handlers);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -55431,8 +54250,7 @@ console.log(SafeInit.getValue(), Validator.rules.size);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -55602,8 +54420,7 @@ console.log(DynamicClass[KEY]);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -55710,8 +54527,7 @@ console.log(service.process("test"));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -55812,8 +54628,7 @@ api.fetchData(1).then(console.log);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -55891,8 +54706,7 @@ console.log(getMetadata("author", Component));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -55979,8 +54793,7 @@ console.log(userService.createUser("John", "john@example.com", 30));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -56085,8 +54898,7 @@ console.log(config.computedValue);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -56170,8 +54982,7 @@ console.log(person.greet());"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -56274,8 +55085,7 @@ console.log(service.newMethod());"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -56365,8 +55175,7 @@ console.log(processor.process(5));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -56466,8 +55275,7 @@ admin.save();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -56666,8 +55474,7 @@ child.init();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -56757,8 +55564,7 @@ console.log(calc.calculate("*", 6, 7));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -56837,8 +55643,7 @@ console.log(IdGenerator.getCount());"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -56948,8 +55753,7 @@ console.log(cache.size);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -57040,8 +55844,7 @@ logger.debug("Test message");"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -57138,8 +55941,7 @@ queue.enqueue(async () => console.log("Task 2"));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -57230,8 +56032,7 @@ console.log(gen.getOdds());"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -57330,8 +56131,7 @@ console.log(account.getHistory());"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -57431,8 +56231,7 @@ console.log(result);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -57528,8 +56327,7 @@ console.log(handler.withGeneric(123, n => n.toString()));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -57719,8 +56517,7 @@ console.log(dog.describe());"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -57801,8 +56598,7 @@ async function consume() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -57866,8 +56662,7 @@ async function main() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -57932,8 +56727,7 @@ async function process() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -58006,8 +56800,7 @@ async function nestedForAwait() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -58076,8 +56869,7 @@ async function handleErrors() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -58148,8 +56940,7 @@ class Pipeline {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -58220,8 +57011,7 @@ async function run() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -58293,8 +57083,7 @@ async function collectResults() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -58368,8 +57157,7 @@ async function consume() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -58554,8 +57342,7 @@ main().catch(console.error);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -58637,8 +57424,7 @@ console.log(city, name);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -58707,8 +57493,7 @@ class Api {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -58777,8 +57562,7 @@ const dynamic = data?.records?.["dynamic-key"];"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -58846,8 +57630,7 @@ console.log(deep, partial);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -58915,8 +57698,7 @@ console.log(theme, timeout, nested);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -58985,8 +57767,7 @@ function chainedCalls(handler: Handler | null) {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -59059,8 +57840,7 @@ console.log(result);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -59127,8 +57907,7 @@ console.log(obj);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -59199,8 +57978,7 @@ console.log(result);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -59361,8 +58139,7 @@ const mixedAccess = appState?.currentUser?.friends?.[0]?.profile?.settings?.them
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -59437,8 +58214,7 @@ console.log(result1, result2, result3);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -59499,8 +58275,7 @@ console.log(result1, result2, result3, result4);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -59565,8 +58340,7 @@ console.log(result1, result2, result3, result4);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -59633,8 +58407,7 @@ console.log(result1, result2, result3, chainResult);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -59710,8 +58483,7 @@ console.log(result1, result2, classResult);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -59786,8 +58558,7 @@ console.log(result, containerData);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -59853,8 +58624,7 @@ console.log(condition, ternaryResult, chainResult);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -59926,8 +58696,7 @@ console.log(finalConfig, merged, partialConfig);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -60013,8 +58782,7 @@ console.log(theme, language, email, service.getTheme());"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -60189,8 +58957,7 @@ console.log(result, multiResult);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -60271,8 +59038,7 @@ console.log(value1, value2, result1, result2);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -60335,8 +59101,7 @@ console.log(value1, value2, result1, result2);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -60401,8 +59166,7 @@ console.log(value1, value2, value3, result1, result2);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -60473,8 +59237,7 @@ console.log(config);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -60539,8 +59302,7 @@ console.log(arr, obj);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -60611,8 +59373,7 @@ console.log(a, b, c, cfg);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -60696,8 +59457,7 @@ console.log(nestedFunction());"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -60790,8 +59550,7 @@ console.log(cache.getOrSet("key", "value"));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -60878,8 +59637,7 @@ console.log(value1, value2, sideEffectResult);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -61046,8 +59804,7 @@ console.log(updated);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -61125,8 +59882,7 @@ console.log(Counter.count);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -61198,8 +59954,7 @@ console.log(InitOrder.a, InitOrder.b, InitOrder.c);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -61273,8 +60028,7 @@ console.log(MultiBlock.getConfig());"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -61347,8 +60101,7 @@ console.log(PrivateFields.incrementCounter());"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -61424,8 +60177,7 @@ console.log(PrivateMethods.process("hello"));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -61497,8 +60249,7 @@ StaticInit.fetch("users");"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -61568,8 +60319,7 @@ console.log(ComputedProps.get(KEY1));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -61652,8 +60402,7 @@ AsyncInit.getData().then(console.log);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -61742,8 +60491,7 @@ console.log(SafeInit.isReady());"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -61906,8 +60654,7 @@ logger.log("DI working!");"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -62008,8 +60755,7 @@ service.getUser().then(console.log);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -62099,8 +60845,7 @@ handler.handleClick({ type: "click" });"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -62200,8 +60945,7 @@ ConfigManager.initialize().then(() => console.log("Config ready"));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -62295,8 +61039,7 @@ const stream = new DataStream(["a", "b", "c", "d", "e"]);
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -62412,8 +61155,7 @@ AsyncService.create().then(service => service.getData());"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -62564,8 +61306,7 @@ const service = new UserService();
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -62653,8 +61394,7 @@ console.log(alphabet.next().value);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -62732,8 +61472,7 @@ console.log("Final count:", result.value);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -62815,8 +61554,7 @@ console.log([...chained]);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -62922,8 +61660,7 @@ for (const n of DataIterator.range(10, 15)) {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -63034,8 +61771,7 @@ for (const s of tcf) {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -63188,8 +61924,7 @@ console.log("Total processed:", result.value);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -63264,8 +61999,7 @@ console.log(counter.getCount());"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -63329,8 +62063,7 @@ counter.reset();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -63402,8 +62135,7 @@ console.log(calc.multiply(5, 3));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -63475,8 +62207,7 @@ console.log(temp.getFahrenheit());"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -63548,8 +62279,7 @@ IdGenerator.reset();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -63664,8 +62394,7 @@ console.log(BankAccount.getAccountCount());"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -63749,8 +62478,7 @@ const firstItem = first([1, 2, 3]);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -63831,8 +62559,7 @@ list.add(new NumberWrapper(2));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -63929,8 +62656,7 @@ const repo = new UserRepository();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -64013,8 +62739,7 @@ const picked = pick({ x: 1, y: 2, z: 3 }, ["x", "z"]);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -64093,8 +62818,7 @@ addEventListener("click", (e) => console.log(e));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -64224,8 +62948,7 @@ const result = mapper.map({ x: 1 }, (s) => ({ y: s.x * 2 }));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -64326,8 +63049,7 @@ const result = callWithArgs(add, 1, 2);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -64405,8 +63127,7 @@ const strings = extractStrings([1, "a", 2, "b"]);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -64492,8 +63213,7 @@ const flat = flatten([[1, 2], [3, 4]]);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -64583,8 +63303,7 @@ const asyncVal = ensureAsync(123);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -64679,8 +63398,7 @@ const errorWrapped = wrapResult(new Error("oops"));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -64811,8 +63529,7 @@ registry.update("user1", { age: 31 });"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -64894,8 +63611,7 @@ console.log(doubled, evens, sum);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -64974,8 +63690,7 @@ export { internalAdd as sum, internalSubtract as difference };"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -65045,8 +63760,7 @@ export { useLibraries };"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -65117,8 +63831,7 @@ console.log(app, element, sorted);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -65195,8 +63908,7 @@ renderApp();"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -65309,8 +64021,7 @@ export { defaultClient as default };"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -65412,8 +64123,7 @@ console.log(updatedUser);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -65520,8 +64230,7 @@ console.log(validateUser(user));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -65628,8 +64337,7 @@ console.log(readonlyState.count);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -65739,8 +64447,7 @@ console.log(publicUser, picked);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -65857,8 +64564,7 @@ console.log(roles, countries, indexed);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -66021,8 +64727,7 @@ console.log(newUser, formState);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -66140,8 +64845,7 @@ processNumber(123);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -66242,8 +64946,7 @@ partialSimple(123);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -66353,8 +65056,7 @@ console.log(simple, configured);"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -66474,8 +65176,7 @@ console.log(users.map(u => u.greet()));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -66589,8 +65290,7 @@ console.log(boundGreet(), boundCalculate(5), counter.getCount());"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
@@ -66763,8 +65463,7 @@ console.log(api, doubleAndStringify(21));"#;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");

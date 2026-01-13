@@ -1,11 +1,11 @@
+use super::is_valid_identifier_name;
 use super::{ParamTransform, ParamTransformPlan, RestParamTransform, ThinPrinter};
-use crate::parser::{NodeIndex, NodeList};
 use crate::parser::syntax_kind_ext;
 use crate::parser::thin_node::{MethodDeclData, ThinNode};
+use crate::parser::{NodeIndex, NodeList};
 use crate::scanner::SyntaxKind;
 use crate::transform_context::TransformDirective;
 use crate::transforms::class_es5::ClassES5Emitter;
-use super::is_valid_identifier_name;
 
 impl<'a> ThinPrinter<'a> {
     pub(super) fn emit_object_literal_entries_es5(&mut self, elements: &[NodeIndex]) {
@@ -35,7 +35,9 @@ impl<'a> ThinPrinter<'a> {
     }
 
     pub(super) fn emit_object_literal_member_es5(&mut self, prop_idx: NodeIndex) {
-        let Some(node) = self.arena.get(prop_idx) else { return };
+        let Some(node) = self.arena.get(prop_idx) else {
+            return;
+        };
 
         match node.kind {
             k if k == syntax_kind_ext::SHORTHAND_PROPERTY_ASSIGNMENT => {
@@ -84,7 +86,9 @@ impl<'a> ThinPrinter<'a> {
 
     /// Check if a property member has a computed property name
     pub(super) fn is_computed_property_member(&self, idx: NodeIndex) -> bool {
-        let Some(node) = self.arena.get(idx) else { return false };
+        let Some(node) = self.arena.get(idx) else {
+            return false;
+        };
 
         let name_idx = match node.kind {
             k if k == syntax_kind_ext::PROPERTY_ASSIGNMENT => {
@@ -96,7 +100,7 @@ impl<'a> ThinPrinter<'a> {
             k if k == syntax_kind_ext::GET_ACCESSOR || k == syntax_kind_ext::SET_ACCESSOR => {
                 self.arena.get_accessor(node).map(|a| a.name)
             }
-            _ => None
+            _ => None,
         };
 
         if let Some(name_idx) = name_idx {
@@ -117,12 +121,18 @@ impl<'a> ThinPrinter<'a> {
         }
 
         // Find the index of the first computed property
-        let first_computed_idx = elements.iter()
-            .position(|&idx| self.is_computed_property_member(idx) || {
-                self.arena.get(idx).map(|n| {
-                    n.kind == syntax_kind_ext::SPREAD_ASSIGNMENT
-                        || n.kind == syntax_kind_ext::SPREAD_ELEMENT
-                }).unwrap_or(false)
+        let first_computed_idx = elements
+            .iter()
+            .position(|&idx| {
+                self.is_computed_property_member(idx) || {
+                    self.arena
+                        .get(idx)
+                        .map(|n| {
+                            n.kind == syntax_kind_ext::SPREAD_ASSIGNMENT
+                                || n.kind == syntax_kind_ext::SPREAD_ELEMENT
+                        })
+                        .unwrap_or(false)
+                }
             })
             .unwrap_or(elements.len());
 
@@ -160,7 +170,9 @@ impl<'a> ThinPrinter<'a> {
 
     /// Emit a property assignment in ES5 computed property transform
     pub(super) fn emit_property_assignment_es5(&mut self, prop_idx: NodeIndex, temp_var: &str) {
-        let Some(node) = self.arena.get(prop_idx) else { return };
+        let Some(node) = self.arena.get(prop_idx) else {
+            return;
+        };
 
         match node.kind {
             k if k == syntax_kind_ext::PROPERTY_ASSIGNMENT => {
@@ -240,7 +252,9 @@ impl<'a> ThinPrinter<'a> {
     pub(super) fn emit_assignment_target_es5(&mut self, name_idx: NodeIndex, temp_var: &str) {
         self.write(temp_var);
 
-        let Some(name_node) = self.arena.get(name_idx) else { return };
+        let Some(name_node) = self.arena.get(name_idx) else {
+            return;
+        };
 
         if name_node.kind == syntax_kind_ext::COMPUTED_PROPERTY_NAME {
             // Computed property: _a[expr]
@@ -272,7 +286,9 @@ impl<'a> ThinPrinter<'a> {
 
     /// Emit property key as a string for Object.defineProperty
     pub(super) fn emit_property_key_string(&mut self, name_idx: NodeIndex) {
-        let Some(name_node) = self.arena.get(name_idx) else { return };
+        let Some(name_node) = self.arena.get(name_idx) else {
+            return;
+        };
 
         if name_node.kind == syntax_kind_ext::COMPUTED_PROPERTY_NAME {
             // Computed property: emit the expression directly
@@ -330,7 +346,9 @@ impl<'a> ThinPrinter<'a> {
 
             // If body is not a block (concise arrow), wrap with return
             let body_node = self.arena.get(func.body);
-            let is_block = body_node.map(|n| n.kind == syntax_kind_ext::BLOCK).unwrap_or(false);
+            let is_block = body_node
+                .map(|n| n.kind == syntax_kind_ext::BLOCK)
+                .unwrap_or(false);
             let needs_param_prologue = param_transforms.has_transforms();
 
             if is_block {
@@ -481,12 +499,7 @@ impl<'a> ThinPrinter<'a> {
         func_name: &str,
         this_expr: &str,
     ) {
-        self.emit_async_function_es5_body(
-            func_name,
-            &func.parameters.nodes,
-            func.body,
-            this_expr,
-        );
+        self.emit_async_function_es5_body(func_name, &func.parameters.nodes, func.body, this_expr);
     }
 
     pub(super) fn emit_async_function_es5_body(
@@ -570,13 +583,20 @@ impl<'a> ThinPrinter<'a> {
         })
     }
 
-    pub(super) fn emit_function_parameters_es5(&mut self, params: &[NodeIndex]) -> ParamTransformPlan {
+    pub(super) fn emit_function_parameters_es5(
+        &mut self,
+        params: &[NodeIndex],
+    ) -> ParamTransformPlan {
         let mut plan = ParamTransformPlan::default();
         let mut first = true;
 
         for (index, &param_idx) in params.iter().enumerate() {
-            let Some(param_node) = self.arena.get(param_idx) else { continue };
-            let Some(param) = self.arena.get_parameter(param_node) else { continue };
+            let Some(param_node) = self.arena.get(param_idx) else {
+                continue;
+            };
+            let Some(param) = self.arena.get_parameter(param_node) else {
+                continue;
+            };
 
             if param.dot_dot_dot_token {
                 let rest_target = param.name;
@@ -590,7 +610,11 @@ impl<'a> ThinPrinter<'a> {
                 if !rest_name.is_empty() {
                     plan.rest = Some(RestParamTransform {
                         name: rest_name,
-                        pattern: if rest_is_pattern { Some(rest_target) } else { None },
+                        pattern: if rest_is_pattern {
+                            Some(rest_target)
+                        } else {
+                            None
+                        },
                         index,
                     });
                 }
@@ -723,14 +747,13 @@ impl<'a> ThinPrinter<'a> {
             }
         }
 
-        if saw_class {
-            Some(false)
-        } else {
-            None
-        }
+        if saw_class { Some(false) } else { None }
     }
 
-    pub(super) fn directive_needs_extends_helper(&self, directive: &TransformDirective) -> Option<bool> {
+    pub(super) fn directive_needs_extends_helper(
+        &self,
+        directive: &TransformDirective,
+    ) -> Option<bool> {
         match directive {
             TransformDirective::ES5Class {
                 class_node,
@@ -762,11 +785,7 @@ impl<'a> ThinPrinter<'a> {
                     }
                 }
 
-                if saw_class {
-                    Some(false)
-                } else {
-                    None
-                }
+                if saw_class { Some(false) } else { None }
             }
             _ => None,
         }
@@ -805,9 +824,9 @@ impl<'a> ThinPrinter<'a> {
             TransformDirective::CommonJSExport { inner, .. } => {
                 self.directive_has_private_members(inner)
             }
-            TransformDirective::Chain(directives) => {
-                directives.iter().any(|directive| self.directive_has_private_members(directive))
-            }
+            TransformDirective::Chain(directives) => directives
+                .iter()
+                .any(|directive| self.directive_has_private_members(directive)),
             _ => false,
         }
     }
@@ -821,14 +840,15 @@ impl<'a> ThinPrinter<'a> {
         };
 
         for &member_idx in &class_data.members.nodes {
-            let Some(member_node) = self.arena.get(member_idx) else { continue };
+            let Some(member_node) = self.arena.get(member_idx) else {
+                continue;
+            };
 
             match member_node.kind {
                 k if k == syntax_kind_ext::PROPERTY_DECLARATION => {
                     if let Some(prop) = self.arena.get_property_decl(member_node) {
                         if crate::transforms::private_fields_es5::is_private_identifier(
-                            self.arena,
-                            prop.name,
+                            self.arena, prop.name,
                         ) {
                             return true;
                         }
@@ -912,8 +932,12 @@ impl<'a> ThinPrinter<'a> {
             };
 
             for &elem_idx in &pattern.elements.nodes {
-                let Some(elem_node) = self.arena.get(elem_idx) else { continue };
-                let Some(elem) = self.arena.get_binding_element(elem_node) else { continue };
+                let Some(elem_node) = self.arena.get(elem_idx) else {
+                    continue;
+                };
+                let Some(elem) = self.arena.get_binding_element(elem_node) else {
+                    continue;
+                };
                 if elem.dot_dot_dot_token {
                     return true;
                 }
@@ -964,7 +988,9 @@ impl<'a> ThinPrinter<'a> {
                 continue;
             }
 
-            let Some(node) = self.arena.get(idx) else { continue };
+            let Some(node) = self.arena.get(idx) else {
+                continue;
+            };
             if node.kind == syntax_kind_ext::TAGGED_TEMPLATE_EXPRESSION {
                 vars.push(self.tagged_template_var_name(idx));
             }
@@ -1101,7 +1127,9 @@ impl<'a> ThinPrinter<'a> {
 
         self.write("extendStatics = Object.setPrototypeOf ||");
         self.write_line();
-        self.write("    ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||");
+        self.write(
+            "    ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||",
+        );
         self.write_line();
         self.write("    function (d, b) { for (var p in b) if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p]; };");
         self.write_line();
@@ -1124,7 +1152,9 @@ impl<'a> ThinPrinter<'a> {
         self.write_line();
         self.write("function __() { this.constructor = d; }");
         self.write_line();
-        self.write("d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());");
+        self.write(
+            "d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());",
+        );
         self.write_line();
 
         self.decrease_indent();

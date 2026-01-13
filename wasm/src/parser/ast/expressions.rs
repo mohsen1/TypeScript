@@ -1,8 +1,8 @@
 //! Expression AST nodes.
 
-use serde::Serialize;
-use crate::scanner::SyntaxKind;
 use super::base::{NodeBase, NodeIndex, NodeList};
+use crate::scanner::SyntaxKind;
+use serde::Serialize;
 
 /// A binary expression (a + b, a = b, etc.).
 #[derive(Clone, Debug, Serialize)]
@@ -43,8 +43,8 @@ pub struct CallExpression {
 pub struct PropertyAccessExpression {
     pub base: NodeBase,
     pub expression: NodeIndex,
-    pub question_dot_token: bool,  // Optional chaining
-    pub name: NodeIndex,           // Identifier or PrivateIdentifier
+    pub question_dot_token: bool, // Optional chaining
+    pub name: NodeIndex,          // Identifier or PrivateIdentifier
 }
 
 /// An element access expression (arr[idx]).
@@ -52,7 +52,7 @@ pub struct PropertyAccessExpression {
 pub struct ElementAccessExpression {
     pub base: NodeBase,
     pub expression: NodeIndex,
-    pub question_dot_token: bool,  // Optional chaining
+    pub question_dot_token: bool, // Optional chaining
     pub argument_expression: NodeIndex,
 }
 
@@ -72,9 +72,9 @@ pub struct ArrowFunction {
     pub modifiers: Option<NodeList>,
     pub type_parameters: Option<NodeList>,
     pub parameters: NodeList,
-    pub type_annotation: NodeIndex,  // Return type (optional)
+    pub type_annotation: NodeIndex, // Return type (optional)
     pub equals_greater_than_token: bool,
-    pub body: NodeIndex,  // Block or Expression
+    pub body: NodeIndex, // Block or Expression
 }
 
 /// A function expression.
@@ -83,7 +83,7 @@ pub struct FunctionExpression {
     pub base: NodeBase,
     pub modifiers: Option<NodeList>,
     pub asterisk_token: bool,
-    pub name: NodeIndex,  // Optional
+    pub name: NodeIndex, // Optional
     pub type_parameters: Option<NodeList>,
     pub parameters: NodeList,
     pub type_annotation: NodeIndex,
@@ -128,15 +128,15 @@ pub struct TaggedTemplateExpression {
     pub base: NodeBase,
     pub tag: NodeIndex,
     pub type_arguments: Option<NodeList>,
-    pub template: NodeIndex,  // TemplateLiteral
+    pub template: NodeIndex, // TemplateLiteral
 }
 
 /// A template expression (`hello ${world}`).
 #[derive(Clone, Debug, Serialize)]
 pub struct TemplateExpression {
     pub base: NodeBase,
-    pub head: NodeIndex,     // TemplateHead
-    pub template_spans: NodeList,  // TemplateSpan[]
+    pub head: NodeIndex,          // TemplateHead
+    pub template_spans: NodeList, // TemplateSpan[]
 }
 
 /// A yield expression (yield x).
@@ -144,7 +144,7 @@ pub struct TemplateExpression {
 pub struct YieldExpression {
     pub base: NodeBase,
     pub asterisk_token: bool,
-    pub expression: NodeIndex,  // Optional
+    pub expression: NodeIndex, // Optional
 }
 
 /// An await expression (await x).

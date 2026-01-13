@@ -181,8 +181,16 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
     }
 
     /// Explain why `source` is not assignable to `target` using TS compatibility rules.
-    pub fn explain_failure(&mut self, source: TypeId, target: TypeId) -> Option<SubtypeFailureReason> {
-        if source == target || source == TypeId::ANY || target == TypeId::ANY || target == TypeId::UNKNOWN {
+    pub fn explain_failure(
+        &mut self,
+        source: TypeId,
+        target: TypeId,
+    ) -> Option<SubtypeFailureReason> {
+        if source == target
+            || source == TypeId::ANY
+            || target == TypeId::ANY
+            || target == TypeId::UNKNOWN
+        {
             return None;
         }
         if !self.strict_null_checks && (source == TypeId::NULL || source == TypeId::UNDEFINED) {
@@ -331,7 +339,11 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
         }
     }
 
-    fn source_lacks_union_common_property(&self, source: TypeId, target_members: &[TypeId]) -> bool {
+    fn source_lacks_union_common_property(
+        &self,
+        source: TypeId,
+        target_members: &[TypeId],
+    ) -> bool {
         let source = self.resolve_weak_type_ref(source);
         let source_key = match self.interner.lookup(source) {
             Some(key) => key,
@@ -346,7 +358,9 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
                     .any(|member| self.source_lacks_union_common_property(*member, target_members))
             }
             TypeKey::TypeParameter(param) => match param.constraint {
-                Some(constraint) => self.source_lacks_union_common_property(constraint, target_members),
+                Some(constraint) => {
+                    self.source_lacks_union_common_property(constraint, target_members)
+                }
                 None => false,
             },
             TypeKey::Object(shape_id) | TypeKey::ObjectWithIndex(shape_id) => {
@@ -386,7 +400,11 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
         }
     }
 
-    fn has_common_property(&self, source_props: &[PropertyInfo], target_props: &[PropertyInfo]) -> bool {
+    fn has_common_property(
+        &self,
+        source_props: &[PropertyInfo],
+        target_props: &[PropertyInfo],
+    ) -> bool {
         let mut source_idx = 0;
         let mut target_idx = 0;
 
@@ -430,9 +448,7 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
         if source == TypeId::ANY || source == TypeId::NEVER || source == TypeId::ERROR {
             return true;
         }
-        if !self.strict_null_checks
-            && (source == TypeId::NULL || source == TypeId::UNDEFINED)
-        {
+        if !self.strict_null_checks && (source == TypeId::NULL || source == TypeId::UNDEFINED) {
             return true;
         }
         if source == TypeId::UNKNOWN

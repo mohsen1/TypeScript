@@ -241,7 +241,8 @@ impl SourceWriter {
 
     /// Get the current indentation width in columns.
     pub fn indent_width(&self) -> u32 {
-        self.indent_level.saturating_mul(self.indent_str.len() as u32)
+        self.indent_level
+            .saturating_mul(self.indent_str.len() as u32)
     }
 
     // =========================================================================
@@ -467,7 +468,10 @@ pub fn compute_line_col(text: &str, pos: u32) -> (u32, u32) {
         let line = text.matches('\n').count() as u32;
         let last_newline = text.rfind('\n').map(|i| i + 1).unwrap_or(0);
         // Count UTF-16 code units in the last line
-        let col = text[last_newline..].chars().map(|c| c.len_utf16() as u32).sum();
+        let col = text[last_newline..]
+            .chars()
+            .map(|c| c.len_utf16() as u32)
+            .sum();
         return (line, col);
     }
 

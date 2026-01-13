@@ -93,7 +93,10 @@ impl<'a> ThinPrinter<'a> {
                     // Single-line comment
                     let comment_start = start + pos;
                     let mut comment_end = pos + 2;
-                    while comment_end < len && bytes[comment_end] != b'\n' && bytes[comment_end] != b'\r' {
+                    while comment_end < len
+                        && bytes[comment_end] != b'\n'
+                        && bytes[comment_end] != b'\r'
+                    {
                         comment_end += 1;
                     }
                     let comment_text = &text[comment_start..start + comment_end];

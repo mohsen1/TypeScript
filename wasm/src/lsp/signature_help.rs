@@ -3,17 +3,17 @@
 //! Provides function signature information and active parameter highlighting
 //! when typing arguments in a call expression.
 
+use crate::binder::symbol_flags;
+use crate::lsp::jsdoc::{ParsedJsdoc, jsdoc_for_node, parse_jsdoc};
+use crate::lsp::position::{LineMap, Position};
+use crate::lsp::resolver::{ScopeCache, ScopeCacheStats};
+use crate::lsp::utils::find_node_at_or_before_offset;
 use crate::parser::thin_node::{CallExprData, NodeAccess, ThinNodeArena};
 use crate::parser::{NodeIndex, NodeList, syntax_kind_ext};
-use crate::binder::symbol_flags;
-use crate::thin_binder::ThinBinderState;
-use crate::solver::{TypeInterner, TypeId, TypeKey, FunctionShape};
-use crate::lsp::position::{Position, LineMap};
-use crate::lsp::utils::find_node_at_or_before_offset;
-use crate::lsp::resolver::{ScopeCache, ScopeCacheStats};
-use crate::lsp::jsdoc::{jsdoc_for_node, parse_jsdoc, ParsedJsdoc};
-use crate::thin_checker::ThinCheckerState;
 use crate::scanner::SyntaxKind;
+use crate::solver::{FunctionShape, TypeId, TypeInterner, TypeKey};
+use crate::thin_binder::ThinBinderState;
+use crate::thin_checker::ThinCheckerState;
 
 /// Represents a parameter in a signature.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -140,7 +140,9 @@ impl<'a> SignatureHelpProvider<'a> {
         scope_cache: Option<&mut ScopeCache>,
         mut scope_stats: Option<&mut ScopeCacheStats>,
     ) -> Option<SignatureHelp> {
-        let offset = self.line_map.position_to_offset(position, self.source_text)?;
+        let offset = self
+            .line_map
+            .position_to_offset(position, self.source_text)?;
 
         // 1. Find the deepest node at the cursor
         let leaf_node = find_node_at_or_before_offset(self.arena, offset, self.source_text);
@@ -154,13 +156,18 @@ impl<'a> SignatureHelpProvider<'a> {
         // 4. Resolve the symbol being called using ScopeWalker
         let mut walker = crate::lsp::resolver::ScopeWalker::new(self.arena, self.binder);
         let symbol_id = if let Some(scope_cache) = scope_cache {
-            walker.resolve_node_cached(root, call_expr.expression, scope_cache, scope_stats.as_deref_mut())
+            walker.resolve_node_cached(
+                root,
+                call_expr.expression,
+                scope_cache,
+                scope_stats.as_deref_mut(),
+            )
         } else {
             walker.resolve_node(root, call_expr.expression)
         };
 
         // 5. Create checker with persistent cache if available
-        let strict = false;  // TODO: get from tsconfig
+        let strict = false; // TODO: get from tsconfig
         let mut checker = if let Some(cache) = type_cache.take() {
             ThinCheckerState::with_cache(
                 self.arena,
@@ -189,7 +196,9 @@ impl<'a> SignatureHelpProvider<'a> {
         let (callee_type, docs) = if let Some(symbol_id) = symbol_id {
             (
                 checker.get_type_of_symbol(symbol_id),
-                access_docs.or_else(|| self.signature_documentation_for_symbol(root, symbol_id, call_kind)),
+                access_docs.or_else(|| {
+                    self.signature_documentation_for_symbol(root, symbol_id, call_kind)
+                }),
             )
         } else {
             (checker.get_type_of_node(call_expr.expression), access_docs)
@@ -214,7 +223,8 @@ impl<'a> SignatureHelpProvider<'a> {
             .as_ref()
             .map(|args| args.nodes.len())
             .unwrap_or(0);
-        let active_signature = self.select_active_signature(&signatures, arg_count, active_parameter);
+        let active_signature =
+            self.select_active_signature(&signatures, arg_count, active_parameter);
 
         Some(SignatureHelp {
             signatures: signatures.into_iter().map(|sig| sig.info).collect(),
@@ -224,7 +234,10 @@ impl<'a> SignatureHelpProvider<'a> {
     }
 
     /// Walk up the AST to find the call expression containing the cursor.
-    fn find_containing_call(&self, start_node: NodeIndex) -> Option<(NodeIndex, &'a CallExprData, CallKind)> {
+    fn find_containing_call(
+        &self,
+        start_node: NodeIndex,
+    ) -> Option<(NodeIndex, &'a CallExprData, CallKind)> {
         let mut current = start_node;
 
         // Safety limit to prevent infinite loops
@@ -232,7 +245,8 @@ impl<'a> SignatureHelpProvider<'a> {
         while !current.is_none() && depth < 100 {
             if let Some(node) = self.arena.get(current) {
                 if node.kind == syntax_kind_ext::CALL_EXPRESSION
-                    || node.kind == syntax_kind_ext::NEW_EXPRESSION {
+                    || node.kind == syntax_kind_ext::NEW_EXPRESSION
+                {
                     if let Some(data) = self.arena.get_call_expr(node) {
                         let kind = if node.kind == syntax_kind_ext::NEW_EXPRESSION {
                             CallKind::New
@@ -260,7 +274,12 @@ impl<'a> SignatureHelpProvider<'a> {
 
     /// Determine active parameter by scanning for commas, respecting nesting.
     /// This is more robust than AST analysis for incomplete code.
-    fn determine_active_parameter(&self, call_idx: NodeIndex, data: &CallExprData, cursor_offset: u32) -> u32 {
+    fn determine_active_parameter(
+        &self,
+        call_idx: NodeIndex,
+        data: &CallExprData,
+        cursor_offset: u32,
+    ) -> u32 {
         // Use AST-based approach instead of token scanning to handle edge cases:
         // - Generic type arguments with angle brackets: Set<string, number>
         // - Nested calls: foo(bar(x, y), z)
@@ -296,9 +315,15 @@ impl<'a> SignatureHelpProvider<'a> {
 
         if let Some(&last_arg_idx) = args.nodes.last() {
             if let Some(last_arg_node) = self.arena.get(last_arg_idx) {
-                let call_end = self.arena.get(call_idx).map(|node| node.end).unwrap_or(cursor_offset);
+                let call_end = self
+                    .arena
+                    .get(call_idx)
+                    .map(|node| node.end)
+                    .unwrap_or(cursor_offset);
                 let scan_end = cursor_offset.min(call_end);
-                if scan_end > last_arg_node.end && self.has_comma_between(last_arg_node.end, scan_end) {
+                if scan_end > last_arg_node.end
+                    && self.has_comma_between(last_arg_node.end, scan_end)
+                {
                     return args.nodes.len() as u32;
                 }
             }
@@ -373,8 +398,10 @@ impl<'a> SignatureHelpProvider<'a> {
             TypeKey::Callable(shape_id) => {
                 let shape = self.interner.callable_shape(shape_id);
                 let mut sigs = Vec::new();
-                let include_call = call_kind == CallKind::Call || shape.construct_signatures.is_empty();
-                let include_construct = call_kind == CallKind::New || shape.call_signatures.is_empty();
+                let include_call =
+                    call_kind == CallKind::Call || shape.construct_signatures.is_empty();
+                let include_construct =
+                    call_kind == CallKind::New || shape.call_signatures.is_empty();
 
                 if include_call {
                     // Add call signatures
@@ -423,7 +450,12 @@ impl<'a> SignatureHelpProvider<'a> {
     }
 
     /// Format a FunctionShape into SignatureInformation
-    fn format_signature(&self, shape: &FunctionShape, checker: &ThinCheckerState, is_constructor: bool) -> SignatureInformation {
+    fn format_signature(
+        &self,
+        shape: &FunctionShape,
+        checker: &ThinCheckerState,
+        is_constructor: bool,
+    ) -> SignatureInformation {
         let mut parameters = Vec::new();
 
         // 1. Parameters
@@ -433,8 +465,8 @@ impl<'a> SignatureHelpProvider<'a> {
         }
 
         for param in &shape.params {
-
-            let name = param.name
+            let name = param
+                .name
                 .map(|atom| checker.ctx.types.resolve_atom(atom))
                 .unwrap_or_else(|| "arg".to_string());
             let type_str = checker.format_type(param.type_id);
@@ -453,7 +485,12 @@ impl<'a> SignatureHelpProvider<'a> {
         // 3. Return Type
         let return_type_str = checker.format_type(shape.return_type);
         let prefix = if is_constructor { "new (" } else { "(" };
-        let label = format!("{}{}): {}", prefix, param_labels.join(", "), return_type_str);
+        let label = format!(
+            "{}{}): {}",
+            prefix,
+            param_labels.join(", "),
+            return_type_str
+        );
 
         SignatureInformation {
             label,
@@ -484,7 +521,10 @@ impl<'a> SignatureHelpProvider<'a> {
     }
 
     fn signature_meta(&self, params: &[crate::solver::ParamInfo]) -> (usize, usize, bool) {
-        let required_params = params.iter().filter(|param| !param.optional && !param.rest).count();
+        let required_params = params
+            .iter()
+            .filter(|param| !param.optional && !param.rest)
+            .count();
         let total_params = params.len();
         let has_rest = params.iter().any(|param| param.rest);
         (required_params, total_params, has_rest)
@@ -513,7 +553,11 @@ impl<'a> SignatureHelpProvider<'a> {
 
         for (idx, sig) in signatures.iter().enumerate() {
             let min_params = sig.required_params;
-            let max_params = if sig.has_rest { usize::MAX } else { sig.total_params };
+            let max_params = if sig.has_rest {
+                usize::MAX
+            } else {
+                sig.total_params
+            };
             let score = if desired < min_params {
                 min_params - desired
             } else if desired > max_params {
@@ -572,14 +616,23 @@ impl<'a> SignatureHelpProvider<'a> {
         }
     }
 
-    fn apply_jsdoc_to_signature(&self, sig: &mut SignatureCandidate, parsed: &ParsedJsdoc, overwrite: bool) {
+    fn apply_jsdoc_to_signature(
+        &self,
+        sig: &mut SignatureCandidate,
+        parsed: &ParsedJsdoc,
+        overwrite: bool,
+    ) {
         if overwrite || sig.info.documentation.is_none() {
             sig.info.documentation = parsed.summary.clone();
         }
 
         for (idx, name) in sig.param_names.iter().enumerate() {
-            let Some(name) = name else { continue; };
-            let Some(param_doc) = parsed.params.get(name) else { continue; };
+            let Some(name) = name else {
+                continue;
+            };
+            let Some(param_doc) = parsed.params.get(name) else {
+                continue;
+            };
             if let Some(param_info) = sig.info.parameters.get_mut(idx) {
                 if overwrite || param_info.documentation.is_none() {
                     param_info.documentation = Some(param_doc.clone());
@@ -628,7 +681,12 @@ impl<'a> SignatureHelpProvider<'a> {
                 continue;
             }
             if call_kind == CallKind::New {
-                self.collect_constructor_docs_from_class(root, decl, &mut candidates, &mut fallback);
+                self.collect_constructor_docs_from_class(
+                    root,
+                    decl,
+                    &mut candidates,
+                    &mut fallback,
+                );
             }
             let doc = jsdoc_for_node(self.arena, root, decl, self.source_text);
             if doc.is_empty() {
@@ -639,7 +697,9 @@ impl<'a> SignatureHelpProvider<'a> {
                 continue;
             }
 
-            if let Some((required_params, total_params, has_rest)) = self.signature_meta_from_decl(decl) {
+            if let Some((required_params, total_params, has_rest)) =
+                self.signature_meta_from_decl(decl)
+            {
                 candidates.push(SignatureDocCandidate {
                     doc: parsed,
                     required_params,
@@ -651,12 +711,11 @@ impl<'a> SignatureHelpProvider<'a> {
             }
         }
 
-        let docs = SignatureDocs { candidates, fallback };
-        if docs.is_empty() {
-            None
-        } else {
-            Some(docs)
-        }
+        let docs = SignatureDocs {
+            candidates,
+            fallback,
+        };
+        if docs.is_empty() { None } else { Some(docs) }
     }
 
     fn collect_constructor_docs_from_class(
@@ -666,11 +725,17 @@ impl<'a> SignatureHelpProvider<'a> {
         candidates: &mut Vec<SignatureDocCandidate>,
         fallback: &mut Option<ParsedJsdoc>,
     ) {
-        let Some(node) = self.arena.get(decl) else { return; };
-        let Some(class_data) = self.arena.get_class(node) else { return; };
+        let Some(node) = self.arena.get(decl) else {
+            return;
+        };
+        let Some(class_data) = self.arena.get_class(node) else {
+            return;
+        };
 
         for &member in class_data.members.nodes.iter() {
-            let Some(member_node) = self.arena.get(member) else { continue; };
+            let Some(member_node) = self.arena.get(member) else {
+                continue;
+            };
             if self.arena.get_constructor(member_node).is_none() {
                 continue;
             }
@@ -684,7 +749,9 @@ impl<'a> SignatureHelpProvider<'a> {
                 continue;
             }
 
-            if let Some((required_params, total_params, has_rest)) = self.signature_meta_from_decl(member) {
+            if let Some((required_params, total_params, has_rest)) =
+                self.signature_meta_from_decl(member)
+            {
                 candidates.push(SignatureDocCandidate {
                     doc: parsed,
                     required_params,
@@ -702,16 +769,23 @@ impl<'a> SignatureHelpProvider<'a> {
         root: NodeIndex,
         access_idx: NodeIndex,
     ) -> Option<SignatureDocs> {
-        let Some(access_node) = self.arena.get(access_idx) else { return None; };
-        let Some(access) = self.arena.get_access_expr(access_node) else { return None; };
+        let Some(access_node) = self.arena.get(access_idx) else {
+            return None;
+        };
+        let Some(access) = self.arena.get_access_expr(access_node) else {
+            return None;
+        };
         let property_name = self
             .arena
             .get_identifier_text(access.name_or_argument)
             .or_else(|| self.arena.get_literal_text(access.name_or_argument))?;
 
-        let (class_decls, static_only) = if let Some(result) = self.class_decls_for_expression(access.expression) {
+        let (class_decls, static_only) = if let Some(result) =
+            self.class_decls_for_expression(access.expression)
+        {
             result
-        } else if let Some(decls) = self.class_decls_for_property_name_in_file(root, property_name) {
+        } else if let Some(decls) = self.class_decls_for_property_name_in_file(root, property_name)
+        {
             (decls, false)
         } else {
             return None;
@@ -720,16 +794,27 @@ impl<'a> SignatureHelpProvider<'a> {
         let mut fallback = None;
 
         for class_decl in class_decls {
-            let Some(class_node) = self.arena.get(class_decl) else { continue; };
-            let Some(class_data) = self.arena.get_class(class_node) else { continue; };
+            let Some(class_node) = self.arena.get(class_decl) else {
+                continue;
+            };
+            let Some(class_data) = self.arena.get_class(class_node) else {
+                continue;
+            };
 
             for &member in class_data.members.nodes.iter() {
-                let Some(member_node) = self.arena.get(member) else { continue; };
-                let Some(method) = self.arena.get_method_decl(member_node) else { continue; };
+                let Some(member_node) = self.arena.get(member) else {
+                    continue;
+                };
+                let Some(method) = self.arena.get_method_decl(member_node) else {
+                    continue;
+                };
                 let Some(member_name) = self
                     .arena
                     .get_identifier_text(method.name)
-                    .or_else(|| self.arena.get_literal_text(method.name)) else { continue; };
+                    .or_else(|| self.arena.get_literal_text(method.name))
+                else {
+                    continue;
+                };
                 if member_name != property_name {
                     continue;
                 }
@@ -751,7 +836,9 @@ impl<'a> SignatureHelpProvider<'a> {
                     continue;
                 }
 
-                if let Some((required_params, total_params, has_rest)) = self.signature_meta_from_decl(member) {
+                if let Some((required_params, total_params, has_rest)) =
+                    self.signature_meta_from_decl(member)
+                {
                     candidates.push(SignatureDocCandidate {
                         doc: parsed,
                         required_params,
@@ -764,16 +851,17 @@ impl<'a> SignatureHelpProvider<'a> {
             }
         }
 
-        let docs = SignatureDocs { candidates, fallback };
-        if docs.is_empty() {
-            None
-        } else {
-            Some(docs)
-        }
+        let docs = SignatureDocs {
+            candidates,
+            fallback,
+        };
+        if docs.is_empty() { None } else { Some(docs) }
     }
 
     fn class_decls_for_expression(&self, expr: NodeIndex) -> Option<(Vec<NodeIndex>, bool)> {
-        let Some(expr_node) = self.arena.get(expr) else { return None; };
+        let Some(expr_node) = self.arena.get(expr) else {
+            return None;
+        };
         if expr_node.kind == SyntaxKind::Identifier as u16 {
             let sym_id = self.resolve_symbol_for_identifier(expr)?;
             return self.class_decls_for_symbol(sym_id);
@@ -799,7 +887,10 @@ impl<'a> SignatureHelpProvider<'a> {
             } else {
                 Some((decls, true))
             }
-        } else if symbol.flags & (symbol_flags::BLOCK_SCOPED_VARIABLE | symbol_flags::FUNCTION_SCOPED_VARIABLE) != 0 {
+        } else if symbol.flags
+            & (symbol_flags::BLOCK_SCOPED_VARIABLE | symbol_flags::FUNCTION_SCOPED_VARIABLE)
+            != 0
+        {
             let decls = self.class_decls_from_variable_symbol(symbol);
             if decls.is_empty() {
                 None
@@ -812,7 +903,9 @@ impl<'a> SignatureHelpProvider<'a> {
     }
 
     fn class_decls_from_symbol(&self, sym_id: crate::binder::SymbolId) -> Vec<NodeIndex> {
-        let Some(symbol) = self.binder.get_symbol(sym_id) else { return Vec::new(); };
+        let Some(symbol) = self.binder.get_symbol(sym_id) else {
+            return Vec::new();
+        };
         let mut decls = symbol.declarations.clone();
         if !symbol.value_declaration.is_none() && !decls.contains(&symbol.value_declaration) {
             decls.push(symbol.value_declaration);
@@ -823,7 +916,9 @@ impl<'a> SignatureHelpProvider<'a> {
             if decl.is_none() {
                 continue;
             }
-            let Some(node) = self.arena.get(decl) else { continue; };
+            let Some(node) = self.arena.get(decl) else {
+                continue;
+            };
             if self.arena.get_class(node).is_some() {
                 class_decls.push(decl);
             }
@@ -837,8 +932,12 @@ impl<'a> SignatureHelpProvider<'a> {
         if decl_idx.is_none() {
             return decls;
         }
-        let Some(node) = self.arena.get(decl_idx) else { return decls; };
-        let Some(var_decl) = self.arena.get_variable_declaration(node) else { return decls; };
+        let Some(node) = self.arena.get(decl_idx) else {
+            return decls;
+        };
+        let Some(var_decl) = self.arena.get_variable_declaration(node) else {
+            return decls;
+        };
         if !var_decl.initializer.is_none() {
             decls.extend(self.class_decls_from_new_expression(var_decl.initializer));
         }
@@ -846,17 +945,25 @@ impl<'a> SignatureHelpProvider<'a> {
     }
 
     fn class_decls_from_new_expression(&self, expr: NodeIndex) -> Vec<NodeIndex> {
-        let Some(node) = self.arena.get(expr) else { return Vec::new(); };
+        let Some(node) = self.arena.get(expr) else {
+            return Vec::new();
+        };
         if node.kind != syntax_kind_ext::NEW_EXPRESSION {
             return Vec::new();
         }
-        let Some(call) = self.arena.get_call_expr(node) else { return Vec::new(); };
+        let Some(call) = self.arena.get_call_expr(node) else {
+            return Vec::new();
+        };
         let callee_idx = call.expression;
-        let Some(callee_node) = self.arena.get(callee_idx) else { return Vec::new(); };
+        let Some(callee_node) = self.arena.get(callee_idx) else {
+            return Vec::new();
+        };
         if callee_node.kind != SyntaxKind::Identifier as u16 {
             return Vec::new();
         }
-        let Some(sym_id) = self.resolve_symbol_for_identifier(callee_idx) else { return Vec::new(); };
+        let Some(sym_id) = self.resolve_symbol_for_identifier(callee_idx) else {
+            return Vec::new();
+        };
         self.class_decls_from_symbol(sym_id)
     }
 
@@ -870,8 +977,12 @@ impl<'a> SignatureHelpProvider<'a> {
         let mut matches = Vec::new();
 
         for &stmt in sf.statements.nodes.iter() {
-            let Some(node) = self.arena.get(stmt) else { continue; };
-            let Some(class_data) = self.arena.get_class(node) else { continue; };
+            let Some(node) = self.arena.get(stmt) else {
+                continue;
+            };
+            let Some(class_data) = self.arena.get_class(node) else {
+                continue;
+            };
             if self.class_has_method_named(class_data, property_name) {
                 matches.push(stmt);
                 if matches.len() > 1 {
@@ -893,12 +1004,19 @@ impl<'a> SignatureHelpProvider<'a> {
         property_name: &str,
     ) -> bool {
         for &member in class_data.members.nodes.iter() {
-            let Some(member_node) = self.arena.get(member) else { continue; };
-            let Some(method) = self.arena.get_method_decl(member_node) else { continue; };
+            let Some(member_node) = self.arena.get(member) else {
+                continue;
+            };
+            let Some(method) = self.arena.get_method_decl(member_node) else {
+                continue;
+            };
             let Some(member_name) = self
                 .arena
                 .get_identifier_text(method.name)
-                .or_else(|| self.arena.get_literal_text(method.name)) else { continue; };
+                .or_else(|| self.arena.get_literal_text(method.name))
+            else {
+                continue;
+            };
             if member_name == property_name {
                 return true;
             }
@@ -907,9 +1025,13 @@ impl<'a> SignatureHelpProvider<'a> {
     }
 
     fn is_static_method(&self, method: &crate::parser::thin_node::MethodDeclData) -> bool {
-        let Some(modifiers) = method.modifiers.as_ref() else { return false; };
+        let Some(modifiers) = method.modifiers.as_ref() else {
+            return false;
+        };
         for &mod_idx in modifiers.nodes.iter() {
-            let Some(mod_node) = self.arena.get(mod_idx) else { continue; };
+            let Some(mod_node) = self.arena.get(mod_idx) else {
+                continue;
+            };
             if mod_node.kind == SyntaxKind::StaticKeyword as u16 {
                 return true;
             }
@@ -917,7 +1039,10 @@ impl<'a> SignatureHelpProvider<'a> {
         false
     }
 
-    fn resolve_symbol_for_identifier(&self, ident_idx: NodeIndex) -> Option<crate::binder::SymbolId> {
+    fn resolve_symbol_for_identifier(
+        &self,
+        ident_idx: NodeIndex,
+    ) -> Option<crate::binder::SymbolId> {
         self.binder
             .resolve_identifier(self.arena, ident_idx)
             .or_else(|| {
@@ -950,8 +1075,12 @@ impl<'a> SignatureHelpProvider<'a> {
         let mut has_rest = false;
 
         for &param_idx in params.nodes.iter() {
-            let Some(param_node) = self.arena.get(param_idx) else { continue; };
-            let Some(param_data) = self.arena.get_parameter(param_node) else { continue; };
+            let Some(param_node) = self.arena.get(param_idx) else {
+                continue;
+            };
+            let Some(param_data) = self.arena.get_parameter(param_node) else {
+                continue;
+            };
             if let Some(name_node) = self.arena.get(param_data.name) {
                 if name_node.kind == SyntaxKind::ThisKeyword as u16 {
                     continue;
@@ -975,7 +1104,6 @@ impl<'a> SignatureHelpProvider<'a> {
 
         Some((required_params, total_params, has_rest))
     }
-
 }
 
 #[cfg(test)]

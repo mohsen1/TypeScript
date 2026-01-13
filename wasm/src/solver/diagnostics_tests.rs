@@ -43,10 +43,22 @@ fn test_format_object_type() {
     let mut formatter = TypeFormatter::new(&interner);
 
     let obj = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER,
- write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
-        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::STRING,
- write_type: TypeId::STRING, optional: true, readonly: false, is_method: false },
+        PropertyInfo {
+            name: interner.intern_string("x"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("y"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: true,
+            readonly: false,
+            is_method: false,
+        },
     ]);
 
     let formatted = formatter.format(obj);
@@ -83,14 +95,17 @@ fn test_format_function_type() {
 
     let func = interner.function(FunctionShape {
         type_params: vec![],
-        params: vec![
-            ParamInfo { name: Some(interner.intern_string("x")), type_id: TypeId::STRING, optional: false, rest: false },
-        ],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
         this_type: None,
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let formatted = formatter.format(func);
@@ -105,14 +120,17 @@ fn test_format_function_type_with_this() {
 
     let func = interner.function(FunctionShape {
         type_params: vec![],
-        params: vec![
-            ParamInfo { name: Some(interner.intern_string("x")), type_id: TypeId::NUMBER, optional: false, rest: false },
-        ],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::NUMBER,
+            optional: false,
+            rest: false,
+        }],
         this_type: Some(TypeId::STRING),
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let formatted = formatter.format(func);
@@ -148,7 +166,11 @@ fn test_union_member_mismatch_diagnostic_includes_related_members() {
         target_union_members: union_members,
     };
 
-    if let SubtypeFailureReason::NoUnionMemberMatches { target_union_members, .. } = &reason {
+    if let SubtypeFailureReason::NoUnionMemberMatches {
+        target_union_members,
+        ..
+    } = &reason
+    {
         assert_eq!(target_union_members.len(), 4);
     } else {
         panic!("Expected NoUnionMemberMatches");
@@ -164,7 +186,9 @@ fn test_union_member_mismatch_diagnostic_includes_related_members() {
     assert_eq!(diag.related.len(), 3);
     assert!(diag.message.contains("null"));
 
-    let related_messages: Vec<&str> = diag.related.iter()
+    let related_messages: Vec<&str> = diag
+        .related
+        .iter()
         .map(|info| info.message.as_str())
         .collect();
     assert!(related_messages.iter().any(|msg| msg.contains("string")));
@@ -179,10 +203,14 @@ fn test_property_missing_diagnostic() {
     let mut builder = DiagnosticBuilder::new(&interner);
 
     let obj1 = interner.object(vec![]);
-    let obj2 = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER,
- write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
-    ]);
+    let obj2 = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
 
     let diag = builder.property_missing("x", obj1, obj2);
     assert_eq!(diag.code, codes::PROPERTY_MISSING);
@@ -192,8 +220,8 @@ fn test_property_missing_diagnostic() {
 
 #[test]
 fn test_diagnostic_with_span() {
-    let diag = TypeDiagnostic::error("Test error", 2322)
-        .with_span(SourceSpan::new("test.ts", 10, 5));
+    let diag =
+        TypeDiagnostic::error("Test error", 2322).with_span(SourceSpan::new("test.ts", 10, 5));
 
     assert!(diag.span.is_some());
     let span = diag.span.unwrap();
@@ -315,8 +343,8 @@ fn test_diagnostic_collector_multiple_errors() {
 
 #[test]
 fn test_diagnostic_to_checker_diagnostic() {
-    let diag = TypeDiagnostic::error("Test error", 2322)
-        .with_span(SourceSpan::new("test.ts", 10, 5));
+    let diag =
+        TypeDiagnostic::error("Test error", 2322).with_span(SourceSpan::new("test.ts", 10, 5));
 
     let checker_diag = diag.to_checker_diagnostic("default.ts");
 

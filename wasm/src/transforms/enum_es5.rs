@@ -35,9 +35,9 @@
 //! // usages are inlined
 //! ```
 
+use crate::parser::syntax_kind_ext;
 use crate::parser::thin_node::ThinNodeArena;
 use crate::parser::{NodeIndex, NodeList};
-use crate::parser::syntax_kind_ext;
 use crate::scanner::SyntaxKind;
 use crate::transforms::emit_utils;
 
@@ -142,8 +142,12 @@ impl<'a> EnumES5Emitter<'a> {
 
     fn emit_members(&mut self, members: &NodeList, enum_name: &str) {
         for &member_idx in &members.nodes {
-            let Some(member_node) = self.arena.get(member_idx) else { continue };
-            let Some(member_data) = self.arena.get_enum_member(member_node) else { continue };
+            let Some(member_node) = self.arena.get(member_idx) else {
+                continue;
+            };
+            let Some(member_data) = self.arena.get_enum_member(member_node) else {
+                continue;
+            };
 
             let member_name = self.get_member_name(member_data.name);
             let has_initializer = !member_data.initializer.is_none();
@@ -255,7 +259,9 @@ impl<'a> EnumES5Emitter<'a> {
     }
 
     fn emit_expression(&mut self, idx: NodeIndex) {
-        let Some(node) = self.arena.get(idx) else { return };
+        let Some(node) = self.arena.get(idx) else {
+            return;
+        };
 
         match node.kind {
             k if k == SyntaxKind::NumericLiteral as u16 => {
@@ -394,32 +400,63 @@ mod tests {
         let output = emit_enum("enum E { A, B, C }");
         assert!(output.contains("var E;"), "Should declare var E");
         assert!(output.contains("(function (E)"), "Should have IIFE");
-        assert!(output.contains("E[E[\"A\"] = 0] = \"A\""), "Should have reverse mapping for A");
-        assert!(output.contains("E[E[\"B\"] = 1] = \"B\""), "Should have reverse mapping for B");
-        assert!(output.contains("E[E[\"C\"] = 2] = \"C\""), "Should auto-increment C");
+        assert!(
+            output.contains("E[E[\"A\"] = 0] = \"A\""),
+            "Should have reverse mapping for A"
+        );
+        assert!(
+            output.contains("E[E[\"B\"] = 1] = \"B\""),
+            "Should have reverse mapping for B"
+        );
+        assert!(
+            output.contains("E[E[\"C\"] = 2] = \"C\""),
+            "Should auto-increment C"
+        );
     }
 
     #[test]
     fn test_enum_with_initializer() {
         let output = emit_enum("enum E { A = 10, B, C = 20 }");
-        assert!(output.contains("E[E[\"A\"] = 10] = \"A\""), "A should be 10");
-        assert!(output.contains("E[E[\"B\"] = 11] = \"B\""), "B should be 11 (auto-increment)");
-        assert!(output.contains("E[E[\"C\"] = 20] = \"C\""), "C should be 20");
+        assert!(
+            output.contains("E[E[\"A\"] = 10] = \"A\""),
+            "A should be 10"
+        );
+        assert!(
+            output.contains("E[E[\"B\"] = 11] = \"B\""),
+            "B should be 11 (auto-increment)"
+        );
+        assert!(
+            output.contains("E[E[\"C\"] = 20] = \"C\""),
+            "C should be 20"
+        );
     }
 
     #[test]
     fn test_string_enum() {
         let output = emit_enum("enum S { A = \"alpha\", B = \"beta\" }");
         assert!(output.contains("var S;"), "Should declare var S");
-        assert!(output.contains("S[\"A\"] = \"alpha\";"), "String enum no reverse mapping");
-        assert!(output.contains("S[\"B\"] = \"beta\";"), "String enum no reverse mapping");
+        assert!(
+            output.contains("S[\"A\"] = \"alpha\";"),
+            "String enum no reverse mapping"
+        );
+        assert!(
+            output.contains("S[\"B\"] = \"beta\";"),
+            "String enum no reverse mapping"
+        );
         // Should NOT contain reverse mapping pattern
-        assert!(!output.contains("S[S["), "String enums should not have reverse mapping");
+        assert!(
+            !output.contains("S[S["),
+            "String enums should not have reverse mapping"
+        );
     }
 
     #[test]
     fn test_const_enum_erased() {
         let output = emit_enum("const enum CE { A = 0 }");
-        assert!(output.trim().is_empty(), "Const enums should be erased: {}", output);
+        assert!(
+            output.trim().is_empty(),
+            "Const enums should be erased: {}",
+            output
+        );
     }
 }

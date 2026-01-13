@@ -3,20 +3,20 @@
 //! This module defines the AST node types that match TypeScript's parser output.
 
 pub mod base;
-pub mod literals;
-pub mod expressions;
-pub mod statements;
 pub mod declarations;
-pub mod types;
+pub mod expressions;
 pub mod jsx;
+pub mod literals;
 pub mod node;
+pub mod statements;
+pub mod types;
 
 // Re-export all types for convenience
 pub use base::*;
-pub use literals::*;
-pub use expressions::*;
-pub use statements::*;
 pub use declarations::*;
-pub use types::*;
+pub use expressions::*;
 pub use jsx::*;
+pub use literals::*;
 pub use node::*;
+pub use statements::*;
+pub use types::*;

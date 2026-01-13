@@ -4,18 +4,18 @@
 //! This separates state from logic, allowing specialized checkers (expressions, statements)
 //! to borrow the context mutably.
 
-use std::collections::{HashMap, HashSet, VecDeque};
-use std::cell::RefCell;
-use std::sync::Arc;
 use rustc_hash::{FxHashMap, FxHashSet};
+use std::cell::RefCell;
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::sync::Arc;
 
+use crate::binder::SymbolId;
+use crate::checker::control_flow::FlowGraph;
+use crate::checker::types::diagnostics::Diagnostic;
 use crate::parser::NodeIndex;
 use crate::parser::thin_node::ThinNodeArena;
-use crate::thin_binder::ThinBinderState;
 use crate::solver::{TypeEnvironment, TypeId, TypeInterner};
-use crate::checker::types::diagnostics::Diagnostic;
-use crate::checker::control_flow::FlowGraph;
-use crate::binder::SymbolId;
+use crate::thin_binder::ThinBinderState;
 
 /// Info about the enclosing class for static member suggestions and abstract property checks.
 #[derive(Clone, Debug)]
@@ -145,7 +145,6 @@ pub struct CheckerContext<'a> {
     pub strict_property_initialization: bool,
 
     // --- Caches ---
-
     /// Cached types for symbols.
     pub symbol_types: FxHashMap<SymbolId, TypeId>,
 
@@ -183,12 +182,10 @@ pub struct CheckerContext<'a> {
     pub symbol_dependency_stack: Vec<SymbolId>,
 
     // --- Diagnostics ---
-
     /// Diagnostics produced during type checking.
     pub diagnostics: Vec<Diagnostic>,
 
     // --- Recursion Guards ---
-
     /// Stack of symbols being resolved.
     pub symbol_resolution_stack: Vec<SymbolId>,
     /// O(1) lookup set for symbol resolution stack.
@@ -202,7 +199,6 @@ pub struct CheckerContext<'a> {
     pub node_resolution_set: HashSet<NodeIndex>,
 
     // --- Scopes & Context ---
-
     /// Current type parameter scope.
     pub type_parameter_scope: HashMap<String, TypeId>,
 

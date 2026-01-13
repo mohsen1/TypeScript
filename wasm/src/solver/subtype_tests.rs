@@ -1,5 +1,5 @@
 use super::*;
-use crate::solver::{instantiate_type, TypeSubstitution};
+use crate::solver::{TypeSubstitution, instantiate_type};
 
 #[test]
 fn test_intrinsic_subtyping() {
@@ -128,7 +128,7 @@ fn test_template_literal_apparent_member_subtyping() {
             type_params: Vec::new(),
             type_predicate: None,
             is_constructor: false,
-                                is_method: false,
+            is_method: false,
         })
     };
 
@@ -209,7 +209,7 @@ fn test_apparent_number_member_subtyping() {
             type_params: Vec::new(),
             type_predicate: None,
             is_constructor: false,
-                                is_method: false,
+            is_method: false,
         })
     };
 
@@ -249,7 +249,7 @@ fn test_apparent_string_member_subtyping() {
             type_params: Vec::new(),
             type_predicate: None,
             is_constructor: false,
-                                is_method: false,
+            is_method: false,
         })
     };
 
@@ -343,7 +343,7 @@ fn test_apparent_boolean_member_subtyping() {
             type_params: Vec::new(),
             type_predicate: None,
             is_constructor: false,
-                                is_method: false,
+            is_method: false,
         })
     };
 
@@ -411,7 +411,7 @@ fn test_apparent_bigint_member_subtyping() {
             type_params: Vec::new(),
             type_predicate: None,
             is_constructor: false,
-                                is_method: false,
+            is_method: false,
         })
     };
 
@@ -450,7 +450,7 @@ fn test_apparent_object_member_subtyping() {
             type_params: Vec::new(),
             type_predicate: None,
             is_constructor: false,
-                                is_method: false,
+            is_method: false,
         })
     };
 
@@ -503,7 +503,7 @@ fn test_object_trifecta_subtyping() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let empty_object = interner.object(Vec::new());
 
@@ -528,7 +528,7 @@ fn test_object_trifecta_object_interface_accepts_primitives() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let object_interface = interner.object(vec![PropertyInfo {
         name: interner.intern_string("toString"),
@@ -564,7 +564,7 @@ fn test_object_trifecta_nullish_rejection() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let object_interface = interner.object(vec![PropertyInfo {
         name: interner.intern_string("toString"),
@@ -601,7 +601,7 @@ fn test_primitive_boxing_assignability() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let number_interface = interner.object(vec![PropertyInfo {
         name: interner.intern_string("toFixed"),
@@ -634,7 +634,7 @@ fn test_primitive_boxing_bigint_assignability() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let bigint_interface = interner.object(vec![PropertyInfo {
         name: interner.intern_string("toString"),
@@ -667,7 +667,7 @@ fn test_primitive_boxing_boolean_assignability() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let boolean_interface = interner.object(vec![PropertyInfo {
         name: interner.intern_string("toString"),
@@ -700,7 +700,7 @@ fn test_primitive_boxing_string_assignability() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let string_interface = interner.object(vec![PropertyInfo {
         name: interner.intern_string("toUpperCase"),
@@ -1097,17 +1097,33 @@ fn test_object_subtyping() {
     let mut checker = SubtypeChecker::new(&interner);
 
     // { x: number }
-    let obj_x = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER,
- write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
-    ]);
+    let obj_x = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
 
     // { x: number, y: string }
     let obj_xy = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER,
- write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
-        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::STRING,
- write_type: TypeId::STRING, optional: false, readonly: false, is_method: false },
+        PropertyInfo {
+            name: interner.intern_string("x"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("y"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
     ]);
 
     // Object with more properties is subtype
@@ -1123,14 +1139,22 @@ fn test_readonly_property_subtyping() {
     let mut checker = SubtypeChecker::new(&interner);
 
     let name = interner.intern_string("x");
-    let readonly_obj = interner.object(vec![
-        PropertyInfo { name, type_id: TypeId::NUMBER,
- write_type: TypeId::NUMBER, optional: false, readonly: true, is_method: false },
-    ]);
-    let mutable_obj = interner.object(vec![
-        PropertyInfo { name, type_id: TypeId::NUMBER,
- write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
-    ]);
+    let readonly_obj = interner.object(vec![PropertyInfo {
+        name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+    let mutable_obj = interner.object(vec![PropertyInfo {
+        name,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
 
     assert!(!checker.is_subtype_of(readonly_obj, mutable_obj));
     assert!(checker.is_subtype_of(mutable_obj, readonly_obj));
@@ -1154,8 +1178,18 @@ fn test_readonly_tuple_subtyping() {
     let mut checker = SubtypeChecker::new(&interner);
 
     let tuple = interner.tuple(vec![
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
     let readonly_tuple = interner.intern(TypeKey::ReadonlyType(tuple));
 
@@ -1275,17 +1309,33 @@ fn test_ref_to_object_resolution() {
     let mut env = TypeEnvironment::new();
 
     // Create an object type: { x: number }
-    let obj_x = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER,
- write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
-    ]);
+    let obj_x = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
 
     // Create a Ref that resolves to { x: number, y: string }
     let obj_xy = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER,
- write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
-        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::STRING,
- write_type: TypeId::STRING, optional: false, readonly: false, is_method: false },
+        PropertyInfo {
+            name: interner.intern_string("x"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("y"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
     ]);
 
     let ref_type = interner.reference(SymbolRef(100));
@@ -1327,15 +1377,30 @@ fn test_function_rest_parameter_subtyping() {
     let fixed_params = FunctionShape {
         type_params: vec![],
         params: vec![
-            ParamInfo { name: Some(interner.intern_string("a")), type_id: TypeId::STRING, optional: false, rest: false },
-            ParamInfo { name: Some(interner.intern_string("b")), type_id: TypeId::ANY, optional: false, rest: false },
-            ParamInfo { name: Some(interner.intern_string("c")), type_id: TypeId::ANY, optional: false, rest: false },
+            ParamInfo {
+                name: Some(interner.intern_string("a")),
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("b")),
+                type_id: TypeId::ANY,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("c")),
+                type_id: TypeId::ANY,
+                optional: false,
+                rest: false,
+            },
         ],
         this_type: None,
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     };
     let fixed_fn = interner.function(fixed_params);
 
@@ -1343,15 +1408,30 @@ fn test_function_rest_parameter_subtyping() {
     let rest_params = FunctionShape {
         type_params: vec![],
         params: vec![
-            ParamInfo { name: Some(interner.intern_string("a")), type_id: TypeId::STRING, optional: false, rest: false },
-            ParamInfo { name: Some(interner.intern_string("b")), type_id: TypeId::ANY, optional: false, rest: false },
-            ParamInfo { name: Some(interner.intern_string("args")), type_id: any_array, optional: false, rest: true },
+            ParamInfo {
+                name: Some(interner.intern_string("a")),
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("b")),
+                type_id: TypeId::ANY,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("args")),
+                type_id: any_array,
+                optional: false,
+                rest: true,
+            },
         ],
         this_type: None,
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     };
     let rest_fn = interner.function(rest_params);
 
@@ -1383,7 +1463,7 @@ fn test_rest_unknown_bivariant_subtyping_toggle() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let source = interner.function(FunctionShape {
@@ -1398,7 +1478,7 @@ fn test_rest_unknown_bivariant_subtyping_toggle() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     assert!(!checker.is_subtype_of(source, target));
@@ -1425,7 +1505,7 @@ fn test_rest_any_bivariant_subtyping_toggle() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let source = interner.function(FunctionShape {
@@ -1440,7 +1520,7 @@ fn test_rest_any_bivariant_subtyping_toggle() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     assert!(!checker.is_subtype_of(source, target));
@@ -1457,14 +1537,27 @@ fn test_tuple_subtyping_extra_elements() {
 
     // [number, string]
     let source = interner.tuple(vec![
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     // [number]
-    let target = interner.tuple(vec![
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
-    ]);
+    let target = interner.tuple(vec![TupleElement {
+        type_id: TypeId::NUMBER,
+        name: None,
+        optional: false,
+        rest: false,
+    }]);
 
     // Source has extra elements, target is closed -> should FAIL
     assert!(!checker.is_subtype_of(source, target));
@@ -1480,14 +1573,34 @@ fn test_tuple_subtyping_with_rest_target() {
 
     // [number, string]
     let source = interner.tuple(vec![
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     // [number, ...string[]]
     let target = interner.tuple(vec![
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
-        TupleElement { type_id: string_array, name: None, optional: false, rest: true },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: string_array,
+            name: None,
+            optional: false,
+            rest: true,
+        },
     ]);
 
     // Target has rest -> should accept extra elements
@@ -1501,19 +1614,54 @@ fn test_tuple_subtyping_rest_tuple_expansion() {
     let mut checker = SubtypeChecker::new(&interner);
 
     let rest_tuple = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     let source = interner.tuple(vec![
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     let target = interner.tuple(vec![
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
-        TupleElement { type_id: rest_tuple, name: None, optional: false, rest: true },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: rest_tuple,
+            name: None,
+            optional: false,
+            rest: true,
+        },
     ]);
 
     assert!(checker.is_subtype_of(source, target));
@@ -1526,18 +1674,48 @@ fn test_tuple_subtyping_rest_tuple_missing_element() {
     let mut checker = SubtypeChecker::new(&interner);
 
     let rest_tuple = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     let source = interner.tuple(vec![
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     let target = interner.tuple(vec![
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
-        TupleElement { type_id: rest_tuple, name: None, optional: false, rest: true },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: rest_tuple,
+            name: None,
+            optional: false,
+            rest: true,
+        },
     ]);
 
     assert!(!checker.is_subtype_of(source, target));
@@ -1550,20 +1728,60 @@ fn test_tuple_subtyping_rest_tuple_extra_element() {
     let mut checker = SubtypeChecker::new(&interner);
 
     let rest_tuple = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     let source = interner.tuple(vec![
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     let target = interner.tuple(vec![
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
-        TupleElement { type_id: rest_tuple, name: None, optional: false, rest: true },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: rest_tuple,
+            name: None,
+            optional: false,
+            rest: true,
+        },
     ]);
 
     assert!(!checker.is_subtype_of(source, target));
@@ -1577,20 +1795,60 @@ fn test_tuple_subtyping_rest_tuple_variadic_tail() {
 
     let boolean_array = interner.array(TypeId::BOOLEAN);
     let rest_tuple = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: boolean_array, name: None, optional: false, rest: true },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: boolean_array,
+            name: None,
+            optional: false,
+            rest: true,
+        },
     ]);
 
     let source = interner.tuple(vec![
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     let target = interner.tuple(vec![
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
-        TupleElement { type_id: rest_tuple, name: None, optional: false, rest: true },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: rest_tuple,
+            name: None,
+            optional: false,
+            rest: true,
+        },
     ]);
 
     assert!(checker.is_subtype_of(source, target));
@@ -1606,14 +1864,34 @@ fn test_tuple_subtyping_source_rest_closed_target() {
 
     // [number, ...string[]]
     let source = interner.tuple(vec![
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
-        TupleElement { type_id: string_array, name: None, optional: false, rest: true },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: string_array,
+            name: None,
+            optional: false,
+            rest: true,
+        },
     ]);
 
     // [number, string]
     let target = interner.tuple(vec![
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     // Source has rest but target is closed -> should FAIL
@@ -1628,14 +1906,27 @@ fn test_tuple_subtyping_optional_elements() {
 
     // [number, string?]
     let source = interner.tuple(vec![
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::STRING, name: None, optional: true, rest: false },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: true,
+            rest: false,
+        },
     ]);
 
     // [number]
-    let target = interner.tuple(vec![
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
-    ]);
+    let target = interner.tuple(vec![TupleElement {
+        type_id: TypeId::NUMBER,
+        name: None,
+        optional: false,
+        rest: false,
+    }]);
 
     // Optional elements don't count as "extra" if they're beyond target length
     // This is actually a borderline case - TypeScript may reject this
@@ -1653,14 +1944,34 @@ fn test_tuple_subtyping_rest_to_rest() {
 
     // [number, ...string[]]
     let source = interner.tuple(vec![
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
-        TupleElement { type_id: string_array, name: None, optional: false, rest: true },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: string_array,
+            name: None,
+            optional: false,
+            rest: true,
+        },
     ]);
 
     // [number, ...string[]]
     let target = interner.tuple(vec![
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
-        TupleElement { type_id: string_array, name: None, optional: false, rest: true },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: string_array,
+            name: None,
+            optional: false,
+            rest: true,
+        },
     ]);
 
     // Both have rest, same types -> should succeed
@@ -1677,8 +1988,18 @@ fn test_tuple_to_array_with_rest() {
 
     // [number, ...string[]]
     let source = interner.tuple(vec![
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
-        TupleElement { type_id: string_array, name: None, optional: false, rest: true },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: string_array,
+            name: None,
+            optional: false,
+            rest: true,
+        },
     ]);
 
     // string[]
@@ -1696,13 +2017,33 @@ fn test_tuple_to_array_with_rest_tuple() {
 
     let string_array = interner.array(TypeId::STRING);
     let rest_tuple = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     let source = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: rest_tuple, name: None, optional: false, rest: true },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: rest_tuple,
+            name: None,
+            optional: false,
+            rest: true,
+        },
     ]);
 
     assert!(checker.is_subtype_of(source, string_array));
@@ -1716,13 +2057,33 @@ fn test_tuple_to_array_with_rest_tuple_mismatch() {
 
     let string_array = interner.array(TypeId::STRING);
     let rest_tuple = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     let source = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: rest_tuple, name: None, optional: false, rest: true },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: rest_tuple,
+            name: None,
+            optional: false,
+            rest: true,
+        },
     ]);
 
     assert!(!checker.is_subtype_of(source, string_array));
@@ -1736,13 +2097,33 @@ fn test_tuple_to_array_with_rest_tuple_variadic() {
 
     let string_array = interner.array(TypeId::STRING);
     let rest_tuple = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: string_array, name: None, optional: false, rest: true },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: string_array,
+            name: None,
+            optional: false,
+            rest: true,
+        },
     ]);
 
     let source = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: rest_tuple, name: None, optional: false, rest: true },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: rest_tuple,
+            name: None,
+            optional: false,
+            rest: true,
+        },
     ]);
 
     assert!(checker.is_subtype_of(source, string_array));
@@ -1758,8 +2139,18 @@ fn test_tuple_to_array_all_matching_with_rest() {
 
     // [string, ...string[]]
     let source = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: string_array, name: None, optional: false, rest: true },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: string_array,
+            name: None,
+            optional: false,
+            rest: true,
+        },
     ]);
 
     // string[]
@@ -1779,8 +2170,18 @@ fn test_tuple_to_array_no_rest() {
 
     // [string, string]
     let source = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     // string[]
@@ -1800,8 +2201,18 @@ fn test_tuple_to_array_mixed_types() {
 
     // [number, string]
     let source = interner.tuple(vec![
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     // string[]
@@ -1819,8 +2230,18 @@ fn test_tuple_array_assignment_tuple_to_union_array() {
     let union_elem = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
     let union_array = interner.array(union_elem);
     let source = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     assert!(checker.is_subtype_of(source, union_array));
@@ -1833,9 +2254,12 @@ fn test_array_to_variadic_tuple() {
     let mut checker = SubtypeChecker::new(&interner);
 
     let string_array = interner.array(TypeId::STRING);
-    let target = interner.tuple(vec![
-        TupleElement { type_id: string_array, name: None, optional: false, rest: true },
-    ]);
+    let target = interner.tuple(vec![TupleElement {
+        type_id: string_array,
+        name: None,
+        optional: false,
+        rest: true,
+    }]);
 
     assert!(!checker.is_subtype_of(string_array, target));
 }
@@ -1847,8 +2271,18 @@ fn test_tuple_array_assignment_array_to_tuple_rejected() {
 
     let string_array = interner.array(TypeId::STRING);
     let target = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     assert!(!checker.is_subtype_of(string_array, target));
@@ -1862,8 +2296,18 @@ fn test_array_to_variadic_tuple_with_required_prefix() {
 
     let string_array = interner.array(TypeId::STRING);
     let target = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: string_array, name: None, optional: false, rest: true },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: string_array,
+            name: None,
+            optional: false,
+            rest: true,
+        },
     ]);
 
     assert!(!checker.is_subtype_of(string_array, target));
@@ -1877,8 +2321,18 @@ fn test_array_to_variadic_tuple_with_optional_prefix() {
 
     let string_array = interner.array(TypeId::STRING);
     let target = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: true, rest: false },
-        TupleElement { type_id: string_array, name: None, optional: false, rest: true },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: true,
+            rest: false,
+        },
+        TupleElement {
+            type_id: string_array,
+            name: None,
+            optional: false,
+            rest: true,
+        },
     ]);
 
     assert!(!checker.is_subtype_of(string_array, target));
@@ -1891,9 +2345,12 @@ fn test_array_to_fixed_optional_tuple() {
     let mut checker = SubtypeChecker::new(&interner);
 
     let string_array = interner.array(TypeId::STRING);
-    let target = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: true, rest: false },
-    ]);
+    let target = interner.tuple(vec![TupleElement {
+        type_id: TypeId::STRING,
+        name: None,
+        optional: true,
+        rest: false,
+    }]);
 
     assert!(!checker.is_subtype_of(string_array, target));
 }
@@ -1905,8 +2362,18 @@ fn test_tuple_array_assignment_empty_array_optional_tuple() {
 
     let empty_array = interner.array(TypeId::NEVER);
     let optional_tuple = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: true, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: true, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: true,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: true,
+            rest: false,
+        },
     ]);
 
     assert!(checker.is_subtype_of(empty_array, optional_tuple));
@@ -1920,12 +2387,18 @@ fn test_never_array_to_optional_tuple() {
 
     let never_array = interner.array(TypeId::NEVER);
     let empty_tuple = interner.tuple(Vec::new());
-    let optional_tuple = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: true, rest: false },
-    ]);
-    let required_tuple = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-    ]);
+    let optional_tuple = interner.tuple(vec![TupleElement {
+        type_id: TypeId::STRING,
+        name: None,
+        optional: true,
+        rest: false,
+    }]);
+    let required_tuple = interner.tuple(vec![TupleElement {
+        type_id: TypeId::STRING,
+        name: None,
+        optional: false,
+        rest: false,
+    }]);
 
     assert!(checker.is_subtype_of(never_array, empty_tuple));
     assert!(checker.is_subtype_of(never_array, optional_tuple));
@@ -1940,9 +2413,12 @@ fn test_never_array_to_variadic_tuple() {
 
     let never_array = interner.array(TypeId::NEVER);
     let string_array = interner.array(TypeId::STRING);
-    let target = interner.tuple(vec![
-        TupleElement { type_id: string_array, name: None, optional: false, rest: true },
-    ]);
+    let target = interner.tuple(vec![TupleElement {
+        type_id: string_array,
+        name: None,
+        optional: false,
+        rest: true,
+    }]);
 
     assert!(checker.is_subtype_of(never_array, target));
 }
@@ -1955,16 +2431,14 @@ fn test_number_index_signature_numeric_property() {
     let mut checker = SubtypeChecker::new(&interner);
 
     // { 0: string }
-    let source = interner.object(vec![
-        PropertyInfo {
-            name: interner.intern_string("0"),
-            type_id: TypeId::STRING,
-            write_type: TypeId::STRING,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-    ]);
+    let source = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("0"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
 
     // { [x: number]: string }
     let target_shape = ObjectShape {
@@ -1990,16 +2464,14 @@ fn test_number_index_signature_type_mismatch() {
     let mut checker = SubtypeChecker::new(&interner);
 
     // { 0: number }
-    let source = interner.object(vec![
-        PropertyInfo {
-            name: interner.intern_string("0"),
-            type_id: TypeId::NUMBER,
-            write_type: TypeId::NUMBER,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-    ]);
+    let source = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("0"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
 
     // { [x: number]: string }
     let target_shape = ObjectShape {
@@ -2037,7 +2509,7 @@ fn test_number_index_signature_method_bivariant_property() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let wide_fn = interner.function(FunctionShape {
@@ -2052,7 +2524,7 @@ fn test_number_index_signature_method_bivariant_property() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let source_method = interner.object(vec![PropertyInfo {
@@ -2108,7 +2580,7 @@ fn test_string_index_signature_method_bivariant_property() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let wide_fn = interner.function(FunctionShape {
@@ -2123,7 +2595,7 @@ fn test_string_index_signature_method_bivariant_property() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let source_method = interner.object(vec![PropertyInfo {
@@ -2888,7 +3360,7 @@ fn test_strict_function_variance() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // (x: string) => void
@@ -2904,7 +3376,7 @@ fn test_strict_function_variance() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // 1. Safe assignment: (string | number) => void  <:  (string) => void
@@ -2939,7 +3411,7 @@ fn test_function_variance_union_intersection_targets() {
             return_type: TypeId::VOID,
             type_predicate: None,
             is_constructor: false,
-                                is_method: false,
+            is_method: false,
         })
     };
 
@@ -3038,7 +3510,7 @@ fn test_method_bivariant_required_param() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let narrow_method = interner.function(FunctionShape {
@@ -3053,7 +3525,7 @@ fn test_method_bivariant_required_param() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let wide_obj = interner.object(vec![PropertyInfo {
@@ -3098,7 +3570,7 @@ fn test_method_source_bivariant_against_function_property() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let wide_func = interner.function(FunctionShape {
@@ -3113,7 +3585,7 @@ fn test_method_source_bivariant_against_function_property() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let source = interner.object(vec![PropertyInfo {
@@ -3158,7 +3630,7 @@ fn test_function_source_bivariant_against_method_property() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let wide_method = interner.function(FunctionShape {
@@ -3173,7 +3645,7 @@ fn test_function_source_bivariant_against_method_property() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let source = interner.object(vec![PropertyInfo {
@@ -3218,7 +3690,7 @@ fn test_variance_optional_rest_method_optional_bivariant() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let narrow_method = interner.function(FunctionShape {
@@ -3233,7 +3705,7 @@ fn test_variance_optional_rest_method_optional_bivariant() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let wide_obj = interner.object(vec![PropertyInfo {
@@ -3280,7 +3752,7 @@ fn test_variance_optional_rest_method_rest_bivariant() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let narrow_method = interner.function(FunctionShape {
@@ -3295,7 +3767,7 @@ fn test_variance_optional_rest_method_rest_bivariant() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let wide_obj = interner.object(vec![PropertyInfo {
@@ -3341,7 +3813,7 @@ fn test_variance_optional_rest_method_optional_with_this_bivariant() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let narrow_method = interner.function(FunctionShape {
@@ -3356,7 +3828,7 @@ fn test_variance_optional_rest_method_optional_with_this_bivariant() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let wide_obj = interner.object(vec![PropertyInfo {
@@ -3404,7 +3876,7 @@ fn test_variance_optional_rest_method_rest_with_this_bivariant() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let narrow_method = interner.function(FunctionShape {
@@ -3419,7 +3891,7 @@ fn test_variance_optional_rest_method_rest_with_this_bivariant() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let wide_obj = interner.object(vec![PropertyInfo {
@@ -3465,7 +3937,7 @@ fn test_variance_optional_rest_function_optional_with_this_contravariant() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let narrow_func = interner.function(FunctionShape {
@@ -3480,7 +3952,7 @@ fn test_variance_optional_rest_function_optional_with_this_contravariant() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let wide_obj = interner.object(vec![PropertyInfo {
@@ -3528,7 +4000,7 @@ fn test_variance_optional_rest_function_rest_with_this_contravariant() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let narrow_func = interner.function(FunctionShape {
@@ -3543,7 +4015,7 @@ fn test_variance_optional_rest_function_rest_with_this_contravariant() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let wide_obj = interner.object(vec![PropertyInfo {
@@ -3674,7 +4146,7 @@ fn test_function_required_count_allows_optional_source_extra() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let target = interner.function(FunctionShape {
@@ -3689,7 +4161,7 @@ fn test_function_required_count_allows_optional_source_extra() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     assert!(checker.is_subtype_of(source, target));
@@ -3720,7 +4192,7 @@ fn test_function_required_count_rejects_required_source_extra() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let target = interner.function(FunctionShape {
@@ -3743,7 +4215,7 @@ fn test_function_required_count_rejects_required_source_extra() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     assert!(!checker.is_subtype_of(source, target));
@@ -3777,7 +4249,7 @@ fn test_function_variance_param_contravariance() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let target = interner.function(FunctionShape {
@@ -3800,7 +4272,7 @@ fn test_function_variance_param_contravariance() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     assert!(checker.is_subtype_of(source, target));
@@ -3827,7 +4299,7 @@ fn test_function_variance_return_covariance() {
         return_type: narrow_return,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let target = interner.function(FunctionShape {
@@ -3842,7 +4314,7 @@ fn test_function_variance_return_covariance() {
         return_type: wide_return,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     assert!(checker.is_subtype_of(source, target));
@@ -3861,7 +4333,7 @@ fn test_function_return_covariance() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let returns_string_or_number = interner.function(FunctionShape {
@@ -3871,7 +4343,7 @@ fn test_function_return_covariance() {
         return_type: interner.union(vec![TypeId::STRING, TypeId::NUMBER]),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     assert!(checker.is_subtype_of(returns_string, returns_string_or_number));
@@ -3890,7 +4362,7 @@ fn test_void_return_exception_subtype() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let returns_void = interner.function(FunctionShape {
@@ -3900,7 +4372,7 @@ fn test_void_return_exception_subtype() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     assert!(!checker.is_subtype_of(returns_number, returns_void));
@@ -3923,7 +4395,7 @@ fn test_void_return_exception_method_property() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let returns_void = interner.function(FunctionShape {
@@ -3933,7 +4405,7 @@ fn test_void_return_exception_method_property() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let source = interner.object(vec![PropertyInfo {
@@ -4008,7 +4480,8 @@ fn test_function_top_assignability() {
         call_signatures: Vec::new(),
         construct_signatures: Vec::new(),
         properties: Vec::new(),
-    ..Default::default() });
+        ..Default::default()
+    });
 
     let specific_fn = interner.function(FunctionShape {
         type_params: vec![],
@@ -4022,7 +4495,7 @@ fn test_function_top_assignability() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     assert!(checker.is_subtype_of(specific_fn, function_top));
@@ -4042,7 +4515,7 @@ fn test_this_parameter_variance() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let string_this_fn = interner.function(FunctionShape {
@@ -4052,7 +4525,7 @@ fn test_this_parameter_variance() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // this parameter is contravariant like regular parameters
@@ -4074,7 +4547,7 @@ fn test_this_parameter_method_property_bivariant() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let narrow_method = interner.function(FunctionShape {
@@ -4084,7 +4557,7 @@ fn test_this_parameter_method_property_bivariant() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let wide_obj = interner.object(vec![PropertyInfo {
@@ -4122,7 +4595,7 @@ fn test_this_parameter_function_property_contravariant() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let narrow_func = interner.function(FunctionShape {
@@ -4132,7 +4605,7 @@ fn test_this_parameter_function_property_contravariant() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let wide_obj = interner.object(vec![PropertyInfo {
@@ -4172,7 +4645,7 @@ fn test_this_parameter_method_source_bivariant_against_function_property() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let wide_func = interner.function(FunctionShape {
@@ -4182,7 +4655,7 @@ fn test_this_parameter_method_source_bivariant_against_function_property() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let source = interner.object(vec![PropertyInfo {
@@ -4222,7 +4695,7 @@ fn test_this_parameter_function_source_bivariant_against_method_property() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let wide_method = interner.function(FunctionShape {
@@ -4232,7 +4705,7 @@ fn test_this_parameter_function_source_bivariant_against_method_property() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let source = interner.object(vec![PropertyInfo {
@@ -4277,7 +4750,7 @@ fn test_this_type_in_param_covariant() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let wide_fn = interner.function(FunctionShape {
@@ -4292,7 +4765,7 @@ fn test_this_type_in_param_covariant() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let narrow_obj = interner.object(vec![PropertyInfo {
@@ -4340,7 +4813,7 @@ fn test_class_like_subtyping_this_param_covariant() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let derived_compare = interner.function(FunctionShape {
@@ -4355,7 +4828,7 @@ fn test_class_like_subtyping_this_param_covariant() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let base = interner.object(vec![
@@ -4419,15 +4892,30 @@ fn test_function_fixed_to_rest_subtyping() {
     let source = interner.function(FunctionShape {
         type_params: vec![],
         params: vec![
-            ParamInfo { name: Some(interner.intern_string("name")), type_id: TypeId::STRING, optional: false, rest: false },
-            ParamInfo { name: Some(interner.intern_string("mixed")), type_id: TypeId::ANY, optional: false, rest: false },
-            ParamInfo { name: Some(interner.intern_string("arg")), type_id: TypeId::ANY, optional: false, rest: false },
+            ParamInfo {
+                name: Some(interner.intern_string("name")),
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("mixed")),
+                type_id: TypeId::ANY,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("arg")),
+                type_id: TypeId::ANY,
+                optional: false,
+                rest: false,
+            },
         ],
         this_type: None,
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Target: (name: string, mixed: any, ...args: any[]) => any
@@ -4435,20 +4923,38 @@ fn test_function_fixed_to_rest_subtyping() {
     let target = interner.function(FunctionShape {
         type_params: vec![],
         params: vec![
-            ParamInfo { name: Some(interner.intern_string("name")), type_id: TypeId::STRING, optional: false, rest: false },
-            ParamInfo { name: Some(interner.intern_string("mixed")), type_id: TypeId::ANY, optional: false, rest: false },
-            ParamInfo { name: Some(interner.intern_string("args")), type_id: any_array, optional: false, rest: true },
+            ParamInfo {
+                name: Some(interner.intern_string("name")),
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("mixed")),
+                type_id: TypeId::ANY,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("args")),
+                type_id: any_array,
+                optional: false,
+                rest: true,
+            },
         ],
         this_type: None,
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Function with fixed params should be subtype of function with rest params
     // This matches TypeScript behavior
-    assert!(checker.is_subtype_of(source, target), "Function with 3 fixed params should be subtype of function with 2 fixed + rest params");
+    assert!(
+        checker.is_subtype_of(source, target),
+        "Function with 3 fixed params should be subtype of function with 2 fixed + rest params"
+    );
 }
 
 #[test]
@@ -4463,28 +4969,48 @@ fn test_function_fixed_to_rest_extra_param_accepts_undefined() {
     let source = interner.function(FunctionShape {
         type_params: vec![],
         params: vec![
-            ParamInfo { name: Some(interner.intern_string("name")), type_id: TypeId::STRING, optional: false, rest: false },
-            ParamInfo { name: Some(interner.intern_string("value")), type_id: num_or_undef, optional: false, rest: false },
+            ParamInfo {
+                name: Some(interner.intern_string("name")),
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("value")),
+                type_id: num_or_undef,
+                optional: false,
+                rest: false,
+            },
         ],
         this_type: None,
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let number_array = interner.array(TypeId::NUMBER);
     let target = interner.function(FunctionShape {
         type_params: vec![],
         params: vec![
-            ParamInfo { name: Some(interner.intern_string("name")), type_id: TypeId::STRING, optional: false, rest: false },
-            ParamInfo { name: Some(interner.intern_string("args")), type_id: number_array, optional: false, rest: true },
+            ParamInfo {
+                name: Some(interner.intern_string("name")),
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("args")),
+                type_id: number_array,
+                optional: false,
+                rest: true,
+            },
         ],
         this_type: None,
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     assert!(checker.is_subtype_of(source, target));
@@ -4500,28 +5026,48 @@ fn test_function_fixed_to_rest_extra_param_rejects_undefined() {
     let source = interner.function(FunctionShape {
         type_params: vec![],
         params: vec![
-            ParamInfo { name: Some(interner.intern_string("name")), type_id: TypeId::STRING, optional: false, rest: false },
-            ParamInfo { name: Some(interner.intern_string("value")), type_id: TypeId::NUMBER, optional: false, rest: false },
+            ParamInfo {
+                name: Some(interner.intern_string("name")),
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("value")),
+                type_id: TypeId::NUMBER,
+                optional: false,
+                rest: false,
+            },
         ],
         this_type: None,
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let number_array = interner.array(TypeId::NUMBER);
     let target = interner.function(FunctionShape {
         type_params: vec![],
         params: vec![
-            ParamInfo { name: Some(interner.intern_string("name")), type_id: TypeId::STRING, optional: false, rest: false },
-            ParamInfo { name: Some(interner.intern_string("args")), type_id: number_array, optional: false, rest: true },
+            ParamInfo {
+                name: Some(interner.intern_string("name")),
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("args")),
+                type_id: number_array,
+                optional: false,
+                rest: true,
+            },
         ],
         this_type: None,
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     assert!(!checker.is_subtype_of(source, target));
@@ -4544,15 +5090,30 @@ fn test_function_rest_tuple_to_rest_array_subtyping() {
     let source = interner.function(FunctionShape {
         type_params: vec![],
         params: vec![
-            ParamInfo { name: Some(interner.intern_string("name")), type_id: TypeId::STRING, optional: false, rest: false },
-            ParamInfo { name: Some(interner.intern_string("mixed")), type_id: TypeId::ANY, optional: false, rest: false },
-            ParamInfo { name: Some(interner.intern_string("args")), type_id: tuple_one_any, optional: false, rest: true },
+            ParamInfo {
+                name: Some(interner.intern_string("name")),
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("mixed")),
+                type_id: TypeId::ANY,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("args")),
+                type_id: tuple_one_any,
+                optional: false,
+                rest: true,
+            },
         ],
         this_type: None,
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Target: (name: string, mixed: any, ...args: any[]) => any
@@ -4560,20 +5121,38 @@ fn test_function_rest_tuple_to_rest_array_subtyping() {
     let target = interner.function(FunctionShape {
         type_params: vec![],
         params: vec![
-            ParamInfo { name: Some(interner.intern_string("name")), type_id: TypeId::STRING, optional: false, rest: false },
-            ParamInfo { name: Some(interner.intern_string("mixed")), type_id: TypeId::ANY, optional: false, rest: false },
-            ParamInfo { name: Some(interner.intern_string("args")), type_id: any_array, optional: false, rest: true },
+            ParamInfo {
+                name: Some(interner.intern_string("name")),
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("mixed")),
+                type_id: TypeId::ANY,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("args")),
+                type_id: any_array,
+                optional: false,
+                rest: true,
+            },
         ],
         this_type: None,
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Function with rest tuple should be subtype of function with rest array
     // (name, mixed, ...args: [any]) should be assignable to (name, mixed, ...args: any[])
-    assert!(checker.is_subtype_of(source, target), "Function with rest tuple [any] should be subtype of function with rest array any[]");
+    assert!(
+        checker.is_subtype_of(source, target),
+        "Function with rest tuple [any] should be subtype of function with rest array any[]"
+    );
 }
 
 #[test]
@@ -6371,7 +6950,7 @@ fn test_generic_covariant_return_position() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let get_union = interner.function(FunctionShape {
@@ -6381,7 +6960,7 @@ fn test_generic_covariant_return_position() {
         return_type: interner.union(vec![TypeId::STRING, TypeId::NUMBER]),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let producer_string = interner.object(vec![PropertyInfo {
@@ -6429,7 +7008,7 @@ fn test_generic_contravariant_param_position() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let accept_union = interner.function(FunctionShape {
@@ -6444,7 +7023,7 @@ fn test_generic_contravariant_param_position() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let consumer_string = interner.object(vec![PropertyInfo {
@@ -6494,7 +7073,7 @@ fn test_generic_mixed_variance_positions() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // process(input: string): string | number
@@ -6510,7 +7089,7 @@ fn test_generic_mixed_variance_positions() {
         return_type: wide_type,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let transform_a = interner.object(vec![PropertyInfo {
@@ -6562,7 +7141,7 @@ fn test_method_bivariant_wider_param() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let method_wide = interner.function(FunctionShape {
@@ -6577,7 +7156,7 @@ fn test_method_bivariant_wider_param() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let obj_narrow_method = interner.object(vec![PropertyInfo {
@@ -6623,7 +7202,7 @@ fn test_method_bivariant_callback_param() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let callback_wide = interner.function(FunctionShape {
@@ -6638,7 +7217,7 @@ fn test_method_bivariant_callback_param() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let method_with_narrow_cb = interner.function(FunctionShape {
@@ -6653,7 +7232,7 @@ fn test_method_bivariant_callback_param() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let method_with_wide_cb = interner.function(FunctionShape {
@@ -6668,7 +7247,7 @@ fn test_method_bivariant_callback_param() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let obj_narrow_cb = interner.object(vec![PropertyInfo {
@@ -6715,7 +7294,7 @@ fn test_function_property_contravariant_not_bivariant() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_wide = interner.function(FunctionShape {
@@ -6730,7 +7309,7 @@ fn test_function_property_contravariant_not_bivariant() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // is_method: false - these are function properties, not methods
@@ -6839,8 +7418,8 @@ fn test_mutable_property_split_accessor_wider_write() {
 
     let obj_split = interner.object(vec![PropertyInfo {
         name: prop_name,
-        type_id: TypeId::STRING,           // read type
-        write_type: wide_type,             // write type (wider)
+        type_id: TypeId::STRING, // read type
+        write_type: wide_type,   // write type (wider)
         optional: false,
         readonly: false,
         is_method: false,
@@ -7514,9 +8093,7 @@ fn test_template_literal_empty_parts() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
 
-    let template = interner.template_literal(vec![
-        TemplateSpan::Type(TypeId::STRING),
-    ]);
+    let template = interner.template_literal(vec![TemplateSpan::Type(TypeId::STRING)]);
 
     // Should be equivalent to string
     assert!(checker.is_subtype_of(template, TypeId::STRING));
@@ -7571,7 +8148,7 @@ fn test_covariant_return_type_subtype() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
@@ -7582,7 +8159,7 @@ fn test_covariant_return_type_subtype() {
         return_type: union,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Covariant: () => string <: () => string | number
@@ -7605,7 +8182,7 @@ fn test_covariant_return_type_literal() {
         return_type: hello,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_return_string = interner.function(FunctionShape {
@@ -7615,7 +8192,7 @@ fn test_covariant_return_type_literal() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Covariant: () => "hello" <: () => string
@@ -7668,7 +8245,7 @@ fn test_covariant_return_type_object() {
         return_type: obj_ab,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_return_a = interner.function(FunctionShape {
@@ -7678,7 +8255,7 @@ fn test_covariant_return_type_object() {
         return_type: obj_a,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Covariant: more properties in return is subtype of fewer
@@ -7703,7 +8280,7 @@ fn test_covariant_return_type_array() {
         return_type: string_array,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_return_union_arr = interner.function(FunctionShape {
@@ -7713,7 +8290,7 @@ fn test_covariant_return_type_array() {
         return_type: union_array,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Covariant: narrower array type in return
@@ -7735,7 +8312,7 @@ fn test_covariant_return_never() {
         return_type: TypeId::NEVER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_return_string = interner.function(FunctionShape {
@@ -7745,7 +8322,7 @@ fn test_covariant_return_never() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // never is subtype of any return type
@@ -7767,7 +8344,7 @@ fn test_covariant_return_void_undefined() {
         return_type: TypeId::UNDEFINED,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_return_void = interner.function(FunctionShape {
@@ -7777,7 +8354,7 @@ fn test_covariant_return_void_undefined() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // undefined <: void
@@ -7809,7 +8386,7 @@ fn test_contravariant_param_wider_is_subtype() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_param_string = interner.function(FunctionShape {
@@ -7824,7 +8401,7 @@ fn test_contravariant_param_wider_is_subtype() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Contravariant: (string | number) => void <: (string) => void
@@ -7885,7 +8462,7 @@ fn test_contravariant_param_base_class() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_param_derived = interner.function(FunctionShape {
@@ -7900,7 +8477,7 @@ fn test_contravariant_param_base_class() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Contravariant: (Base) => void <: (Derived) => void
@@ -7927,7 +8504,7 @@ fn test_contravariant_param_unknown() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_param_string = interner.function(FunctionShape {
@@ -7942,7 +8519,7 @@ fn test_contravariant_param_unknown() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // (unknown) => void is subtype of (string) => void
@@ -7978,7 +8555,7 @@ fn test_contravariant_multiple_params() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Narrower params
@@ -8002,7 +8579,7 @@ fn test_contravariant_multiple_params() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Contravariant in all params
@@ -8031,7 +8608,7 @@ fn test_contravariant_callback_param() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let cb_wide = interner.function(FunctionShape {
@@ -8046,7 +8623,7 @@ fn test_contravariant_callback_param() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_with_cb_narrow = interner.function(FunctionShape {
@@ -8061,7 +8638,7 @@ fn test_contravariant_callback_param() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_with_cb_wide = interner.function(FunctionShape {
@@ -8076,7 +8653,7 @@ fn test_contravariant_callback_param() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Double contravariance: narrower callback param is subtype
@@ -8198,7 +8775,7 @@ fn test_invariant_ref_cell_pattern() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let set_string = interner.function(FunctionShape {
         type_params: vec![],
@@ -8212,7 +8789,7 @@ fn test_invariant_ref_cell_pattern() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let refcell_string = interner.object(vec![
         PropertyInfo {
@@ -8242,7 +8819,7 @@ fn test_invariant_ref_cell_pattern() {
         return_type: union,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let set_union = interner.function(FunctionShape {
         type_params: vec![],
@@ -8256,7 +8833,7 @@ fn test_invariant_ref_cell_pattern() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let refcell_union = interner.object(vec![
         PropertyInfo {
@@ -8302,7 +8879,7 @@ fn test_invariant_in_out_parameter() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
@@ -8318,7 +8895,7 @@ fn test_invariant_in_out_parameter() {
         return_type: union,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Mixed variance creates invariance
@@ -8354,7 +8931,7 @@ fn test_bivariant_method_param_wider() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Method with wide param
@@ -8370,7 +8947,7 @@ fn test_bivariant_method_param_wider() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Object with method (is_method: true enables bivariance)
@@ -8421,7 +8998,7 @@ fn test_bivariant_method_vs_function_property() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_wide = interner.function(FunctionShape {
@@ -8436,7 +9013,7 @@ fn test_bivariant_method_vs_function_property() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Method (is_method: true)
@@ -8518,7 +9095,7 @@ fn test_bivariant_event_handler_pattern() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let handler_derived = interner.function(FunctionShape {
@@ -8533,7 +9110,7 @@ fn test_bivariant_event_handler_pattern() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Object with event handler method
@@ -8583,7 +9160,7 @@ fn test_bivariant_overload_callback() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Callback that takes number
@@ -8599,7 +9176,7 @@ fn test_bivariant_overload_callback() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let obj_cb_string = interner.object(vec![PropertyInfo {
@@ -8646,7 +9223,7 @@ fn test_bivariant_optional_method_param() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Method with optional param
@@ -8662,7 +9239,7 @@ fn test_bivariant_optional_method_param() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let obj_required = interner.object(vec![PropertyInfo {
@@ -8873,11 +9450,8 @@ fn test_intersection_intrinsics_flatten() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
 
-    let intrinsic_intersection = interner.intersection(vec![
-        TypeId::STRING,
-        TypeId::NUMBER,
-        TypeId::BOOLEAN,
-    ]);
+    let intrinsic_intersection =
+        interner.intersection(vec![TypeId::STRING, TypeId::NUMBER, TypeId::BOOLEAN]);
 
     // Disjoint intrinsics intersection is never
     assert!(checker.is_subtype_of(intrinsic_intersection, TypeId::NEVER));
@@ -9222,7 +9796,7 @@ fn test_intersection_never_with_function() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let with_never = interner.intersection(vec![fn_type, TypeId::NEVER]);
@@ -9434,7 +10008,7 @@ fn test_intersection_method_access() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let obj_a = interner.object(vec![PropertyInfo {
@@ -9513,7 +10087,7 @@ fn test_intersection_function_member_access() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_number = interner.function(FunctionShape {
@@ -9528,7 +10102,7 @@ fn test_intersection_function_member_access() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_intersection = interner.intersection(vec![fn_string, fn_number]);
@@ -9547,7 +10121,7 @@ fn test_intersection_function_member_access() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // (string => void) & (number => void) should be callable with string | number
@@ -9649,7 +10223,7 @@ fn test_fn_param_contravariance_wider_param_is_subtype() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_union_param = interner.function(FunctionShape {
@@ -9664,7 +10238,7 @@ fn test_fn_param_contravariance_wider_param_is_subtype() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Function with wider param type is subtype (contravariance)
@@ -9691,7 +10265,7 @@ fn test_fn_param_contravariance_unknown_accepts_all() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_unknown_param = interner.function(FunctionShape {
@@ -9706,7 +10280,7 @@ fn test_fn_param_contravariance_unknown_accepts_all() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // unknown param accepts any input, so it's a subtype
@@ -9739,7 +10313,7 @@ fn test_fn_param_contravariance_multiple_params() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_wide = interner.function(FunctionShape {
@@ -9762,7 +10336,7 @@ fn test_fn_param_contravariance_multiple_params() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Wide params is subtype due to contravariance
@@ -9819,7 +10393,7 @@ fn test_fn_param_contravariance_object_type() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_obj_ab = interner.function(FunctionShape {
@@ -9834,7 +10408,7 @@ fn test_fn_param_contravariance_object_type() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // fn_obj_a has wider param (accepts more objects), so it's subtype
@@ -9861,7 +10435,7 @@ fn test_fn_param_contravariance_never_param() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_never_param = interner.function(FunctionShape {
@@ -9876,7 +10450,7 @@ fn test_fn_param_contravariance_never_param() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // never is the narrowest type, so fn_string is subtype of fn_never (contravariance)
@@ -9903,7 +10477,7 @@ fn test_fn_param_contravariance_literal_type() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_literal_param = interner.function(FunctionShape {
@@ -9918,7 +10492,7 @@ fn test_fn_param_contravariance_literal_type() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // string is wider than "hello", so fn_string is subtype
@@ -9946,7 +10520,7 @@ fn test_fn_return_covariance_narrower_return_is_subtype() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_return_union = interner.function(FunctionShape {
@@ -9956,7 +10530,7 @@ fn test_fn_return_covariance_narrower_return_is_subtype() {
         return_type: return_union,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Narrower return type is subtype (covariance)
@@ -9980,7 +10554,7 @@ fn test_fn_return_covariance_literal_return() {
         return_type: hello,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_return_string = interner.function(FunctionShape {
@@ -9990,7 +10564,7 @@ fn test_fn_return_covariance_literal_return() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // "hello" is subtype of string, so fn_return_literal is subtype
@@ -10010,7 +10584,7 @@ fn test_fn_return_covariance_never_return() {
         return_type: TypeId::NEVER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_return_string = interner.function(FunctionShape {
@@ -10020,7 +10594,7 @@ fn test_fn_return_covariance_never_return() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_return_number = interner.function(FunctionShape {
@@ -10030,7 +10604,7 @@ fn test_fn_return_covariance_never_return() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // never is subtype of everything
@@ -10082,7 +10656,7 @@ fn test_fn_return_covariance_object_return() {
         return_type: obj_a,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_return_ab = interner.function(FunctionShape {
@@ -10092,7 +10666,7 @@ fn test_fn_return_covariance_object_return() {
         return_type: obj_ab,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // { a, b } is subtype of { a }, so fn_return_ab is subtype
@@ -10114,7 +10688,7 @@ fn test_fn_return_covariance_void_return() {
         return_type: TypeId::UNDEFINED,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_return_void = interner.function(FunctionShape {
@@ -10124,7 +10698,7 @@ fn test_fn_return_covariance_void_return() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // undefined is subtype of void
@@ -10145,7 +10719,7 @@ fn test_fn_return_covariance_unknown_return() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_return_unknown = interner.function(FunctionShape {
@@ -10155,7 +10729,7 @@ fn test_fn_return_covariance_unknown_return() {
         return_type: TypeId::UNKNOWN,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // string is subtype of unknown, so fn_return_string is subtype
@@ -10179,7 +10753,7 @@ fn test_fn_optional_param_fewer_params_is_subtype() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_optional_param = interner.function(FunctionShape {
@@ -10194,7 +10768,7 @@ fn test_fn_optional_param_fewer_params_is_subtype() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Function with no params can be used where optional param is expected
@@ -10219,7 +10793,7 @@ fn test_fn_optional_param_required_to_optional() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_optional = interner.function(FunctionShape {
@@ -10234,7 +10808,7 @@ fn test_fn_optional_param_required_to_optional() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Required param function can substitute for optional param function
@@ -10259,7 +10833,7 @@ fn test_fn_optional_param_optional_to_required_not_subtype() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_optional = interner.function(FunctionShape {
@@ -10274,7 +10848,7 @@ fn test_fn_optional_param_optional_to_required_not_subtype() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Optional cannot substitute where required is expected
@@ -10299,7 +10873,7 @@ fn test_fn_optional_param_multiple_optional() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_two_optional = interner.function(FunctionShape {
@@ -10322,7 +10896,7 @@ fn test_fn_optional_param_multiple_optional() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // One required can substitute for two optional
@@ -10355,7 +10929,7 @@ fn test_fn_optional_param_mixed_required_optional() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_one_optional = interner.function(FunctionShape {
@@ -10378,7 +10952,7 @@ fn test_fn_optional_param_mixed_required_optional() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Both required can substitute for one optional
@@ -10405,7 +10979,7 @@ fn test_fn_optional_param_with_undefined_union() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_optional_param = interner.function(FunctionShape {
@@ -10420,7 +10994,7 @@ fn test_fn_optional_param_with_undefined_union() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // These should be related - exact relationship depends on implementation
@@ -10453,7 +11027,7 @@ fn test_fn_rest_param_basic() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_no_params = interner.function(FunctionShape {
@@ -10463,7 +11037,7 @@ fn test_fn_rest_param_basic() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // No params should be subtype of rest (can be called with zero args)
@@ -10498,7 +11072,7 @@ fn test_fn_rest_param_fixed_params_to_rest() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_rest = interner.function(FunctionShape {
@@ -10513,7 +11087,7 @@ fn test_fn_rest_param_fixed_params_to_rest() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Fixed string params should be subtype of rest strings
@@ -10541,7 +11115,7 @@ fn test_fn_rest_param_wider_element_type() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_rest_unknown = interner.function(FunctionShape {
@@ -10556,7 +11130,7 @@ fn test_fn_rest_param_wider_element_type() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // unknown[] accepts more, so it's subtype (contravariance)
@@ -10591,7 +11165,7 @@ fn test_fn_rest_param_with_leading_params() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_just_string = interner.function(FunctionShape {
@@ -10606,7 +11180,7 @@ fn test_fn_rest_param_with_leading_params() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Just string param should be subtype (rest can be empty)
@@ -10635,7 +11209,7 @@ fn test_fn_rest_param_union_element_type() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_rest_union = interner.function(FunctionShape {
@@ -10650,7 +11224,7 @@ fn test_fn_rest_param_union_element_type() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Union array accepts more types, so it's subtype
@@ -10677,7 +11251,7 @@ fn test_fn_rest_to_rest_same_type() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_rest2 = interner.function(FunctionShape {
@@ -10692,7 +11266,7 @@ fn test_fn_rest_to_rest_same_type() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Same rest type should be bidirectionally subtype
@@ -10728,7 +11302,7 @@ fn test_fn_rest_combined_with_optional() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_no_params = interner.function(FunctionShape {
@@ -10738,7 +11312,7 @@ fn test_fn_rest_combined_with_optional() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // No params should be subtype (both optional and rest can be empty)
@@ -10925,7 +11499,7 @@ fn test_excess_property_with_method() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let obj_a = interner.object(vec![PropertyInfo {
@@ -11656,7 +12230,7 @@ fn test_readonly_method_property() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let obj_readonly_method = interner.object(vec![PropertyInfo {
@@ -11696,13 +12270,33 @@ fn test_tuple_fixed_same_length_same_types() {
     let mut checker = SubtypeChecker::new(&interner);
 
     let tuple1 = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     let tuple2 = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     // Same types - bidirectional subtype
@@ -11720,13 +12314,33 @@ fn test_tuple_fixed_covariant_elements() {
     let forty_two = interner.literal_number(42.0);
 
     let literal_tuple = interner.tuple(vec![
-        TupleElement { type_id: hello, name: None, optional: false, rest: false },
-        TupleElement { type_id: forty_two, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: hello,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: forty_two,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     let wide_tuple = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     // Literal tuple is subtype of wider tuple
@@ -11742,14 +12356,39 @@ fn test_tuple_fixed_different_lengths_not_subtype() {
     let mut checker = SubtypeChecker::new(&interner);
 
     let tuple_3 = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     let tuple_2 = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     // Extra element - not subtype of fixed tuple
@@ -11765,13 +12404,33 @@ fn test_tuple_fixed_type_mismatch() {
     let mut checker = SubtypeChecker::new(&interner);
 
     let tuple_ss = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     let tuple_sn = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     // Different element types - not subtypes
@@ -11797,9 +12456,12 @@ fn test_tuple_fixed_single_element() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
 
-    let single = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-    ]);
+    let single = interner.tuple(vec![TupleElement {
+        type_id: TypeId::STRING,
+        name: None,
+        optional: false,
+        rest: false,
+    }]);
 
     assert!(checker.is_subtype_of(single, single));
 }
@@ -11812,13 +12474,19 @@ fn test_tuple_fixed_union_element() {
 
     let union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
 
-    let tuple_union = interner.tuple(vec![
-        TupleElement { type_id: union, name: None, optional: false, rest: false },
-    ]);
+    let tuple_union = interner.tuple(vec![TupleElement {
+        type_id: union,
+        name: None,
+        optional: false,
+        rest: false,
+    }]);
 
-    let tuple_string = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-    ]);
+    let tuple_string = interner.tuple(vec![TupleElement {
+        type_id: TypeId::STRING,
+        name: None,
+        optional: false,
+        rest: false,
+    }]);
 
     // [string] <: [string | number]
     assert!(checker.is_subtype_of(tuple_string, tuple_union));
@@ -11839,13 +12507,33 @@ fn test_tuple_rest_basic() {
     let number_array = interner.array(TypeId::NUMBER);
 
     let tuple_with_rest = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: number_array, name: None, optional: false, rest: true },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: number_array,
+            name: None,
+            optional: false,
+            rest: true,
+        },
     ]);
 
     let tuple_string_number = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     // Fixed tuple with matching types is subtype of rest tuple
@@ -11861,15 +12549,45 @@ fn test_tuple_rest_accepts_multiple() {
     let number_array = interner.array(TypeId::NUMBER);
 
     let tuple_with_rest = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: number_array, name: None, optional: false, rest: true },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: number_array,
+            name: None,
+            optional: false,
+            rest: true,
+        },
     ]);
 
     let tuple_four = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     // Multiple numbers match rest
@@ -11885,13 +12603,26 @@ fn test_tuple_rest_accepts_zero() {
     let number_array = interner.array(TypeId::NUMBER);
 
     let tuple_with_rest = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: number_array, name: None, optional: false, rest: true },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: number_array,
+            name: None,
+            optional: false,
+            rest: true,
+        },
     ]);
 
-    let tuple_one = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-    ]);
+    let tuple_one = interner.tuple(vec![TupleElement {
+        type_id: TypeId::STRING,
+        name: None,
+        optional: false,
+        rest: false,
+    }]);
 
     // Zero rest elements is valid
     assert!(checker.is_subtype_of(tuple_one, tuple_with_rest));
@@ -11906,13 +12637,33 @@ fn test_tuple_rest_type_mismatch() {
     let number_array = interner.array(TypeId::NUMBER);
 
     let tuple_with_rest = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: number_array, name: None, optional: false, rest: true },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: number_array,
+            name: None,
+            optional: false,
+            rest: true,
+        },
     ]);
 
     let tuple_bool = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     // boolean doesn't match number rest
@@ -11927,13 +12678,19 @@ fn test_tuple_rest_to_rest() {
 
     let string_array = interner.array(TypeId::STRING);
 
-    let tuple_rest1 = interner.tuple(vec![
-        TupleElement { type_id: string_array, name: None, optional: false, rest: true },
-    ]);
+    let tuple_rest1 = interner.tuple(vec![TupleElement {
+        type_id: string_array,
+        name: None,
+        optional: false,
+        rest: true,
+    }]);
 
-    let tuple_rest2 = interner.tuple(vec![
-        TupleElement { type_id: string_array, name: None, optional: false, rest: true },
-    ]);
+    let tuple_rest2 = interner.tuple(vec![TupleElement {
+        type_id: string_array,
+        name: None,
+        optional: false,
+        rest: true,
+    }]);
 
     // Same rest types - bidirectional subtype
     assert!(checker.is_subtype_of(tuple_rest1, tuple_rest2));
@@ -11950,13 +12707,19 @@ fn test_tuple_rest_covariant() {
     let hello_array = interner.array(hello);
     let string_array = interner.array(TypeId::STRING);
 
-    let tuple_literal_rest = interner.tuple(vec![
-        TupleElement { type_id: hello_array, name: None, optional: false, rest: true },
-    ]);
+    let tuple_literal_rest = interner.tuple(vec![TupleElement {
+        type_id: hello_array,
+        name: None,
+        optional: false,
+        rest: true,
+    }]);
 
-    let tuple_string_rest = interner.tuple(vec![
-        TupleElement { type_id: string_array, name: None, optional: false, rest: true },
-    ]);
+    let tuple_string_rest = interner.tuple(vec![TupleElement {
+        type_id: string_array,
+        name: None,
+        optional: false,
+        rest: true,
+    }]);
 
     // Literal rest is subtype of string rest
     assert!(checker.is_subtype_of(tuple_literal_rest, tuple_string_rest));
@@ -11971,15 +12734,45 @@ fn test_tuple_rest_middle_position() {
     let number_array = interner.array(TypeId::NUMBER);
 
     let tuple_middle_rest = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: number_array, name: None, optional: false, rest: true },
-        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: number_array,
+            name: None,
+            optional: false,
+            rest: true,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     let tuple_three = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     // Fixed tuple matches middle rest
@@ -11997,13 +12790,26 @@ fn test_tuple_optional_basic() {
     let mut checker = SubtypeChecker::new(&interner);
 
     let tuple_optional = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: true, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: true,
+            rest: false,
+        },
     ]);
 
-    let tuple_one = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-    ]);
+    let tuple_one = interner.tuple(vec![TupleElement {
+        type_id: TypeId::STRING,
+        name: None,
+        optional: false,
+        rest: false,
+    }]);
 
     // Shorter tuple matches optional
     assert!(checker.is_subtype_of(tuple_one, tuple_optional));
@@ -12016,13 +12822,33 @@ fn test_tuple_optional_provided() {
     let mut checker = SubtypeChecker::new(&interner);
 
     let tuple_optional = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: true, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: true,
+            rest: false,
+        },
     ]);
 
     let tuple_both = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     // Full tuple with optional provided is subtype
@@ -12036,8 +12862,18 @@ fn test_tuple_optional_all_optional() {
     let mut checker = SubtypeChecker::new(&interner);
 
     let tuple_all_optional = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: true, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: true, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: true,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: true,
+            rest: false,
+        },
     ]);
 
     let empty_tuple = interner.tuple(vec![]);
@@ -12053,13 +12889,33 @@ fn test_tuple_optional_type_mismatch() {
     let mut checker = SubtypeChecker::new(&interner);
 
     let tuple_optional_number = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: true, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: true,
+            rest: false,
+        },
     ]);
 
     let tuple_with_bool = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     // Wrong type for optional slot
@@ -12072,13 +12928,19 @@ fn test_tuple_optional_required_to_optional() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
 
-    let tuple_required = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-    ]);
+    let tuple_required = interner.tuple(vec![TupleElement {
+        type_id: TypeId::STRING,
+        name: None,
+        optional: false,
+        rest: false,
+    }]);
 
-    let tuple_optional = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: true, rest: false },
-    ]);
+    let tuple_optional = interner.tuple(vec![TupleElement {
+        type_id: TypeId::STRING,
+        name: None,
+        optional: true,
+        rest: false,
+    }]);
 
     // Required is subtype of optional
     assert!(checker.is_subtype_of(tuple_required, tuple_optional));
@@ -12090,13 +12952,19 @@ fn test_tuple_optional_to_required_not_subtype() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
 
-    let tuple_required = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-    ]);
+    let tuple_required = interner.tuple(vec![TupleElement {
+        type_id: TypeId::STRING,
+        name: None,
+        optional: false,
+        rest: false,
+    }]);
 
-    let tuple_optional = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: true, rest: false },
-    ]);
+    let tuple_optional = interner.tuple(vec![TupleElement {
+        type_id: TypeId::STRING,
+        name: None,
+        optional: true,
+        rest: false,
+    }]);
 
     // Optional is NOT subtype of required
     assert!(!checker.is_subtype_of(tuple_optional, tuple_required));
@@ -12109,18 +12977,46 @@ fn test_tuple_optional_multiple() {
     let mut checker = SubtypeChecker::new(&interner);
 
     let tuple_multi_optional = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: true, rest: false },
-        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: true, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: true,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            name: None,
+            optional: true,
+            rest: false,
+        },
     ]);
 
-    let tuple_one = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-    ]);
+    let tuple_one = interner.tuple(vec![TupleElement {
+        type_id: TypeId::STRING,
+        name: None,
+        optional: false,
+        rest: false,
+    }]);
 
     let tuple_two = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     // Both shorter tuples match
@@ -12142,13 +13038,33 @@ fn test_tuple_labeled_same_labels() {
     let y_name = interner.intern_string("y");
 
     let tuple1 = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: Some(x_name), optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: Some(y_name), optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: Some(x_name),
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: Some(y_name),
+            optional: false,
+            rest: false,
+        },
     ]);
 
     let tuple2 = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: Some(x_name), optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: Some(y_name), optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: Some(x_name),
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: Some(y_name),
+            optional: false,
+            rest: false,
+        },
     ]);
 
     // Same labels - bidirectional subtype
@@ -12166,13 +13082,33 @@ fn test_tuple_labeled_to_unlabeled() {
     let y_name = interner.intern_string("y");
 
     let labeled = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: Some(x_name), optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: Some(y_name), optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: Some(x_name),
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: Some(y_name),
+            optional: false,
+            rest: false,
+        },
     ]);
 
     let unlabeled = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     // Labels don't affect subtyping - types must match
@@ -12192,13 +13128,33 @@ fn test_tuple_labeled_different_labels() {
     let y_name = interner.intern_string("y");
 
     let tuple_ab = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: Some(a_name), optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: Some(b_name), optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: Some(a_name),
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: Some(b_name),
+            optional: false,
+            rest: false,
+        },
     ]);
 
     let tuple_xy = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: Some(x_name), optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: Some(y_name), optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: Some(x_name),
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: Some(y_name),
+            optional: false,
+            rest: false,
+        },
     ]);
 
     // Different labels but same types - should still be subtypes
@@ -12216,13 +13172,26 @@ fn test_tuple_labeled_optional() {
     let y_name = interner.intern_string("y");
 
     let labeled_optional = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: Some(x_name), optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: Some(y_name), optional: true, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: Some(x_name),
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: Some(y_name),
+            optional: true,
+            rest: false,
+        },
     ]);
 
-    let labeled_one = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: Some(x_name), optional: false, rest: false },
-    ]);
+    let labeled_one = interner.tuple(vec![TupleElement {
+        type_id: TypeId::STRING,
+        name: Some(x_name),
+        optional: false,
+        rest: false,
+    }]);
 
     // Shorter tuple matches optional labeled
     assert!(checker.is_subtype_of(labeled_one, labeled_optional));
@@ -12239,13 +13208,33 @@ fn test_tuple_labeled_rest() {
     let number_array = interner.array(TypeId::NUMBER);
 
     let labeled_rest = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: Some(x_name), optional: false, rest: false },
-        TupleElement { type_id: number_array, name: Some(rest_name), optional: false, rest: true },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: Some(x_name),
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: number_array,
+            name: Some(rest_name),
+            optional: false,
+            rest: true,
+        },
     ]);
 
     let labeled_two = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: Some(x_name), optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: Some(x_name),
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     // Fixed elements match labeled rest
@@ -12261,13 +13250,19 @@ fn test_tuple_labeled_covariant() {
     let x_name = interner.intern_string("x");
     let hello = interner.literal_string("hello");
 
-    let literal_labeled = interner.tuple(vec![
-        TupleElement { type_id: hello, name: Some(x_name), optional: false, rest: false },
-    ]);
+    let literal_labeled = interner.tuple(vec![TupleElement {
+        type_id: hello,
+        name: Some(x_name),
+        optional: false,
+        rest: false,
+    }]);
 
-    let string_labeled = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: Some(x_name), optional: false, rest: false },
-    ]);
+    let string_labeled = interner.tuple(vec![TupleElement {
+        type_id: TypeId::STRING,
+        name: Some(x_name),
+        optional: false,
+        rest: false,
+    }]);
 
     // Literal labeled is subtype of string labeled
     assert!(checker.is_subtype_of(literal_labeled, string_labeled));
@@ -12283,15 +13278,45 @@ fn test_tuple_labeled_mixed() {
     let y_name = interner.intern_string("y");
 
     let mixed = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: Some(x_name), optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::BOOLEAN, name: Some(y_name), optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: Some(x_name),
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            name: Some(y_name),
+            optional: false,
+            rest: false,
+        },
     ]);
 
     let all_unlabeled = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     // Mixed and unlabeled should be equivalent
@@ -12444,7 +13469,7 @@ fn test_class_inheritance_method_override() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let derived_method = interner.function(FunctionShape {
@@ -12454,7 +13479,7 @@ fn test_class_inheritance_method_override() {
         return_type: hello,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let base = interner.object(vec![PropertyInfo {
@@ -12684,7 +13709,7 @@ fn test_implements_simple_interface() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let interface = interner.object(vec![PropertyInfo {
@@ -12738,7 +13763,7 @@ fn test_implements_multiple_interfaces() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let interface_a = interner.object(vec![PropertyInfo {
@@ -12799,7 +13824,7 @@ fn test_implements_missing_method() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let interface = interner.object(vec![PropertyInfo {
@@ -12834,7 +13859,7 @@ fn test_implements_optional_method() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let interface = interner.object(vec![PropertyInfo {
@@ -12874,7 +13899,7 @@ fn test_implements_wrong_signature() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let class_method = interner.function(FunctionShape {
@@ -12889,7 +13914,7 @@ fn test_implements_wrong_signature() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let interface = interner.object(vec![PropertyInfo {
@@ -13028,7 +14053,7 @@ fn test_abstract_class_with_abstract_method() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Abstract base class structure
@@ -13072,7 +14097,7 @@ fn test_abstract_class_with_concrete_method() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let void_method = interner.function(FunctionShape {
@@ -13082,7 +14107,7 @@ fn test_abstract_class_with_concrete_method() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let abstract_base = interner.object(vec![
@@ -13144,7 +14169,7 @@ fn test_abstract_class_to_abstract_class() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let abstract_a = interner.object(vec![PropertyInfo {
@@ -13234,7 +14259,7 @@ fn test_abstract_class_generic_method() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Instantiated with number
@@ -13250,7 +14275,7 @@ fn test_abstract_class_generic_method() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let base_string = interner.object(vec![PropertyInfo {
@@ -13293,7 +14318,7 @@ fn test_abstract_class_missing_implementation() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let string_method = interner.function(FunctionShape {
@@ -13303,7 +14328,7 @@ fn test_abstract_class_missing_implementation() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let abstract_base = interner.object(vec![
@@ -13773,7 +14798,7 @@ fn test_private_member_method_brand() {
         return_type: TypeId::BOOLEAN,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let class_foo = interner.object(vec![PropertyInfo {
@@ -13932,7 +14957,7 @@ fn test_interface_extends_with_method() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let string_method = interner.function(FunctionShape {
@@ -13942,7 +14967,7 @@ fn test_interface_extends_with_method() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let interface_a = interner.object(vec![PropertyInfo {
@@ -13993,7 +15018,7 @@ fn test_interface_extends_override_method() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let hello_method = interner.function(FunctionShape {
@@ -14003,7 +15028,7 @@ fn test_interface_extends_override_method() {
         return_type: hello,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let interface_a = interner.object(vec![PropertyInfo {
@@ -14288,7 +15313,7 @@ fn test_interface_extends_multiple_methods() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let write_method = interner.function(FunctionShape {
@@ -14303,7 +15328,7 @@ fn test_interface_extends_multiple_methods() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let readable = interner.object(vec![PropertyInfo {
@@ -14625,7 +15650,7 @@ fn test_interface_merge_method_overloads() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let number_method = interner.function(FunctionShape {
@@ -14640,7 +15665,7 @@ fn test_interface_merge_method_overloads() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let interface_string = interner.object(vec![PropertyInfo {
@@ -14899,7 +15924,7 @@ fn test_interface_vs_type_alias_with_methods() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let interface_i = interner.object(vec![PropertyInfo {
@@ -15217,7 +16242,7 @@ fn test_never_is_bottom_type_for_function_types() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // never <: (x: string) => number
@@ -15334,7 +16359,7 @@ fn test_unknown_is_top_type_for_function_types() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // (x: number) => string <: unknown
@@ -15528,7 +16553,7 @@ fn test_intersection_unknown_with_function_simplifies() {
         return_type: TypeId::BOOLEAN,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let intersection = interner.intersection(vec![fn_type, TypeId::UNKNOWN]);
@@ -15559,7 +16584,8 @@ fn test_intersection_multiple_unknowns_simplifies() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
 
-    let intersection = interner.intersection(vec![TypeId::UNKNOWN, TypeId::STRING, TypeId::UNKNOWN]);
+    let intersection =
+        interner.intersection(vec![TypeId::UNKNOWN, TypeId::STRING, TypeId::UNKNOWN]);
 
     // unknown & string & unknown <: string
     assert!(checker.is_subtype_of(intersection, TypeId::STRING));
@@ -15837,9 +16863,9 @@ fn test_const_enum_computed_member() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
 
-    let a = interner.literal_number(1.0);  // 1 << 0
-    let b = interner.literal_number(2.0);  // 1 << 1
-    let c = interner.literal_number(4.0);  // 1 << 2
+    let a = interner.literal_number(1.0); // 1 << 0
+    let b = interner.literal_number(2.0); // 1 << 1
+    let c = interner.literal_number(4.0); // 1 << 2
 
     let flags_enum = interner.union(vec![a, b, c]);
 
@@ -16062,7 +17088,7 @@ fn test_enum_member_as_function_param() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_inactive_param = interner.function(FunctionShape {
@@ -16077,7 +17103,7 @@ fn test_enum_member_as_function_param() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Functions with different enum member params are not subtypes
@@ -16099,7 +17125,7 @@ fn test_enum_member_as_return_type() {
         return_type: active,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_returns_string = interner.function(FunctionShape {
@@ -16109,7 +17135,7 @@ fn test_enum_member_as_return_type() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Function returning enum member is subtype of function returning string
@@ -17047,7 +18073,7 @@ fn test_index_signature_function_value() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let indexed_fn = interner.object_with_index(ObjectShape {
@@ -17235,7 +18261,7 @@ fn test_variance_nested_function_contravariance() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Callback with wide param
@@ -17252,7 +18278,7 @@ fn test_variance_nested_function_contravariance() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // HOF taking narrow callback
@@ -17268,7 +18294,7 @@ fn test_variance_nested_function_contravariance() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // HOF taking wide callback
@@ -17284,7 +18310,7 @@ fn test_variance_nested_function_contravariance() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // HOF with wide callback <: HOF with narrow callback (double contravariance = covariance)
@@ -17309,7 +18335,7 @@ fn test_variance_callback_return_type() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Callback returning wide type
@@ -17321,7 +18347,7 @@ fn test_variance_callback_return_type() {
         return_type: wide_return,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // HOF taking narrow-returning callback
@@ -17337,7 +18363,7 @@ fn test_variance_callback_return_type() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // HOF taking wide-returning callback
@@ -17353,7 +18379,7 @@ fn test_variance_callback_return_type() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // HOF with narrow-returning <: HOF with wide-returning (contravariant flip of covariant)
@@ -17492,7 +18518,7 @@ fn test_variance_function_returning_function() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Inner function with wide param
@@ -17508,7 +18534,7 @@ fn test_variance_function_returning_function() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Factory returning narrow-param function
@@ -17519,7 +18545,7 @@ fn test_variance_function_returning_function() {
         return_type: inner_narrow,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Factory returning wide-param function
@@ -17530,7 +18556,7 @@ fn test_variance_function_returning_function() {
         return_type: inner_wide,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Factory returning wide-param <: factory returning narrow-param
@@ -17559,7 +18585,7 @@ fn test_variance_union_in_contravariant_position() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_single_param = interner.function(FunctionShape {
@@ -17574,7 +18600,7 @@ fn test_variance_union_in_contravariant_position() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Union param <: single param (contravariance)
@@ -17616,7 +18642,7 @@ fn test_variance_intersection_in_covariant_position() {
         return_type: intersection_ab,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_returns_a = interner.function(FunctionShape {
@@ -17626,7 +18652,7 @@ fn test_variance_intersection_in_covariant_position() {
         return_type: obj_a,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Returns A & B <: returns A (covariance, intersection subtype of member)
@@ -17669,12 +18695,13 @@ fn test_variance_method_bivariant_params() {
                     type_id: TypeId::STRING,
                     optional: false,
                     rest: false,
-                ..Default::default() }],
+                    ..Default::default()
+                }],
                 this_type: None,
                 return_type: TypeId::VOID,
                 type_predicate: None,
                 is_constructor: false,
-                                is_method: false,
+                is_method: false,
             }),
             write_type: TypeId::VOID,
             optional: false,
@@ -17696,12 +18723,13 @@ fn test_variance_method_bivariant_params() {
                     type_id: wide_type,
                     optional: false,
                     rest: false,
-                ..Default::default() }],
+                    ..Default::default()
+                }],
                 this_type: None,
                 return_type: TypeId::VOID,
                 type_predicate: None,
                 is_constructor: false,
-                                is_method: false,
+                is_method: false,
             }),
             write_type: TypeId::VOID,
             optional: false,
@@ -17738,7 +18766,7 @@ fn test_variance_function_property_contravariant() {
             return_type: TypeId::VOID,
             type_predicate: None,
             is_constructor: false,
-                                is_method: false,
+            is_method: false,
         }),
         write_type: TypeId::VOID,
         optional: false,
@@ -17761,7 +18789,7 @@ fn test_variance_function_property_contravariant() {
             return_type: TypeId::VOID,
             type_predicate: None,
             is_constructor: false,
-                                is_method: false,
+            is_method: false,
         }),
         write_type: TypeId::VOID,
         optional: false,
@@ -17798,7 +18826,7 @@ fn test_variance_promise_covariant() {
                 return_type: TypeId::VOID,
                 type_predicate: None,
                 is_constructor: false,
-                                is_method: false,
+                is_method: false,
             }),
             optional: false,
             rest: false,
@@ -17807,7 +18835,7 @@ fn test_variance_promise_covariant() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let then_wide = interner.function(FunctionShape {
@@ -17826,7 +18854,7 @@ fn test_variance_promise_covariant() {
                 return_type: TypeId::VOID,
                 type_predicate: None,
                 is_constructor: false,
-                                is_method: false,
+                is_method: false,
             }),
             optional: false,
             rest: false,
@@ -17835,7 +18863,7 @@ fn test_variance_promise_covariant() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let promise_narrow = interner.object(vec![PropertyInfo {
@@ -17883,7 +18911,7 @@ fn test_variance_triple_nested_contravariance() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let inner_wide = interner.function(FunctionShape {
@@ -17898,7 +18926,7 @@ fn test_variance_triple_nested_contravariance() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Middle: (g: innermost) => void
@@ -17914,7 +18942,7 @@ fn test_variance_triple_nested_contravariance() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let middle_wide = interner.function(FunctionShape {
@@ -17929,7 +18957,7 @@ fn test_variance_triple_nested_contravariance() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Outermost: (f: middle) => void
@@ -17945,7 +18973,7 @@ fn test_variance_triple_nested_contravariance() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let outer_wide = interner.function(FunctionShape {
@@ -17960,7 +18988,7 @@ fn test_variance_triple_nested_contravariance() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Three levels of contravariance = contravariant (in strict mode)
@@ -18049,7 +19077,7 @@ fn test_variance_rest_param_contravariant() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_wide_rest = interner.function(FunctionShape {
@@ -18064,7 +19092,7 @@ fn test_variance_rest_param_contravariant() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Wide rest param <: narrow rest param (contravariant)
@@ -18090,7 +19118,7 @@ fn test_variance_optional_param_covariant_optionality() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_required = interner.function(FunctionShape {
@@ -18105,7 +19133,7 @@ fn test_variance_optional_param_covariant_optionality() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Optional param function <: required param function
@@ -18134,7 +19162,7 @@ fn test_overload_single_signature_subtype() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let callable_type = interner.callable(CallableShape {
@@ -18554,7 +19582,7 @@ fn test_this_parameter_explicit_type() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_without_this = interner.function(FunctionShape {
@@ -18569,7 +19597,7 @@ fn test_this_parameter_explicit_type() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Function without this requirement <: function with this requirement
@@ -18619,7 +19647,7 @@ fn test_this_parameter_covariant_in_method() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Method on base type
@@ -18630,7 +19658,7 @@ fn test_this_parameter_covariant_in_method() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Base method <: derived method (covariant this)
@@ -18650,7 +19678,7 @@ fn test_this_parameter_void_this() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_any_this = interner.function(FunctionShape {
@@ -18660,7 +19688,7 @@ fn test_this_parameter_void_this() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_no_this = interner.function(FunctionShape {
@@ -18670,7 +19698,7 @@ fn test_this_parameter_void_this() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // void this and no this should be compatible
@@ -18704,7 +19732,7 @@ fn test_this_parameter_in_callable_method() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let callable_with_method = interner.callable(CallableShape {
@@ -18717,7 +19745,8 @@ fn test_this_parameter_in_callable_method() {
             optional: false,
             readonly: false,
             is_method: true,
-        ..Default::default() }],
+            ..Default::default()
+        }],
     });
 
     // Plain method without this
@@ -18728,7 +19757,7 @@ fn test_this_parameter_in_callable_method() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let callable_plain = interner.callable(CallableShape {
@@ -18741,7 +19770,8 @@ fn test_this_parameter_in_callable_method() {
             optional: false,
             readonly: false,
             is_method: true,
-        ..Default::default() }],
+            ..Default::default()
+        }],
     });
 
     // Both should be compatible (methods are bivariant)
@@ -18777,7 +19807,7 @@ fn test_this_parameter_fluent_api_pattern() {
         return_type: builder_type,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Different builder that also returns self
@@ -18812,7 +19842,7 @@ fn test_this_parameter_fluent_api_pattern() {
         return_type: other_builder,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Methods with different this/return types are not subtypes
@@ -18833,7 +19863,7 @@ fn test_this_parameter_unknown_this() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_string_this = interner.function(FunctionShape {
@@ -18843,7 +19873,7 @@ fn test_this_parameter_unknown_this() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // unknown this should work with any this type
@@ -19148,7 +20178,7 @@ fn test_symbol_keyed_object_property() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Object with symbol-keyed method (using string name as proxy)
@@ -19311,7 +20341,7 @@ fn test_iterable_protocol_types() {
         return_type: iter_result,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let iterator = interner.object(vec![PropertyInfo {
@@ -19374,7 +20404,7 @@ fn test_async_iterable_protocol_types() {
         return_type: promise,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let async_iterator = interner.object(vec![PropertyInfo {
@@ -19712,7 +20742,7 @@ fn test_nullable_function_type() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let nullable_fn = interner.union(vec![fn_type, TypeId::NULL]);
@@ -20157,7 +21187,7 @@ fn test_function_intersection_creates_overload() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_num_to_str = interner.function(FunctionShape {
@@ -20172,7 +21202,7 @@ fn test_function_intersection_creates_overload() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let intersection = interner.intersection(vec![fn_str_to_num, fn_num_to_str]);
@@ -20570,7 +21600,7 @@ fn test_intersection_method_signatures() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let obj_foo = interner.object(vec![PropertyInfo {
@@ -20612,7 +21642,7 @@ fn test_intersection_same_method_different_returns() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn_number = interner.function(FunctionShape {
@@ -20622,7 +21652,7 @@ fn test_intersection_same_method_different_returns() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let obj_foo_string = interner.object(vec![PropertyInfo {
@@ -20899,7 +21929,7 @@ fn test_keyof_with_method() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let obj = interner.object(vec![PropertyInfo {
@@ -21423,7 +22453,7 @@ fn test_keyof_symbol_keyed_object() {
         return_type: TypeId::OBJECT,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let obj = interner.object(vec![PropertyInfo {
@@ -21555,7 +22585,7 @@ fn test_constructor_vs_regular_function() {
         return_type: instance,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Constructor and function with same signature are not assignable
@@ -21978,7 +23008,7 @@ fn test_constructor_with_static_properties() {
                 return_type: instance,
                 type_predicate: None,
                 is_constructor: false,
-                                is_method: false,
+                is_method: false,
             }),
             write_type: TypeId::NEVER,
             optional: false,
@@ -22322,7 +23352,7 @@ fn test_this_type_in_method_return() {
         return_type: this_type,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let obj = interner.object(vec![PropertyInfo {
@@ -22358,7 +23388,7 @@ fn test_this_type_fluent_builder() {
         return_type: this_type,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let set_value = interner.function(FunctionShape {
@@ -22373,7 +23403,7 @@ fn test_this_type_fluent_builder() {
         return_type: this_type,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let build = interner.function(FunctionShape {
@@ -22383,7 +23413,7 @@ fn test_this_type_fluent_builder() {
         return_type: result_type,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let builder = interner.object(vec![
@@ -22431,7 +23461,7 @@ fn test_this_type_with_explicit_this_parameter() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     assert!(method_with_this != TypeId::ERROR);
@@ -22456,7 +23486,7 @@ fn test_this_type_with_this_constraint() {
         return_type: t_param,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     assert!(constrained_method != TypeId::ERROR);
@@ -22477,7 +23507,7 @@ fn test_this_type_in_callback() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let obj = interner.object(vec![PropertyInfo {
@@ -22522,7 +23552,7 @@ fn test_this_type_in_class_method() {
         return_type: this_type,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let chainable = interner.object(vec![PropertyInfo {
@@ -22558,7 +23588,7 @@ fn test_this_type_with_generic_method() {
         return_type: this_type,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     assert!(generic_fluent != TypeId::ERROR);
@@ -22641,7 +23671,7 @@ fn test_this_type_clone_method() {
         return_type: this_type,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let cloneable = interner.object(vec![PropertyInfo {
@@ -22671,7 +23701,7 @@ fn test_this_type_with_optional_chaining() {
         return_type: optional_this,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     assert!(optional_chain != TypeId::ERROR);
@@ -22692,7 +23722,7 @@ fn test_this_type_with_promise() {
         return_type: promise_this,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     assert!(async_method != TypeId::ERROR);
@@ -22729,7 +23759,7 @@ fn test_this_type_map_method() {
         return_type: u_ref,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let map_method = interner.function(FunctionShape {
@@ -22744,7 +23774,7 @@ fn test_this_type_map_method() {
         return_type: u_ref,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     assert!(map_method != TypeId::ERROR);
@@ -22836,7 +23866,7 @@ fn test_this_type_method_decorator_pattern() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     assert!(decorated != TypeId::ERROR);
@@ -22857,7 +23887,7 @@ fn test_this_type_static_vs_instance() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Instance method - returns this
@@ -22868,7 +23898,7 @@ fn test_this_type_static_vs_instance() {
         return_type: this_type,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let class_type = interner.object(vec![
@@ -22908,7 +23938,7 @@ fn test_this_type_with_getter_setter() {
         return_type: this_type,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let obj = interner.object(vec![PropertyInfo {
@@ -22943,7 +23973,7 @@ fn test_this_type_with_rest_params() {
         return_type: this_type,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     assert!(rest_method != TypeId::ERROR);
@@ -22980,7 +24010,7 @@ fn test_this_type_with_method_overload() {
         return_type: this_type,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let overload2 = interner.function(FunctionShape {
@@ -22995,7 +24025,7 @@ fn test_this_type_with_method_overload() {
         return_type: this_type,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Union of overloads
@@ -23033,7 +24063,7 @@ fn test_this_type_event_emitter_pattern() {
         return_type: this_type,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let off_method = interner.function(FunctionShape {
@@ -23056,7 +24086,7 @@ fn test_this_type_event_emitter_pattern() {
         return_type: this_type,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let emit_method = interner.function(FunctionShape {
@@ -23079,7 +24109,7 @@ fn test_this_type_event_emitter_pattern() {
         return_type: this_type,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let emitter = interner.object(vec![
@@ -23123,7 +24153,8 @@ fn test_this_type_query_builder() {
 
     let this_type = interner.intern(TypeKey::ThisType);
     let result_array = interner.array(interner.reference(SymbolRef(100)));
-    let promise_results = interner.application(interner.reference(SymbolRef(101)), vec![result_array]);
+    let promise_results =
+        interner.application(interner.reference(SymbolRef(101)), vec![result_array]);
 
     let where_method = interner.function(FunctionShape {
         type_params: vec![],
@@ -23137,7 +24168,7 @@ fn test_this_type_query_builder() {
         return_type: this_type,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let order_by_method = interner.function(FunctionShape {
@@ -23152,7 +24183,7 @@ fn test_this_type_query_builder() {
         return_type: this_type,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let limit_method = interner.function(FunctionShape {
@@ -23167,7 +24198,7 @@ fn test_this_type_query_builder() {
         return_type: this_type,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let execute_method = interner.function(FunctionShape {
@@ -23177,7 +24208,7 @@ fn test_this_type_query_builder() {
         return_type: promise_results,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let query_builder = interner.object(vec![
@@ -23536,7 +24567,7 @@ fn test_readonly_with_function_property() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let obj = interner.object(vec![PropertyInfo {
@@ -23563,7 +24594,7 @@ fn test_readonly_method_is_always_readonly() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let obj = interner.object(vec![PropertyInfo {
@@ -24882,7 +25913,8 @@ fn test_overload_empty_callable() {
         call_signatures: vec![],
         construct_signatures: vec![],
         properties: vec![],
-    ..Default::default() });
+        ..Default::default()
+    });
 
     assert!(empty_callable != TypeId::ERROR);
 }
@@ -25005,7 +26037,7 @@ fn test_overload_array_methods_pattern() {
         return_type: u_param,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // (x: T) => boolean
@@ -25021,7 +26053,7 @@ fn test_overload_array_methods_pattern() {
         return_type: TypeId::BOOLEAN,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // (acc: U, x: T) => U
@@ -25045,7 +26077,7 @@ fn test_overload_array_methods_pattern() {
         return_type: u_param,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let u_array = interner.array(u_param);
@@ -25068,7 +26100,7 @@ fn test_overload_array_methods_pattern() {
         return_type: u_array,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // filter(fn: (x: T) => boolean): T[]
@@ -25084,7 +26116,7 @@ fn test_overload_array_methods_pattern() {
         return_type: t_array,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // reduce<U>(fn: (acc: U, x: T) => U, init: U): U
@@ -25112,7 +26144,7 @@ fn test_overload_array_methods_pattern() {
         return_type: u_param,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let array_like = interner.object(vec![
@@ -25234,7 +26266,7 @@ fn test_overload_event_handler_pattern() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // (e: KeyboardEvent) => void
@@ -25250,7 +26282,7 @@ fn test_overload_event_handler_pattern() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // (e: Event) => void
@@ -25266,7 +26298,7 @@ fn test_overload_event_handler_pattern() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let add_event_listener = interner.callable(CallableShape {
@@ -25389,7 +26421,7 @@ fn test_overload_promise_then_pattern() {
         return_type: u_param,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // (reason: any) => V
@@ -25405,7 +26437,7 @@ fn test_overload_promise_then_pattern() {
         return_type: v_param,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let u_or_v = interner.union(vec![u_param, v_param]);
@@ -25490,7 +26522,7 @@ fn test_overload_constructor_overloads() {
                 return_type: TypeId::NUMBER,
                 type_predicate: None,
                 is_constructor: false,
-                                is_method: false,
+                is_method: false,
             }),
             write_type: TypeId::NEVER,
             optional: false,
@@ -25506,7 +26538,7 @@ fn test_overload_constructor_overloads() {
                 return_type: TypeId::STRING,
                 type_predicate: None,
                 is_constructor: false,
-                                is_method: false,
+                is_method: false,
             }),
             write_type: TypeId::NEVER,
             optional: false,

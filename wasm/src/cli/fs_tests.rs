@@ -1,4 +1,4 @@
-use super::fs::{discover_ts_files, FileDiscoveryOptions};
+use super::fs::{FileDiscoveryOptions, discover_ts_files};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 

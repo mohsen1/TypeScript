@@ -1,5 +1,8 @@
 use super::*;
-use crate::solver::{AssignabilityChecker, CompatChecker, infer_generic_function, evaluate_conditional, ConditionalType};
+use crate::solver::{
+    AssignabilityChecker, CompatChecker, ConditionalType, evaluate_conditional,
+    infer_generic_function,
+};
 
 #[test]
 fn test_inference_basic() {
@@ -127,7 +130,7 @@ fn test_inference_occurs_check_function_this_type() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let result = ctx.unify_var_type(var_t, func);
@@ -621,8 +624,18 @@ fn test_resolve_bounds_tuple_lower_array_upper() {
     let var = ctx.fresh_type_param(t_name);
     let string_array = interner.array(TypeId::STRING);
     let tuple = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: string_array, name: None, optional: false, rest: true },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: string_array,
+            name: None,
+            optional: false,
+            rest: true,
+        },
     ]);
 
     ctx.add_lower_bound(var, tuple);
@@ -839,7 +852,7 @@ fn test_resolve_bounds_method_property_bivariant_params() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let upper_fn = interner.function(FunctionShape {
         type_params: Vec::new(),
@@ -848,7 +861,7 @@ fn test_resolve_bounds_method_property_bivariant_params() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let lower = interner.object(vec![PropertyInfo {
@@ -903,7 +916,7 @@ fn test_resolve_bounds_function_property_contravariant_params() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let upper_fn = interner.function(FunctionShape {
         type_params: Vec::new(),
@@ -912,7 +925,7 @@ fn test_resolve_bounds_function_property_contravariant_params() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let lower = interner.object(vec![PropertyInfo {
@@ -975,7 +988,7 @@ fn test_resolve_bounds_with_assignability_bivariant_function_property() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let upper_fn = interner.function(FunctionShape {
         type_params: Vec::new(),
@@ -984,7 +997,7 @@ fn test_resolve_bounds_with_assignability_bivariant_function_property() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let lower = interner.object(vec![PropertyInfo {
@@ -1042,7 +1055,7 @@ fn test_resolve_bounds_function_param_contravariance_extends() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let upper_fn = interner.function(FunctionShape {
         type_params: Vec::new(),
@@ -1051,7 +1064,7 @@ fn test_resolve_bounds_function_param_contravariance_extends() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Contextual signature provides a narrow parameter type constraint.
@@ -1083,7 +1096,7 @@ fn test_resolve_bounds_function_return_covariance_extends() {
         return_type: interner.literal_string("ok"),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let upper_fn = interner.function(FunctionShape {
         type_params: Vec::new(),
@@ -1092,7 +1105,7 @@ fn test_resolve_bounds_function_return_covariance_extends() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     ctx.add_lower_bound(var, lower_fn);
@@ -4091,7 +4104,7 @@ fn test_resolve_bounds_function_subtype() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let upper = interner.function(FunctionShape {
         type_params: Vec::new(),
@@ -4100,7 +4113,7 @@ fn test_resolve_bounds_function_subtype() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     ctx.add_lower_bound(var, lower);
@@ -4124,7 +4137,7 @@ fn test_resolve_bounds_function_this_parameter_mismatch() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let upper = interner.function(FunctionShape {
         type_params: Vec::new(),
@@ -4133,7 +4146,7 @@ fn test_resolve_bounds_function_this_parameter_mismatch() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     ctx.add_lower_bound(var, lower);
@@ -4164,7 +4177,7 @@ fn test_resolve_bounds_function_this_parameter_optional_target() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let upper = interner.function(FunctionShape {
         type_params: Vec::new(),
@@ -4173,7 +4186,7 @@ fn test_resolve_bounds_function_this_parameter_optional_target() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     ctx.add_lower_bound(var, lower);
@@ -4197,7 +4210,7 @@ fn test_resolve_bounds_function_this_parameter_any_upper_bound() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let upper = interner.function(FunctionShape {
         type_params: Vec::new(),
@@ -4206,7 +4219,7 @@ fn test_resolve_bounds_function_this_parameter_any_upper_bound() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     ctx.add_lower_bound(var, lower);
@@ -4231,7 +4244,7 @@ fn test_resolve_bounds_function_this_parameter_contravariant() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let upper = interner.function(FunctionShape {
         type_params: Vec::new(),
@@ -4240,7 +4253,7 @@ fn test_resolve_bounds_function_this_parameter_contravariant() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     ctx.add_lower_bound(var, lower);
@@ -4267,7 +4280,8 @@ fn test_resolve_bounds_callable_this_parameter_contravariant() {
             type_predicate: None,
         }],
         construct_signatures: Vec::new(),
-        properties: Vec::new(), ..Default::default()
+        properties: Vec::new(),
+        ..Default::default()
     });
     let upper = interner.callable(CallableShape {
         call_signatures: vec![CallSignature {
@@ -4278,7 +4292,8 @@ fn test_resolve_bounds_callable_this_parameter_contravariant() {
             type_predicate: None,
         }],
         construct_signatures: Vec::new(),
-        properties: Vec::new(), ..Default::default()
+        properties: Vec::new(),
+        ..Default::default()
     });
 
     ctx.add_lower_bound(var, lower);
@@ -4413,7 +4428,8 @@ fn test_resolve_bounds_callable_subtype() {
             type_predicate: None,
         }],
         construct_signatures: Vec::new(),
-        properties: Vec::new(), ..Default::default()
+        properties: Vec::new(),
+        ..Default::default()
     });
     let upper = interner.callable(CallableShape {
         call_signatures: vec![CallSignature {
@@ -4424,7 +4440,8 @@ fn test_resolve_bounds_callable_subtype() {
             type_predicate: None,
         }],
         construct_signatures: Vec::new(),
-        properties: Vec::new(), ..Default::default()
+        properties: Vec::new(),
+        ..Default::default()
     });
 
     ctx.add_lower_bound(var, lower);
@@ -4461,7 +4478,7 @@ fn test_resolve_bounds_function_to_callable() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let upper = interner.callable(CallableShape {
         call_signatures: vec![CallSignature {
@@ -4472,7 +4489,8 @@ fn test_resolve_bounds_function_to_callable() {
             type_predicate: None,
         }],
         construct_signatures: Vec::new(),
-        properties: Vec::new(), ..Default::default()
+        properties: Vec::new(),
+        ..Default::default()
     });
 
     ctx.add_lower_bound(var, lower);
@@ -4511,7 +4529,8 @@ fn test_resolve_bounds_callable_to_function() {
             type_predicate: None,
         }],
         construct_signatures: Vec::new(),
-        properties: Vec::new(), ..Default::default()
+        properties: Vec::new(),
+        ..Default::default()
     });
     let upper = interner.function(FunctionShape {
         type_params: Vec::new(),
@@ -4520,7 +4539,7 @@ fn test_resolve_bounds_callable_to_function() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     ctx.add_lower_bound(var, lower);
@@ -4625,7 +4644,7 @@ fn test_infer_union_target_with_placeholder_member() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     };
 
     let result = infer_generic_function(&interner, &mut checker, &func, &[TypeId::NUMBER]);
@@ -4661,7 +4680,7 @@ fn test_infer_union_target_with_placeholder_and_never_member() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     };
 
     let result = infer_generic_function(&interner, &mut checker, &func, &[TypeId::NUMBER]);
@@ -5381,10 +5400,16 @@ fn test_circular_extends_chain_with_endpoint_bound() {
     assert_eq!(results[2], (v_name, TypeId::NUMBER));
     // U has upper bound V but no lower bound, so resolves to its upper bound (V type param)
     assert_eq!(results[1].0, u_name);
-    assert!(matches!(interner.lookup(results[1].1), Some(TypeKey::TypeParameter(_))));
+    assert!(matches!(
+        interner.lookup(results[1].1),
+        Some(TypeKey::TypeParameter(_))
+    ));
     // T has upper bound U but no lower bound, resolves to its upper bound (U type param)
     assert_eq!(results[0].0, t_name);
-    assert!(matches!(interner.lookup(results[0].1), Some(TypeKey::TypeParameter(_))));
+    assert!(matches!(
+        interner.lookup(results[0].1),
+        Some(TypeKey::TypeParameter(_))
+    ));
 }
 
 #[test]
@@ -6113,7 +6138,7 @@ fn test_method_return_type_inference_basic() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Call returns string, so T should be inferred as string
@@ -6154,7 +6179,7 @@ fn test_method_parameter_type_inference() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Called with number, so T should be inferred as number
@@ -6190,7 +6215,7 @@ fn test_method_this_type_inference() {
         return_type: this_type,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Create an object type to represent `this`
@@ -6242,7 +6267,7 @@ fn test_method_generic_parameter_inference() {
         return_type: return_array,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Called with boolean, so T should be inferred as boolean
@@ -6378,7 +6403,7 @@ fn test_circular_type_alias_function_return() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     ctx.add_lower_bound(var_f, fn_type);
 
@@ -6431,7 +6456,7 @@ fn test_self_ref_constraint_builder_pattern() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let builder_type = interner.object(vec![PropertyInfo {
         name: build_prop,
@@ -6480,7 +6505,12 @@ fn test_self_ref_constraint_json_value() {
     let var_t = ctx.fresh_type_param(t_name);
 
     // Upper bound: primitive union (simplified JSON)
-    let json_primitive = interner.union(vec![TypeId::STRING, TypeId::NUMBER, TypeId::BOOLEAN, TypeId::NULL]);
+    let json_primitive = interner.union(vec![
+        TypeId::STRING,
+        TypeId::NUMBER,
+        TypeId::BOOLEAN,
+        TypeId::NULL,
+    ]);
     ctx.add_upper_bound(var_t, json_primitive);
 
     // Lower bound: string (valid JSON value)
@@ -6680,7 +6710,7 @@ fn test_mutual_recursion_function_params() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let fn_g = interner.function(FunctionShape {
         type_params: vec![],
@@ -6689,7 +6719,7 @@ fn test_mutual_recursion_function_params() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     ctx.add_lower_bound(var_f, fn_f);
@@ -7413,12 +7443,18 @@ fn test_variadic_tuple_concat() {
     let var_u = ctx.fresh_type_param(u_name);
 
     // Infer from concrete tuple parts
-    let tuple_t = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-    ]);
-    let tuple_u = interner.tuple(vec![
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
-    ]);
+    let tuple_t = interner.tuple(vec![TupleElement {
+        type_id: TypeId::STRING,
+        name: None,
+        optional: false,
+        rest: false,
+    }]);
+    let tuple_u = interner.tuple(vec![TupleElement {
+        type_id: TypeId::NUMBER,
+        name: None,
+        optional: false,
+        rest: false,
+    }]);
 
     ctx.add_lower_bound(var_t, tuple_t);
     ctx.add_lower_bound(var_u, tuple_u);
@@ -7470,8 +7506,18 @@ fn test_named_tuple_with_optional() {
     let x_name = interner.intern_string("x");
     let y_name = interner.intern_string("y");
     let named_tuple = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: Some(x_name), optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: Some(y_name), optional: true, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: Some(x_name),
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: Some(y_name),
+            optional: true,
+            rest: false,
+        },
     ]);
 
     ctx.add_lower_bound(var_t, TypeId::STRING);
@@ -7545,8 +7591,18 @@ fn test_named_tuple_mixed_named_unnamed() {
     // Create mixed tuple
     let x_name = interner.intern_string("x");
     let mixed_tuple = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: Some(x_name), optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: Some(x_name),
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     ctx.add_lower_bound(var_t, TypeId::STRING);
@@ -7591,8 +7647,18 @@ fn test_tuple_spread_function_args() {
 
     // T is inferred as tuple from function arguments
     let args_tuple = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
     ctx.add_lower_bound(var_t, args_tuple);
 
@@ -7612,12 +7678,25 @@ fn test_tuple_spread_concat_tuples() {
     let var_b = ctx.fresh_type_param(b_name);
 
     // A and B are tuple parts
-    let tuple_a = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-    ]);
+    let tuple_a = interner.tuple(vec![TupleElement {
+        type_id: TypeId::STRING,
+        name: None,
+        optional: false,
+        rest: false,
+    }]);
     let tuple_b = interner.tuple(vec![
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     ctx.add_lower_bound(var_a, tuple_a);
@@ -7640,8 +7719,18 @@ fn test_tuple_spread_in_return() {
 
     // T is the spread part of return tuple
     let spread_part = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
     ctx.add_lower_bound(var_t, spread_part);
 
@@ -7661,9 +7750,12 @@ fn test_tuple_spread_with_rest() {
     let var_u = ctx.fresh_type_param(u_name);
 
     // T is fixed tuple, U is element type of rest
-    let fixed_tuple = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-    ]);
+    let fixed_tuple = interner.tuple(vec![TupleElement {
+        type_id: TypeId::STRING,
+        name: None,
+        optional: false,
+        rest: false,
+    }]);
     ctx.add_lower_bound(var_t, fixed_tuple);
     ctx.add_lower_bound(var_u, TypeId::NUMBER);
 
@@ -8014,7 +8106,7 @@ fn test_in_operator_union_narrowing() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let bird_type = interner.object(vec![PropertyInfo {
@@ -8076,7 +8168,7 @@ fn test_in_operator_method_check() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let array_like = interner.object(vec![PropertyInfo {
@@ -10132,7 +10224,7 @@ fn test_constraint_upper_bound_function() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     ctx.add_upper_bound(var_t, any_fn);
 
@@ -10144,7 +10236,7 @@ fn test_constraint_upper_bound_function() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     ctx.add_lower_bound(var_t, specific_fn);
 
@@ -10329,7 +10421,7 @@ fn test_constraint_intersection_with_callable() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     ctx.add_upper_bound(var_t, fn_type);
 
@@ -10551,7 +10643,7 @@ fn test_constraint_satisfaction_array_element() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let comparable = interner.object(vec![PropertyInfo {
         name: compare_prop,
@@ -10720,7 +10812,7 @@ fn test_default_function_type() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     ctx.add_upper_bound(var_t, any_fn);
 
@@ -10732,7 +10824,7 @@ fn test_default_function_type() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     ctx.add_lower_bound(var_t, num_fn);
 
@@ -10894,7 +10986,7 @@ fn test_self_ref_type_param_promise_of_self() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Lower bound: Promise<number>
@@ -10982,7 +11074,12 @@ fn test_self_ref_type_param_recursive_json() {
     let var_t = ctx.fresh_type_param(t_name);
 
     // JSON-like type: union of primitives
-    let json_primitives = interner.union(vec![TypeId::STRING, TypeId::NUMBER, TypeId::BOOLEAN, TypeId::NULL]);
+    let json_primitives = interner.union(vec![
+        TypeId::STRING,
+        TypeId::NUMBER,
+        TypeId::BOOLEAN,
+        TypeId::NULL,
+    ]);
     ctx.add_lower_bound(var_t, json_primitives);
 
     let result = ctx.resolve_with_constraints(var_t).unwrap();
@@ -11089,7 +11186,7 @@ fn test_mutual_dependency_input_output() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     ctx.add_lower_bound(var_i, input_fn);
@@ -11120,7 +11217,7 @@ fn test_mutual_dependency_request_response() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Request type with respond method
@@ -11244,7 +11341,7 @@ fn test_recursive_constraint_comparable() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Comparable interface with compareTo method
@@ -11281,7 +11378,7 @@ fn test_recursive_constraint_builder_pattern() {
         return_type: TypeId::OBJECT,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let build_fn = interner.function(FunctionShape {
@@ -11291,7 +11388,7 @@ fn test_recursive_constraint_builder_pattern() {
         return_type: TypeId::OBJECT,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Builder with methods that return the builder itself
@@ -11337,7 +11434,7 @@ fn test_recursive_constraint_expression_tree() {
         return_type: TypeId::UNKNOWN,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Expression with evaluate method
@@ -11383,7 +11480,7 @@ fn test_recursive_constraint_cloneable() {
         return_type: TypeId::OBJECT,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Cloneable with clone method
@@ -11419,7 +11516,7 @@ fn test_recursive_constraint_iterable() {
         return_type: TypeId::OBJECT,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Iterable with Symbol.iterator method
@@ -11536,7 +11633,7 @@ fn test_constraint_cycle_generic_extends() {
         return_type: TypeId::OBJECT,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Container type with self-referential constraint
@@ -11697,9 +11794,24 @@ fn test_param_inference_rest_parameter_tuple() {
 
     // Arguments are [string, number, boolean]
     let tuple = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, optional: false, name: None, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, optional: false, name: None, rest: false },
-        TupleElement { type_id: TypeId::BOOLEAN, optional: false, name: None, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            optional: false,
+            name: None,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            optional: false,
+            name: None,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            optional: false,
+            name: None,
+            rest: false,
+        },
     ]);
     ctx.add_lower_bound(var_t, tuple);
 
@@ -11979,7 +12091,7 @@ fn test_f_bounded_comparable() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let comparable_type = interner.object(vec![PropertyInfo {
@@ -12015,7 +12127,7 @@ fn test_f_bounded_builder_pattern() {
         return_type: TypeId::OBJECT, // Returns T (self-referential)
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let set_fn = interner.function(FunctionShape {
@@ -12030,7 +12142,7 @@ fn test_f_bounded_builder_pattern() {
         return_type: TypeId::OBJECT, // Returns this
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let builder_type = interner.object(vec![
@@ -12122,7 +12234,7 @@ fn test_f_bounded_cloneable() {
         return_type: TypeId::OBJECT,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let cloneable_type = interner.object(vec![PropertyInfo {
@@ -12163,7 +12275,7 @@ fn test_f_bounded_with_additional_constraint() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let serialize_fn = interner.function(FunctionShape {
@@ -12173,7 +12285,7 @@ fn test_f_bounded_with_additional_constraint() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Combined type with both Comparable and Serializable methods
@@ -12715,7 +12827,7 @@ fn test_parameters_utility_inference() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     ctx.add_lower_bound(var_t, func);
@@ -12801,7 +12913,7 @@ fn test_circular_constraint_polymorphic_this() {
         return_type: TypeId::OBJECT, // Returns this
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let chain_type = interner.object(vec![
@@ -12851,7 +12963,7 @@ fn test_circular_constraint_recursive_promise() {
         return_type: TypeId::OBJECT,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let promise_type = interner.object(vec![PropertyInfo {
@@ -12899,7 +13011,7 @@ fn test_circular_constraint_event_emitter() {
         return_type: TypeId::OBJECT, // Returns this for chaining
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let emit_fn = interner.function(FunctionShape {
@@ -12914,7 +13026,7 @@ fn test_circular_constraint_event_emitter() {
         return_type: TypeId::BOOLEAN,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let emitter_type = interner.object(vec![
@@ -12972,7 +13084,7 @@ fn test_circular_constraint_fluent_interface() {
         return_type: TypeId::OBJECT, // Returns this
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fluent_type = interner.object(vec![
@@ -13094,7 +13206,7 @@ fn test_circular_constraint_state_machine() {
         return_type: TypeId::OBJECT, // Returns S
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let state_type = interner.object(vec![
@@ -13155,7 +13267,7 @@ fn test_circular_constraint_visitor_pattern() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let visitable_type = interner.object(vec![PropertyInfo {
@@ -13190,7 +13302,7 @@ fn test_circular_constraint_expression_tree() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let combine_fn = interner.function(FunctionShape {
@@ -13205,7 +13317,7 @@ fn test_circular_constraint_expression_tree() {
         return_type: TypeId::OBJECT, // Returns T
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let expr_type = interner.object(vec![
@@ -13257,7 +13369,7 @@ fn test_circular_constraint_repository_pattern() {
         return_type: TypeId::OBJECT, // Returns T | undefined
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let save_fn = interner.function(FunctionShape {
@@ -13272,7 +13384,7 @@ fn test_circular_constraint_repository_pattern() {
         return_type: TypeId::OBJECT, // Returns R for chaining
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let entity_type = interner.object(vec![PropertyInfo {
@@ -14182,8 +14294,18 @@ fn test_overload_with_tuple_spread() {
     let var_t = ctx.fresh_type_param(t_name);
 
     let tuple = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
     ctx.add_lower_bound(var_t, tuple);
 
@@ -14227,7 +14349,7 @@ fn test_overload_callback_return_type() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     ctx.add_lower_bound(var_t, callback);
 
@@ -14254,7 +14376,7 @@ fn test_overload_nested_generics() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let promise_like = interner.object(vec![PropertyInfo {
         name: interner.intern_string("then"),

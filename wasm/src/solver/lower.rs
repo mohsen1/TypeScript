@@ -5,17 +5,17 @@
 //!
 //! Lowering is lazy - types are only computed when queried.
 
-use crate::parser::thin_node::{ThinNodeArena, SignatureData, IndexSignatureData, TypeAliasData};
-use crate::parser::base::NodeIndex;
+use crate::interner::Atom;
 use crate::parser::NodeList;
-use crate::scanner::SyntaxKind;
+use crate::parser::base::NodeIndex;
 use crate::parser::syntax_kind_ext;
+use crate::parser::thin_node::{IndexSignatureData, SignatureData, ThinNodeArena, TypeAliasData};
+use crate::scanner::SyntaxKind;
+use crate::solver::subtype::{SubtypeChecker, TypeResolver};
 use crate::solver::types::*;
 use crate::solver::{QueryDatabase, TypeDatabase};
-use crate::solver::subtype::{SubtypeChecker, TypeResolver};
-use crate::interner::Atom;
-use std::cell::RefCell;
 use rustc_hash::{FxHashMap, FxHashSet};
+use std::cell::RefCell;
 
 #[cfg(test)]
 use crate::solver::TypeInterner;
@@ -79,45 +79,49 @@ impl InterfaceParts {
             Entry::Vacant(entry) => {
                 entry.insert(PropertyMerge::Property(prop));
             }
-            Entry::Occupied(mut entry) => {
-                match entry.get_mut() {
-                    PropertyMerge::Property(existing) => {
-                        if existing.type_id == prop.type_id
-                            && existing.write_type == prop.write_type
-                            && existing.optional == prop.optional
-                            && existing.readonly == prop.readonly
-                            && existing.is_method == prop.is_method
-                        {
-                            return;
-                        }
-                        let conflict = PropertyInfo {
-                            name: prop.name,
-                            type_id: TypeId::ERROR,
-                            write_type: TypeId::ERROR,
-                            optional: existing.optional && prop.optional,
-                            readonly: existing.readonly && prop.readonly,
-                            is_method: false,
-                        };
-                        entry.insert(PropertyMerge::Conflict(conflict));
+            Entry::Occupied(mut entry) => match entry.get_mut() {
+                PropertyMerge::Property(existing) => {
+                    if existing.type_id == prop.type_id
+                        && existing.write_type == prop.write_type
+                        && existing.optional == prop.optional
+                        && existing.readonly == prop.readonly
+                        && existing.is_method == prop.is_method
+                    {
+                        return;
                     }
-                    PropertyMerge::Method(methods) => {
-                        let conflict = PropertyInfo {
-                            name: prop.name,
-                            type_id: TypeId::ERROR,
-                            write_type: TypeId::ERROR,
-                            optional: methods.optional && prop.optional,
-                            readonly: false,
-                            is_method: false,
-                        };
-                        entry.insert(PropertyMerge::Conflict(conflict));
-                    }
-                    PropertyMerge::Conflict(_) => {}
+                    let conflict = PropertyInfo {
+                        name: prop.name,
+                        type_id: TypeId::ERROR,
+                        write_type: TypeId::ERROR,
+                        optional: existing.optional && prop.optional,
+                        readonly: existing.readonly && prop.readonly,
+                        is_method: false,
+                    };
+                    entry.insert(PropertyMerge::Conflict(conflict));
                 }
-            }
+                PropertyMerge::Method(methods) => {
+                    let conflict = PropertyInfo {
+                        name: prop.name,
+                        type_id: TypeId::ERROR,
+                        write_type: TypeId::ERROR,
+                        optional: methods.optional && prop.optional,
+                        readonly: false,
+                        is_method: false,
+                    };
+                    entry.insert(PropertyMerge::Conflict(conflict));
+                }
+                PropertyMerge::Conflict(_) => {}
+            },
         }
     }
 
-    fn merge_method(&mut self, name: Atom, signature: CallSignature, optional: bool, readonly: bool) {
+    fn merge_method(
+        &mut self,
+        name: Atom,
+        signature: CallSignature,
+        optional: bool,
+        readonly: bool,
+    ) {
         use std::collections::hash_map::Entry;
 
         match self.properties.entry(name) {
@@ -128,27 +132,25 @@ impl InterfaceParts {
                     readonly,
                 }));
             }
-            Entry::Occupied(mut entry) => {
-                match entry.get_mut() {
-                    PropertyMerge::Method(methods) => {
-                        methods.signatures.push(signature);
-                        methods.optional |= optional;
-                        methods.readonly &= readonly;
-                    }
-                    PropertyMerge::Property(prop) => {
-                        let conflict = PropertyInfo {
-                            name,
-                            type_id: TypeId::ERROR,
-                            write_type: TypeId::ERROR,
-                            optional: prop.optional && optional,
-                            readonly: false,
-                            is_method: false,
-                        };
-                        entry.insert(PropertyMerge::Conflict(conflict));
-                    }
-                    PropertyMerge::Conflict(_) => {}
+            Entry::Occupied(mut entry) => match entry.get_mut() {
+                PropertyMerge::Method(methods) => {
+                    methods.signatures.push(signature);
+                    methods.optional |= optional;
+                    methods.readonly &= readonly;
                 }
-            }
+                PropertyMerge::Property(prop) => {
+                    let conflict = PropertyInfo {
+                        name,
+                        type_id: TypeId::ERROR,
+                        write_type: TypeId::ERROR,
+                        optional: prop.optional && optional,
+                        readonly: false,
+                        is_method: false,
+                    };
+                    entry.insert(PropertyMerge::Conflict(conflict));
+                }
+                PropertyMerge::Conflict(_) => {}
+            },
         }
     }
 
@@ -318,60 +320,40 @@ impl<'a> TypeLowering<'a> {
             // =========================================================================
             // Literal types (true, false)
             // =========================================================================
-            k if k == SyntaxKind::TrueKeyword as u16 => {
-                self.interner.literal_boolean(true)
-            }
-            k if k == SyntaxKind::FalseKeyword as u16 => {
-                self.interner.literal_boolean(false)
-            }
+            k if k == SyntaxKind::TrueKeyword as u16 => self.interner.literal_boolean(true),
+            k if k == SyntaxKind::FalseKeyword as u16 => self.interner.literal_boolean(false),
 
             // =========================================================================
             // Composite types
             // =========================================================================
-            k if k == syntax_kind_ext::UNION_TYPE => {
-                self.lower_union_type(node_idx)
-            }
-            k if k == syntax_kind_ext::INTERSECTION_TYPE => {
-                self.lower_intersection_type(node_idx)
-            }
+            k if k == syntax_kind_ext::UNION_TYPE => self.lower_union_type(node_idx),
+            k if k == syntax_kind_ext::INTERSECTION_TYPE => self.lower_intersection_type(node_idx),
 
             // =========================================================================
             // Array and tuple types
             // =========================================================================
-            k if k == syntax_kind_ext::ARRAY_TYPE => {
-                self.lower_array_type(node_idx)
-            }
-            k if k == syntax_kind_ext::TUPLE_TYPE => {
-                self.lower_tuple_type(node_idx)
-            }
+            k if k == syntax_kind_ext::ARRAY_TYPE => self.lower_array_type(node_idx),
+            k if k == syntax_kind_ext::TUPLE_TYPE => self.lower_tuple_type(node_idx),
 
             // =========================================================================
             // Function type
             // =========================================================================
-            k if k == syntax_kind_ext::FUNCTION_TYPE => {
-                self.lower_function_type(node_idx)
-            }
+            k if k == syntax_kind_ext::FUNCTION_TYPE => self.lower_function_type(node_idx),
 
             // =========================================================================
             // Type literal (object type)
             // =========================================================================
-            k if k == syntax_kind_ext::TYPE_LITERAL => {
-                self.lower_type_literal(node_idx)
-            }
+            k if k == syntax_kind_ext::TYPE_LITERAL => self.lower_type_literal(node_idx),
 
             // =========================================================================
             // Conditional type
             // =========================================================================
-            k if k == syntax_kind_ext::CONDITIONAL_TYPE => {
-                self.lower_conditional_type(node_idx)
-            }
+            k if k == syntax_kind_ext::CONDITIONAL_TYPE => self.lower_conditional_type(node_idx),
 
             // =========================================================================
             // Mapped type
             // =========================================================================
-            k if k == syntax_kind_ext::MAPPED_TYPE => {
-                self.lower_mapped_type(node_idx)
-            }
+            k if k == syntax_kind_ext::MAPPED_TYPE => self.lower_mapped_type(node_idx),
 
             // =========================================================================
             // Indexed access type
@@ -383,40 +365,28 @@ impl<'a> TypeLowering<'a> {
             // =========================================================================
             // Literal type (string literal, number literal in type position)
             // =========================================================================
-            k if k == syntax_kind_ext::LITERAL_TYPE => {
-                self.lower_literal_type(node_idx)
-            }
+            k if k == syntax_kind_ext::LITERAL_TYPE => self.lower_literal_type(node_idx),
 
             // =========================================================================
             // Type reference (NamedType or NamedType<Args>)
             // =========================================================================
-            k if k == syntax_kind_ext::TYPE_REFERENCE => {
-                self.lower_type_reference(node_idx)
-            }
+            k if k == syntax_kind_ext::TYPE_REFERENCE => self.lower_type_reference(node_idx),
 
             // =========================================================================
             // Qualified name (A.B)
             // =========================================================================
-            k if k == syntax_kind_ext::QUALIFIED_NAME => {
-                self.lower_qualified_name_type(node_idx)
-            }
+            k if k == syntax_kind_ext::QUALIFIED_NAME => self.lower_qualified_name_type(node_idx),
 
             // =========================================================================
             // Identifier (simple type reference without type arguments)
             // =========================================================================
-            k if k == SyntaxKind::Identifier as u16 => {
-                self.lower_identifier_type(node_idx)
-            }
+            k if k == SyntaxKind::Identifier as u16 => self.lower_identifier_type(node_idx),
 
             // =========================================================================
             // This type
             // =========================================================================
-            k if k == SyntaxKind::ThisKeyword as u16 => {
-                self.interner.intern(TypeKey::ThisType)
-            }
-            k if k == syntax_kind_ext::THIS_TYPE => {
-                self.interner.intern(TypeKey::ThisType)
-            }
+            k if k == SyntaxKind::ThisKeyword as u16 => self.interner.intern(TypeKey::ThisType),
+            k if k == syntax_kind_ext::THIS_TYPE => self.interner.intern(TypeKey::ThisType),
 
             // =========================================================================
             // Parenthesized type
@@ -428,30 +398,22 @@ impl<'a> TypeLowering<'a> {
             // =========================================================================
             // Type query (typeof in type position)
             // =========================================================================
-            k if k == syntax_kind_ext::TYPE_QUERY => {
-                self.lower_type_query(node_idx)
-            }
+            k if k == syntax_kind_ext::TYPE_QUERY => self.lower_type_query(node_idx),
 
             // =========================================================================
             // Type predicate (x is T / asserts x is T)
             // =========================================================================
-            k if k == syntax_kind_ext::TYPE_PREDICATE => {
-                self.lower_type_predicate(node_idx)
-            }
+            k if k == syntax_kind_ext::TYPE_PREDICATE => self.lower_type_predicate(node_idx),
 
             // =========================================================================
             // Type operator (keyof, readonly, unique)
             // =========================================================================
-            k if k == syntax_kind_ext::TYPE_OPERATOR => {
-                self.lower_type_operator(node_idx)
-            }
+            k if k == syntax_kind_ext::TYPE_OPERATOR => self.lower_type_operator(node_idx),
 
             // =========================================================================
             // Infer type (infer R)
             // =========================================================================
-            k if k == syntax_kind_ext::INFER_TYPE => {
-                self.lower_infer_type(node_idx)
-            }
+            k if k == syntax_kind_ext::INFER_TYPE => self.lower_infer_type(node_idx),
 
             // =========================================================================
             // Template literal type
@@ -470,9 +432,7 @@ impl<'a> TypeLowering<'a> {
             // =========================================================================
             // Constructor type (new () => T)
             // =========================================================================
-            k if k == syntax_kind_ext::CONSTRUCTOR_TYPE => {
-                self.lower_constructor_type(node_idx)
-            }
+            k if k == syntax_kind_ext::CONSTRUCTOR_TYPE => self.lower_constructor_type(node_idx),
 
             // =========================================================================
             // Optional/Rest types (unwrap)
@@ -496,7 +456,10 @@ impl<'a> TypeLowering<'a> {
         };
 
         if let Some(data) = self.arena.get_composite_type(node) {
-            let members: Vec<TypeId> = data.types.nodes.iter()
+            let members: Vec<TypeId> = data
+                .types
+                .nodes
+                .iter()
                 .map(|&idx| self.lower_type(idx))
                 .collect();
             self.interner.union(members)
@@ -513,7 +476,10 @@ impl<'a> TypeLowering<'a> {
         };
 
         if let Some(data) = self.arena.get_composite_type(node) {
-            let members: Vec<TypeId> = data.types.nodes.iter()
+            let members: Vec<TypeId> = data
+                .types
+                .nodes
+                .iter()
                 .map(|&idx| self.lower_type(idx))
                 .collect();
             self.interner.intersection(members)
@@ -545,7 +511,10 @@ impl<'a> TypeLowering<'a> {
         };
 
         if let Some(data) = self.arena.get_tuple_type(node) {
-            let elements: Vec<TupleElement> = data.elements.nodes.iter()
+            let elements: Vec<TupleElement> = data
+                .elements
+                .nodes
+                .iter()
                 .map(|&idx| self.lower_tuple_element(idx))
                 .collect();
             self.interner.tuple(elements)
@@ -590,12 +559,15 @@ impl<'a> TypeLowering<'a> {
             let wrapped = if let Some(data) = self.arena.get_wrapped_type(node) {
                 Some(data.type_node)
             } else {
-                self.arena.type_operators.get(node.data_index as usize)
+                self.arena
+                    .type_operators
+                    .get(node.data_index as usize)
                     .map(|data| data.type_node)
             };
 
             return TupleElement {
-                type_id: wrapped.map_or_else(|| self.lower_type(node_idx), |inner| self.lower_type(inner)),
+                type_id: wrapped
+                    .map_or_else(|| self.lower_type(node_idx), |inner| self.lower_type(inner)),
                 name: None,
                 optional: node.kind == syntax_kind_ext::OPTIONAL_TYPE,
                 rest: node.kind == syntax_kind_ext::REST_TYPE,
@@ -686,8 +658,12 @@ impl<'a> TypeLowering<'a> {
         let mut this_type = None;
 
         for &idx in &params.nodes {
-            let Some(param_node) = self.arena.get(idx) else { continue };
-            let Some(param_data) = self.arena.get_parameter(param_node) else { continue };
+            let Some(param_node) = self.arena.get(idx) else {
+                continue;
+            };
+            let Some(param_data) = self.arena.get_parameter(param_node) else {
+                continue;
+            };
 
             if let Some(name_node) = self.arena.get(param_data.name) {
                 if let Some(id_data) = self.arena.get_identifier(name_node) {
@@ -736,12 +712,14 @@ impl<'a> TypeLowering<'a> {
         };
 
         if let Some(data) = self.arena.get_function_type(node) {
-            let (type_params, (params, this_type, return_type, type_predicate)) = self.with_type_params(&data.type_parameters, || {
-                let (params, this_type) = self.lower_params_with_this(&data.parameters);
+            let (type_params, (params, this_type, return_type, type_predicate)) = self
+                .with_type_params(&data.type_parameters, || {
+                    let (params, this_type) = self.lower_params_with_this(&data.parameters);
 
-                let (return_type, type_predicate) = self.lower_return_type(data.type_annotation);
-                (params, this_type, return_type, type_predicate)
-            });
+                    let (return_type, type_predicate) =
+                        self.lower_return_type(data.type_annotation);
+                    (params, this_type, return_type, type_predicate)
+                });
 
             let shape = FunctionShape {
                 type_params,
@@ -774,7 +752,9 @@ impl<'a> TypeLowering<'a> {
             let mut number_index = None;
 
             for &idx in &data.members.nodes {
-                let Some(member) = self.arena.get(idx) else { continue };
+                let Some(member) = self.arena.get(idx) else {
+                    continue;
+                };
 
                 if let Some(sig) = self.arena.get_signature(member) {
                     match member.kind {
@@ -858,8 +838,12 @@ impl<'a> TypeLowering<'a> {
         let mut found = false;
 
         for &decl_idx in declarations {
-            let Some(node) = self.arena.get(decl_idx) else { continue };
-            let Some(interface) = self.arena.get_interface(node) else { continue };
+            let Some(node) = self.arena.get(decl_idx) else {
+                continue;
+            };
+            let Some(interface) = self.arena.get_interface(node) else {
+                continue;
+            };
             found = true;
             if type_params.is_none() {
                 type_params = interface.type_parameters.as_ref();
@@ -876,8 +860,12 @@ impl<'a> TypeLowering<'a> {
         }
 
         for &decl_idx in declarations {
-            let Some(node) = self.arena.get(decl_idx) else { continue };
-            let Some(interface) = self.arena.get_interface(node) else { continue };
+            let Some(node) = self.arena.get(decl_idx) else {
+                continue;
+            };
+            let Some(interface) = self.arena.get_interface(node) else {
+                continue;
+            };
             self.collect_interface_members(&interface.members, &mut parts);
         }
 
@@ -904,7 +892,9 @@ impl<'a> TypeLowering<'a> {
 
     fn collect_interface_members(&self, members: &NodeList, parts: &mut InterfaceParts) {
         for &idx in &members.nodes {
-            let Some(member) = self.arena.get(idx) else { continue };
+            let Some(member) = self.arena.get(idx) else {
+                continue;
+            };
 
             if let Some(sig) = self.arena.get_signature(member) {
                 match member.kind {
@@ -912,7 +902,9 @@ impl<'a> TypeLowering<'a> {
                         parts.call_signatures.push(self.lower_call_signature(sig));
                     }
                     k if k == syntax_kind_ext::CONSTRUCT_SIGNATURE => {
-                        parts.construct_signatures.push(self.lower_call_signature(sig));
+                        parts
+                            .construct_signatures
+                            .push(self.lower_call_signature(sig));
                     }
                     k if k == syntax_kind_ext::METHOD_SIGNATURE => {
                         if let Some(name) = self.lower_signature_name(sig.name) {
@@ -948,7 +940,8 @@ impl<'a> TypeLowering<'a> {
                         call_signatures: methods.signatures,
                         construct_signatures: Vec::new(),
                         properties: Vec::new(),
-                    ..Default::default() });
+                        ..Default::default()
+                    });
                     properties.push(PropertyInfo {
                         name,
                         type_id,
@@ -991,11 +984,12 @@ impl<'a> TypeLowering<'a> {
     }
 
     fn lower_call_signature(&self, sig: &SignatureData) -> CallSignature {
-        let (type_params, (params, this_type, return_type, type_predicate)) = self.with_type_params(&sig.type_parameters, || {
-            let (params, this_type) = self.lower_signature_params(sig);
-            let (return_type, type_predicate) = self.lower_return_type(sig.type_annotation);
-            (params, this_type, return_type, type_predicate)
-        });
+        let (type_params, (params, this_type, return_type, type_predicate)) = self
+            .with_type_params(&sig.type_parameters, || {
+                let (params, this_type) = self.lower_signature_params(sig);
+                let (return_type, type_predicate) = self.lower_return_type(sig.type_annotation);
+                (params, this_type, return_type, type_predicate)
+            });
 
         CallSignature {
             type_params,
@@ -1007,11 +1001,12 @@ impl<'a> TypeLowering<'a> {
     }
 
     fn lower_method_signature(&self, sig: &SignatureData) -> TypeId {
-        let (type_params, (params, this_type, return_type, type_predicate)) = self.with_type_params(&sig.type_parameters, || {
-            let (params, this_type) = self.lower_signature_params(sig);
-            let (return_type, type_predicate) = self.lower_return_type(sig.type_annotation);
-            (params, this_type, return_type, type_predicate)
-        });
+        let (type_params, (params, this_type, return_type, type_predicate)) = self
+            .with_type_params(&sig.type_parameters, || {
+                let (params, this_type) = self.lower_signature_params(sig);
+                let (return_type, type_predicate) = self.lower_return_type(sig.type_annotation);
+                (params, this_type, return_type, type_predicate)
+            });
 
         self.interner.function(FunctionShape {
             type_params,
@@ -1025,7 +1020,9 @@ impl<'a> TypeLowering<'a> {
     }
 
     fn lower_signature_params(&self, sig: &SignatureData) -> (Vec<ParamInfo>, Option<TypeId>) {
-        let Some(params) = &sig.parameters else { return (Vec::new(), None) };
+        let Some(params) = &sig.parameters else {
+            return (Vec::new(), None);
+        };
         self.lower_params_with_this(params)
     }
 
@@ -1043,7 +1040,12 @@ impl<'a> TypeLowering<'a> {
     }
 
     fn lower_index_signature(&self, sig: &IndexSignatureData) -> Option<IndexSignature> {
-        let param_idx = sig.parameters.nodes.first().copied().unwrap_or(NodeIndex::NONE);
+        let param_idx = sig
+            .parameters
+            .nodes
+            .first()
+            .copied()
+            .unwrap_or(NodeIndex::NONE);
         let param_node = self.arena.get(param_idx)?;
         let param_data = self.arena.get_parameter(param_node)?;
         let key_type = self.lower_type(param_data.type_annotation);
@@ -1359,7 +1361,9 @@ impl<'a> TypeLowering<'a> {
     fn is_naked_type_param(&self, node_idx: NodeIndex) -> bool {
         let mut current = node_idx;
         loop {
-            let Some(node) = self.arena.get(current) else { return false };
+            let Some(node) = self.arena.get(current) else {
+                return false;
+            };
             match node.kind {
                 k if k == syntax_kind_ext::PARENTHESIZED_TYPE => {
                     if let Some(data) = self.arena.get_wrapped_type(node) {
@@ -1369,20 +1373,26 @@ impl<'a> TypeLowering<'a> {
                     return false;
                 }
                 k if k == syntax_kind_ext::TYPE_REFERENCE => {
-                    let Some(data) = self.arena.get_type_ref(node) else { return false };
+                    let Some(data) = self.arena.get_type_ref(node) else {
+                        return false;
+                    };
                     if let Some(args) = &data.type_arguments {
                         if !args.nodes.is_empty() {
                             return false;
                         }
                     }
-                    let Some(name_node) = self.arena.get(data.type_name) else { return false };
+                    let Some(name_node) = self.arena.get(data.type_name) else {
+                        return false;
+                    };
                     if let Some(ident) = self.arena.get_identifier(name_node) {
                         return self.lookup_type_param(&ident.escaped_text).is_some();
                     }
                     return false;
                 }
                 k if k == SyntaxKind::Identifier as u16 => {
-                    let Some(ident) = self.arena.get_identifier(node) else { return false };
+                    let Some(ident) = self.arena.get_identifier(node) else {
+                        return false;
+                    };
                     return self.lookup_type_param(&ident.escaped_text).is_some();
                 }
                 _ => return false,
@@ -1563,7 +1573,9 @@ impl<'a> TypeLowering<'a> {
         if let Some(data) = self.arena.get_mapped_type(node) {
             let (type_param, constraint) = self.lower_mapped_type_param(data.type_parameter);
             self.push_type_param_scope();
-            let type_param_id = self.interner.intern(TypeKey::TypeParameter(type_param.clone()));
+            let type_param_id = self
+                .interner
+                .intern(TypeKey::TypeParameter(type_param.clone()));
             self.add_type_param_binding(type_param.name, type_param_id);
             let name_type = if data.name_type != NodeIndex::NONE {
                 Some(self.lower_type(data.name_type))
@@ -1577,8 +1589,10 @@ impl<'a> TypeLowering<'a> {
                 constraint,
                 name_type,
                 template,
-                readonly_modifier: self.lower_mapped_modifier(data.readonly_token, SyntaxKind::ReadonlyKeyword as u16),
-                optional_modifier: self.lower_mapped_modifier(data.question_token, SyntaxKind::QuestionToken as u16),
+                readonly_modifier: self
+                    .lower_mapped_modifier(data.readonly_token, SyntaxKind::ReadonlyKeyword as u16),
+                optional_modifier: self
+                    .lower_mapped_modifier(data.question_token, SyntaxKind::QuestionToken as u16),
             };
             self.interner.mapped(mapped)
         } else {
@@ -1591,7 +1605,14 @@ impl<'a> TypeLowering<'a> {
             Some(n) => n,
             None => {
                 let name = self.interner.intern_string("K");
-                return (TypeParamInfo { name, constraint: None, default: None }, TypeId::ANY);
+                return (
+                    TypeParamInfo {
+                        name,
+                        constraint: None,
+                        default: None,
+                    },
+                    TypeId::ANY,
+                );
             }
         };
 
@@ -1627,11 +1648,22 @@ impl<'a> TypeLowering<'a> {
             )
         } else {
             let name = self.interner.intern_string("K");
-            (TypeParamInfo { name, constraint: None, default: None }, TypeId::ANY)
+            (
+                TypeParamInfo {
+                    name,
+                    constraint: None,
+                    default: None,
+                },
+                TypeId::ANY,
+            )
         }
     }
 
-    fn lower_mapped_modifier(&self, token_idx: NodeIndex, default_kind: u16) -> Option<MappedModifier> {
+    fn lower_mapped_modifier(
+        &self,
+        token_idx: NodeIndex,
+        default_kind: u16,
+    ) -> Option<MappedModifier> {
         use crate::scanner::SyntaxKind;
 
         if token_idx == NodeIndex::NONE {
@@ -1658,7 +1690,8 @@ impl<'a> TypeLowering<'a> {
         if let Some(data) = self.arena.get_indexed_access_type(node) {
             let object_type = self.lower_type(data.object_type);
             let index_type = self.lower_type(data.index_type);
-            self.interner.intern(TypeKey::IndexAccess(object_type, index_type))
+            self.interner
+                .intern(TypeKey::IndexAccess(object_type, index_type))
         } else {
             TypeId::ERROR
         }
@@ -1843,7 +1876,9 @@ impl<'a> TypeLowering<'a> {
                     }
                     k if k == SyntaxKind::NumericLiteral as u16 => {
                         if let Some(lit_data) = self.arena.get_literal(literal_node) {
-                            if let Some(value) = self.parse_numeric_literal_value(lit_data.value, &lit_data.text) {
+                            if let Some(value) =
+                                self.parse_numeric_literal_value(lit_data.value, &lit_data.text)
+                            {
                                 self.interner.literal_number(value)
                             } else {
                                 TypeId::NUMBER
@@ -1864,9 +1899,7 @@ impl<'a> TypeLowering<'a> {
                             TypeId::BIGINT
                         }
                     }
-                    k if k == SyntaxKind::TrueKeyword as u16 => {
-                        self.interner.literal_boolean(true)
-                    }
+                    k if k == SyntaxKind::TrueKeyword as u16 => self.interner.literal_boolean(true),
                     k if k == SyntaxKind::FalseKeyword as u16 => {
                         self.interner.literal_boolean(false)
                     }
@@ -1879,8 +1912,15 @@ impl<'a> TypeLowering<'a> {
                             match operand_node.kind {
                                 k if k == SyntaxKind::NumericLiteral as u16 => {
                                     if let Some(lit_data) = self.arena.get_literal(operand_node) {
-                                        if let Some(value) = self.parse_numeric_literal_value(lit_data.value, &lit_data.text) {
-                                            let value = if op == SyntaxKind::MinusToken as u16 { -value } else { value };
+                                        if let Some(value) = self.parse_numeric_literal_value(
+                                            lit_data.value,
+                                            &lit_data.text,
+                                        ) {
+                                            let value = if op == SyntaxKind::MinusToken as u16 {
+                                                -value
+                                            } else {
+                                                value
+                                            };
                                             self.interner.literal_number(value)
                                         } else {
                                             TypeId::NUMBER
@@ -1891,10 +1931,18 @@ impl<'a> TypeLowering<'a> {
                                 }
                                 k if k == SyntaxKind::BigIntLiteral as u16 => {
                                     if let Some(lit_data) = self.arena.get_literal(operand_node) {
-                                        let text = lit_data.text.strip_suffix('n').unwrap_or(&lit_data.text);
+                                        let text = lit_data
+                                            .text
+                                            .strip_suffix('n')
+                                            .unwrap_or(&lit_data.text);
                                         let negative = op == SyntaxKind::MinusToken as u16;
-                                        if let Some(normalized) = self.normalize_bigint_literal(text) {
-                                            self.interner.literal_bigint_with_sign(negative, normalized.as_ref())
+                                        if let Some(normalized) =
+                                            self.normalize_bigint_literal(text)
+                                        {
+                                            self.interner.literal_bigint_with_sign(
+                                                negative,
+                                                normalized.as_ref(),
+                                            )
                                         } else {
                                             TypeId::BIGINT
                                         }
@@ -1933,7 +1981,8 @@ impl<'a> TypeLowering<'a> {
                         && self.lookup_type_param(name).is_none()
                         && self.resolve_type_symbol(data.type_name).is_none()
                     {
-                        let elem_type = data.type_arguments
+                        let elem_type = data
+                            .type_arguments
                             .as_ref()
                             .and_then(|args| args.nodes.first().copied())
                             .map(|idx| self.lower_type(idx))
@@ -1951,9 +2000,8 @@ impl<'a> TypeLowering<'a> {
             let base_type = self.lower_type(data.type_name);
             if let Some(args) = &data.type_arguments {
                 if !args.nodes.is_empty() {
-                    let type_args: Vec<TypeId> = args.nodes.iter()
-                        .map(|&idx| self.lower_type(idx))
-                        .collect();
+                    let type_args: Vec<TypeId> =
+                        args.nodes.iter().map(|&idx| self.lower_type(idx)).collect();
                     return self.interner.application(base_type, type_args);
                 }
             }
@@ -2037,14 +2085,13 @@ impl<'a> TypeLowering<'a> {
         if let Some(data) = self.arena.get_type_query(node) {
             // Create a symbol reference from the expression name
             if let Some(symbol_id) = self.resolve_value_symbol(data.expr_name) {
-                let base = self.interner.intern(TypeKey::TypeQuery(SymbolRef(symbol_id)));
+                let base = self
+                    .interner
+                    .intern(TypeKey::TypeQuery(SymbolRef(symbol_id)));
                 if let Some(args) = &data.type_arguments {
                     if !args.nodes.is_empty() {
-                        let type_args: Vec<TypeId> = args
-                            .nodes
-                            .iter()
-                            .map(|&idx| self.lower_type(idx))
-                            .collect();
+                        let type_args: Vec<TypeId> =
+                            args.nodes.iter().map(|&idx| self.lower_type(idx)).collect();
                         return self.interner.application(base, type_args);
                     }
                 }
@@ -2076,7 +2123,8 @@ impl<'a> TypeLowering<'a> {
                 158 => {
                     // unique symbol creates a unique symbol type
                     // Use node index as unique identifier
-                    self.interner.intern(TypeKey::UniqueSymbol(SymbolRef(node_idx.0)))
+                    self.interner
+                        .intern(TypeKey::UniqueSymbol(SymbolRef(node_idx.0)))
                 }
                 _ => inner_type,
             }
@@ -2095,9 +2143,9 @@ impl<'a> TypeLowering<'a> {
             return Some(TypePredicateTarget::This);
         }
 
-        self.arena
-            .get_identifier(node)
-            .map(|ident| TypePredicateTarget::Identifier(self.interner.intern_string(&ident.escaped_text)))
+        self.arena.get_identifier(node).map(|ident| {
+            TypePredicateTarget::Identifier(self.interner.intern_string(&ident.escaped_text))
+        })
     }
 
     fn lower_type_predicate_return(&self, node_idx: NodeIndex) -> (TypeId, Option<TypePredicate>) {
@@ -2183,7 +2231,9 @@ impl<'a> TypeLowering<'a> {
             if let Some(head_node) = self.arena.get(data.head) {
                 if let Some(head_lit) = self.arena.get_literal(head_node) {
                     if !head_lit.text.is_empty() {
-                        spans.push(TemplateSpan::Text(self.interner.intern_string(&head_lit.text)));
+                        spans.push(TemplateSpan::Text(
+                            self.interner.intern_string(&head_lit.text),
+                        ));
                     }
                 }
             }
@@ -2192,14 +2242,18 @@ impl<'a> TypeLowering<'a> {
             for &span_idx in &data.template_spans.nodes {
                 if let Some(span_node) = self.arena.get(span_idx) {
                     if span_node.kind == syntax_kind_ext::TEMPLATE_LITERAL_TYPE_SPAN {
-                        if let Some(span_data) = self.arena.template_spans.get(span_node.data_index as usize) {
+                        if let Some(span_data) =
+                            self.arena.template_spans.get(span_node.data_index as usize)
+                        {
                             let type_id = self.lower_type(span_data.expression);
                             spans.push(TemplateSpan::Type(type_id));
 
                             if let Some(lit_node) = self.arena.get(span_data.literal) {
                                 if let Some(lit_data) = self.arena.get_literal(lit_node) {
                                     if !lit_data.text.is_empty() {
-                                        spans.push(TemplateSpan::Text(self.interner.intern_string(&lit_data.text)));
+                                        spans.push(TemplateSpan::Text(
+                                            self.interner.intern_string(&lit_data.text),
+                                        ));
                                     }
                                 }
                             }
@@ -2238,12 +2292,14 @@ impl<'a> TypeLowering<'a> {
 
         // Constructor types use the same data structure as function types
         if let Some(data) = self.arena.get_function_type(node) {
-            let (type_params, (params, this_type, return_type, type_predicate)) = self.with_type_params(&data.type_parameters, || {
-                let (params, this_type) = self.lower_params_with_this(&data.parameters);
+            let (type_params, (params, this_type, return_type, type_predicate)) = self
+                .with_type_params(&data.type_parameters, || {
+                    let (params, this_type) = self.lower_params_with_this(&data.parameters);
 
-                let (return_type, type_predicate) = self.lower_return_type(data.type_annotation);
-                (params, this_type, return_type, type_predicate)
-            });
+                    let (return_type, type_predicate) =
+                        self.lower_return_type(data.type_annotation);
+                    (params, this_type, return_type, type_predicate)
+                });
 
             let shape = FunctionShape {
                 type_params,

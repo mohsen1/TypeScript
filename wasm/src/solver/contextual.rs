@@ -9,8 +9,8 @@
 //! The key insight is that when we have an expected type, we can use it
 //! to infer types for parts of the expression that would otherwise be unknown.
 
-use crate::solver::types::*;
 use crate::solver::TypeDatabase;
+use crate::solver::types::*;
 
 #[cfg(test)]
 use crate::solver::TypeInterner;
@@ -73,7 +73,8 @@ impl<'a> ContextualTypeContext<'a> {
             // For union of function types, try to find common parameter type
             TypeKey::Union(members) => {
                 let members = self.interner.type_list(members);
-                let param_types: Vec<TypeId> = members.iter()
+                let param_types: Vec<TypeId> = members
+                    .iter()
                     .filter_map(|&m| {
                         let ctx = ContextualTypeContext::with_expected(self.interner, m);
                         ctx.get_parameter_type(index)
@@ -113,7 +114,8 @@ impl<'a> ContextualTypeContext<'a> {
             }
             TypeKey::Union(members) => {
                 let members = self.interner.type_list(members);
-                let param_types: Vec<TypeId> = members.iter()
+                let param_types: Vec<TypeId> = members
+                    .iter()
                     .filter_map(|&m| {
                         let ctx = ContextualTypeContext::with_expected(self.interner, m);
                         ctx.get_parameter_type_for_call(index, arg_count)
@@ -145,7 +147,8 @@ impl<'a> ContextualTypeContext<'a> {
             }
             TypeKey::Union(members) => {
                 let members = self.interner.type_list(members);
-                let this_types: Vec<TypeId> = members.iter()
+                let this_types: Vec<TypeId> = members
+                    .iter()
                     .filter_map(|&m| {
                         let ctx = ContextualTypeContext::with_expected(self.interner, m);
                         ctx.get_this_type()
@@ -177,7 +180,8 @@ impl<'a> ContextualTypeContext<'a> {
             }
             TypeKey::Union(members) => {
                 let members = self.interner.type_list(members);
-                let return_types: Vec<TypeId> = members.iter()
+                let return_types: Vec<TypeId> = members
+                    .iter()
                     .filter_map(|&m| {
                         let ctx = ContextualTypeContext::with_expected(self.interner, m);
                         ctx.get_return_type()
@@ -232,11 +236,7 @@ impl<'a> ContextualTypeContext<'a> {
                 if index < elements.len() {
                     Some(elements[index].type_id)
                 } else if let Some(last) = elements.last() {
-                    if last.rest {
-                        Some(last.type_id)
-                    } else {
-                        None
-                    }
+                    if last.rest { Some(last.type_id) } else { None }
                 } else {
                     None
                 }
@@ -268,7 +268,8 @@ impl<'a> ContextualTypeContext<'a> {
             }
             TypeKey::Union(members) => {
                 let members = self.interner.type_list(members);
-                let prop_types: Vec<TypeId> = members.iter()
+                let prop_types: Vec<TypeId> = members
+                    .iter()
                     .filter_map(|&m| {
                         let ctx = ContextualTypeContext::with_expected(self.interner, m);
                         ctx.get_property_type(name)
@@ -340,7 +341,8 @@ impl<'a> ContextualTypeContext<'a> {
                 // For rest parameter with union type (e.g., union of tuples), extract element at index from each member
                 if let Some(TypeKey::Union(members)) = self.interner.lookup(param.type_id) {
                     let members = self.interner.type_list(members);
-                    let elem_types: Vec<TypeId> = members.iter()
+                    let elem_types: Vec<TypeId> = members
+                        .iter()
                         .filter_map(|&m| {
                             let ctx = ContextualTypeContext::with_expected(self.interner, m);
                             ctx.get_tuple_element_type(index)
@@ -374,7 +376,8 @@ impl<'a> ContextualTypeContext<'a> {
                 // For rest parameter with union type (e.g., union of tuples), extract element at index from each member
                 if let Some(TypeKey::Union(members)) = self.interner.lookup(last.type_id) {
                     let members = self.interner.type_list(members);
-                    let elem_types: Vec<TypeId> = members.iter()
+                    let elem_types: Vec<TypeId> = members
+                        .iter()
                         .filter_map(|&m| {
                             let ctx = ContextualTypeContext::with_expected(self.interner, m);
                             ctx.get_tuple_element_type(index)
@@ -482,10 +485,7 @@ impl<'a> ContextualTypeContext<'a> {
     }
 
     fn get_this_type_from_signatures(&self, signatures: &[CallSignature]) -> Option<TypeId> {
-        let this_types: Vec<TypeId> = signatures
-            .iter()
-            .filter_map(|sig| sig.this_type)
-            .collect();
+        let this_types: Vec<TypeId> = signatures.iter().filter_map(|sig| sig.this_type).collect();
 
         if this_types.is_empty() {
             None

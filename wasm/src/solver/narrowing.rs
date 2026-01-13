@@ -18,8 +18,8 @@
 //! ```
 
 use crate::interner::Atom;
-use crate::solver::types::*;
 use crate::solver::TypeDatabase;
+use crate::solver::types::*;
 
 #[cfg(test)]
 use crate::solver::TypeInterner;
@@ -65,7 +65,9 @@ impl<'a> NarrowingContext<'a> {
         for &member in members.iter() {
             if let Some(TypeKey::Object(shape_id)) = self.interner.lookup(member) {
                 let shape = self.interner.object_shape(shape_id);
-                let props_vec: Vec<(Atom, TypeId)> = shape.properties.iter()
+                let props_vec: Vec<(Atom, TypeId)> = shape
+                    .properties
+                    .iter()
                     .map(|p| (p.name, p.type_id))
                     .collect();
 
@@ -92,7 +94,8 @@ impl<'a> NarrowingContext<'a> {
 
             for (i, props) in member_props.iter().enumerate() {
                 // Find this property in the member
-                let prop_type = props.iter()
+                let prop_type = props
+                    .iter()
                     .find(|(name, _)| name == prop_name)
                     .map(|(_, ty)| *ty);
 
@@ -207,11 +210,7 @@ impl<'a> NarrowingContext<'a> {
     /// Narrow a type based on a typeof check.
     ///
     /// Example: `typeof x === "string"` narrows `string | number` to `string`
-    pub fn narrow_by_typeof(
-        &self,
-        source_type: TypeId,
-        typeof_result: &str,
-    ) -> TypeId {
+    pub fn narrow_by_typeof(&self, source_type: TypeId, typeof_result: &str) -> TypeId {
         if source_type == TypeId::ANY {
             return TypeId::ANY;
         }
@@ -324,7 +323,8 @@ impl<'a> NarrowingContext<'a> {
                         }
                         return Some(narrowed);
                     }
-                    if let Some(narrowed) = self.narrow_type_param_excluding(member, excluded_type) {
+                    if let Some(narrowed) = self.narrow_type_param_excluding(member, excluded_type)
+                    {
                         if narrowed == TypeId::NEVER {
                             return None;
                         }
@@ -430,9 +430,7 @@ impl<'a> NarrowingContext<'a> {
             Some(TypeKey::Function(_) | TypeKey::Callable(_)) => true,
             Some(TypeKey::Intersection(members)) => {
                 let members = self.interner.type_list(members);
-                members
-                    .iter()
-                    .any(|member| self.is_function_type(*member))
+                members.iter().any(|member| self.is_function_type(*member))
             }
             _ => false,
         }
@@ -489,9 +487,7 @@ impl<'a> NarrowingContext<'a> {
             Some(TypeKey::ReadonlyType(inner)) => self.is_object_typeof(inner),
             Some(TypeKey::Intersection(members)) => {
                 let members = self.interner.type_list(members);
-                members
-                    .iter()
-                    .all(|member| self.is_object_typeof(*member))
+                members.iter().all(|member| self.is_object_typeof(*member))
             }
             Some(TypeKey::TypeParameter(info)) | Some(TypeKey::Infer(info)) => info
                 .constraint
@@ -657,7 +653,10 @@ impl<'a> NarrowingContext<'a> {
         }
 
         if target == TypeId::STRING {
-            if matches!(self.interner.lookup(source), Some(TypeKey::TemplateLiteral(_))) {
+            if matches!(
+                self.interner.lookup(source),
+                Some(TypeKey::TemplateLiteral(_))
+            ) {
                 return true;
             }
         }
@@ -667,7 +666,10 @@ impl<'a> NarrowingContext<'a> {
 }
 
 /// Convenience function for finding discriminants.
-pub fn find_discriminants(interner: &dyn TypeDatabase, union_type: TypeId) -> Vec<DiscriminantInfo> {
+pub fn find_discriminants(
+    interner: &dyn TypeDatabase,
+    union_type: TypeId,
+) -> Vec<DiscriminantInfo> {
     let ctx = NarrowingContext::new(interner);
     ctx.find_discriminants(union_type)
 }

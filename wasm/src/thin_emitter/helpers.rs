@@ -100,12 +100,16 @@ impl<'a> ThinPrinter<'a> {
     // =========================================================================
 
     pub(super) fn has_identifier_text(&self, idx: NodeIndex) -> bool {
-        let Some(node) = self.arena.get(idx) else { return false };
+        let Some(node) = self.arena.get(idx) else {
+            return false;
+        };
         self.arena.get_identifier(node).is_some()
     }
 
     pub(super) fn write_identifier_text(&mut self, idx: NodeIndex) {
-        let Some(node) = self.arena.get(idx) else { return };
+        let Some(node) = self.arena.get(idx) else {
+            return;
+        };
         if let Some(ident) = self.arena.get_identifier(node) {
             self.write(&ident.escaped_text);
         }
@@ -113,7 +117,9 @@ impl<'a> ThinPrinter<'a> {
 
     /// Get identifier text from a node index
     pub(super) fn get_identifier_text(&self, idx: NodeIndex) -> String {
-        let Some(node) = self.arena.get(idx) else { return String::new() };
+        let Some(node) = self.arena.get(idx) else {
+            return String::new();
+        };
         if let Some(ident) = self.arena.get_identifier(node) {
             return ident.escaped_text.clone();
         }

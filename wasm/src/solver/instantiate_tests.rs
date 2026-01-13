@@ -26,8 +26,16 @@ fn test_substitution_from_args() {
     let t_name = interner.intern_string("T");
     let u_name = interner.intern_string("U");
     let type_params = vec![
-        TypeParamInfo { name: t_name, constraint: None, default: None },
-        TypeParamInfo { name: u_name, constraint: None, default: None },
+        TypeParamInfo {
+            name: t_name,
+            constraint: None,
+            default: None,
+        },
+        TypeParamInfo {
+            name: u_name,
+            constraint: None,
+            default: None,
+        },
     ];
     let type_args = vec![TypeId::STRING, TypeId::NUMBER];
 
@@ -119,16 +127,14 @@ fn test_instantiate_object() {
         constraint: None,
         default: None,
     }));
-    let obj = interner.object(vec![
-        PropertyInfo {
-            name: interner.intern_string("value"),
-            type_id: type_param_t,
-            write_type: type_param_t,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-    ]);
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("value"),
+        type_id: type_param_t,
+        write_type: type_param_t,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
 
     // Substitute T = number -> { value: number }
     let mut subst = TypeSubstitution::new();
@@ -136,16 +142,14 @@ fn test_instantiate_object() {
     let result = instantiate_type(&interner, obj, &subst);
 
     // Result should be { value: number }
-    let expected = interner.object(vec![
-        PropertyInfo {
-            name: interner.intern_string("value"),
-            type_id: TypeId::NUMBER,
-            write_type: TypeId::NUMBER,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-    ]);
+    let expected = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("value"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
     assert_eq!(result, expected);
 }
 
@@ -172,7 +176,7 @@ fn test_instantiate_function() {
         return_type: type_param_t,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Substitute T = string -> (x: string) => string
@@ -193,7 +197,7 @@ fn test_instantiate_function() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     assert_eq!(result, expected);
 }
@@ -221,7 +225,7 @@ fn test_instantiate_function_shadowed_type_params() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let mut subst = TypeSubstitution::new();
@@ -240,7 +244,7 @@ fn test_instantiate_function_shadowed_type_params() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     assert_eq!(result, expected);
 }
@@ -263,8 +267,18 @@ fn test_instantiate_tuple() {
         default: None,
     }));
     let tuple = interner.tuple(vec![
-        TupleElement { type_id: type_param_t, name: None, optional: false, rest: false },
-        TupleElement { type_id: type_param_u, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: type_param_t,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: type_param_u,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     // Substitute T = string, U = number -> [string, number]
@@ -275,8 +289,18 @@ fn test_instantiate_tuple() {
 
     // Result should be [string, number]
     let expected = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
     assert_eq!(result, expected);
 }
@@ -294,9 +318,11 @@ fn test_instantiate_generic_convenience() {
     let array_t = interner.array(type_param_t);
 
     // Use convenience function
-    let type_params = vec![
-        TypeParamInfo { name: interner.intern_string("T"), constraint: None, default: None },
-    ];
+    let type_params = vec![TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    }];
     let type_args = vec![TypeId::STRING];
 
     let result = instantiate_generic(&interner, array_t, &type_params, &type_args);
@@ -377,7 +403,10 @@ fn test_instantiate_application_map_nested() {
         &[k_param, v_param],
         &[TypeId::STRING, TypeId::NUMBER],
     );
-    let expected = interner.application(map_base, vec![TypeId::STRING, interner.array(TypeId::NUMBER)]);
+    let expected = interner.application(
+        map_base,
+        vec![TypeId::STRING, interner.array(TypeId::NUMBER)],
+    );
     assert_eq!(result, expected);
 }
 
@@ -390,11 +419,26 @@ fn test_instantiate_intrinsics_unchanged() {
     let mut subst = TypeSubstitution::new();
     subst.insert(t_name, TypeId::NUMBER);
 
-    assert_eq!(instantiate_type(&interner, TypeId::STRING, &subst), TypeId::STRING);
-    assert_eq!(instantiate_type(&interner, TypeId::NUMBER, &subst), TypeId::NUMBER);
-    assert_eq!(instantiate_type(&interner, TypeId::BOOLEAN, &subst), TypeId::BOOLEAN);
-    assert_eq!(instantiate_type(&interner, TypeId::NULL, &subst), TypeId::NULL);
-    assert_eq!(instantiate_type(&interner, TypeId::UNDEFINED, &subst), TypeId::UNDEFINED);
+    assert_eq!(
+        instantiate_type(&interner, TypeId::STRING, &subst),
+        TypeId::STRING
+    );
+    assert_eq!(
+        instantiate_type(&interner, TypeId::NUMBER, &subst),
+        TypeId::NUMBER
+    );
+    assert_eq!(
+        instantiate_type(&interner, TypeId::BOOLEAN, &subst),
+        TypeId::BOOLEAN
+    );
+    assert_eq!(
+        instantiate_type(&interner, TypeId::NULL, &subst),
+        TypeId::NULL
+    );
+    assert_eq!(
+        instantiate_type(&interner, TypeId::UNDEFINED, &subst),
+        TypeId::UNDEFINED
+    );
 }
 
 #[test]

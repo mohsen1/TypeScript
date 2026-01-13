@@ -12,7 +12,11 @@ fn debug_union_normalization() {
 
     // Union containing `any` is normalized to just `any` (TypeScript behavior)
     let any_or_string = interner.union(vec![TypeId::ANY, TypeId::STRING]);
-    assert_eq!(any_or_string, TypeId::ANY, "any | string should normalize to any");
+    assert_eq!(
+        any_or_string,
+        TypeId::ANY,
+        "any | string should normalize to any"
+    );
 
     // Union without `any` stays as a union
     let string_or_number = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
@@ -99,7 +103,8 @@ fn test_union_without_any_stays_union() {
     assert!(checker.is_subtype_of(TypeId::NUMBER, string_or_number));
 
     // string | number is subtype of string | number | boolean
-    let string_or_number_or_boolean = interner.union(vec![TypeId::STRING, TypeId::NUMBER, TypeId::BOOLEAN]);
+    let string_or_number_or_boolean =
+        interner.union(vec![TypeId::STRING, TypeId::NUMBER, TypeId::BOOLEAN]);
     assert!(checker.is_subtype_of(string_or_number, string_or_number_or_boolean));
 
     // string | number is NOT subtype of string | boolean (number is not in the target)

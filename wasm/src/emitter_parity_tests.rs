@@ -335,7 +335,8 @@ fn test_parity_es5_class_static_async_this_capture() {
 /// using __extends helper and IIFE pattern.
 #[test]
 fn test_parity_es5_class_expression_extends() {
-    let source = "const Derived = class extends Base { constructor() { super(); this.value = 1; } };";
+    let source =
+        "const Derived = class extends Base { constructor() { super(); this.value = 1; } };";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
     let arena = &parser.arena;
@@ -467,7 +468,9 @@ class Derived extends Base {
         output
     );
     assert!(
-        !output.contains("instanceField =") || output.contains("this.instanceField =") || output.contains("_this.instanceField ="),
+        !output.contains("instanceField =")
+            || output.contains("this.instanceField =")
+            || output.contains("_this.instanceField ="),
         "ES5 output should not have class field syntax outside constructor: {}",
         output
     );
@@ -643,7 +646,8 @@ fn test_parity_es5_default_export_class() {
 /// Async iteration should be downleveled using __asyncValues helper.
 #[test]
 fn test_parity_es5_async_iteration() {
-    let source = "async function process(items) { for await (const item of items) { console.log(item); } }";
+    let source =
+        "async function process(items) { for await (const item of items) { console.log(item); } }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
     let arena = &parser.arena;
@@ -818,7 +822,9 @@ class StreamProcessor {
     );
     // Type annotations should be erased
     assert!(
-        !output.contains(": DataItem") && !output.contains("AsyncIterable<") && !output.contains("Promise<void>"),
+        !output.contains(": DataItem")
+            && !output.contains("AsyncIterable<")
+            && !output.contains("Promise<void>"),
         "ES5 output should erase type annotations: {}",
         output
     );
@@ -908,7 +914,9 @@ async function safeIterate<T>(stream: AsyncIterable<T>): Promise<T[]> {
     );
     // Type annotations should be erased
     assert!(
-        !output.contains("AsyncIterable<T>") && !output.contains("Promise<T[]>") && !output.contains(": T[]"),
+        !output.contains("AsyncIterable<T>")
+            && !output.contains("Promise<T[]>")
+            && !output.contains(": T[]"),
         "ES5 output should erase type annotations: {}",
         output
     );
@@ -980,7 +988,9 @@ async function extractValues(stream: AsyncIterable<NestedData>): Promise<number[
     );
     // Type annotations should be erased
     assert!(
-        !output.contains("AsyncIterable<") && !output.contains("Promise<number[]>") && !output.contains(": number[]"),
+        !output.contains("AsyncIterable<")
+            && !output.contains("Promise<number[]>")
+            && !output.contains(": number[]"),
         "ES5 output should erase type annotations: {}",
         output
     );
@@ -1203,7 +1213,9 @@ fn test_parity_es5_method_shorthand() {
     );
     // No method shorthand syntax
     assert!(
-        !output.contains("greet()") || output.contains("greet: function()") || output.contains("greet:function()"),
+        !output.contains("greet()")
+            || output.contains("greet: function()")
+            || output.contains("greet:function()"),
         "ES5 output should not contain method shorthand syntax: {}",
         output
     );
@@ -1869,7 +1881,8 @@ fn test_parity_es5_class_constructor_super() {
 /// Class methods should be added to the prototype.
 #[test]
 fn test_parity_es5_class_prototype_method() {
-    let source = "class Calculator { add(a, b) { return a + b; } multiply(a, b) { return a * b; } }";
+    let source =
+        "class Calculator { add(a, b) { return a + b; } multiply(a, b) { return a * b; } }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
     let arena = &parser.arena;
@@ -1918,7 +1931,8 @@ fn test_parity_es5_class_prototype_method() {
 /// Async arrow should be converted to function with __awaiter/__generator.
 #[test]
 fn test_parity_es5_async_arrow() {
-    let source = "const fetchData = async () => { const result = await fetch('/api'); return result; };";
+    let source =
+        "const fetchData = async () => { const result = await fetch('/api'); return result; };";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
     let arena = &parser.arena;
@@ -2154,7 +2168,8 @@ fn test_parity_es5_class_static_property() {
     );
     // Static properties should be assigned on the class constructor
     assert!(
-        output.contains("Config.version") && (output.contains("'1.0.0'") || output.contains("\"1.0.0\"")),
+        output.contains("Config.version")
+            && (output.contains("'1.0.0'") || output.contains("\"1.0.0\"")),
         "ES5 output should assign static version property: {}",
         output
     );
@@ -2371,7 +2386,10 @@ fn test_parity_es5_string_enum() {
     );
     // Enum members should have string values
     assert!(
-        output.contains("UP") && output.contains("DOWN") && output.contains("LEFT") && output.contains("RIGHT"),
+        output.contains("UP")
+            && output.contains("DOWN")
+            && output.contains("LEFT")
+            && output.contains("RIGHT"),
         "ES5 output should contain all string enum values: {}",
         output
     );
@@ -2909,7 +2927,9 @@ const partial: PartialEmployee = { ...employee, salary: undefined };
 
     // Spread syntax should not appear
     assert!(
-        !output.contains("...person") && !output.contains("...p") && !output.contains("...employee"),
+        !output.contains("...person")
+            && !output.contains("...p")
+            && !output.contains("...employee"),
         "Spread syntax should not appear: {}",
         output
     );
@@ -2989,7 +3009,9 @@ const combined = { ...a, ...b, ...c, ...d };
 
     // Spread syntax should not appear
     assert!(
-        !output.contains("...defaults") && !output.contains("...userConfig") && !output.contains("...envConfig"),
+        !output.contains("...defaults")
+            && !output.contains("...userConfig")
+            && !output.contains("...envConfig"),
         "Spread syntax should not appear: {}",
         output
     );
@@ -3265,7 +3287,9 @@ class SpreadBuilder<T extends object> {
 
     // Spread syntax should not appear
     assert!(
-        !output.contains("...base") && !output.contains("...obj") && !output.contains("...this.data"),
+        !output.contains("...base")
+            && !output.contains("...obj")
+            && !output.contains("...this.data"),
         "Spread syntax should not appear: {}",
         output
     );
@@ -3997,7 +4021,9 @@ class Calculator {
     );
     // Type annotations should be erased
     assert!(
-        !output.contains(": number") && !output.contains(": any") && !output.contains("PropertyDescriptor"),
+        !output.contains(": number")
+            && !output.contains(": any")
+            && !output.contains("PropertyDescriptor"),
         "Type annotations should be erased: {}",
         output
     );
@@ -4313,7 +4339,9 @@ class Container<T> {
 
     // Spread syntax should not appear
     assert!(
-        !output.contains("...numbers") && !output.contains("...strings") && !output.contains("...items"),
+        !output.contains("...numbers")
+            && !output.contains("...strings")
+            && !output.contains("...items"),
         "Spread syntax should not appear: {}",
         output
     );
@@ -5321,7 +5349,8 @@ fn test_parity_es5_for_of_array_destructuring() {
 /// for (const {x, y} of points) should downlevel both for-of and destructuring.
 #[test]
 fn test_parity_es5_for_of_object_destructuring() {
-    let source = "const points = [{x:1,y:2},{x:3,y:4}]; for (const {x, y} of points) { console.log(x, y); }";
+    let source =
+        "const points = [{x:1,y:2},{x:3,y:4}]; for (const {x, y} of points) { console.log(x, y); }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
     let arena = &parser.arena;
@@ -6274,7 +6303,9 @@ const getData = ([first, [second, third]]: [number, [string, boolean]]) => first
         output
     );
     assert!(
-        !output.contains(": string") && !output.contains(": number") && !output.contains(": boolean"),
+        !output.contains(": string")
+            && !output.contains(": number")
+            && !output.contains(": boolean"),
         "ES5 output should erase primitive type annotations: {}",
         output
     );
@@ -6405,7 +6436,8 @@ fn test_parity_es5_getter_only_typed() {
 /// set prop(v: Type) should downlevel and erase type.
 #[test]
 fn test_parity_es5_setter_only_typed() {
-    let source = "class Counter { private _count = 0; set count(val: number) { this._count = val; } }";
+    let source =
+        "class Counter { private _count = 0; set count(val: number) { this._count = val; } }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
     let arena = &parser.arena;
@@ -6872,7 +6904,9 @@ class Counter {
     );
     // Type annotations should be erased
     assert!(
-        !output.contains(": Configuration") && !output.contains(": number") && !output.contains(": boolean"),
+        !output.contains(": Configuration")
+            && !output.contains(": number")
+            && !output.contains(": boolean"),
         "Type annotations should be erased: {}",
         output
     );
@@ -7000,7 +7034,8 @@ fn test_parity_es5_static_setter_typed() {
     );
     // Static accessors should be on constructor (Logger), not Logger.prototype
     assert!(
-        output.contains("Object.defineProperty(Logger,") || output.contains("Object.defineProperty(Logger, "),
+        output.contains("Object.defineProperty(Logger,")
+            || output.contains("Object.defineProperty(Logger, "),
         "ES5 output should define static accessor on Logger constructor: {}",
         output
     );
@@ -7556,7 +7591,9 @@ class Widget {
     );
     // Type annotation should be erased
     assert!(
-        !output.contains(": string") && !output.contains(": number") && !output.contains(": Function"),
+        !output.contains(": string")
+            && !output.contains(": number")
+            && !output.contains(": Function"),
         "Type annotations should be erased: {}",
         output
     );
@@ -7673,7 +7710,9 @@ class DerivedService extends BaseService {
     );
     // Type annotations should be erased
     assert!(
-        !output.contains(": string") && !output.contains(": number") && !output.contains(": Function"),
+        !output.contains(": string")
+            && !output.contains(": number")
+            && !output.contains(": Function"),
         "Type annotations should be erased: {}",
         output
     );
@@ -7728,7 +7767,9 @@ class DataService {
     );
     // Type annotations should be erased
     assert!(
-        !output.contains(": number") && !output.contains(": string") && !output.contains("PropertyDescriptor"),
+        !output.contains(": number")
+            && !output.contains(": string")
+            && !output.contains("PropertyDescriptor"),
         "Type annotations should be erased: {}",
         output
     );
@@ -7781,7 +7822,10 @@ class SearchController {
     );
     // Type annotations should be erased
     assert!(
-        !output.contains(": number") && !output.contains(": string") && !output.contains(": void") && !output.contains("PropertyDescriptor"),
+        !output.contains(": number")
+            && !output.contains(": string")
+            && !output.contains(": void")
+            && !output.contains("PropertyDescriptor"),
         "Type annotations should be erased: {}",
         output
     );
@@ -7889,7 +7933,9 @@ class ApiClient {
     );
     // Type annotations should be erased
     assert!(
-        !output.contains(": number") && !output.contains("Promise<string>") && !output.contains("PropertyDescriptor"),
+        !output.contains(": number")
+            && !output.contains("Promise<string>")
+            && !output.contains("PropertyDescriptor"),
         "Type annotations should be erased: {}",
         output
     );
@@ -7936,7 +7982,9 @@ class FormField {
     );
     // No decorator syntax in ES5
     assert!(
-        !output.contains("@observable") && !output.contains("@validate") && !output.contains("@persist"),
+        !output.contains("@observable")
+            && !output.contains("@validate")
+            && !output.contains("@persist"),
         "ES5 output should not contain decorator syntax: {}",
         output
     );
@@ -8556,7 +8604,9 @@ fn test_parity_es5_async_generator_try_catch() {
     );
     // Type annotations should be erased
     assert!(
-        !output.contains(": string[]") && !output.contains("AsyncGenerator<") && !output.contains(": unknown"),
+        !output.contains(": string[]")
+            && !output.contains("AsyncGenerator<")
+            && !output.contains(": unknown"),
         "Type annotations should be erased: {}",
         output
     );
@@ -9112,7 +9162,9 @@ namespace Company {
     );
     // No namespace keyword
     assert!(
-        !output.contains("namespace Company") && !output.contains("namespace Department") && !output.contains("namespace Team"),
+        !output.contains("namespace Company")
+            && !output.contains("namespace Department")
+            && !output.contains("namespace Team"),
         "ES5 output should not contain namespace keywords: {}",
         output
     );
@@ -9130,7 +9182,9 @@ namespace Company {
     );
     // Type annotations should be erased
     assert!(
-        !output.contains(": string") && !output.contains(": number") && !output.contains(": Member"),
+        !output.contains(": string")
+            && !output.contains(": number")
+            && !output.contains(": Member"),
         "ES5 output should erase type annotations: {}",
         output
     );
@@ -10480,7 +10534,9 @@ async function* streamData(url: string): AsyncGenerator<DataChunk> {
     );
     // Type annotations should be erased
     assert!(
-        !output.contains("AsyncGenerator<") && !output.contains(": DataChunk") && !output.contains(": string"),
+        !output.contains("AsyncGenerator<")
+            && !output.contains(": DataChunk")
+            && !output.contains(": string"),
         "ES5 output should erase type annotations: {}",
         output
     );
@@ -12611,7 +12667,9 @@ class PropertyMapper {
     );
     // Type annotations should be erased
     assert!(
-        !output.contains(": string") && !output.contains(": number") && !output.contains(": { [key: string]"),
+        !output.contains(": string")
+            && !output.contains(": number")
+            && !output.contains(": { [key: string]"),
         "ES5 output should erase type annotations: {}",
         output
     );
@@ -12686,7 +12744,9 @@ const config: Config = {
     );
     // Type annotations should be erased
     assert!(
-        !output.contains(": string") && !output.contains(": symbol") && !output.contains(": Config"),
+        !output.contains(": string")
+            && !output.contains(": symbol")
+            && !output.contains(": Config"),
         "ES5 output should erase type annotations: {}",
         output
     );
@@ -12770,7 +12830,9 @@ const result = builder.build(42);
     );
     // Generic type parameters should be erased
     assert!(
-        !output.contains("<T>") && !output.contains("<K extends") && !output.contains("<string, T>"),
+        !output.contains("<T>")
+            && !output.contains("<K extends")
+            && !output.contains("<string, T>"),
         "ES5 output should erase generic type parameters: {}",
         output
     );
@@ -12988,7 +13050,9 @@ function logWithLevel(level: string = "debug", timestamp: boolean = true, ...mes
     );
     // Type annotations should be erased
     assert!(
-        !output.contains(": string[]") && !output.contains(": boolean") && !output.contains(": void"),
+        !output.contains(": string[]")
+            && !output.contains(": boolean")
+            && !output.contains(": void"),
         "Type annotations should be erased: {}",
         output
     );
@@ -13314,7 +13378,8 @@ function log(first: string, ...rest: string[]): void {
     );
     // Overload signatures should be erased
     assert!(
-        output.matches("function format").count() == 1 && output.matches("function log").count() == 1,
+        output.matches("function format").count() == 1
+            && output.matches("function log").count() == 1,
         "Overload signatures should be erased: {}",
         output
     );
@@ -13415,7 +13480,9 @@ const processor = (fn: (...nums: number[]) => number): number => {
 
     // Should contain the functions
     assert!(
-        output.contains("withCallback") && output.contains("registerHandler") && output.contains("processor"),
+        output.contains("withCallback")
+            && output.contains("registerHandler")
+            && output.contains("processor"),
         "Output should contain functions: {}",
         output
     );
@@ -13427,7 +13494,9 @@ const processor = (fn: (...nums: number[]) => number): number => {
     );
     // Type annotations should be erased
     assert!(
-        !output.contains(": (...args") && !output.contains(": (...events") && !output.contains(": (...nums"),
+        !output.contains(": (...args")
+            && !output.contains(": (...events")
+            && !output.contains(": (...nums"),
         "Type annotations should be erased: {}",
         output
     );
@@ -13590,7 +13659,9 @@ function processArray(items: number[] = [], transform: (x: number) => number = (
 
     // Should contain the functions
     assert!(
-        output.contains("createConfig") && output.contains("formatDate") && output.contains("processArray"),
+        output.contains("createConfig")
+            && output.contains("formatDate")
+            && output.contains("processArray"),
         "Output should contain functions: {}",
         output
     );
@@ -13602,7 +13673,9 @@ function processArray(items: number[] = [], transform: (x: number) => number = (
     );
     // Type annotations should be erased
     assert!(
-        !output.contains(": object") && !output.contains(": Date") && !output.contains(": number[]"),
+        !output.contains(": object")
+            && !output.contains(": Date")
+            && !output.contains(": number[]"),
         "Type annotations should be erased: {}",
         output
     );
@@ -13935,7 +14008,9 @@ const { [propName]: userId, name: userName } = user;
     );
     // Type annotations should be erased
     assert!(
-        !output.contains(": { name:") && !output.contains(": User") && !output.contains("interface User"),
+        !output.contains(": { name:")
+            && !output.contains(": User")
+            && !output.contains("interface User"),
         "Type annotations should be erased: {}",
         output
     );
@@ -13987,13 +14062,17 @@ const { items, count } = provider.getData();
 
     // Should contain the functions
     assert!(
-        output.contains("getCoords") && output.contains("getPair") && output.contains("DataProvider"),
+        output.contains("getCoords")
+            && output.contains("getPair")
+            && output.contains("DataProvider"),
         "Output should contain functions: {}",
         output
     );
     // Type annotations should be erased
     assert!(
-        !output.contains(": { x:") && !output.contains(": [string, number]") && !output.contains(": number"),
+        !output.contains(": { x:")
+            && !output.contains(": [string, number]")
+            && !output.contains(": number"),
         "Type annotations should be erased: {}",
         output
     );
@@ -14041,7 +14120,9 @@ function process({ input: src, output: dest }: { input: string; output: string }
     );
     // Type annotations should be erased
     assert!(
-        !output.contains(": Person") && !output.contains("interface Person") && !output.contains(": { data:"),
+        !output.contains(": Person")
+            && !output.contains("interface Person")
+            && !output.contains(": { data:"),
         "Type annotations should be erased: {}",
         output
     );
@@ -14095,7 +14176,9 @@ for (const [k, v] of map.entries()) {
     );
     // Type annotations should be erased
     assert!(
-        !output.contains(": Entry[]") && !output.contains("interface Entry") && !output.contains(": [string, number][]"),
+        !output.contains(": Entry[]")
+            && !output.contains("interface Entry")
+            && !output.contains(": [string, number][]"),
         "Type annotations should be erased: {}",
         output
     );
@@ -14254,7 +14337,9 @@ const [left, right]: [string, string] = pair.values;
     );
     // Type aliases should be erased
     assert!(
-        !output.contains("type Point2D") && !output.contains("type Point3D") && !output.contains("type Result"),
+        !output.contains("type Point2D")
+            && !output.contains("type Point3D")
+            && !output.contains("type Result"),
         "Type aliases should be erased: {}",
         output
     );
@@ -14691,7 +14776,9 @@ function skipNegative(values: number[]): number[] {
 
     // Should contain the functions
     assert!(
-        output.contains("findFirst") && output.contains("sumUntil") && output.contains("skipNegative"),
+        output.contains("findFirst")
+            && output.contains("sumUntil")
+            && output.contains("skipNegative"),
         "Output should contain functions: {}",
         output
     );
@@ -14885,7 +14972,9 @@ class AsyncProcessor {
 
     // Should contain the functions
     assert!(
-        output.contains("processItems") && output.contains("collectResults") && output.contains("AsyncProcessor"),
+        output.contains("processItems")
+            && output.contains("collectResults")
+            && output.contains("AsyncProcessor"),
         "Output should contain functions: {}",
         output
     );
@@ -14958,7 +15047,9 @@ function processWithFinally(nums: number[]): number {
     );
     // Type annotations should be erased
     assert!(
-        !output.contains(": string[]") && !output.contains(": number[]") && !output.contains(": number"),
+        !output.contains(": string[]")
+            && !output.contains(": number[]")
+            && !output.contains(": number"),
         "Type annotations should be erased: {}",
         output
     );
@@ -15019,7 +15110,9 @@ function skipRows(data: string[][], skipValue: string): string[] {
     );
     // Type annotations should be erased
     assert!(
-        !output.contains(": number[][]") && !output.contains(": string[][]") && !output.contains(": boolean"),
+        !output.contains(": number[][]")
+            && !output.contains(": string[][]")
+            && !output.contains(": boolean"),
         "Type annotations should be erased: {}",
         output
     );
@@ -15261,7 +15354,9 @@ class AppComponent {
 
     // Should contain the class and decorators
     assert!(
-        output.contains("AppComponent") && output.contains("component") && output.contains("injectable"),
+        output.contains("AppComponent")
+            && output.contains("component")
+            && output.contains("injectable"),
         "Output should contain class and decorators: {}",
         output
     );
@@ -15348,7 +15443,9 @@ class Admin extends User {
     );
     // Type annotations should be erased
     assert!(
-        !output.contains(": number") && !output.contains(": string") && !output.contains(": string[]"),
+        !output.contains(": number")
+            && !output.contains(": string")
+            && !output.contains(": string[]"),
         "Type annotations should be erased: {}",
         output
     );
@@ -15535,7 +15632,9 @@ class ExtendedService extends BaseService {
     );
     // Type annotations should be erased
     assert!(
-        !output.contains(": string[]") && !output.contains(": void") && !output.contains(": boolean"),
+        !output.contains(": string[]")
+            && !output.contains(": void")
+            && !output.contains(": boolean"),
         "Type annotations should be erased: {}",
         output
     );
@@ -15596,7 +15695,9 @@ class EventHandler {
     );
     // Type annotations should be erased
     assert!(
-        !output.contains(": Map<") && !output.contains(": Function[]") && !output.contains(": void"),
+        !output.contains(": Map<")
+            && !output.contains(": Function[]")
+            && !output.contains(": void"),
         "Type annotations should be erased: {}",
         output
     );
@@ -15668,7 +15769,9 @@ class DataService {
     );
     // Type annotations should be erased
     assert!(
-        !output.contains(": string") && !output.contains(": number") && !output.contains("Promise<"),
+        !output.contains(": string")
+            && !output.contains(": number")
+            && !output.contains("Promise<"),
         "ES5 output should erase type annotations: {}",
         output
     );
@@ -16061,7 +16164,9 @@ class Admin extends User {
     );
     // Type annotations should be erased
     assert!(
-        !output.contains(": string") && !output.contains(": number") && !output.contains(": string[]"),
+        !output.contains(": string")
+            && !output.contains(": number")
+            && !output.contains(": string[]"),
         "Type annotations should be erased: {}",
         output
     );
@@ -17025,7 +17130,9 @@ async function consumeRange(): Promise<number[]> {
     );
     // Type annotations should be erased
     assert!(
-        !output.contains(": number") && !output.contains(": AsyncGenerator") && !output.contains(": Promise"),
+        !output.contains(": number")
+            && !output.contains(": AsyncGenerator")
+            && !output.contains(": Promise"),
         "Type annotations should be erased: {}",
         output
     );
@@ -17212,7 +17319,9 @@ async function conditionalLoad(condition: boolean): Promise<void> {
     );
     // Type annotations should be erased
     assert!(
-        !output.contains(": string") && !output.contains(": Promise") && !output.contains(": boolean"),
+        !output.contains(": string")
+            && !output.contains(": Promise")
+            && !output.contains(": boolean"),
         "Type annotations should be erased: {}",
         output
     );
@@ -17296,7 +17405,9 @@ export { currentUrl, baseDir, getModulePath };
 
     // Variables and function should be present
     assert!(
-        output.contains("currentUrl") && output.contains("baseDir") && output.contains("getModulePath"),
+        output.contains("currentUrl")
+            && output.contains("baseDir")
+            && output.contains("getModulePath"),
         "Output should contain variables and function: {}",
         output
     );
@@ -17706,7 +17817,9 @@ class ReadOnlyConfig extends BaseConfig {
 
     // All classes should be present
     assert!(
-        output.contains("BaseConfig") && output.contains("DerivedConfig") && output.contains("ReadOnlyConfig"),
+        output.contains("BaseConfig")
+            && output.contains("DerivedConfig")
+            && output.contains("ReadOnlyConfig"),
         "Output should contain all classes: {}",
         output
     );
@@ -17778,7 +17891,9 @@ fn test_parity_es5_private_instance_field_methods() {
     );
     // Should use private field helpers or WeakMap
     assert!(
-        output.contains("__classPrivateFieldGet") || output.contains("__classPrivateFieldSet") || output.contains("WeakMap"),
+        output.contains("__classPrivateFieldGet")
+            || output.contains("__classPrivateFieldSet")
+            || output.contains("WeakMap"),
         "ES5 output should use private field mechanism: {}",
         output
     );
@@ -17842,7 +17957,9 @@ fn test_parity_es5_private_static_field_complex() {
 
     // Class and methods should be present
     assert!(
-        output.contains("Logger") && output.contains("getInstance") && output.contains("setLogLevel"),
+        output.contains("Logger")
+            && output.contains("getInstance")
+            && output.contains("setLogLevel"),
         "Output should contain class and methods: {}",
         output
     );
@@ -18043,7 +18160,9 @@ fn test_parity_es5_static_block_complex_init_order() {
     );
     // Static properties should be present
     assert!(
-        output.contains("BASE_URL") && output.contains("API_VERSION") && output.contains("FULL_URL"),
+        output.contains("BASE_URL")
+            && output.contains("API_VERSION")
+            && output.contains("FULL_URL"),
         "Output should contain static properties: {}",
         output
     );
@@ -18173,7 +18292,9 @@ fn test_parity_es5_static_block_async_pattern() {
 
     // Class and methods should be present
     assert!(
-        output.contains("AsyncService") && output.contains("waitForInit") && output.contains("isReady"),
+        output.contains("AsyncService")
+            && output.contains("waitForInit")
+            && output.contains("isReady"),
         "Output should contain class and methods: {}",
         output
     );
@@ -18648,7 +18769,9 @@ class NestedDelegator {
 
     // All generator functions should be present
     assert!(
-        output.contains("innerGenerator") && output.contains("middleGenerator") && output.contains("outerGenerator"),
+        output.contains("innerGenerator")
+            && output.contains("middleGenerator")
+            && output.contains("outerGenerator"),
         "Output should contain all generator functions: {}",
         output
     );
@@ -18799,7 +18922,9 @@ const asyncInReduce = async (values: number[]): Promise<number> => {
 
     // Functions should be present
     assert!(
-        output.contains("processUsers") && output.contains("nestedAsync") && output.contains("asyncInReduce"),
+        output.contains("processUsers")
+            && output.contains("nestedAsync")
+            && output.contains("asyncInReduce"),
         "Output should contain async arrow functions: {}",
         output
     );
@@ -19407,7 +19532,9 @@ async function asyncMapProcess<K, V>(
 
     // Functions should be present
     assert!(
-        output.contains("processMap") && output.contains("setToArray") && output.contains("asyncMapProcess"),
+        output.contains("processMap")
+            && output.contains("setToArray")
+            && output.contains("asyncMapProcess"),
         "Output should contain functions: {}",
         output
     );
@@ -19506,7 +19633,9 @@ class ConfigurableService {
     );
     // Access modifiers should be erased
     assert!(
-        !output.contains("readonly ") && !output.contains("private ") && !output.contains("protected "),
+        !output.contains("readonly ")
+            && !output.contains("private ")
+            && !output.contains("protected "),
         "Access modifiers should be erased: {}",
         output
     );
@@ -19591,7 +19720,9 @@ class FormModel {
     );
     // Type annotations should be erased
     assert!(
-        !output.contains(": string") && !output.contains(": number") && !output.contains(": boolean"),
+        !output.contains(": string")
+            && !output.contains(": number")
+            && !output.contains(": boolean"),
         "Type annotations should be erased: {}",
         output
     );
@@ -19668,7 +19799,9 @@ class ComputedFromFunction {
     );
     // Type annotations should be erased
     assert!(
-        !output.contains(": number") && !output.contains(": string") && !output.contains(": unknown"),
+        !output.contains(": number")
+            && !output.contains(": string")
+            && !output.contains(": unknown"),
         "Type annotations should be erased: {}",
         output
     );
@@ -19744,8 +19877,10 @@ class Admin extends User {
 
     // All classes should be present
     assert!(
-        output.contains("BaseEntity") && output.contains("TimestampedEntity")
-            && output.contains("User") && output.contains("Admin"),
+        output.contains("BaseEntity")
+            && output.contains("TimestampedEntity")
+            && output.contains("User")
+            && output.contains("Admin"),
         "Output should contain all classes: {}",
         output
     );
@@ -19757,13 +19892,17 @@ class Admin extends User {
     );
     // Abstract and access modifiers should be erased
     assert!(
-        !output.contains("abstract ") && !output.contains("private ") && !output.contains("override "),
+        !output.contains("abstract ")
+            && !output.contains("private ")
+            && !output.contains("override "),
         "Modifiers should be erased: {}",
         output
     );
     // Type annotations should be erased
     assert!(
-        !output.contains(": Date") && !output.contains(": string[]") && !output.contains(": boolean"),
+        !output.contains(": Date")
+            && !output.contains(": string[]")
+            && !output.contains(": boolean"),
         "Type annotations should be erased: {}",
         output
     );
@@ -19985,7 +20124,9 @@ class Aggregator<T> {
 
     // Functions should be present
     assert!(
-        output.contains("variadicLogger") && output.contains("combiner") && output.contains("partialApply"),
+        output.contains("variadicLogger")
+            && output.contains("combiner")
+            && output.contains("partialApply"),
         "Output should contain functions: {}",
         output
     );
@@ -20607,7 +20748,9 @@ async function batchProcess<T, R>(
 
     // Functions should be present
     assert!(
-        output.contains("executeWithRetry") && output.contains("logErrors") && output.contains("batchProcess"),
+        output.contains("executeWithRetry")
+            && output.contains("logErrors")
+            && output.contains("batchProcess"),
         "Output should contain functions: {}",
         output
     );
@@ -21063,7 +21206,9 @@ const optionalMap = <T, U>(
 
     // Functions should be present
     assert!(
-        output.contains("getValue") && output.contains("getNestedValue") && output.contains("transformValue"),
+        output.contains("getValue")
+            && output.contains("getNestedValue")
+            && output.contains("transformValue"),
         "Output should contain functions: {}",
         output
     );
@@ -21260,7 +21405,9 @@ class ExpressionProcessor {
 
     // Functions should be present
     assert!(
-        output.contains("getComputedValue") && output.contains("complexDefault") && output.contains("conditionalNullish"),
+        output.contains("getComputedValue")
+            && output.contains("complexDefault")
+            && output.contains("conditionalNullish"),
         "Output should contain functions: {}",
         output
     );
@@ -21355,7 +21502,9 @@ class ConfigManager {
     );
     // Methods should be present
     assert!(
-        output.contains("getOrCompute") && output.contains("getString") && output.contains("getNumber"),
+        output.contains("getOrCompute")
+            && output.contains("getString")
+            && output.contains("getNumber"),
         "Output should contain methods: {}",
         output
     );
@@ -21446,7 +21595,9 @@ class ResolverChain<T> {
 
     // Functions should be present
     assert!(
-        output.contains("resolveWithDefault") && output.contains("chainResolvers") && output.contains("asyncResolve"),
+        output.contains("resolveWithDefault")
+            && output.contains("chainResolvers")
+            && output.contains("asyncResolve"),
         "Output should contain functions: {}",
         output
     );
@@ -21832,7 +21983,9 @@ const isLess: boolean = comp1.lessThan(200n);
     );
     // Type annotations should be erased
     assert!(
-        !output.contains(": bigint") && !output.contains(": boolean") && !output.contains(": number"),
+        !output.contains(": bigint")
+            && !output.contains(": boolean")
+            && !output.contains(": number"),
         "Type annotations should be erased: {}",
         output
     );
@@ -25059,7 +25212,8 @@ class UserRepository {
     );
     // Interfaces should be erased
     assert!(
-        !output.contains("interface ParameterDecorator") && !output.contains("interface DatabaseConnection"),
+        !output.contains("interface ParameterDecorator")
+            && !output.contains("interface DatabaseConnection"),
         "Interfaces should be erased: {}",
         output
     );
@@ -25178,13 +25332,16 @@ const user = new UserEntity(1, "John");
     );
     // Decorator functions should be present
     assert!(
-        output.contains("function entity") && output.contains("function logged") && output.contains("function validated"),
+        output.contains("function entity")
+            && output.contains("function logged")
+            && output.contains("function validated"),
         "Decorator functions should be present: {}",
         output
     );
     // Interfaces should be erased
     assert!(
-        !output.contains("interface ClassDecorator") && !output.contains("interface MethodDecorator"),
+        !output.contains("interface ClassDecorator")
+            && !output.contains("interface MethodDecorator"),
         "Interfaces should be erased: {}",
         output
     );
@@ -25308,7 +25465,9 @@ const widget = new Widget({});
     );
     // Decorator functions should be present
     assert!(
-        output.contains("function component") && output.contains("function input") && output.contains("function autobind"),
+        output.contains("function component")
+            && output.contains("function input")
+            && output.contains("function autobind"),
         "Decorator functions should be present: {}",
         output
     );
@@ -25326,7 +25485,9 @@ const widget = new Widget({});
     );
     // Type annotations should be erased
     assert!(
-        !output.contains(": string") && !output.contains(": number") && !output.contains(": Function"),
+        !output.contains(": string")
+            && !output.contains(": number")
+            && !output.contains(": Function"),
         "Type annotations should be erased: {}",
         output
     );
@@ -25529,7 +25690,9 @@ const client2 = new ApiClient({ timeout: 10000 });
     );
     // Type annotations should be erased
     assert!(
-        !output.contains(": number") && !output.contains(": Config") && !output.contains(": ApiClient[]"),
+        !output.contains(": number")
+            && !output.contains(": Config")
+            && !output.contains(": ApiClient[]"),
         "Type annotations should be erased: {}",
         output
     );
@@ -25748,7 +25911,9 @@ const rect = new Rectangle(10, 20);
     );
     // Type annotations should be erased
     assert!(
-        !output.contains(": number") && !output.contains(": Dimensions") && !output.contains(": void"),
+        !output.contains(": number")
+            && !output.contains(": Dimensions")
+            && !output.contains(": void"),
         "Type annotations should be erased: {}",
         output
     );
@@ -26012,7 +26177,9 @@ const collection = new PrivateCollection<NumberWrapper>(50);
     );
     // Generic type parameters should be erased
     assert!(
-        !output.contains("<T extends") && !output.contains("<T>") && !output.contains("<NumberWrapper>"),
+        !output.contains("<T extends")
+            && !output.contains("<T>")
+            && !output.contains("<NumberWrapper>"),
         "Generic type parameters should be erased: {}",
         output
     );
@@ -26334,7 +26501,9 @@ const counter2 = UpDownCounter.create();
     );
     // Private/protected/readonly modifiers should be erased
     assert!(
-        !output.contains("private static") && !output.contains("protected static") && !output.contains("readonly MAX"),
+        !output.contains("private static")
+            && !output.contains("protected static")
+            && !output.contains("readonly MAX"),
         "Access modifiers should be erased: {}",
         output
     );
@@ -26426,8 +26595,10 @@ const button = new Button("Submit");
 
     // All classes should be present
     assert!(
-        output.contains("Component") && output.contains("UIComponent") &&
-        output.contains("InteractiveComponent") && output.contains("Button"),
+        output.contains("Component")
+            && output.contains("UIComponent")
+            && output.contains("InteractiveComponent")
+            && output.contains("Button"),
         "All classes should be present: {}",
         output
     );
@@ -26694,7 +26865,9 @@ const userEntity = new UserEntity();
     );
     // Protected/private/readonly modifiers should be erased
     assert!(
-        !output.contains("protected static") && !output.contains("private static") && !output.contains("readonly VERSION"),
+        !output.contains("protected static")
+            && !output.contains("private static")
+            && !output.contains("readonly VERSION"),
         "Access modifiers should be erased: {}",
         output
     );
@@ -27048,7 +27221,9 @@ const widget = new Widget("MyWidget", 100, 200);
     );
     // Mixin functions should be present
     assert!(
-        output.contains("Loggable") && output.contains("Disposable") && output.contains("Activatable"),
+        output.contains("Loggable")
+            && output.contains("Disposable")
+            && output.contains("Activatable"),
         "Mixin functions should be present: {}",
         output
     );
@@ -27533,7 +27708,9 @@ const user = new UserModel("user-1");
     );
     // Mixin functions should be present
     assert!(
-        output.contains("EventEmitter") && output.contains("Observable") && output.contains("Validatable"),
+        output.contains("EventEmitter")
+            && output.contains("Observable")
+            && output.contains("Validatable"),
         "Mixin functions should be present: {}",
         output
     );
@@ -27801,7 +27978,9 @@ class KeyValueStore<K extends string | number, V extends object> {
 
     // Classes should be present
     assert!(
-        output.contains("SortedList") && output.contains("Repository") && output.contains("KeyValueStore"),
+        output.contains("SortedList")
+            && output.contains("Repository")
+            && output.contains("KeyValueStore"),
         "Classes should be present: {}",
         output
     );
@@ -27904,7 +28083,9 @@ class CachedRepository<T, ID> extends BaseRepository<T, ID> {
 
     // Classes should be present
     assert!(
-        output.contains("BaseRepository") && output.contains("UserRepository") && output.contains("CachedRepository"),
+        output.contains("BaseRepository")
+            && output.contains("UserRepository")
+            && output.contains("CachedRepository"),
         "Classes should be present: {}",
         output
     );
@@ -28006,13 +28187,17 @@ const map2 = new TypedMap<number, boolean>();
 
     // Classes should be present
     assert!(
-        output.contains("EventEmitter") && output.contains("TypedMap") && output.contains("ConfigStore"),
+        output.contains("EventEmitter")
+            && output.contains("TypedMap")
+            && output.contains("ConfigStore"),
         "Classes should be present: {}",
         output
     );
     // Generic type parameters with defaults should be erased
     assert!(
-        !output.contains("<T = any>") && !output.contains("<K = string") && !output.contains("<T extends object ="),
+        !output.contains("<T = any>")
+            && !output.contains("<K = string")
+            && !output.contains("<T extends object ="),
         "Generic type parameters with defaults should be erased: {}",
         output
     );
@@ -28123,7 +28308,10 @@ class Pipeline<TInput, TOutput = TInput> {
 
     // Classes should be present
     assert!(
-        output.contains("BaseService") && output.contains("CompositeService") && output.contains("GenericFactory") && output.contains("Pipeline"),
+        output.contains("BaseService")
+            && output.contains("CompositeService")
+            && output.contains("GenericFactory")
+            && output.contains("Pipeline"),
         "Classes should be present: {}",
         output
     );
@@ -28153,7 +28341,9 @@ class Pipeline<TInput, TOutput = TInput> {
     );
     // Generic type parameters should be erased
     assert!(
-        !output.contains("<T extends Entity") && !output.contains("<TInput,") && !output.contains("<T extends new"),
+        !output.contains("<T extends Entity")
+            && !output.contains("<TInput,")
+            && !output.contains("<T extends new"),
         "Generic type parameters should be erased: {}",
         output
     );
@@ -28219,13 +28409,17 @@ const [r, g, b] = color;
 
     // Functions should be present
     assert!(
-        output.contains("createPoint") && output.contains("getColor") && output.contains("processEntry"),
+        output.contains("createPoint")
+            && output.contains("getColor")
+            && output.contains("processEntry"),
         "Functions should be present: {}",
         output
     );
     // Type aliases should be erased
     assert!(
-        !output.contains("type Point") && !output.contains("type RGB") && !output.contains("type NameAge"),
+        !output.contains("type Point")
+            && !output.contains("type RGB")
+            && !output.contains("type NameAge"),
         "Type aliases should be erased: {}",
         output
     );
@@ -28300,7 +28494,9 @@ const full: OptionalTuple = ["test", 42, true];
 
     // Functions and class should be present
     assert!(
-        output.contains("processOptional") && output.contains("createConfig") && output.contains("TupleHandler"),
+        output.contains("processOptional")
+            && output.contains("createConfig")
+            && output.contains("TupleHandler"),
         "Functions and class should be present: {}",
         output
     );
@@ -28376,13 +28572,17 @@ const tuple2: StringNumbers = ["value", 1, 2, 3, 4, 5];
 
     // Functions and class should be present
     assert!(
-        output.contains("logStringsAndNumbers") && output.contains("processRestTuple") && output.contains("RestTupleProcessor"),
+        output.contains("logStringsAndNumbers")
+            && output.contains("processRestTuple")
+            && output.contains("RestTupleProcessor"),
         "Functions and class should be present: {}",
         output
     );
     // Type aliases should be erased
     assert!(
-        !output.contains("type StringNumberBooleans") && !output.contains("type StringNumbers") && !output.contains("type Unbounded"),
+        !output.contains("type StringNumberBooleans")
+            && !output.contains("type StringNumbers")
+            && !output.contains("type Unbounded"),
         "Type aliases should be erased: {}",
         output
     );
@@ -28453,13 +28653,17 @@ const user: Person = ["John", 25, "john@example.com"];
 
     // Functions and class should be present
     assert!(
-        output.contains("createCoordinate") && output.contains("formatPerson") && output.contains("RangeCalculator"),
+        output.contains("createCoordinate")
+            && output.contains("formatPerson")
+            && output.contains("RangeCalculator"),
         "Functions and class should be present: {}",
         output
     );
     // Type aliases should be erased
     assert!(
-        !output.contains("type Coordinate") && !output.contains("type Person") && !output.contains("type Range"),
+        !output.contains("type Coordinate")
+            && !output.contains("type Person")
+            && !output.contains("type Range"),
         "Type aliases should be erased: {}",
         output
     );
@@ -28539,13 +28743,18 @@ const withPrefix = prepend("start", [1, 2, 3]);
 
     // Functions should be present
     assert!(
-        output.contains("concat") && output.contains("prepend") && output.contains("append") && output.contains("tail"),
+        output.contains("concat")
+            && output.contains("prepend")
+            && output.contains("append")
+            && output.contains("tail"),
         "Functions should be present: {}",
         output
     );
     // Type aliases should be erased
     assert!(
-        !output.contains("type Concat") && !output.contains("type Prepend") && !output.contains("type Tail"),
+        !output.contains("type Concat")
+            && !output.contains("type Prepend")
+            && !output.contains("type Tail"),
         "Type aliases should be erased: {}",
         output
     );
@@ -28557,7 +28766,9 @@ const withPrefix = prepend("start", [1, 2, 3]);
     );
     // Return type annotations should be erased
     assert!(
-        !output.contains("): Concat<") && !output.contains("): Prepend<") && !output.contains("): Tail<"),
+        !output.contains("): Concat<")
+            && !output.contains("): Prepend<")
+            && !output.contains("): Tail<"),
         "Return type annotations should be erased: {}",
         output
     );
@@ -28636,13 +28847,17 @@ async function fetchData(): Promise<AsyncResult<object>> {
 
     // Classes and functions should be present
     assert!(
-        output.contains("BaseProcessor") && output.contains("DataProcessor") && output.contains("paginate"),
+        output.contains("BaseProcessor")
+            && output.contains("DataProcessor")
+            && output.contains("paginate"),
         "Classes and functions should be present: {}",
         output
     );
     // Type aliases should be erased
     assert!(
-        !output.contains("type EventData") && !output.contains("type AsyncResult") && !output.contains("type PaginatedResult"),
+        !output.contains("type EventData")
+            && !output.contains("type AsyncResult")
+            && !output.contains("type PaginatedResult"),
         "Type aliases should be erased: {}",
         output
     );
@@ -28749,19 +28964,25 @@ const status: Status = "pending";
 
     // Functions and class should be present
     assert!(
-        output.contains("formatValue") && output.contains("getStatus") && output.contains("UnionHandler"),
+        output.contains("formatValue")
+            && output.contains("getStatus")
+            && output.contains("UnionHandler"),
         "Functions and class should be present: {}",
         output
     );
     // Type aliases should be erased
     assert!(
-        !output.contains("type StringOrNumber") && !output.contains("type Primitive") && !output.contains("type Status"),
+        !output.contains("type StringOrNumber")
+            && !output.contains("type Primitive")
+            && !output.contains("type Status"),
         "Type aliases should be erased: {}",
         output
     );
     // Union type annotations should be erased
     assert!(
-        !output.contains(": StringOrNumber") && !output.contains(": Status") && !output.contains(": Primitive"),
+        !output.contains(": StringOrNumber")
+            && !output.contains(": Status")
+            && !output.contains(": Primitive"),
         "Union type annotations should be erased: {}",
         output
     );
@@ -28845,13 +29066,17 @@ const rect: Rectangle = { kind: "rectangle", width: 10, height: 20 };
 
     // Functions and class should be present
     assert!(
-        output.contains("getArea") && output.contains("isCircle") && output.contains("ShapeProcessor"),
+        output.contains("getArea")
+            && output.contains("isCircle")
+            && output.contains("ShapeProcessor"),
         "Functions and class should be present: {}",
         output
     );
     // Interfaces should be erased
     assert!(
-        !output.contains("interface Circle") && !output.contains("interface Rectangle") && !output.contains("interface Triangle"),
+        !output.contains("interface Circle")
+            && !output.contains("interface Rectangle")
+            && !output.contains("interface Triangle"),
         "Interfaces should be erased: {}",
         output
     );
@@ -28943,19 +29168,25 @@ const fullContact: FullContact = { name: "Bob", age: 25, email: "bob@example.com
 
     // Functions and class should be present
     assert!(
-        output.contains("greet") && output.contains("sendEmail") && output.contains("ContactManager"),
+        output.contains("greet")
+            && output.contains("sendEmail")
+            && output.contains("ContactManager"),
         "Functions and class should be present: {}",
         output
     );
     // Interfaces should be erased
     assert!(
-        !output.contains("interface Named") && !output.contains("interface Aged") && !output.contains("interface Emailable"),
+        !output.contains("interface Named")
+            && !output.contains("interface Aged")
+            && !output.contains("interface Emailable"),
         "Interfaces should be erased: {}",
         output
     );
     // Type aliases should be erased
     assert!(
-        !output.contains("type Person") && !output.contains("type Contact") && !output.contains("type FullContact"),
+        !output.contains("type Person")
+            && !output.contains("type Contact")
+            && !output.contains("type FullContact"),
         "Type aliases should be erased: {}",
         output
     );
@@ -29038,13 +29269,17 @@ const maybe: Maybe<boolean> = true;
 
     // Functions and class should be present
     assert!(
-        output.contains("getValue") && output.contains("handleMaybe") && output.contains("NullableContainer"),
+        output.contains("getValue")
+            && output.contains("handleMaybe")
+            && output.contains("NullableContainer"),
         "Functions and class should be present: {}",
         output
     );
     // Type aliases should be erased
     assert!(
-        !output.contains("type Nullable") && !output.contains("type Optional") && !output.contains("type Maybe"),
+        !output.contains("type Nullable")
+            && !output.contains("type Optional")
+            && !output.contains("type Maybe"),
         "Type aliases should be erased: {}",
         output
     );
@@ -29156,7 +29391,9 @@ const user: SerializableEntity = new User("Alice", "alice@example.com");
     );
     // Type aliases should be erased
     assert!(
-        !output.contains("type Entity") && !output.contains("type SerializableEntity") && !output.contains("type WithMethods"),
+        !output.contains("type Entity")
+            && !output.contains("type SerializableEntity")
+            && !output.contains("type WithMethods"),
         "Type aliases should be erased: {}",
         output
     );
@@ -29276,19 +29513,25 @@ const service: Instrumented<{ name: string }> = {
 
     // Functions and class should be present
     assert!(
-        output.contains("isSuccess") && output.contains("fetchData") && output.contains("InstrumentedService"),
+        output.contains("isSuccess")
+            && output.contains("fetchData")
+            && output.contains("InstrumentedService"),
         "Functions and class should be present: {}",
         output
     );
     // Interfaces should be erased
     assert!(
-        !output.contains("interface Success") && !output.contains("interface Failure") && !output.contains("interface Logger"),
+        !output.contains("interface Success")
+            && !output.contains("interface Failure")
+            && !output.contains("interface Logger"),
         "Interfaces should be erased: {}",
         output
     );
     // Type aliases should be erased
     assert!(
-        !output.contains("type Result") && !output.contains("type AsyncResult") && !output.contains("type Instrumented"),
+        !output.contains("type Result")
+            && !output.contains("type AsyncResult")
+            && !output.contains("type Instrumented"),
         "Type aliases should be erased: {}",
         output
     );
@@ -29413,7 +29656,9 @@ const nonNullValues = values.filter(isNonNull);
     );
     // Type predicates should be erased
     assert!(
-        !output.contains("animal is Cat") && !output.contains("animal is Dog") && !output.contains("value is T"),
+        !output.contains("animal is Cat")
+            && !output.contains("animal is Dog")
+            && !output.contains("value is T"),
         "Type predicates should be erased: {}",
         output
     );
@@ -29504,7 +29749,9 @@ function processValue(value: string | number | object): void {
 
     // Functions and class should be present
     assert!(
-        output.contains("isString") && output.contains("formatPrimitive") && output.contains("TypeChecker"),
+        output.contains("isString")
+            && output.contains("formatPrimitive")
+            && output.contains("TypeChecker"),
         "Functions and class should be present: {}",
         output
     );
@@ -29626,13 +29873,18 @@ function handleError(e: unknown): string {
 
     // Classes and functions should be present
     assert!(
-        output.contains("Animal") && output.contains("Dog") && output.contains("Cat") && output.contains("AnimalProcessor"),
+        output.contains("Animal")
+            && output.contains("Dog")
+            && output.contains("Cat")
+            && output.contains("AnimalProcessor"),
         "Classes and functions should be present: {}",
         output
     );
     // Type predicates should be erased
     assert!(
-        !output.contains("animal is Dog") && !output.contains("animal is Cat") && !output.contains("a is Dog"),
+        !output.contains("animal is Dog")
+            && !output.contains("animal is Cat")
+            && !output.contains("a is Dog"),
         "Type predicates should be erased: {}",
         output
     );
@@ -29741,7 +29993,9 @@ function hasName<T>(obj: T): obj is T & WithName {
 
     // Functions and class should be present
     assert!(
-        output.contains("isFish") && output.contains("isBird") && output.contains("CreatureHandler"),
+        output.contains("isFish")
+            && output.contains("isBird")
+            && output.contains("CreatureHandler"),
         "Functions and class should be present: {}",
         output
     );
@@ -29857,7 +30111,9 @@ function processNumber(value: unknown): number {
 
     // Functions and class should be present
     assert!(
-        output.contains("assertIsString") && output.contains("assertIsDefined") && output.contains("Validator"),
+        output.contains("assertIsString")
+            && output.contains("assertIsDefined")
+            && output.contains("Validator"),
         "Functions and class should be present: {}",
         output
     );
@@ -29988,7 +30244,9 @@ function narrowUnion(value: string | number | boolean | object | null): string {
 
     // Functions and class should be present
     assert!(
-        output.contains("isSuccessResponse") && output.contains("assertSuccess") && output.contains("ApiClient"),
+        output.contains("isSuccessResponse")
+            && output.contains("assertSuccess")
+            && output.contains("ApiClient"),
         "Functions and class should be present: {}",
         output
     );
@@ -30265,7 +30523,9 @@ const counterReducer = ((state: number, action: { type: string }) => {
 
     // Variables should be present
     assert!(
-        output.contains("handler") && output.contains("arrowHandler") && output.contains("handlers"),
+        output.contains("handler")
+            && output.contains("arrowHandler")
+            && output.contains("handlers"),
         "Variables should be present: {}",
         output
     );
@@ -30475,7 +30735,9 @@ const options = {
     );
     // satisfies keyword should be erased
     assert!(
-        !output.contains("satisfies ButtonConfig") && !output.contains("satisfies FormConfig") && !output.contains("satisfies Logger"),
+        !output.contains("satisfies ButtonConfig")
+            && !output.contains("satisfies FormConfig")
+            && !output.contains("satisfies Logger"),
         "satisfies keyword should be erased: {}",
         output
     );
@@ -30574,7 +30836,9 @@ async function fetchData<T>(): Promise<State<T>> {
 
     // Variables should be present
     assert!(
-        output.contains("api") && output.contains("initialState") && output.contains("emailValidator"),
+        output.contains("api")
+            && output.contains("initialState")
+            && output.contains("emailValidator"),
         "Variables should be present: {}",
         output
     );
@@ -30586,19 +30850,25 @@ async function fetchData<T>(): Promise<State<T>> {
     );
     // Interfaces should be erased
     assert!(
-        !output.contains("interface ApiEndpoint") && !output.contains("interface State") && !output.contains("interface Component"),
+        !output.contains("interface ApiEndpoint")
+            && !output.contains("interface State")
+            && !output.contains("interface Component"),
         "Interfaces should be erased: {}",
         output
     );
     // Type aliases should be erased
     assert!(
-        !output.contains("type ApiRoutes") && !output.contains("type UserState") && !output.contains("type Validator"),
+        !output.contains("type ApiRoutes")
+            && !output.contains("type UserState")
+            && !output.contains("type Validator"),
         "Type aliases should be erased: {}",
         output
     );
     // satisfies keyword should be erased
     assert!(
-        !output.contains("satisfies ApiRoutes") && !output.contains("satisfies UserState") && !output.contains("satisfies Validator"),
+        !output.contains("satisfies ApiRoutes")
+            && !output.contains("satisfies UserState")
+            && !output.contains("satisfies Validator"),
         "satisfies keyword should be erased: {}",
         output
     );
@@ -30761,7 +31031,9 @@ const single = ["only"] as const;
     );
     // Type aliases should be erased
     assert!(
-        !output.contains("type Colors") && !output.contains("type ColorItem") && !output.contains("type TupleType"),
+        !output.contains("type Colors")
+            && !output.contains("type ColorItem")
+            && !output.contains("type TupleType"),
         "Type aliases should be erased: {}",
         output
     );
@@ -30834,7 +31106,9 @@ const arrayOfObjects = [
 
     // Variables should be present
     assert!(
-        output.contains("deepConfig") && output.contains("routes") && output.contains("arrayOfObjects"),
+        output.contains("deepConfig")
+            && output.contains("routes")
+            && output.contains("arrayOfObjects"),
         "Variables should be present: {}",
         output
     );
@@ -31019,7 +31293,9 @@ function* generatorConfig() {
 
     // Functions and class should be present
     assert!(
-        output.contains("getConfig") && output.contains("getColors") && output.contains("ConfigFactory"),
+        output.contains("getConfig")
+            && output.contains("getColors")
+            && output.contains("ConfigFactory"),
         "Functions and class should be present: {}",
         output
     );
@@ -31119,7 +31395,9 @@ function getCode<K extends keyof typeof lookup.codes>(key: K): typeof lookup.cod
 
     // Variables, functions and class should be present
     assert!(
-        output.contains("ACTIONS") && output.contains("PERMISSIONS") && output.contains("ActionHandler"),
+        output.contains("ACTIONS")
+            && output.contains("PERMISSIONS")
+            && output.contains("ActionHandler"),
         "Variables, functions and class should be present: {}",
         output
     );
@@ -31131,7 +31409,9 @@ function getCode<K extends keyof typeof lookup.codes>(key: K): typeof lookup.cod
     );
     // Type aliases should be erased
     assert!(
-        !output.contains("type ActionType") && !output.contains("type Permission") && !output.contains("type DefaultUserType"),
+        !output.contains("type ActionType")
+            && !output.contains("type Permission")
+            && !output.contains("type DefaultUserType"),
         "Type aliases should be erased: {}",
         output
     );
@@ -31193,7 +31473,9 @@ const key: Key = "test_key";
     );
     // Type aliases should be erased
     assert!(
-        !output.contains("type Greeting") && !output.contains("type Id") && !output.contains("type Key"),
+        !output.contains("type Greeting")
+            && !output.contains("type Id")
+            && !output.contains("type Key"),
         "Type aliases should be erased: {}",
         output
     );

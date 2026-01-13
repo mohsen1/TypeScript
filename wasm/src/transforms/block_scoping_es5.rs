@@ -31,7 +31,7 @@
 //! ```
 
 use crate::parser::thin_node::{ThinNode, ThinNodeArena};
-use crate::parser::{syntax_kind_ext, NodeIndex};
+use crate::parser::{NodeIndex, syntax_kind_ext};
 use crate::scanner::SyntaxKind;
 use rustc_hash::FxHashSet;
 use std::collections::HashMap;
@@ -69,7 +69,9 @@ impl BlockScopeState {
     /// Returns the name to emit (may be renamed if shadowing)
     pub fn register_variable(&mut self, original_name: &str) -> String {
         // Check if this name exists in any parent scope (shadowing)
-        let needs_rename = self.scope_stack.iter()
+        let needs_rename = self
+            .scope_stack
+            .iter()
             .any(|scope| scope.contains_key(original_name));
 
         let emitted_name = if needs_rename {
@@ -292,7 +294,9 @@ fn visit_children<F: FnMut(NodeIndex)>(arena: &ThinNodeArena, node: &ThinNode, m
 pub fn collect_loop_vars(arena: &ThinNodeArena, initializer_idx: NodeIndex) -> Vec<String> {
     let mut vars = Vec::new();
 
-    let Some(node) = arena.get(initializer_idx) else { return vars };
+    let Some(node) = arena.get(initializer_idx) else {
+        return vars;
+    };
 
     // Initializer can be VARIABLE_DECLARATION_LIST or expression
     if node.kind == syntax_kind_ext::VARIABLE_DECLARATION_LIST {

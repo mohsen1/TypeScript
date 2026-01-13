@@ -1,5 +1,5 @@
 use super::*;
-use crate::solver::{instantiate_type, TypeSubstitution};
+use crate::solver::{TypeSubstitution, instantiate_type};
 
 #[test]
 fn test_conditional_true_branch() {
@@ -124,7 +124,7 @@ fn test_rest_unknown_bivariant_conditional_evaluate_strict() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let source = interner.function(FunctionShape {
@@ -139,7 +139,7 @@ fn test_rest_unknown_bivariant_conditional_evaluate_strict() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let lit_true = interner.literal_boolean(true);
@@ -1311,7 +1311,7 @@ fn test_conditional_infer_object_property_function_return_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let extends_obj = interner.object(vec![PropertyInfo {
         name: interner.intern_string("a"),
@@ -1338,7 +1338,7 @@ fn test_conditional_infer_object_property_function_return_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let number_fn = interner.function(FunctionShape {
         params: Vec::new(),
@@ -1347,7 +1347,7 @@ fn test_conditional_infer_object_property_function_return_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let obj_string = interner.object(vec![PropertyInfo {
         name: interner.intern_string("a"),
@@ -2009,7 +2009,8 @@ fn test_conditional_infer_template_literal_with_middle_constrained_non_distribut
 }
 
 #[test]
-fn test_conditional_infer_template_literal_with_middle_non_distributive_non_matching_union_branch() {
+fn test_conditional_infer_template_literal_with_middle_non_distributive_non_matching_union_branch()
+{
     let interner = TypeInterner::new();
 
     let t_name = interner.intern_string("T");
@@ -2116,7 +2117,8 @@ fn test_conditional_infer_template_literal_with_middle_non_distributive_non_stri
 }
 
 #[test]
-fn test_conditional_infer_template_literal_with_middle_non_distributive_non_string_template_union_branch() {
+fn test_conditional_infer_template_literal_with_middle_non_distributive_non_string_template_union_branch()
+ {
     let interner = TypeInterner::new();
 
     let t_name = interner.intern_string("T");
@@ -2164,7 +2166,10 @@ fn test_conditional_infer_template_literal_with_middle_non_distributive_non_stri
         TemplateSpan::Type(TypeId::STRING),
         TemplateSpan::Text(interner.intern_string("bar")),
     ]);
-    subst.insert(t_name, interner.union(vec![middle_template, TypeId::NUMBER]));
+    subst.insert(
+        t_name,
+        interner.union(vec![middle_template, TypeId::NUMBER]),
+    );
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
@@ -2468,7 +2473,8 @@ fn test_conditional_infer_template_literal_with_suffix_non_distributive_union_br
 }
 
 #[test]
-fn test_conditional_infer_template_literal_with_suffix_non_distributive_non_matching_union_branch() {
+fn test_conditional_infer_template_literal_with_suffix_non_distributive_non_matching_union_branch()
+{
     let interner = TypeInterner::new();
 
     let t_name = interner.intern_string("T");
@@ -2573,7 +2579,8 @@ fn test_conditional_infer_template_literal_with_suffix_non_distributive_non_stri
 }
 
 #[test]
-fn test_conditional_infer_template_literal_with_suffix_non_distributive_non_string_template_union_branch() {
+fn test_conditional_infer_template_literal_with_suffix_non_distributive_non_string_template_union_branch()
+ {
     let interner = TypeInterner::new();
 
     let t_name = interner.intern_string("T");
@@ -2619,7 +2626,10 @@ fn test_conditional_infer_template_literal_with_suffix_non_distributive_non_stri
         TemplateSpan::Type(TypeId::STRING),
         TemplateSpan::Text(interner.intern_string("bar")),
     ]);
-    subst.insert(t_name, interner.union(vec![suffix_template, TypeId::NUMBER]));
+    subst.insert(
+        t_name,
+        interner.union(vec![suffix_template, TypeId::NUMBER]),
+    );
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
@@ -2848,7 +2858,8 @@ fn test_conditional_infer_template_literal_with_prefix_non_distributive_union_br
 }
 
 #[test]
-fn test_conditional_infer_template_literal_with_prefix_non_distributive_non_matching_union_branch() {
+fn test_conditional_infer_template_literal_with_prefix_non_distributive_non_matching_union_branch()
+{
     let interner = TypeInterner::new();
 
     let t_name = interner.intern_string("T");
@@ -3063,7 +3074,8 @@ fn test_conditional_infer_template_literal_with_prefix_constrained_non_distribut
 }
 
 #[test]
-fn test_conditional_infer_template_literal_two_infers_with_constraint_non_distributive_union_input() {
+fn test_conditional_infer_template_literal_two_infers_with_constraint_non_distributive_union_input()
+{
     let interner = TypeInterner::new();
 
     let t_name = interner.intern_string("T");
@@ -3130,7 +3142,8 @@ fn test_conditional_infer_template_literal_two_infers_with_constraint_non_distri
 }
 
 #[test]
-fn test_conditional_infer_template_literal_two_infers_with_constraint_non_distributive_non_matching_union_branch() {
+fn test_conditional_infer_template_literal_two_infers_with_constraint_non_distributive_non_matching_union_branch()
+ {
     let interner = TypeInterner::new();
 
     let t_name = interner.intern_string("T");
@@ -3191,7 +3204,8 @@ fn test_conditional_infer_template_literal_two_infers_with_constraint_non_distri
 }
 
 #[test]
-fn test_conditional_infer_template_literal_two_infers_with_constraint_non_distributive_union_branch() {
+fn test_conditional_infer_template_literal_two_infers_with_constraint_non_distributive_union_branch()
+ {
     let interner = TypeInterner::new();
 
     let t_name = interner.intern_string("T");
@@ -3966,8 +3980,7 @@ fn test_conditional_infer_nested_object_property_readonly_wrapper() {
         readonly: false,
         is_method: false,
     }]);
-    let extends_inner =
-        interner.intern(TypeKey::ReadonlyType(extends_inner_obj));
+    let extends_inner = interner.intern(TypeKey::ReadonlyType(extends_inner_obj));
     let extends_obj = interner.object(vec![PropertyInfo {
         name: interner.intern_string("a"),
         type_id: extends_inner,
@@ -3994,8 +4007,7 @@ fn test_conditional_infer_nested_object_property_readonly_wrapper() {
         readonly: false,
         is_method: false,
     }]);
-    let obj_a_string =
-        interner.intern(TypeKey::ReadonlyType(obj_a_string_inner));
+    let obj_a_string = interner.intern(TypeKey::ReadonlyType(obj_a_string_inner));
     let obj_a_number = interner.object(vec![PropertyInfo {
         name: interner.intern_string("b"),
         type_id: TypeId::NUMBER,
@@ -5268,7 +5280,7 @@ fn test_conditional_infer_function_param_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let cond = ConditionalType {
         check_type: t_param,
@@ -5292,7 +5304,7 @@ fn test_conditional_infer_function_param_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let number_fn = interner.function(FunctionShape {
         params: vec![ParamInfo {
@@ -5306,7 +5318,7 @@ fn test_conditional_infer_function_param_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     subst.insert(t_name, interner.union(vec![string_fn, number_fn]));
 
@@ -5349,7 +5361,7 @@ fn test_conditional_infer_function_optional_param_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let cond = ConditionalType {
         check_type: t_param,
@@ -5373,7 +5385,7 @@ fn test_conditional_infer_function_optional_param_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let number_fn = interner.function(FunctionShape {
         params: vec![ParamInfo {
@@ -5387,7 +5399,7 @@ fn test_conditional_infer_function_optional_param_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     subst.insert(t_name, interner.union(vec![string_fn, number_fn]));
 
@@ -5430,7 +5442,7 @@ fn test_conditional_infer_function_optional_param_non_distributive_union_input()
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let cond = ConditionalType {
         check_type: interner.tuple(vec![TupleElement {
@@ -5464,7 +5476,7 @@ fn test_conditional_infer_function_optional_param_non_distributive_union_input()
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let number_fn = interner.function(FunctionShape {
         params: vec![ParamInfo {
@@ -5478,7 +5490,7 @@ fn test_conditional_infer_function_optional_param_non_distributive_union_input()
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     subst.insert(t_name, interner.union(vec![string_fn, number_fn]));
 
@@ -5520,7 +5532,7 @@ fn test_conditional_infer_function_param_non_function_union_branch() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let cond = ConditionalType {
         check_type: t_param,
@@ -5544,7 +5556,7 @@ fn test_conditional_infer_function_param_non_function_union_branch() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     subst.insert(t_name, interner.union(vec![string_fn, TypeId::NUMBER]));
 
@@ -5586,7 +5598,7 @@ fn test_conditional_infer_function_param_non_distributive_union_input() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let cond = ConditionalType {
         check_type: interner.tuple(vec![TupleElement {
@@ -5620,7 +5632,7 @@ fn test_conditional_infer_function_param_non_distributive_union_input() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let number_fn = interner.function(FunctionShape {
         params: vec![ParamInfo {
@@ -5634,7 +5646,7 @@ fn test_conditional_infer_function_param_non_distributive_union_input() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     subst.insert(t_name, interner.union(vec![string_fn, number_fn]));
 
@@ -5676,7 +5688,7 @@ fn test_conditional_infer_function_param_non_distributive_union_branch() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let cond = ConditionalType {
         check_type: interner.tuple(vec![TupleElement {
@@ -5710,7 +5722,7 @@ fn test_conditional_infer_function_param_non_distributive_union_branch() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     subst.insert(t_name, interner.union(vec![string_fn, TypeId::NUMBER]));
 
@@ -5752,7 +5764,7 @@ fn test_conditional_infer_function_rest_param_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let cond = ConditionalType {
         check_type: t_param,
@@ -5776,7 +5788,7 @@ fn test_conditional_infer_function_rest_param_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let number_fn = interner.function(FunctionShape {
         params: vec![ParamInfo {
@@ -5790,7 +5802,7 @@ fn test_conditional_infer_function_rest_param_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     subst.insert(t_name, interner.union(vec![string_fn, number_fn]));
 
@@ -5836,7 +5848,7 @@ fn test_conditional_infer_function_rest_param_non_distributive_union_input() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let cond = ConditionalType {
         check_type: interner.tuple(vec![TupleElement {
@@ -5870,7 +5882,7 @@ fn test_conditional_infer_function_rest_param_non_distributive_union_input() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let number_fn = interner.function(FunctionShape {
         params: vec![ParamInfo {
@@ -5884,7 +5896,7 @@ fn test_conditional_infer_function_rest_param_non_distributive_union_input() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     subst.insert(t_name, interner.union(vec![string_fn, number_fn]));
 
@@ -5930,7 +5942,7 @@ fn test_conditional_infer_function_rest_param_non_distributive_union_branch() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let cond = ConditionalType {
         check_type: interner.tuple(vec![TupleElement {
@@ -5964,7 +5976,7 @@ fn test_conditional_infer_function_rest_param_non_distributive_union_branch() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     subst.insert(t_name, interner.union(vec![string_fn, TypeId::NUMBER]));
 
@@ -6001,7 +6013,7 @@ fn test_conditional_infer_function_this_param_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let cond = ConditionalType {
         check_type: t_param,
@@ -6020,7 +6032,7 @@ fn test_conditional_infer_function_this_param_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let number_fn = interner.function(FunctionShape {
         params: Vec::new(),
@@ -6029,7 +6041,7 @@ fn test_conditional_infer_function_this_param_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     subst.insert(t_name, interner.union(vec![string_fn, number_fn]));
 
@@ -6067,7 +6079,7 @@ fn test_conditional_infer_function_this_param_non_distributive_union_input() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let cond = ConditionalType {
         check_type: interner.tuple(vec![TupleElement {
@@ -6096,7 +6108,7 @@ fn test_conditional_infer_function_this_param_non_distributive_union_input() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let number_fn = interner.function(FunctionShape {
         params: Vec::new(),
@@ -6105,7 +6117,7 @@ fn test_conditional_infer_function_this_param_non_distributive_union_input() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     subst.insert(t_name, interner.union(vec![string_fn, number_fn]));
 
@@ -6143,7 +6155,7 @@ fn test_conditional_infer_function_this_param_non_distributive_union_branch() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let cond = ConditionalType {
         check_type: interner.tuple(vec![TupleElement {
@@ -6172,7 +6184,7 @@ fn test_conditional_infer_function_this_param_non_distributive_union_branch() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     subst.insert(t_name, interner.union(vec![string_fn, TypeId::NUMBER]));
 
@@ -6208,7 +6220,7 @@ fn test_conditional_infer_function_return_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let cond = ConditionalType {
         check_type: t_param,
@@ -6227,7 +6239,7 @@ fn test_conditional_infer_function_return_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let number_fn = interner.function(FunctionShape {
         params: Vec::new(),
@@ -6236,7 +6248,7 @@ fn test_conditional_infer_function_return_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     subst.insert(t_name, interner.union(vec![string_fn, number_fn]));
 
@@ -6273,7 +6285,7 @@ fn test_conditional_infer_function_return_non_distributive_union_input() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let cond = ConditionalType {
         check_type: interner.tuple(vec![TupleElement {
@@ -6302,7 +6314,7 @@ fn test_conditional_infer_function_return_non_distributive_union_input() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let number_fn = interner.function(FunctionShape {
         params: Vec::new(),
@@ -6311,7 +6323,7 @@ fn test_conditional_infer_function_return_non_distributive_union_input() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     subst.insert(t_name, interner.union(vec![string_fn, number_fn]));
 
@@ -6361,7 +6373,7 @@ fn test_conditional_infer_function_param_and_return_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let true_tuple = interner.tuple(vec![
         TupleElement {
@@ -6399,7 +6411,7 @@ fn test_conditional_infer_function_param_and_return_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let boolean_string_fn = interner.function(FunctionShape {
         params: vec![ParamInfo {
@@ -6413,9 +6425,12 @@ fn test_conditional_infer_function_param_and_return_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
-    subst.insert(t_name, interner.union(vec![string_number_fn, boolean_string_fn]));
+    subst.insert(
+        t_name,
+        interner.union(vec![string_number_fn, boolean_string_fn]),
+    );
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
@@ -6478,7 +6493,7 @@ fn test_conditional_infer_function_return_non_distributive_union_branch() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let cond = ConditionalType {
         check_type: interner.tuple(vec![TupleElement {
@@ -6507,7 +6522,7 @@ fn test_conditional_infer_function_return_non_distributive_union_branch() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     subst.insert(t_name, interner.union(vec![string_fn, TypeId::NUMBER]));
 
@@ -6556,7 +6571,7 @@ fn test_conditional_infer_function_param_and_return_non_distributive_union_input
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let true_tuple = interner.tuple(vec![
         TupleElement {
@@ -6604,7 +6619,7 @@ fn test_conditional_infer_function_param_and_return_non_distributive_union_input
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let boolean_string_fn = interner.function(FunctionShape {
         params: vec![ParamInfo {
@@ -6618,9 +6633,12 @@ fn test_conditional_infer_function_param_and_return_non_distributive_union_input
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
-    subst.insert(t_name, interner.union(vec![string_number_fn, boolean_string_fn]));
+    subst.insert(
+        t_name,
+        interner.union(vec![string_number_fn, boolean_string_fn]),
+    );
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
@@ -6722,7 +6740,10 @@ fn test_conditional_infer_object_call_signature_distributive() {
         construct_signatures: Vec::new(),
         properties: Vec::new(),
     });
-    subst.insert(t_name, interner.union(vec![string_callable, number_callable]));
+    subst.insert(
+        t_name,
+        interner.union(vec![string_callable, number_callable]),
+    );
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
@@ -6789,7 +6810,7 @@ fn test_conditional_infer_call_signature_param_from_function_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let number_fn = interner.function(FunctionShape {
         params: vec![ParamInfo {
@@ -6803,7 +6824,7 @@ fn test_conditional_infer_call_signature_param_from_function_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     subst.insert(t_name, interner.union(vec![string_fn, number_fn]));
 
@@ -6861,7 +6882,7 @@ fn test_conditional_infer_call_signature_return_from_function_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let number_fn = interner.function(FunctionShape {
         params: Vec::new(),
@@ -6870,7 +6891,7 @@ fn test_conditional_infer_call_signature_return_from_function_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     subst.insert(t_name, interner.union(vec![string_fn, number_fn]));
 
@@ -6969,7 +6990,10 @@ fn test_conditional_infer_object_call_signature_non_distributive_union_input() {
         construct_signatures: Vec::new(),
         properties: Vec::new(),
     });
-    subst.insert(t_name, interner.union(vec![string_callable, number_callable]));
+    subst.insert(
+        t_name,
+        interner.union(vec![string_callable, number_callable]),
+    );
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
@@ -7056,7 +7080,10 @@ fn test_conditional_infer_object_call_signature_optional_param_distributive() {
         construct_signatures: Vec::new(),
         properties: Vec::new(),
     });
-    subst.insert(t_name, interner.union(vec![string_callable, number_callable]));
+    subst.insert(
+        t_name,
+        interner.union(vec![string_callable, number_callable]),
+    );
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
@@ -7153,7 +7180,10 @@ fn test_conditional_infer_object_call_signature_optional_param_non_distributive_
         construct_signatures: Vec::new(),
         properties: Vec::new(),
     });
-    subst.insert(t_name, interner.union(vec![string_callable, number_callable]));
+    subst.insert(
+        t_name,
+        interner.union(vec![string_callable, number_callable]),
+    );
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
@@ -7240,7 +7270,10 @@ fn test_conditional_infer_object_call_signature_rest_param_distributive() {
         construct_signatures: Vec::new(),
         properties: Vec::new(),
     });
-    subst.insert(t_name, interner.union(vec![string_callable, number_callable]));
+    subst.insert(
+        t_name,
+        interner.union(vec![string_callable, number_callable]),
+    );
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
@@ -7340,7 +7373,10 @@ fn test_conditional_infer_object_call_signature_rest_param_non_distributive_unio
         construct_signatures: Vec::new(),
         properties: Vec::new(),
     });
-    subst.insert(t_name, interner.union(vec![string_callable, number_callable]));
+    subst.insert(
+        t_name,
+        interner.union(vec![string_callable, number_callable]),
+    );
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
@@ -7413,7 +7449,10 @@ fn test_conditional_infer_object_call_signature_non_callable_union_branch() {
         construct_signatures: Vec::new(),
         properties: Vec::new(),
     });
-    subst.insert(t_name, interner.union(vec![string_callable, TypeId::NUMBER]));
+    subst.insert(
+        t_name,
+        interner.union(vec![string_callable, TypeId::NUMBER]),
+    );
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
@@ -7492,7 +7531,10 @@ fn test_conditional_infer_object_call_signature_non_distributive_union_branch() 
         construct_signatures: Vec::new(),
         properties: Vec::new(),
     });
-    subst.insert(t_name, interner.union(vec![string_callable, TypeId::NUMBER]));
+    subst.insert(
+        t_name,
+        interner.union(vec![string_callable, TypeId::NUMBER]),
+    );
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
@@ -8278,7 +8320,10 @@ fn test_conditional_infer_tuple_rest_distributive() {
         optional: false,
         rest: false,
     }]);
-    subst.insert(t_name, interner.union(vec![tuple_string_number, tuple_string]));
+    subst.insert(
+        t_name,
+        interner.union(vec![tuple_string_number, tuple_string]),
+    );
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
@@ -8365,7 +8410,10 @@ fn test_conditional_infer_tuple_rest_with_head_infer_distributive() {
         optional: false,
         rest: false,
     }]);
-    subst.insert(t_name, interner.union(vec![tuple_string_number, tuple_boolean]));
+    subst.insert(
+        t_name,
+        interner.union(vec![tuple_string_number, tuple_boolean]),
+    );
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
@@ -8413,7 +8461,10 @@ fn test_conditional_infer_union_true_branch_distributive() {
 
     let cond_type = interner.conditional(cond);
     let mut subst = TypeSubstitution::new();
-    subst.insert(t_name, interner.union(vec![TypeId::STRING, TypeId::BOOLEAN]));
+    subst.insert(
+        t_name,
+        interner.union(vec![TypeId::STRING, TypeId::BOOLEAN]),
+    );
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
@@ -8451,7 +8502,10 @@ fn test_conditional_infer_union_false_branch_distributive() {
 
     let cond_type = interner.conditional(cond);
     let mut subst = TypeSubstitution::new();
-    subst.insert(t_name, interner.union(vec![TypeId::STRING, TypeId::BOOLEAN]));
+    subst.insert(
+        t_name,
+        interner.union(vec![TypeId::STRING, TypeId::BOOLEAN]),
+    );
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
@@ -8503,8 +8557,7 @@ fn test_conditional_infer_readonly_array_element_extraction() {
     }));
 
     // T extends readonly (infer R)[] ? R : never, with T = readonly string[] | readonly number[].
-    let extends_array =
-        interner.intern(TypeKey::ReadonlyType(interner.array(infer_r)));
+    let extends_array = interner.intern(TypeKey::ReadonlyType(interner.array(infer_r)));
     let cond = ConditionalType {
         check_type: t_param,
         extends_type: extends_array,
@@ -8519,7 +8572,10 @@ fn test_conditional_infer_readonly_array_element_extraction() {
         interner.intern(TypeKey::ReadonlyType(interner.array(TypeId::STRING)));
     let readonly_number_array =
         interner.intern(TypeKey::ReadonlyType(interner.array(TypeId::NUMBER)));
-    subst.insert(t_name, interner.union(vec![readonly_string_array, readonly_number_array]));
+    subst.insert(
+        t_name,
+        interner.union(vec![readonly_string_array, readonly_number_array]),
+    );
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
@@ -8547,8 +8603,7 @@ fn test_conditional_infer_readonly_array_element_non_distributive_union_input() 
     }));
 
     // T extends readonly (infer R)[] ? R : never, with T = readonly string[] | readonly number[] (no distribution).
-    let extends_array =
-        interner.intern(TypeKey::ReadonlyType(interner.array(infer_r)));
+    let extends_array = interner.intern(TypeKey::ReadonlyType(interner.array(infer_r)));
     let cond = ConditionalType {
         check_type: t_param,
         extends_type: extends_array,
@@ -8563,7 +8618,10 @@ fn test_conditional_infer_readonly_array_element_non_distributive_union_input() 
         interner.intern(TypeKey::ReadonlyType(interner.array(TypeId::STRING)));
     let readonly_number_array =
         interner.intern(TypeKey::ReadonlyType(interner.array(TypeId::NUMBER)));
-    subst.insert(t_name, interner.union(vec![readonly_string_array, readonly_number_array]));
+    subst.insert(
+        t_name,
+        interner.union(vec![readonly_string_array, readonly_number_array]),
+    );
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
@@ -8591,8 +8649,7 @@ fn test_conditional_infer_readonly_array_element_non_distributive_union_branch()
     }));
 
     // T extends readonly (infer R)[] ? R : never, with T = readonly string[] | number (no distribution).
-    let extends_array =
-        interner.intern(TypeKey::ReadonlyType(interner.array(infer_r)));
+    let extends_array = interner.intern(TypeKey::ReadonlyType(interner.array(infer_r)));
     let cond = ConditionalType {
         check_type: t_param,
         extends_type: extends_array,
@@ -8605,7 +8662,10 @@ fn test_conditional_infer_readonly_array_element_non_distributive_union_branch()
     let mut subst = TypeSubstitution::new();
     let readonly_string_array =
         interner.intern(TypeKey::ReadonlyType(interner.array(TypeId::STRING)));
-    subst.insert(t_name, interner.union(vec![readonly_string_array, TypeId::NUMBER]));
+    subst.insert(
+        t_name,
+        interner.union(vec![readonly_string_array, TypeId::NUMBER]),
+    );
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
@@ -8632,8 +8692,7 @@ fn test_conditional_infer_readonly_array_element_non_array_union_branch() {
     }));
 
     // T extends readonly (infer R)[] ? R : never, with T = readonly string[] | number.
-    let extends_array =
-        interner.intern(TypeKey::ReadonlyType(interner.array(infer_r)));
+    let extends_array = interner.intern(TypeKey::ReadonlyType(interner.array(infer_r)));
     let cond = ConditionalType {
         check_type: t_param,
         extends_type: extends_array,
@@ -8646,7 +8705,10 @@ fn test_conditional_infer_readonly_array_element_non_array_union_branch() {
     let mut subst = TypeSubstitution::new();
     let readonly_string_array =
         interner.intern(TypeKey::ReadonlyType(interner.array(TypeId::STRING)));
-    subst.insert(t_name, interner.union(vec![readonly_string_array, TypeId::NUMBER]));
+    subst.insert(
+        t_name,
+        interner.union(vec![readonly_string_array, TypeId::NUMBER]),
+    );
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
@@ -8673,14 +8735,13 @@ fn test_conditional_infer_readonly_tuple_element_extraction() {
     }));
 
     // T extends readonly [infer R] ? R : never, with T = readonly [string] | readonly [number].
-    let extends_tuple = interner.intern(TypeKey::ReadonlyType(interner.tuple(vec![
-        TupleElement {
+    let extends_tuple =
+        interner.intern(TypeKey::ReadonlyType(interner.tuple(vec![TupleElement {
             type_id: infer_r,
             name: None,
             optional: false,
             rest: false,
-        },
-    ])));
+        }])));
     let cond = ConditionalType {
         check_type: t_param,
         extends_type: extends_tuple,
@@ -8691,23 +8752,24 @@ fn test_conditional_infer_readonly_tuple_element_extraction() {
 
     let cond_type = interner.conditional(cond);
     let mut subst = TypeSubstitution::new();
-    let readonly_string_tuple = interner.intern(TypeKey::ReadonlyType(interner.tuple(vec![
-        TupleElement {
+    let readonly_string_tuple =
+        interner.intern(TypeKey::ReadonlyType(interner.tuple(vec![TupleElement {
             type_id: TypeId::STRING,
             name: None,
             optional: false,
             rest: false,
-        },
-    ])));
-    let readonly_number_tuple = interner.intern(TypeKey::ReadonlyType(interner.tuple(vec![
-        TupleElement {
+        }])));
+    let readonly_number_tuple =
+        interner.intern(TypeKey::ReadonlyType(interner.tuple(vec![TupleElement {
             type_id: TypeId::NUMBER,
             name: None,
             optional: false,
             rest: false,
-        },
-    ])));
-    subst.insert(t_name, interner.union(vec![readonly_string_tuple, readonly_number_tuple]));
+        }])));
+    subst.insert(
+        t_name,
+        interner.union(vec![readonly_string_tuple, readonly_number_tuple]),
+    );
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
@@ -8735,14 +8797,13 @@ fn test_conditional_infer_readonly_tuple_element_non_distributive_union_input() 
     }));
 
     // T extends readonly [infer R] ? R : never, with T = readonly [string] | readonly [number] (no distribution).
-    let extends_tuple = interner.intern(TypeKey::ReadonlyType(interner.tuple(vec![
-        TupleElement {
+    let extends_tuple =
+        interner.intern(TypeKey::ReadonlyType(interner.tuple(vec![TupleElement {
             type_id: infer_r,
             name: None,
             optional: false,
             rest: false,
-        },
-    ])));
+        }])));
     let cond = ConditionalType {
         check_type: t_param,
         extends_type: extends_tuple,
@@ -8753,23 +8814,24 @@ fn test_conditional_infer_readonly_tuple_element_non_distributive_union_input() 
 
     let cond_type = interner.conditional(cond);
     let mut subst = TypeSubstitution::new();
-    let readonly_string_tuple = interner.intern(TypeKey::ReadonlyType(interner.tuple(vec![
-        TupleElement {
+    let readonly_string_tuple =
+        interner.intern(TypeKey::ReadonlyType(interner.tuple(vec![TupleElement {
             type_id: TypeId::STRING,
             name: None,
             optional: false,
             rest: false,
-        },
-    ])));
-    let readonly_number_tuple = interner.intern(TypeKey::ReadonlyType(interner.tuple(vec![
-        TupleElement {
+        }])));
+    let readonly_number_tuple =
+        interner.intern(TypeKey::ReadonlyType(interner.tuple(vec![TupleElement {
             type_id: TypeId::NUMBER,
             name: None,
             optional: false,
             rest: false,
-        },
-    ])));
-    subst.insert(t_name, interner.union(vec![readonly_string_tuple, readonly_number_tuple]));
+        }])));
+    subst.insert(
+        t_name,
+        interner.union(vec![readonly_string_tuple, readonly_number_tuple]),
+    );
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
@@ -8797,14 +8859,13 @@ fn test_conditional_infer_readonly_tuple_element_non_distributive_union_branch()
     }));
 
     // T extends readonly [infer R] ? R : never, with T = readonly [string] | number (no distribution).
-    let extends_tuple = interner.intern(TypeKey::ReadonlyType(interner.tuple(vec![
-        TupleElement {
+    let extends_tuple =
+        interner.intern(TypeKey::ReadonlyType(interner.tuple(vec![TupleElement {
             type_id: infer_r,
             name: None,
             optional: false,
             rest: false,
-        },
-    ])));
+        }])));
     let cond = ConditionalType {
         check_type: t_param,
         extends_type: extends_tuple,
@@ -8815,15 +8876,17 @@ fn test_conditional_infer_readonly_tuple_element_non_distributive_union_branch()
 
     let cond_type = interner.conditional(cond);
     let mut subst = TypeSubstitution::new();
-    let readonly_string_tuple = interner.intern(TypeKey::ReadonlyType(interner.tuple(vec![
-        TupleElement {
+    let readonly_string_tuple =
+        interner.intern(TypeKey::ReadonlyType(interner.tuple(vec![TupleElement {
             type_id: TypeId::STRING,
             name: None,
             optional: false,
             rest: false,
-        },
-    ])));
-    subst.insert(t_name, interner.union(vec![readonly_string_tuple, TypeId::NUMBER]));
+        }])));
+    subst.insert(
+        t_name,
+        interner.union(vec![readonly_string_tuple, TypeId::NUMBER]),
+    );
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
@@ -8850,14 +8913,13 @@ fn test_conditional_infer_readonly_tuple_element_non_tuple_union_branch() {
     }));
 
     // T extends readonly [infer R] ? R : never, with T = readonly [string] | number.
-    let extends_tuple = interner.intern(TypeKey::ReadonlyType(interner.tuple(vec![
-        TupleElement {
+    let extends_tuple =
+        interner.intern(TypeKey::ReadonlyType(interner.tuple(vec![TupleElement {
             type_id: infer_r,
             name: None,
             optional: false,
             rest: false,
-        },
-    ])));
+        }])));
     let cond = ConditionalType {
         check_type: t_param,
         extends_type: extends_tuple,
@@ -8868,15 +8930,17 @@ fn test_conditional_infer_readonly_tuple_element_non_tuple_union_branch() {
 
     let cond_type = interner.conditional(cond);
     let mut subst = TypeSubstitution::new();
-    let readonly_string_tuple = interner.intern(TypeKey::ReadonlyType(interner.tuple(vec![
-        TupleElement {
+    let readonly_string_tuple =
+        interner.intern(TypeKey::ReadonlyType(interner.tuple(vec![TupleElement {
             type_id: TypeId::STRING,
             name: None,
             optional: false,
             rest: false,
-        },
-    ])));
-    subst.insert(t_name, interner.union(vec![readonly_string_tuple, TypeId::NUMBER]));
+        }])));
+    subst.insert(
+        t_name,
+        interner.union(vec![readonly_string_tuple, TypeId::NUMBER]),
+    );
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
@@ -8903,8 +8967,7 @@ fn test_conditional_infer_readonly_array_mixed_input() {
     }));
 
     // T extends readonly (infer R)[] ? R : never, with T = readonly string[] | number[].
-    let extends_array =
-        interner.intern(TypeKey::ReadonlyType(interner.array(infer_r)));
+    let extends_array = interner.intern(TypeKey::ReadonlyType(interner.array(infer_r)));
     let cond = ConditionalType {
         check_type: t_param,
         extends_type: extends_array,
@@ -8918,7 +8981,10 @@ fn test_conditional_infer_readonly_array_mixed_input() {
     let readonly_string_array =
         interner.intern(TypeKey::ReadonlyType(interner.array(TypeId::STRING)));
     let number_array = interner.array(TypeId::NUMBER);
-    subst.insert(t_name, interner.union(vec![readonly_string_array, number_array]));
+    subst.insert(
+        t_name,
+        interner.union(vec![readonly_string_array, number_array]),
+    );
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
@@ -9290,10 +9356,22 @@ fn test_index_access_object_literal() {
 
     // { x: number, y: string }["x"] -> number
     let obj = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER,
- write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
-        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::STRING,
- write_type: TypeId::STRING, optional: false, readonly: false, is_method: false },
+        PropertyInfo {
+            name: interner.intern_string("x"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("y"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
     ]);
     let key_x = interner.literal_string("x");
 
@@ -9307,10 +9385,22 @@ fn test_index_access_object_string_key() {
 
     // { x: number, y: string }["y"] -> string
     let obj = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER,
- write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
-        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::STRING,
- write_type: TypeId::STRING, optional: false, readonly: false, is_method: false },
+        PropertyInfo {
+            name: interner.intern_string("x"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("y"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
     ]);
     let key_y = interner.literal_string("y");
 
@@ -9323,10 +9413,22 @@ fn test_index_access_object_string_index_optional_properties() {
     let interner = TypeInterner::new();
 
     let obj = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER,
- write_type: TypeId::NUMBER, optional: true, readonly: false, is_method: false },
-        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::STRING,
- write_type: TypeId::STRING, optional: false, readonly: false, is_method: false },
+        PropertyInfo {
+            name: interner.intern_string("x"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: true,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("y"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
     ]);
 
     let result = evaluate_index_access(&interner, obj, TypeId::STRING);
@@ -9339,10 +9441,14 @@ fn test_index_access_object_missing_key() {
     let interner = TypeInterner::new();
 
     // { x: number }["z"] -> undefined
-    let obj = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER,
- write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
-    ]);
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
     let key_z = interner.literal_string("z");
 
     let result = evaluate_index_access(&interner, obj, key_z);
@@ -9355,10 +9461,22 @@ fn test_index_access_object_union_key() {
 
     // { x: number, y: string }["x" | "y"] -> number | string
     let obj = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER,
- write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
-        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::STRING,
- write_type: TypeId::STRING, optional: false, readonly: false, is_method: false },
+        PropertyInfo {
+            name: interner.intern_string("x"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("y"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
     ]);
     let key_x = interner.literal_string("x");
     let key_y = interner.literal_string("y");
@@ -9751,15 +9869,19 @@ fn test_index_access_object_with_number_index_signature_no_unchecked() {
 
 #[test]
 fn test_index_access_resolves_ref() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
+    use crate::solver::{SymbolRef, TypeEnvironment};
 
     let interner = TypeInterner::new();
     let mut env = TypeEnvironment::new();
 
-    let obj = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER,
- write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
-    ]);
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
 
     let sym = SymbolRef(1);
     env.insert(sym, obj);
@@ -9776,10 +9898,14 @@ fn test_index_access_resolves_ref() {
 fn test_index_access_type_param_constraint() {
     let interner = TypeInterner::new();
 
-    let constraint = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER,
- write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
-    ]);
+    let constraint = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
 
     let type_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
         name: interner.intern_string("T"),
@@ -9818,10 +9944,14 @@ fn test_index_access_type_param_no_constraint_deferred() {
 fn test_index_access_optional_property() {
     let interner = TypeInterner::new();
 
-    let obj = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER,
- write_type: TypeId::NUMBER, optional: true, readonly: false, is_method: false },
-    ]);
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
 
     let key_x = interner.literal_string("x");
     let result = evaluate_index_access(&interner, obj, key_x);
@@ -9911,7 +10041,9 @@ fn test_index_access_array_string_index() {
     let includes_type = evaluate_index_access(&interner, string_array, includes_key);
 
     let result = evaluate_index_access(&interner, string_array, TypeId::STRING);
-    let key = interner.lookup(result).expect("expected union for array[string]");
+    let key = interner
+        .lookup(result)
+        .expect("expected union for array[string]");
 
     match key {
         TypeKey::Union(members) => {
@@ -9933,7 +10065,9 @@ fn test_index_access_array_string_index_with_no_unchecked_indexed_access() {
     evaluator.set_no_unchecked_indexed_access(true);
 
     let result = evaluator.evaluate_index_access(string_array, TypeId::STRING);
-    let key = interner.lookup(result).expect("expected union for array[string]");
+    let key = interner
+        .lookup(result)
+        .expect("expected union for array[string]");
 
     match key {
         TypeKey::Union(members) => {
@@ -10006,8 +10140,18 @@ fn test_index_access_tuple_literal() {
 
     // [string, number][0] -> string
     let tuple = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
     let zero = interner.literal_number(0.0);
 
@@ -10022,8 +10166,18 @@ fn test_index_access_tuple_rest_array_literal() {
     // [string, ...number[]][1] -> number
     let number_array = interner.array(TypeId::NUMBER);
     let tuple = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: number_array, name: None, optional: false, rest: true },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: number_array,
+            name: None,
+            optional: false,
+            rest: true,
+        },
     ]);
     let one = interner.literal_number(1.0);
     let two = interner.literal_number(2.0);
@@ -10038,12 +10192,32 @@ fn test_index_access_tuple_rest_tuple_literal() {
 
     // [string, ...[number, boolean]][1] -> number
     let rest_tuple = interner.tuple(vec![
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
     let tuple = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: rest_tuple, name: None, optional: false, rest: true },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: rest_tuple,
+            name: None,
+            optional: false,
+            rest: true,
+        },
     ]);
 
     let one = interner.literal_number(1.0);
@@ -10051,8 +10225,14 @@ fn test_index_access_tuple_rest_tuple_literal() {
     let three = interner.literal_number(3.0);
 
     assert_eq!(evaluate_index_access(&interner, tuple, one), TypeId::NUMBER);
-    assert_eq!(evaluate_index_access(&interner, tuple, two), TypeId::BOOLEAN);
-    assert_eq!(evaluate_index_access(&interner, tuple, three), TypeId::UNDEFINED);
+    assert_eq!(
+        evaluate_index_access(&interner, tuple, two),
+        TypeId::BOOLEAN
+    );
+    assert_eq!(
+        evaluate_index_access(&interner, tuple, three),
+        TypeId::UNDEFINED
+    );
 }
 
 #[test]
@@ -10061,8 +10241,18 @@ fn test_index_access_tuple_optional_literal() {
 
     // [string, number?][1] -> number | undefined
     let tuple = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: true, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: true,
+            rest: false,
+        },
     ]);
     let one = interner.literal_number(1.0);
 
@@ -10077,8 +10267,18 @@ fn test_index_access_tuple_negative_literal() {
 
     let number_array = interner.array(TypeId::NUMBER);
     let tuple = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: number_array, name: None, optional: false, rest: true },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: number_array,
+            name: None,
+            optional: false,
+            rest: true,
+        },
     ]);
     let negative = interner.literal_number(-1.0);
 
@@ -10091,8 +10291,18 @@ fn test_index_access_tuple_fractional_literal() {
     let interner = TypeInterner::new();
 
     let tuple = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
     let fractional = interner.literal_number(1.5);
 
@@ -10106,8 +10316,18 @@ fn test_index_access_tuple_negative_string_literal() {
 
     let number_array = interner.array(TypeId::NUMBER);
     let tuple = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: number_array, name: None, optional: false, rest: true },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: number_array,
+            name: None,
+            optional: false,
+            rest: true,
+        },
     ]);
     let negative = interner.literal_string("-1");
 
@@ -10120,8 +10340,18 @@ fn test_index_access_tuple_fractional_string_literal() {
     let interner = TypeInterner::new();
 
     let tuple = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
     let fractional = interner.literal_string("1.5");
 
@@ -10134,14 +10364,26 @@ fn test_index_access_tuple_string_index() {
     let interner = TypeInterner::new();
 
     let tuple = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
     let map_key = interner.literal_string("map");
     let map_type = evaluate_index_access(&interner, tuple, map_key);
 
     let result = evaluate_index_access(&interner, tuple, TypeId::STRING);
-    let key = interner.lookup(result).expect("expected union for tuple[string]");
+    let key = interner
+        .lookup(result)
+        .expect("expected union for tuple[string]");
 
     match key {
         TypeKey::Union(members) => {
@@ -10159,14 +10401,26 @@ fn test_index_access_tuple_string_index_with_no_unchecked_indexed_access() {
     let interner = TypeInterner::new();
 
     let tuple = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
     let mut evaluator = TypeEvaluator::new(&interner);
     evaluator.set_no_unchecked_indexed_access(true);
 
     let result = evaluator.evaluate_index_access(tuple, TypeId::STRING);
-    let key = interner.lookup(result).expect("expected union for tuple[string]");
+    let key = interner
+        .lookup(result)
+        .expect("expected union for tuple[string]");
 
     match key {
         TypeKey::Union(members) => {
@@ -10182,8 +10436,18 @@ fn test_index_access_tuple_string_literal_length() {
     let interner = TypeInterner::new();
 
     let tuple = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
     let length_key = interner.literal_string("length");
 
@@ -10196,8 +10460,18 @@ fn test_index_access_tuple_string_literal_numeric_key() {
     let interner = TypeInterner::new();
 
     let tuple = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
     let zero = interner.literal_string("0");
 
@@ -10210,8 +10484,18 @@ fn test_index_access_readonly_tuple_literal() {
     let interner = TypeInterner::new();
 
     let tuple = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
     let readonly_tuple = interner.intern(TypeKey::ReadonlyType(tuple));
     let one = interner.literal_number(1.0);
@@ -10309,7 +10593,9 @@ fn test_keyof_readonly_array() {
     let readonly_array = interner.intern(TypeKey::ReadonlyType(array));
 
     let result = evaluate_keyof(&interner, readonly_array);
-    let key = interner.lookup(result).expect("expected union for keyof readonly array");
+    let key = interner
+        .lookup(result)
+        .expect("expected union for keyof readonly array");
 
     match key {
         TypeKey::Union(members) => {
@@ -10329,13 +10615,25 @@ fn test_keyof_readonly_tuple() {
     let interner = TypeInterner::new();
 
     let tuple = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
     let readonly_tuple = interner.intern(TypeKey::ReadonlyType(tuple));
 
     let result = evaluate_keyof(&interner, readonly_tuple);
-    let key = interner.lookup(result).expect("expected union for keyof readonly tuple");
+    let key = interner
+        .lookup(result)
+        .expect("expected union for keyof readonly tuple");
 
     match key {
         TypeKey::Union(members) => {
@@ -10359,10 +10657,22 @@ fn test_keyof_type_param_constraint() {
     let interner = TypeInterner::new();
 
     let constraint = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER,
- write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
-        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::STRING,
- write_type: TypeId::STRING, optional: false, readonly: false, is_method: false },
+        PropertyInfo {
+            name: interner.intern_string("x"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("y"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
     ]);
 
     let type_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
@@ -10384,10 +10694,22 @@ fn test_base_constraint_assignability_evaluate_keyof() {
     let interner = TypeInterner::new();
 
     let constraint = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER,
- write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
-        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::STRING,
- write_type: TypeId::STRING, optional: false, readonly: false, is_method: false },
+        PropertyInfo {
+            name: interner.intern_string("x"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("y"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
     ]);
 
     let type_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
@@ -10424,16 +10746,28 @@ fn test_keyof_type_param_no_constraint_deferred() {
 
 #[test]
 fn test_keyof_resolves_ref() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
+    use crate::solver::{SymbolRef, TypeEnvironment};
 
     let interner = TypeInterner::new();
     let mut env = TypeEnvironment::new();
 
     let obj = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER,
- write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
-        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::STRING,
- write_type: TypeId::STRING, optional: false, readonly: false, is_method: false },
+        PropertyInfo {
+            name: interner.intern_string("x"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("y"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
     ]);
 
     let sym = SymbolRef(2);
@@ -10456,8 +10790,18 @@ fn test_index_access_tuple_second() {
 
     // [string, number][1] -> number
     let tuple = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
     let one = interner.literal_number(1.0);
 
@@ -10471,8 +10815,18 @@ fn test_index_access_tuple_number() {
 
     // [string, number][number] -> string | number
     let tuple = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     let result = evaluate_index_access(&interner, tuple, TypeId::NUMBER);
@@ -10488,8 +10842,18 @@ fn test_index_access_tuple_optional_number() {
 
     // [string, number?][number] -> string | number | undefined
     let tuple = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: true, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: true,
+            rest: false,
+        },
     ]);
 
     let result = evaluate_index_access(&interner, tuple, TypeId::NUMBER);
@@ -10537,10 +10901,14 @@ fn test_evaluate_type_non_meta() {
     assert_eq!(evaluate_type(&interner, TypeId::STRING), TypeId::STRING);
     assert_eq!(evaluate_type(&interner, TypeId::NUMBER), TypeId::NUMBER);
 
-    let obj = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER,
- write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
-    ]);
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
     assert_eq!(evaluate_type(&interner, obj), obj);
 }
 
@@ -10554,10 +10922,22 @@ fn test_keyof_object() {
 
     // keyof { x: number, y: string } = "x" | "y"
     let obj = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER,
- write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
-        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::STRING,
- write_type: TypeId::STRING, optional: false, readonly: false, is_method: false },
+        PropertyInfo {
+            name: interner.intern_string("x"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("y"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
     ]);
 
     let result = evaluate_keyof(&interner, obj);
@@ -10591,7 +10971,11 @@ fn test_keyof_object_with_string_index_signature() {
     });
 
     let result = evaluate_keyof(&interner, obj);
-    let expected = interner.union(vec![interner.literal_string("x"), TypeId::STRING, TypeId::NUMBER]);
+    let expected = interner.union(vec![
+        interner.literal_string("x"),
+        TypeId::STRING,
+        TypeId::NUMBER,
+    ]);
     assert_eq!(result, expected);
 }
 
@@ -10718,7 +11102,10 @@ fn test_keyof_intersection_unions_keys() {
 
     let intersection = interner.intersection(vec![obj_a, obj_b]);
     let result = evaluate_keyof(&interner, intersection);
-    let expected = interner.union(vec![interner.literal_string("a"), interner.literal_string("b")]);
+    let expected = interner.union(vec![
+        interner.literal_string("a"),
+        interner.literal_string("b"),
+    ]);
     assert_eq!(result, expected);
 }
 
@@ -10798,7 +11185,9 @@ fn test_keyof_array() {
     let arr = interner.array(TypeId::STRING);
 
     let result = evaluate_keyof(&interner, arr);
-    let key = interner.lookup(result).expect("expected union for keyof array");
+    let key = interner
+        .lookup(result)
+        .expect("expected union for keyof array");
 
     match key {
         TypeKey::Union(members) => {
@@ -10819,13 +11208,25 @@ fn test_keyof_tuple() {
 
     // keyof [string, number] includes tuple indices and array members
     let tuple = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     let result = evaluate_keyof(&interner, tuple);
 
-    let key = interner.lookup(result).expect("expected union for keyof tuple");
+    let key = interner
+        .lookup(result)
+        .expect("expected union for keyof tuple");
 
     match key {
         TypeKey::Union(members) => {
@@ -10850,16 +11251,38 @@ fn test_keyof_tuple_with_rest_tuple() {
 
     // keyof [string, ...[number, boolean]] includes expanded indices
     let rest_tuple = interner.tuple(vec![
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
     let tuple = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: rest_tuple, name: None, optional: false, rest: true },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: rest_tuple,
+            name: None,
+            optional: false,
+            rest: true,
+        },
     ]);
 
     let result = evaluate_keyof(&interner, tuple);
-    let key = interner.lookup(result).expect("expected union for keyof tuple with rest");
+    let key = interner
+        .lookup(result)
+        .expect("expected union for keyof tuple with rest");
 
     match key {
         TypeKey::Union(members) => {
@@ -10909,16 +11332,28 @@ fn test_keyof_object_keyword() {
 
 #[test]
 fn test_object_trifecta_keyof_object_interface() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
+    use crate::solver::{SymbolRef, TypeEnvironment};
 
     let interner = TypeInterner::new();
     let mut env = TypeEnvironment::new();
 
     let object_interface = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("toString"), type_id: TypeId::STRING,
- write_type: TypeId::STRING, optional: false, readonly: false, is_method: false },
-        PropertyInfo { name: interner.intern_string("valueOf"), type_id: TypeId::NUMBER,
- write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
+        PropertyInfo {
+            name: interner.intern_string("toString"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("valueOf"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
     ]);
 
     let sym = SymbolRef(1);
@@ -10927,7 +11362,9 @@ fn test_object_trifecta_keyof_object_interface() {
     let ref_type = interner.reference(sym);
     let evaluator = TypeEvaluator::with_resolver(&interner, &env);
     let result = evaluator.evaluate_keyof(ref_type);
-    let key = interner.lookup(result).expect("expected union for keyof Object interface");
+    let key = interner
+        .lookup(result)
+        .expect("expected union for keyof Object interface");
 
     match key {
         TypeKey::Union(members) => {
@@ -10965,7 +11402,9 @@ fn test_keyof_string_apparent_members() {
     let interner = TypeInterner::new();
 
     let result = evaluate_keyof(&interner, TypeId::STRING);
-    let key = interner.lookup(result).expect("expected union for keyof string");
+    let key = interner
+        .lookup(result)
+        .expect("expected union for keyof string");
 
     match key {
         TypeKey::Union(members) => {
@@ -10985,7 +11424,9 @@ fn test_apparent_number_keyof_members() {
     let interner = TypeInterner::new();
 
     let result = evaluate_keyof(&interner, TypeId::NUMBER);
-    let key = interner.lookup(result).expect("expected union for keyof number");
+    let key = interner
+        .lookup(result)
+        .expect("expected union for keyof number");
 
     match key {
         TypeKey::Union(members) => {
@@ -11362,14 +11803,14 @@ fn test_keyof_readonly_and_optional_properties() {
             type_id: TypeId::STRING,
             write_type: TypeId::STRING,
             optional: false,
-            readonly: true,  // readonly
+            readonly: true, // readonly
             is_method: false,
         },
         PropertyInfo {
             name: interner.intern_string("b"),
             type_id: TypeId::NUMBER,
             write_type: TypeId::NUMBER,
-            optional: true,  // optional
+            optional: true, // optional
             readonly: false,
             is_method: false,
         },
@@ -11622,7 +12063,7 @@ fn test_keyof_function_type() {
         type_params: vec![],
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let result = evaluate_keyof(&interner, func);
@@ -11759,7 +12200,7 @@ fn test_keyof_with_method_property() {
         type_params: vec![],
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let obj = interner.object(vec![
@@ -11995,10 +12436,22 @@ fn test_mapped_type_basic() {
 
     // Result should be { x: number, y: number }
     let expected = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER,
- write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
-        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::NUMBER,
- write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
+        PropertyInfo {
+            name: interner.intern_string("x"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("y"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
     ]);
     assert_eq!(result, expected);
 }
@@ -12045,7 +12498,10 @@ fn test_mapped_type_over_string_keys() {
 
             assert!(saw_length, "missing length property");
             assert!(saw_to_string, "missing toString property");
-            let number_index = shape.number_index.as_ref().expect("expected number index signature");
+            let number_index = shape
+                .number_index
+                .as_ref()
+                .expect("expected number index signature");
             assert_eq!(number_index.key_type, TypeId::NUMBER);
             assert_eq!(number_index.value_type, TypeId::BOOLEAN);
         }
@@ -12335,7 +12791,10 @@ fn test_mapped_type_string_index_signature() {
             assert!(shape.properties.is_empty());
             assert!(shape.number_index.is_none());
 
-            let string_index = shape.string_index.as_ref().expect("expected string index signature");
+            let string_index = shape
+                .string_index
+                .as_ref()
+                .expect("expected string index signature");
             assert_eq!(string_index.key_type, TypeId::STRING);
             let expected_value = interner.union(vec![TypeId::NUMBER, TypeId::UNDEFINED]);
             assert_eq!(string_index.value_type, expected_value);
@@ -12371,7 +12830,10 @@ fn test_mapped_type_number_index_signature() {
             assert!(shape.properties.is_empty());
             assert!(shape.string_index.is_none());
 
-            let number_index = shape.number_index.as_ref().expect("expected number index signature");
+            let number_index = shape
+                .number_index
+                .as_ref()
+                .expect("expected number index signature");
             assert_eq!(number_index.key_type, TypeId::NUMBER);
             assert_eq!(number_index.value_type, TypeId::STRING);
             assert!(!number_index.readonly);
@@ -12403,10 +12865,14 @@ fn test_mapped_type_single_key() {
 
     let result = evaluate_mapped(&interner, &mapped);
 
-    let expected = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("foo"), type_id: TypeId::STRING,
- write_type: TypeId::STRING, optional: false, readonly: false, is_method: false },
-    ]);
+    let expected = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("foo"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
     assert_eq!(result, expected);
 }
 
@@ -12437,10 +12903,22 @@ fn test_mapped_type_with_optional_modifier() {
 
     // Result should be { x?: number, y?: number }
     let expected = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER,
- write_type: TypeId::NUMBER, optional: true, readonly: false, is_method: false },
-        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::NUMBER,
- write_type: TypeId::NUMBER, optional: true, readonly: false, is_method: false },
+        PropertyInfo {
+            name: interner.intern_string("x"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: true,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("y"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: true,
+            readonly: false,
+            is_method: false,
+        },
     ]);
     assert_eq!(result, expected);
 }
@@ -12468,10 +12946,14 @@ fn test_mapped_type_with_readonly_modifier() {
 
     let result = evaluate_mapped(&interner, &mapped);
 
-    let expected = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER,
- write_type: TypeId::NUMBER, optional: false, readonly: true, is_method: false },
-    ]);
+    let expected = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
     assert_eq!(result, expected);
 }
 
@@ -12509,10 +12991,22 @@ fn test_mapped_type_with_template_substitution() {
 
     // Result should be { x: "x", y: "y" }
     let expected = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("x"), type_id: key_x,
- write_type: key_x, optional: false, readonly: false, is_method: false },
-        PropertyInfo { name: interner.intern_string("y"), type_id: key_y,
- write_type: key_y, optional: false, readonly: false, is_method: false },
+        PropertyInfo {
+            name: interner.intern_string("x"),
+            type_id: key_x,
+            write_type: key_x,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("y"),
+            type_id: key_y,
+            write_type: key_y,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
     ]);
     assert_eq!(result, expected);
 }
@@ -12635,7 +13129,7 @@ fn test_mapped_type_remove_readonly_modifier() {
         constraint: keys,
         name_type: None,
         template: TypeId::STRING,
-        readonly_modifier: Some(MappedModifier::Remove),  // -readonly
+        readonly_modifier: Some(MappedModifier::Remove), // -readonly
         optional_modifier: None,
     };
 
@@ -12650,7 +13144,7 @@ fn test_mapped_type_remove_readonly_modifier() {
             type_id: TypeId::STRING,
             write_type: TypeId::STRING,
             optional: false,
-            readonly: false,  // readonly removed
+            readonly: false, // readonly removed
             is_method: false,
         },
         PropertyInfo {
@@ -12688,7 +13182,7 @@ fn test_mapped_type_remove_optional_modifier() {
         name_type: None,
         template: TypeId::NUMBER,
         readonly_modifier: None,
-        optional_modifier: Some(MappedModifier::Remove),  // -?
+        optional_modifier: Some(MappedModifier::Remove), // -?
     };
 
     let result = evaluate_mapped(&interner, &mapped);
@@ -12701,7 +13195,7 @@ fn test_mapped_type_remove_optional_modifier() {
             name: a_name,
             type_id: TypeId::NUMBER,
             write_type: TypeId::NUMBER,
-            optional: false,  // optional removed
+            optional: false, // optional removed
             readonly: false,
             is_method: false,
         },
@@ -12739,7 +13233,7 @@ fn test_mapped_type_add_readonly_modifier() {
         constraint: keys,
         name_type: None,
         template: TypeId::BOOLEAN,
-        readonly_modifier: Some(MappedModifier::Add),  // +readonly
+        readonly_modifier: Some(MappedModifier::Add), // +readonly
         optional_modifier: None,
     };
 
@@ -12754,7 +13248,7 @@ fn test_mapped_type_add_readonly_modifier() {
             type_id: TypeId::BOOLEAN,
             write_type: TypeId::BOOLEAN,
             optional: false,
-            readonly: true,  // readonly added
+            readonly: true, // readonly added
             is_method: false,
         },
         PropertyInfo {
@@ -12792,7 +13286,7 @@ fn test_mapped_type_add_optional_modifier() {
         name_type: None,
         template: TypeId::STRING,
         readonly_modifier: None,
-        optional_modifier: Some(MappedModifier::Add),  // +?
+        optional_modifier: Some(MappedModifier::Add), // +?
     };
 
     let result = evaluate_mapped(&interner, &mapped);
@@ -12805,7 +13299,7 @@ fn test_mapped_type_add_optional_modifier() {
             name: bar_name,
             type_id: TypeId::STRING,
             write_type: TypeId::STRING,
-            optional: true,  // optional added
+            optional: true, // optional added
             readonly: false,
             is_method: false,
         },
@@ -12841,8 +13335,8 @@ fn test_mapped_type_both_modifiers() {
         constraint: key_id,
         name_type: None,
         template: TypeId::NUMBER,
-        readonly_modifier: Some(MappedModifier::Add),  // +readonly
-        optional_modifier: Some(MappedModifier::Add),  // +?
+        readonly_modifier: Some(MappedModifier::Add), // +readonly
+        optional_modifier: Some(MappedModifier::Add), // +?
     };
 
     let result = evaluate_mapped(&interner, &mapped);
@@ -12880,8 +13374,8 @@ fn test_mapped_type_both_remove_modifiers() {
         constraint: key_data,
         name_type: None,
         template: TypeId::STRING,
-        readonly_modifier: Some(MappedModifier::Remove),  // -readonly
-        optional_modifier: Some(MappedModifier::Remove),  // -?
+        readonly_modifier: Some(MappedModifier::Remove), // -readonly
+        optional_modifier: Some(MappedModifier::Remove), // -?
     };
 
     let result = evaluate_mapped(&interner, &mapped);
@@ -12892,8 +13386,8 @@ fn test_mapped_type_both_remove_modifiers() {
         name: data_name,
         type_id: TypeId::STRING,
         write_type: TypeId::STRING,
-        optional: false,  // optional removed
-        readonly: false,  // readonly removed
+        optional: false, // optional removed
+        readonly: false, // readonly removed
         is_method: false,
     }]);
 
@@ -12919,8 +13413,8 @@ fn test_mapped_type_add_readonly_remove_optional() {
         constraint: key_value,
         name_type: None,
         template: TypeId::NUMBER,
-        readonly_modifier: Some(MappedModifier::Add),     // +readonly
-        optional_modifier: Some(MappedModifier::Remove),  // -?
+        readonly_modifier: Some(MappedModifier::Add), // +readonly
+        optional_modifier: Some(MappedModifier::Remove), // -?
     };
 
     let result = evaluate_mapped(&interner, &mapped);
@@ -12931,8 +13425,8 @@ fn test_mapped_type_add_readonly_remove_optional() {
         name: value_name,
         type_id: TypeId::NUMBER,
         write_type: TypeId::NUMBER,
-        optional: false,  // optional removed
-        readonly: true,   // readonly added
+        optional: false, // optional removed
+        readonly: true,  // readonly added
         is_method: false,
     }]);
 
@@ -12958,8 +13452,8 @@ fn test_mapped_type_remove_readonly_add_optional() {
         constraint: key_config,
         name_type: None,
         template: TypeId::BOOLEAN,
-        readonly_modifier: Some(MappedModifier::Remove),  // -readonly
-        optional_modifier: Some(MappedModifier::Add),     // +?
+        readonly_modifier: Some(MappedModifier::Remove), // -readonly
+        optional_modifier: Some(MappedModifier::Add),    // +?
     };
 
     let result = evaluate_mapped(&interner, &mapped);
@@ -12970,8 +13464,8 @@ fn test_mapped_type_remove_readonly_add_optional() {
         name: config_name,
         type_id: TypeId::BOOLEAN,
         write_type: TypeId::BOOLEAN,
-        optional: true,   // optional added
-        readonly: false,  // readonly removed
+        optional: true,  // optional added
+        readonly: false, // readonly removed
         is_method: false,
     }]);
 
@@ -13002,7 +13496,7 @@ fn test_mapped_type_minus_readonly_on_readonly_source() {
         constraint: keys,
         name_type: None,
         template: TypeId::STRING,
-        readonly_modifier: Some(MappedModifier::Remove),  // -readonly
+        readonly_modifier: Some(MappedModifier::Remove), // -readonly
         optional_modifier: None,
     };
 
@@ -13017,7 +13511,7 @@ fn test_mapped_type_minus_readonly_on_readonly_source() {
             type_id: TypeId::STRING,
             write_type: TypeId::STRING,
             optional: false,
-            readonly: false,  // removed
+            readonly: false, // removed
             is_method: false,
         },
         PropertyInfo {
@@ -13054,7 +13548,7 @@ fn test_mapped_type_plus_optional_on_required_source() {
         name_type: None,
         template: TypeId::NUMBER,
         readonly_modifier: None,
-        optional_modifier: Some(MappedModifier::Add),  // +?
+        optional_modifier: Some(MappedModifier::Add), // +?
     };
 
     let result = evaluate_mapped(&interner, &mapped);
@@ -13067,7 +13561,7 @@ fn test_mapped_type_plus_optional_on_required_source() {
             name: x_name,
             type_id: TypeId::NUMBER,
             write_type: TypeId::NUMBER,
-            optional: true,  // added
+            optional: true, // added
             readonly: false,
             is_method: false,
         },
@@ -13248,8 +13742,8 @@ fn test_mapped_type_add_both_modifiers_on_source() {
         constraint: key_value,
         name_type: None,
         template: TypeId::STRING,
-        readonly_modifier: Some(MappedModifier::Add),  // +readonly
-        optional_modifier: Some(MappedModifier::Add),  // +?
+        readonly_modifier: Some(MappedModifier::Add), // +readonly
+        optional_modifier: Some(MappedModifier::Add), // +?
     };
 
     let result = evaluate_mapped(&interner, &mapped);
@@ -13286,8 +13780,8 @@ fn test_mapped_type_remove_both_modifiers_required_pattern() {
         constraint: key_data,
         name_type: None,
         template: TypeId::STRING,
-        readonly_modifier: Some(MappedModifier::Remove),  // -readonly
-        optional_modifier: Some(MappedModifier::Remove),  // -?
+        readonly_modifier: Some(MappedModifier::Remove), // -readonly
+        optional_modifier: Some(MappedModifier::Remove), // -?
     };
 
     let result = evaluate_mapped(&interner, &mapped);
@@ -13394,7 +13888,7 @@ fn test_mapped_type_preserves_source_types() {
         type_param: key_param,
         constraint: keys,
         name_type: None,
-        template: key_param_id,  // Template is the key itself
+        template: key_param_id, // Template is the key itself
         readonly_modifier: None,
         optional_modifier: None,
     };
@@ -13628,7 +14122,7 @@ fn test_mapped_type_as_template_literal() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let mapped = MappedType {
@@ -13710,7 +14204,7 @@ fn test_mapped_type_as_conditional_transformation() {
         type_param: key_param,
         constraint: keys,
         name_type: Some(name_type),
-        template: key_param_id,  // Template is the original key
+        template: key_param_id, // Template is the original key
         readonly_modifier: None,
         optional_modifier: None,
     };
@@ -13829,7 +14323,7 @@ fn test_mapped_type_as_identity() {
     let mapped = MappedType {
         type_param: key_param,
         constraint: keys,
-        name_type: Some(key_param_id),  // Identity: as K
+        name_type: Some(key_param_id), // Identity: as K
         template: TypeId::NUMBER,
         readonly_modifier: None,
         optional_modifier: None,
@@ -14016,7 +14510,7 @@ fn test_conditional_function_extends_function() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // () => void extends () => void ? true : false
@@ -14030,7 +14524,10 @@ fn test_conditional_function_extends_function() {
 
     let result = evaluate_conditional(&interner, &cond);
 
-    assert_eq!(result, lit_true, "() => void extends () => void should be true");
+    assert_eq!(
+        result, lit_true,
+        "() => void extends () => void should be true"
+    );
 }
 
 /// Test conditional with array extends array.
@@ -14071,8 +14568,18 @@ fn test_conditional_tuple_extends_array() {
     let lit_false = interner.literal_boolean(false);
 
     let tuple = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
     let any_array = interner.array(TypeId::ANY);
 
@@ -14087,7 +14594,10 @@ fn test_conditional_tuple_extends_array() {
 
     let result = evaluate_conditional(&interner, &cond);
 
-    assert_eq!(result, lit_true, "[string, number] extends any[] should be true");
+    assert_eq!(
+        result, lit_true,
+        "[string, number] extends any[] should be true"
+    );
 }
 
 /// Test conditional with object structural subtyping.
@@ -14144,7 +14654,10 @@ fn test_conditional_object_structural_subtype() {
 
     let result = evaluate_conditional(&interner, &cond);
 
-    assert_eq!(result, lit_true, "{{a: string, b: number}} extends {{a: string}} should be true");
+    assert_eq!(
+        result, lit_true,
+        "{{a: string, b: number}} extends {{a: string}} should be true"
+    );
 }
 
 /// Test conditional with bigint type.
@@ -14247,7 +14760,7 @@ fn test_conditional_infer_extract_state_pattern() {
         return_type: infer_s,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // The concrete Reducer type: (state: number | undefined, action: AnyAction) => number
@@ -14273,7 +14786,7 @@ fn test_conditional_infer_extract_state_pattern() {
         return_type: concrete_state,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Conditional: concrete_reducer extends extends_fn ? S : never
@@ -14328,7 +14841,7 @@ fn test_conditional_infer_extract_action_pattern() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Concrete action type: { type: "inc" } | { type: "dec" }
@@ -14372,7 +14885,7 @@ fn test_conditional_infer_extract_action_pattern() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Conditional: concrete_reducer extends extends_fn ? A : never
@@ -14437,7 +14950,7 @@ fn test_conditional_infer_extract_state_non_matching() {
         return_type: infer_s,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Non-Reducer type: just a plain string
@@ -14492,7 +15005,7 @@ fn test_conditional_infer_extract_state_union_distributive() {
         return_type: infer_s,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Two reducer-like functions
@@ -14508,7 +15021,7 @@ fn test_conditional_infer_extract_state_union_distributive() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let reducer_string = interner.function(FunctionShape {
         type_params: vec![],
@@ -14522,7 +15035,7 @@ fn test_conditional_infer_extract_state_union_distributive() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Conditional: T extends (x: infer S) => S ? S : never
@@ -14563,8 +15076,8 @@ fn test_conditional_infer_extract_state_union_distributive() {
 /// Expected behavior: Application types should expand to instantiated body.
 #[test]
 fn test_application_ref_expansion_box_string() {
-    use crate::solver::subtype::TypeEnvironment;
     use crate::solver::evaluate::TypeEvaluator;
+    use crate::solver::subtype::TypeEnvironment;
 
     let interner = TypeInterner::new();
 
@@ -14627,8 +15140,8 @@ fn test_application_ref_expansion_box_string() {
 /// - Should expand to `(state: number | undefined, action: AnyAction) => number`
 #[test]
 fn test_application_ref_expansion_reducer_function() {
-    use crate::solver::subtype::TypeEnvironment;
     use crate::solver::evaluate::TypeEvaluator;
+    use crate::solver::subtype::TypeEnvironment;
 
     let interner = TypeInterner::new();
 
@@ -14654,7 +15167,7 @@ fn test_application_ref_expansion_reducer_function() {
     let s_or_undefined = interner.union(vec![s_type, TypeId::UNDEFINED]);
 
     let reducer_body = interner.function(FunctionShape {
-        type_params: vec![],  // Body has no additional type params
+        type_params: vec![], // Body has no additional type params
         params: vec![
             ParamInfo {
                 name: Some(state_name),
@@ -14673,7 +15186,7 @@ fn test_application_ref_expansion_reducer_function() {
         return_type: s_type,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Create Ref(1) for Reducer type alias
@@ -14723,7 +15236,7 @@ fn test_application_ref_expansion_reducer_function() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // TODO: When Application expansion is implemented (Worker 2/3 fix),
@@ -14745,8 +15258,8 @@ fn test_application_ref_expansion_reducer_function() {
 /// Should expand to the fully instantiated structure.
 #[test]
 fn test_application_ref_expansion_nested() {
-    use crate::solver::subtype::TypeEnvironment;
     use crate::solver::evaluate::TypeEvaluator;
+    use crate::solver::subtype::TypeEnvironment;
 
     let interner = TypeInterner::new();
 
@@ -14837,8 +15350,8 @@ fn test_application_ref_expansion_nested() {
 /// - `Optional<string, null>` should expand to `string | null`
 #[test]
 fn test_application_ref_expansion_with_defaults() {
-    use crate::solver::subtype::TypeEnvironment;
     use crate::solver::evaluate::TypeEvaluator;
+    use crate::solver::subtype::TypeEnvironment;
 
     let interner = TypeInterner::new();
 
@@ -14853,7 +15366,7 @@ fn test_application_ref_expansion_with_defaults() {
     let d_param = TypeParamInfo {
         name: d_name,
         constraint: None,
-        default: Some(TypeId::UNDEFINED),  // D = undefined
+        default: Some(TypeId::UNDEFINED), // D = undefined
     };
     let t_type = interner.intern(TypeKey::TypeParameter(t_param));
     let d_type = interner.intern(TypeKey::TypeParameter(d_param));
@@ -14868,7 +15381,8 @@ fn test_application_ref_expansion_with_defaults() {
     let optional_string = interner.application(optional_ref, vec![TypeId::STRING]);
 
     // Case 2: Optional<string, null> - both args provided
-    let optional_string_null = interner.application(optional_ref, vec![TypeId::STRING, TypeId::NULL]);
+    let optional_string_null =
+        interner.application(optional_ref, vec![TypeId::STRING, TypeId::NULL]);
 
     // Set up resolver
     let mut env = TypeEnvironment::new();
@@ -14910,8 +15424,8 @@ fn test_application_ref_expansion_with_defaults() {
 /// The constraint should be preserved/checked during expansion.
 #[test]
 fn test_application_ref_expansion_with_constraints() {
-    use crate::solver::subtype::TypeEnvironment;
     use crate::solver::evaluate::TypeEvaluator;
+    use crate::solver::subtype::TypeEnvironment;
 
     let interner = TypeInterner::new();
 
@@ -14919,7 +15433,7 @@ fn test_application_ref_expansion_with_constraints() {
     let t_name = interner.intern_string("T");
     let t_param = TypeParamInfo {
         name: t_name,
-        constraint: Some(TypeId::NUMBER),  // T extends number
+        constraint: Some(TypeId::NUMBER), // T extends number
         default: None,
     };
     let t_type = interner.intern(TypeKey::TypeParameter(t_param));
@@ -14992,8 +15506,8 @@ fn test_application_ref_expansion_with_constraints() {
 /// `Box<never>` should expand to `{ value: never }`
 #[test]
 fn test_application_ref_expansion_with_never_arg() {
-    use crate::solver::subtype::TypeEnvironment;
     use crate::solver::evaluate::TypeEvaluator;
+    use crate::solver::subtype::TypeEnvironment;
 
     let interner = TypeInterner::new();
 
@@ -15057,8 +15571,8 @@ fn test_application_ref_expansion_with_never_arg() {
 /// `Box<unknown>` should expand to `{ value: unknown }`
 #[test]
 fn test_application_ref_expansion_with_unknown_arg() {
-    use crate::solver::subtype::TypeEnvironment;
     use crate::solver::evaluate::TypeEvaluator;
+    use crate::solver::subtype::TypeEnvironment;
 
     let interner = TypeInterner::new();
 
@@ -15122,8 +15636,8 @@ fn test_application_ref_expansion_with_unknown_arg() {
 /// `Box<any>` should expand to `{ value: any }`
 #[test]
 fn test_application_ref_expansion_with_any_arg() {
-    use crate::solver::subtype::TypeEnvironment;
     use crate::solver::evaluate::TypeEvaluator;
+    use crate::solver::subtype::TypeEnvironment;
 
     let interner = TypeInterner::new();
 
@@ -15187,8 +15701,8 @@ fn test_application_ref_expansion_with_any_arg() {
 /// `Box<string | number>` should expand to `{ value: string | number }`
 #[test]
 fn test_application_ref_expansion_with_union_arg() {
-    use crate::solver::subtype::TypeEnvironment;
     use crate::solver::evaluate::TypeEvaluator;
+    use crate::solver::subtype::TypeEnvironment;
 
     let interner = TypeInterner::new();
 
@@ -15253,8 +15767,8 @@ fn test_application_ref_expansion_with_union_arg() {
 /// should either pass through or handle appropriately.
 #[test]
 fn test_application_non_ref_base_passthrough() {
-    use crate::solver::subtype::TypeEnvironment;
     use crate::solver::evaluate::TypeEvaluator;
+    use crate::solver::subtype::TypeEnvironment;
 
     let interner = TypeInterner::new();
 
@@ -15283,8 +15797,8 @@ fn test_application_non_ref_base_passthrough() {
 /// Recursive types need special handling to avoid infinite expansion.
 #[test]
 fn test_application_ref_expansion_recursive() {
-    use crate::solver::subtype::TypeEnvironment;
     use crate::solver::evaluate::TypeEvaluator;
+    use crate::solver::subtype::TypeEnvironment;
 
     let interner = TypeInterner::new();
 
@@ -15372,8 +15886,8 @@ fn test_application_ref_expansion_recursive() {
 /// This tests: Box<string & { length: number }>
 #[test]
 fn test_application_ref_expansion_with_intersection_arg() {
-    use crate::solver::subtype::TypeEnvironment;
     use crate::solver::evaluate::TypeEvaluator;
+    use crate::solver::subtype::TypeEnvironment;
 
     let interner = TypeInterner::new();
 
@@ -15443,8 +15957,8 @@ fn test_application_ref_expansion_with_intersection_arg() {
 /// This tests: type Map<K, V> = { key: K, value: V }
 #[test]
 fn test_application_ref_expansion_multi_param() {
-    use crate::solver::subtype::TypeEnvironment;
     use crate::solver::evaluate::TypeEvaluator;
+    use crate::solver::subtype::TypeEnvironment;
 
     let interner = TypeInterner::new();
 
@@ -15534,8 +16048,8 @@ fn test_application_ref_expansion_multi_param() {
 /// that Application expansion properly triggers conditional evaluation.
 #[test]
 fn test_application_ref_expansion_with_conditional_body() {
-    use crate::solver::subtype::TypeEnvironment;
     use crate::solver::evaluate::TypeEvaluator;
+    use crate::solver::subtype::TypeEnvironment;
 
     let interner = TypeInterner::new();
 
@@ -15582,11 +16096,13 @@ fn test_application_ref_expansion_with_conditional_body() {
     // IsString<string> should evaluate to string (true branch: string extends string)
     // IsString<number> should evaluate to number (false branch: number doesn't extend string)
     assert_eq!(
-        result_string, TypeId::STRING,
+        result_string,
+        TypeId::STRING,
         "IsString<string> should evaluate to string (true branch)"
     );
     assert_eq!(
-        result_number, TypeId::NUMBER,
+        result_number,
+        TypeId::NUMBER,
         "IsString<number> should evaluate to number (false branch)"
     );
 }
@@ -15596,8 +16112,8 @@ fn test_application_ref_expansion_with_conditional_body() {
 /// This tests: Box<[string, number]>
 #[test]
 fn test_application_ref_expansion_with_tuple_arg() {
-    use crate::solver::subtype::TypeEnvironment;
     use crate::solver::evaluate::TypeEvaluator;
+    use crate::solver::subtype::TypeEnvironment;
 
     let interner = TypeInterner::new();
 
@@ -15626,8 +16142,18 @@ fn test_application_ref_expansion_with_tuple_arg() {
 
     // Create tuple: [string, number]
     let tuple_type = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     // Create Application: Box<[string, number]>
@@ -15661,8 +16187,8 @@ fn test_application_ref_expansion_with_tuple_arg() {
 /// `type ArrayOf<T> = T[]` with `ArrayOf<string>` should expand to `string[]`
 #[test]
 fn test_application_ref_expansion_with_array_body() {
-    use crate::solver::subtype::TypeEnvironment;
     use crate::solver::evaluate::TypeEvaluator;
+    use crate::solver::subtype::TypeEnvironment;
 
     let interner = TypeInterner::new();
 
@@ -15706,8 +16232,8 @@ fn test_application_ref_expansion_with_array_body() {
 /// should expand to `{ readonly value: number }`
 #[test]
 fn test_application_ref_expansion_with_readonly_property() {
-    use crate::solver::subtype::TypeEnvironment;
     use crate::solver::evaluate::TypeEvaluator;
+    use crate::solver::subtype::TypeEnvironment;
 
     let interner = TypeInterner::new();
 
@@ -15727,7 +16253,7 @@ fn test_application_ref_expansion_with_readonly_property() {
         type_id: t_type,
         write_type: t_type,
         optional: false,
-        readonly: true,  // readonly modifier
+        readonly: true, // readonly modifier
         is_method: false,
     }]);
 
@@ -15766,8 +16292,8 @@ fn test_application_ref_expansion_with_readonly_property() {
 /// should expand to `{ value?: string }`
 #[test]
 fn test_application_ref_expansion_with_optional_property() {
-    use crate::solver::subtype::TypeEnvironment;
     use crate::solver::evaluate::TypeEvaluator;
+    use crate::solver::subtype::TypeEnvironment;
 
     let interner = TypeInterner::new();
 
@@ -15786,7 +16312,7 @@ fn test_application_ref_expansion_with_optional_property() {
         name: value_name,
         type_id: t_type,
         write_type: t_type,
-        optional: true,  // optional modifier
+        optional: true, // optional modifier
         readonly: false,
         is_method: false,
     }]);
@@ -15826,8 +16352,8 @@ fn test_application_ref_expansion_with_optional_property() {
 /// should expand to `{ get(): boolean }`
 #[test]
 fn test_application_ref_expansion_with_method() {
-    use crate::solver::subtype::TypeEnvironment;
     use crate::solver::evaluate::TypeEvaluator;
+    use crate::solver::subtype::TypeEnvironment;
 
     let interner = TypeInterner::new();
 
@@ -15848,7 +16374,7 @@ fn test_application_ref_expansion_with_method() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Define: type WithMethod<T> = { get(): T }
@@ -15859,7 +16385,7 @@ fn test_application_ref_expansion_with_method() {
         write_type: method_type,
         optional: false,
         readonly: false,
-        is_method: true,  // method
+        is_method: true, // method
     }]);
 
     // Create Ref(1) for WithMethod type alias
@@ -15883,7 +16409,7 @@ fn test_application_ref_expansion_with_method() {
         return_type: TypeId::BOOLEAN,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Expected: { get(): boolean }
@@ -15908,8 +16434,8 @@ fn test_application_ref_expansion_with_method() {
 /// should expand to `(...args: string[]) => void`
 #[test]
 fn test_application_ref_expansion_with_rest_param() {
-    use crate::solver::subtype::TypeEnvironment;
     use crate::solver::evaluate::TypeEvaluator;
+    use crate::solver::subtype::TypeEnvironment;
 
     let interner = TypeInterner::new();
 
@@ -15928,19 +16454,17 @@ fn test_application_ref_expansion_with_rest_param() {
 
     let varargs_body = interner.function(FunctionShape {
         type_params: vec![],
-        params: vec![
-            ParamInfo {
-                name: Some(args_name),
-                type_id: t_array,
-                optional: false,
-                rest: true,  // rest parameter
-            },
-        ],
+        params: vec![ParamInfo {
+            name: Some(args_name),
+            type_id: t_array,
+            optional: false,
+            rest: true, // rest parameter
+        }],
         this_type: None,
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Create Ref(1) for VarArgs type alias
@@ -15960,19 +16484,17 @@ fn test_application_ref_expansion_with_rest_param() {
     let string_array = interner.array(TypeId::STRING);
     let expected = interner.function(FunctionShape {
         type_params: vec![],
-        params: vec![
-            ParamInfo {
-                name: Some(args_name),
-                type_id: string_array,
-                optional: false,
-                rest: true,
-            },
-        ],
+        params: vec![ParamInfo {
+            name: Some(args_name),
+            type_id: string_array,
+            optional: false,
+            rest: true,
+        }],
         this_type: None,
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     assert_eq!(
@@ -15987,8 +16509,8 @@ fn test_application_ref_expansion_with_rest_param() {
 /// should expand to `{ [key: string]: number }`
 #[test]
 fn test_application_ref_expansion_with_index_signature() {
-    use crate::solver::subtype::TypeEnvironment;
     use crate::solver::evaluate::TypeEvaluator;
+    use crate::solver::subtype::TypeEnvironment;
 
     let interner = TypeInterner::new();
 
@@ -16048,8 +16570,8 @@ fn test_application_ref_expansion_with_index_signature() {
 /// should expand to `{ [index: number]: string }`
 #[test]
 fn test_application_ref_expansion_with_number_index_signature() {
-    use crate::solver::subtype::TypeEnvironment;
     use crate::solver::evaluate::TypeEvaluator;
+    use crate::solver::subtype::TypeEnvironment;
 
     let interner = TypeInterner::new();
 
@@ -16109,8 +16631,8 @@ fn test_application_ref_expansion_with_number_index_signature() {
 /// should expand to `{ value: "hello" }`
 #[test]
 fn test_application_ref_expansion_with_literal_arg() {
-    use crate::solver::subtype::TypeEnvironment;
     use crate::solver::evaluate::TypeEvaluator;
+    use crate::solver::subtype::TypeEnvironment;
 
     let interner = TypeInterner::new();
 
@@ -16172,8 +16694,8 @@ fn test_application_ref_expansion_with_literal_arg() {
 /// should expand to `{ value: 42 }`
 #[test]
 fn test_application_ref_expansion_with_numeric_literal_arg() {
-    use crate::solver::subtype::TypeEnvironment;
     use crate::solver::evaluate::TypeEvaluator;
+    use crate::solver::subtype::TypeEnvironment;
 
     let interner = TypeInterner::new();
 
@@ -16223,10 +16745,7 @@ fn test_application_ref_expansion_with_numeric_literal_arg() {
         is_method: false,
     }]);
 
-    assert_eq!(
-        result, expected,
-        "Box<42> should expand to {{ value: 42 }}"
-    );
+    assert_eq!(result, expected, "Box<42> should expand to {{ value: 42 }}");
 }
 
 /// Test Application expansion with multiple properties referencing same type param.
@@ -16235,8 +16754,8 @@ fn test_application_ref_expansion_with_numeric_literal_arg() {
 /// should expand to `{ first: string; second: string }`
 #[test]
 fn test_application_ref_expansion_with_multiple_refs_to_same_param() {
-    use crate::solver::subtype::TypeEnvironment;
     use crate::solver::evaluate::TypeEvaluator;
+    use crate::solver::subtype::TypeEnvironment;
 
     let interner = TypeInterner::new();
 
@@ -16316,8 +16835,8 @@ fn test_application_ref_expansion_with_multiple_refs_to_same_param() {
 /// should expand to `{ value: true }`
 #[test]
 fn test_application_ref_expansion_with_boolean_literal_arg() {
-    use crate::solver::subtype::TypeEnvironment;
     use crate::solver::evaluate::TypeEvaluator;
+    use crate::solver::subtype::TypeEnvironment;
 
     let interner = TypeInterner::new();
 
@@ -16379,8 +16898,8 @@ fn test_application_ref_expansion_with_boolean_literal_arg() {
 /// should expand to `string | number`
 #[test]
 fn test_application_ref_expansion_with_union_body() {
-    use crate::solver::subtype::TypeEnvironment;
     use crate::solver::evaluate::TypeEvaluator;
+    use crate::solver::subtype::TypeEnvironment;
 
     let interner = TypeInterner::new();
 
@@ -16407,7 +16926,8 @@ fn test_application_ref_expansion_with_union_body() {
     let either_ref = interner.reference(SymbolRef(1));
 
     // Create Application: Either<string, number>
-    let either_string_number = interner.application(either_ref, vec![TypeId::STRING, TypeId::NUMBER]);
+    let either_string_number =
+        interner.application(either_ref, vec![TypeId::STRING, TypeId::NUMBER]);
 
     // Set up resolver with type parameters
     let mut env = TypeEnvironment::new();
@@ -16431,8 +16951,8 @@ fn test_application_ref_expansion_with_union_body() {
 /// should expand to `{x: number} & {y: string}`
 #[test]
 fn test_application_ref_expansion_with_intersection_body() {
-    use crate::solver::subtype::TypeEnvironment;
     use crate::solver::evaluate::TypeEvaluator;
+    use crate::solver::subtype::TypeEnvironment;
 
     let interner = TypeInterner::new();
 
@@ -16503,8 +17023,8 @@ fn test_application_ref_expansion_with_intersection_body() {
 /// should expand to `(this: {x: number}) => void`
 #[test]
 fn test_application_ref_expansion_with_this_param() {
-    use crate::solver::subtype::TypeEnvironment;
     use crate::solver::evaluate::TypeEvaluator;
+    use crate::solver::subtype::TypeEnvironment;
 
     let interner = TypeInterner::new();
 
@@ -16521,11 +17041,11 @@ fn test_application_ref_expansion_with_this_param() {
     let bound_method_body = interner.function(FunctionShape {
         type_params: vec![],
         params: vec![],
-        this_type: Some(t_type),  // this parameter
+        this_type: Some(t_type), // this parameter
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Create Ref(1) for BoundMethod type alias
@@ -16560,7 +17080,7 @@ fn test_application_ref_expansion_with_this_param() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     assert_eq!(
@@ -16575,8 +17095,8 @@ fn test_application_ref_expansion_with_this_param() {
 /// should expand to `(x?: string) => string`
 #[test]
 fn test_application_ref_expansion_with_optional_param() {
-    use crate::solver::subtype::TypeEnvironment;
     use crate::solver::evaluate::TypeEvaluator;
+    use crate::solver::subtype::TypeEnvironment;
 
     let interner = TypeInterner::new();
 
@@ -16596,14 +17116,14 @@ fn test_application_ref_expansion_with_optional_param() {
         params: vec![ParamInfo {
             name: Some(x_name),
             type_id: t_type,
-            optional: true,  // optional parameter
+            optional: true, // optional parameter
             rest: false,
         }],
         this_type: None,
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Create Ref(1) for OptionalFn type alias
@@ -16632,7 +17152,7 @@ fn test_application_ref_expansion_with_optional_param() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     assert_eq!(
@@ -16647,8 +17167,8 @@ fn test_application_ref_expansion_with_optional_param() {
 /// should expand to `readonly number[]`
 #[test]
 fn test_application_ref_expansion_with_readonly_array_body() {
-    use crate::solver::subtype::TypeEnvironment;
     use crate::solver::evaluate::TypeEvaluator;
+    use crate::solver::subtype::TypeEnvironment;
 
     let interner = TypeInterner::new();
 
@@ -16694,8 +17214,8 @@ fn test_application_ref_expansion_with_readonly_array_body() {
 /// should expand to `{ readonly id: string; value?: number }`
 #[test]
 fn test_application_ref_expansion_with_mixed_modifiers() {
-    use crate::solver::subtype::TypeEnvironment;
     use crate::solver::evaluate::TypeEvaluator;
+    use crate::solver::subtype::TypeEnvironment;
 
     let interner = TypeInterner::new();
 
@@ -16717,14 +17237,14 @@ fn test_application_ref_expansion_with_mixed_modifiers() {
             type_id: TypeId::STRING,
             write_type: TypeId::STRING,
             optional: false,
-            readonly: true,  // readonly
+            readonly: true, // readonly
             is_method: false,
         },
         PropertyInfo {
             name: value_name,
             type_id: t_type,
             write_type: t_type,
-            optional: true,  // optional
+            optional: true, // optional
             readonly: false,
             is_method: false,
         },
@@ -16775,8 +17295,8 @@ fn test_application_ref_expansion_with_mixed_modifiers() {
 /// should expand to `{ (arg: string): boolean }`
 #[test]
 fn test_application_ref_expansion_with_callable_body() {
-    use crate::solver::subtype::TypeEnvironment;
     use crate::solver::evaluate::TypeEvaluator;
+    use crate::solver::subtype::TypeEnvironment;
 
     let interner = TypeInterner::new();
 
@@ -16814,13 +17334,15 @@ fn test_application_ref_expansion_with_callable_body() {
         call_signatures: vec![call_sig],
         construct_signatures: vec![],
         properties: vec![],
-    ..Default::default() });
+        ..Default::default()
+    });
 
     // Create Ref(1) for Callback type alias
     let callback_ref = interner.reference(SymbolRef(1));
 
     // Create Application: Callback<string, boolean>
-    let callback_string_bool = interner.application(callback_ref, vec![TypeId::STRING, TypeId::BOOLEAN]);
+    let callback_string_bool =
+        interner.application(callback_ref, vec![TypeId::STRING, TypeId::BOOLEAN]);
 
     // Set up resolver with type parameters
     let mut env = TypeEnvironment::new();
@@ -16846,7 +17368,8 @@ fn test_application_ref_expansion_with_callable_body() {
         call_signatures: vec![expected_call_sig],
         construct_signatures: vec![],
         properties: vec![],
-    ..Default::default() });
+        ..Default::default()
+    });
 
     assert_eq!(
         result, expected,
@@ -16860,8 +17383,8 @@ fn test_application_ref_expansion_with_callable_body() {
 /// should expand to `{ new (): {x: number} }`
 #[test]
 fn test_application_ref_expansion_with_construct_signature() {
-    use crate::solver::subtype::TypeEnvironment;
     use crate::solver::evaluate::TypeEvaluator;
+    use crate::solver::subtype::TypeEnvironment;
 
     let interner = TypeInterner::new();
 
@@ -16886,7 +17409,8 @@ fn test_application_ref_expansion_with_construct_signature() {
         call_signatures: vec![],
         construct_signatures: vec![construct_sig],
         properties: vec![],
-    ..Default::default() });
+        ..Default::default()
+    });
 
     // Create Ref(1) for Constructor type alias
     let constructor_ref = interner.reference(SymbolRef(1));
@@ -16924,7 +17448,8 @@ fn test_application_ref_expansion_with_construct_signature() {
         call_signatures: vec![],
         construct_signatures: vec![expected_construct_sig],
         properties: vec![],
-    ..Default::default() });
+        ..Default::default()
+    });
 
     assert_eq!(
         result, expected,
@@ -16938,8 +17463,8 @@ fn test_application_ref_expansion_with_construct_signature() {
 /// should expand to `{ inner: { value: string } }`
 #[test]
 fn test_application_ref_expansion_with_deeply_nested_param() {
-    use crate::solver::subtype::TypeEnvironment;
     use crate::solver::evaluate::TypeEvaluator;
+    use crate::solver::subtype::TypeEnvironment;
 
     let interner = TypeInterner::new();
 
@@ -17103,7 +17628,10 @@ fn test_conditional_intersection_check_type() {
     let result = evaluate_conditional(&interner, &cond);
 
     // string & {...} extends string should be true (intersection is more specific)
-    assert_eq!(result, lit_true, "string intersection extends string should be true");
+    assert_eq!(
+        result, lit_true,
+        "string intersection extends string should be true"
+    );
 }
 
 /// Test conditional with `never` as check type (non-distributive).
@@ -17130,7 +17658,10 @@ fn test_conditional_never_check_type_non_distributive() {
 
     // With non-distributive, never extends T should evaluate normally
     // never is assignable to everything, so true branch
-    assert_eq!(result, lit_true, "never extends string (non-distributive) should be true");
+    assert_eq!(
+        result, lit_true,
+        "never extends string (non-distributive) should be true"
+    );
 }
 
 /// Test conditional with `never` extends type.
@@ -17195,8 +17726,18 @@ fn test_conditional_infer_tuple_multiple_positions() {
 
     // Create tuple: [string, number]
     let tuple_type = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     // Create infer placeholders for A and B
@@ -17215,15 +17756,35 @@ fn test_conditional_infer_tuple_multiple_positions() {
 
     // Create extends pattern: [infer A, infer B]
     let pattern = interner.tuple(vec![
-        TupleElement { type_id: infer_a, name: None, optional: false, rest: false },
-        TupleElement { type_id: infer_b, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: infer_a,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: infer_b,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     // Create true branch: [B, A] - swapped
     // We reference the inferred types using their positions
     let swapped = interner.tuple(vec![
-        TupleElement { type_id: infer_b, name: None, optional: false, rest: false },
-        TupleElement { type_id: infer_a, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: infer_b,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: infer_a,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     let cond = ConditionalType {
@@ -17238,11 +17799,24 @@ fn test_conditional_infer_tuple_multiple_positions() {
 
     // Expected: [number, string] (swapped)
     let expected = interner.tuple(vec![
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
-    assert_eq!(result, expected, "[string, number] with [infer A, infer B] should swap to [number, string]");
+    assert_eq!(
+        result, expected,
+        "[string, number] with [infer A, infer B] should swap to [number, string]"
+    );
 }
 
 /// Test nested conditional types (conditional in true branch).
@@ -17278,7 +17852,10 @@ fn test_conditional_nested_in_true_branch() {
     let result = evaluate_conditional(&interner, &outer_cond);
 
     // "hello" extends string -> true, then "hello" extends "hello" -> "greeting"
-    assert_eq!(result, greeting_lit, "nested conditional should resolve to 'greeting'");
+    assert_eq!(
+        result, greeting_lit,
+        "nested conditional should resolve to 'greeting'"
+    );
 }
 
 /// Test distributive conditional with literal union.
@@ -17311,7 +17888,10 @@ fn test_conditional_distributive_literal_union() {
     // "a" -> "yes", "b" -> "no", "c" -> "no"
     // Result: "yes" | "no"
     let expected = interner.union(vec![yes_lit, no_lit]);
-    assert_eq!(result, expected, "distributive over literal union should produce 'yes' | 'no'");
+    assert_eq!(
+        result, expected,
+        "distributive over literal union should produce 'yes' | 'no'"
+    );
 }
 
 /// Test conditional with `any` in extends position.
@@ -17389,7 +17969,11 @@ fn test_conditional_infer_constraint_mismatch_edge() {
     let result = evaluate_conditional(&interner, &cond);
 
     // number doesn't satisfy constraint `extends string`, so false branch
-    assert_eq!(result, TypeId::NEVER, "infer with mismatched constraint should produce never");
+    assert_eq!(
+        result,
+        TypeId::NEVER,
+        "infer with mismatched constraint should produce never"
+    );
 }
 
 // =========================================================================
@@ -18161,7 +18745,10 @@ fn test_variadic_tuple_spread_at_end() {
     ]);
 
     // Verify the tuple was created as a tuple type
-    assert!(matches!(interner.lookup(variadic_tuple), Some(TypeKey::Tuple(_))));
+    assert!(matches!(
+        interner.lookup(variadic_tuple),
+        Some(TypeKey::Tuple(_))
+    ));
     assert_ne!(variadic_tuple, TypeId::NEVER);
     assert_ne!(variadic_tuple, TypeId::UNKNOWN);
 }
@@ -18189,7 +18776,10 @@ fn test_variadic_tuple_spread_at_start() {
     ]);
 
     // Verify the tuple was created as a tuple type
-    assert!(matches!(interner.lookup(variadic_tuple), Some(TypeKey::Tuple(_))));
+    assert!(matches!(
+        interner.lookup(variadic_tuple),
+        Some(TypeKey::Tuple(_))
+    ));
     assert_ne!(variadic_tuple, TypeId::NEVER);
     assert_ne!(variadic_tuple, TypeId::UNKNOWN);
 }
@@ -18753,7 +19343,7 @@ fn test_indexed_access_optional_property() {
         name: interner.intern_string("a"),
         type_id: TypeId::STRING,
         write_type: TypeId::STRING,
-        optional: true,  // optional property
+        optional: true, // optional property
         readonly: false,
         is_method: false,
     }]);
@@ -18778,7 +19368,7 @@ fn test_indexed_access_mixed_optional_required() {
             name: interner.intern_string("a"),
             type_id: TypeId::STRING,
             write_type: TypeId::STRING,
-            optional: false,  // required
+            optional: false, // required
             readonly: false,
             is_method: false,
         },
@@ -18786,7 +19376,7 @@ fn test_indexed_access_mixed_optional_required() {
             name: interner.intern_string("b"),
             type_id: TypeId::NUMBER,
             write_type: TypeId::NUMBER,
-            optional: true,  // optional
+            optional: true, // optional
             readonly: false,
             is_method: false,
         },
@@ -18824,9 +19414,24 @@ fn test_indexed_access_tuple_literal_index() {
     let interner = TypeInterner::new();
 
     let tuple = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     let key_0 = interner.literal_number(0.0);
@@ -18924,7 +19529,7 @@ fn test_indexed_access_readonly_property() {
         type_id: TypeId::STRING,
         write_type: TypeId::STRING,
         optional: false,
-        readonly: true,  // readonly
+        readonly: true, // readonly
         is_method: false,
     }]);
 
@@ -18932,7 +19537,6 @@ fn test_indexed_access_readonly_property() {
     let result = evaluate_index_access(&interner, obj, key_a);
     assert_eq!(result, TypeId::STRING);
 }
-
 
 // ============================================================================
 // Generator Function Type Tests
@@ -18967,7 +19571,7 @@ fn test_generator_function_return_type_extraction() {
         return_type: infer_r,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let cond = ConditionalType {
@@ -18989,7 +19593,7 @@ fn test_generator_function_return_type_extraction() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     subst.insert(t_name, input_fn);
 
@@ -19175,7 +19779,7 @@ fn test_generator_function_next_param_type() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let cond = ConditionalType {
@@ -19203,7 +19807,7 @@ fn test_generator_function_next_param_type() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     subst.insert(t_name, input_fn);
 
@@ -19248,7 +19852,7 @@ fn test_generator_function_multiple_params() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let cond = ConditionalType {
@@ -19285,7 +19889,7 @@ fn test_generator_function_multiple_params() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     subst.insert(t_name, input_fn);
 
@@ -19295,7 +19899,13 @@ fn test_generator_function_multiple_params() {
     // Rest parameter extraction may return never if pattern doesn't match
     // or return the extracted parameters if it does
     // This tests the basic structure is correct
-    assert!(result == TypeId::NEVER || matches!(interner.lookup(result), Some(TypeKey::Tuple(_)) | Some(TypeKey::Array(_)) | Some(_)));
+    assert!(
+        result == TypeId::NEVER
+            || matches!(
+                interner.lookup(result),
+                Some(TypeKey::Tuple(_)) | Some(TypeKey::Array(_)) | Some(_)
+            )
+    );
 }
 
 // ============================================================================
@@ -19408,7 +20018,7 @@ fn test_module_augmentation_function_overload() {
         return_type: infer_r,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let cond = ConditionalType {
@@ -19430,7 +20040,7 @@ fn test_module_augmentation_function_overload() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     subst.insert(t_name, input_fn);
 
@@ -19467,7 +20077,7 @@ fn test_module_augmentation_namespace_merge() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let utils_obj = interner.object(vec![PropertyInfo {
         name: format_prop,
@@ -19490,7 +20100,10 @@ fn test_module_augmentation_namespace_merge() {
     let merged_ns = interner.intersection(vec![ns1, ns2]);
 
     // Verify it's an intersection
-    assert!(matches!(interner.lookup(merged_ns), Some(TypeKey::Intersection(_))));
+    assert!(matches!(
+        interner.lookup(merged_ns),
+        Some(TypeKey::Intersection(_))
+    ));
 }
 
 #[test]
@@ -19864,7 +20477,7 @@ fn test_return_type_generic_function() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Source: generic function <U>(x: U) => U
@@ -19890,7 +20503,7 @@ fn test_return_type_generic_function() {
         return_type: u_param, // returns U
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let cond = ConditionalType {
@@ -19935,7 +20548,7 @@ fn test_return_type_overloaded_function() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Overloaded function: { (x: string): number; (x: number): boolean; }
@@ -20012,7 +20625,7 @@ fn test_return_type_type_predicate_function() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Source: (x: unknown) => x is string (type guard)
@@ -20033,7 +20646,7 @@ fn test_return_type_type_predicate_function() {
             asserts: false,
         }),
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let cond = ConditionalType {
@@ -20076,7 +20689,7 @@ fn test_parameters_rest_param_function() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Source: (...args: string[]) => void
@@ -20092,7 +20705,7 @@ fn test_parameters_rest_param_function() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let cond = ConditionalType {
@@ -20136,7 +20749,7 @@ fn test_parameters_optional_and_rest_combination() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Source: (a: string, b?: number, ...rest: boolean[]) => void
@@ -20166,7 +20779,7 @@ fn test_parameters_optional_and_rest_combination() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let cond = ConditionalType {
@@ -20346,7 +20959,7 @@ fn test_return_type_union_distributive() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let cond = ConditionalType {
@@ -20368,7 +20981,7 @@ fn test_return_type_union_distributive() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let fn_number = interner.function(FunctionShape {
         type_params: Vec::new(),
@@ -20377,7 +20990,7 @@ fn test_return_type_union_distributive() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     subst.insert(t_name, interner.union(vec![fn_string, fn_number]));
 
@@ -20598,14 +21211,34 @@ fn test_infer_tuple_swap_pattern() {
 
     // Pattern: [infer A, infer B]
     let pattern = interner.tuple(vec![
-        TupleElement { type_id: infer_a, name: None, optional: false, rest: false },
-        TupleElement { type_id: infer_b, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: infer_a,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: infer_b,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     // Input: [string, number]
     let input = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     // True branch result would be [B, A] = [number, string]
@@ -20644,14 +21277,34 @@ fn test_infer_tuple_swap_second_position() {
 
     // Pattern: [infer A, infer B]
     let pattern = interner.tuple(vec![
-        TupleElement { type_id: infer_a, name: None, optional: false, rest: false },
-        TupleElement { type_id: infer_b, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: infer_a,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: infer_b,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     // Input: [string, number]
     let input = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     // Extract B
@@ -20701,7 +21354,7 @@ fn test_infer_function_signature_param_and_return() {
         return_type: infer_r,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Input: (x: string) => number
@@ -20717,7 +21370,7 @@ fn test_infer_function_signature_param_and_return() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Extract P (parameter type)
@@ -20783,7 +21436,7 @@ fn test_infer_function_multiple_params() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Input: (a: boolean, b: string) => void
@@ -20807,7 +21460,7 @@ fn test_infer_function_multiple_params() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Extract A
@@ -21023,7 +21676,7 @@ fn test_infer_contravariant_single_param() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Input: (x: string | number) => void
@@ -21040,7 +21693,7 @@ fn test_infer_contravariant_single_param() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let cond = ConditionalType {
@@ -21092,7 +21745,7 @@ fn test_infer_contravariant_intersection_from_multiple_candidates() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Input: (a: string, b: string) => void
@@ -21116,7 +21769,7 @@ fn test_infer_contravariant_intersection_from_multiple_candidates() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let cond = ConditionalType {
@@ -21158,7 +21811,7 @@ fn test_infer_contravariant_callback_param() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Outer pattern: (callback: CallbackPattern) => any
@@ -21174,7 +21827,7 @@ fn test_infer_contravariant_callback_param() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Input callback: (x: number) => void
@@ -21190,7 +21843,7 @@ fn test_infer_contravariant_callback_param() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Input: (callback: InputCallback) => void
@@ -21206,7 +21859,7 @@ fn test_infer_contravariant_callback_param() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let cond = ConditionalType {
@@ -21248,15 +21901,40 @@ fn test_tuple_spread_infer_first_rest() {
 
     // Pattern: [infer F, ...infer R]
     let pattern = interner.tuple(vec![
-        TupleElement { type_id: infer_f, name: None, optional: false, rest: false },
-        TupleElement { type_id: infer_r, name: None, optional: false, rest: true },
+        TupleElement {
+            type_id: infer_f,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: infer_r,
+            name: None,
+            optional: false,
+            rest: true,
+        },
     ]);
 
     // Input: [string, number, boolean]
     let input = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     // Extract F (first element)
@@ -21283,16 +21961,41 @@ fn test_tuple_spread_concat_pattern() {
 
     // Result of concat: [string, number, boolean]
     let concat_result = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     // Pattern: [string, ...any[]]
     let any_array = interner.array(TypeId::ANY);
     let pattern = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: any_array, name: None, optional: false, rest: true },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: any_array,
+            name: None,
+            optional: false,
+            rest: true,
+        },
     ]);
 
     let lit_yes = interner.literal_string("yes");
@@ -21368,16 +22071,41 @@ fn test_tuple_spread_push_pattern() {
     // Original: [string, number]
     // After push boolean: [string, number, boolean]
     let pushed = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     // Pattern: [...any[], boolean] - ends with boolean
     let any_array = interner.array(TypeId::ANY);
     let pattern = interner.tuple(vec![
-        TupleElement { type_id: any_array, name: None, optional: false, rest: true },
-        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: any_array,
+            name: None,
+            optional: false,
+            rest: true,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     let lit_yes = interner.literal_string("yes");
@@ -21431,7 +22159,10 @@ fn test_nonnullable_removes_null() {
     // and since not all members extend null|undefined, it returns the union as-is.
     // The test verifies the conditional evaluates without crashing.
     // When fully implemented, result should equal TypeId::STRING.
-    assert!(result != TypeId::NEVER, "NonNullable should not return never for string|null");
+    assert!(
+        result != TypeId::NEVER,
+        "NonNullable should not return never for string|null"
+    );
 }
 
 /// Test NonNullable<T> with union containing undefined.
@@ -21458,7 +22189,10 @@ fn test_nonnullable_removes_undefined() {
 
     // TODO: When distributive conditional is fully implemented with type parameters,
     // result should equal TypeId::NUMBER.
-    assert!(result != TypeId::NEVER, "NonNullable should not return never for number|undefined");
+    assert!(
+        result != TypeId::NEVER,
+        "NonNullable should not return never for number|undefined"
+    );
 }
 
 /// Test NonNullable<T> with union containing both null and undefined.
@@ -21485,7 +22219,10 @@ fn test_nonnullable_removes_null_and_undefined() {
 
     // TODO: When distributive conditional is fully implemented with type parameters,
     // result should equal TypeId::STRING.
-    assert!(result != TypeId::NEVER, "NonNullable should not return never for string|null|undefined");
+    assert!(
+        result != TypeId::NEVER,
+        "NonNullable should not return never for string|null|undefined"
+    );
 }
 
 /// Test NonNullable<T> with complex union.
@@ -21517,7 +22254,10 @@ fn test_nonnullable_preserves_non_nullable_members() {
 
     // TODO: When distributive conditional is fully implemented with type parameters,
     // result should equal string | number union.
-    assert!(result != TypeId::NEVER, "NonNullable should not return never for mixed union");
+    assert!(
+        result != TypeId::NEVER,
+        "NonNullable should not return never for mixed union"
+    );
 }
 
 /// Test NonNullable<T> with only nullable types.
@@ -21607,7 +22347,10 @@ fn test_readonly_nested_object_top_level_only() {
             let shape = interner.object_shape(shape_id);
             assert_eq!(shape.properties.len(), 1);
             // Top-level property 'a' should be readonly
-            assert!(shape.properties[0].readonly, "Property 'a' should be readonly");
+            assert!(
+                shape.properties[0].readonly,
+                "Property 'a' should be readonly"
+            );
 
             // The nested object should NOT be readonly (shallow Readonly)
             let inner_type = shape.properties[0].type_id;
@@ -21687,8 +22430,14 @@ fn test_readonly_multiple_properties_nested() {
         TypeKey::Object(shape_id) => {
             let shape = interner.object_shape(shape_id);
             assert_eq!(shape.properties.len(), 2);
-            assert!(shape.properties[0].readonly, "Property 'a' should be readonly");
-            assert!(shape.properties[1].readonly, "Property 'b' should be readonly");
+            assert!(
+                shape.properties[0].readonly,
+                "Property 'a' should be readonly"
+            );
+            assert!(
+                shape.properties[1].readonly,
+                "Property 'b' should be readonly"
+            );
         }
         _ => panic!("Expected Object type"),
     }
@@ -21901,7 +22650,10 @@ fn test_deep_readonly_with_array_property() {
         TypeKey::Object(shape_id) => {
             let shape = interner.object_shape(shape_id);
             assert_eq!(shape.properties.len(), 1);
-            assert!(shape.properties[0].readonly, "Property 'items' should be readonly");
+            assert!(
+                shape.properties[0].readonly,
+                "Property 'items' should be readonly"
+            );
             // The array type itself is preserved
             assert_eq!(shape.properties[0].type_id, string_array);
         }
@@ -22194,7 +22946,10 @@ fn test_awaited_mixed_union() {
     // are not fully distributed. The test verifies we get a valid result.
     // When fully implemented: Promise<boolean> unwraps to boolean, number passes through,
     // result should be boolean | number.
-    assert!(result != TypeId::NEVER, "Awaited on mixed union should not return never");
+    assert!(
+        result != TypeId::NEVER,
+        "Awaited on mixed union should not return never"
+    );
 }
 
 // ============================================================================
@@ -22332,7 +23087,12 @@ fn test_infer_mapped_type_mixed_values() {
     // V should be string | number (union of all value types)
     // Behavior depends on implementation - may return first match, union, or never
     let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
-    assert!(result == expected || result == TypeId::STRING || result == TypeId::NUMBER || result == TypeId::NEVER);
+    assert!(
+        result == expected
+            || result == TypeId::STRING
+            || result == TypeId::NUMBER
+            || result == TypeId::NEVER
+    );
 }
 
 #[test]
@@ -22409,7 +23169,7 @@ fn test_infer_with_extends_constraint() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Input: (x: "hello") => void - literal string satisfies constraint
@@ -22426,7 +23186,7 @@ fn test_infer_with_extends_constraint() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let cond = ConditionalType {
@@ -22467,7 +23227,7 @@ fn test_infer_with_constraint_violation() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Input: (x: number) => void - number does NOT satisfy string constraint
@@ -22483,7 +23243,7 @@ fn test_infer_with_constraint_violation() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let cond = ConditionalType {
@@ -22519,7 +23279,7 @@ fn test_infer_multiple_same_name_covariant() {
         return_type: infer_r, // covariant position
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Pattern object with getter
@@ -22540,7 +23300,7 @@ fn test_infer_multiple_same_name_covariant() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let input = interner.object(vec![PropertyInfo {
@@ -22924,20 +23684,18 @@ fn test_iterable_with_symbol_iterator() {
         return_type: iter_result,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Iterator<number> = { next(): IteratorResult<number> }
-    let iterator = interner.object(vec![
-        PropertyInfo {
-            name: next_name,
-            type_id: next_fn,
-            write_type: next_fn,
-            optional: false,
-            readonly: true,
-            is_method: true,
-        },
-    ]);
+    let iterator = interner.object(vec![PropertyInfo {
+        name: next_name,
+        type_id: next_fn,
+        write_type: next_fn,
+        optional: false,
+        readonly: true,
+        is_method: true,
+    }]);
 
     // Verify iterator structure
     match interner.lookup(iterator) {
@@ -22984,7 +23742,7 @@ fn test_symbol_keyed_property() {
         return_type: TypeId::ANY, // Simplified
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Note: In the actual implementation, symbol-keyed properties would need
@@ -23087,16 +23845,14 @@ fn test_async_iterator_result() {
     ]);
 
     // Promise<IteratorResult<string>> simplified as { then: IteratorResult }
-    let promise_iter = interner.object(vec![
-        PropertyInfo {
-            name: then_name,
-            type_id: iter_result,
-            write_type: iter_result,
-            optional: false,
-            readonly: true,
-            is_method: false,
-        },
-    ]);
+    let promise_iter = interner.object(vec![PropertyInfo {
+        name: then_name,
+        type_id: iter_result,
+        write_type: iter_result,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
 
     // Verify structure
     match interner.lookup(promise_iter) {
@@ -23286,7 +24042,7 @@ fn test_extract_function_types() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Test: (() => void) extends (() => void) ? T : never
@@ -23672,7 +24428,7 @@ fn test_noinfer_in_function_param_position() {
         return_type: t_param,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Verify function structure
@@ -23890,7 +24646,7 @@ fn test_noinfer_default_parameter() {
         return_type: t_param,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     match interner.lookup(func) {
@@ -23969,7 +24725,7 @@ fn test_noinfer_multiple_type_params() {
         return_type: result_tuple,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     match interner.lookup(func) {
@@ -24030,7 +24786,7 @@ fn test_noinfer_in_return_position() {
         return_type: t_param, // NoInfer<T> = T
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     match interner.lookup(func) {
@@ -24125,7 +24881,10 @@ fn test_record_string_keys() {
         Some(TypeKey::ObjectWithIndex(shape_id)) => {
             let shape = interner.object_shape(shape_id);
             assert!(shape.string_index.is_some());
-            assert_eq!(shape.string_index.as_ref().unwrap().value_type, TypeId::NUMBER);
+            assert_eq!(
+                shape.string_index.as_ref().unwrap().value_type,
+                TypeId::NUMBER
+            );
         }
         _ => panic!("Expected ObjectWithIndex type"),
     }
@@ -24150,7 +24909,10 @@ fn test_record_number_keys() {
         Some(TypeKey::ObjectWithIndex(shape_id)) => {
             let shape = interner.object_shape(shape_id);
             assert!(shape.number_index.is_some());
-            assert_eq!(shape.number_index.as_ref().unwrap().value_type, TypeId::STRING);
+            assert_eq!(
+                shape.number_index.as_ref().unwrap().value_type,
+                TypeId::STRING
+            );
         }
         _ => panic!("Expected ObjectWithIndex type"),
     }
@@ -24677,7 +25439,7 @@ fn test_partial_with_methods() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let partial_obj = interner.object(vec![PropertyInfo {
@@ -25015,9 +25777,24 @@ fn test_template_three_infers() {
     let input = interner.literal_string("x/y/z");
 
     let result_tuple = interner.tuple(vec![
-        TupleElement { type_id: infer_a, name: None, optional: false, rest: false },
-        TupleElement { type_id: infer_b, name: None, optional: false, rest: false },
-        TupleElement { type_id: infer_c, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: infer_a,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: infer_b,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: infer_c,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     let cond = ConditionalType {
@@ -25045,9 +25822,7 @@ fn test_template_union_distribution_simple() {
     }));
 
     // Pattern: just `${infer X}` (matches any string)
-    let pattern = interner.template_literal(vec![
-        TemplateSpan::Type(infer_x),
-    ]);
+    let pattern = interner.template_literal(vec![TemplateSpan::Type(infer_x)]);
 
     let lit_a = interner.literal_string("a");
     let lit_b = interner.literal_string("b");
@@ -25153,9 +25928,7 @@ fn test_template_constrained_infer_string() {
     }));
 
     // Pattern: `${infer S extends string}`
-    let pattern = interner.template_literal(vec![
-        TemplateSpan::Type(infer_s),
-    ]);
+    let pattern = interner.template_literal(vec![TemplateSpan::Type(infer_s)]);
 
     let input = interner.literal_string("test");
 
@@ -25189,9 +25962,7 @@ fn test_template_constrained_infer_literal_union() {
     }));
 
     // Pattern: `${infer S extends "a" | "b"}`
-    let pattern = interner.template_literal(vec![
-        TemplateSpan::Type(infer_s),
-    ]);
+    let pattern = interner.template_literal(vec![TemplateSpan::Type(infer_s)]);
 
     let input = interner.literal_string("a");
 
@@ -25226,9 +25997,7 @@ fn test_template_constrained_infer_violation() {
     }));
 
     // Pattern: `${infer S extends "a" | "b"}`
-    let pattern = interner.template_literal(vec![
-        TemplateSpan::Type(infer_s),
-    ]);
+    let pattern = interner.template_literal(vec![TemplateSpan::Type(infer_s)]);
 
     let input = interner.literal_string("c");
 
@@ -25303,7 +26072,7 @@ fn test_omit_this_parameter_basic() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Function without this parameter (result of OmitThisParameter)
@@ -25319,7 +26088,7 @@ fn test_omit_this_parameter_basic() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Verify original has this
@@ -25359,7 +26128,7 @@ fn test_omit_this_parameter_no_this() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     match interner.lookup(fn_no_this) {
@@ -25389,8 +26158,16 @@ fn test_omit_this_preserves_generics() {
     // After OmitThisParameter, type params remain
     let fn_result = interner.function(FunctionShape {
         type_params: vec![
-            TypeParamInfo { name: t_name, constraint: None, default: None },
-            TypeParamInfo { name: u_name, constraint: None, default: None },
+            TypeParamInfo {
+                name: t_name,
+                constraint: None,
+                default: None,
+            },
+            TypeParamInfo {
+                name: u_name,
+                constraint: None,
+                default: None,
+            },
         ],
         params: vec![ParamInfo {
             name: Some(interner.intern_string("x")),
@@ -25402,7 +26179,7 @@ fn test_omit_this_preserves_generics() {
         return_type: u_param,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     match interner.lookup(fn_result) {
@@ -25825,7 +26602,7 @@ fn test_this_parameter_type() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     match interner.lookup(fn_with_this) {
@@ -25849,7 +26626,7 @@ fn test_return_type_simple() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     match interner.lookup(func) {
@@ -25939,9 +26716,7 @@ fn test_distributive_large_union_15_members() {
     let interner = TypeInterner::new();
 
     // Create 15-member union of number literals
-    let members: Vec<TypeId> = (0..15)
-        .map(|i| interner.literal_number(i as f64))
-        .collect();
+    let members: Vec<TypeId> = (0..15).map(|i| interner.literal_number(i as f64)).collect();
     let large_union = interner.union(members.clone());
 
     // Type parameter T for check type
@@ -27193,8 +27968,8 @@ fn test_awaited_triple_nested() {
 #[test]
 fn test_recursive_type_simple_tree() {
     // Test: type Tree = { left?: Tree, right?: Tree, value: number }
-    use crate::solver::subtype::TypeEnvironment;
     use crate::solver::evaluate::TypeEvaluator;
+    use crate::solver::subtype::TypeEnvironment;
 
     let interner = TypeInterner::new();
 
@@ -27257,8 +28032,8 @@ fn test_recursive_type_simple_tree() {
 #[test]
 fn test_recursive_type_linked_list() {
     // Test: type List<T> = { value: T, next: List<T> | null }
-    use crate::solver::subtype::TypeEnvironment;
     use crate::solver::evaluate::TypeEvaluator;
+    use crate::solver::subtype::TypeEnvironment;
 
     let interner = TypeInterner::new();
 
@@ -27320,7 +28095,10 @@ fn test_recursive_type_linked_list() {
             assert_eq!(shape.properties.len(), 2);
             // At least one property should be STRING (the substituted T)
             let has_string = shape.properties.iter().any(|p| p.type_id == TypeId::STRING);
-            assert!(has_string, "Should have value property substituted to STRING");
+            assert!(
+                has_string,
+                "Should have value property substituted to STRING"
+            );
         }
         _ => panic!("Expected Object type"),
     }
@@ -27808,8 +28586,8 @@ fn test_mutually_recursive_types_state_machine() {
 fn test_mutually_recursive_types_request_response() {
     // Test: type Request<T> = { id: number, response: Response<T> }
     //       type Response<T> = { data: T, request: Request<T> }
-    use crate::solver::subtype::TypeEnvironment;
     use crate::solver::evaluate::TypeEvaluator;
+    use crate::solver::subtype::TypeEnvironment;
 
     let interner = TypeInterner::new();
 
@@ -27888,7 +28666,10 @@ fn test_mutually_recursive_types_request_response() {
             assert_eq!(shape.properties.len(), 2);
             // At least one property should be NUMBER (id field)
             let has_number = shape.properties.iter().any(|p| p.type_id == TypeId::NUMBER);
-            assert!(has_number, "Request should have id property with NUMBER type");
+            assert!(
+                has_number,
+                "Request should have id property with NUMBER type"
+            );
         }
         _ => panic!("Expected Object type"),
     }
@@ -28056,8 +28837,8 @@ fn test_recursive_conditional_type_deep_readonly() {
 #[test]
 fn test_depth_limited_recursion_level_1() {
     // Test recursive expansion stops at appropriate depth
-    use crate::solver::subtype::TypeEnvironment;
     use crate::solver::evaluate::TypeEvaluator;
+    use crate::solver::subtype::TypeEnvironment;
 
     let interner = TypeInterner::new();
 
@@ -28197,8 +28978,8 @@ fn test_depth_limited_recursion_tuple_builder() {
 #[test]
 fn test_depth_limited_recursion_max_expansion() {
     // Test that recursive types don't expand infinitely
-    use crate::solver::subtype::TypeEnvironment;
     use crate::solver::evaluate::TypeEvaluator;
+    use crate::solver::subtype::TypeEnvironment;
 
     let interner = TypeInterner::new();
 
@@ -28234,8 +29015,8 @@ fn test_depth_limited_recursion_max_expansion() {
 #[test]
 fn test_depth_limited_recursion_path_tracking() {
     // Test that circular references are detected in evaluation
-    use crate::solver::subtype::TypeEnvironment;
     use crate::solver::evaluate::TypeEvaluator;
+    use crate::solver::subtype::TypeEnvironment;
 
     let interner = TypeInterner::new();
 
@@ -28683,8 +29464,18 @@ fn test_infer_discriminated_union_with_extra_props() {
 
     // Result: [T, D]
     let result_tuple = interner.tuple(vec![
-        TupleElement { type_id: infer_t, name: None, optional: false, rest: false },
-        TupleElement { type_id: infer_d, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: infer_t,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: infer_d,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     let cond = ConditionalType {
@@ -28814,7 +29605,7 @@ fn test_multiple_infers_both_constrained() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Input: (a: "hello", b: 42) => void
@@ -28840,13 +29631,23 @@ fn test_multiple_infers_both_constrained() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Result: [A, B]
     let result_tuple = interner.tuple(vec![
-        TupleElement { type_id: infer_a, name: None, optional: false, rest: false },
-        TupleElement { type_id: infer_b, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: infer_a,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: infer_b,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     let cond = ConditionalType {
@@ -28903,7 +29704,7 @@ fn test_multiple_infers_constraint_violation() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Input: (a: "hello", b: 42) => void - b violates string constraint
@@ -28929,12 +29730,22 @@ fn test_multiple_infers_constraint_violation() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let result_tuple = interner.tuple(vec![
-        TupleElement { type_id: infer_a, name: None, optional: false, rest: false },
-        TupleElement { type_id: infer_b, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: infer_a,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: infer_b,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     let cond = ConditionalType {
@@ -29012,8 +29823,18 @@ fn test_multiple_infers_same_constraint() {
     ]);
 
     let result_tuple = interner.tuple(vec![
-        TupleElement { type_id: infer_x, name: None, optional: false, rest: false },
-        TupleElement { type_id: infer_y, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: infer_x,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: infer_y,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     let cond = ConditionalType {
@@ -29115,9 +29936,24 @@ fn test_multiple_infers_different_constraints() {
     ]);
 
     let result_tuple = interner.tuple(vec![
-        TupleElement { type_id: infer_s, name: None, optional: false, rest: false },
-        TupleElement { type_id: infer_n, name: None, optional: false, rest: false },
-        TupleElement { type_id: infer_b, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: infer_s,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: infer_n,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: infer_b,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     let cond = ConditionalType {
@@ -29139,7 +29975,7 @@ fn test_multiple_infers_different_constraints() {
 
 #[test]
 fn test_typeof_variable_reference_basic() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
+    use crate::solver::{SymbolRef, TypeEnvironment};
 
     // typeof x where x: number
     let interner = TypeInterner::new();
@@ -29157,7 +29993,7 @@ fn test_typeof_variable_reference_basic() {
 
 #[test]
 fn test_typeof_variable_reference_object_type() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
+    use crate::solver::{SymbolRef, TypeEnvironment};
 
     // typeof x where x: { a: string, b: number }
     let interner = TypeInterner::new();
@@ -29194,7 +30030,7 @@ fn test_typeof_variable_reference_object_type() {
 
 #[test]
 fn test_typeof_variable_reference_array_type() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
+    use crate::solver::{SymbolRef, TypeEnvironment};
 
     // typeof arr where arr: string[]
     let interner = TypeInterner::new();
@@ -29214,7 +30050,7 @@ fn test_typeof_variable_reference_array_type() {
 
 #[test]
 fn test_typeof_imported_value_basic() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
+    use crate::solver::{SymbolRef, TypeEnvironment};
 
     // typeof importedValue where importedValue: boolean
     let interner = TypeInterner::new();
@@ -29233,7 +30069,7 @@ fn test_typeof_imported_value_basic() {
 
 #[test]
 fn test_typeof_imported_value_complex() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
+    use crate::solver::{SymbolRef, TypeEnvironment};
 
     // typeof importedConfig where importedConfig: { port: number, host: string }
     let interner = TypeInterner::new();
@@ -29270,7 +30106,7 @@ fn test_typeof_imported_value_complex() {
 
 #[test]
 fn test_typeof_function_type() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
+    use crate::solver::{SymbolRef, TypeEnvironment};
 
     // typeof fn where fn: (x: number) => string
     let interner = TypeInterner::new();
@@ -29288,7 +30124,7 @@ fn test_typeof_function_type() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let sym = SymbolRef(1);
@@ -29303,7 +30139,7 @@ fn test_typeof_function_type() {
 
 #[test]
 fn test_typeof_function_multiple_params() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
+    use crate::solver::{SymbolRef, TypeEnvironment};
 
     // typeof fn where fn: (a: string, b: number) => boolean
     let interner = TypeInterner::new();
@@ -29329,7 +30165,7 @@ fn test_typeof_function_multiple_params() {
         return_type: TypeId::BOOLEAN,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let sym = SymbolRef(1);
@@ -29344,7 +30180,7 @@ fn test_typeof_function_multiple_params() {
 
 #[test]
 fn test_typeof_const_string_literal() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
+    use crate::solver::{SymbolRef, TypeEnvironment};
 
     // typeof x where x: "hello" (const assertion)
     let interner = TypeInterner::new();
@@ -29364,7 +30200,7 @@ fn test_typeof_const_string_literal() {
 
 #[test]
 fn test_typeof_const_number_literal() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
+    use crate::solver::{SymbolRef, TypeEnvironment};
 
     // typeof x where x: 42 (const assertion)
     let interner = TypeInterner::new();
@@ -29384,7 +30220,7 @@ fn test_typeof_const_number_literal() {
 
 #[test]
 fn test_typeof_const_tuple_readonly() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
+    use crate::solver::{SymbolRef, TypeEnvironment};
 
     // typeof x where x = [1, 2, 3] as const -> readonly [1, 2, 3]
     let interner = TypeInterner::new();
@@ -29395,9 +30231,24 @@ fn test_typeof_const_tuple_readonly() {
     let three = interner.literal_number(3.0);
 
     let tuple = interner.tuple(vec![
-        TupleElement { type_id: one, name: None, optional: false, rest: false },
-        TupleElement { type_id: two, name: None, optional: false, rest: false },
-        TupleElement { type_id: three, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: one,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: two,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: three,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
     let readonly_tuple = interner.intern(TypeKey::ReadonlyType(tuple));
 
@@ -29413,7 +30264,7 @@ fn test_typeof_const_tuple_readonly() {
 
 #[test]
 fn test_typeof_const_object_readonly() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
+    use crate::solver::{SymbolRef, TypeEnvironment};
 
     // typeof x where x = { a: 1, b: "hello" } as const
     // -> { readonly a: 1, readonly b: "hello" }
@@ -29454,7 +30305,7 @@ fn test_typeof_const_object_readonly() {
 
 #[test]
 fn test_typeof_unresolved_passes_through() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
+    use crate::solver::{SymbolRef, TypeEnvironment};
 
     // When resolver doesn't know the symbol, TypeQuery passes through unchanged
     let interner = TypeInterner::new();
@@ -29472,7 +30323,7 @@ fn test_typeof_unresolved_passes_through() {
 
 #[test]
 fn test_typeof_in_union() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
+    use crate::solver::{SymbolRef, TypeEnvironment};
 
     // typeof x | typeof y
     let interner = TypeInterner::new();
@@ -29508,7 +30359,7 @@ fn test_typeof_in_union() {
 
 #[test]
 fn test_typeof_in_keyof() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
+    use crate::solver::{SymbolRef, TypeEnvironment};
 
     // keyof typeof x where x: { a: string, b: number }
     let interner = TypeInterner::new();
@@ -29551,7 +30402,7 @@ fn test_typeof_in_keyof() {
 
 #[test]
 fn test_typeof_indexed_access() {
-    use crate::solver::{TypeEnvironment, SymbolRef};
+    use crate::solver::{SymbolRef, TypeEnvironment};
 
     // (typeof x)["a"] where x: { a: number, b: string }
     let interner = TypeInterner::new();
@@ -30486,7 +31337,7 @@ fn test_mapped_type_template_literal_keys() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let mapped = MappedType {
@@ -30634,7 +31485,7 @@ fn test_satisfies_constraint_failure() {
 
 #[test]
 fn test_satisfies_literal_widening_preserved_string() {
-    use crate::solver::{SubtypeChecker, LiteralValue};
+    use crate::solver::{LiteralValue, SubtypeChecker};
 
     // With satisfies, literal types are preserved:
     // const x = "hello" satisfies string -> type is "hello"
@@ -30656,7 +31507,7 @@ fn test_satisfies_literal_widening_preserved_string() {
 
 #[test]
 fn test_satisfies_literal_widening_preserved_number() {
-    use crate::solver::{SubtypeChecker, LiteralValue};
+    use crate::solver::{LiteralValue, SubtypeChecker};
 
     // const x = 42 satisfies number -> type remains 42 (literal)
     let interner = TypeInterner::new();
@@ -30673,7 +31524,7 @@ fn test_satisfies_literal_widening_preserved_number() {
 
 #[test]
 fn test_satisfies_literal_widening_preserved_boolean() {
-    use crate::solver::{SubtypeChecker, LiteralValue};
+    use crate::solver::{LiteralValue, SubtypeChecker};
 
     // const x = true satisfies boolean -> type remains true (literal)
     let interner = TypeInterner::new();
@@ -30945,9 +31796,24 @@ fn test_satisfies_array_type() {
     let three = interner.literal_number(3.0);
 
     let tuple = interner.tuple(vec![
-        TupleElement { type_id: one, name: None, optional: false, rest: false },
-        TupleElement { type_id: two, name: None, optional: false, rest: false },
-        TupleElement { type_id: three, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: one,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: two,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: three,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     let number_array = interner.array(TypeId::NUMBER);
@@ -31427,7 +32293,10 @@ fn test_zero_number_literal() {
         false_type: interner.literal_boolean(false),
         is_distributive: false,
     };
-    assert_eq!(evaluate_conditional(&interner, &cond_zero), interner.literal_boolean(true));
+    assert_eq!(
+        evaluate_conditional(&interner, &cond_zero),
+        interner.literal_boolean(true)
+    );
 
     let cond_neg = ConditionalType {
         check_type: neg_zero,
@@ -31436,7 +32305,10 @@ fn test_zero_number_literal() {
         false_type: interner.literal_boolean(false),
         is_distributive: false,
     };
-    assert_eq!(evaluate_conditional(&interner, &cond_neg), interner.literal_boolean(true));
+    assert_eq!(
+        evaluate_conditional(&interner, &cond_neg),
+        interner.literal_boolean(true)
+    );
 }
 
 /// Boolean literal type operations
@@ -31524,7 +32396,10 @@ fn test_null_undefined_extends() {
         false_type: interner.literal_boolean(false),
         is_distributive: false,
     };
-    assert_eq!(evaluate_conditional(&interner, &cond_null), interner.literal_boolean(true));
+    assert_eq!(
+        evaluate_conditional(&interner, &cond_null),
+        interner.literal_boolean(true)
+    );
 
     // undefined extends undefined
     let cond_undef = ConditionalType {
@@ -31534,7 +32409,10 @@ fn test_null_undefined_extends() {
         false_type: interner.literal_boolean(false),
         is_distributive: false,
     };
-    assert_eq!(evaluate_conditional(&interner, &cond_undef), interner.literal_boolean(true));
+    assert_eq!(
+        evaluate_conditional(&interner, &cond_undef),
+        interner.literal_boolean(true)
+    );
 
     // null doesn't extend undefined
     let cond_null_undef = ConditionalType {
@@ -31544,7 +32422,10 @@ fn test_null_undefined_extends() {
         false_type: interner.literal_boolean(false),
         is_distributive: false,
     };
-    assert_eq!(evaluate_conditional(&interner, &cond_null_undef), interner.literal_boolean(false));
+    assert_eq!(
+        evaluate_conditional(&interner, &cond_null_undef),
+        interner.literal_boolean(false)
+    );
 }
 
 /// Void and undefined relationship
@@ -31578,7 +32459,10 @@ fn test_never_bottom_type() {
         false_type: interner.literal_boolean(false),
         is_distributive: false,
     };
-    assert_eq!(evaluate_conditional(&interner, &cond_string), interner.literal_boolean(true));
+    assert_eq!(
+        evaluate_conditional(&interner, &cond_string),
+        interner.literal_boolean(true)
+    );
 
     let cond_number = ConditionalType {
         check_type: TypeId::NEVER,
@@ -31587,7 +32471,10 @@ fn test_never_bottom_type() {
         false_type: interner.literal_boolean(false),
         is_distributive: false,
     };
-    assert_eq!(evaluate_conditional(&interner, &cond_number), interner.literal_boolean(true));
+    assert_eq!(
+        evaluate_conditional(&interner, &cond_number),
+        interner.literal_boolean(true)
+    );
 }
 
 /// Any and unknown are top types
@@ -31603,7 +32490,10 @@ fn test_any_unknown_top_types() {
         false_type: interner.literal_boolean(false),
         is_distributive: false,
     };
-    assert_eq!(evaluate_conditional(&interner, &cond_any), interner.literal_boolean(true));
+    assert_eq!(
+        evaluate_conditional(&interner, &cond_any),
+        interner.literal_boolean(true)
+    );
 
     // string extends unknown
     let cond_unknown = ConditionalType {
@@ -31613,7 +32503,10 @@ fn test_any_unknown_top_types() {
         false_type: interner.literal_boolean(false),
         is_distributive: false,
     };
-    assert_eq!(evaluate_conditional(&interner, &cond_unknown), interner.literal_boolean(true));
+    assert_eq!(
+        evaluate_conditional(&interner, &cond_unknown),
+        interner.literal_boolean(true)
+    );
 }
 
 // ============================================================================
@@ -31762,9 +32655,24 @@ fn test_const_array_literal_tuple() {
 
     // Create tuple with literal elements
     let tuple = interner.tuple(vec![
-        TupleElement { type_id: one, name: None, optional: false, rest: false },
-        TupleElement { type_id: two, name: None, optional: false, rest: false },
-        TupleElement { type_id: three, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: one,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: two,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: three,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     // Wrap in ReadonlyType for as const
@@ -31797,26 +32705,39 @@ fn test_const_array_mixed_types() {
     let lit_true = interner.literal_boolean(true);
 
     let tuple = interner.tuple(vec![
-        TupleElement { type_id: one, name: None, optional: false, rest: false },
-        TupleElement { type_id: two_str, name: None, optional: false, rest: false },
-        TupleElement { type_id: lit_true, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: one,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: two_str,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: lit_true,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     let readonly_tuple = interner.intern(TypeKey::ReadonlyType(tuple));
 
     match interner.lookup(readonly_tuple) {
-        Some(TypeKey::ReadonlyType(inner)) => {
-            match interner.lookup(inner) {
-                Some(TypeKey::Tuple(list_id)) => {
-                    let elements = interner.tuple_list(list_id);
-                    assert_eq!(elements.len(), 3);
-                    assert_eq!(elements[0].type_id, one);
-                    assert_eq!(elements[1].type_id, two_str);
-                    assert_eq!(elements[2].type_id, lit_true);
-                }
-                other => panic!("Expected Tuple, got {:?}", other),
+        Some(TypeKey::ReadonlyType(inner)) => match interner.lookup(inner) {
+            Some(TypeKey::Tuple(list_id)) => {
+                let elements = interner.tuple_list(list_id);
+                assert_eq!(elements.len(), 3);
+                assert_eq!(elements[0].type_id, one);
+                assert_eq!(elements[1].type_id, two_str);
+                assert_eq!(elements[2].type_id, lit_true);
             }
-        }
+            other => panic!("Expected Tuple, got {:?}", other),
+        },
         other => panic!("Expected ReadonlyType, got {:?}", other),
     }
 }
@@ -31833,20 +32754,50 @@ fn test_const_array_nested() {
     let four = interner.literal_number(4.0);
 
     let inner1 = interner.tuple(vec![
-        TupleElement { type_id: one, name: None, optional: false, rest: false },
-        TupleElement { type_id: two, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: one,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: two,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
     let inner1_readonly = interner.intern(TypeKey::ReadonlyType(inner1));
 
     let inner2 = interner.tuple(vec![
-        TupleElement { type_id: three, name: None, optional: false, rest: false },
-        TupleElement { type_id: four, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: three,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: four,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
     let inner2_readonly = interner.intern(TypeKey::ReadonlyType(inner2));
 
     let outer = interner.tuple(vec![
-        TupleElement { type_id: inner1_readonly, name: None, optional: false, rest: false },
-        TupleElement { type_id: inner2_readonly, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: inner1_readonly,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: inner2_readonly,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
     let outer_readonly = interner.intern(TypeKey::ReadonlyType(outer));
 
@@ -31885,8 +32836,18 @@ fn test_const_array_vs_mutable() {
 
     // Non-readonly tuple with literal types
     let mutable_tuple = interner.tuple(vec![
-        TupleElement { type_id: one, name: None, optional: false, rest: false },
-        TupleElement { type_id: two, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: one,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: two,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     let number_array = interner.array(TypeId::NUMBER);
@@ -31923,16 +32884,14 @@ fn test_readonly_inference_object() {
     // Readonly<T> applied to object makes all properties readonly
     let interner = TypeInterner::new();
 
-    let obj = interner.object(vec![
-        PropertyInfo {
-            name: interner.intern_string("a"),
-            type_id: TypeId::NUMBER,
-            write_type: TypeId::NUMBER,
-            optional: false,
-            readonly: false,
-            is_method: false,
-        },
-    ]);
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
 
     // Wrap in ReadonlyType
     let readonly_obj = interner.intern(TypeKey::ReadonlyType(obj));
@@ -31955,9 +32914,24 @@ fn test_readonly_keyof() {
     let three = interner.literal_number(3.0);
 
     let tuple = interner.tuple(vec![
-        TupleElement { type_id: one, name: None, optional: false, rest: false },
-        TupleElement { type_id: two, name: None, optional: false, rest: false },
-        TupleElement { type_id: three, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: one,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: two,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: three,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
     let readonly_tuple = interner.intern(TypeKey::ReadonlyType(tuple));
 
@@ -33818,9 +34792,7 @@ fn test_distributive_large_union_none_match() {
     let mut subst = TypeSubstitution::new();
 
     // Create a union of 15 number literals
-    let members: Vec<TypeId> = (0..15)
-        .map(|i| interner.literal_number(i as f64))
-        .collect();
+    let members: Vec<TypeId> = (0..15).map(|i| interner.literal_number(i as f64)).collect();
     subst.insert(t_name, interner.union(members));
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
@@ -33872,7 +34844,10 @@ fn test_distributive_nested_conditional() {
 
     let cond_type = interner.conditional(outer_cond);
     let mut subst = TypeSubstitution::new();
-    subst.insert(t_name, interner.union(vec![lit_a, lit_b, lit_c, lit_1, lit_2]));
+    subst.insert(
+        t_name,
+        interner.union(vec![lit_a, lit_b, lit_c, lit_1, lit_2]),
+    );
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
@@ -33918,7 +34893,10 @@ fn test_distributive_with_infer_filter() {
 
     let string_array = interner.array(TypeId::STRING);
     let number_array = interner.array(TypeId::NUMBER);
-    subst.insert(t_name, interner.union(vec![string_array, number_array, TypeId::BOOLEAN]));
+    subst.insert(
+        t_name,
+        interner.union(vec![string_array, number_array, TypeId::BOOLEAN]),
+    );
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
@@ -33968,7 +34946,10 @@ fn test_distributive_with_mapped_branches() {
 
     let cond_type = interner.conditional(outer_cond);
     let mut subst = TypeSubstitution::new();
-    subst.insert(t_name, interner.union(vec![lit_a, lit_1, interner.literal_boolean(true)]));
+    subst.insert(
+        t_name,
+        interner.union(vec![lit_a, lit_1, interner.literal_boolean(true)]),
+    );
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
@@ -34048,7 +35029,10 @@ fn test_distributive_with_infer_in_true_branch() {
         is_method: false,
     }]);
 
-    subst.insert(t_name, interner.union(vec![obj_string, obj_number, obj_other]));
+    subst.insert(
+        t_name,
+        interner.union(vec![obj_string, obj_number, obj_other]),
+    );
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
@@ -34163,7 +35147,12 @@ fn test_distributive_non_nullable_utility() {
     let mut subst = TypeSubstitution::new();
     subst.insert(
         t_name,
-        interner.union(vec![TypeId::STRING, TypeId::NULL, TypeId::UNDEFINED, TypeId::NUMBER]),
+        interner.union(vec![
+            TypeId::STRING,
+            TypeId::NULL,
+            TypeId::UNDEFINED,
+            TypeId::NUMBER,
+        ]),
     );
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
@@ -34227,7 +35216,12 @@ fn test_distributive_deeply_nested_union() {
     let mut subst = TypeSubstitution::new();
     subst.insert(
         t_name,
-        interner.union(vec![lit_a, lit_1, interner.literal_boolean(true), TypeId::NULL]),
+        interner.union(vec![
+            lit_a,
+            lit_1,
+            interner.literal_boolean(true),
+            TypeId::NULL,
+        ]),
     );
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
@@ -34373,7 +35367,11 @@ fn test_distributive_with_duplicate_results() {
     let mut subst = TypeSubstitution::new();
     subst.insert(
         t_name,
-        interner.union(vec![lit_a, interner.literal_number(42.0), interner.literal_boolean(true)]),
+        interner.union(vec![
+            lit_a,
+            interner.literal_number(42.0),
+            interner.literal_boolean(true),
+        ]),
     );
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
@@ -34482,7 +35480,10 @@ fn test_distributive_with_constrained_infer() {
     let string_array = interner.array(TypeId::STRING);
     let number_array = interner.array(TypeId::NUMBER);
     let boolean_array = interner.array(TypeId::BOOLEAN);
-    subst.insert(t_name, interner.union(vec![string_array, number_array, boolean_array]));
+    subst.insert(
+        t_name,
+        interner.union(vec![string_array, number_array, boolean_array]),
+    );
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
@@ -34529,7 +35530,10 @@ fn test_distributive_intrinsic_union() {
 
     let cond_type = interner.conditional(cond);
     let mut subst = TypeSubstitution::new();
-    subst.insert(t_name, interner.union(vec![TypeId::STRING, TypeId::NUMBER, obj_type]));
+    subst.insert(
+        t_name,
+        interner.union(vec![TypeId::STRING, TypeId::NUMBER, obj_type]),
+    );
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
@@ -34571,7 +35575,7 @@ fn test_distributive_function_types() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let cond = ConditionalType {
@@ -34592,7 +35596,7 @@ fn test_distributive_function_types() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let fn2 = interner.function(FunctionShape {
         params: vec![ParamInfo {
@@ -34606,7 +35610,7 @@ fn test_distributive_function_types() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     subst.insert(t_name, interner.union(vec![fn1, TypeId::STRING, fn2]));
@@ -34654,11 +35658,17 @@ fn test_distributive_readonly_array() {
     let cond_type = interner.conditional(cond);
     let mut subst = TypeSubstitution::new();
 
-    let readonly_string_array = interner.intern(TypeKey::ReadonlyType(interner.array(TypeId::STRING)));
-    let readonly_number_array = interner.intern(TypeKey::ReadonlyType(interner.array(TypeId::NUMBER)));
+    let readonly_string_array =
+        interner.intern(TypeKey::ReadonlyType(interner.array(TypeId::STRING)));
+    let readonly_number_array =
+        interner.intern(TypeKey::ReadonlyType(interner.array(TypeId::NUMBER)));
     subst.insert(
         t_name,
-        interner.union(vec![readonly_string_array, readonly_number_array, TypeId::BOOLEAN]),
+        interner.union(vec![
+            readonly_string_array,
+            readonly_number_array,
+            TypeId::BOOLEAN,
+        ]),
     );
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
@@ -34771,7 +35781,11 @@ fn test_distributive_multiple_arrays() {
     let nested_number_array = interner.array(interner.array(TypeId::NUMBER));
     subst.insert(
         t_name,
-        interner.union(vec![nested_string_array, nested_number_array, TypeId::BOOLEAN]),
+        interner.union(vec![
+            nested_string_array,
+            nested_number_array,
+            TypeId::BOOLEAN,
+        ]),
     );
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
@@ -34812,7 +35826,10 @@ fn test_distributive_keyof_filter() {
 
     let cond_type = interner.conditional(cond);
     let mut subst = TypeSubstitution::new();
-    subst.insert(t_name, interner.union(vec![lit_a, lit_b, lit_1, TypeId::SYMBOL]));
+    subst.insert(
+        t_name,
+        interner.union(vec![lit_a, lit_b, lit_1, TypeId::SYMBOL]),
+    );
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
@@ -34859,7 +35876,14 @@ fn test_distributive_mixed_primitive_union() {
     let mut subst = TypeSubstitution::new();
     subst.insert(
         t_name,
-        interner.union(vec![lit_a, lit_1, lit_true, TypeId::NULL, TypeId::UNDEFINED, empty_obj]),
+        interner.union(vec![
+            lit_a,
+            lit_1,
+            lit_true,
+            TypeId::NULL,
+            TypeId::UNDEFINED,
+            empty_obj,
+        ]),
     );
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
@@ -35179,7 +36203,7 @@ fn test_distributive_infer_return_type() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let cond = ConditionalType {
@@ -35200,7 +36224,7 @@ fn test_distributive_infer_return_type() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let fn_number = interner.function(FunctionShape {
         params: Vec::new(),
@@ -35209,10 +36233,13 @@ fn test_distributive_infer_return_type() {
         type_params: Vec::new(),
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
-    subst.insert(t_name, interner.union(vec![fn_string, fn_number, TypeId::STRING]));
+    subst.insert(
+        t_name,
+        interner.union(vec![fn_string, fn_number, TypeId::STRING]),
+    );
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
@@ -35254,7 +36281,10 @@ fn test_distributive_union_of_unions() {
 
     // Nested unions (should be flattened by union())
     let strings = interner.union(vec![lit_a, lit_b]);
-    let numbers = interner.union(vec![interner.literal_number(10.0), interner.literal_number(20.0)]);
+    let numbers = interner.union(vec![
+        interner.literal_number(10.0),
+        interner.literal_number(20.0),
+    ]);
     subst.insert(t_name, interner.union(vec![strings, numbers]));
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
@@ -35305,7 +36335,10 @@ fn test_distributive_boolean_literals() {
 
     let cond_type = interner.conditional(outer);
     let mut subst = TypeSubstitution::new();
-    subst.insert(t_name, interner.union(vec![lit_true, lit_false, TypeId::NULL]));
+    subst.insert(
+        t_name,
+        interner.union(vec![lit_true, lit_false, TypeId::NULL]),
+    );
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
@@ -35540,7 +36573,10 @@ fn test_distributive_triple_nested_conditional() {
 
     let cond_type = interner.conditional(outer);
     let mut subst = TypeSubstitution::new();
-    subst.insert(t_name, interner.union(vec![lit_a, lit_b, lit_c, lit_d, lit_e]));
+    subst.insert(
+        t_name,
+        interner.union(vec![lit_a, lit_b, lit_c, lit_d, lit_e]),
+    );
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
@@ -35672,7 +36708,10 @@ fn test_distributive_literal_type_filter() {
 
     let cond_type = interner.conditional(cond);
     let mut subst = TypeSubstitution::new();
-    subst.insert(t_name, interner.union(vec![lit_a, lit_b, lit_c, lit_d, lit_e]));
+    subst.insert(
+        t_name,
+        interner.union(vec![lit_a, lit_b, lit_c, lit_d, lit_e]),
+    );
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
@@ -36025,10 +37064,7 @@ fn test_distributive_with_symbol() {
 
     let cond_type = interner.conditional(cond);
     let mut subst = TypeSubstitution::new();
-    subst.insert(
-        t_name,
-        interner.union(vec![TypeId::SYMBOL, TypeId::STRING]),
-    );
+    subst.insert(t_name, interner.union(vec![TypeId::SYMBOL, TypeId::STRING]));
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
@@ -36072,7 +37108,10 @@ fn test_distributive_with_object_keyword() {
     }]);
 
     let mut subst = TypeSubstitution::new();
-    subst.insert(t_name, interner.union(vec![obj, TypeId::STRING, TypeId::NUMBER]));
+    subst.insert(
+        t_name,
+        interner.union(vec![obj, TypeId::STRING, TypeId::NUMBER]),
+    );
 
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
@@ -36396,7 +37435,7 @@ fn test_distributive_promise_like_unwrap() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // then method: (onfulfilled: callback) => any
@@ -36412,7 +37451,7 @@ fn test_distributive_promise_like_unwrap() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let then_prop = interner.intern_string("then");
@@ -36448,7 +37487,7 @@ fn test_distributive_promise_like_unwrap() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let string_then = interner.function(FunctionShape {
@@ -36463,7 +37502,7 @@ fn test_distributive_promise_like_unwrap() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let promise_string = interner.object(vec![PropertyInfo {
@@ -36513,7 +37552,7 @@ fn test_return_type_async_promise_unwrapping() {
         return_type: promise_string,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     match interner.lookup(async_func) {
@@ -36537,7 +37576,7 @@ fn test_return_type_void_function() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     match interner.lookup(void_func) {
@@ -36562,7 +37601,7 @@ fn test_return_type_never_function() {
         return_type: TypeId::NEVER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     match interner.lookup(never_func) {
@@ -36587,7 +37626,7 @@ fn test_return_type_union_of_functions() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let func_number = interner.function(FunctionShape {
@@ -36597,7 +37636,7 @@ fn test_return_type_union_of_functions() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let union_funcs = interner.union(vec![func_string, func_number]);
@@ -36657,7 +37696,7 @@ fn test_return_type_conditional_return() {
         return_type: cond_return,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     match interner.lookup(generic_func) {
@@ -36740,7 +37779,7 @@ fn test_parameters_this_parameter() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     match interner.lookup(func_with_this) {
@@ -36942,7 +37981,7 @@ fn test_return_type_with_infer_in_conditional() {
         return_type: infer_r,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // When T is a function, the infer R should capture return type
@@ -36953,7 +37992,7 @@ fn test_return_type_with_infer_in_conditional() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Substitute T with the actual function
@@ -36996,7 +38035,7 @@ fn test_parameters_with_infer_in_conditional() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Test with a function that has specific params
@@ -37020,7 +38059,7 @@ fn test_parameters_with_infer_in_conditional() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let cond = ConditionalType {
@@ -37055,7 +38094,7 @@ fn test_return_type_generic_with_constraint() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
@@ -37126,7 +38165,7 @@ fn test_return_type_intersection_of_functions() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let func_number = interner.function(FunctionShape {
@@ -37136,7 +38175,7 @@ fn test_return_type_intersection_of_functions() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let intersection = interner.intersection(vec![func_string, func_number]);
@@ -37168,7 +38207,7 @@ fn test_parameters_union_of_functions_with_different_arities() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let func2 = interner.function(FunctionShape {
@@ -37191,7 +38230,7 @@ fn test_parameters_union_of_functions_with_different_arities() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let union_funcs = interner.union(vec![func1, func2]);
@@ -37277,7 +38316,7 @@ fn test_this_parameter_type_extraction() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     match interner.lookup(func_with_this) {
@@ -37317,7 +38356,7 @@ fn test_omit_this_parameter() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Function without this parameter (result of OmitThisParameter)
@@ -37333,7 +38372,7 @@ fn test_omit_this_parameter() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     match interner.lookup(func_with_this) {
@@ -37368,7 +38407,7 @@ fn test_instance_type_from_constructor() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let instance_type = interner.object(vec![
         PropertyInfo {
@@ -37491,7 +38530,7 @@ fn test_awaited_with_nested_promises() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let inner_promise = interner.object(vec![PropertyInfo {
         name: interner.intern_string("then"),
@@ -37509,7 +38548,7 @@ fn test_awaited_with_nested_promises() {
         return_type: inner_promise,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let outer_promise = interner.object(vec![PropertyInfo {
         name: interner.intern_string("then"),
@@ -38098,7 +39137,7 @@ fn test_distributive_function_type_union() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let func2 = interner.function(FunctionShape {
@@ -38108,7 +39147,7 @@ fn test_distributive_function_type_union() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let source = interner.union(vec![func1, func2, TypeId::BOOLEAN]);
@@ -38125,7 +39164,7 @@ fn test_distributive_function_type_union() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let cond = ConditionalType {
@@ -38170,15 +39209,40 @@ fn test_infer_variadic_tuple_head() {
 
     // Pattern: [infer H, ...infer T]
     let pattern = interner.tuple(vec![
-        TupleElement { type_id: infer_h, name: None, optional: false, rest: false },
-        TupleElement { type_id: infer_t, name: None, optional: false, rest: true },
+        TupleElement {
+            type_id: infer_h,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: infer_t,
+            name: None,
+            optional: false,
+            rest: true,
+        },
     ]);
 
     // Input: [string, number, boolean]
     let input = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     let cond = ConditionalType {
@@ -38215,15 +39279,40 @@ fn test_infer_variadic_tuple_tail() {
 
     // Pattern: [...infer H, infer L]
     let pattern = interner.tuple(vec![
-        TupleElement { type_id: infer_h, name: None, optional: false, rest: true },
-        TupleElement { type_id: infer_l, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: infer_h,
+            name: None,
+            optional: false,
+            rest: true,
+        },
+        TupleElement {
+            type_id: infer_l,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     // Input: [string, number, boolean]
     let input = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     let cond = ConditionalType {
@@ -38267,17 +39356,52 @@ fn test_infer_variadic_tuple_middle() {
 
     // Pattern: [infer F, ...infer M, infer L]
     let pattern = interner.tuple(vec![
-        TupleElement { type_id: infer_f, name: None, optional: false, rest: false },
-        TupleElement { type_id: infer_m, name: None, optional: false, rest: true },
-        TupleElement { type_id: infer_l, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: infer_f,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: infer_m,
+            name: None,
+            optional: false,
+            rest: true,
+        },
+        TupleElement {
+            type_id: infer_l,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     // Input: [string, number, boolean, symbol]
     let input = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::SYMBOL, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::SYMBOL,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     let cond = ConditionalType {
@@ -38322,7 +39446,7 @@ fn test_infer_from_overloaded_callable() {
         return_type: infer_r,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // Input: { (x: string): number; (x: number): string }
@@ -38459,10 +39583,8 @@ fn test_infer_with_index_access_result() {
     }]);
 
     // Index access: input["prop"]
-    let index_access = interner.intern(TypeKey::IndexAccess(
-        input,
-        interner.literal_string("prop"),
-    ));
+    let index_access =
+        interner.intern(TypeKey::IndexAccess(input, interner.literal_string("prop")));
 
     let cond = ConditionalType {
         check_type: input,
@@ -38553,7 +39675,7 @@ fn test_infer_promise_like_unwrap() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let then_fn = interner.function(FunctionShape {
@@ -38568,7 +39690,7 @@ fn test_infer_promise_like_unwrap() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let pattern = interner.object(vec![PropertyInfo {
@@ -38593,7 +39715,7 @@ fn test_infer_promise_like_unwrap() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let input_then = interner.function(FunctionShape {
@@ -38608,7 +39730,7 @@ fn test_infer_promise_like_unwrap() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let input = interner.object(vec![PropertyInfo {
@@ -38939,19 +40061,49 @@ fn test_infer_optional_tuple_element() {
 
     // Pattern: [infer A, infer B?]
     let pattern = interner.tuple(vec![
-        TupleElement { type_id: infer_a, name: None, optional: false, rest: false },
-        TupleElement { type_id: infer_b, name: None, optional: true, rest: false },
+        TupleElement {
+            type_id: infer_a,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: infer_b,
+            name: None,
+            optional: true,
+            rest: false,
+        },
     ]);
 
     // Input: [string, number]
     let input = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     let result_tuple = interner.tuple(vec![
-        TupleElement { type_id: infer_a, name: None, optional: false, rest: false },
-        TupleElement { type_id: infer_b, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: infer_a,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: infer_b,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     let cond = ConditionalType {
@@ -39069,10 +40221,8 @@ fn test_template_literal_concatenation() {
     let hello = interner.literal_string("hello");
     let world = interner.literal_string("world");
 
-    let template = interner.template_literal(vec![
-        TemplateSpan::Type(hello),
-        TemplateSpan::Type(world),
-    ]);
+    let template =
+        interner.template_literal(vec![TemplateSpan::Type(hello), TemplateSpan::Type(world)]);
 
     // The template structure should be valid
     match interner.lookup(template) {
@@ -39099,9 +40249,8 @@ fn test_template_literal_single_text() {
     // `hello` just text, no interpolations
     let interner = TypeInterner::new();
 
-    let template = interner.template_literal(vec![
-        TemplateSpan::Text(interner.intern_string("hello")),
-    ]);
+    let template =
+        interner.template_literal(vec![TemplateSpan::Text(interner.intern_string("hello"))]);
 
     // Should be equivalent to "hello" literal
     let result = evaluate_type(&interner, template);
@@ -39741,7 +40890,7 @@ fn test_callable_param_infer_union_of_signatures() {
         this_type: None,
         type_params: Vec::new(),
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let cond = ConditionalType {
@@ -39767,7 +40916,7 @@ fn test_callable_param_infer_union_of_signatures() {
         this_type: None,
         type_params: Vec::new(),
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let fn_number = interner.function(FunctionShape {
         params: vec![ParamInfo {
@@ -39781,7 +40930,7 @@ fn test_callable_param_infer_union_of_signatures() {
         this_type: None,
         type_params: Vec::new(),
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let fn_union = interner.union(vec![fn_string, fn_number]);
 
@@ -39921,7 +41070,7 @@ fn test_callable_param_infer_mixed_union() {
         this_type: None,
         type_params: Vec::new(),
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let cond = ConditionalType {
@@ -39946,7 +41095,7 @@ fn test_callable_param_infer_mixed_union() {
         this_type: None,
         type_params: Vec::new(),
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let mixed_union = interner.union(vec![fn_string, TypeId::NUMBER]);
 
@@ -39998,7 +41147,7 @@ fn test_callable_return_and_param_infer_separately() {
         this_type: None,
         type_params: Vec::new(),
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     // True type: tuple [P, R]
@@ -40039,7 +41188,7 @@ fn test_callable_return_and_param_infer_separately() {
         this_type: None,
         type_params: Vec::new(),
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let mut subst = TypeSubstitution::new();
@@ -40111,7 +41260,7 @@ fn test_callable_multiple_params_infer() {
         this_type: None,
         type_params: Vec::new(),
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let tuple_type = interner.tuple(vec![
@@ -40159,7 +41308,7 @@ fn test_callable_multiple_params_infer() {
         this_type: None,
         type_params: Vec::new(),
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let mut subst = TypeSubstitution::new();
@@ -40799,7 +41948,7 @@ fn test_infer_return_void_vs_undefined() {
         this_type: None,
         type_params: Vec::new(),
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let cond = ConditionalType {
@@ -40819,7 +41968,7 @@ fn test_infer_return_void_vs_undefined() {
         this_type: None,
         type_params: Vec::new(),
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let mut subst = TypeSubstitution::new();
@@ -40858,7 +42007,7 @@ fn test_infer_return_promise_like() {
         this_type: None,
         type_params: Vec::new(),
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let cond = ConditionalType {
@@ -40889,7 +42038,7 @@ fn test_infer_return_promise_like() {
         this_type: None,
         type_params: Vec::new(),
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let mut subst = TypeSubstitution::new();
@@ -40928,7 +42077,7 @@ fn test_infer_return_union() {
         this_type: None,
         type_params: Vec::new(),
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let cond = ConditionalType {
@@ -40949,7 +42098,7 @@ fn test_infer_return_union() {
         this_type: None,
         type_params: Vec::new(),
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let mut subst = TypeSubstitution::new();
@@ -40990,7 +42139,7 @@ fn test_infer_return_never() {
         this_type: None,
         type_params: Vec::new(),
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let cond = ConditionalType {
@@ -41010,7 +42159,7 @@ fn test_infer_return_never() {
         this_type: None,
         type_params: Vec::new(),
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let mut subst = TypeSubstitution::new();
@@ -41480,7 +42629,7 @@ fn test_distribution_with_function_types() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn1 = interner.function(FunctionShape {
@@ -41495,7 +42644,7 @@ fn test_distribution_with_function_types() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let fn2 = interner.function(FunctionShape {
@@ -41510,7 +42659,7 @@ fn test_distribution_with_function_types() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let check_union = interner.union(vec![fn1, TypeId::STRING, fn2]);
@@ -41782,9 +42931,18 @@ fn test_indexed_access_tuple_each_element() {
     let key_1 = interner.literal_number(1.0);
     let key_2 = interner.literal_number(2.0);
 
-    assert_eq!(evaluate_index_access(&interner, tuple, key_0), TypeId::STRING);
-    assert_eq!(evaluate_index_access(&interner, tuple, key_1), TypeId::NUMBER);
-    assert_eq!(evaluate_index_access(&interner, tuple, key_2), TypeId::BOOLEAN);
+    assert_eq!(
+        evaluate_index_access(&interner, tuple, key_0),
+        TypeId::STRING
+    );
+    assert_eq!(
+        evaluate_index_access(&interner, tuple, key_1),
+        TypeId::NUMBER
+    );
+    assert_eq!(
+        evaluate_index_access(&interner, tuple, key_2),
+        TypeId::BOOLEAN
+    );
 }
 
 #[test]
@@ -42081,7 +43239,7 @@ fn test_indexed_access_function_property() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let obj = interner.object(vec![PropertyInfo {

@@ -10,30 +10,31 @@ use std::mem::size_of;
 
 #[test]
 fn test_thin_parser_simple_expression() {
-    let mut parser = ThinParserState::new(
-        "test.ts".to_string(),
-        "1 + 2".to_string(),
-    );
+    let mut parser = ThinParserState::new("test.ts".to_string(), "1 + 2".to_string());
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
     assert!(parser.arena.len() > 0);
 
     // Should have: SourceFile, ExpressionStatement, BinaryExpression, 2 NumericLiterals
-    assert!(parser.arena.len() >= 5, "Expected at least 5 nodes, got {}", parser.arena.len());
+    assert!(
+        parser.arena.len() >= 5,
+        "Expected at least 5 nodes, got {}",
+        parser.arena.len()
+    );
 }
 
 #[test]
 fn test_thin_parser_reset_clears_arena() {
-    let mut parser = ThinParserState::new(
-        "test.ts".to_string(),
-        "const a = 1;".to_string(),
-    );
+    let mut parser = ThinParserState::new("test.ts".to_string(), "const a = 1;".to_string());
     parser.parse_source_file();
 
     let arena = parser.get_arena();
     assert!(
-        arena.identifiers.iter().any(|ident| ident.escaped_text == "a"),
+        arena
+            .identifiers
+            .iter()
+            .any(|ident| ident.escaped_text == "a"),
         "Expected identifier 'a' after first parse"
     );
 
@@ -42,11 +43,17 @@ fn test_thin_parser_reset_clears_arena() {
 
     let arena = parser.get_arena();
     assert!(
-        arena.identifiers.iter().any(|ident| ident.escaped_text == "b"),
+        arena
+            .identifiers
+            .iter()
+            .any(|ident| ident.escaped_text == "b"),
         "Expected identifier 'b' after reset parse"
     );
     assert!(
-        !arena.identifiers.iter().any(|ident| ident.escaped_text == "a"),
+        !arena
+            .identifiers
+            .iter()
+            .any(|ident| ident.escaped_text == "a"),
         "Did not expect identifier 'a' after reset parse"
     );
 }
@@ -54,17 +61,17 @@ fn test_thin_parser_reset_clears_arena() {
 #[test]
 fn test_thin_parser_numeric_separator_invalid_diagnostic() {
     let source = "let x = 1_;";
-    let mut parser = ThinParserState::new(
-        "test.ts".to_string(),
-        source.to_string(),
-    );
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     parser.parse_source_file();
 
     let diagnostics = parser.get_diagnostics();
     let diag = diagnostics
         .iter()
         .find(|diag| diag.code == diagnostic_codes::NUMERIC_SEPARATORS_NOT_ALLOWED_HERE)
-        .expect(&format!("Expected numeric separator diagnostic, got: {:?}", diagnostics));
+        .expect(&format!(
+            "Expected numeric separator diagnostic, got: {:?}",
+            diagnostics
+        ));
     let underscore_pos = source.find('_').expect("underscore not found") as u32;
     assert_eq!(diag.start, underscore_pos);
     assert_eq!(diag.length, 1);
@@ -73,10 +80,7 @@ fn test_thin_parser_numeric_separator_invalid_diagnostic() {
 #[test]
 fn test_thin_parser_numeric_separator_consecutive_diagnostic() {
     let source = "let x = 1__0;";
-    let mut parser = ThinParserState::new(
-        "test.ts".to_string(),
-        source.to_string(),
-    );
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     parser.parse_source_file();
 
     let diagnostics = parser.get_diagnostics();
@@ -85,7 +89,10 @@ fn test_thin_parser_numeric_separator_consecutive_diagnostic() {
         .find(|diag| {
             diag.code == diagnostic_codes::MULTIPLE_CONSECUTIVE_NUMERIC_SEPARATORS_NOT_PERMITTED
         })
-        .expect(&format!("Expected consecutive separator diagnostic, got: {:?}", diagnostics));
+        .expect(&format!(
+            "Expected consecutive separator diagnostic, got: {:?}",
+            diagnostics
+        ));
     let underscore_pos = source.find("__").expect("double underscore not found") as u32 + 1;
     assert_eq!(diag.start, underscore_pos);
     assert_eq!(diag.length, 1);
@@ -100,15 +107,16 @@ fn test_thin_parser_function() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Unexpected errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Unexpected errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
 fn test_thin_parser_variable_declaration() {
-    let mut parser = ThinParserState::new(
-        "test.ts".to_string(),
-        "let x = 42;".to_string(),
-    );
+    let mut parser = ThinParserState::new("test.ts".to_string(), "let x = 42;".to_string());
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
@@ -129,10 +137,8 @@ fn test_thin_parser_if_statement() {
 
 #[test]
 fn test_thin_parser_while_loop() {
-    let mut parser = ThinParserState::new(
-        "test.ts".to_string(),
-        "while (x < 10) { x++; }".to_string(),
-    );
+    let mut parser =
+        ThinParserState::new("test.ts".to_string(), "while (x < 10) { x++; }".to_string());
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
@@ -160,15 +166,17 @@ fn test_thin_parser_object_literal() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
 fn test_thin_parser_array_literal() {
-    let mut parser = ThinParserState::new(
-        "test.ts".to_string(),
-        "let arr = [1, 2, 3];".to_string(),
-    );
+    let mut parser =
+        ThinParserState::new("test.ts".to_string(), "let arr = [1, 2, 3];".to_string());
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
@@ -229,7 +237,11 @@ fn test_thin_parser_get_accessor_type_parameters_report_ts1094() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     parser.parse_source_file();
 
-    let codes: Vec<u32> = parser.get_diagnostics().iter().map(|diag| diag.code).collect();
+    let codes: Vec<u32> = parser
+        .get_diagnostics()
+        .iter()
+        .map(|diag| diag.code)
+        .collect();
     assert!(
         codes.contains(&diagnostic_codes::ACCESSOR_CANNOT_HAVE_TYPE_PARAMETERS),
         "Expected TS1094 diagnostics: {:?}",
@@ -248,7 +260,11 @@ fn test_thin_parser_set_accessor_return_type_report_ts1095() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     parser.parse_source_file();
 
-    let codes: Vec<u32> = parser.get_diagnostics().iter().map(|diag| diag.code).collect();
+    let codes: Vec<u32> = parser
+        .get_diagnostics()
+        .iter()
+        .map(|diag| diag.code)
+        .collect();
     assert!(
         codes.contains(&diagnostic_codes::SETTER_CANNOT_HAVE_RETURN_TYPE),
         "Expected TS1095 diagnostics: {:?}",
@@ -267,7 +283,11 @@ fn test_thin_parser_object_get_accessor_parameters_report_ts1054() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     parser.parse_source_file();
 
-    let codes: Vec<u32> = parser.get_diagnostics().iter().map(|diag| diag.code).collect();
+    let codes: Vec<u32> = parser
+        .get_diagnostics()
+        .iter()
+        .map(|diag| diag.code)
+        .collect();
     assert!(
         codes.contains(&diagnostic_codes::GETTER_MUST_NOT_HAVE_PARAMETERS),
         "Expected TS1054 diagnostics: {:?}",
@@ -286,7 +306,11 @@ fn test_thin_parser_duplicate_extends_reports_ts1172() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     parser.parse_source_file();
 
-    let codes: Vec<u32> = parser.get_diagnostics().iter().map(|diag| diag.code).collect();
+    let codes: Vec<u32> = parser
+        .get_diagnostics()
+        .iter()
+        .map(|diag| diag.code)
+        .collect();
     assert!(
         codes.contains(&diagnostic_codes::EXTENDS_CLAUSE_ALREADY_SEEN),
         "Expected TS1172 diagnostics: {:?}",
@@ -305,7 +329,11 @@ fn test_thin_parser_async_function_expression_keyword_name() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     parser.parse_source_file();
 
-    let codes: Vec<u32> = parser.get_diagnostics().iter().map(|diag| diag.code).collect();
+    let codes: Vec<u32> = parser
+        .get_diagnostics()
+        .iter()
+        .map(|diag| diag.code)
+        .collect();
     assert!(
         !codes.contains(&diagnostic_codes::TOKEN_EXPECTED),
         "Unexpected TS1005 diagnostics: {:?}",
@@ -324,7 +352,11 @@ fn test_thin_parser_static_block_with_modifiers() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     parser.parse_source_file();
 
-    let codes: Vec<u32> = parser.get_diagnostics().iter().map(|diag| diag.code).collect();
+    let codes: Vec<u32> = parser
+        .get_diagnostics()
+        .iter()
+        .map(|diag| diag.code)
+        .collect();
     assert!(
         !codes.contains(&diagnostic_codes::DECLARATION_OR_STATEMENT_EXPECTED),
         "Unexpected TS1128 diagnostics: {:?}",
@@ -343,7 +375,11 @@ fn test_thin_parser_enum_computed_property_reports_ts1164() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     parser.parse_source_file();
 
-    let codes: Vec<u32> = parser.get_diagnostics().iter().map(|diag| diag.code).collect();
+    let codes: Vec<u32> = parser
+        .get_diagnostics()
+        .iter()
+        .map(|diag| diag.code)
+        .collect();
     assert!(
         codes.contains(&diagnostic_codes::COMPUTED_PROPERTY_NAME_IN_ENUM),
         "Expected TS1164 diagnostics: {:?}",
@@ -362,7 +398,11 @@ fn test_thin_parser_type_assertion_in_new_expression_reports_ts1109() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     parser.parse_source_file();
 
-    let codes: Vec<u32> = parser.get_diagnostics().iter().map(|diag| diag.code).collect();
+    let codes: Vec<u32> = parser
+        .get_diagnostics()
+        .iter()
+        .map(|diag| diag.code)
+        .collect();
     assert!(
         codes.contains(&diagnostic_codes::EXPRESSION_EXPECTED),
         "Expected TS1109 diagnostics: {:?}",
@@ -381,7 +421,11 @@ fn test_thin_parser_generic_default_missing_type_reports_ts1110() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     parser.parse_source_file();
 
-    let codes: Vec<u32> = parser.get_diagnostics().iter().map(|diag| diag.code).collect();
+    let codes: Vec<u32> = parser
+        .get_diagnostics()
+        .iter()
+        .map(|diag| diag.code)
+        .collect();
     assert!(
         codes.contains(&diagnostic_codes::TYPE_EXPECTED),
         "Expected TS1110 diagnostics: {:?}",
@@ -400,7 +444,11 @@ fn test_thin_parser_jsx_like_syntax_in_ts_recovers() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     parser.parse_source_file();
 
-    let codes: Vec<u32> = parser.get_diagnostics().iter().map(|diag| diag.code).collect();
+    let codes: Vec<u32> = parser
+        .get_diagnostics()
+        .iter()
+        .map(|diag| diag.code)
+        .collect();
     assert!(
         codes.contains(&diagnostic_codes::TOKEN_EXPECTED),
         "Expected TS1005 diagnostics: {:?}",
@@ -409,7 +457,10 @@ fn test_thin_parser_jsx_like_syntax_in_ts_recovers() {
 
     let arena = parser.get_arena();
     assert!(
-        arena.identifiers.iter().any(|ident| ident.escaped_text == "y"),
+        arena
+            .identifiers
+            .iter()
+            .any(|ident| ident.escaped_text == "y"),
         "Expected identifier 'y' to be parsed after JSX-like syntax"
     );
 }
@@ -514,7 +565,10 @@ fn test_thin_parser_unterminated_template_expression_no_crash() {
 
     assert!(!root.is_none());
     assert!(
-        parser.get_diagnostics().iter().any(|diag| diag.code == diagnostic_codes::TOKEN_EXPECTED),
+        parser
+            .get_diagnostics()
+            .iter()
+            .any(|diag| diag.code == diagnostic_codes::TOKEN_EXPECTED),
         "Expected a token expected diagnostic, got: {:?}",
         parser.get_diagnostics()
     );
@@ -528,7 +582,10 @@ fn test_thin_parser_unterminated_template_literal_reports_ts1160() {
 
     assert!(!root.is_none());
     assert!(
-        parser.get_diagnostics().iter().any(|diag| diag.code == diagnostic_codes::UNTERMINATED_TEMPLATE_LITERAL),
+        parser
+            .get_diagnostics()
+            .iter()
+            .any(|diag| diag.code == diagnostic_codes::UNTERMINATED_TEMPLATE_LITERAL),
         "Expected unterminated template literal diagnostic, got: {:?}",
         parser.get_diagnostics()
     );
@@ -560,10 +617,7 @@ fn test_thin_parser_template_literal_property_name_no_ts1160() {
 
 #[test]
 fn test_thin_parser_call_expression() {
-    let mut parser = ThinParserState::new(
-        "test.ts".to_string(),
-        "foo(1, 2, 3);".to_string(),
-    );
+    let mut parser = ThinParserState::new("test.ts".to_string(), "foo(1, 2, 3);".to_string());
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
@@ -572,10 +626,7 @@ fn test_thin_parser_call_expression() {
 
 #[test]
 fn test_thin_parser_property_access() {
-    let mut parser = ThinParserState::new(
-        "test.ts".to_string(),
-        "obj.foo.bar;".to_string(),
-    );
+    let mut parser = ThinParserState::new("test.ts".to_string(), "obj.foo.bar;".to_string());
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
@@ -584,10 +635,7 @@ fn test_thin_parser_property_access() {
 
 #[test]
 fn test_thin_parser_new_expression() {
-    let mut parser = ThinParserState::new(
-        "test.ts".to_string(),
-        "new Foo(1, 2);".to_string(),
-    );
+    let mut parser = ThinParserState::new("test.ts".to_string(), "new Foo(1, 2);".to_string());
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
@@ -603,7 +651,11 @@ fn test_thin_parser_class_declaration() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -615,7 +667,11 @@ fn test_thin_parser_class_with_constructor() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -627,7 +683,11 @@ fn test_thin_parser_class_member_named_var() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -652,7 +712,11 @@ fn test_thin_parser_class_extends_call() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -665,19 +729,25 @@ fn test_thin_parser_class_extends_property_access() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
 fn test_thin_parser_decorator_class() {
-    let mut parser = ThinParserState::new(
-        "test.ts".to_string(),
-        "@Component class Foo {}".to_string(),
-    );
+    let mut parser =
+        ThinParserState::new("test.ts".to_string(), "@Component class Foo {}".to_string());
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -689,7 +759,11 @@ fn test_thin_parser_decorator_with_call() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -701,7 +775,11 @@ fn test_thin_parser_multiple_decorators() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -713,7 +791,11 @@ fn test_thin_parser_decorator_abstract_class() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -725,7 +807,11 @@ fn test_thin_parser_class_extends_and_implements() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -737,7 +823,11 @@ fn test_thin_parser_abstract_class() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -762,7 +852,11 @@ fn test_thin_parser_get_accessor() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -774,7 +868,11 @@ fn test_thin_parser_set_accessor() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -799,7 +897,11 @@ fn test_thin_parser_get_set_pair() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -824,7 +926,10 @@ fn test_thin_parser_memory_efficiency() {
     println!("Fat Node memory: {} bytes", fat_memory);
     println!("Memory savings: {}x", fat_memory / thin_memory.max(1));
 
-    assert!(fat_memory / thin_memory.max(1) >= 10, "Should have at least 10x memory savings");
+    assert!(
+        fat_memory / thin_memory.max(1) >= 10,
+        "Should have at least 10x memory savings"
+    );
 }
 
 #[test]
@@ -836,7 +941,11 @@ fn test_thin_parser_interface_declaration() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -848,7 +957,11 @@ fn test_thin_parser_interface_with_methods() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -860,32 +973,38 @@ fn test_thin_parser_interface_extends() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
 fn test_thin_parser_type_alias() {
-    let mut parser = ThinParserState::new(
-        "test.ts".to_string(),
-        "type ID = string;".to_string(),
-    );
+    let mut parser = ThinParserState::new("test.ts".to_string(), "type ID = string;".to_string());
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
 fn test_thin_parser_type_alias_object() {
     // Test type alias with object type (unions not yet supported)
-    let mut parser = ThinParserState::new(
-        "test.ts".to_string(),
-        "type Point = Coord;".to_string(),
-    );
+    let mut parser = ThinParserState::new("test.ts".to_string(), "type Point = Coord;".to_string());
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -897,7 +1016,11 @@ fn test_thin_parser_index_signature() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -909,7 +1032,11 @@ fn test_thin_parser_readonly_index_signature() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -921,7 +1048,11 @@ fn test_thin_parser_readonly_property_signature() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -933,7 +1064,11 @@ fn test_thin_parser_arrow_function_simple() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -945,7 +1080,11 @@ fn test_thin_parser_arrow_function_single_param() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -957,7 +1096,11 @@ fn test_thin_parser_arrow_function_block_body() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -969,7 +1112,11 @@ fn test_thin_parser_arrow_function_no_params() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -981,7 +1128,11 @@ fn test_thin_parser_arrow_function_in_object_literal() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -993,7 +1144,11 @@ fn test_thin_parser_type_assertion_angle_bracket() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1005,7 +1160,11 @@ fn test_thin_parser_literal_type_assertion_angle_bracket() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1017,7 +1176,11 @@ fn test_thin_parser_async_function() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1029,7 +1192,11 @@ fn test_thin_parser_async_arrow_function() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1041,7 +1208,11 @@ fn test_thin_parser_async_arrow_single_param() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1053,7 +1224,11 @@ fn test_thin_parser_generator_function() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1065,7 +1240,11 @@ fn test_thin_parser_yield_expression() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1077,7 +1256,11 @@ fn test_thin_parser_yield_star() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1089,7 +1272,11 @@ fn test_thin_parser_await_expression() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1101,56 +1288,66 @@ fn test_thin_parser_union_type() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
 fn test_thin_parser_intersection_type() {
-    let mut parser = ThinParserState::new(
-        "test.ts".to_string(),
-        "let x: A & B & C;".to_string(),
-    );
+    let mut parser = ThinParserState::new("test.ts".to_string(), "let x: A & B & C;".to_string());
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
 fn test_thin_parser_union_intersection_mixed() {
     // Intersection binds tighter than union: A & B | C means (A & B) | C
-    let mut parser = ThinParserState::new(
-        "test.ts".to_string(),
-        "let x: A & B | C & D;".to_string(),
-    );
+    let mut parser =
+        ThinParserState::new("test.ts".to_string(), "let x: A & B | C & D;".to_string());
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
 fn test_thin_parser_array_type() {
-    let mut parser = ThinParserState::new(
-        "test.ts".to_string(),
-        "let arr: string[];".to_string(),
-    );
+    let mut parser = ThinParserState::new("test.ts".to_string(), "let arr: string[];".to_string());
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
 fn test_thin_parser_nested_array_type() {
-    let mut parser = ThinParserState::new(
-        "test.ts".to_string(),
-        "let matrix: number[][];".to_string(),
-    );
+    let mut parser =
+        ThinParserState::new("test.ts".to_string(), "let matrix: number[][];".to_string());
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1162,7 +1359,11 @@ fn test_thin_parser_union_array_type() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1174,7 +1375,11 @@ fn test_thin_parser_tuple_type() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1186,7 +1391,11 @@ fn test_thin_parser_tuple_type_mixed() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1198,7 +1407,11 @@ fn test_thin_parser_tuple_array() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1210,7 +1423,11 @@ fn test_thin_parser_generic_type() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1222,7 +1439,11 @@ fn test_thin_parser_generic_type_multiple() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1234,7 +1455,11 @@ fn test_thin_parser_generic_nested() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1246,7 +1471,11 @@ fn test_thin_parser_promise_type() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1258,7 +1487,11 @@ fn test_thin_parser_function_type() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1270,7 +1503,11 @@ fn test_thin_parser_function_type_no_params() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1282,7 +1519,11 @@ fn test_thin_parser_function_type_multiple_params() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1294,7 +1535,11 @@ fn test_thin_parser_function_type_optional_param() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1306,7 +1551,11 @@ fn test_thin_parser_function_type_rest_param() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1319,7 +1568,11 @@ fn test_thin_parser_parenthesized_type_still_works() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1331,7 +1584,11 @@ fn test_thin_parser_literal_type_string() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1343,19 +1600,24 @@ fn test_thin_parser_literal_type_number() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
 fn test_thin_parser_literal_type_boolean() {
-    let mut parser = ThinParserState::new(
-        "test.ts".to_string(),
-        "let flag: true;".to_string(),
-    );
+    let mut parser = ThinParserState::new("test.ts".to_string(), "let flag: true;".to_string());
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1367,7 +1629,11 @@ fn test_thin_parser_typeof_type() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1379,7 +1645,11 @@ fn test_thin_parser_typeof_type_qualified() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 // =========================================================================
@@ -1396,7 +1666,11 @@ fn test_thin_parser_generic_arrow_simple() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1408,7 +1682,11 @@ fn test_thin_parser_generic_arrow_tsx_trailing_comma() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1421,7 +1699,11 @@ fn test_thin_parser_generic_arrow_multiple_params() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1434,7 +1716,11 @@ fn test_thin_parser_generic_arrow_with_constraint() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1447,7 +1733,11 @@ fn test_thin_parser_generic_arrow_with_default() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1460,7 +1750,11 @@ fn test_thin_parser_generic_arrow_with_constraint_and_default() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1473,7 +1767,11 @@ fn test_thin_parser_async_generic_arrow() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1486,7 +1784,11 @@ fn test_thin_parser_generic_arrow_expression_body() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1499,7 +1801,11 @@ fn test_thin_parser_arrow_function_with_return_type() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1512,7 +1818,11 @@ fn test_thin_parser_arrow_type_predicate() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1524,7 +1834,11 @@ fn test_thin_parser_this_type_predicate() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1536,7 +1850,11 @@ fn test_thin_parser_asserts_this_type_predicate() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1548,7 +1866,11 @@ fn test_thin_parser_asserts_this_type_predicate_without_is() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1561,7 +1883,11 @@ fn test_thin_parser_constructor_type() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1574,7 +1900,11 @@ fn test_thin_parser_constructor_type_with_params() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1587,7 +1917,11 @@ fn test_thin_parser_generic_constructor_type() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 // =========================================================================
@@ -1604,7 +1938,11 @@ fn test_thin_parser_keyof_type() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1617,7 +1955,11 @@ fn test_thin_parser_keyof_typeof() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1630,7 +1972,11 @@ fn test_thin_parser_keyof_in_union() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1643,7 +1989,11 @@ fn test_thin_parser_readonly_array() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1656,7 +2006,11 @@ fn test_thin_parser_readonly_tuple() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 // =========================================================================
@@ -1673,7 +2027,11 @@ fn test_thin_parser_indexed_access_type() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1686,7 +2044,11 @@ fn test_thin_parser_indexed_access_keyof() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1699,7 +2061,11 @@ fn test_thin_parser_indexed_access_chain() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1712,7 +2078,11 @@ fn test_thin_parser_indexed_access_with_array() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1725,7 +2095,11 @@ fn test_thin_parser_indexed_access_number() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 // =========================================================================
@@ -1742,7 +2116,11 @@ fn test_thin_parser_conditional_type_simple() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1755,7 +2133,11 @@ fn test_thin_parser_conditional_type_nested() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1768,7 +2150,11 @@ fn test_thin_parser_conditional_type_with_infer() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1781,7 +2167,11 @@ fn test_thin_parser_conditional_type_distributive() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1794,7 +2184,11 @@ fn test_thin_parser_infer_type() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 // =========================================================================
@@ -1811,7 +2205,11 @@ fn test_thin_parser_mapped_type_simple() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1824,7 +2222,11 @@ fn test_thin_parser_mapped_type_readonly() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1837,7 +2239,11 @@ fn test_thin_parser_mapped_type_required() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1850,7 +2256,11 @@ fn test_thin_parser_mapped_type_as_clause() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1863,7 +2273,11 @@ fn test_thin_parser_type_literal() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1876,7 +2290,11 @@ fn test_thin_parser_type_literal_method() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 // =========================================================================
@@ -1893,7 +2311,11 @@ fn test_thin_parser_template_literal_type_simple() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1906,7 +2328,11 @@ fn test_thin_parser_template_literal_type_with_substitution() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1919,7 +2345,11 @@ fn test_thin_parser_template_literal_type_multiple_substitutions() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1932,7 +2362,11 @@ fn test_thin_parser_template_literal_type_with_union() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1945,7 +2379,11 @@ fn test_thin_parser_template_literal_type_uppercase() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 // =========================================================================
@@ -1962,7 +2400,11 @@ fn test_thin_parser_jsx_self_closing() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1975,7 +2417,11 @@ fn test_thin_parser_jsx_with_children() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -1988,7 +2434,11 @@ fn test_thin_parser_jsx_with_attributes() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -2001,7 +2451,11 @@ fn test_thin_parser_jsx_with_expression() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -2014,7 +2468,11 @@ fn test_thin_parser_jsx_fragment() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -2027,7 +2485,11 @@ fn test_thin_parser_jsx_spread_attribute() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -2040,7 +2502,11 @@ fn test_thin_parser_jsx_namespaced() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -2053,7 +2519,11 @@ fn test_thin_parser_jsx_member_expression() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 // =========================================================================
@@ -2069,7 +2539,11 @@ fn test_thin_parser_import_default() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -2081,7 +2555,11 @@ fn test_thin_parser_import_named() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -2093,19 +2571,24 @@ fn test_thin_parser_import_namespace() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
 fn test_thin_parser_import_side_effect() {
-    let mut parser = ThinParserState::new(
-        "test.ts".to_string(),
-        r#"import "foo";"#.to_string(),
-    );
+    let mut parser = ThinParserState::new("test.ts".to_string(), r#"import "foo";"#.to_string());
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -2117,19 +2600,25 @@ fn test_thin_parser_export_function() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
 fn test_thin_parser_export_const() {
-    let mut parser = ThinParserState::new(
-        "test.ts".to_string(),
-        "export const x = 42;".to_string(),
-    );
+    let mut parser =
+        ThinParserState::new("test.ts".to_string(), "export const x = 42;".to_string());
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -2141,7 +2630,11 @@ fn test_thin_parser_export_default() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -2153,7 +2646,11 @@ fn test_thin_parser_re_export() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -2165,19 +2662,25 @@ fn test_thin_parser_default_re_export_specifiers() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
 fn test_thin_parser_export_star() {
-    let mut parser = ThinParserState::new(
-        "test.ts".to_string(),
-        r#"export * from "foo";"#.to_string(),
-    );
+    let mut parser =
+        ThinParserState::new("test.ts".to_string(), r#"export * from "foo";"#.to_string());
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 // =========================================================================
@@ -2242,10 +2745,8 @@ fn test_thin_parser_optional_chaining() {
 
 #[test]
 fn test_thin_parser_optional_chain_call_with_type_arguments() {
-    let mut parser = ThinParserState::new(
-        "test.ts".to_string(),
-        "let x = obj?.<T>(value)".to_string(),
-    );
+    let mut parser =
+        ThinParserState::new("test.ts".to_string(), "let x = obj?.<T>(value)".to_string());
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
@@ -2401,10 +2902,7 @@ fn test_thin_parser_type_identifier_assignment_statement() {
 
 #[test]
 fn test_thin_parser_nullish_coalescing() {
-    let mut parser = ThinParserState::new(
-        "test.ts".to_string(),
-        "let x = a ?? b ?? c".to_string(),
-    );
+    let mut parser = ThinParserState::new("test.ts".to_string(), "let x = a ?? b ?? c".to_string());
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
@@ -2458,7 +2956,8 @@ fn test_thin_parser_infer_type_complex() {
 fn test_thin_parser_rest_spread() {
     let mut parser = ThinParserState::new(
         "test.ts".to_string(),
-        "function foo(...args: number[]) { let [first, ...rest] = args; return [...rest, first]; }".to_string(),
+        "function foo(...args: number[]) { let [first, ...rest] = args; return [...rest, first]; }"
+            .to_string(),
     );
     let root = parser.parse_source_file();
 
@@ -2563,7 +3062,11 @@ fn test_thin_parser_static_property() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -2575,7 +3078,11 @@ fn test_thin_parser_static_method() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -2587,7 +3094,11 @@ fn test_thin_parser_private_property() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -2599,7 +3110,11 @@ fn test_thin_parser_protected_method() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -2611,7 +3126,11 @@ fn test_thin_parser_readonly_property() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -2623,7 +3142,11 @@ fn test_thin_parser_public_constructor() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -2635,7 +3158,11 @@ fn test_thin_parser_static_get_accessor() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -2647,19 +3174,28 @@ fn test_thin_parser_private_set_accessor() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
 fn test_thin_parser_multiple_modifiers() {
     let mut parser = ThinParserState::new(
         "test.ts".to_string(),
-        "class Foo { static readonly MAX_SIZE: number = 100; private static instance: Foo; }".to_string(),
+        "class Foo { static readonly MAX_SIZE: number = 100; private static instance: Foo; }"
+            .to_string(),
     );
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -2671,7 +3207,11 @@ fn test_thin_parser_override_method() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -2683,7 +3223,11 @@ fn test_thin_parser_async_method() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -2695,7 +3239,11 @@ fn test_thin_parser_abstract_method_in_class() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -2707,7 +3255,11 @@ fn test_thin_parser_call_signature() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -2719,7 +3271,11 @@ fn test_thin_parser_construct_signature() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -2734,12 +3290,17 @@ fn test_thin_parser_interface_with_call_and_construct() {
         interface Foo {
             (): string;
             bar(key: string): string;
-        }"#.to_string(),
+        }"#
+        .to_string(),
     );
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -2751,7 +3312,11 @@ fn test_thin_parser_type_literal_with_call_signature() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -2764,7 +3329,11 @@ fn test_thin_parser_accessor_signature_in_type() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -2790,7 +3359,11 @@ fn test_thin_parser_interface_accessor_signature() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Errors: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 // =============================================================================
@@ -2801,15 +3374,15 @@ fn test_thin_parser_interface_accessor_signature() {
 fn test_thin_parser_class_semicolon_element_ts1068() {
     // Regression test: Empty statement (semicolon) in class body should not error
     // Previously incorrectly reported TS1068 "Unexpected token"
-    let mut parser = ThinParserState::new(
-        "test.ts".to_string(),
-        "class C { ; }".to_string(),
-    );
+    let mut parser = ThinParserState::new("test.ts".to_string(), "class C { ; }".to_string());
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(),
-        "Class with semicolon element should not error: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Class with semicolon element should not error: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -2823,41 +3396,46 @@ fn test_thin_parser_class_multiple_semicolons() {
             ;
             ;
             y: string;
-        }"#.to_string(),
+        }"#
+        .to_string(),
     );
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(),
-        "Class with multiple semicolons should not error: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Class with multiple semicolons should not error: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
 fn test_thin_parser_await_as_type_name() {
     // 'await' should be valid as a type name in type annotations
-    let mut parser = ThinParserState::new(
-        "test.ts".to_string(),
-        "var v: await;".to_string(),
-    );
+    let mut parser = ThinParserState::new("test.ts".to_string(), "var v: await;".to_string());
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(),
-        "'await' as type name should not error: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "'await' as type name should not error: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
 fn test_thin_parser_await_as_parameter_name() {
     // 'await' should be valid as parameter name outside async functions
-    let mut parser = ThinParserState::new(
-        "test.ts".to_string(),
-        "function f(await) { }".to_string(),
-    );
+    let mut parser =
+        ThinParserState::new("test.ts".to_string(), "function f(await) { }".to_string());
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(),
-        "'await' as parameter name should not error: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "'await' as parameter name should not error: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -2870,8 +3448,11 @@ fn test_thin_parser_await_as_identifier_with_default() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(),
-        "'await = await' should not error: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "'await = await' should not error: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -2884,8 +3465,11 @@ fn test_thin_parser_await_in_async_function() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(),
-        "await in async function should not error: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "await in async function should not error: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -2898,8 +3482,11 @@ fn test_thin_parser_await_in_async_arrow() {
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(),
-        "await in async arrow should not error: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "await in async arrow should not error: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -2911,27 +3498,31 @@ fn test_thin_parser_await_in_async_method() {
             async method() {
                 await this.foo();
             }
-        }"#.to_string(),
+        }"#
+        .to_string(),
     );
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(),
-        "await in async method should not error: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "await in async method should not error: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
 fn test_thin_parser_yield_as_type_name() {
     // 'yield' should be valid as a type name
-    let mut parser = ThinParserState::new(
-        "test.ts".to_string(),
-        "var v: yield;".to_string(),
-    );
+    let mut parser = ThinParserState::new("test.ts".to_string(), "var v: yield;".to_string());
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(),
-        "'yield' as type name should not error: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "'yield' as type name should not error: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 #[test]
@@ -2941,13 +3532,17 @@ fn test_thin_parser_await_type_in_async_context() {
         "test.ts".to_string(),
         r#"var foo = async (): Promise<void> => {
             var v: await;
-        }"#.to_string(),
+        }"#
+        .to_string(),
     );
     let root = parser.parse_source_file();
 
     assert!(!root.is_none());
-    assert!(parser.get_diagnostics().is_empty(),
-        "'await' as type in async context should not error: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "'await' as type in async context should not error: {:?}",
+        parser.get_diagnostics()
+    );
 }
 
 // Error Recovery Tests for TS1005/TS1109/TS1068/TS1128 (ArrowFunctions + Expressions)
@@ -2960,7 +3555,11 @@ fn test_thin_parser_arrow_function_missing_param_type() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     parser.parse_source_file();
 
-    let codes: Vec<u32> = parser.get_diagnostics().iter().map(|diag| diag.code).collect();
+    let codes: Vec<u32> = parser
+        .get_diagnostics()
+        .iter()
+        .map(|diag| diag.code)
+        .collect();
     assert!(
         codes.contains(&diagnostic_codes::TYPE_EXPECTED),
         "Expected TS1110 for missing parameter type: {:?}",
@@ -2982,7 +3581,11 @@ fn test_thin_parser_arrow_function_missing_param_type_paren() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     parser.parse_source_file();
 
-    let codes: Vec<u32> = parser.get_diagnostics().iter().map(|diag| diag.code).collect();
+    let codes: Vec<u32> = parser
+        .get_diagnostics()
+        .iter()
+        .map(|diag| diag.code)
+        .collect();
     assert!(
         codes.contains(&diagnostic_codes::TYPE_EXPECTED),
         "Expected TS1110 for missing parameter type: {:?}",
@@ -3000,7 +3603,11 @@ fn test_thin_parser_enum_computed_property_name() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     parser.parse_source_file();
 
-    let codes: Vec<u32> = parser.get_diagnostics().iter().map(|diag| diag.code).collect();
+    let codes: Vec<u32> = parser
+        .get_diagnostics()
+        .iter()
+        .map(|diag| diag.code)
+        .collect();
     assert!(
         codes.contains(&diagnostic_codes::COMPUTED_PROPERTY_NAME_IN_ENUM),
         "Expected TS1164 for computed property name in enum: {:?}",
@@ -3013,7 +3620,10 @@ fn test_thin_parser_enum_computed_property_name() {
         parser.get_diagnostics()
     );
     // Parser should recover and continue parsing
-    assert!(!parser.arena.nodes.is_empty(), "Parser should recover and build AST");
+    assert!(
+        !parser.arena.nodes.is_empty(),
+        "Parser should recover and build AST"
+    );
 }
 
 #[test]
@@ -3024,14 +3634,21 @@ fn test_thin_parser_type_alias_missing_equals() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     parser.parse_source_file();
 
-    let codes: Vec<u32> = parser.get_diagnostics().iter().map(|diag| diag.code).collect();
+    let codes: Vec<u32> = parser
+        .get_diagnostics()
+        .iter()
+        .map(|diag| diag.code)
+        .collect();
     assert!(
         codes.contains(&diagnostic_codes::TOKEN_EXPECTED),
         "Expected TS1005 for missing equals token: {:?}",
         parser.get_diagnostics()
     );
     // Parser should recover and build an AST node
-    assert!(!parser.arena.nodes.is_empty(), "Parser should recover and build AST");
+    assert!(
+        !parser.arena.nodes.is_empty(),
+        "Parser should recover and build AST"
+    );
 }
 
 #[test]
@@ -3045,12 +3662,17 @@ fn test_thin_parser_type_alias_missing_equals_recovers_with_object_type() {
     // Should emit TS1005 for missing '='
     let diags = parser.get_diagnostics();
     assert!(
-        diags.iter().any(|d| d.code == diagnostic_codes::TOKEN_EXPECTED),
+        diags
+            .iter()
+            .any(|d| d.code == diagnostic_codes::TOKEN_EXPECTED),
         "Expected TS1005 diagnostic: {:?}",
         diags
     );
     // Parser should successfully build the AST despite the error
-    assert!(!parser.arena.nodes.is_empty(), "Parser should build AST with recovery");
+    assert!(
+        !parser.arena.nodes.is_empty(),
+        "Parser should build AST with recovery"
+    );
 }
 
 #[test]
@@ -3062,9 +3684,16 @@ fn test_thin_parser_function_keyword_in_class_recovers() {
     parser.parse_source_file();
 
     // Parser should recover and build the class AST
-    assert!(!parser.arena.nodes.is_empty(), "Parser should recover and build class AST");
+    assert!(
+        !parser.arena.nodes.is_empty(),
+        "Parser should recover and build class AST"
+    );
     // Should not emit TS1068 (unexpected token in class) - should handle gracefully
-    let codes: Vec<u32> = parser.get_diagnostics().iter().map(|diag| diag.code).collect();
+    let codes: Vec<u32> = parser
+        .get_diagnostics()
+        .iter()
+        .map(|diag| diag.code)
+        .collect();
     assert!(
         !codes.contains(&diagnostic_codes::UNEXPECTED_TOKEN_CLASS_MEMBER),
         "Should not emit TS1068 for function keyword in class, got: {:?}",

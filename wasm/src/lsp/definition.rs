@@ -2,12 +2,12 @@
 //!
 //! Given a position in the source, finds where the symbol at that position is defined.
 
-use crate::parser::thin_node::ThinNodeArena;
-use crate::parser::NodeIndex;
-use crate::thin_binder::ThinBinderState;
-use crate::lsp::position::{Position, Location, LineMap, Range};
-use crate::lsp::utils::find_node_at_offset;
+use crate::lsp::position::{LineMap, Location, Position, Range};
 use crate::lsp::resolver::{ScopeCache, ScopeCacheStats, ScopeWalker};
+use crate::lsp::utils::find_node_at_offset;
+use crate::parser::NodeIndex;
+use crate::parser::thin_node::ThinNodeArena;
+use crate::thin_binder::ThinBinderState;
 
 /// Go-to-Definition provider.
 ///
@@ -70,7 +70,9 @@ impl<'a> GoToDefinition<'a> {
         mut scope_stats: Option<&mut ScopeCacheStats>,
     ) -> Option<Vec<Location>> {
         // 1. Convert position to byte offset
-        let offset = self.line_map.position_to_offset(position, self.source_text)?;
+        let offset = self
+            .line_map
+            .position_to_offset(position, self.source_text)?;
 
         // 2. Find the most specific node at this offset
         let node_idx = find_node_at_offset(self.arena, offset);
@@ -95,8 +97,12 @@ impl<'a> GoToDefinition<'a> {
             .iter()
             .filter_map(|&decl_idx| {
                 let decl_node = self.arena.get(decl_idx)?;
-                let start_pos = self.line_map.offset_to_position(decl_node.pos, self.source_text);
-                let end_pos = self.line_map.offset_to_position(decl_node.end, self.source_text);
+                let start_pos = self
+                    .line_map
+                    .offset_to_position(decl_node.pos, self.source_text);
+                let end_pos = self
+                    .line_map
+                    .offset_to_position(decl_node.end, self.source_text);
 
                 Some(Location {
                     file_path: self.file_name.clone(),
@@ -115,7 +121,11 @@ impl<'a> GoToDefinition<'a> {
     /// Get the definition location for a specific node (by NodeIndex).
     ///
     /// This is useful when you already have the node index from another operation.
-    pub fn get_definition_for_node(&self, root: NodeIndex, node_idx: NodeIndex) -> Option<Vec<Location>> {
+    pub fn get_definition_for_node(
+        &self,
+        root: NodeIndex,
+        node_idx: NodeIndex,
+    ) -> Option<Vec<Location>> {
         self.get_definition_for_node_internal(root, node_idx, None, None)
     }
 
@@ -157,8 +167,12 @@ impl<'a> GoToDefinition<'a> {
             .iter()
             .filter_map(|&decl_idx| {
                 let decl_node = self.arena.get(decl_idx)?;
-                let start_pos = self.line_map.offset_to_position(decl_node.pos, self.source_text);
-                let end_pos = self.line_map.offset_to_position(decl_node.end, self.source_text);
+                let start_pos = self
+                    .line_map
+                    .offset_to_position(decl_node.pos, self.source_text);
+                let end_pos = self
+                    .line_map
+                    .offset_to_position(decl_node.end, self.source_text);
 
                 Some(Location {
                     file_path: self.file_name.clone(),
@@ -178,9 +192,9 @@ impl<'a> GoToDefinition<'a> {
 #[cfg(test)]
 mod definition_tests {
     use super::*;
-    use crate::thin_parser::ThinParserState;
-    use crate::thin_binder::ThinBinderState;
     use crate::lsp::position::LineMap;
+    use crate::thin_binder::ThinBinderState;
+    use crate::thin_parser::ThinParserState;
 
     #[test]
     fn test_goto_definition_simple_variable() {
@@ -199,7 +213,8 @@ mod definition_tests {
         // Position at the 'x' in "x + 1" (line 1, column 0)
         let position = Position::new(1, 0);
 
-        let goto_def = GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let goto_def =
+            GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
         let definitions = goto_def.get_definition(root, position);
 
         // Should find the definition at "const x = 1"
@@ -208,7 +223,10 @@ mod definition_tests {
         if let Some(defs) = definitions {
             assert!(!defs.is_empty(), "Should have at least one definition");
             // The definition should be on line 0
-            assert_eq!(defs[0].range.start.line, 0, "Definition should be on line 0");
+            assert_eq!(
+                defs[0].range.start.line, 0,
+                "Definition should be on line 0"
+            );
         }
     }
 
@@ -227,13 +245,20 @@ mod definition_tests {
         // Position at the 'Foo' in the type annotation (line 1)
         let position = Position::new(1, 9);
 
-        let goto_def = GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let goto_def =
+            GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
         let definitions = goto_def.get_definition(root, position);
 
-        assert!(definitions.is_some(), "Should find definition for type reference");
+        assert!(
+            definitions.is_some(),
+            "Should find definition for type reference"
+        );
         if let Some(defs) = definitions {
             assert!(!defs.is_empty(), "Should have at least one definition");
-            assert_eq!(defs[0].range.start.line, 0, "Definition should be on line 0");
+            assert_eq!(
+                defs[0].range.start.line, 0,
+                "Definition should be on line 0"
+            );
         }
     }
 
@@ -252,13 +277,20 @@ mod definition_tests {
         // Position at the 'foo' usage (line 1)
         let position = Position::new(1, 0);
 
-        let goto_def = GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let goto_def =
+            GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
         let definitions = goto_def.get_definition(root, position);
 
-        assert!(definitions.is_some(), "Should find definition for binding pattern name");
+        assert!(
+            definitions.is_some(),
+            "Should find definition for binding pattern name"
+        );
         if let Some(defs) = definitions {
             assert!(!defs.is_empty(), "Should have at least one definition");
-            assert_eq!(defs[0].range.start.line, 0, "Definition should be on line 0");
+            assert_eq!(
+                defs[0].range.start.line, 0,
+                "Definition should be on line 0"
+            );
         }
     }
 
@@ -277,13 +309,20 @@ mod definition_tests {
         // Position at the 'foo' usage in the return (line 1)
         let position = Position::new(1, 9);
 
-        let goto_def = GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let goto_def =
+            GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
         let definitions = goto_def.get_definition(root, position);
 
-        assert!(definitions.is_some(), "Should find definition for parameter binding name");
+        assert!(
+            definitions.is_some(),
+            "Should find definition for parameter binding name"
+        );
         if let Some(defs) = definitions {
             assert!(!defs.is_empty(), "Should have at least one definition");
-            assert_eq!(defs[0].range.start.line, 0, "Definition should be on line 0");
+            assert_eq!(
+                defs[0].range.start.line, 0,
+                "Definition should be on line 0"
+            );
         }
     }
 
@@ -302,13 +341,20 @@ mod definition_tests {
         // Position at the 'value' usage (line 3)
         let position = Position::new(3, 11);
 
-        let goto_def = GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let goto_def =
+            GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
         let definitions = goto_def.get_definition(root, position);
 
-        assert!(definitions.is_some(), "Should find definition for method local");
+        assert!(
+            definitions.is_some(),
+            "Should find definition for method local"
+        );
         if let Some(defs) = definitions {
             assert!(!defs.is_empty(), "Should have at least one definition");
-            assert_eq!(defs[0].range.start.line, 2, "Definition should be on line 2");
+            assert_eq!(
+                defs[0].range.start.line, 2,
+                "Definition should be on line 2"
+            );
         }
     }
 
@@ -327,13 +373,20 @@ mod definition_tests {
         // Position at the 'method' name (line 1)
         let position = Position::new(1, 2);
 
-        let goto_def = GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let goto_def =
+            GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
         let definitions = goto_def.get_definition(root, position);
 
-        assert!(definitions.is_some(), "Should find definition for method name");
+        assert!(
+            definitions.is_some(),
+            "Should find definition for method name"
+        );
         if let Some(defs) = definitions {
             assert!(!defs.is_empty(), "Should have at least one definition");
-            assert_eq!(defs[0].range.start.line, 1, "Definition should be on line 1");
+            assert_eq!(
+                defs[0].range.start.line, 1,
+                "Definition should be on line 1"
+            );
         }
     }
 
@@ -352,10 +405,14 @@ mod definition_tests {
         // Position at the 'value' usage (line 3)
         let position = Position::new(3, 11);
 
-        let goto_def = GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let goto_def =
+            GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
         let definitions = goto_def.get_definition(root, position);
 
-        assert!(definitions.is_none(), "Class members should not resolve as lexical identifiers");
+        assert!(
+            definitions.is_none(),
+            "Class members should not resolve as lexical identifiers"
+        );
     }
 
     #[test]
@@ -373,13 +430,20 @@ mod definition_tests {
         // Position at the 'Foo' usage (line 2)
         let position = Position::new(2, 11);
 
-        let goto_def = GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let goto_def =
+            GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
         let definitions = goto_def.get_definition(root, position);
 
-        assert!(definitions.is_some(), "Should resolve class name within class scope");
+        assert!(
+            definitions.is_some(),
+            "Should resolve class name within class scope"
+        );
         if let Some(defs) = definitions {
             assert!(!defs.is_empty(), "Should have at least one definition");
-            assert_eq!(defs[0].range.start.line, 0, "Definition should be on line 0");
+            assert_eq!(
+                defs[0].range.start.line, 0,
+                "Definition should be on line 0"
+            );
         }
     }
 
@@ -398,19 +462,27 @@ mod definition_tests {
         // Position at the 'Bar' usage (line 2)
         let position = Position::new(2, 11);
 
-        let goto_def = GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let goto_def =
+            GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
         let definitions = goto_def.get_definition(root, position);
 
-        assert!(definitions.is_some(), "Should resolve class expression name in body");
+        assert!(
+            definitions.is_some(),
+            "Should resolve class expression name in body"
+        );
         if let Some(defs) = definitions {
             assert!(!defs.is_empty(), "Should have at least one definition");
-            assert_eq!(defs[0].range.start.line, 0, "Definition should be on line 0");
+            assert_eq!(
+                defs[0].range.start.line, 0,
+                "Definition should be on line 0"
+            );
         }
     }
 
     #[test]
     fn test_goto_definition_nested_arrow_in_conditional() {
-        let source = "const handler = cond ? (() => {\n  const value = 1;\n  return value;\n}) : null;";
+        let source =
+            "const handler = cond ? (() => {\n  const value = 1;\n  return value;\n}) : null;";
         let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
         let root = parser.parse_source_file();
         let arena = parser.get_arena();
@@ -423,13 +495,17 @@ mod definition_tests {
         // Position at the 'value' usage (line 2)
         let position = Position::new(2, 9);
 
-        let goto_def = GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let goto_def =
+            GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
         let definitions = goto_def.get_definition(root, position);
 
         assert!(definitions.is_some(), "Should resolve nested arrow locals");
         if let Some(defs) = definitions {
             assert!(!defs.is_empty(), "Should have at least one definition");
-            assert_eq!(defs[0].range.start.line, 1, "Definition should be on line 1");
+            assert_eq!(
+                defs[0].range.start.line, 1,
+                "Definition should be on line 1"
+            );
         }
     }
 
@@ -448,13 +524,20 @@ mod definition_tests {
         // Position at the 'value' usage (line 2)
         let position = Position::new(2, 9);
 
-        let goto_def = GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let goto_def =
+            GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
         let definitions = goto_def.get_definition(root, position);
 
-        assert!(definitions.is_some(), "Should resolve nested arrow locals in condition");
+        assert!(
+            definitions.is_some(),
+            "Should resolve nested arrow locals in condition"
+        );
         if let Some(defs) = definitions {
             assert!(!defs.is_empty(), "Should have at least one definition");
-            assert_eq!(defs[0].range.start.line, 1, "Definition should be on line 1");
+            assert_eq!(
+                defs[0].range.start.line, 1,
+                "Definition should be on line 1"
+            );
         }
     }
 
@@ -473,13 +556,20 @@ mod definition_tests {
         // Position at the 'value' usage (line 2)
         let position = Position::new(2, 9);
 
-        let goto_def = GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let goto_def =
+            GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
         let definitions = goto_def.get_definition(root, position);
 
-        assert!(definitions.is_some(), "Should resolve nested arrow locals in while condition");
+        assert!(
+            definitions.is_some(),
+            "Should resolve nested arrow locals in while condition"
+        );
         if let Some(defs) = definitions {
             assert!(!defs.is_empty(), "Should have at least one definition");
-            assert_eq!(defs[0].range.start.line, 1, "Definition should be on line 1");
+            assert_eq!(
+                defs[0].range.start.line, 1,
+                "Definition should be on line 1"
+            );
         }
     }
 
@@ -498,13 +588,20 @@ mod definition_tests {
         // Position at the 'value' usage (line 2)
         let position = Position::new(2, 9);
 
-        let goto_def = GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let goto_def =
+            GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
         let definitions = goto_def.get_definition(root, position);
 
-        assert!(definitions.is_some(), "Should resolve nested arrow locals in for-of expression");
+        assert!(
+            definitions.is_some(),
+            "Should resolve nested arrow locals in for-of expression"
+        );
         if let Some(defs) = definitions {
             assert!(!defs.is_empty(), "Should have at least one definition");
-            assert_eq!(defs[0].range.start.line, 1, "Definition should be on line 1");
+            assert_eq!(
+                defs[0].range.start.line, 1,
+                "Definition should be on line 1"
+            );
         }
     }
 
@@ -523,13 +620,20 @@ mod definition_tests {
         // Position at the 'value' usage (line 2)
         let position = Position::new(2, 9);
 
-        let goto_def = GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let goto_def =
+            GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
         let definitions = goto_def.get_definition(root, position);
 
-        assert!(definitions.is_some(), "Should resolve locals in export default expression");
+        assert!(
+            definitions.is_some(),
+            "Should resolve locals in export default expression"
+        );
         if let Some(defs) = definitions {
             assert!(!defs.is_empty(), "Should have at least one definition");
-            assert_eq!(defs[0].range.start.line, 1, "Definition should be on line 1");
+            assert_eq!(
+                defs[0].range.start.line, 1,
+                "Definition should be on line 1"
+            );
         }
     }
 
@@ -548,13 +652,20 @@ mod definition_tests {
         // Position at the 'value' usage (line 2)
         let position = Position::new(2, 2);
 
-        let goto_def = GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let goto_def =
+            GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
         let definitions = goto_def.get_definition(root, position);
 
-        assert!(definitions.is_some(), "Should resolve locals inside labeled statement");
+        assert!(
+            definitions.is_some(),
+            "Should resolve locals inside labeled statement"
+        );
         if let Some(defs) = definitions {
             assert!(!defs.is_empty(), "Should have at least one definition");
-            assert_eq!(defs[0].range.start.line, 1, "Definition should be on line 1");
+            assert_eq!(
+                defs[0].range.start.line, 1,
+                "Definition should be on line 1"
+            );
         }
     }
 
@@ -573,13 +684,20 @@ mod definition_tests {
         // Position at the 'value' usage (line 2)
         let position = Position::new(2, 2);
 
-        let goto_def = GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let goto_def =
+            GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
         let definitions = goto_def.get_definition(root, position);
 
-        assert!(definitions.is_some(), "Should resolve locals inside with statement");
+        assert!(
+            definitions.is_some(),
+            "Should resolve locals inside with statement"
+        );
         if let Some(defs) = definitions {
             assert!(!defs.is_empty(), "Should have at least one definition");
-            assert_eq!(defs[0].range.start.line, 1, "Definition should be on line 1");
+            assert_eq!(
+                defs[0].range.start.line, 1,
+                "Definition should be on line 1"
+            );
         }
     }
 
@@ -598,13 +716,20 @@ mod definition_tests {
         // Position at the 'value' usage before the declaration (line 1)
         let position = Position::new(1, 2);
 
-        let goto_def = GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let goto_def =
+            GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
         let definitions = goto_def.get_definition(root, position);
 
-        assert!(definitions.is_some(), "Should resolve hoisted var definition");
+        assert!(
+            definitions.is_some(),
+            "Should resolve hoisted var definition"
+        );
         if let Some(defs) = definitions {
             assert!(!defs.is_empty(), "Should have at least one definition");
-            assert_eq!(defs[0].range.start.line, 3, "Definition should be on line 3");
+            assert_eq!(
+                defs[0].range.start.line, 3,
+                "Definition should be on line 3"
+            );
         }
     }
 
@@ -623,13 +748,17 @@ mod definition_tests {
         // Position at the 'deco' usage in the decorator (line 1)
         let position = Position::new(1, 1);
 
-        let goto_def = GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let goto_def =
+            GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
         let definitions = goto_def.get_definition(root, position);
 
         assert!(definitions.is_some(), "Should resolve decorator reference");
         if let Some(defs) = definitions {
             assert!(!defs.is_empty(), "Should have at least one definition");
-            assert_eq!(defs[0].range.start.line, 0, "Definition should be on line 0");
+            assert_eq!(
+                defs[0].range.start.line, 0,
+                "Definition should be on line 0"
+            );
         }
     }
 
@@ -648,13 +777,20 @@ mod definition_tests {
         // Position at the 'value' usage inside the decorator argument (line 3)
         let position = Position::new(3, 9);
 
-        let goto_def = GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let goto_def =
+            GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
         let definitions = goto_def.get_definition(root, position);
 
-        assert!(definitions.is_some(), "Should resolve locals inside decorator arguments");
+        assert!(
+            definitions.is_some(),
+            "Should resolve locals inside decorator arguments"
+        );
         if let Some(defs) = definitions {
             assert!(!defs.is_empty(), "Should have at least one definition");
-            assert_eq!(defs[0].range.start.line, 2, "Definition should be on line 2");
+            assert_eq!(
+                defs[0].range.start.line, 2,
+                "Definition should be on line 2"
+            );
         }
     }
 
@@ -673,13 +809,20 @@ mod definition_tests {
         // Position at the 'value' usage (line 2)
         let position = Position::new(2, 9);
 
-        let goto_def = GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let goto_def =
+            GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
         let definitions = goto_def.get_definition(root, position);
 
-        assert!(definitions.is_some(), "Should resolve nested object literal locals");
+        assert!(
+            definitions.is_some(),
+            "Should resolve nested object literal locals"
+        );
         if let Some(defs) = definitions {
             assert!(!defs.is_empty(), "Should have at least one definition");
-            assert_eq!(defs[0].range.start.line, 1, "Definition should be on line 1");
+            assert_eq!(
+                defs[0].range.start.line, 1,
+                "Definition should be on line 1"
+            );
         }
     }
 
@@ -698,13 +841,17 @@ mod definition_tests {
         // Position at the 'value' usage (line 3)
         let position = Position::new(3, 4);
 
-        let goto_def = GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let goto_def =
+            GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
         let definitions = goto_def.get_definition(root, position);
 
         assert!(definitions.is_some(), "Should resolve static block locals");
         if let Some(defs) = definitions {
             assert!(!defs.is_empty(), "Should have at least one definition");
-            assert_eq!(defs[0].range.start.line, 2, "Definition should be on line 2");
+            assert_eq!(
+                defs[0].range.start.line, 2,
+                "Definition should be on line 2"
+            );
         }
     }
 
@@ -723,10 +870,14 @@ mod definition_tests {
         // Position outside any identifier
         let position = Position::new(0, 11); // At the semicolon
 
-        let goto_def = GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let goto_def =
+            GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
         let definitions = goto_def.get_definition(root, position);
 
         // Should not find a definition
-        assert!(definitions.is_none(), "Should not find definition at semicolon");
+        assert!(
+            definitions.is_none(),
+            "Should not find definition at semicolon"
+        );
     }
 }

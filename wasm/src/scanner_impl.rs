@@ -9,10 +9,10 @@
 // Allow dead code for scanner infrastructure methods that will be used in future phases
 #![allow(dead_code)]
 
-use wasm_bindgen::prelude::*;
-use crate::scanner::SyntaxKind;
 use crate::char_codes::CharacterCodes;
 use crate::interner::{Atom, Interner};
+use crate::scanner::SyntaxKind;
+use wasm_bindgen::prelude::*;
 
 // =============================================================================
 // Token Flags
@@ -192,7 +192,8 @@ impl ScannerState {
     /// Check if the current token is an identifier.
     #[wasm_bindgen(js_name = isIdentifier)]
     pub fn is_identifier(&self) -> bool {
-        self.token == SyntaxKind::Identifier || (self.token as u16) > (SyntaxKind::WithKeyword as u16)
+        self.token == SyntaxKind::Identifier
+            || (self.token as u16) > (SyntaxKind::WithKeyword as u16)
     }
 
     /// Check if the current token is a reserved word.
@@ -257,7 +258,11 @@ impl ScannerState {
                 b as u32
             } else {
                 // Non-ASCII: decode UTF-8 char
-                self.source[index..].chars().next().map(|c| c as u32).unwrap_or(0)
+                self.source[index..]
+                    .chars()
+                    .next()
+                    .map(|c| c as u32)
+                    .unwrap_or(0)
             }
         } else {
             0
@@ -333,7 +338,7 @@ impl ScannerState {
 
         loop {
             self.token_start = self.pos;
-            
+
             if self.pos >= self.end {
                 self.token = SyntaxKind::EndOfFileToken;
                 return self.token;
@@ -347,17 +352,17 @@ impl ScannerState {
                     self.token_flags |= TokenFlags::PrecedingLineBreak as u32;
                     if self.skip_trivia {
                         self.pos += 1;
-                        if ch == CharacterCodes::CARRIAGE_RETURN 
-                            && self.pos < self.end 
-                            && self.char_code_unchecked(self.pos) == CharacterCodes::LINE_FEED 
+                        if ch == CharacterCodes::CARRIAGE_RETURN
+                            && self.pos < self.end
+                            && self.char_code_unchecked(self.pos) == CharacterCodes::LINE_FEED
                         {
                             self.pos += 1;
                         }
                         continue;
                     } else {
-                        if ch == CharacterCodes::CARRIAGE_RETURN 
-                            && self.pos + 1 < self.end 
-                            && self.char_code_unchecked(self.pos + 1) == CharacterCodes::LINE_FEED 
+                        if ch == CharacterCodes::CARRIAGE_RETURN
+                            && self.pos + 1 < self.end
+                            && self.char_code_unchecked(self.pos + 1) == CharacterCodes::LINE_FEED
                         {
                             self.pos += 2;
                         } else {
@@ -377,12 +382,16 @@ impl ScannerState {
                     if self.skip_trivia {
                         // Use char_len_at for proper UTF-8 handling (NON_BREAKING_SPACE is 2 bytes)
                         self.pos += self.char_len_at(self.pos);
-                        while self.pos < self.end && is_white_space_single_line(self.char_code_unchecked(self.pos)) {
+                        while self.pos < self.end
+                            && is_white_space_single_line(self.char_code_unchecked(self.pos))
+                        {
                             self.pos += self.char_len_at(self.pos);
                         }
                         continue;
                     } else {
-                        while self.pos < self.end && is_white_space_single_line(self.char_code_unchecked(self.pos)) {
+                        while self.pos < self.end
+                            && is_white_space_single_line(self.char_code_unchecked(self.pos))
+                        {
                             self.pos += self.char_len_at(self.pos);
                         }
                         self.token = SyntaxKind::WhitespaceTrivia;
@@ -394,13 +403,17 @@ impl ScannerState {
                 CharacterCodes::BYTE_ORDER_MARK => {
                     if self.skip_trivia {
                         self.pos += 3; // BOM is 3 bytes in UTF-8
-                        while self.pos < self.end && is_white_space_single_line(self.char_code_unchecked(self.pos)) {
+                        while self.pos < self.end
+                            && is_white_space_single_line(self.char_code_unchecked(self.pos))
+                        {
                             self.pos += self.char_len_at(self.pos);
                         }
                         continue;
                     } else {
                         self.pos += 3; // BOM is 3 bytes in UTF-8
-                        while self.pos < self.end && is_white_space_single_line(self.char_code_unchecked(self.pos)) {
+                        while self.pos < self.end
+                            && is_white_space_single_line(self.char_code_unchecked(self.pos))
+                        {
                             self.pos += self.char_len_at(self.pos);
                         }
                         self.token = SyntaxKind::WhitespaceTrivia;
@@ -471,9 +484,9 @@ impl ScannerState {
                         self.scan_number();
                         return self.token;
                     }
-                    if self.pos + 2 < self.end 
-                        && self.char_code_unchecked(self.pos + 1) == CharacterCodes::DOT 
-                        && self.char_code_unchecked(self.pos + 2) == CharacterCodes::DOT 
+                    if self.pos + 2 < self.end
+                        && self.char_code_unchecked(self.pos + 1) == CharacterCodes::DOT
+                        && self.char_code_unchecked(self.pos + 2) == CharacterCodes::DOT
                     {
                         self.pos += 3;
                         self.token = SyntaxKind::DotDotDotToken;
@@ -649,8 +662,8 @@ impl ScannerState {
 
                 // Question mark
                 CharacterCodes::QUESTION => {
-                    if self.char_code_at(self.pos + 1) == Some(CharacterCodes::DOT) 
-                        && !is_digit(self.char_code_at(self.pos + 2).unwrap_or(0)) 
+                    if self.char_code_at(self.pos + 1) == Some(CharacterCodes::DOT)
+                        && !is_digit(self.char_code_at(self.pos + 2).unwrap_or(0))
                     {
                         self.pos += 2;
                         self.token = SyntaxKind::QuestionDotToken;
@@ -711,7 +724,9 @@ impl ScannerState {
                         self.pos += 2;
                         while self.pos < self.end {
                             let c = self.char_code_unchecked(self.pos);
-                            if c == CharacterCodes::LINE_FEED || c == CharacterCodes::CARRIAGE_RETURN {
+                            if c == CharacterCodes::LINE_FEED
+                                || c == CharacterCodes::CARRIAGE_RETURN
+                            {
                                 break;
                             }
                             self.pos += self.char_len_at(self.pos); // Handle multi-byte UTF-8
@@ -735,7 +750,9 @@ impl ScannerState {
                                 comment_closed = true;
                                 break;
                             }
-                            if c == CharacterCodes::LINE_FEED || c == CharacterCodes::CARRIAGE_RETURN {
+                            if c == CharacterCodes::LINE_FEED
+                                || c == CharacterCodes::CARRIAGE_RETURN
+                            {
                                 self.token_flags |= TokenFlags::PrecedingLineBreak as u32;
                             }
                             self.pos += self.char_len_at(self.pos); // Handle multi-byte UTF-8
@@ -777,9 +794,13 @@ impl ScannerState {
                     // Simplified: just treat as hash token
                     // Full implementation would check for private identifier
                     self.pos += 1;
-                    if self.pos < self.end && is_identifier_start(self.char_code_unchecked(self.pos)) {
+                    if self.pos < self.end
+                        && is_identifier_start(self.char_code_unchecked(self.pos))
+                    {
                         self.pos += self.char_len_at(self.pos); // Handle multi-byte UTF-8
-                        while self.pos < self.end && is_identifier_part(self.char_code_unchecked(self.pos)) {
+                        while self.pos < self.end
+                            && is_identifier_part(self.char_code_unchecked(self.pos))
+                        {
                             self.pos += self.char_len_at(self.pos); // Handle multi-byte UTF-8
                         }
                         self.token_value = self.substring(self.token_start, self.pos);
@@ -791,7 +812,7 @@ impl ScannerState {
                 }
 
                 // Numbers
-                CharacterCodes::_0 ..= CharacterCodes::_9 => {
+                CharacterCodes::_0..=CharacterCodes::_9 => {
                     self.scan_number();
                     return self.token;
                 }
@@ -815,7 +836,7 @@ impl ScannerState {
     fn scan_string(&mut self, quote: u32) {
         self.pos += 1; // Skip opening quote
         let mut result = String::new();
-        
+
         while self.pos < self.end {
             let ch = self.char_code_unchecked(self.pos);
             if ch == quote {
@@ -884,7 +905,7 @@ impl ScannerState {
     fn scan_template_literal(&mut self) {
         self.pos += 1; // Skip backtick
         let mut result = String::new();
-        
+
         while self.pos < self.end {
             let ch = self.char_code_unchecked(self.pos);
             if ch == CharacterCodes::BACKTICK {
@@ -893,8 +914,8 @@ impl ScannerState {
                 self.token = SyntaxKind::NoSubstitutionTemplateLiteral;
                 return;
             }
-            if ch == CharacterCodes::DOLLAR 
-                && self.char_code_at(self.pos + 1) == Some(CharacterCodes::OPEN_BRACE) 
+            if ch == CharacterCodes::DOLLAR
+                && self.char_code_at(self.pos + 1) == Some(CharacterCodes::OPEN_BRACE)
             {
                 self.pos += 2;
                 self.token_value = result;
@@ -947,7 +968,7 @@ impl ScannerState {
                 self.pos += self.char_len_at(self.pos); // Advance by character byte length
             }
         }
-        
+
         self.token_flags |= TokenFlags::Unterminated as u32;
         self.token_value = result;
         self.token = SyntaxKind::NoSubstitutionTemplateLiteral;
@@ -956,7 +977,7 @@ impl ScannerState {
     /// Scan a number literal (simplified).
     fn scan_number(&mut self) {
         let start = self.pos;
-        
+
         // Check for hex, octal, binary
         if self.char_code_unchecked(self.pos) == CharacterCodes::_0 {
             let next = self.char_code_at(self.pos + 1).unwrap_or(0);
@@ -965,7 +986,9 @@ impl ScannerState {
                 self.pos += 2;
                 self.token_flags |= TokenFlags::HexSpecifier as u32;
                 self.scan_digits_with_separators(is_hex_digit);
-                if self.pos < self.end && self.char_code_unchecked(self.pos) == CharacterCodes::LOWER_N {
+                if self.pos < self.end
+                    && self.char_code_unchecked(self.pos) == CharacterCodes::LOWER_N
+                {
                     self.pos += 1;
                     self.token_value = self.substring(start, self.pos);
                     self.token = SyntaxKind::BigIntLiteral;
@@ -980,7 +1003,9 @@ impl ScannerState {
                 self.pos += 2;
                 self.token_flags |= TokenFlags::BinarySpecifier as u32;
                 self.scan_digits_with_separators(is_binary_digit);
-                if self.pos < self.end && self.char_code_unchecked(self.pos) == CharacterCodes::LOWER_N {
+                if self.pos < self.end
+                    && self.char_code_unchecked(self.pos) == CharacterCodes::LOWER_N
+                {
                     self.pos += 1;
                     self.token_value = self.substring(start, self.pos);
                     self.token = SyntaxKind::BigIntLiteral;
@@ -995,7 +1020,9 @@ impl ScannerState {
                 self.pos += 2;
                 self.token_flags |= TokenFlags::OctalSpecifier as u32;
                 self.scan_digits_with_separators(is_octal_digit);
-                if self.pos < self.end && self.char_code_unchecked(self.pos) == CharacterCodes::LOWER_N {
+                if self.pos < self.end
+                    && self.char_code_unchecked(self.pos) == CharacterCodes::LOWER_N
+                {
                     self.pos += 1;
                     self.token_value = self.substring(start, self.pos);
                     self.token = SyntaxKind::BigIntLiteral;
@@ -1009,13 +1036,13 @@ impl ScannerState {
 
         // Decimal number
         self.scan_digits_with_separators(is_digit);
-        
+
         // Decimal point
         if self.pos < self.end && self.char_code_unchecked(self.pos) == CharacterCodes::DOT {
             self.pos += 1;
             self.scan_digits_with_separators(is_digit);
         }
-        
+
         // Exponent
         if self.pos < self.end {
             let ch = self.char_code_unchecked(self.pos);
@@ -1031,7 +1058,7 @@ impl ScannerState {
                 self.scan_digits_with_separators(is_digit);
             }
         }
-        
+
         // BigInt suffix
         if self.pos < self.end && self.char_code_unchecked(self.pos) == CharacterCodes::LOWER_N {
             self.pos += 1;
@@ -1039,7 +1066,7 @@ impl ScannerState {
             self.token = SyntaxKind::BigIntLiteral;
             return;
         }
-        
+
         self.token_value = self.substring(start, self.pos);
         self.token = SyntaxKind::NumericLiteral;
     }
@@ -1228,7 +1255,7 @@ impl ScannerState {
 
     /// Re-scan the current `}` token as the continuation of a template literal.
     /// Called by the parser when it determines that a `}` is closing a template expression.
-    /// 
+    ///
     /// # Arguments
     /// * `is_tagged_template` - If true, invalid escape sequences should not report errors
     ///   (tagged templates can have invalid escapes that get passed to the tag function as raw).
@@ -1256,7 +1283,7 @@ impl ScannerState {
     }
 
     /// Internal helper to scan a template literal part and set the token value.
-    /// 
+    ///
     /// # Arguments
     /// * `started_with_backtick` - true if this is the start of a template (head or no-substitution),
     ///   false if this is a continuation after a `}` (middle or tail).
@@ -1275,10 +1302,10 @@ impl ScannerState {
         self.pos += 1;
         let mut start = self.pos;
         let mut contents = String::new();
-        
+
         while self.pos < self.end {
             let ch = self.char_code_unchecked(self.pos);
-            
+
             // End of template: backtick
             if ch == CharacterCodes::BACKTICK {
                 contents.push_str(&self.substring(start, self.pos));
@@ -1290,11 +1317,11 @@ impl ScannerState {
                     SyntaxKind::TemplateTail
                 };
             }
-            
+
             // Template expression: ${
-            if ch == CharacterCodes::DOLLAR 
-                && self.pos + 1 < self.end 
-                && self.char_code_unchecked(self.pos + 1) == CharacterCodes::OPEN_BRACE 
+            if ch == CharacterCodes::DOLLAR
+                && self.pos + 1 < self.end
+                && self.char_code_unchecked(self.pos + 1) == CharacterCodes::OPEN_BRACE
             {
                 contents.push_str(&self.substring(start, self.pos));
                 self.pos += 2;
@@ -1305,7 +1332,7 @@ impl ScannerState {
                     SyntaxKind::TemplateMiddle
                 };
             }
-            
+
             // Escape sequence
             if ch == CharacterCodes::BACKSLASH {
                 contents.push_str(&self.substring(start, self.pos));
@@ -1315,12 +1342,14 @@ impl ScannerState {
                 start = self.pos;
                 continue;
             }
-            
+
             // CR normalization (CR or CRLF -> LF)
             if ch == CharacterCodes::CARRIAGE_RETURN {
                 contents.push_str(&self.substring(start, self.pos));
                 self.pos += 1;
-                if self.pos < self.end && self.char_code_unchecked(self.pos) == CharacterCodes::LINE_FEED {
+                if self.pos < self.end
+                    && self.char_code_unchecked(self.pos) == CharacterCodes::LINE_FEED
+                {
                     self.pos += 1;
                 }
                 contents.push('\n');
@@ -1328,10 +1357,10 @@ impl ScannerState {
                 start = self.pos;
                 continue;
             }
-            
+
             self.pos += 1;
         }
-        
+
         // Unterminated template
         contents.push_str(&self.substring(start, self.pos));
         self.token_flags |= TokenFlags::Unterminated as u32;
@@ -1384,7 +1413,9 @@ impl ScannerState {
             | CharacterCodes::PARAGRAPH_SEPARATOR => String::new(), // Line continuation
             CharacterCodes::CARRIAGE_RETURN => {
                 // Skip following LF if present
-                if self.pos < self.end && self.char_code_unchecked(self.pos) == CharacterCodes::LINE_FEED {
+                if self.pos < self.end
+                    && self.char_code_unchecked(self.pos) == CharacterCodes::LINE_FEED
+                {
                     self.pos += 1;
                 }
                 String::new() // Line continuation
@@ -1405,14 +1436,18 @@ impl ScannerState {
             }
             CharacterCodes::LOWER_U => {
                 // Unicode escape \uHHHH or \u{H+}
-                if self.pos < self.end && self.char_code_unchecked(self.pos) == CharacterCodes::OPEN_BRACE {
+                if self.pos < self.end
+                    && self.char_code_unchecked(self.pos) == CharacterCodes::OPEN_BRACE
+                {
                     // \u{...}
                     self.pos += 1;
                     let hex_start = self.pos;
                     while self.pos < self.end && is_hex_digit(self.char_code_unchecked(self.pos)) {
                         self.pos += 1;
                     }
-                    if self.pos < self.end && self.char_code_unchecked(self.pos) == CharacterCodes::CLOSE_BRACE {
+                    if self.pos < self.end
+                        && self.char_code_unchecked(self.pos) == CharacterCodes::CLOSE_BRACE
+                    {
                         let hex = self.substring(hex_start, self.pos);
                         self.pos += 1;
                         if let Ok(code) = u32::from_str_radix(&hex, 16) {
@@ -1467,9 +1502,13 @@ impl ScannerState {
                     // In JSX, hyphens are allowed in identifiers
                     self.pos += 1;
                     // After hyphen, we need more identifier characters
-                    if self.pos < self.end && is_identifier_start(self.char_code_unchecked(self.pos)) {
+                    if self.pos < self.end
+                        && is_identifier_start(self.char_code_unchecked(self.pos))
+                    {
                         self.pos += self.char_len_at(self.pos); // Handle multi-byte UTF-8
-                        while self.pos < self.end && is_identifier_part(self.char_code_unchecked(self.pos)) {
+                        while self.pos < self.end
+                            && is_identifier_part(self.char_code_unchecked(self.pos))
+                        {
                             self.pos += self.char_len_at(self.pos); // Handle multi-byte UTF-8
                         }
                     }
@@ -1562,7 +1601,8 @@ impl ScannerState {
         self.full_start_pos = self.pos;
 
         // Skip whitespace
-        while self.pos < self.end && is_white_space_single_line(self.char_code_unchecked(self.pos)) {
+        while self.pos < self.end && is_white_space_single_line(self.char_code_unchecked(self.pos))
+        {
             self.pos += 1;
         }
 
@@ -1645,7 +1685,8 @@ impl ScannerState {
         if self.token == SyntaxKind::HashToken {
             if self.pos < self.end && is_identifier_start(self.char_code_unchecked(self.pos)) {
                 self.pos += 1;
-                while self.pos < self.end && is_identifier_part(self.char_code_unchecked(self.pos)) {
+                while self.pos < self.end && is_identifier_part(self.char_code_unchecked(self.pos))
+                {
                     self.pos += 1;
                 }
                 self.token_value = self.substring(self.token_start, self.pos);
@@ -1703,8 +1744,10 @@ impl ScannerState {
         if ch == CharacterCodes::LINE_FEED || ch == CharacterCodes::CARRIAGE_RETURN {
             self.token_flags |= TokenFlags::PrecedingLineBreak as u32;
             self.pos += 1;
-            if ch == CharacterCodes::CARRIAGE_RETURN && self.pos < self.end
-                && self.char_code_unchecked(self.pos) == CharacterCodes::LINE_FEED {
+            if ch == CharacterCodes::CARRIAGE_RETURN
+                && self.pos < self.end
+                && self.char_code_unchecked(self.pos) == CharacterCodes::LINE_FEED
+            {
                 self.pos += 1;
             }
             self.token = SyntaxKind::NewLineTrivia;
@@ -1713,7 +1756,9 @@ impl ScannerState {
 
         // Handle whitespace
         if is_white_space_single_line(ch) {
-            while self.pos < self.end && is_white_space_single_line(self.char_code_unchecked(self.pos)) {
+            while self.pos < self.end
+                && is_white_space_single_line(self.char_code_unchecked(self.pos))
+            {
                 self.pos += 1;
             }
             self.token = SyntaxKind::WhitespaceTrivia;
@@ -1780,7 +1825,9 @@ impl ScannerState {
             CharacterCodes::BACKTICK => {
                 // Scan backtick-quoted string in JSDoc
                 self.pos += 1;
-                while self.pos < self.end && self.char_code_unchecked(self.pos) != CharacterCodes::BACKTICK {
+                while self.pos < self.end
+                    && self.char_code_unchecked(self.pos) != CharacterCodes::BACKTICK
+                {
                     self.pos += 1;
                 }
                 if self.pos < self.end {
@@ -1800,7 +1847,8 @@ impl ScannerState {
                 self.pos += 1;
             }
             self.token_value = self.substring(self.token_start, self.pos);
-            self.token = crate::scanner::text_to_keyword(&self.token_value).unwrap_or(SyntaxKind::Identifier);
+            self.token = crate::scanner::text_to_keyword(&self.token_value)
+                .unwrap_or(SyntaxKind::Identifier);
             return self.token;
         }
 
@@ -1902,7 +1950,9 @@ impl ScannerState {
                 let ch = self.char_code_unchecked(self.pos);
                 if ch == CharacterCodes::CARRIAGE_RETURN {
                     self.pos += 1;
-                    if self.pos < self.end && self.char_code_unchecked(self.pos) == CharacterCodes::LINE_FEED {
+                    if self.pos < self.end
+                        && self.char_code_unchecked(self.pos) == CharacterCodes::LINE_FEED
+                    {
                         self.pos += 1;
                     }
                 } else if ch == CharacterCodes::LINE_FEED {
@@ -1972,7 +2022,8 @@ impl ScannerState {
         self.token_flags = snapshot.token_flags;
         self.token_atom = snapshot.token_atom;
         self.token_invalid_separator_pos = snapshot.token_invalid_separator_pos;
-        self.token_invalid_separator_is_consecutive = snapshot.token_invalid_separator_is_consecutive;
+        self.token_invalid_separator_is_consecutive =
+            snapshot.token_invalid_separator_is_consecutive;
     }
 
     /// Get the interned atom for the current identifier token.
@@ -2073,7 +2124,7 @@ fn is_octal_digit(ch: u32) -> bool {
 }
 
 fn is_hex_digit(ch: u32) -> bool {
-    is_digit(ch) 
+    is_digit(ch)
         || (ch >= CharacterCodes::UPPER_A && ch <= CharacterCodes::UPPER_F)
         || (ch >= CharacterCodes::LOWER_A && ch <= CharacterCodes::LOWER_F)
 }
@@ -2108,6 +2159,6 @@ fn is_regex_flag(ch: u32) -> bool {
         | CharacterCodes::LOWER_U  // u - unicode
         | CharacterCodes::LOWER_V  // v - unicode sets
         | CharacterCodes::LOWER_Y  // y - sticky
-        | CharacterCodes::LOWER_D  // d - has indices
+        | CharacterCodes::LOWER_D // d - has indices
     )
 }

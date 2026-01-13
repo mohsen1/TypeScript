@@ -14,7 +14,11 @@ impl TempDir {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        path.push(format!("tsz_cli_reporter_test_{}_{}", std::process::id(), nanos));
+        path.push(format!(
+            "tsz_cli_reporter_test_{}_{}",
+            std::process::id(),
+            nanos
+        ));
         std::fs::create_dir_all(&path)?;
         Ok(Self { path })
     }
@@ -37,10 +41,7 @@ fn write_file(path: &Path, contents: &str) {
 fn reporter_formats_diagnostic_with_location() {
     let temp = TempDir::new().expect("temp dir");
     let file_path = temp.path.join("src/main.ts");
-    write_file(
-        &file_path,
-        "let x = 1;\nlet y = 2;\n",
-    );
+    write_file(&file_path, "let x = 1;\nlet y = 2;\n");
 
     let diagnostic = Diagnostic {
         file: file_path.to_string_lossy().into_owned(),
@@ -81,14 +82,11 @@ fn reporter_omits_code_when_missing() {
 fn reporter_includes_source_snippet_with_underline() {
     let temp = TempDir::new().expect("temp dir");
     let file_path = temp.path.join("test.ts");
-    write_file(
-        &file_path,
-        "let x: number = \"string\";\n",
-    );
+    write_file(&file_path, "let x: number = \"string\";\n");
 
     let diagnostic = Diagnostic {
         file: file_path.to_string_lossy().into_owned(),
-        start: 16,  // position of "string"
+        start: 16, // position of "string"
         length: 8,
         message_text: "Type 'string' is not assignable to type 'number'.".to_string(),
         category: DiagnosticCategory::Error,
@@ -100,23 +98,26 @@ fn reporter_includes_source_snippet_with_underline() {
     let output = reporter.format_diagnostic(&diagnostic);
 
     // Should include line number, source line, and underline with tildes
-    assert!(output.contains("1   let x: number = \"string\";"), "missing source line: {output}");
-    assert!(output.contains("        ~~~~~~~~"), "missing underline: {output}");
+    assert!(
+        output.contains("1   let x: number = \"string\";"),
+        "missing source line: {output}"
+    );
+    assert!(
+        output.contains("        ~~~~~~~~"),
+        "missing underline: {output}"
+    );
 }
 
 #[test]
 fn reporter_handles_multiline_snippets() {
     let temp = TempDir::new().expect("temp dir");
     let file_path = temp.path.join("test.ts");
-    write_file(
-        &file_path,
-        "let a = 1;\nlet b = 2;\nlet c = 3;\n",
-    );
+    write_file(&file_path, "let a = 1;\nlet b = 2;\nlet c = 3;\n");
 
     // Error on line 2
     let diagnostic = Diagnostic {
         file: file_path.to_string_lossy().into_owned(),
-        start: 11,  // 'b' on line 2
+        start: 11, // 'b' on line 2
         length: 1,
         message_text: "Cannot find name 'b'.".to_string(),
         category: DiagnosticCategory::Error,
@@ -127,6 +128,12 @@ fn reporter_handles_multiline_snippets() {
     let mut reporter = Reporter::new(false);
     let output = reporter.format_diagnostic(&diagnostic);
 
-    assert!(output.contains("2   let b = 2;"), "missing correct line: {output}");
-    assert!(output.contains("       ~"), "missing underline at position: {output}");
+    assert!(
+        output.contains("2   let b = 2;"),
+        "missing correct line: {output}"
+    );
+    assert!(
+        output.contains("       ~"),
+        "missing underline at position: {output}"
+    );
 }

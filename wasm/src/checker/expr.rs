@@ -4,9 +4,9 @@
 //! It follows the "Check Fast, Explain Slow" pattern where we first
 //! infer types, then use the solver to explain any failures.
 
+use super::context::CheckerContext;
 use crate::parser::NodeIndex;
 use crate::solver::TypeId;
-use super::context::CheckerContext;
 
 /// Expression type checker that operates on the shared context.
 ///
@@ -40,8 +40,8 @@ impl<'a, 'ctx> ExpressionChecker<'a, 'ctx> {
 
     /// Compute the type of an expression (internal, not cached).
     fn compute_type(&mut self, idx: NodeIndex) -> TypeId {
-        use crate::scanner::SyntaxKind;
         use crate::parser::syntax_kind_ext;
+        use crate::scanner::SyntaxKind;
 
         let Some(node) = self.ctx.arena.get(idx) else {
             return TypeId::ANY;
@@ -87,9 +87,9 @@ impl<'a, 'ctx> ExpressionChecker<'a, 'ctx> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::thin_parser::ThinParserState;
-    use crate::thin_binder::ThinBinderState;
     use crate::solver::TypeInterner;
+    use crate::thin_binder::ThinBinderState;
+    use crate::thin_parser::ThinParserState;
 
     #[test]
     fn test_expression_checker_numeric_literal() {
@@ -101,19 +101,17 @@ mod tests {
         binder.bind_source_file(parser.get_arena(), root);
 
         let types = TypeInterner::new();
-        let mut ctx = CheckerContext::new(
-            parser.get_arena(),
-            &binder,
-            &types,
-            "test.ts".to_string(),
-        );
+        let mut ctx =
+            CheckerContext::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
 
         // Get the expression statement and its expression
         if let Some(root_node) = parser.get_arena().get(root) {
             if let Some(sf_data) = parser.get_arena().get_source_file(root_node) {
                 if let Some(&stmt_idx) = sf_data.statements.nodes.first() {
                     if let Some(stmt_node) = parser.get_arena().get(stmt_idx) {
-                        if let Some(expr_stmt) = parser.get_arena().get_expression_statement(stmt_node) {
+                        if let Some(expr_stmt) =
+                            parser.get_arena().get_expression_statement(stmt_node)
+                        {
                             let mut checker = ExpressionChecker::new(&mut ctx);
                             let ty = checker.check(expr_stmt.expression);
                             assert_eq!(ty, TypeId::NUMBER);

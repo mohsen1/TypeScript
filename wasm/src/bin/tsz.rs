@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
-use std::io::IsTerminal;
 use clap::Parser;
+use std::io::IsTerminal;
 
 use wasm::cli::args::CliArgs;
 use wasm::cli::{driver, reporter::Reporter, watch};

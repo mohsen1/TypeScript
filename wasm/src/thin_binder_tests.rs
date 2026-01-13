@@ -1,7 +1,7 @@
 //! Tests for ThinBinder
 
-use crate::thin_parser::ThinParserState;
 use crate::thin_binder::ThinBinderState;
+use crate::thin_parser::ThinParserState;
 
 #[test]
 fn test_thin_binder_variable_declaration() {
@@ -22,10 +22,7 @@ fn test_thin_binder_variable_declaration() {
 
 #[test]
 fn test_thin_binder_reset_clears_state() {
-    let mut parser = ThinParserState::new(
-        "test.ts".to_string(),
-        "const a = 1;".to_string(),
-    );
+    let mut parser = ThinParserState::new("test.ts".to_string(), "const a = 1;".to_string());
     let root = parser.parse_source_file();
 
     let mut binder = ThinBinderState::new();
@@ -42,10 +39,7 @@ fn test_thin_binder_reset_clears_state() {
     assert!(binder.node_symbols.is_empty());
     assert_eq!(binder.flow_nodes.len(), 1);
 
-    let mut parser = ThinParserState::new(
-        "test.ts".to_string(),
-        "const b = 2;".to_string(),
-    );
+    let mut parser = ThinParserState::new("test.ts".to_string(), "const b = 2;".to_string());
     let root = parser.parse_source_file();
     binder.bind_source_file(parser.get_arena(), root);
 
@@ -143,7 +137,7 @@ fn test_thin_binder_import_declaration() {
     assert!(binder.file_locals.has("foo"));
     // Named imports create alias symbols
     assert!(binder.file_locals.has("bar"));
-    assert!(binder.file_locals.has("qux"));  // aliased from baz
+    assert!(binder.file_locals.has("qux")); // aliased from baz
 }
 
 #[test]
@@ -162,7 +156,10 @@ fn test_thin_binder_export_declaration() {
 
     // Export specifiers should have symbols (marked via node_symbols, not file_locals)
     // This ensures the binding runs without errors
-    assert!(binder.symbols.len() > 1, "Should have created export symbols");
+    assert!(
+        binder.symbols.len() > 1,
+        "Should have created export symbols"
+    );
 }
 
 #[test]
@@ -177,7 +174,10 @@ fn test_thin_binder_exported_function() {
     binder.bind_source_file(parser.get_arena(), root);
 
     // Exported function should be bound to file_locals
-    assert!(binder.file_locals.has("foo"), "Exported function 'foo' should be in file_locals");
+    assert!(
+        binder.file_locals.has("foo"),
+        "Exported function 'foo' should be in file_locals"
+    );
 }
 
 #[test]
@@ -192,7 +192,10 @@ fn test_thin_binder_exported_class() {
     binder.bind_source_file(parser.get_arena(), root);
 
     // Exported class should be bound to file_locals
-    assert!(binder.file_locals.has("MyClass"), "Exported class 'MyClass' should be in file_locals");
+    assert!(
+        binder.file_locals.has("MyClass"),
+        "Exported class 'MyClass' should be in file_locals"
+    );
 }
 
 #[test]
@@ -207,8 +210,14 @@ fn test_thin_binder_exported_const() {
     binder.bind_source_file(parser.get_arena(), root);
 
     // Exported variables should be bound to file_locals
-    assert!(binder.file_locals.has("x"), "Exported const 'x' should be in file_locals");
-    assert!(binder.file_locals.has("y"), "Exported const 'y' should be in file_locals");
+    assert!(
+        binder.file_locals.has("x"),
+        "Exported const 'x' should be in file_locals"
+    );
+    assert!(
+        binder.file_locals.has("y"),
+        "Exported const 'y' should be in file_locals"
+    );
 }
 
 fn assert_bound_state_resolves_param_impl(
@@ -219,7 +228,7 @@ fn assert_bound_state_resolves_param_impl(
 ) {
     use crate::binder::SymbolTable;
     use crate::parallel;
-    use crate::parser::{syntax_kind_ext, NodeIndex};
+    use crate::parser::{NodeIndex, syntax_kind_ext};
 
     let program = parallel::compile_files(vec![("test.ts".to_string(), source.to_string())]);
     let file = &program.files[0];
@@ -257,11 +266,15 @@ fn assert_bound_state_resolves_param_impl(
 
     for i in 0..arena.len() {
         let idx = NodeIndex(i as u32);
-        let Some(node) = arena.get(idx) else { continue; };
+        let Some(node) = arena.get(idx) else {
+            continue;
+        };
         if node.kind != syntax_kind_ext::FUNCTION_DECLARATION {
             continue;
         }
-        let Some(func) = arena.get_function(node) else { continue; };
+        let Some(func) = arena.get_function(node) else {
+            continue;
+        };
         let name = arena
             .get(func.name)
             .and_then(|name_node| arena.get_identifier(name_node))
@@ -270,8 +283,12 @@ fn assert_bound_state_resolves_param_impl(
             continue;
         }
         for &param_idx in &func.parameters.nodes {
-            let Some(param_node) = arena.get(param_idx) else { continue; };
-            let Some(param) = arena.get_parameter(param_node) else { continue; };
+            let Some(param_node) = arena.get(param_idx) else {
+                continue;
+            };
+            let Some(param) = arena.get_parameter(param_node) else {
+                continue;
+            };
             let param_text = arena
                 .get(param.name)
                 .and_then(|param_name_node| arena.get_identifier(param_name_node))
@@ -306,8 +323,12 @@ fn assert_bound_state_resolves_param_impl(
         if idx == param_name_idx {
             continue;
         }
-        let Some(node) = arena.get(idx) else { continue; };
-        let Some(ident) = arena.get_identifier(node) else { continue; };
+        let Some(node) = arena.get(idx) else {
+            continue;
+        };
+        let Some(ident) = arena.get_identifier(node) else {
+            continue;
+        };
         if ident.escaped_text != param_name {
             continue;
         }
@@ -318,7 +339,9 @@ fn assert_bound_state_resolves_param_impl(
                 in_body = true;
                 break;
             }
-            let Some(ext) = arena.get_extended(current) else { break; };
+            let Some(ext) = arena.get_extended(current) else {
+                break;
+            };
             current = ext.parent;
         }
         if in_body {
@@ -334,8 +357,7 @@ fn assert_bound_state_resolves_param_impl(
 
     let resolved = binder.resolve_identifier(arena, usage_idx);
     assert_eq!(
-        resolved,
-        param_symbol,
+        resolved, param_symbol,
         "Expected body identifier to resolve to the parameter symbol"
     );
 }
@@ -352,7 +374,11 @@ fn assert_bound_state_resolves_param_without_scopes(
     assert_bound_state_resolves_param_impl(source, function_name, param_name, false);
 }
 
-fn node_is_within(arena: &crate::parser::thin_node::ThinNodeArena, node_idx: crate::parser::NodeIndex, container: crate::parser::NodeIndex) -> bool {
+fn node_is_within(
+    arena: &crate::parser::thin_node::ThinNodeArena,
+    node_idx: crate::parser::NodeIndex,
+    container: crate::parser::NodeIndex,
+) -> bool {
     let mut current = node_idx;
     while !current.is_none() {
         if current == container {
@@ -442,7 +468,7 @@ export function getModuleInstanceState(node: ModuleDeclaration, visited?: Map<nu
 fn test_thin_binder_resolves_block_local_from_bound_state_binder_ts_432() {
     use crate::binder::SymbolTable;
     use crate::parallel;
-    use crate::parser::{syntax_kind_ext, NodeIndex};
+    use crate::parser::{NodeIndex, syntax_kind_ext};
 
     let source = r#"
 export function getModuleInstanceStateForAliasTarget(
@@ -492,11 +518,15 @@ export function getModuleInstanceStateForAliasTarget(
     let mut function_body = NodeIndex::NONE;
     for i in 0..arena.len() {
         let idx = NodeIndex(i as u32);
-        let Some(node) = arena.get(idx) else { continue; };
+        let Some(node) = arena.get(idx) else {
+            continue;
+        };
         if node.kind != syntax_kind_ext::FUNCTION_DECLARATION {
             continue;
         }
-        let Some(func) = arena.get_function(node) else { continue; };
+        let Some(func) = arena.get_function(node) else {
+            continue;
+        };
         let name = arena
             .get(func.name)
             .and_then(|name_node| arena.get_identifier(name_node))
@@ -516,11 +546,15 @@ export function getModuleInstanceStateForAliasTarget(
     let mut decl_symbol = None;
     for i in 0..arena.len() {
         let idx = NodeIndex(i as u32);
-        let Some(node) = arena.get(idx) else { continue; };
+        let Some(node) = arena.get(idx) else {
+            continue;
+        };
         if node.kind != syntax_kind_ext::VARIABLE_DECLARATION {
             continue;
         }
-        let Some(decl) = arena.get_variable_declaration(node) else { continue; };
+        let Some(decl) = arena.get_variable_declaration(node) else {
+            continue;
+        };
         let name = arena
             .get(decl.name)
             .and_then(|name_node| arena.get_identifier(name_node))
@@ -540,21 +574,32 @@ export function getModuleInstanceStateForAliasTarget(
         !decl_name_idx.is_none(),
         "Expected declaration for statements"
     );
-    assert!(decl_symbol.is_some(), "Expected symbol for statements declaration");
+    assert!(
+        decl_symbol.is_some(),
+        "Expected symbol for statements declaration"
+    );
 
     let mut usage_idx = NodeIndex::NONE;
     for i in 0..arena.len() {
         let idx = NodeIndex(i as u32);
-        let Some(node) = arena.get(idx) else { continue; };
+        let Some(node) = arena.get(idx) else {
+            continue;
+        };
         if node.kind != syntax_kind_ext::FOR_OF_STATEMENT {
             continue;
         }
         if !node_is_within(arena, idx, function_body) {
             continue;
         }
-        let Some(for_data) = arena.get_for_in_of(node) else { continue; };
-        let Some(expr_node) = arena.get(for_data.expression) else { continue; };
-        let Some(ident) = arena.get_identifier(expr_node) else { continue; };
+        let Some(for_data) = arena.get_for_in_of(node) else {
+            continue;
+        };
+        let Some(expr_node) = arena.get(for_data.expression) else {
+            continue;
+        };
+        let Some(ident) = arena.get_identifier(expr_node) else {
+            continue;
+        };
         if ident.escaped_text == "statements" {
             usage_idx = for_data.expression;
             break;
@@ -568,15 +613,14 @@ export function getModuleInstanceStateForAliasTarget(
 
     let resolved = binder.resolve_identifier(arena, usage_idx);
     assert_eq!(
-        resolved,
-        decl_symbol,
+        resolved, decl_symbol,
         "Expected for-of expression to resolve to statements declaration"
     );
 }
 #[test]
 fn test_namespace_binding_debug() {
-    use crate::thin_parser::ThinParserState;
     use crate::thin_binder::ThinBinderState;
+    use crate::thin_parser::ThinParserState;
 
     let source = r#"
 namespace foo {
@@ -595,8 +639,13 @@ namespace foo {
     binder.bind_source_file(arena, root);
 
     // Check if 'foo' was bound
-    let foo_sym_id = binder.file_locals.get("foo").expect("'foo' should be in file_locals");
-    let foo_symbol = binder.get_symbol(foo_sym_id).expect("foo symbol should exist");
+    let foo_sym_id = binder
+        .file_locals
+        .get("foo")
+        .expect("'foo' should be in file_locals");
+    let foo_symbol = binder
+        .get_symbol(foo_sym_id)
+        .expect("foo symbol should exist");
 
     // Check if exports were captured
     assert!(foo_symbol.exports.is_some(), "foo should have exports");
@@ -605,12 +654,24 @@ namespace foo {
     let exports = foo_symbol.exports.as_ref().unwrap();
 
     // Exported members should be present
-    assert!(exports.get("Provide").is_some(), "Provide should be in foo's exports");
-    assert!(exports.get("bar").is_some(), "bar should be in foo's exports");
+    assert!(
+        exports.get("Provide").is_some(),
+        "Provide should be in foo's exports"
+    );
+    assert!(
+        exports.get("bar").is_some(),
+        "bar should be in foo's exports"
+    );
 
     // Non-exported members should NOT be in exports
-    assert!(exports.get("NotExported").is_none(), "NotExported should NOT be in foo's exports");
-    assert!(exports.get("baz").is_none(), "baz should NOT be in foo's exports");
+    assert!(
+        exports.get("NotExported").is_none(),
+        "NotExported should NOT be in foo's exports"
+    );
+    assert!(
+        exports.get("baz").is_none(),
+        "baz should NOT be in foo's exports"
+    );
 
     // Should have exactly 2 exports
     assert_eq!(exports.len(), 2, "foo should have exactly 2 exports");
@@ -618,9 +679,9 @@ namespace foo {
 
 #[test]
 fn test_import_alias_binding() {
-    use crate::thin_parser::ThinParserState;
-    use crate::thin_binder::ThinBinderState;
     use crate::binder::symbol_flags;
+    use crate::thin_binder::ThinBinderState;
+    use crate::thin_parser::ThinParserState;
 
     let source = r#"
 namespace NS {
@@ -638,20 +699,32 @@ var x: Alias;
     binder.bind_source_file(arena, root);
 
     // Check that 'Alias' was bound as an ALIAS symbol
-    let alias_sym_id = binder.file_locals.get("Alias").expect("'Alias' should be in file_locals");
-    let alias_symbol = binder.get_symbol(alias_sym_id).expect("Alias symbol should exist");
+    let alias_sym_id = binder
+        .file_locals
+        .get("Alias")
+        .expect("'Alias' should be in file_locals");
+    let alias_symbol = binder
+        .get_symbol(alias_sym_id)
+        .expect("Alias symbol should exist");
 
     // Verify it has the ALIAS flag
-    assert_eq!(alias_symbol.flags & symbol_flags::ALIAS, symbol_flags::ALIAS, "Alias should have ALIAS flag");
+    assert_eq!(
+        alias_symbol.flags & symbol_flags::ALIAS,
+        symbol_flags::ALIAS,
+        "Alias should have ALIAS flag"
+    );
 
     // Verify it has a declaration
-    assert!(!alias_symbol.declarations.is_empty(), "Alias should have declarations");
+    assert!(
+        !alias_symbol.declarations.is_empty(),
+        "Alias should have declarations"
+    );
 }
 
 #[test]
 fn test_namespace_exports_merge_across_decls() {
-    use crate::thin_parser::ThinParserState;
     use crate::thin_binder::ThinBinderState;
+    use crate::thin_parser::ThinParserState;
 
     let source = r#"
 namespace Merge {
@@ -671,21 +744,35 @@ namespace Merge {
     let mut binder = ThinBinderState::new();
     binder.bind_source_file(arena, root);
 
-    let merge_sym_id = binder.file_locals.get("Merge").expect("'Merge' should be in file_locals");
-    let merge_symbol = binder.get_symbol(merge_sym_id).expect("Merge symbol should exist");
+    let merge_sym_id = binder
+        .file_locals
+        .get("Merge")
+        .expect("'Merge' should be in file_locals");
+    let merge_symbol = binder
+        .get_symbol(merge_sym_id)
+        .expect("Merge symbol should exist");
 
-    let exports = merge_symbol.exports.as_ref().expect("Merge should have exports");
+    let exports = merge_symbol
+        .exports
+        .as_ref()
+        .expect("Merge should have exports");
     assert!(exports.get("a").is_some(), "a should be in Merge exports");
     assert!(exports.get("b").is_some(), "b should be in Merge exports");
-    assert!(exports.get("foo").is_some(), "foo should be in Merge exports");
-    assert!(exports.get("hidden").is_none(), "hidden should not be in Merge exports");
+    assert!(
+        exports.get("foo").is_some(),
+        "foo should be in Merge exports"
+    );
+    assert!(
+        exports.get("hidden").is_none(),
+        "hidden should not be in Merge exports"
+    );
     assert_eq!(exports.len(), 3, "Merge should have exactly 3 exports");
 }
 
 #[test]
 fn test_class_namespace_merge_exports() {
-    use crate::thin_parser::ThinParserState;
     use crate::thin_binder::ThinBinderState;
+    use crate::thin_parser::ThinParserState;
 
     let source = r#"
 class Merge {
@@ -704,19 +791,33 @@ namespace Merge {
     let mut binder = ThinBinderState::new();
     binder.bind_source_file(arena, root);
 
-    let merge_sym_id = binder.file_locals.get("Merge").expect("'Merge' should be in file_locals");
-    let merge_symbol = binder.get_symbol(merge_sym_id).expect("Merge symbol should exist");
+    let merge_sym_id = binder
+        .file_locals
+        .get("Merge")
+        .expect("'Merge' should be in file_locals");
+    let merge_symbol = binder
+        .get_symbol(merge_sym_id)
+        .expect("Merge symbol should exist");
 
-    let exports = merge_symbol.exports.as_ref().expect("Merge should have exports");
-    assert!(exports.get("extra").is_some(), "extra should be in Merge exports");
-    assert!(exports.get("hidden").is_none(), "hidden should not be in Merge exports");
+    let exports = merge_symbol
+        .exports
+        .as_ref()
+        .expect("Merge should have exports");
+    assert!(
+        exports.get("extra").is_some(),
+        "extra should be in Merge exports"
+    );
+    assert!(
+        exports.get("hidden").is_none(),
+        "hidden should not be in Merge exports"
+    );
     assert_eq!(exports.len(), 1, "Merge should have exactly 1 export");
 }
 
 #[test]
 fn test_namespace_class_merge_exports_reverse_order() {
-    use crate::thin_parser::ThinParserState;
     use crate::thin_binder::ThinBinderState;
+    use crate::thin_parser::ThinParserState;
 
     let source = r#"
 namespace Merge {
@@ -735,19 +836,33 @@ class Merge {
     let mut binder = ThinBinderState::new();
     binder.bind_source_file(arena, root);
 
-    let merge_sym_id = binder.file_locals.get("Merge").expect("'Merge' should be in file_locals");
-    let merge_symbol = binder.get_symbol(merge_sym_id).expect("Merge symbol should exist");
+    let merge_sym_id = binder
+        .file_locals
+        .get("Merge")
+        .expect("'Merge' should be in file_locals");
+    let merge_symbol = binder
+        .get_symbol(merge_sym_id)
+        .expect("Merge symbol should exist");
 
-    let exports = merge_symbol.exports.as_ref().expect("Merge should have exports");
-    assert!(exports.get("extra").is_some(), "extra should be in Merge exports");
-    assert!(exports.get("hidden").is_none(), "hidden should not be in Merge exports");
+    let exports = merge_symbol
+        .exports
+        .as_ref()
+        .expect("Merge should have exports");
+    assert!(
+        exports.get("extra").is_some(),
+        "extra should be in Merge exports"
+    );
+    assert!(
+        exports.get("hidden").is_none(),
+        "hidden should not be in Merge exports"
+    );
     assert_eq!(exports.len(), 1, "Merge should have exactly 1 export");
 }
 
 #[test]
 fn test_function_namespace_merge_exports() {
-    use crate::thin_parser::ThinParserState;
     use crate::thin_binder::ThinBinderState;
+    use crate::thin_parser::ThinParserState;
 
     let source = r#"
 function Merge() {}
@@ -764,19 +879,33 @@ namespace Merge {
     let mut binder = ThinBinderState::new();
     binder.bind_source_file(arena, root);
 
-    let merge_sym_id = binder.file_locals.get("Merge").expect("'Merge' should be in file_locals");
-    let merge_symbol = binder.get_symbol(merge_sym_id).expect("Merge symbol should exist");
+    let merge_sym_id = binder
+        .file_locals
+        .get("Merge")
+        .expect("'Merge' should be in file_locals");
+    let merge_symbol = binder
+        .get_symbol(merge_sym_id)
+        .expect("Merge symbol should exist");
 
-    let exports = merge_symbol.exports.as_ref().expect("Merge should have exports");
-    assert!(exports.get("extra").is_some(), "extra should be in Merge exports");
-    assert!(exports.get("hidden").is_none(), "hidden should not be in Merge exports");
+    let exports = merge_symbol
+        .exports
+        .as_ref()
+        .expect("Merge should have exports");
+    assert!(
+        exports.get("extra").is_some(),
+        "extra should be in Merge exports"
+    );
+    assert!(
+        exports.get("hidden").is_none(),
+        "hidden should not be in Merge exports"
+    );
     assert_eq!(exports.len(), 1, "Merge should have exactly 1 export");
 }
 
 #[test]
 fn test_namespace_function_merge_exports_reverse_order() {
-    use crate::thin_parser::ThinParserState;
     use crate::thin_binder::ThinBinderState;
+    use crate::thin_parser::ThinParserState;
 
     let source = r#"
 namespace Merge {
@@ -793,19 +922,33 @@ function Merge() {}
     let mut binder = ThinBinderState::new();
     binder.bind_source_file(arena, root);
 
-    let merge_sym_id = binder.file_locals.get("Merge").expect("'Merge' should be in file_locals");
-    let merge_symbol = binder.get_symbol(merge_sym_id).expect("Merge symbol should exist");
+    let merge_sym_id = binder
+        .file_locals
+        .get("Merge")
+        .expect("'Merge' should be in file_locals");
+    let merge_symbol = binder
+        .get_symbol(merge_sym_id)
+        .expect("Merge symbol should exist");
 
-    let exports = merge_symbol.exports.as_ref().expect("Merge should have exports");
-    assert!(exports.get("extra").is_some(), "extra should be in Merge exports");
-    assert!(exports.get("hidden").is_none(), "hidden should not be in Merge exports");
+    let exports = merge_symbol
+        .exports
+        .as_ref()
+        .expect("Merge should have exports");
+    assert!(
+        exports.get("extra").is_some(),
+        "extra should be in Merge exports"
+    );
+    assert!(
+        exports.get("hidden").is_none(),
+        "hidden should not be in Merge exports"
+    );
     assert_eq!(exports.len(), 1, "Merge should have exactly 1 export");
 }
 
 #[test]
 fn test_enum_namespace_merge_exports() {
-    use crate::thin_parser::ThinParserState;
     use crate::thin_binder::ThinBinderState;
+    use crate::thin_parser::ThinParserState;
 
     let source = r#"
 enum Merge {
@@ -824,19 +967,33 @@ namespace Merge {
     let mut binder = ThinBinderState::new();
     binder.bind_source_file(arena, root);
 
-    let merge_sym_id = binder.file_locals.get("Merge").expect("'Merge' should be in file_locals");
-    let merge_symbol = binder.get_symbol(merge_sym_id).expect("Merge symbol should exist");
+    let merge_sym_id = binder
+        .file_locals
+        .get("Merge")
+        .expect("'Merge' should be in file_locals");
+    let merge_symbol = binder
+        .get_symbol(merge_sym_id)
+        .expect("Merge symbol should exist");
 
-    let exports = merge_symbol.exports.as_ref().expect("Merge should have exports");
-    assert!(exports.get("extra").is_some(), "extra should be in Merge exports");
-    assert!(exports.get("hidden").is_none(), "hidden should not be in Merge exports");
+    let exports = merge_symbol
+        .exports
+        .as_ref()
+        .expect("Merge should have exports");
+    assert!(
+        exports.get("extra").is_some(),
+        "extra should be in Merge exports"
+    );
+    assert!(
+        exports.get("hidden").is_none(),
+        "hidden should not be in Merge exports"
+    );
     assert_eq!(exports.len(), 1, "Merge should have exactly 1 export");
 }
 
 #[test]
 fn test_namespace_enum_merge_exports_reverse_order() {
-    use crate::thin_parser::ThinParserState;
     use crate::thin_binder::ThinBinderState;
+    use crate::thin_parser::ThinParserState;
 
     let source = r#"
 namespace Merge {
@@ -855,12 +1012,26 @@ enum Merge {
     let mut binder = ThinBinderState::new();
     binder.bind_source_file(arena, root);
 
-    let merge_sym_id = binder.file_locals.get("Merge").expect("'Merge' should be in file_locals");
-    let merge_symbol = binder.get_symbol(merge_sym_id).expect("Merge symbol should exist");
+    let merge_sym_id = binder
+        .file_locals
+        .get("Merge")
+        .expect("'Merge' should be in file_locals");
+    let merge_symbol = binder
+        .get_symbol(merge_sym_id)
+        .expect("Merge symbol should exist");
 
-    let exports = merge_symbol.exports.as_ref().expect("Merge should have exports");
-    assert!(exports.get("extra").is_some(), "extra should be in Merge exports");
-    assert!(exports.get("hidden").is_none(), "hidden should not be in Merge exports");
+    let exports = merge_symbol
+        .exports
+        .as_ref()
+        .expect("Merge should have exports");
+    assert!(
+        exports.get("extra").is_some(),
+        "extra should be in Merge exports"
+    );
+    assert!(
+        exports.get("hidden").is_none(),
+        "hidden should not be in Merge exports"
+    );
     assert_eq!(exports.len(), 1, "Merge should have exactly 1 export");
 }
 
@@ -883,4 +1054,542 @@ fn test_thin_binder_deep_binary_expression() {
     binder.bind_source_file(parser.get_arena(), root);
 
     assert!(binder.file_locals.is_empty());
+}
+
+// BIND-12: Test namespace member resolution
+#[test]
+fn test_namespace_member_resolution_basic() {
+    use crate::thin_binder::ThinBinderState;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+namespace NS {
+    export const x = 1;
+    export function foo() { return 2; }
+    export class Bar { value: number = 3; }
+    export enum Color { Red, Green }
+}
+
+const a = NS.x;
+const b = NS.foo();
+const c = new NS.Bar();
+const d = NS.Color.Red;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    // Namespace should be bound
+    assert!(
+        binder.file_locals.has("NS"),
+        "NS namespace should be in file_locals"
+    );
+
+    let ns_sym_id = binder.file_locals.get("NS").expect("NS should exist");
+    let ns_symbol = binder
+        .get_symbol(ns_sym_id)
+        .expect("NS symbol should exist");
+
+    // Namespace should have exports
+    assert!(ns_symbol.exports.is_some(), "NS should have exports");
+    let exports = ns_symbol.exports.as_ref().unwrap();
+
+    // All exported members should be in exports
+    assert!(exports.get("x").is_some(), "x should be in NS exports");
+    assert!(exports.get("foo").is_some(), "foo should be in NS exports");
+    assert!(exports.get("Bar").is_some(), "Bar should be in NS exports");
+    assert!(
+        exports.get("Color").is_some(),
+        "Color should be in NS exports"
+    );
+}
+
+#[test]
+fn test_namespace_member_resolution_nested() {
+    use crate::thin_binder::ThinBinderState;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+namespace Outer {
+    export namespace Inner {
+        export const value = 42;
+        export function getDouble() { return value * 2; }
+    }
+}
+
+const a = Outer.Inner.value;
+const b = Outer.Inner.getDouble();
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    // Outer namespace should be bound
+    assert!(
+        binder.file_locals.has("Outer"),
+        "Outer namespace should be in file_locals"
+    );
+
+    let outer_sym_id = binder.file_locals.get("Outer").expect("Outer should exist");
+    let outer_symbol = binder
+        .get_symbol(outer_sym_id)
+        .expect("Outer symbol should exist");
+
+    // Outer should have Inner in its exports
+    assert!(outer_symbol.exports.is_some(), "Outer should have exports");
+    let outer_exports = outer_symbol.exports.as_ref().unwrap();
+    assert!(
+        outer_exports.get("Inner").is_some(),
+        "Inner should be in Outer exports"
+    );
+}
+
+#[test]
+fn test_namespace_member_resolution_non_exported() {
+    use crate::thin_binder::ThinBinderState;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+namespace NS {
+    export const exported = 1;
+    const notExported = 2;
+}
+
+const a = NS.exported;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let ns_sym_id = binder.file_locals.get("NS").expect("NS should exist");
+    let ns_symbol = binder
+        .get_symbol(ns_sym_id)
+        .expect("NS symbol should exist");
+
+    // Only exported members should be in exports
+    let exports = ns_symbol.exports.as_ref().expect("NS should have exports");
+    assert!(
+        exports.get("exported").is_some(),
+        "exported should be in NS exports"
+    );
+    assert!(
+        exports.get("notExported").is_none(),
+        "notExported should NOT be in NS exports"
+    );
+}
+
+#[test]
+fn test_namespace_deep_chain_resolution() {
+    use crate::thin_binder::ThinBinderState;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+namespace A {
+    export namespace B {
+        export namespace C {
+            export const deepValue = "deep";
+            export function deepFunc() { return "func"; }
+        }
+    }
+}
+
+const a = A.B.C.deepValue;
+const b = A.B.C.deepFunc();
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    // A namespace should be bound
+    assert!(
+        binder.file_locals.has("A"),
+        "A namespace should be in file_locals"
+    );
+
+    let a_sym_id = binder.file_locals.get("A").expect("A should exist");
+    let a_symbol = binder.get_symbol(a_sym_id).expect("A symbol should exist");
+
+    // A should have B in exports
+    let a_exports = a_symbol.exports.as_ref().expect("A should have exports");
+    assert!(a_exports.get("B").is_some(), "B should be in A exports");
+}
+
+#[test]
+fn test_enum_member_access() {
+    use crate::thin_binder::ThinBinderState;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+enum Color {
+    Red,
+    Green,
+    Blue
+}
+
+const a = Color.Red;
+const b = Color.Green;
+const c = Color.Blue;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    // Color enum should be bound
+    assert!(
+        binder.file_locals.has("Color"),
+        "Color enum should be in file_locals"
+    );
+
+    let color_sym_id = binder.file_locals.get("Color").expect("Color should exist");
+    let color_symbol = binder
+        .get_symbol(color_sym_id)
+        .expect("Color symbol should exist");
+
+    // Enum should have members in exports
+    assert!(color_symbol.exports.is_some(), "Color should have exports");
+    let exports = color_symbol.exports.as_ref().unwrap();
+
+    assert!(
+        exports.get("Red").is_some(),
+        "Red should be in Color exports"
+    );
+    assert!(
+        exports.get("Green").is_some(),
+        "Green should be in Color exports"
+    );
+    assert!(
+        exports.get("Blue").is_some(),
+        "Blue should be in Color exports"
+    );
+}
+
+#[test]
+fn test_enum_namespace_merging_access() {
+    use crate::thin_binder::ThinBinderState;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+enum Direction {
+    Up = 1,
+    Down = 2
+}
+namespace Direction {
+    export function getName(d: Direction): string {
+        return d === Direction.Up ? "Up" : "Down";
+    }
+    export const helperValue = 99;
+}
+
+const a = Direction.Up;
+const b = Direction.getName(Direction.Down);
+const c = Direction.helperValue;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    // Direction should be bound (merged enum and namespace)
+    assert!(
+        binder.file_locals.has("Direction"),
+        "Direction should be in file_locals"
+    );
+
+    let dir_sym_id = binder
+        .file_locals
+        .get("Direction")
+        .expect("Direction should exist");
+    let dir_symbol = binder
+        .get_symbol(dir_sym_id)
+        .expect("Direction symbol should exist");
+
+    // Direction should have both enum members and namespace exports
+    assert!(
+        dir_symbol.exports.is_some(),
+        "Direction should have exports"
+    );
+    let exports = dir_symbol.exports.as_ref().unwrap();
+
+    // Enum members
+    assert!(
+        exports.get("Up").is_some(),
+        "Up should be in Direction exports"
+    );
+    assert!(
+        exports.get("Down").is_some(),
+        "Down should be in Direction exports"
+    );
+
+    // Namespace exports
+    assert!(
+        exports.get("getName").is_some(),
+        "getName should be in Direction exports"
+    );
+    assert!(
+        exports.get("helperValue").is_some(),
+        "helperValue should be in Direction exports"
+    );
+}
+
+#[test]
+fn test_enum_with_initialized_members() {
+    use crate::thin_binder::ThinBinderState;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+enum Status {
+    Pending = 0,
+    Active = 1,
+    Done = 2
+}
+
+const a = Status.Pending;
+const b = Status.Active;
+const c = Status.Done;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    // Status enum should be bound
+    assert!(
+        binder.file_locals.has("Status"),
+        "Status enum should be in file_locals"
+    );
+
+    let status_sym_id = binder
+        .file_locals
+        .get("Status")
+        .expect("Status should exist");
+    let status_symbol = binder
+        .get_symbol(status_sym_id)
+        .expect("Status symbol should exist");
+
+    // Enum should have all members in exports
+    assert!(
+        status_symbol.exports.is_some(),
+        "Status should have exports"
+    );
+    let exports = status_symbol.exports.as_ref().unwrap();
+
+    assert!(
+        exports.get("Pending").is_some(),
+        "Pending should be in Status exports"
+    );
+    assert!(
+        exports.get("Active").is_some(),
+        "Active should be in Status exports"
+    );
+    assert!(
+        exports.get("Done").is_some(),
+        "Done should be in Status exports"
+    );
+}
+
+#[test]
+fn test_const_enum_declaration() {
+    use crate::binder::symbol_flags;
+    use crate::thin_binder::ThinBinderState;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+const enum Priority {
+    Low = 1,
+    Medium = 2,
+    High = 3
+}
+
+const a = Priority.Low;
+const b = Priority.Medium;
+const c = Priority.High;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    // Priority const enum should be bound
+    assert!(
+        binder.file_locals.has("Priority"),
+        "Priority const enum should be in file_locals"
+    );
+
+    let priority_sym_id = binder
+        .file_locals
+        .get("Priority")
+        .expect("Priority should exist");
+    let priority_symbol = binder
+        .get_symbol(priority_sym_id)
+        .expect("Priority symbol should exist");
+
+    // Should have CONST_ENUM flag
+    assert_eq!(
+        priority_symbol.flags & symbol_flags::CONST_ENUM,
+        symbol_flags::CONST_ENUM,
+        "Priority should have CONST_ENUM flag"
+    );
+
+    // Should have exports
+    assert!(
+        priority_symbol.exports.is_some(),
+        "Priority should have exports"
+    );
+    let exports = priority_symbol.exports.as_ref().unwrap();
+
+    assert!(
+        exports.get("Low").is_some(),
+        "Low should be in Priority exports"
+    );
+    assert!(
+        exports.get("Medium").is_some(),
+        "Medium should be in Priority exports"
+    );
+    assert!(
+        exports.get("High").is_some(),
+        "High should be in Priority exports"
+    );
+}
+
+#[test]
+fn test_namespace_reopening_exports() {
+    use crate::thin_binder::ThinBinderState;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+namespace Reopened {
+    export const first = 1;
+}
+namespace Reopened {
+    export const second = 2;
+    export function combined() { return first + second; }
+}
+
+const a = Reopened.first;
+const b = Reopened.second;
+const c = Reopened.combined();
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let reopened_sym_id = binder
+        .file_locals
+        .get("Reopened")
+        .expect("Reopened should exist");
+    let reopened_symbol = binder
+        .get_symbol(reopened_sym_id)
+        .expect("Reopened symbol should exist");
+
+    // Should have all exports from both declarations
+    let exports = reopened_symbol
+        .exports
+        .as_ref()
+        .expect("Reopened should have exports");
+
+    assert!(
+        exports.get("first").is_some(),
+        "first should be in Reopened exports"
+    );
+    assert!(
+        exports.get("second").is_some(),
+        "second should be in Reopened exports"
+    );
+    assert!(
+        exports.get("combined").is_some(),
+        "combined should be in Reopened exports"
+    );
+    assert_eq!(exports.len(), 3, "Reopened should have exactly 3 exports");
+}
+
+#[test]
+fn test_enum_namespace_merging_with_exports() {
+    use crate::thin_binder::ThinBinderState;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+enum ErrorCode {
+    NotFound = 404,
+    ServerError = 500
+}
+namespace ErrorCode {
+    export function getMessage(code: ErrorCode): string {
+        if (code === ErrorCode.NotFound) return "Not Found";
+        if (code === ErrorCode.ServerError) return "Server Error";
+        return "Unknown";
+    }
+}
+
+const err1 = ErrorCode.NotFound;
+const msg1 = ErrorCode.getMessage(ErrorCode.NotFound);
+const err2 = ErrorCode.ServerError;
+const msg2 = ErrorCode.getMessage(ErrorCode.ServerError);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let error_code_sym_id = binder
+        .file_locals
+        .get("ErrorCode")
+        .expect("ErrorCode should exist");
+    let error_code_symbol = binder
+        .get_symbol(error_code_sym_id)
+        .expect("ErrorCode symbol should exist");
+
+    // Should have both enum members and namespace function
+    let exports = error_code_symbol
+        .exports
+        .as_ref()
+        .expect("ErrorCode should have exports");
+
+    assert!(
+        exports.get("NotFound").is_some(),
+        "NotFound should be in ErrorCode exports"
+    );
+    assert!(
+        exports.get("ServerError").is_some(),
+        "ServerError should be in ErrorCode exports"
+    );
+    assert!(
+        exports.get("getMessage").is_some(),
+        "getMessage should be in ErrorCode exports"
+    );
 }

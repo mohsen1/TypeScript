@@ -5,9 +5,9 @@
 //! These benchmarks help track performance of the scanner against various
 //! TypeScript source files and identify serialization overhead.
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId, Throughput};
-use wasm::scanner_impl::ScannerState;
+use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
 use wasm::scanner::SyntaxKind;
+use wasm::scanner_impl::ScannerState;
 
 /// Sample TypeScript source for basic benchmarking
 const SMALL_SOURCE: &str = r#"
@@ -125,8 +125,14 @@ fn generate_large_source(lines: usize) -> String {
         match i % 5 {
             0 => source.push_str(&format!("const var{}: number = {};\n", i, i)),
             1 => source.push_str(&format!("const str{}: string = \"value{}\";\n", i, i)),
-            2 => source.push_str(&format!("function fn{}(x: number): number {{ return x * {}; }}\n", i, i)),
-            3 => source.push_str(&format!("interface I{} {{ value: number; name: string; }}\n", i)),
+            2 => source.push_str(&format!(
+                "function fn{}(x: number): number {{ return x * {}; }}\n",
+                i, i
+            )),
+            3 => source.push_str(&format!(
+                "interface I{} {{ value: number; name: string; }}\n",
+                i
+            )),
             _ => source.push_str(&format!("type T{} = {{ id: {}; data: string }};\n", i, i)),
         }
     }
@@ -249,10 +255,28 @@ fn bench_keyword_lookup(c: &mut Criterion) {
     use wasm::scanner::text_to_keyword;
 
     let keywords = vec![
-        "const", "let", "var", "function", "class", "interface",
-        "type", "enum", "if", "else", "while", "for", "return",
-        "import", "export", "from", "as", "async", "await",
-        "notakeyword", "identifier", "someOtherWord"
+        "const",
+        "let",
+        "var",
+        "function",
+        "class",
+        "interface",
+        "type",
+        "enum",
+        "if",
+        "else",
+        "while",
+        "for",
+        "return",
+        "import",
+        "export",
+        "from",
+        "as",
+        "async",
+        "await",
+        "notakeyword",
+        "identifier",
+        "someOtherWord",
     ];
 
     c.bench_function("keyword_lookup", |b| {
