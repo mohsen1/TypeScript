@@ -5110,8 +5110,12 @@ impl<'a> ThinCheckerState<'a> {
                 return TypeId::ERROR;
             }
             let declared_type = self.get_type_of_symbol(sym_id);
-            // Check for static block TDZ violation (variable used before declaration in source order)
+            // Check for TDZ violations (variable used before declaration in source order)
+            // 1. Static block TDZ - variable used in static block before its declaration
+            // 2. Computed property TDZ - variable used in computed property name before its declaration
             if self.is_variable_used_before_declaration_in_static_block(sym_id, idx) {
+                self.error_variable_used_before_assigned_at(name, idx);
+            } else if self.is_variable_used_before_declaration_in_computed_property(sym_id, idx) {
                 self.error_variable_used_before_assigned_at(name, idx);
             } else if self.should_check_definite_assignment(sym_id, idx)
                 && !self.is_definitely_assigned_at(idx)
@@ -5706,6 +5710,122 @@ impl<'a> ThinCheckerState<'a> {
 
         // Check if the symbol is a module-level variable (not a class member)
         // We're looking for variables declared outside the class
+        if (symbol.flags & symbol_flags::VARIABLE) == 0 {
+            return false;
+        }
+
+        // Get the position of the variable's declaration
+        for &decl_idx in &symbol.declarations {
+            // Check if this is a variable declaration
+            let Some(var_stmt_idx) = self.find_enclosing_variable_statement(decl_idx) else {
+                continue;
+            };
+            let Some(var_stmt_node) = self.ctx.arena.get(var_stmt_idx) else {
+                continue;
+            };
+
+            // Variable is declared AFTER the class - this is TDZ error
+            if var_stmt_node.pos > class_pos {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    /// Find the enclosing computed property name for a node, if any.
+    ///
+    /// Returns the NodeIndex of the COMPUTED_PROPERTY_NAME if the node is inside one.
+    fn find_enclosing_computed_property(&self, idx: NodeIndex) -> Option<NodeIndex> {
+        let mut current = idx;
+        while !current.is_none() {
+            if let Some(node) = self.ctx.arena.get(current) {
+                if node.kind == syntax_kind_ext::COMPUTED_PROPERTY_NAME {
+                    return Some(current);
+                }
+                // Stop at function boundaries (computed properties inside functions are evaluated at call time)
+                if node.kind == syntax_kind_ext::FUNCTION_DECLARATION
+                    || node.kind == syntax_kind_ext::FUNCTION_EXPRESSION
+                    || node.kind == syntax_kind_ext::ARROW_FUNCTION
+                    || node.kind == syntax_kind_ext::METHOD_DECLARATION
+                    || node.kind == syntax_kind_ext::CONSTRUCTOR
+                {
+                    return None;
+                }
+            }
+            let ext = self.ctx.arena.get_extended(current)?;
+            if ext.parent.is_none() {
+                return None;
+            }
+            current = ext.parent;
+        }
+        None
+    }
+
+    /// Find the class declaration containing a computed property name.
+    ///
+    /// Walks up from a computed property to find the containing class member,
+    /// then finds the class declaration.
+    fn find_class_for_computed_property(&self, computed_idx: NodeIndex) -> Option<NodeIndex> {
+        // Walk up to find the class member (property, method, accessor)
+        let mut current = computed_idx;
+        while !current.is_none() {
+            let ext = self.ctx.arena.get_extended(current)?;
+            let parent = ext.parent;
+            if parent.is_none() {
+                return None;
+            }
+            let parent_node = self.ctx.arena.get(parent)?;
+            // If we found a class, return it
+            if parent_node.kind == syntax_kind_ext::CLASS_DECLARATION
+                || parent_node.kind == syntax_kind_ext::CLASS_EXPRESSION
+            {
+                return Some(parent);
+            }
+            current = parent;
+        }
+        None
+    }
+
+    /// Check if a variable is used in a computed property name before its declaration (TDZ check).
+    ///
+    /// In TypeScript, if a variable is declared at module level AFTER a class declaration,
+    /// using that variable in a computed property name should emit TS2454.
+    ///
+    /// Example:
+    /// ```typescript
+    /// class C {
+    ///     [FOO]() {}  // Error: Variable 'FOO' is used before being assigned
+    /// }
+    /// const FOO = "foo";  // Declared after the class
+    /// ```
+    fn is_variable_used_before_declaration_in_computed_property(
+        &self,
+        sym_id: SymbolId,
+        usage_idx: NodeIndex,
+    ) -> bool {
+        // Check if we're inside a computed property name
+        let Some(computed_idx) = self.find_enclosing_computed_property(usage_idx) else {
+            return false;
+        };
+
+        // Get the class containing the computed property
+        let Some(class_idx) = self.find_class_for_computed_property(computed_idx) else {
+            return false;
+        };
+
+        // Get the class position
+        let Some(class_node) = self.ctx.arena.get(class_idx) else {
+            return false;
+        };
+        let class_pos = class_node.pos;
+
+        // Get the symbol's declaration
+        let Some(symbol) = self.ctx.binder.get_symbol(sym_id) else {
+            return false;
+        };
+
+        // Check if the symbol is a module-level variable (not a class member)
         if (symbol.flags & symbol_flags::VARIABLE) == 0 {
             return false;
         }
