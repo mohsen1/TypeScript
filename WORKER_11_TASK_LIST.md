@@ -7,6 +7,12 @@
 (none yet)
 
 ## Completed
+- [x] **SOLV-43: Fix ANY fallbacks in thin_checker.rs type resolution**
+  - Changed compute_type_of_node catch-all fallback from ANY to ERROR (thin_checker.rs:680)
+  - Changed circular reference fallback from ANY to ERROR (thin_checker.rs:460)
+  - Changed missing node fallback from ANY to ERROR (thin_checker.rs:482)
+  - Changed get_type_from_type_reference fallbacks from ANY to ERROR (thin_checker.rs:687, 692, 892)
+  - These were fallback cases where missing data or unknown nodes were silently accepted
 - [x] **SOLV-42: Fix additional ANY fallbacks in lower.rs**
   - Changed IndexSignatureResolver to return ERROR instead of ANY (lower.rs:60)
   - Changed array type lowering fallback from ANY to ERROR (lower.rs:503)

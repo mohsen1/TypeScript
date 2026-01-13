@@ -455,9 +455,9 @@ impl<'a> ThinCheckerState<'a> {
             return cached;
         }
 
-        // Check for circular reference
+        // Check for circular reference - return ERROR to expose resolution bugs
         if self.ctx.node_resolution_set.contains(&idx) {
-            return TypeId::ANY;
+            return TypeId::ERROR;
         }
 
         // Push onto resolution stack
@@ -479,7 +479,7 @@ impl<'a> ThinCheckerState<'a> {
     /// Compute the type of a node (internal, not cached).
     fn compute_type_of_node(&mut self, idx: NodeIndex) -> TypeId {
         let Some(node) = self.ctx.arena.get(idx) else {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Missing node - propagate error
         };
         let is_function_declaration = node.kind == syntax_kind_ext::FUNCTION_DECLARATION;
 
@@ -676,20 +676,20 @@ impl<'a> ThinCheckerState<'a> {
             // Qualified name (A.B.C) - resolve namespace member access
             k if k == syntax_kind_ext::QUALIFIED_NAME => self.resolve_qualified_name(idx),
 
-            // Default case
-            _ => TypeId::ANY,
+            // Default case - unknown node kind is an error
+            _ => TypeId::ERROR,
         }
     }
 
     /// Get type from a type reference node (e.g., "number", "string", "MyType").
     fn get_type_from_type_reference(&mut self, idx: NodeIndex) -> TypeId {
         let Some(node) = self.ctx.arena.get(idx) else {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Missing node - propagate error
         };
 
         // Get the TypeRefData from the arena
         let Some(type_ref) = self.ctx.arena.get_type_ref(node) else {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Missing type ref data - propagate error
         };
 
         let type_name_idx = type_ref.type_name;
@@ -888,7 +888,8 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
 
-        TypeId::ANY
+        // Unknown type name node kind - propagate error
+        TypeId::ERROR
     }
 
     fn should_resolve_recursive_type_alias(
