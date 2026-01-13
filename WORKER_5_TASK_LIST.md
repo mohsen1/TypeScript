@@ -1,15 +1,16 @@
 # Worker 5 Task List
 
 ## Current Task
-- [ ] Test with real-world lib.d.ts augmentations
-  - DOM APIs (Window, Document, etc.)
-  - Node.js globals (process, Buffer)
-  - Verify no TS2304 errors for standard library
+(none - all tasks completed)
 
 ## Queue
 (none)
 
 ## Completed
+- [x] Test with real-world lib.d.ts augmentations
+  - DOM APIs (Window, Document, etc.)
+  - Node.js globals (process, Buffer)
+  - Verify no TS2304 errors for standard library
 - [x] Add module resolution debugging
   - Log symbol table merge operations
   - Track which file each symbol comes from
