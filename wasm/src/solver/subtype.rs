@@ -174,6 +174,9 @@ pub struct SubtypeChecker<'a, R: TypeResolver = NoopResolver> {
     pub no_unchecked_indexed_access: bool,
     /// Whether to enforce weak type detection (optional-only targets require overlap).
     pub enforce_weak_types: bool,
+    // When true, disables method bivariance (methods use contravariance).
+    // Default: false (methods are bivariant in TypeScript for compatibility).
+    pub disable_method_bivariance: bool,
 }
 
 impl<'a> SubtypeChecker<'a, NoopResolver> {
@@ -193,6 +196,7 @@ impl<'a> SubtypeChecker<'a, NoopResolver> {
             strict_null_checks: true,
             no_unchecked_indexed_access: false,
             enforce_weak_types: true, // Enable to catch weak type violations (TS2559)
+            disable_method_bivariance: false,
         }
     }
 }
@@ -213,6 +217,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             strict_null_checks: true,
             no_unchecked_indexed_access: false,
             enforce_weak_types: true, // Enable to catch weak type violations (TS2559)
+            disable_method_bivariance: false,
         }
     }
 
