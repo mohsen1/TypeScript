@@ -3,16 +3,15 @@
 ## Squad: CFA Squad (TS2564 Focus)
 
 ## Current Task
-- [ ] Analyze TS2564 missing errors (Property has no initializer) - 413 occurrences still missing
+- [ ] Review `wasm/src/checker/control_flow.rs` and `flow_analyzer.rs` for definite assignment tracking gaps
 
 ## Queue
-- [ ] Review `wasm/src/checker/control_flow.rs` and `flow_analyzer.rs` for definite assignment tracking gaps
 - [ ] Identify class property initialization patterns not being detected
 - [ ] Fix constructor flow analysis to track property assignments through method calls
 - [ ] Add test cases for complex initialization patterns (conditional, super calls, helper methods)
 
 ## Completed
-(Previous phase work archived)
+- [x] Analyze TS2564 missing errors (Property has no initializer) - 413 occurrences still missing
 
 ## Context
 - **Goal:** TS2564 is #1 missing error (413 occurrences) - fix edge cases
