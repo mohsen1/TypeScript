@@ -120,9 +120,12 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
 
         let result = if source == target {
             true
-        } else if source == TypeId::ANY || target == TypeId::ANY {
-            // `any` is the JS escape hatch (top + bottom). See https://github.com/microsoft/TypeScript/issues/10715.
-            true
+        } else if let Some(any_result) = self.lawyer.check_any_propagation(source, target, self.interner) {
+            // The Lawyer layer decided the outcome based on `any` propagation rules.
+            // In default mode, `any` is the JS escape hatch (top + bottom).
+            // In strict mode, `any` may delegate to structural checking.
+            // See https://github.com/microsoft/TypeScript/issues/10715.
+            any_result
         } else if !self.strict_null_checks
             && (source == TypeId::NULL || source == TypeId::UNDEFINED)
         {
@@ -154,8 +157,9 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
         if source == target {
             return true;
         }
-        if source == TypeId::ANY || target == TypeId::ANY {
-            return true;
+        // Use the lawyer layer for `any` propagation rules
+        if let Some(any_result) = self.lawyer.check_any_propagation(source, target, self.interner) {
+            return any_result;
         }
         if !self.strict_null_checks && (source == TypeId::NULL || source == TypeId::UNDEFINED) {
             return true;
@@ -186,11 +190,14 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
         source: TypeId,
         target: TypeId,
     ) -> Option<SubtypeFailureReason> {
-        if source == target
-            || source == TypeId::ANY
-            || target == TypeId::ANY
-            || target == TypeId::UNKNOWN
-        {
+        if source == target {
+            return None;
+        }
+        // Use the lawyer layer for `any` propagation rules
+        if self.lawyer.check_any_propagation(source, target, self.interner).is_some() {
+            return None;
+        }
+        if target == TypeId::UNKNOWN {
             return None;
         }
         if !self.strict_null_checks && (source == TypeId::NULL || source == TypeId::UNDEFINED) {
