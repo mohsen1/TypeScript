@@ -1,13 +1,12 @@
 # Worker 7 Task List - Solver Squad
 
 ## Current Task
-- [ ] No current task assigned
-
-## Queue
 - [ ] **SOLV-18: Fix tuple type subtyping**
   - Implement covariant tuple subtyping
   - Handle tuple length differences correctly
   - Test: `[number, string]` vs `[number, string, boolean]`
+
+## Queue
 - [ ] **SOLV-19: Strengthen function type variance**
   - Implement proper contravariance for parameter types
   - Handle function type assignability correctly
