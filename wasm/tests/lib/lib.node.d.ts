@@ -18,46 +18,15 @@ interface ProcessVersions {
     napi: string;
     llhttp: string;
     openssl: string;
-    cldr: string;
-    icu: string;
-    tz: string;
-    unicode: string;
 }
 
 interface Process {
     readonly arch: string;
     readonly argv: string[];
     readonly argv0: string;
-    readonly config: {
-        readonly target_defaults: {
-            readonly cflags: any[];
-            readonly default_configuration: string;
-            readonly defines: string[];
-            readonly include_dirs: string[];
-            readonly libraries: string[];
-        };
-        readonly variables: {
-            readonly clang: number;
-            readonly host_arch: string;
-            readonly node_install_npm: boolean;
-            readonly node_install_waf: boolean;
-            readonly node_prefix: string;
-            readonly node_shared_openssl: boolean;
-            readonly node_shared_v8: boolean;
-            readonly node_shared_zlib: boolean;
-            readonly node_use_dtrace: boolean;
-            readonly node_use_etw: boolean;
-            readonly node_use_openssl: boolean;
-            readonly target_arch: string;
-            readonly v8_no_strict_aliasing: number;
-            readonly v8_use_snapshot: boolean;
-            readonly visibility: string;
-        };
-    };
     connected: boolean;
     readonly cwd: () => string;
     readonly debugPort: number;
-    readonly domain: any;
     readonly env: ProcessEnv;
     readonly execArgv: string[];
     readonly execPath: string;
@@ -111,9 +80,7 @@ interface Process {
     on(event: 'disconnect', listener: () => void): this;
     on(event: 'exit', listener: (code: number) => void): this;
     on(event: 'message', listener: (message: any, sendHandle: any) => void): this;
-    on(event: 'multipleResolves', listener: (type: 'resolve' | 'reject', promise: Promise<any>, value: any) => void): this;
-    on(event: 'rejectionHandled', listener: (promise: Promise<any>) => void): this;
-    on(event: 'uncaughtException', listener: (error: Error, origin: 'uncaughtException' | 'unhandledRejection') => void): this;
+    on(event: 'uncaughtException', listener: (error: Error) => void): this;
     on(event: 'unhandledRejection', listener: (reason: any, promise: Promise<any>) => void): this;
     on(event: 'warning', listener: (warning: Error) => void): this;
     on(event: string, listener: (...args: any[]) => void): this;
@@ -213,15 +180,11 @@ interface Buffer extends Uint8Array {
     writeInt16LE(value: number, offset?: number): number;
     writeInt32BE(value: number, offset?: number): number;
     writeInt32LE(value: number, offset?: number): number;
-    writeIntBE(value: number, offset: number, byteLength: number): number;
-    writeIntLE(value: number, offset: number, byteLength: number): number;
     writeUInt8(value: number, offset?: number): number;
     writeUInt16BE(value: number, offset?: number): number;
     writeUInt16LE(value: number, offset?: number): number;
     writeUInt32BE(value: number, offset?: number): number;
     writeUInt32LE(value: number, offset?: number): number;
-    writeUIntBE(value: number, offset: number, byteLength: number): number;
-    writeUIntLE(value: number, offset: number, byteLength: number): number;
     readBigInt64BE(offset?: number): bigint;
     readBigInt64LE(offset?: number): bigint;
     readBigUInt64BE(offset?: number): bigint;
@@ -235,15 +198,11 @@ interface Buffer extends Uint8Array {
     readInt16LE(offset?: number): number;
     readInt32BE(offset?: number): number;
     readInt32LE(offset?: number): number;
-    readIntBE(offset: number, byteLength: number): number;
-    readIntLE(offset: number, byteLength: number): number;
     readUInt8(offset?: number): number;
     readUInt16BE(offset?: number): number;
     readUInt16LE(offset?: number): number;
     readUInt32BE(offset?: number): number;
     readUInt32LE(offset?: number): number;
-    readUIntBE(offset: number, byteLength: number): number;
-    readUIntLE(offset: number, byteLength: number): number;
     reverse(): this;
     swap16(): Buffer;
     swap32(): Buffer;
@@ -606,20 +565,10 @@ interface Crypto {
 
 interface SubtleCrypto {
     decrypt(algorithm: AlgorithmIdentifier, key: CryptoKey, data: BufferSource): Promise<ArrayBuffer>;
-    deriveBits(algorithm: AlgorithmIdentifier, baseKey: CryptoKey, length: number): Promise<ArrayBuffer>;
-    deriveKey(algorithm: AlgorithmIdentifier, baseKey: CryptoKey, derivedKeyType: AlgorithmIdentifier, extractable: boolean, keyUsages: KeyUsage[]): Promise<CryptoKey>;
     digest(algorithm: AlgorithmIdentifier, data: BufferSource): Promise<ArrayBuffer>;
     encrypt(algorithm: AlgorithmIdentifier, key: CryptoKey, data: BufferSource): Promise<ArrayBuffer>;
-    exportKey(format: "jwk", key: CryptoKey): Promise<JsonWebKey>;
-    exportKey(format: "raw" | "spki" | "pkcs8", key: CryptoKey): Promise<ArrayBuffer>;
-    generateKey(algorithm: RsaHashedKeyGenParams | EcKeyGenParams, extractable: boolean, keyUsages: ReadonlyArray<KeyUsage>): Promise<CryptoKeyPair>;
-    generateKey(algorithm: AesKeyGenParams | HmacKeyGenParams | Pbkdf2Params, extractable: boolean, keyUsages: ReadonlyArray<KeyUsage>): Promise<CryptoKey>;
-    importKey(format: "jwk", keyData: JsonWebKey, algorithm: AlgorithmIdentifier, extractable: boolean, keyUsages: ReadonlyArray<KeyUsage>): Promise<CryptoKey>;
-    importKey(format: "raw" | "spki" | "pkcs8", keyData: BufferSource, algorithm: AlgorithmIdentifier, extractable: boolean, keyUsages: KeyUsage[]): Promise<CryptoKey>;
     sign(algorithm: AlgorithmIdentifier, key: CryptoKey, data: BufferSource): Promise<ArrayBuffer>;
-    unwrapKey(format: KeyFormat, wrappedKey: BufferSource, unwrappingKey: CryptoKey, unwrapAlgorithm: AlgorithmIdentifier, unwrappedKeyAlgorithm: AlgorithmIdentifier, extractable: boolean, keyUsages: KeyUsage[]): Promise<CryptoKey>;
     verify(algorithm: AlgorithmIdentifier, key: CryptoKey, signature: BufferSource, data: BufferSource): Promise<boolean>;
-    wrapKey(format: KeyFormat, key: CryptoKey, wrappingKey: CryptoKey, wrapAlgorithm: AlgorithmIdentifier): Promise<ArrayBuffer>;
 }
 
 type AlgorithmIdentifier = string | Algorithm;
@@ -635,70 +584,12 @@ interface CryptoKey {
     readonly usages: KeyUsage[];
 }
 
-interface CryptoKeyPair {
-    privateKey: CryptoKey;
-    publicKey: CryptoKey;
-}
-
 interface KeyAlgorithm {
     name: string;
 }
 
-type KeyFormat = "jwk" | "pkcs8" | "raw" | "spki";
 type KeyType = "private" | "public" | "secret";
 type KeyUsage = "decrypt" | "deriveBits" | "deriveKey" | "encrypt" | "sign" | "unwrapKey" | "verify" | "wrapKey";
-
-interface JsonWebKey {
-    alg?: string;
-    crv?: string;
-    d?: string;
-    dp?: string;
-    dq?: string;
-    e?: string;
-    ext?: boolean;
-    k?: string;
-    key_ops?: string[];
-    kty?: string;
-    n?: string;
-    oth?: RsaOtherPrimesInfo[];
-    p?: string;
-    q?: string;
-    qi?: string;
-    use?: string;
-    x?: string;
-    y?: string;
-}
-
-interface RsaOtherPrimesInfo {
-    d?: string;
-    r?: string;
-    t?: string;
-}
-
-interface RsaHashedKeyGenParams extends Algorithm {
-    hash: AlgorithmIdentifier;
-    modulusLength: number;
-    publicExponent: Uint8Array;
-}
-
-interface EcKeyGenParams extends Algorithm {
-    namedCurve: string;
-}
-
-interface AesKeyGenParams extends Algorithm {
-    length: number;
-}
-
-interface HmacKeyGenParams extends Algorithm {
-    hash: AlgorithmIdentifier;
-    length?: number;
-}
-
-interface Pbkdf2Params extends Algorithm {
-    hash: AlgorithmIdentifier;
-    iterations: number;
-    salt: BufferSource;
-}
 
 type BufferSource = ArrayBufferView | ArrayBuffer;
 type Transferable = ArrayBuffer;
@@ -816,7 +707,7 @@ declare var Request: {
 type RequestInfo = Request | string;
 type RequestCache = "default" | "force-cache" | "no-cache" | "no-store" | "only-if-cached" | "reload";
 type RequestCredentials = "include" | "omit" | "same-origin";
-type RequestDestination = "" | "audio" | "audioworklet" | "document" | "embed" | "font" | "frame" | "iframe" | "image" | "manifest" | "object" | "paintworklet" | "report" | "script" | "sharedworker" | "style" | "track" | "video" | "worker" | "xslt";
+type RequestDestination = "" | "audio" | "document" | "embed" | "font" | "frame" | "iframe" | "image" | "manifest" | "object" | "report" | "script" | "style" | "track" | "video" | "worker" | "xslt";
 type RequestMode = "cors" | "navigate" | "no-cors" | "same-origin";
 type RequestRedirect = "error" | "follow" | "manual";
 type ReferrerPolicy = "" | "no-referrer" | "no-referrer-when-downgrade" | "origin" | "origin-when-cross-origin" | "same-origin" | "strict-origin" | "strict-origin-when-cross-origin" | "unsafe-url";

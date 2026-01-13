@@ -82,8 +82,6 @@ interface NumberConstructor {
     readonly MAX_VALUE: number;
     readonly MIN_VALUE: number;
     readonly NaN: number;
-    readonly POSITIVE_INFINITY: number;
-    readonly NEGATIVE_INFINITY: number;
     isFinite(value: number): boolean;
     isNaN(value: number): boolean;
     parseInt(string: string, radix?: number): number;
@@ -312,26 +310,6 @@ interface RangeErrorConstructor extends ErrorConstructor {
 }
 
 declare var RangeError: RangeErrorConstructor;
-
-interface SyntaxError extends Error {}
-
-interface SyntaxErrorConstructor extends ErrorConstructor {
-    new(message?: string): SyntaxError;
-    (message?: string): SyntaxError;
-    readonly prototype: SyntaxError;
-}
-
-declare var SyntaxError: SyntaxErrorConstructor;
-
-interface ReferenceError extends Error {}
-
-interface ReferenceErrorConstructor extends ErrorConstructor {
-    new(message?: string): ReferenceError;
-    (message?: string): ReferenceError;
-    readonly prototype: ReferenceError;
-}
-
-declare var ReferenceError: ReferenceErrorConstructor;
 
 // Regular Expression
 interface RegExp {
@@ -610,101 +588,6 @@ interface Uint8ArrayConstructor {
 
 declare var Uint8Array: Uint8ArrayConstructor;
 
-interface Uint8ClampedArray {
-    readonly BYTES_PER_ELEMENT: number;
-    readonly buffer: ArrayBuffer;
-    readonly byteLength: number;
-    readonly byteOffset: number;
-    readonly length: number;
-    [index: number]: number;
-}
-
-interface Uint8ClampedArrayConstructor {
-    readonly prototype: Uint8ClampedArray;
-    new(length: number): Uint8ClampedArray;
-    new(array: ArrayLike<number>): Uint8ClampedArray;
-    new(buffer: ArrayBuffer, byteOffset?: number, length?: number): Uint8ClampedArray;
-    readonly BYTES_PER_ELEMENT: number;
-}
-
-declare var Uint8ClampedArray: Uint8ClampedArrayConstructor;
-
-interface Int16Array {
-    readonly BYTES_PER_ELEMENT: number;
-    readonly buffer: ArrayBuffer;
-    readonly byteLength: number;
-    readonly byteOffset: number;
-    readonly length: number;
-    [index: number]: number;
-}
-
-interface Int16ArrayConstructor {
-    readonly prototype: Int16Array;
-    new(length: number): Int16Array;
-    new(array: ArrayLike<number>): Int16Array;
-    new(buffer: ArrayBuffer, byteOffset?: number, length?: number): Int16Array;
-    readonly BYTES_PER_ELEMENT: number;
-}
-
-declare var Int16Array: Int16ArrayConstructor;
-
-interface Uint16Array {
-    readonly BYTES_PER_ELEMENT: number;
-    readonly buffer: ArrayBuffer;
-    readonly byteLength: number;
-    readonly byteOffset: number;
-    readonly length: number;
-    [index: number]: number;
-}
-
-interface Uint16ArrayConstructor {
-    readonly prototype: Uint16Array;
-    new(length: number): Uint16Array;
-    new(array: ArrayLike<number>): Uint16Array;
-    new(buffer: ArrayBuffer, byteOffset?: number, length?: number): Uint16Array;
-    readonly BYTES_PER_ELEMENT: number;
-}
-
-declare var Uint16Array: Uint16ArrayConstructor;
-
-interface Int32Array {
-    readonly BYTES_PER_ELEMENT: number;
-    readonly buffer: ArrayBuffer;
-    readonly byteLength: number;
-    readonly byteOffset: number;
-    readonly length: number;
-    [index: number]: number;
-}
-
-interface Int32ArrayConstructor {
-    readonly prototype: Int32Array;
-    new(length: number): Int32Array;
-    new(array: ArrayLike<number>): Int32Array;
-    new(buffer: ArrayBuffer, byteOffset?: number, length?: number): Int32Array;
-    readonly BYTES_PER_ELEMENT: number;
-}
-
-declare var Int32Array: Int32ArrayConstructor;
-
-interface Uint32Array {
-    readonly BYTES_PER_ELEMENT: number;
-    readonly buffer: ArrayBuffer;
-    readonly byteLength: number;
-    readonly byteOffset: number;
-    readonly length: number;
-    [index: number]: number;
-}
-
-interface Uint32ArrayConstructor {
-    readonly prototype: Uint32Array;
-    new(length: number): Uint32Array;
-    new(array: ArrayLike<number>): Uint32Array;
-    new(buffer: ArrayBuffer, byteOffset?: number, length?: number): Uint32Array;
-    readonly BYTES_PER_ELEMENT: number;
-}
-
-declare var Uint32Array: Uint32ArrayConstructor;
-
 interface Float32Array {
     readonly BYTES_PER_ELEMENT: number;
     readonly buffer: ArrayBuffer;
@@ -724,25 +607,6 @@ interface Float32ArrayConstructor {
 
 declare var Float32Array: Float32ArrayConstructor;
 
-interface Float64Array {
-    readonly BYTES_PER_ELEMENT: number;
-    readonly buffer: ArrayBuffer;
-    readonly byteLength: number;
-    readonly byteOffset: number;
-    readonly length: number;
-    [index: number]: number;
-}
-
-interface Float64ArrayConstructor {
-    readonly prototype: Float64Array;
-    new(length: number): Float64Array;
-    new(array: ArrayLike<number>): Float64Array;
-    new(buffer: ArrayBuffer, byteOffset?: number, length?: number): Float64Array;
-    readonly BYTES_PER_ELEMENT: number;
-}
-
-declare var Float64Array: Float64ArrayConstructor;
-
 // Utility types
 type Partial<T> = { [P in keyof T]?: T[P] };
 type Required<T> = { [P in keyof T]-?: T[P] };
@@ -757,12 +621,6 @@ type Parameters<T extends (...args: any) => any> = T extends (...args: infer P) 
 type ConstructorParameters<T extends abstract new (...args: any) => any> = T extends abstract new (...args: infer P) => any ? P : never;
 type ReturnType<T extends (...args: any) => any> = T extends (...args: any) => infer R ? R : any;
 type InstanceType<T extends abstract new (...args: any) => any> = T extends abstract new (...args: any) => infer R ? R : any;
-type ThisParameterType<T> = T extends (this: infer U, ...args: never) => any ? U : unknown;
-type OmitThisParameter<T> = unknown extends ThisParameterType<T> ? T : T extends (...args: infer A) => infer R ? (...args: A) => R : T;
-type Uppercase<S extends string> = intrinsic;
-type Lowercase<S extends string> = intrinsic;
-type Capitalize<S extends string> = intrinsic;
-type Uncapitalize<S extends string> = intrinsic;
 type PropertyKey = string | number | symbol;
 
 // Global functions

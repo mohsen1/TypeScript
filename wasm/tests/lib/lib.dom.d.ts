@@ -41,10 +41,6 @@ interface Event {
     preventDefault(): void;
     stopImmediatePropagation(): void;
     stopPropagation(): void;
-    readonly AT_TARGET: 2;
-    readonly BUBBLING_PHASE: 3;
-    readonly CAPTURING_PHASE: 1;
-    readonly NONE: 0;
 }
 
 interface EventInit {
@@ -56,10 +52,6 @@ interface EventInit {
 declare var Event: {
     prototype: Event;
     new(type: string, eventInitDict?: EventInit): Event;
-    readonly AT_TARGET: 2;
-    readonly BUBBLING_PHASE: 3;
-    readonly CAPTURING_PHASE: 1;
-    readonly NONE: 0;
 };
 
 interface MouseEvent extends UIEvent {
@@ -106,16 +98,6 @@ interface EventModifierInit extends UIEventInit {
     altKey?: boolean;
     ctrlKey?: boolean;
     metaKey?: boolean;
-    modifierAltGraph?: boolean;
-    modifierCapsLock?: boolean;
-    modifierFn?: boolean;
-    modifierFnLock?: boolean;
-    modifierHyper?: boolean;
-    modifierNumLock?: boolean;
-    modifierScrollLock?: boolean;
-    modifierSuper?: boolean;
-    modifierSymbol?: boolean;
-    modifierSymbolLock?: boolean;
     shiftKey?: boolean;
 }
 
@@ -135,10 +117,6 @@ interface KeyboardEvent extends UIEvent {
 declare var KeyboardEvent: {
     prototype: KeyboardEvent;
     new(type: string, eventInitDict?: KeyboardEventInit): KeyboardEvent;
-    readonly DOM_KEY_LOCATION_LEFT: 1;
-    readonly DOM_KEY_LOCATION_NUMPAD: 3;
-    readonly DOM_KEY_LOCATION_RIGHT: 2;
-    readonly DOM_KEY_LOCATION_STANDARD: 0;
 };
 
 interface KeyboardEventInit extends EventModifierInit {
@@ -163,40 +141,6 @@ declare var UIEvent: {
     prototype: UIEvent;
     new(type: string, eventInitDict?: UIEventInit): UIEvent;
 };
-
-interface FocusEvent extends UIEvent {
-    readonly relatedTarget: EventTarget | null;
-}
-
-declare var FocusEvent: {
-    prototype: FocusEvent;
-    new(type: string, eventInitDict?: FocusEventInit): FocusEvent;
-};
-
-interface FocusEventInit extends UIEventInit {
-    relatedTarget?: EventTarget | null;
-}
-
-interface InputEvent extends UIEvent {
-    readonly data: string | null;
-    readonly dataTransfer: DataTransfer | null;
-    readonly inputType: string;
-    readonly isComposing: boolean;
-    getTargetRanges(): StaticRange[];
-}
-
-declare var InputEvent: {
-    prototype: InputEvent;
-    new(type: string, eventInitDict?: InputEventInit): InputEvent;
-};
-
-interface InputEventInit extends UIEventInit {
-    data?: string | null;
-    dataTransfer?: DataTransfer | null;
-    inputType?: string;
-    isComposing?: boolean;
-    targetRanges?: StaticRange[];
-}
 
 // EventTarget
 interface EventTarget {
@@ -266,47 +210,11 @@ interface Node extends EventTarget {
     normalize(): void;
     removeChild<T extends Node>(child: T): T;
     replaceChild<T extends Node>(node: Node, child: T): T;
-    readonly ATTRIBUTE_NODE: 2;
-    readonly CDATA_SECTION_NODE: 4;
-    readonly COMMENT_NODE: 8;
-    readonly DOCUMENT_FRAGMENT_NODE: 11;
-    readonly DOCUMENT_NODE: 9;
-    readonly DOCUMENT_POSITION_CONTAINED_BY: 16;
-    readonly DOCUMENT_POSITION_CONTAINS: 8;
-    readonly DOCUMENT_POSITION_DISCONNECTED: 1;
-    readonly DOCUMENT_POSITION_FOLLOWING: 4;
-    readonly DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC: 32;
-    readonly DOCUMENT_POSITION_PRECEDING: 2;
-    readonly DOCUMENT_TYPE_NODE: 10;
-    readonly ELEMENT_NODE: 1;
-    readonly ENTITY_NODE: 6;
-    readonly ENTITY_REFERENCE_NODE: 5;
-    readonly NOTATION_NODE: 12;
-    readonly PROCESSING_INSTRUCTION_NODE: 7;
-    readonly TEXT_NODE: 3;
 }
 
 declare var Node: {
     prototype: Node;
     new(): Node;
-    readonly ATTRIBUTE_NODE: 2;
-    readonly CDATA_SECTION_NODE: 4;
-    readonly COMMENT_NODE: 8;
-    readonly DOCUMENT_FRAGMENT_NODE: 11;
-    readonly DOCUMENT_NODE: 9;
-    readonly DOCUMENT_POSITION_CONTAINED_BY: 16;
-    readonly DOCUMENT_POSITION_CONTAINS: 8;
-    readonly DOCUMENT_POSITION_DISCONNECTED: 1;
-    readonly DOCUMENT_POSITION_FOLLOWING: 4;
-    readonly DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC: 32;
-    readonly DOCUMENT_POSITION_PRECEDING: 2;
-    readonly DOCUMENT_TYPE_NODE: 10;
-    readonly ELEMENT_NODE: 1;
-    readonly ENTITY_NODE: 6;
-    readonly ENTITY_REFERENCE_NODE: 5;
-    readonly NOTATION_NODE: 12;
-    readonly PROCESSING_INSTRUCTION_NODE: 7;
-    readonly TEXT_NODE: 3;
 };
 
 interface GetRootNodeOptions {
@@ -355,32 +263,21 @@ interface Element extends Node, ParentNode, ChildNode {
     readonly scrollWidth: number;
     slot: string;
     readonly tagName: string;
-    attachShadow(init: ShadowRootInit): ShadowRoot;
     closest<K extends keyof HTMLElementTagNameMap>(selector: K): HTMLElementTagNameMap[K] | null;
     closest(selectors: string): Element | null;
     getAttribute(qualifiedName: string): string | null;
     getAttributeNS(namespace: string | null, localName: string): string | null;
     getAttributeNames(): string[];
-    getAttributeNode(qualifiedName: string): Attr | null;
-    getAttributeNodeNS(namespace: string | null, localName: string): Attr | null;
     getBoundingClientRect(): DOMRect;
-    getClientRects(): DOMRectList;
     getElementsByClassName(classNames: string): HTMLCollectionOf<Element>;
     getElementsByTagName<K extends keyof HTMLElementTagNameMap>(qualifiedName: K): HTMLCollectionOf<HTMLElementTagNameMap[K]>;
     getElementsByTagName(qualifiedName: string): HTMLCollectionOf<Element>;
-    getElementsByTagNameNS(namespaceURI: string, localName: string): HTMLCollectionOf<Element>;
     hasAttribute(qualifiedName: string): boolean;
     hasAttributeNS(namespace: string | null, localName: string): boolean;
     hasAttributes(): boolean;
-    insertAdjacentElement(where: InsertPosition, element: Element): Element | null;
-    insertAdjacentHTML(position: InsertPosition, text: string): void;
-    insertAdjacentText(where: InsertPosition, data: string): void;
     matches(selectors: string): boolean;
     removeAttribute(qualifiedName: string): void;
     removeAttributeNS(namespace: string | null, localName: string): void;
-    removeAttributeNode(attr: Attr): Attr;
-    requestFullscreen(options?: FullscreenOptions): Promise<void>;
-    requestPointerLock(): void;
     scroll(options?: ScrollToOptions): void;
     scroll(x: number, y: number): void;
     scrollBy(options?: ScrollToOptions): void;
@@ -390,8 +287,6 @@ interface Element extends Node, ParentNode, ChildNode {
     scrollTo(x: number, y: number): void;
     setAttribute(qualifiedName: string, value: string): void;
     setAttributeNS(namespace: string | null, qualifiedName: string, value: string): void;
-    setAttributeNode(attr: Attr): Attr | null;
-    setAttributeNodeNS(attr: Attr): Attr | null;
     toggleAttribute(qualifiedName: string, force?: boolean): boolean;
 }
 
@@ -399,8 +294,6 @@ declare var Element: {
     prototype: Element;
     new(): Element;
 };
-
-type InsertPosition = "beforebegin" | "afterbegin" | "beforeend" | "afterend";
 
 interface ScrollIntoViewOptions extends ScrollOptions {
     block?: ScrollLogicalPosition;
@@ -418,12 +311,6 @@ interface ScrollToOptions extends ScrollOptions {
 
 type ScrollBehavior = "auto" | "instant" | "smooth";
 type ScrollLogicalPosition = "center" | "end" | "nearest" | "start";
-
-interface FullscreenOptions {
-    navigationUI?: FullscreenNavigationUI;
-}
-
-type FullscreenNavigationUI = "auto" | "hide" | "show";
 
 // HTMLElement
 interface HTMLElement extends Element {
@@ -454,7 +341,6 @@ interface HTMLElement extends Element {
     tabIndex: number;
     title: string;
     translate: boolean;
-    attachInternals(): ElementInternals;
     blur(): void;
     click(): void;
     focus(options?: FocusOptions): void;
@@ -489,12 +375,6 @@ interface HTMLParagraphElement extends HTMLElement {}
 declare var HTMLParagraphElement: {
     prototype: HTMLParagraphElement;
     new(): HTMLParagraphElement;
-};
-
-interface HTMLHeadingElement extends HTMLElement {}
-declare var HTMLHeadingElement: {
-    prototype: HTMLHeadingElement;
-    new(): HTMLHeadingElement;
 };
 
 interface HTMLAnchorElement extends HTMLElement {
@@ -554,7 +434,7 @@ declare var HTMLImageElement: {
 interface HTMLInputElement extends HTMLElement {
     accept: string;
     alt: string;
-    autocomplete: AutoFill;
+    autocomplete: string;
     capture: string;
     checked: boolean;
     defaultChecked: boolean;
@@ -571,7 +451,6 @@ interface HTMLInputElement extends HTMLElement {
     height: number;
     indeterminate: boolean;
     readonly labels: NodeListOf<HTMLLabelElement> | null;
-    readonly list: HTMLDataListElement | null;
     max: string;
     maxLength: number;
     min: string;
@@ -594,8 +473,6 @@ interface HTMLInputElement extends HTMLElement {
     value: string;
     valueAsDate: Date | null;
     valueAsNumber: number;
-    readonly webkitEntries: readonly FileSystemEntry[];
-    webkitdirectory: boolean;
     width: number;
     readonly willValidate: boolean;
     checkValidity(): boolean;
@@ -615,7 +492,6 @@ declare var HTMLInputElement: {
     new(): HTMLInputElement;
 };
 
-type AutoFill = string;
 type SelectionMode = "select" | "start" | "end" | "preserve";
 
 interface HTMLButtonElement extends HTMLElement {
@@ -646,7 +522,7 @@ declare var HTMLButtonElement: {
 interface HTMLFormElement extends HTMLElement {
     acceptCharset: string;
     action: string;
-    autocomplete: AutoFill;
+    autocomplete: string;
     readonly elements: HTMLFormControlsCollection;
     encoding: string;
     enctype: string;
@@ -670,7 +546,7 @@ declare var HTMLFormElement: {
 };
 
 interface HTMLTextAreaElement extends HTMLElement {
-    autocomplete: AutoFill;
+    autocomplete: string;
     cols: number;
     defaultValue: string;
     dirName: string;
@@ -708,7 +584,7 @@ declare var HTMLTextAreaElement: {
 };
 
 interface HTMLSelectElement extends HTMLElement {
-    autocomplete: AutoFill;
+    autocomplete: string;
     disabled: boolean;
     readonly form: HTMLFormElement | null;
     readonly labels: NodeListOf<HTMLLabelElement>;
@@ -771,12 +647,9 @@ interface HTMLCanvasElement extends HTMLElement {
     height: number;
     width: number;
     getContext(contextId: "2d", options?: CanvasRenderingContext2DSettings): CanvasRenderingContext2D | null;
-    getContext(contextId: "webgl", options?: WebGLContextAttributes): WebGLRenderingContext | null;
-    getContext(contextId: "webgl2", options?: WebGLContextAttributes): WebGL2RenderingContext | null;
     getContext(contextId: string, options?: any): RenderingContext | null;
     toBlob(callback: BlobCallback, type?: string, quality?: number): void;
     toDataURL(type?: string, quality?: number): string;
-    transferControlToOffscreen(): OffscreenCanvas;
 }
 
 declare var HTMLCanvasElement: {
@@ -785,55 +658,7 @@ declare var HTMLCanvasElement: {
 };
 
 type BlobCallback = (blob: Blob | null) => void;
-type RenderingContext = CanvasRenderingContext2D | WebGLRenderingContext | WebGL2RenderingContext;
-
-interface HTMLScriptElement extends HTMLElement {
-    async: boolean;
-    crossOrigin: string | null;
-    defer: boolean;
-    integrity: string;
-    noModule: boolean;
-    referrerPolicy: string;
-    src: string;
-    text: string;
-    type: string;
-}
-
-declare var HTMLScriptElement: {
-    prototype: HTMLScriptElement;
-    new(): HTMLScriptElement;
-};
-
-interface HTMLStyleElement extends HTMLElement {
-    disabled: boolean;
-    media: string;
-    readonly sheet: CSSStyleSheet | null;
-}
-
-declare var HTMLStyleElement: {
-    prototype: HTMLStyleElement;
-    new(): HTMLStyleElement;
-};
-
-interface HTMLLinkElement extends HTMLElement {
-    as: string;
-    crossOrigin: string | null;
-    disabled: boolean;
-    href: string;
-    hreflang: string;
-    integrity: string;
-    media: string;
-    referrerPolicy: string;
-    rel: string;
-    readonly relList: DOMTokenList;
-    readonly sheet: CSSStyleSheet | null;
-    type: string;
-}
-
-declare var HTMLLinkElement: {
-    prototype: HTMLLinkElement;
-    new(): HTMLLinkElement;
-};
+type RenderingContext = CanvasRenderingContext2D;
 
 // Document
 interface Document extends Node, ParentNode {
@@ -846,7 +671,6 @@ interface Document extends Node, ParentNode {
     readonly compatMode: string;
     readonly contentType: string;
     cookie: string;
-    readonly currentScript: HTMLOrSVGScriptElement | null;
     readonly defaultView: Window | null;
     designMode: string;
     dir: string;
@@ -868,24 +692,18 @@ interface Document extends Node, ParentNode {
     readonly referrer: string;
     readonly scripts: HTMLCollectionOf<HTMLScriptElement>;
     readonly scrollingElement: Element | null;
-    readonly timeline: DocumentTimeline;
     title: string;
     readonly visibilityState: DocumentVisibilityState;
     adoptNode<T extends Node>(node: T): T;
     close(): void;
     createAttribute(localName: string): Attr;
-    createAttributeNS(namespace: string | null, qualifiedName: string): Attr;
     createComment(data: string): Comment;
     createDocumentFragment(): DocumentFragment;
     createElement<K extends keyof HTMLElementTagNameMap>(tagName: K, options?: ElementCreationOptions): HTMLElementTagNameMap[K];
     createElement(tagName: string, options?: ElementCreationOptions): HTMLElement;
     createElementNS(namespaceURI: string | null, qualifiedName: string, options?: ElementCreationOptions): Element;
     createEvent(eventInterface: string): Event;
-    createNodeIterator(root: Node, whatToShow?: number, filter?: NodeFilter | null): NodeIterator;
-    createProcessingInstruction(target: string, data: string): ProcessingInstruction;
-    createRange(): Range;
     createTextNode(data: string): Text;
-    createTreeWalker(root: Node, whatToShow?: number, filter?: NodeFilter | null): TreeWalker;
     execCommand(commandId: string, showUI?: boolean, value?: string): boolean;
     exitFullscreen(): Promise<void>;
     exitPointerLock(): void;
@@ -894,7 +712,6 @@ interface Document extends Node, ParentNode {
     getElementsByName(elementName: string): NodeListOf<HTMLElement>;
     getElementsByTagName<K extends keyof HTMLElementTagNameMap>(qualifiedName: K): HTMLCollectionOf<HTMLElementTagNameMap[K]>;
     getElementsByTagName(qualifiedName: string): HTMLCollectionOf<Element>;
-    getElementsByTagNameNS(namespaceURI: string | null, localName: string): HTMLCollectionOf<Element>;
     hasFocus(): boolean;
     importNode<T extends Node>(node: T, deep?: boolean): T;
     open(unused1?: string, unused2?: string): Document;
@@ -950,15 +767,12 @@ interface Window extends EventTarget {
     readonly self: Window;
     readonly sessionStorage: Storage;
     readonly localStorage: Storage;
-    readonly speechSynthesis: SpeechSynthesis;
     status: string;
     readonly top: Window | null;
-    readonly visualViewport: VisualViewport | null;
     readonly window: Window;
     alert(message?: any): void;
     blur(): void;
     cancelAnimationFrame(handle: number): void;
-    cancelIdleCallback(handle: number): void;
     close(): void;
     confirm(message?: string): boolean;
     focus(): void;
@@ -969,11 +783,9 @@ interface Window extends EventTarget {
     moveTo(x: number, y: number): void;
     open(url?: string | URL, target?: string, features?: string): Window | null;
     postMessage(message: any, targetOrigin: string, transfer?: Transferable[]): void;
-    postMessage(message: any, options?: WindowPostMessageOptions): void;
     print(): void;
     prompt(message?: string, _default?: string): string | null;
     requestAnimationFrame(callback: FrameRequestCallback): number;
-    requestIdleCallback(callback: IdleRequestCallback, options?: IdleRequestOptions): number;
     resizeBy(x: number, y: number): void;
     resizeTo(width: number, height: number): void;
     scroll(options?: ScrollToOptions): void;
@@ -987,11 +799,8 @@ interface Window extends EventTarget {
     btoa(data: string): string;
     clearInterval(id?: number): void;
     clearTimeout(id?: number): void;
-    createImageBitmap(image: ImageBitmapSource, options?: ImageBitmapOptions): Promise<ImageBitmap>;
-    createImageBitmap(image: ImageBitmapSource, sx: number, sy: number, sw: number, sh: number, options?: ImageBitmapOptions): Promise<ImageBitmap>;
     fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
     queueMicrotask(callback: VoidFunction): void;
-    reportError(e: any): void;
     setInterval(handler: TimerHandler, timeout?: number, ...arguments: any[]): number;
     setTimeout(handler: TimerHandler, timeout?: number, ...arguments: any[]): number;
     structuredClone<T>(value: T, options?: StructuredSerializeOptions): T;
@@ -1006,23 +815,9 @@ declare var window: Window;
 declare var document: Document;
 
 type FrameRequestCallback = (time: DOMHighResTimeStamp) => void;
-type IdleRequestCallback = (deadline: IdleDeadline) => void;
 type TimerHandler = string | Function;
 type VoidFunction = () => void;
 type DOMHighResTimeStamp = number;
-
-interface IdleRequestOptions {
-    timeout?: number;
-}
-
-interface IdleDeadline {
-    readonly didTimeout: boolean;
-    timeRemaining(): DOMHighResTimeStamp;
-}
-
-interface WindowPostMessageOptions extends StructuredSerializeOptions {
-    targetOrigin?: string;
-}
 
 interface StructuredSerializeOptions {
     transfer?: Transferable[];
@@ -1078,17 +873,11 @@ interface Navigator {
     readonly language: string;
     readonly languages: readonly string[];
     readonly maxTouchPoints: number;
-    readonly mediaDevices: MediaDevices;
     readonly onLine: boolean;
-    readonly pdfViewerEnabled: boolean;
-    readonly permissions: Permissions;
     readonly platform: string;
-    readonly serviceWorker: ServiceWorkerContainer;
     readonly userAgent: string;
     readonly webdriver: boolean;
     canShare(data?: ShareData): boolean;
-    getGamepads(): (Gamepad | null)[];
-    sendBeacon(url: string | URL, data?: BodyInit | null): boolean;
     share(data?: ShareData): Promise<void>;
     vibrate(pattern: VibratePattern): boolean;
 }
@@ -1164,7 +953,7 @@ declare var Request: {
 type RequestInfo = Request | string;
 type RequestCache = "default" | "force-cache" | "no-cache" | "no-store" | "only-if-cached" | "reload";
 type RequestCredentials = "include" | "omit" | "same-origin";
-type RequestDestination = "" | "audio" | "audioworklet" | "document" | "embed" | "font" | "frame" | "iframe" | "image" | "manifest" | "object" | "paintworklet" | "report" | "script" | "sharedworker" | "style" | "track" | "video" | "worker" | "xslt";
+type RequestDestination = "" | "audio" | "document" | "embed" | "font" | "frame" | "iframe" | "image" | "manifest" | "object" | "report" | "script" | "style" | "track" | "video" | "worker" | "xslt";
 type RequestMode = "cors" | "navigate" | "no-cors" | "same-origin";
 type RequestRedirect = "error" | "follow" | "manual";
 type ReferrerPolicy = "" | "no-referrer" | "no-referrer-when-downgrade" | "origin" | "origin-when-cross-origin" | "same-origin" | "strict-origin" | "strict-origin-when-cross-origin" | "unsafe-url";
@@ -1182,7 +971,6 @@ interface RequestInit {
     referrer?: string;
     referrerPolicy?: ReferrerPolicy;
     signal?: AbortSignal | null;
-    window?: null;
 }
 
 type BodyInit = ReadableStream<Uint8Array> | Blob | BufferSource | FormData | URLSearchParams | string;
@@ -1331,52 +1119,6 @@ declare var FileList: {
     prototype: FileList;
     new(): FileList;
 };
-
-interface FileReader extends EventTarget {
-    readonly error: DOMException | null;
-    onabort: ((this: FileReader, ev: ProgressEvent<FileReader>) => any) | null;
-    onerror: ((this: FileReader, ev: ProgressEvent<FileReader>) => any) | null;
-    onload: ((this: FileReader, ev: ProgressEvent<FileReader>) => any) | null;
-    onloadend: ((this: FileReader, ev: ProgressEvent<FileReader>) => any) | null;
-    onloadstart: ((this: FileReader, ev: ProgressEvent<FileReader>) => any) | null;
-    onprogress: ((this: FileReader, ev: ProgressEvent<FileReader>) => any) | null;
-    readonly readyState: typeof FileReader.DONE | typeof FileReader.EMPTY | typeof FileReader.LOADING;
-    readonly result: string | ArrayBuffer | null;
-    abort(): void;
-    readAsArrayBuffer(blob: Blob): void;
-    readAsBinaryString(blob: Blob): void;
-    readAsDataURL(blob: Blob): void;
-    readAsText(blob: Blob, encoding?: string): void;
-    readonly DONE: 2;
-    readonly EMPTY: 0;
-    readonly LOADING: 1;
-}
-
-declare var FileReader: {
-    prototype: FileReader;
-    new(): FileReader;
-    readonly DONE: 2;
-    readonly EMPTY: 0;
-    readonly LOADING: 1;
-};
-
-interface ProgressEvent<T extends EventTarget = EventTarget> extends Event {
-    readonly lengthComputable: boolean;
-    readonly loaded: number;
-    readonly target: T | null;
-    readonly total: number;
-}
-
-declare var ProgressEvent: {
-    prototype: ProgressEvent;
-    new(type: string, eventInitDict?: ProgressEventInit): ProgressEvent;
-};
-
-interface ProgressEventInit extends EventInit {
-    lengthComputable?: boolean;
-    loaded?: number;
-    total?: number;
-}
 
 // FormData
 interface FormData {
@@ -1571,17 +1313,6 @@ interface DOMRectInit {
     y?: number;
 }
 
-interface DOMRectList {
-    readonly length: number;
-    item(index: number): DOMRect | null;
-    [index: number]: DOMRect;
-}
-
-declare var DOMRectList: {
-    prototype: DOMRectList;
-    new(): DOMRectList;
-};
-
 // Attribute
 interface Attr extends Node {
     readonly localName: string;
@@ -1616,7 +1347,6 @@ declare var CharacterData: {
 };
 
 interface Text extends CharacterData {
-    readonly assignedSlot: HTMLSlotElement | null;
     readonly wholeText: string;
     splitText(offset: number): Text;
 }
@@ -1641,30 +1371,20 @@ interface HTMLElementTagNameMap {
     "canvas": HTMLCanvasElement;
     "div": HTMLDivElement;
     "form": HTMLFormElement;
-    "h1": HTMLHeadingElement;
-    "h2": HTMLHeadingElement;
-    "h3": HTMLHeadingElement;
-    "h4": HTMLHeadingElement;
-    "h5": HTMLHeadingElement;
-    "h6": HTMLHeadingElement;
     "img": HTMLImageElement;
     "input": HTMLInputElement;
     "label": HTMLLabelElement;
-    "link": HTMLLinkElement;
     "option": HTMLOptionElement;
     "p": HTMLParagraphElement;
-    "script": HTMLScriptElement;
     "select": HTMLSelectElement;
     "span": HTMLSpanElement;
-    "style": HTMLStyleElement;
     "textarea": HTMLTextAreaElement;
 }
 
-// Additional placeholder interfaces (empty for now, can be expanded)
+// Placeholder interfaces
 interface CSSStyleDeclaration {
     cssText: string;
     readonly length: number;
-    readonly parentRule: CSSRule | null;
     getPropertyPriority(property: string): string;
     getPropertyValue(property: string): string;
     item(index: number): string;
@@ -1679,55 +1399,24 @@ declare var CSSStyleDeclaration: {
     new(): CSSStyleDeclaration;
 };
 
-interface CSSStyleSheet extends StyleSheet {}
-interface CSSRule {}
-interface StyleSheet {}
 interface DocumentFragment extends Node, ParentNode {}
 declare var DocumentFragment: { prototype: DocumentFragment; new(): DocumentFragment; };
 interface DocumentType extends Node {}
 interface HTMLHeadElement extends HTMLElement {}
 interface HTMLAreaElement extends HTMLElement {}
-interface HTMLOrSVGScriptElement {}
-interface HTMLDataListElement extends HTMLElement {}
+interface HTMLScriptElement extends HTMLElement {}
 interface HTMLOptGroupElement extends HTMLElement {}
-interface HTMLSlotElement extends HTMLElement {}
-interface ShadowRoot extends Node {}
-interface ShadowRootInit {}
-interface DataTransfer {}
-interface StaticRange {}
-interface Range {}
 interface Selection {}
-interface NodeIterator {}
-interface TreeWalker {}
-interface ProcessingInstruction extends Node {}
-interface NodeFilter {}
-interface DocumentTimeline {}
-interface ValidityState {}
-interface ElementInternals {}
-interface FileSystemEntry {}
 interface MediaQueryList {}
 interface Screen {}
 interface Performance {}
-interface VisualViewport {}
-interface SpeechSynthesis {}
 interface Clipboard {}
 interface Geolocation {}
-interface MediaDevices {}
-interface Permissions {}
-interface ServiceWorkerContainer {}
-interface Gamepad {}
+interface ValidityState {}
 interface CanvasRenderingContext2DSettings {}
 interface CanvasRenderingContext2D {}
-interface WebGLContextAttributes {}
-interface WebGLRenderingContext {}
-interface WebGL2RenderingContext {}
-interface OffscreenCanvas {}
-interface ImageBitmap {}
-interface ImageBitmapOptions {}
-type ImageBitmapSource = Blob | ImageData | HTMLImageElement | HTMLCanvasElement | HTMLVideoElement | OffscreenCanvas | ImageBitmap;
-interface ImageData {}
-interface HTMLVideoElement extends HTMLElement {}
 interface MediaSource {}
 interface ReadableStream<R = any> {}
-type Transferable = ArrayBuffer | MessagePort | ImageBitmap | OffscreenCanvas;
+type Transferable = ArrayBuffer | MessagePort | ImageBitmap;
 interface MessagePort {}
+interface ImageBitmap {}
