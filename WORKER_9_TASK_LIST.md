@@ -1,13 +1,12 @@
 # Worker 9 Task List - Solver Squad
 
 ## Current Task
-- [ ] **SOLV-21: Add conditional type handling**
-  - Implement conditional type evaluation in solver
-  - Handle `T extends U ? X : Y` correctly
-  - Test conditional type distributivity
+- [ ] **SOLV-22: Fix template literal type checking**
+  - Implement template literal type inference
+  - Handle string literal unions in template literals
+  - Test: `` `hello-${T}` `` type resolution
 
 ## Queue
-- [ ] **SOLV-22: Fix template literal type checking**
   - Implement template literal type inference
   - Handle string literal unions in template literals
   - Test: `` `hello-${T}` `` type resolution
@@ -25,6 +24,11 @@
   - Verify `ReturnType<T>` utility type works correctly
 
 ## Completed
+- [x] **SOLV-21: Add conditional type handling**
+  - Implemented conditional type evaluation in solver
+  - Handle `T extends U ? X : Y` correctly
+  - Added conditional type support to evaluate.rs
+  - Test conditional type distributivity
 - [x] **SOLV-9: Test generic constraint violations**
   - Created tests for bounded generics: `<T extends number>`
   - Ensured `f<string>(123)` errors when string doesn't extend number
