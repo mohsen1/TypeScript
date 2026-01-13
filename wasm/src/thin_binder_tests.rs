@@ -1892,3 +1892,73 @@ export const localValue = importedFunc();
     let local_value_symbol = binder.get_symbol(local_value_sym_id).expect("localValue symbol should exist");
     assert!(local_value_symbol.is_exported);
 }
+
+#[test]
+fn test_symbol_table_validation_valid_code() {
+    use crate::thin_binder::ThinBinderState;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+const x = 1;
+function foo() { return x; }
+class MyClass { value: number = 42; }
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let errors = binder.validate_symbol_table();
+    assert!(errors.is_empty(), "Valid code should have no validation errors: {:?}", errors);
+    assert!(binder.is_symbol_table_valid());
+}
+
+#[test]
+fn test_symbol_table_validation_detects_orphans() {
+    use crate::thin_binder::ThinBinderState;
+    use crate::thin_parser::ThinParserState;
+
+    let source = "const x = 1;";
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let orphan_id = binder.symbols.alloc(crate::binder::symbol_flags::BLOCK_SCOPED_VARIABLE, "orphan".to_string());
+
+    let errors = binder.validate_symbol_table();
+    assert!(!errors.is_empty());
+
+    let orphan_errors: Vec<_> = errors.iter().filter(|e| matches!(e, crate::thin_binder::ValidationError::OrphanedSymbol { .. })).collect();
+    assert_eq!(orphan_errors.len(), 1);
+}
+
+#[test]
+fn test_symbol_table_validation_broken_links() {
+    use crate::thin_binder::ThinBinderState;
+    use crate::thin_parser::ThinParserState;
+
+    let source = "const x = 1;";
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let fake_sym_id = crate::binder::SymbolId(99999);
+    binder.node_symbols.insert(100, fake_sym_id);
+
+    let errors = binder.validate_symbol_table();
+    assert!(!errors.is_empty());
+
+    let link_errors: Vec<_> = errors.iter().filter(|e| matches!(e, crate::thin_binder::ValidationError::BrokenSymbolLink { .. })).collect();
+    assert_eq!(link_errors.len(), 1);
+}
