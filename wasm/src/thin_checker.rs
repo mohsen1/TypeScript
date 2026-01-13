@@ -8125,8 +8125,15 @@ impl<'a> ThinCheckerState<'a> {
                 }
 
                 PropertyAccessResult::IsUnknown => {
-                    // Accessing property on unknown type returns any
-                    TypeId::ANY
+                    // TS2571: Object is of type 'unknown'
+                    // Unknown requires explicit type narrowing before property access
+                    use crate::checker::types::diagnostics::diagnostic_codes;
+                    self.error_at_node(
+                        access.expression,
+                        "Object is of type 'unknown'.",
+                        diagnostic_codes::OBJECT_IS_OF_TYPE_UNKNOWN,
+                    );
+                    TypeId::ERROR
                 }
             }
         } else {
@@ -8172,7 +8179,16 @@ impl<'a> ThinCheckerState<'a> {
             PropertyAccessResult::PossiblyNullOrUndefined { property_type, .. } => {
                 property_type.unwrap_or(TypeId::ANY)
             }
-            PropertyAccessResult::IsUnknown => TypeId::ANY,
+            PropertyAccessResult::IsUnknown => {
+                // TS2571: Object is of type 'unknown'
+                use crate::checker::types::diagnostics::diagnostic_codes;
+                self.error_at_node(
+                    access.expression,
+                    "Object is of type 'unknown'.",
+                    diagnostic_codes::OBJECT_IS_OF_TYPE_UNKNOWN,
+                );
+                TypeId::ERROR
+            }
         };
 
         // Handle nullish coercion
@@ -8367,7 +8383,16 @@ impl<'a> ThinCheckerState<'a> {
             PropertyAccessResult::PossiblyNullOrUndefined { property_type, .. } => {
                 property_type.unwrap_or(TypeId::ANY)
             }
-            PropertyAccessResult::IsUnknown => TypeId::ANY,
+            PropertyAccessResult::IsUnknown => {
+                // TS2571: Object is of type 'unknown'
+                use crate::checker::types::diagnostics::diagnostic_codes;
+                self.error_at_node(
+                    access.expression,
+                    "Object is of type 'unknown'.",
+                    diagnostic_codes::OBJECT_IS_OF_TYPE_UNKNOWN,
+                );
+                TypeId::ERROR
+            }
         };
 
         if let Some(cause) = nullish_cause {
@@ -8581,7 +8606,16 @@ impl<'a> ThinCheckerState<'a> {
                         PropertyAccessResult::PossiblyNullOrUndefined { property_type, .. } => {
                             property_type.unwrap_or(TypeId::ANY)
                         }
-                        PropertyAccessResult::IsUnknown => TypeId::ANY,
+                        PropertyAccessResult::IsUnknown => {
+                            // TS2571: Object is of type 'unknown'
+                            use crate::checker::types::diagnostics::diagnostic_codes;
+                            self.error_at_node(
+                                access.expression,
+                                "Object is of type 'unknown'.",
+                                diagnostic_codes::OBJECT_IS_OF_TYPE_UNKNOWN,
+                            );
+                            TypeId::ERROR
+                        }
                         PropertyAccessResult::PropertyNotFound { .. } => {
                             report_no_index = true;
                             TypeId::ANY
@@ -8952,7 +8986,9 @@ impl<'a> ThinCheckerState<'a> {
                 PropertyAccessResult::PossiblyNullOrUndefined { property_type, .. } => {
                     types.push(property_type.unwrap_or(TypeId::ANY));
                 }
-                PropertyAccessResult::IsUnknown => types.push(TypeId::ANY),
+                // IsUnknown: Return None to signal that property access on unknown failed
+                // The caller has node context and will report TS2571 error
+                PropertyAccessResult::IsUnknown => return None,
                 PropertyAccessResult::PropertyNotFound { .. } => return None,
             }
         }
