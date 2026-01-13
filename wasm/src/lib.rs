@@ -324,6 +324,17 @@ impl ThinParser {
             let mut binder = ThinBinderState::new();
             binder.bind_source_file(self.parser.get_arena(), root_idx);
 
+            // Inject lib file symbols for global type resolution (console, Array, Promise, etc.)
+            if !self.lib_files.is_empty() {
+                let lib_contexts: Vec<thin_binder::LibContext> = self.lib_files.iter().map(|lib| {
+                    thin_binder::LibContext {
+                        arena: Arc::clone(&lib.arena),
+                        binder: Arc::clone(&lib.binder),
+                    }
+                }).collect();
+                binder.inject_lib_symbols(&lib_contexts);
+            }
+
             // Collect symbol names for the result
             let symbols: std::collections::HashMap<String, u32> = binder.file_locals
                 .iter()

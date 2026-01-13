@@ -18,6 +18,16 @@ use crate::parser::node_flags;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::Arc;
 
+/// Lib file context for global type resolution.
+/// This mirrors the definition in checker::context to avoid circular dependencies.
+#[derive(Clone)]
+pub struct LibContext {
+    /// The AST arena for this lib file.
+    pub arena: Arc<ThinNodeArena>,
+    /// The binder state with symbols from this lib file.
+    pub binder: Arc<ThinBinderState>,
+}
+
 /// Binder state using ThinNodeArena.
 pub struct ThinBinderState {
     /// Arena for symbol storage
@@ -369,6 +379,26 @@ impl ThinBinderState {
         }
 
         false
+    }
+
+    /// Inject lib file symbols into file_locals for global symbol resolution.
+    ///
+    /// This should be called during binding to make global symbols like
+    /// `console`, `Array`, `Promise`, etc. available in the current file's scope.
+    ///
+    /// # Arguments
+    /// * `lib_contexts` - Vector of lib file contexts (arena + binder pairs)
+    pub fn inject_lib_symbols(&mut self, lib_contexts: &[LibContext]) {
+        for lib_ctx in lib_contexts {
+            // Copy symbol references from lib binder's file_locals into our file_locals
+            for (name, &sym_id) in lib_ctx.binder.file_locals.iter() {
+                // Store the symbol reference
+                self.file_locals.set(name.clone(), sym_id);
+
+                // Track which arena this symbol belongs to for cross-file resolution
+                self.symbol_arenas.insert(sym_id, Arc::clone(&lib_ctx.arena));
+            }
+        }
     }
 
     /// Bind a source file using ThinNodeArena.
