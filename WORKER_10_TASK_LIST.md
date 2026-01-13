@@ -1,7 +1,7 @@
 # Worker 10 Task List - Solver Squad
 
 ## Current Task
-- [ ] **SOLV-37: Implement discriminated union narrowing**
+- [x] **SOLV-37: Implement discriminated union narrowing**
   - Narrow union types based on discriminant property
   - Test: `type Shape = { kind: "circle", radius: number } | { kind: "square", side: number }`
   - Verify `if (shape.kind === "circle")` narrows to circle type
