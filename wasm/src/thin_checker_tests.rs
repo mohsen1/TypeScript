@@ -22,7 +22,7 @@ fn test_thin_checker_basic_types() {
     let arena = ThinNodeArena::new();
     let binder = ThinBinderState::new();
     let types = TypeInterner::new();
-    let _checker = ThinCheckerState::new(&area, &binder, &types, "test.ts".to_string(), false);
+    let _checker = ThinCheckerState::new(&arena, &binder, &types, "test.ts".to_string(), false);
 
     // Verify intrinsic TypeIds are constants (compile-time values)
     assert_eq!(TypeId::NUMBER.0, 9);
