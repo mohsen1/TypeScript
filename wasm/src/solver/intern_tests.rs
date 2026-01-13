@@ -1,4 +1,7 @@
 use super::*;
+use crate::solver::intern::PROPERTY_MAP_THRESHOLD;
+use crate::parser::ThinNodeArena;
+use crate::parser::NodeIndex;
 
 #[test]
 fn test_interner_intrinsics() {

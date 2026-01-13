@@ -18,7 +18,7 @@ use crate::interner::{Atom, ShardedInterner};
 const SHARD_BITS: u32 = 6;
 const SHARD_COUNT: usize = 1 << SHARD_BITS; // 64 shards
 const SHARD_MASK: u32 = (SHARD_COUNT as u32) - 1;
-const PROPERTY_MAP_THRESHOLD: usize = 24;
+pub(crate) const PROPERTY_MAP_THRESHOLD: usize = 24;
 const TYPE_LIST_INLINE: usize = 8;
 pub(crate) const TEMPLATE_LITERAL_EXPANSION_LIMIT: usize = 10000;
 

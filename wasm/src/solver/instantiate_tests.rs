@@ -1,4 +1,5 @@
 use super::*;
+use crate::solver::instantiate::MAX_INSTANTIATION_DEPTH;
 
 #[test]
 fn test_substitution_basic() {

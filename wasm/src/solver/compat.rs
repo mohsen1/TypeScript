@@ -150,7 +150,7 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
         result
     }
 
-    fn is_assignable_strict(&mut self, source: TypeId, target: TypeId) -> bool {
+    pub fn is_assignable_strict(&mut self, source: TypeId, target: TypeId) -> bool {
         if source == target {
             return true;
         }

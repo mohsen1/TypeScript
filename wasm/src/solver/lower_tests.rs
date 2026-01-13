@@ -1,6 +1,8 @@
 use super::*;
 use crate::thin_parser::ThinParserState;
 use crate::parser::syntax_kind_ext;
+use crate::parser::NodeIndex;
+use crate::parser::ThinNodeArena;
 
 #[test]
 fn test_intrinsic_type_ids() {
