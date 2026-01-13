@@ -192,7 +192,7 @@ impl<'a> SubtypeChecker<'a, NoopResolver> {
             exact_optional_property_types: false,
             strict_null_checks: true,
             no_unchecked_indexed_access: false,
-            enforce_weak_types: false,
+            enforce_weak_types: true, // Enable to catch weak type violations (TS2559)
         }
     }
 }
@@ -212,7 +212,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             exact_optional_property_types: false,
             strict_null_checks: true,
             no_unchecked_indexed_access: false,
-            enforce_weak_types: false,
+            enforce_weak_types: true, // Enable to catch weak type violations (TS2559)
         }
     }
 
