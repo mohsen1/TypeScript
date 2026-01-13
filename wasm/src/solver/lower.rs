@@ -1911,7 +1911,7 @@ impl<'a> TypeLowering<'a> {
                         if let Some(unary) = self.arena.get_unary_expr(literal_node) {
                             let op = unary.operator;
                             let Some(operand_node) = self.arena.get(unary.operand) else {
-                                return TypeId::ANY;
+                                return TypeId::ERROR; // Propagate error for missing operand
                             };
                             match operand_node.kind {
                                 k if k == SyntaxKind::NumericLiteral as u16 => {
@@ -1954,19 +1954,19 @@ impl<'a> TypeLowering<'a> {
                                         TypeId::BIGINT
                                     }
                                 }
-                                _ => TypeId::ANY,
+                                _ => TypeId::ERROR, // Propagate error for unknown operand kind
                             }
                         } else {
-                            TypeId::ANY
+                            TypeId::ERROR // Propagate error for missing unary expression data
                         }
                     }
-                    _ => TypeId::ANY,
+                    _ => TypeId::ERROR, // Propagate error for unknown literal kind
                 }
             } else {
-                TypeId::ANY
+                TypeId::ERROR // Propagate error for missing literal node
             }
         } else {
-            TypeId::ANY
+            TypeId::ERROR // Propagate error for missing literal type data
         }
     }
 
