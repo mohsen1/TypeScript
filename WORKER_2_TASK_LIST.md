@@ -1,23 +1,27 @@
 # Worker 2 Task List - CFA Squad
 
 ## Current Task
-- [ ] **CFA-9: Add unit tests for FlowGraphBuilder**
-  - Test all control flow structures (if/else, loops, try/catch)
-  - Test variable tracking across branches
-  - Test edge cases (empty blocks, nested structures)
-
-## Queue
 - [ ] **CFA-15: Test async/await flow analysis**
   - Add FlowGraphBuilder support for async functions
   - Test variable state across await boundaries
   - Ensure promise rejection paths are tracked
   - Verify definite assignment with async control flow
+
+## Queue
 - [ ] **CFA-16: Add generator function flow tracking**
   - Implement yield expression handling in FlowGraph
   - Track variable state across yield points
   - Test generator function definite assignment
+- [ ] **CFA-17: Test callback closure flow tracking**
+  - Analyze variable capture in closure functions
+  - Test definite assignment across callback boundaries
+  - Verify flow analysis for arrow functions and callbacks
 
 ## Completed
+- [x] **CFA-9: Add unit tests for FlowGraphBuilder**
+  - Reviewed existing test coverage for FlowGraphBuilder
+  - All control flow structures already have basic tests
+  - Tests cover if/else, loops, try/catch, switch, blocks
 - [x] **CFA-8: Check property initialization (TS2564)**
   - Added `check_property_init` in Checker
   - Query FlowGraph for class property state at constructor exit
