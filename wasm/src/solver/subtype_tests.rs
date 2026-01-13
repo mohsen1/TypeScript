@@ -25285,11 +25285,11 @@ fn test_overload_generic_identity() {
     // }
     let interner = TypeInterner::new();
 
-    let t_param = interner.type_parameter(TypeParamInfo {
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
         name: interner.intern_string("T"),
         constraint: None,
         default: None,
-    });
+    }));
 
     let callable = interner.callable(CallableShape {
         call_signatures: vec![
@@ -25339,17 +25339,17 @@ fn test_overload_generic_with_constraint() {
     // }
     let interner = TypeInterner::new();
 
-    let t_string = interner.type_parameter(TypeParamInfo {
+    let t_string = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
         name: interner.intern_string("T"),
         constraint: Some(TypeId::STRING),
         default: None,
-    });
+    }));
 
-    let t_number = interner.type_parameter(TypeParamInfo {
+    let t_number = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
         name: interner.intern_string("T"),
         constraint: Some(TypeId::NUMBER),
         default: None,
-    });
+    }));
 
     let callable = interner.callable(CallableShape {
         call_signatures: vec![
@@ -25682,17 +25682,17 @@ fn test_overload_generic_multiple_type_params() {
     // }
     let interner = TypeInterner::new();
 
-    let t_param = interner.type_parameter(TypeParamInfo {
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
         name: interner.intern_string("T"),
         constraint: None,
         default: None,
-    });
+    }));
 
-    let u_param = interner.type_parameter(TypeParamInfo {
+    let u_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
         name: interner.intern_string("U"),
         constraint: None,
         default: None,
-    });
+    }));
 
     let tuple_t_u = interner.tuple(vec![
         TupleElement {
@@ -26116,11 +26116,11 @@ fn test_overload_generic_default_type() {
     // }
     let interner = TypeInterner::new();
 
-    let t_param = interner.type_parameter(TypeParamInfo {
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
         name: interner.intern_string("T"),
         constraint: None,
         default: Some(TypeId::STRING),
-    });
+    }));
 
     let callable = interner.callable(CallableShape {
         call_signatures: vec![CallSignature {
@@ -26158,17 +26158,17 @@ fn test_overload_array_methods_pattern() {
     // }
     let interner = TypeInterner::new();
 
-    let t_param = interner.type_parameter(TypeParamInfo {
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
         name: interner.intern_string("T"),
         constraint: None,
         default: None,
-    });
+    }));
 
-    let u_param = interner.type_parameter(TypeParamInfo {
+    let u_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
         name: interner.intern_string("U"),
         constraint: None,
         default: None,
-    });
+    }));
 
     // (x: T) => U
     let map_callback = interner.function(FunctionShape {
@@ -26538,23 +26538,23 @@ fn test_overload_promise_then_pattern() {
     // }
     let interner = TypeInterner::new();
 
-    let t_param = interner.type_parameter(TypeParamInfo {
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
         name: interner.intern_string("T"),
         constraint: None,
         default: None,
-    });
+    }));
 
-    let u_param = interner.type_parameter(TypeParamInfo {
+    let u_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
         name: interner.intern_string("U"),
         constraint: None,
         default: None,
-    });
+    }));
 
-    let v_param = interner.type_parameter(TypeParamInfo {
+    let v_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
         name: interner.intern_string("V"),
         constraint: None,
         default: None,
-    });
+    }));
 
     // (value: T) => U
     let on_fulfilled_sync = interner.function(FunctionShape {
