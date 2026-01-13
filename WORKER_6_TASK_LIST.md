@@ -30,3 +30,8 @@
     - Module resolution problems
   - Created minimal repro test cases
   - Documented in `docs/ts2304_analysis.md`
+- [x] **BIND-6: Fix symbol lookup order**
+  - Verified correct scope chain: local -> module -> global (already implemented)
+  - Added shadowing tests for variable declarations
+  - Added tests for `import { x }` vs `let x` correctly
+  - Created 3 comprehensive test files covering ES6 import shadowing scenarios
