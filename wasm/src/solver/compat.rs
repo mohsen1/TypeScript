@@ -149,8 +149,16 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
         } else if target == TypeId::UNKNOWN {
             // `unknown` is top but not assignable to non-top types. See https://github.com/microsoft/TypeScript/issues/10715.
             true
-        } else if source == TypeId::NEVER || source == TypeId::ERROR || target == TypeId::ERROR {
+        } else if source == TypeId::NEVER {
+            // `never` is bottom - assignable to everything
             true
+        } else if source == TypeId::ERROR || target == TypeId::ERROR {
+            // Error types should NOT silently pass assignability checks.
+            // This prevents "error poisoning" where a TS2304 (cannot find name) masks
+            // downstream TS2322 (type not assignable) errors.
+            // Delegate to subtype checker which returns false for ERROR.
+            self.configure_subtype(self.strict_function_types);
+            self.subtype.is_subtype_of(source, target)
         } else if source == TypeId::UNKNOWN {
             false
         } else if self.violates_weak_union(source, target) {
@@ -183,8 +191,17 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
         if target == TypeId::UNKNOWN {
             return true;
         }
-        if source == TypeId::NEVER || source == TypeId::ERROR || target == TypeId::ERROR {
+        if source == TypeId::NEVER {
             return true;
+        }
+        if source == TypeId::ERROR || target == TypeId::ERROR {
+            // Error types should NOT silently pass assignability checks.
+            // Delegate to subtype checker which returns false for ERROR.
+            let prev = self.subtype.strict_function_types;
+            self.configure_subtype(true);
+            let result = self.subtype.is_subtype_of(source, target);
+            self.subtype.strict_function_types = prev;
+            return result;
         }
         if source == TypeId::UNKNOWN {
             return false;
@@ -219,8 +236,14 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
         if !self.strict_null_checks && (source == TypeId::NULL || source == TypeId::UNDEFINED) {
             return None;
         }
-        if source == TypeId::NEVER || source == TypeId::ERROR || target == TypeId::ERROR {
+        if source == TypeId::NEVER {
             return None;
+        }
+        // Error types should NOT return None - let subtype checker explain the failure
+        // This prevents "error poisoning" where errors mask downstream type mismatches
+        if source == TypeId::ERROR || target == TypeId::ERROR {
+            self.configure_subtype(self.strict_function_types);
+            return self.subtype.explain_failure(source, target);
         }
         if self.violates_weak_union(source, target) {
             return Some(SubtypeFailureReason::TypeMismatch {
@@ -470,8 +493,13 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
     }
 
     fn is_assignable_to_empty_object(&self, source: TypeId) -> bool {
-        if source == TypeId::ANY || source == TypeId::NEVER || source == TypeId::ERROR {
+        if source == TypeId::ANY || source == TypeId::NEVER {
             return true;
+        }
+        // ERROR types should NOT silently pass - they represent unresolved types
+        // and should propagate errors rather than being silently compatible
+        if source == TypeId::ERROR {
+            return false;
         }
         if !self.strict_null_checks && (source == TypeId::NULL || source == TypeId::UNDEFINED) {
             return true;
