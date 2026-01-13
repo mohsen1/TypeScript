@@ -22,6 +22,8 @@ pub struct CompatChecker<'a, R: TypeResolver = NoopResolver> {
     strict_null_checks: bool,
     no_unchecked_indexed_access: bool,
     exact_optional_property_types: bool,
+    /// When true, enables additional strict subtype checking rules for lib.d.ts
+    strict_subtype_checking: bool,
     cache: FxHashMap<(TypeId, TypeId), bool>,
 }
 
@@ -36,6 +38,7 @@ impl<'a> CompatChecker<'a, NoopResolver> {
             strict_null_checks: true,
             no_unchecked_indexed_access: false,
             exact_optional_property_types: false,
+            strict_subtype_checking: false,
             cache: FxHashMap::default(),
         }
     }
@@ -52,6 +55,7 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
             strict_null_checks: true,
             no_unchecked_indexed_access: false,
             exact_optional_property_types: false,
+            strict_subtype_checking: false,
             cache: FxHashMap::default(),
         }
     }
@@ -91,6 +95,18 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
     }
 
     /// Configure strict mode for `any` propagation.
+
+    /// Configure strict subtype checking mode for lib.d.ts type checking.
+    ///
+    /// When enabled, applies additional strictness rules that reject borderline
+    /// cases allowed by TypeScript's legacy behavior. This includes disabling
+    /// method bivariance for soundness.
+    pub fn set_strict_subtype_checking(&mut self, strict: bool) {
+        if self.strict_subtype_checking != strict {
+            self.strict_subtype_checking = strict;
+            self.cache.clear();
+        }
+    }
     ///
     /// When strict mode is enabled, `any` does NOT silence structural mismatches.
     /// This means the type checker will still report errors even when `any` is involved,
@@ -235,6 +251,8 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
         self.subtype.exact_optional_property_types = self.exact_optional_property_types;
         self.subtype.strict_null_checks = self.strict_null_checks;
         self.subtype.no_unchecked_indexed_access = self.no_unchecked_indexed_access;
+        // In strict mode, disable method bivariance for soundness
+        self.subtype.disable_method_bivariance = self.strict_subtype_checking;
     }
 
     fn violates_weak_type(&self, source: TypeId, target: TypeId) -> bool {
