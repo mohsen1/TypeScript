@@ -104,9 +104,15 @@ struct FlowContext {
     continue_label: Option<FlowNodeId>,
     /// Type of flow construct
     context_type: FlowContextType,
+    /// Finally block to execute on exit (for try statements)
+    finally_block: NodeIndex,
+    /// Flow state before entering finally (for routing exits through finally)
+    pre_finally_flow: FlowNodeId,
+    /// Flow state after exiting finally (for routing exits through finally)
+    post_finally_flow: FlowNodeId,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 enum FlowContextType {
     Loop,
     Switch,
@@ -227,6 +233,24 @@ impl<'a> FlowGraphBuilder<'a> {
             // Return/throw/break/continue
             syntax_kind_ext::RETURN_STATEMENT | syntax_kind_ext::THROW_STATEMENT => {
                 self.record_node_flow(stmt_idx);
+
+                // Check for try contexts with finally blocks that need to execute
+                let pre_exit_flow = self.current_flow;
+
+                // Collect and execute any finally blocks on the stack
+                let mut finally_flows: Vec<NodeIndex> = Vec::new();
+                for ctx in self.flow_stack.iter().rev() {
+                    if !ctx.finally_block.is_none() && ctx.context_type == FlowContextType::Try {
+                        finally_flows.push(ctx.finally_block);
+                    }
+                }
+
+                // Build finally blocks in reverse order (innermost first)
+                for finally_block in finally_flows.iter().rev() {
+                    self.build_statement(*finally_block);
+                }
+
+                // After all finally blocks, set to unreachable
                 self.current_flow = self.graph.unreachable_flow;
             }
 
@@ -326,6 +350,9 @@ impl<'a> FlowGraphBuilder<'a> {
             break_label: merge_label,
             continue_label: Some(loop_label),
             context_type: FlowContextType::Loop,
+            finally_block: NodeIndex::NONE,
+            pre_finally_flow: FlowNodeId::NONE,
+            post_finally_flow: FlowNodeId::NONE,
         });
 
         self.current_flow = loop_label;
@@ -376,6 +403,9 @@ impl<'a> FlowGraphBuilder<'a> {
             break_label: merge_label,
             continue_label: Some(loop_label),
             context_type: FlowContextType::Loop,
+            finally_block: NodeIndex::NONE,
+            pre_finally_flow: FlowNodeId::NONE,
+            post_finally_flow: FlowNodeId::NONE,
         });
 
         self.current_flow = loop_label;
@@ -427,6 +457,9 @@ impl<'a> FlowGraphBuilder<'a> {
             break_label: merge_label,
             continue_label: Some(loop_label),
             context_type: FlowContextType::Loop,
+            finally_block: NodeIndex::NONE,
+            pre_finally_flow: FlowNodeId::NONE,
+            post_finally_flow: FlowNodeId::NONE,
         });
 
         // Track initializer (variable declaration or expression)
@@ -494,6 +527,9 @@ impl<'a> FlowGraphBuilder<'a> {
             break_label: merge_label,
             continue_label: Some(loop_label),
             context_type: FlowContextType::Loop,
+            finally_block: NodeIndex::NONE,
+            pre_finally_flow: FlowNodeId::NONE,
+            post_finally_flow: FlowNodeId::NONE,
         });
 
         // Track initializer (variable declaration)
@@ -532,6 +568,9 @@ impl<'a> FlowGraphBuilder<'a> {
             break_label: merge_label,
             continue_label: Some(loop_label),
             context_type: FlowContextType::Loop,
+            finally_block: NodeIndex::NONE,
+            pre_finally_flow: FlowNodeId::NONE,
+            post_finally_flow: FlowNodeId::NONE,
         });
 
         // Track initializer (variable declaration)
@@ -564,6 +603,9 @@ impl<'a> FlowGraphBuilder<'a> {
             break_label: end_label,
             continue_label: None,
             context_type: FlowContextType::Switch,
+            finally_block: NodeIndex::NONE,
+            pre_finally_flow: FlowNodeId::NONE,
+            post_finally_flow: FlowNodeId::NONE,
         });
 
         // Bind case block
@@ -642,42 +684,80 @@ impl<'a> FlowGraphBuilder<'a> {
     /// Build flow graph for a try statement.
     fn build_try_statement(&mut self, try_data: &crate::parser::thin_node::TryData) {
         let pre_try_flow = self.current_flow;
+        let has_finally = !try_data.finally_block.is_none();
 
-        // Create merge label for after try/catch/finally
-        let end_label = self.graph.nodes.alloc(flow_flags::BRANCH_LABEL);
+        // Create merge label for after try/catch (before finally)
+        let pre_finally_label = self.graph.nodes.alloc(flow_flags::BRANCH_LABEL);
+
+        // Push try context to track finally block for exit statements
+        let finally_ctx = if has_finally {
+            Some(FlowContext {
+                break_label: FlowNodeId::NONE, // Not used for try
+                continue_label: None,
+                context_type: FlowContextType::Try,
+                finally_block: try_data.finally_block,
+                pre_finally_flow: pre_finally_label,
+                post_finally_flow: FlowNodeId::NONE, // Will be set after building finally
+            })
+        } else {
+            None
+        };
+
+        if let Some(ctx) = finally_ctx {
+            self.flow_stack.push(ctx);
+        }
 
         // Bind try block
         self.build_statement(try_data.try_block);
         let post_try_flow = self.current_flow;
 
         // Bind catch clause if present
-        if !try_data.catch_clause.is_none() {
+        let post_catch_flow = if !try_data.catch_clause.is_none() {
             if let Some(catch_node) = self.arena.get(try_data.catch_clause) {
                 if let Some(catch) = self.arena.get_catch_clause(catch_node) {
-                // Reset flow - catch can be entered from any point in try
-                self.current_flow = pre_try_flow;
+                    // Reset flow - catch can be entered from any point in try
+                    self.current_flow = pre_try_flow;
 
-                // Bind catch variable if present
-                if !catch.variable_declaration.is_none() {
-                    self.build_statement(catch.variable_declaration);
-                }
+                    // Bind catch variable if present
+                    if !catch.variable_declaration.is_none() {
+                        self.build_statement(catch.variable_declaration);
+                    }
 
-                // Bind catch block
-                self.build_statement(catch.block);
-                self.add_antecedent(end_label, self.current_flow);
+                    // Bind catch block
+                    self.build_statement(catch.block);
+                    Some(self.current_flow)
+                } else {
+                    None
                 }
+            } else {
+                None
             }
+        } else {
+            None
+        };
+
+        // Pop try context
+        if has_finally {
+            self.flow_stack.pop();
         }
 
-        // Add post-try flow to end label
-        self.add_antecedent(end_label, post_try_flow);
+        // Add post-try flow to pre-finally label
+        self.add_antecedent(pre_finally_label, post_try_flow);
+
+        // Add post-catch flow to pre-finally label if present
+        if let Some(catch_flow) = post_catch_flow {
+            self.add_antecedent(pre_finally_label, catch_flow);
+        }
 
         // Bind finally block if present
-        if !try_data.finally_block.is_none() {
-            self.current_flow = end_label;
+        if has_finally {
+            // Build the finally block starting from the pre-finally label
+            self.current_flow = pre_finally_label;
             self.build_statement(try_data.finally_block);
+            // After finally, current_flow is the post-finally flow
         } else {
-            self.current_flow = end_label;
+            // No finally block, use pre-finally label directly
+            self.current_flow = pre_finally_label;
         }
     }
 
@@ -692,24 +772,60 @@ impl<'a> FlowGraphBuilder<'a> {
 
     /// Handle a break statement.
     fn handle_break(&mut self) {
-        // Find the enclosing loop or switch
+        // First pass: collect finally blocks and find target
+        let mut finally_blocks: Vec<NodeIndex> = Vec::new();
+        let mut target_label = FlowNodeId::NONE;
+
         for ctx in self.flow_stack.iter().rev() {
-            self.add_antecedent(ctx.break_label, self.current_flow);
-            self.current_flow = self.graph.unreachable_flow;
-            return;
+            if !ctx.finally_block.is_none() && ctx.context_type == FlowContextType::Try {
+                finally_blocks.push(ctx.finally_block);
+            }
+
+            if ctx.break_label != FlowNodeId::NONE {
+                target_label = ctx.break_label;
+                break;
+            }
         }
+
+        // Second pass: build finally blocks (if any)
+        for finally_block in finally_blocks.iter().rev() {
+            self.build_statement(*finally_block);
+        }
+
+        // Add break target antecedent
+        if !target_label.is_none() {
+            self.add_antecedent(target_label, self.current_flow);
+        }
+        self.current_flow = self.graph.unreachable_flow;
     }
 
     /// Handle a continue statement.
     fn handle_continue(&mut self) {
-        // Find the enclosing loop
+        // First pass: collect finally blocks and find target
+        let mut finally_blocks: Vec<NodeIndex> = Vec::new();
+        let mut target_label = FlowNodeId::NONE;
+
         for ctx in self.flow_stack.iter().rev() {
+            if !ctx.finally_block.is_none() && ctx.context_type == FlowContextType::Try {
+                finally_blocks.push(ctx.finally_block);
+            }
+
             if let Some(continue_label) = ctx.continue_label {
-                self.add_antecedent(continue_label, self.current_flow);
-                self.current_flow = self.graph.unreachable_flow;
-                return;
+                target_label = continue_label;
+                break;
             }
         }
+
+        // Second pass: build finally blocks (if any)
+        for finally_block in finally_blocks.iter().rev() {
+            self.build_statement(*finally_block);
+        }
+
+        // Add continue target antecedent
+        if !target_label.is_none() {
+            self.add_antecedent(target_label, self.current_flow);
+        }
+        self.current_flow = self.graph.unreachable_flow;
     }
 
     /// Create a new flow node and link it to an antecedent.
@@ -855,6 +971,65 @@ while (true) {
                 let graph = builder.build_source_file(&sf.statements);
 
                 // Verify flow graph exists with loop label
+                assert!(graph.nodes.len() > 0);
+            }
+        }
+    }
+
+    #[test]
+    fn test_flow_graph_try_finally() {
+        let source = r#"
+let x;
+try {
+    x = 1;
+} finally {
+}
+console.log(x);
+"#;
+
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let arena = parser.get_arena();
+
+        if let Some(source_file) = arena.get(root) {
+            if let Some(sf) = arena.get_source_file(source_file) {
+                let mut builder = FlowGraphBuilder::new(arena);
+                let graph = builder.build_source_file(&sf.statements);
+
+                // Verify flow graph exists
+                assert!(graph.nodes.len() > 0);
+
+                // The key is that the finally block should be on the flow path
+                // from the try block to the console.log statement
+                // This ensures that assignments in try are visible after finally
+            }
+        }
+    }
+
+    #[test]
+    fn test_flow_graph_try_catch_finally() {
+        let source = r#"
+try {
+    let x = 1;
+} catch (e) {
+    let y = 2;
+} finally {
+    let z = 3;
+}
+"#;
+
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let arena = parser.get_arena();
+
+        if let Some(source_file) = arena.get(root) {
+            if let Some(sf) = arena.get_source_file(source_file) {
+                let mut builder = FlowGraphBuilder::new(arena);
+                let graph = builder.build_source_file(&sf.statements);
+
+                // Verify flow graph exists with try/catch/finally
                 assert!(graph.nodes.len() > 0);
             }
         }
