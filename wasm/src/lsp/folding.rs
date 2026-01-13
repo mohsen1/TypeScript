@@ -2,9 +2,9 @@
 //!
 //! Provides folding range information for code blocks (functions, classes, etc.).
 
+use crate::lsp::position::LineMap;
 use crate::parser::thin_node::ThinNodeArena;
 use crate::parser::{NodeIndex, syntax_kind_ext};
-use crate::lsp::position::LineMap;
 
 /// A folding range
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -108,7 +108,9 @@ impl<'a> FoldingRangeProvider<'a> {
 
                     // Only add if multi-line class
                     if class_range.0 < class_range.1 {
-                        ranges.push(FoldingRange::new(class_range.0, class_range.1).with_kind("region"));
+                        ranges.push(
+                            FoldingRange::new(class_range.0, class_range.1).with_kind("region"),
+                        );
                     }
 
                     // Recurse into class members
@@ -149,7 +151,9 @@ impl<'a> FoldingRangeProvider<'a> {
                     let iface_range = self.get_line_range(node_idx);
 
                     if iface_range.0 < iface_range.1 {
-                        ranges.push(FoldingRange::new(iface_range.0, iface_range.1).with_kind("region"));
+                        ranges.push(
+                            FoldingRange::new(iface_range.0, iface_range.1).with_kind("region"),
+                        );
                     }
 
                     // Recurse into interface members
@@ -165,7 +169,9 @@ impl<'a> FoldingRangeProvider<'a> {
                     let alias_range = self.get_line_range(node_idx);
 
                     if alias_range.0 < alias_range.1 {
-                        ranges.push(FoldingRange::new(alias_range.0, alias_range.1).with_kind("region"));
+                        ranges.push(
+                            FoldingRange::new(alias_range.0, alias_range.1).with_kind("region"),
+                        );
                     }
                 }
             }
@@ -176,7 +182,9 @@ impl<'a> FoldingRangeProvider<'a> {
                     let enum_range = self.get_line_range(node_idx);
 
                     if enum_range.0 < enum_range.1 {
-                        ranges.push(FoldingRange::new(enum_range.0, enum_range.1).with_kind("region"));
+                        ranges.push(
+                            FoldingRange::new(enum_range.0, enum_range.1).with_kind("region"),
+                        );
                     }
 
                     // Recurse into enum members
@@ -192,7 +200,9 @@ impl<'a> FoldingRangeProvider<'a> {
                     let module_range = self.get_line_range(node_idx);
 
                     if module_range.0 < module_range.1 {
-                        ranges.push(FoldingRange::new(module_range.0, module_range.1).with_kind("region"));
+                        ranges.push(
+                            FoldingRange::new(module_range.0, module_range.1).with_kind("region"),
+                        );
                     }
 
                     // Recurse into module body
@@ -295,9 +305,7 @@ impl<'a> FoldingRangeProvider<'a> {
 
                 // Only add if multi-line
                 if end_line > start_line {
-                    ranges.push(
-                        FoldingRange::new(start_line, end_line).with_kind("comment")
-                    );
+                    ranges.push(FoldingRange::new(start_line, end_line).with_kind("comment"));
                 }
 
                 i = end_line as usize + 1;
@@ -318,8 +326,12 @@ impl<'a> FoldingRangeProvider<'a> {
         let hi = node.end;
 
         // Get line positions
-        let start_pos = self.line_map.offset_to_position(lo as u32, self.source_text);
-        let end_pos = self.line_map.offset_to_position(hi.saturating_sub(1) as u32, self.source_text);
+        let start_pos = self
+            .line_map
+            .offset_to_position(lo as u32, self.source_text);
+        let end_pos = self
+            .line_map
+            .offset_to_position(hi.saturating_sub(1) as u32, self.source_text);
 
         (start_pos.line, end_pos.line)
     }
@@ -349,7 +361,10 @@ function foo() {
 
         // Should find a folding range for the function body (lines 1-3)
         let function_range = ranges.iter().find(|r| r.start_line == 1 && r.end_line == 3);
-        assert!(function_range.is_some(), "Should find function body folding range");
+        assert!(
+            function_range.is_some(),
+            "Should find function body folding range"
+        );
     }
 
     #[test]
@@ -399,7 +414,10 @@ class MyClass {
 
         // Should find the class body as a region
         let class_range = ranges.iter().find(|r| r.kind.as_deref() == Some("region"));
-        assert!(class_range.is_some(), "Should find class body folding range");
+        assert!(
+            class_range.is_some(),
+            "Should find class body folding range"
+        );
     }
 
     #[test]
@@ -418,7 +436,10 @@ if (true) {
         let ranges = provider.get_folding_ranges(root);
 
         // Should find a folding range for the if block
-        assert!(!ranges.is_empty(), "Should find block statement folding range");
+        assert!(
+            !ranges.is_empty(),
+            "Should find block statement folding range"
+        );
     }
 
     #[test]
@@ -491,7 +512,10 @@ namespace MyNamespace {
         let ranges = provider.get_folding_ranges(root);
 
         // Single-line constructs should not be foldable
-        assert!(ranges.is_empty(), "Should not find folding ranges for single-line code");
+        assert!(
+            ranges.is_empty(),
+            "Should not find folding ranges for single-line code"
+        );
     }
 
     #[test]
@@ -505,6 +529,9 @@ namespace MyNamespace {
         let provider = FoldingRangeProvider::new(arena, &line_map, source);
         let ranges = provider.get_folding_ranges(root);
 
-        assert!(ranges.is_empty(), "Should not find folding ranges in empty source");
+        assert!(
+            ranges.is_empty(),
+            "Should not find folding ranges in empty source"
+        );
     }
 }

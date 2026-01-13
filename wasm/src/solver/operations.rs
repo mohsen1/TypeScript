@@ -19,20 +19,17 @@
 //! - Optimized independently
 
 use crate::interner::Atom;
-use std::cell::RefCell;
+use crate::solver::diagnostics::PendingDiagnostic;
+use crate::solver::evaluate::evaluate_type;
+use crate::solver::infer::InferenceContext;
+use crate::solver::instantiate::{TypeSubstitution, instantiate_type};
 use crate::solver::types::*;
 use crate::solver::{
-    apparent_object_member_kind,
+    ApparentMemberKind, QueryDatabase, TypeDatabase, apparent_object_member_kind,
     apparent_primitive_member_kind,
-    ApparentMemberKind,
-    QueryDatabase,
-    TypeDatabase,
 };
-use crate::solver::diagnostics::PendingDiagnostic;
-use crate::solver::infer::InferenceContext;
-use crate::solver::evaluate::evaluate_type;
-use crate::solver::instantiate::{TypeSubstitution, instantiate_type};
 use rustc_hash::{FxHashMap, FxHashSet};
+use std::cell::RefCell;
 
 pub trait AssignabilityChecker {
     fn is_assignable_to(&mut self, source: TypeId, target: TypeId) -> bool;
@@ -152,9 +149,7 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
     /// This is used when a TypeParameter from an outer scope is used as an argument.
     fn expand_type_param(&self, ty: TypeId) -> TypeId {
         match self.interner.lookup(ty) {
-            Some(TypeKey::TypeParameter(tp)) => {
-                tp.constraint.unwrap_or(ty)
-            }
+            Some(TypeKey::TypeParameter(tp)) => tp.constraint.unwrap_or(ty),
             _ => ty,
         }
     }
@@ -202,10 +197,15 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
         result
     }
 
-    fn resolve_generic_call_inner(&mut self, func: &FunctionShape, arg_types: &[TypeId]) -> CallResult {
+    fn resolve_generic_call_inner(
+        &mut self,
+        func: &FunctionShape,
+        arg_types: &[TypeId],
+    ) -> CallResult {
         let mut infer_ctx = InferenceContext::new(self.interner.as_type_database());
         let mut substitution = TypeSubstitution::new();
-        let mut var_map: FxHashMap<TypeId, crate::solver::infer::InferenceVar> = FxHashMap::default();
+        let mut var_map: FxHashMap<TypeId, crate::solver::infer::InferenceVar> =
+            FxHashMap::default();
         let mut type_param_vars = Vec::with_capacity(func.type_params.len());
 
         // 1. Create inference variables and placeholders for each type parameter
@@ -232,23 +232,28 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
         }
 
         // 2. Instantiate parameters with placeholders
-        let instantiated_params: Vec<ParamInfo> = func.params.iter().map(|p| {
-            ParamInfo {
+        let instantiated_params: Vec<ParamInfo> = func
+            .params
+            .iter()
+            .map(|p| ParamInfo {
                 name: p.name.clone(),
                 type_id: instantiate_type(self.interner, p.type_id, &substitution),
                 optional: p.optional,
                 rest: p.rest,
-            }
-        }).collect();
+            })
+            .collect();
 
         // 3. Collect constraints from arguments
-        let rest_tuple_inference = self.rest_tuple_inference_target(&instantiated_params, arg_types, &var_map);
+        let rest_tuple_inference =
+            self.rest_tuple_inference_target(&instantiated_params, arg_types, &var_map);
         let rest_tuple_start = rest_tuple_inference.as_ref().map(|(start, _, _)| *start);
         for (i, &arg_type) in arg_types.iter().enumerate() {
             if rest_tuple_start.is_some_and(|start| i >= start) {
                 continue;
             }
-            let Some(target_type) = self.param_type_for_arg_index(&instantiated_params, i, arg_types.len()) else {
+            let Some(target_type) =
+                self.param_type_for_arg_index(&instantiated_params, i, arg_types.len())
+            else {
                 break;
             };
 
@@ -333,15 +338,19 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
             }
         }
 
-        let instantiated_params: Vec<ParamInfo> = func.params.iter().map(|p| {
-            let instantiated = instantiate_type(self.interner, p.type_id, &final_subst);
-            ParamInfo {
-                name: p.name.clone(),
-                type_id: instantiated,
-                optional: p.optional,
-                rest: p.rest,
-            }
-        }).collect();
+        let instantiated_params: Vec<ParamInfo> = func
+            .params
+            .iter()
+            .map(|p| {
+                let instantiated = instantiate_type(self.interner, p.type_id, &final_subst);
+                ParamInfo {
+                    name: p.name.clone(),
+                    type_id: instantiated,
+                    optional: p.optional,
+                    rest: p.rest,
+                }
+            })
+            .collect();
         let (min_args, max_args) = self.arg_count_bounds(&instantiated_params);
         if arg_types.len() < min_args {
             return CallResult::ArgumentCountMismatch {
@@ -359,7 +368,8 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                 };
             }
         }
-        if let Some(result) = self.check_argument_types_with(&instantiated_params, arg_types, true) {
+        if let Some(result) = self.check_argument_types_with(&instantiated_params, arg_types, true)
+        {
             return result;
         }
 
@@ -367,7 +377,11 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
         CallResult::Success(return_type)
     }
 
-    fn check_argument_types(&mut self, params: &[ParamInfo], arg_types: &[TypeId]) -> Option<CallResult> {
+    fn check_argument_types(
+        &mut self,
+        params: &[ParamInfo],
+        arg_types: &[TypeId],
+    ) -> Option<CallResult> {
         self.check_argument_types_with(params, arg_types, false)
     }
 
@@ -388,7 +402,8 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
             let expanded_arg_type = self.expand_type_param(*arg_type);
 
             let assignable = if strict {
-                self.checker.is_assignable_to_strict(expanded_arg_type, param_type)
+                self.checker
+                    .is_assignable_to_strict(expanded_arg_type, param_type)
             } else {
                 self.checker.is_assignable_to(expanded_arg_type, param_type)
             };
@@ -431,7 +446,11 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
         arg_count: usize,
     ) -> Option<TypeId> {
         let rest_param = params.last().filter(|param| param.rest);
-        let rest_start = if rest_param.is_some() { params.len().saturating_sub(1) } else { params.len() };
+        let rest_start = if rest_param.is_some() {
+            params.len().saturating_sub(1)
+        } else {
+            params.len()
+        };
 
         if arg_index < rest_start {
             return Some(params[arg_index].type_id);
@@ -610,7 +629,8 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                                     break;
                                 }
                                 let arg_type = arg_types[arg_index - 1];
-                                let assignable = self.checker.is_assignable_to(arg_type, tail_elem.type_id);
+                                let assignable =
+                                    self.checker.is_assignable_to(arg_type, tail_elem.type_id);
                                 if tail_elem.optional && !assignable {
                                     break;
                                 }
@@ -652,7 +672,11 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                 rest: false,
             })
             .collect();
-        Some((start_index, target_type, self.interner.tuple(tuple_elements)))
+        Some((
+            start_index,
+            target_type,
+            self.interner.tuple(tuple_elements),
+        ))
     }
 
     fn type_contains_placeholder(
@@ -720,10 +744,11 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
             TypeKey::Function(shape_id) => {
                 let shape = self.interner.function_shape(shape_id);
                 shape.type_params.iter().any(|tp| {
-                    tp.constraint
-                        .is_some_and(|constraint| self.type_contains_placeholder(constraint, var_map, visited))
-                        || tp.default
-                            .is_some_and(|default| self.type_contains_placeholder(default, var_map, visited))
+                    tp.constraint.is_some_and(|constraint| {
+                        self.type_contains_placeholder(constraint, var_map, visited)
+                    }) || tp.default.is_some_and(|default| {
+                        self.type_contains_placeholder(default, var_map, visited)
+                    })
                 }) || shape
                     .params
                     .iter()
@@ -742,14 +767,11 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                         }) || tp.default.is_some_and(|default| {
                             self.type_contains_placeholder(default, var_map, visited)
                         })
-                    }) || sig
-                        .params
-                        .iter()
-                        .any(|param| self.type_contains_placeholder(param.type_id, var_map, visited))
-                        || sig.this_type.is_some_and(|this_type| {
-                            self.type_contains_placeholder(this_type, var_map, visited)
-                        })
-                        || self.type_contains_placeholder(sig.return_type, var_map, visited)
+                    }) || sig.params.iter().any(|param| {
+                        self.type_contains_placeholder(param.type_id, var_map, visited)
+                    }) || sig.this_type.is_some_and(|this_type| {
+                        self.type_contains_placeholder(this_type, var_map, visited)
+                    }) || self.type_contains_placeholder(sig.return_type, var_map, visited)
                 });
                 if in_call {
                     return true;
@@ -761,14 +783,11 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                         }) || tp.default.is_some_and(|default| {
                             self.type_contains_placeholder(default, var_map, visited)
                         })
-                    }) || sig
-                        .params
-                        .iter()
-                        .any(|param| self.type_contains_placeholder(param.type_id, var_map, visited))
-                        || sig.this_type.is_some_and(|this_type| {
-                            self.type_contains_placeholder(this_type, var_map, visited)
-                        })
-                        || self.type_contains_placeholder(sig.return_type, var_map, visited)
+                    }) || sig.params.iter().any(|param| {
+                        self.type_contains_placeholder(param.type_id, var_map, visited)
+                    }) || sig.this_type.is_some_and(|this_type| {
+                        self.type_contains_placeholder(this_type, var_map, visited)
+                    }) || self.type_contains_placeholder(sig.return_type, var_map, visited)
                 });
                 if in_construct {
                     return true;
@@ -787,15 +806,11 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
             }
             TypeKey::Mapped(mapped_id) => {
                 let mapped = self.interner.mapped_type(mapped_id);
-                mapped
-                    .type_param
-                    .constraint
-                    .is_some_and(|constraint| self.type_contains_placeholder(constraint, var_map, visited))
-                    || mapped
-                        .type_param
-                        .default
-                        .is_some_and(|default| self.type_contains_placeholder(default, var_map, visited))
-                    || self.type_contains_placeholder(mapped.constraint, var_map, visited)
+                mapped.type_param.constraint.is_some_and(|constraint| {
+                    self.type_contains_placeholder(constraint, var_map, visited)
+                }) || mapped.type_param.default.is_some_and(|default| {
+                    self.type_contains_placeholder(default, var_map, visited)
+                }) || self.type_contains_placeholder(mapped.constraint, var_map, visited)
                     || self.type_contains_placeholder(mapped.template, var_map, visited)
             }
             TypeKey::IndexAccess(obj, idx) => {
@@ -832,9 +847,11 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
         ctx: &mut InferenceContext,
         var_map: &FxHashMap<TypeId, crate::solver::infer::InferenceVar>,
         source: TypeId,
-        target: TypeId
+        target: TypeId,
     ) {
-        if source == target { return; }
+        if source == target {
+            return;
+        }
 
         // If target is an inference placeholder, add lower bound: source <: var
         if let Some(&var) = var_map.get(&target) {
@@ -864,7 +881,10 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
             (_, Some(TypeKey::ReadonlyType(t_inner))) => {
                 self.constrain_types(ctx, var_map, source, t_inner);
             }
-            (Some(TypeKey::IndexAccess(s_obj, s_idx)), Some(TypeKey::IndexAccess(t_obj, t_idx))) => {
+            (
+                Some(TypeKey::IndexAccess(s_obj, s_idx)),
+                Some(TypeKey::IndexAccess(t_obj, t_idx)),
+            ) => {
                 self.constrain_types(ctx, var_map, s_obj, t_obj);
                 self.constrain_types(ctx, var_map, s_idx, t_idx);
             }
@@ -880,14 +900,17 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
 
                 for (s_span, t_span) in s_spans.iter().zip(t_spans.iter()) {
                     match (s_span, t_span) {
-                        (TemplateSpan::Text(s_text), TemplateSpan::Text(t_text)) if s_text == t_text => {}
+                        (TemplateSpan::Text(s_text), TemplateSpan::Text(t_text))
+                            if s_text == t_text => {}
                         (TemplateSpan::Type(_), TemplateSpan::Type(_)) => {}
                         _ => return,
                     }
                 }
 
                 for (s_span, t_span) in s_spans.iter().zip(t_spans.iter()) {
-                    if let (TemplateSpan::Type(s_type), TemplateSpan::Type(t_type)) = (s_span, t_span) {
+                    if let (TemplateSpan::Type(s_type), TemplateSpan::Type(t_type)) =
+                        (s_span, t_span)
+                    {
                         self.constrain_types(ctx, var_map, *s_type, *t_type);
                     }
                 }
@@ -1069,7 +1092,10 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                 let t_shape = self.interner.object_shape(t_shape_id);
                 self.constrain_properties(ctx, var_map, &s_shape.properties, &t_shape.properties);
             }
-            (Some(TypeKey::ObjectWithIndex(s_shape_id)), Some(TypeKey::ObjectWithIndex(t_shape_id))) => {
+            (
+                Some(TypeKey::ObjectWithIndex(s_shape_id)),
+                Some(TypeKey::ObjectWithIndex(t_shape_id)),
+            ) => {
                 let s_shape = self.interner.object_shape(s_shape_id);
                 let t_shape = self.interner.object_shape(t_shape_id);
                 self.constrain_properties(ctx, var_map, &s_shape.properties, &t_shape.properties);
@@ -1282,7 +1308,9 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
             let source_sig = &source_signatures[0];
             let target_sig = &target_signatures[0];
             if source_sig.type_params.is_empty() && target_sig.type_params.is_empty() {
-                self.constrain_call_signature_to_call_signature(ctx, var_map, source_sig, target_sig);
+                self.constrain_call_signature_to_call_signature(
+                    ctx, var_map, source_sig, target_sig,
+                );
             }
             return;
         }
@@ -1308,7 +1336,9 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                     .and_then(|index| source_signatures.get(index))
                 };
                 if let Some(source_sig) = source_sig {
-                    self.constrain_call_signature_to_call_signature(ctx, var_map, source_sig, target_sig);
+                    self.constrain_call_signature_to_call_signature(
+                        ctx, var_map, source_sig, target_sig,
+                    );
                 }
             }
             return;
@@ -1319,7 +1349,9 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
             if source_sig.type_params.is_empty() {
                 for target_sig in target_signatures {
                     if target_sig.type_params.is_empty() {
-                        self.constrain_call_signature_to_call_signature(ctx, var_map, source_sig, target_sig);
+                        self.constrain_call_signature_to_call_signature(
+                            ctx, var_map, source_sig, target_sig,
+                        );
                     }
                 }
             }
@@ -1336,7 +1368,9 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                     is_constructor,
                 ) {
                     let source_sig = &source_signatures[index];
-                    self.constrain_call_signature_to_call_signature(ctx, var_map, source_sig, target_sig);
+                    self.constrain_call_signature_to_call_signature(
+                        ctx, var_map, source_sig, target_sig,
+                    );
                 }
             }
         }
@@ -1434,7 +1468,9 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                         if s_elem.rest {
                             break;
                         }
-                        let assignable = self.checker.is_assignable_to(s_elem.type_id, tail_elem.type_id);
+                        let assignable = self
+                            .checker
+                            .is_assignable_to(s_elem.type_id, tail_elem.type_id);
                         if tail_elem.optional && !assignable {
                             break;
                         }
@@ -1490,7 +1526,11 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
     }
 
     /// Resolve a call to a callable type (with overloads).
-    fn resolve_callable_call(&mut self, callable: &CallableShape, arg_types: &[TypeId]) -> CallResult {
+    fn resolve_callable_call(
+        &mut self,
+        callable: &CallableShape,
+        arg_types: &[TypeId],
+    ) -> CallResult {
         // If there are no call signatures at all, this type is not callable
         // (e.g., a class constructor without call signatures)
         if callable.call_signatures.is_empty() {
@@ -1534,7 +1574,11 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
 
             match self.resolve_function_call(&func, arg_types) {
                 CallResult::Success(ret) => return CallResult::Success(ret),
-                CallResult::ArgumentTypeMismatch { index: _, expected, actual } => {
+                CallResult::ArgumentTypeMismatch {
+                    index: _,
+                    expected,
+                    actual,
+                } => {
                     all_arg_count_mismatches = false;
                     failures.push(
                         crate::solver::diagnostics::PendingDiagnosticBuilder::argument_not_assignable(
@@ -1542,7 +1586,11 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                         )
                     );
                 }
-                CallResult::ArgumentCountMismatch { expected_min, expected_max, actual } => {
+                CallResult::ArgumentCountMismatch {
+                    expected_min,
+                    expected_max,
+                    actual,
+                } => {
                     let expected = expected_max.unwrap_or(expected_min);
                     min_expected = min_expected.min(expected_min);
                     max_expected = max_expected.max(expected);
@@ -1562,7 +1610,11 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
         if all_arg_count_mismatches && !failures.is_empty() {
             return CallResult::ArgumentCountMismatch {
                 expected_min: min_expected,
-                expected_max: if max_expected > min_expected { Some(max_expected) } else { None },
+                expected_max: if max_expected > min_expected {
+                    Some(max_expected)
+                } else {
+                    None
+                },
                 actual: actual_count,
             };
         }
@@ -1703,7 +1755,10 @@ struct MappedAccessGuard<'a> {
 
 impl<'a> Drop for MappedAccessGuard<'a> {
     fn drop(&mut self) {
-        self.evaluator.mapped_access_visiting.borrow_mut().remove(&self.obj_type);
+        self.evaluator
+            .mapped_access_visiting
+            .borrow_mut()
+            .remove(&self.obj_type);
         *self.evaluator.mapped_access_depth.borrow_mut() -= 1;
     }
 }
@@ -1748,7 +1803,10 @@ impl<'a> PropertyAccessEvaluator<'a> {
             return None;
         }
 
-        Some(MappedAccessGuard { evaluator: self, obj_type })
+        Some(MappedAccessGuard {
+            evaluator: self,
+            obj_type,
+        })
     }
 
     /// Check if a property name is a private field (starts with #)
@@ -1854,7 +1912,7 @@ impl<'a> PropertyAccessEvaluator<'a> {
                 if let Some(ref idx) = shape.string_index {
                     return PropertyAccessResult::Success {
                         type_id: self.add_undefined_if_unchecked(idx.value_type),
-                        from_index_signature: true,  // Resolved via index signature!
+                        from_index_signature: true, // Resolved via index signature!
                     };
                 }
 
@@ -1896,11 +1954,14 @@ impl<'a> PropertyAccessEvaluator<'a> {
                 let prop_atom = prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name));
                 let mut valid_results = Vec::new();
                 let mut nullable_causes = Vec::new();
-                let mut any_from_index = false;  // Track if any member used index signature
+                let mut any_from_index = false; // Track if any member used index signature
 
                 for &member in members.iter() {
                     // Check for null/undefined directly
-                    if member == TypeId::NULL || member == TypeId::UNDEFINED || member == TypeId::VOID {
+                    if member == TypeId::NULL
+                        || member == TypeId::UNDEFINED
+                        || member == TypeId::VOID
+                    {
                         let cause = if member == TypeId::VOID {
                             TypeId::UNDEFINED
                         } else {
@@ -1911,24 +1972,32 @@ impl<'a> PropertyAccessEvaluator<'a> {
                     }
 
                     match self.resolve_property_access_inner(member, prop_name, Some(prop_atom)) {
-                        PropertyAccessResult::Success { type_id, from_index_signature } => {
+                        PropertyAccessResult::Success {
+                            type_id,
+                            from_index_signature,
+                        } => {
                             valid_results.push(type_id);
                             if from_index_signature {
-                                any_from_index = true;  // Propagate: if ANY member uses index, flag it
+                                any_from_index = true; // Propagate: if ANY member uses index, flag it
                             }
                         }
-                        PropertyAccessResult::PossiblyNullOrUndefined { property_type, cause } => {
+                        PropertyAccessResult::PossiblyNullOrUndefined {
+                            property_type,
+                            cause,
+                        } => {
                             if let Some(t) = property_type {
                                 valid_results.push(t);
                             }
                             nullable_causes.push(cause);
                         }
                         // If any non-nullable member is missing the property, it's a PropertyNotFound error
-                    _ => return PropertyAccessResult::PropertyNotFound {
-                        type_id: obj_type,
-                        property_name: prop_atom,
-                    },
-                }
+                        _ => {
+                            return PropertyAccessResult::PropertyNotFound {
+                                type_id: obj_type,
+                                property_name: prop_atom,
+                            };
+                        }
+                    }
                 }
 
                 // If there are nullable causes, return PossiblyNullOrUndefined
@@ -1967,7 +2036,7 @@ impl<'a> PropertyAccessEvaluator<'a> {
                 // Union of all result types
                 PropertyAccessResult::Success {
                     type_id,
-                    from_index_signature: any_from_index,  // Contagious across union members
+                    from_index_signature: any_from_index, // Contagious across union members
                 }
             }
 
@@ -1981,13 +2050,19 @@ impl<'a> PropertyAccessEvaluator<'a> {
 
                 for &member in members.iter() {
                     match self.resolve_property_access_inner(member, prop_name, Some(prop_atom)) {
-                        PropertyAccessResult::Success { type_id, from_index_signature } => {
+                        PropertyAccessResult::Success {
+                            type_id,
+                            from_index_signature,
+                        } => {
                             results.push(type_id);
                             if from_index_signature {
                                 any_from_index = true;
                             }
                         }
-                        PropertyAccessResult::PossiblyNullOrUndefined { property_type, cause } => {
+                        PropertyAccessResult::PossiblyNullOrUndefined {
+                            property_type,
+                            cause,
+                        } => {
                             if let Some(t) = property_type {
                                 results.push(t);
                             }
@@ -2098,11 +2173,12 @@ impl<'a> PropertyAccessEvaluator<'a> {
 
             TypeKey::Intrinsic(IntrinsicKind::Object) => {
                 let prop_atom = prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name));
-                self.resolve_object_member(prop_name, prop_atom)
-                    .unwrap_or(PropertyAccessResult::PropertyNotFound {
+                self.resolve_object_member(prop_name, prop_atom).unwrap_or(
+                    PropertyAccessResult::PropertyNotFound {
                         type_id: obj_type,
                         property_name: prop_atom,
-                    })
+                    },
+                )
             }
 
             TypeKey::Array(_) => {
@@ -2132,7 +2208,8 @@ impl<'a> PropertyAccessEvaluator<'a> {
                     // Evaluation didn't change the type - property not found
                     PropertyAccessResult::PropertyNotFound {
                         type_id: obj_type,
-                        property_name: prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name)),
+                        property_name: prop_atom
+                            .unwrap_or_else(|| self.interner.intern_string(prop_name)),
                     }
                 }
             }
@@ -2154,7 +2231,8 @@ impl<'a> PropertyAccessEvaluator<'a> {
                     // Evaluation didn't change the type - property not found
                     PropertyAccessResult::PropertyNotFound {
                         type_id: obj_type,
-                        property_name: prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name)),
+                        property_name: prop_atom
+                            .unwrap_or_else(|| self.interner.intern_string(prop_name)),
                     }
                 }
             }
@@ -2240,7 +2318,11 @@ impl<'a> PropertyAccessEvaluator<'a> {
         }
     }
 
-    fn resolve_object_member(&self, prop_name: &str, _prop_atom: Atom) -> Option<PropertyAccessResult> {
+    fn resolve_object_member(
+        &self,
+        prop_name: &str,
+        _prop_atom: Atom,
+    ) -> Option<PropertyAccessResult> {
         match apparent_object_member_kind(prop_name) {
             Some(ApparentMemberKind::Value(type_id)) => Some(PropertyAccessResult::Success {
                 type_id,
@@ -2263,7 +2345,12 @@ impl<'a> PropertyAccessEvaluator<'a> {
 
     /// Resolve properties on boolean type.
     fn resolve_boolean_property(&self, prop_name: &str, prop_atom: Atom) -> PropertyAccessResult {
-        self.resolve_apparent_property(IntrinsicKind::Boolean, TypeId::BOOLEAN, prop_name, prop_atom)
+        self.resolve_apparent_property(
+            IntrinsicKind::Boolean,
+            TypeId::BOOLEAN,
+            prop_name,
+            prop_atom,
+        )
     }
 
     /// Resolve properties on bigint type.
@@ -2272,7 +2359,11 @@ impl<'a> PropertyAccessEvaluator<'a> {
     }
 
     /// Resolve properties on symbol primitive type.
-    fn resolve_symbol_primitive_property(&self, prop_name: &str, prop_atom: Atom) -> PropertyAccessResult {
+    fn resolve_symbol_primitive_property(
+        &self,
+        prop_name: &str,
+        prop_atom: Atom,
+    ) -> PropertyAccessResult {
         if prop_name == "toString" || prop_name == "valueOf" {
             return PropertyAccessResult::Success {
                 type_id: TypeId::ANY,
@@ -2284,14 +2375,22 @@ impl<'a> PropertyAccessEvaluator<'a> {
     }
 
     /// Resolve properties on array type.
-    fn resolve_array_property(&self, array_type: TypeId, prop_name: &str, prop_atom: Atom) -> PropertyAccessResult {
+    fn resolve_array_property(
+        &self,
+        array_type: TypeId,
+        prop_name: &str,
+        prop_atom: Atom,
+    ) -> PropertyAccessResult {
         let element_type = self.array_element_type(array_type);
         let array_of_element = self.interner.array(element_type);
         let element_or_undefined = self.element_type_with_undefined(element_type);
 
         match prop_name {
             // Array properties
-            "length" => PropertyAccessResult::Success { type_id: TypeId::NUMBER, from_index_signature: false },
+            "length" => PropertyAccessResult::Success {
+                type_id: TypeId::NUMBER,
+                from_index_signature: false,
+            },
 
             // Array methods that return arrays
             "concat" => {
@@ -2304,10 +2403,14 @@ impl<'a> PropertyAccessEvaluator<'a> {
                 )
             }
             "filter" => {
-                let callback = self.array_callback_type(element_type, array_of_element, TypeId::BOOLEAN);
+                let callback =
+                    self.array_callback_type(element_type, array_of_element, TypeId::BOOLEAN);
                 self.function_result(
                     Vec::new(),
-                    vec![self.param(callback, false, false), self.param(TypeId::ANY, true, false)],
+                    vec![
+                        self.param(callback, false, false),
+                        self.param(TypeId::ANY, true, false),
+                    ],
                     array_of_element,
                 )
             }
@@ -2325,10 +2428,14 @@ impl<'a> PropertyAccessEvaluator<'a> {
                 let u_type = self.type_param_type(&u_param);
                 let array_u = self.interner.array(u_type);
                 let callback_return = self.interner.union2(u_type, array_u);
-                let callback = self.array_callback_type(element_type, array_of_element, callback_return);
+                let callback =
+                    self.array_callback_type(element_type, array_of_element, callback_return);
                 self.function_result(
                     vec![u_param],
-                    vec![self.param(callback, false, false), self.param(TypeId::ANY, true, false)],
+                    vec![
+                        self.param(callback, false, false),
+                        self.param(TypeId::ANY, true, false),
+                    ],
                     array_u,
                 )
             }
@@ -2339,20 +2446,24 @@ impl<'a> PropertyAccessEvaluator<'a> {
                 let array_u = self.interner.array(u_type);
                 self.function_result(
                     vec![u_param],
-                    vec![self.param(callback, false, false), self.param(TypeId::ANY, true, false)],
+                    vec![
+                        self.param(callback, false, false),
+                        self.param(TypeId::ANY, true, false),
+                    ],
                     array_u,
                 )
             }
             "reverse" | "toReversed" => {
                 self.function_result(Vec::new(), Vec::new(), array_of_element)
             }
-            "slice" => {
-                self.function_result(
-                    Vec::new(),
-                    vec![self.param(TypeId::NUMBER, true, false), self.param(TypeId::NUMBER, true, false)],
-                    array_of_element,
-                )
-            }
+            "slice" => self.function_result(
+                Vec::new(),
+                vec![
+                    self.param(TypeId::NUMBER, true, false),
+                    self.param(TypeId::NUMBER, true, false),
+                ],
+                array_of_element,
+            ),
             "sort" | "toSorted" => {
                 let compare = self.array_compare_callback_type(element_type);
                 self.function_result(
@@ -2361,47 +2472,43 @@ impl<'a> PropertyAccessEvaluator<'a> {
                     array_of_element,
                 )
             }
-            "splice" | "toSpliced" => {
-                self.function_result(
-                    Vec::new(),
-                    vec![
-                        self.param(TypeId::NUMBER, false, false),
-                        self.param(TypeId::NUMBER, true, false),
-                        self.param(self.interner.array(element_type), false, true),
-                    ],
-                    array_of_element,
-                )
-            }
-            "with" => {
-                self.function_result(
-                    Vec::new(),
-                    vec![
-                        self.param(TypeId::NUMBER, false, false),
-                        self.param(element_type, false, false),
-                    ],
-                    array_of_element,
-                )
-            }
+            "splice" | "toSpliced" => self.function_result(
+                Vec::new(),
+                vec![
+                    self.param(TypeId::NUMBER, false, false),
+                    self.param(TypeId::NUMBER, true, false),
+                    self.param(self.interner.array(element_type), false, true),
+                ],
+                array_of_element,
+            ),
+            "with" => self.function_result(
+                Vec::new(),
+                vec![
+                    self.param(TypeId::NUMBER, false, false),
+                    self.param(element_type, false, false),
+                ],
+                array_of_element,
+            ),
 
             // Array methods that return specific types
-            "at" => {
-                self.function_result(
-                    Vec::new(),
-                    vec![self.param(TypeId::NUMBER, false, false)],
-                    element_or_undefined,
-                )
-            }
+            "at" => self.function_result(
+                Vec::new(),
+                vec![self.param(TypeId::NUMBER, false, false)],
+                element_or_undefined,
+            ),
             "find" | "findLast" => {
-                let callback = self.array_callback_type(element_type, array_of_element, TypeId::BOOLEAN);
+                let callback =
+                    self.array_callback_type(element_type, array_of_element, TypeId::BOOLEAN);
                 self.function_result(
                     Vec::new(),
-                    vec![self.param(callback, false, false), self.param(TypeId::ANY, true, false)],
+                    vec![
+                        self.param(callback, false, false),
+                        self.param(TypeId::ANY, true, false),
+                    ],
                     element_or_undefined,
                 )
             }
-            "pop" | "shift" => {
-                self.function_result(Vec::new(), Vec::new(), element_or_undefined)
-            }
+            "pop" | "shift" => self.function_result(Vec::new(), Vec::new(), element_or_undefined),
 
             "every" | "includes" | "some" => {
                 let params = match prop_name {
@@ -2415,7 +2522,10 @@ impl<'a> PropertyAccessEvaluator<'a> {
                             array_of_element,
                             TypeId::BOOLEAN,
                         );
-                        vec![self.param(callback, false, false), self.param(TypeId::ANY, true, false)]
+                        vec![
+                            self.param(callback, false, false),
+                            self.param(TypeId::ANY, true, false),
+                        ]
                     }
                 };
                 self.function_result(Vec::new(), params, TypeId::BOOLEAN)
@@ -2423,7 +2533,9 @@ impl<'a> PropertyAccessEvaluator<'a> {
 
             "findIndex" | "findLastIndex" | "indexOf" | "lastIndexOf" | "push" | "unshift" => {
                 let params = match prop_name {
-                    "push" | "unshift" => vec![self.param(self.interner.array(element_type), false, true)],
+                    "push" | "unshift" => {
+                        vec![self.param(self.interner.array(element_type), false, true)]
+                    }
                     "indexOf" | "lastIndexOf" => vec![
                         self.param(element_type, false, false),
                         self.param(TypeId::NUMBER, true, false),
@@ -2434,7 +2546,10 @@ impl<'a> PropertyAccessEvaluator<'a> {
                             array_of_element,
                             TypeId::BOOLEAN,
                         );
-                        vec![self.param(callback, false, false), self.param(TypeId::ANY, true, false)]
+                        vec![
+                            self.param(callback, false, false),
+                            self.param(TypeId::ANY, true, false),
+                        ]
                     }
                 };
                 self.function_result(Vec::new(), params, TypeId::NUMBER)
@@ -2443,12 +2558,15 @@ impl<'a> PropertyAccessEvaluator<'a> {
             "forEach" | "copyWithin" | "fill" => {
                 let (params, return_type) = match prop_name {
                     "forEach" => {
-                        let callback = self.array_callback_type(
-                            element_type,
-                            array_of_element,
+                        let callback =
+                            self.array_callback_type(element_type, array_of_element, TypeId::VOID);
+                        (
+                            vec![
+                                self.param(callback, false, false),
+                                self.param(TypeId::ANY, true, false),
+                            ],
                             TypeId::VOID,
-                        );
-                        (vec![self.param(callback, false, false), self.param(TypeId::ANY, true, false)], TypeId::VOID)
+                        )
                     }
                     "copyWithin" => (
                         vec![
@@ -2594,7 +2712,8 @@ impl<'a> PropertyAccessEvaluator<'a> {
     }
 
     fn array_reduce_callable(&self, element_type: TypeId, array_type: TypeId) -> CallableShape {
-        let callback_no_init = self.array_reduce_callback_type(element_type, element_type, array_type);
+        let callback_no_init =
+            self.array_reduce_callback_type(element_type, element_type, array_type);
         let no_init = CallSignature {
             type_params: Vec::new(),
             params: vec![self.param(callback_no_init, false, false)],
@@ -2608,7 +2727,10 @@ impl<'a> PropertyAccessEvaluator<'a> {
         let callback_with_init = self.array_reduce_callback_type(u_type, element_type, array_type);
         let with_init = CallSignature {
             type_params: vec![u_param],
-            params: vec![self.param(callback_with_init, false, false), self.param(u_type, false, false)],
+            params: vec![
+                self.param(callback_with_init, false, false),
+                self.param(u_type, false, false),
+            ],
             this_type: None,
             return_type: u_type,
             type_predicate: None,
@@ -2649,8 +2771,7 @@ impl<'a> PropertyAccessEvaluator<'a> {
     }
 
     fn type_param_type(&self, param: &TypeParamInfo) -> TypeId {
-        self.interner
-            .intern(TypeKey::TypeParameter(param.clone()))
+        self.interner.intern(TypeKey::TypeParameter(param.clone()))
     }
 
     fn param(&self, type_id: TypeId, optional: bool, rest: bool) -> ParamInfo {
@@ -2707,8 +2828,14 @@ impl<'a> PropertyAccessEvaluator<'a> {
         match prop_name {
             "apply" | "call" | "bind" => self.method_result(TypeId::ANY),
             "toString" => self.method_result(TypeId::STRING),
-            "length" => PropertyAccessResult::Success { type_id: TypeId::NUMBER, from_index_signature: false },
-            "prototype" | "arguments" => PropertyAccessResult::Success { type_id: TypeId::ANY, from_index_signature: false },
+            "length" => PropertyAccessResult::Success {
+                type_id: TypeId::NUMBER,
+                from_index_signature: false,
+            },
+            "prototype" | "arguments" => PropertyAccessResult::Success {
+                type_id: TypeId::ANY,
+                from_index_signature: false,
+            },
             "caller" => PropertyAccessResult::Success {
                 type_id: self.any_args_function(TypeId::ANY),
                 from_index_signature: false,
@@ -2878,14 +3005,22 @@ impl<'a> BinaryOpEvaluator<'a> {
             return BinaryOpResult::Success(TypeId::NUMBER);
         }
 
-        BinaryOpResult::TypeError { left, right, op: "+" }
+        BinaryOpResult::TypeError {
+            left,
+            right,
+            op: "+",
+        }
     }
 
     fn evaluate_arithmetic(&self, left: TypeId, right: TypeId) -> BinaryOpResult {
         if left == TypeId::NUMBER && right == TypeId::NUMBER {
             BinaryOpResult::Success(TypeId::NUMBER)
         } else {
-            BinaryOpResult::TypeError { left, right, op: "arithmetic" }
+            BinaryOpResult::TypeError {
+                left,
+                right,
+                op: "arithmetic",
+            }
         }
     }
 
@@ -2935,7 +3070,9 @@ impl<'a> BinaryOpEvaluator<'a> {
 
         if let Some(TypeKey::Union(members)) = self.interner.lookup(left) {
             let members = self.interner.type_list(members);
-            return members.iter().any(|member| self.has_overlap(*member, right));
+            return members
+                .iter()
+                .any(|member| self.has_overlap(*member, right));
         }
         if let Some(TypeKey::Union(members)) = self.interner.lookup(right) {
             let members = self.interner.type_list(members);

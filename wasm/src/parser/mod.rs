@@ -15,16 +15,16 @@
 //! - Current `Node` enum is 208 bytes (0.31 nodes/cache-line)
 //! - ThinNode is 16 bytes (4 nodes/cache-line) - 13x better cache locality
 
-pub mod flags;
-pub mod ast;
 pub mod arena;
+pub mod ast;
+pub mod flags;
 pub mod thin_node;
 
 #[cfg(test)]
 mod tests;
 
 // Re-export flags
-pub use flags::{node_flags, modifier_flags, transform_flags};
+pub use flags::{modifier_flags, node_flags, transform_flags};
 
 // Re-export AST types
 pub use ast::*;

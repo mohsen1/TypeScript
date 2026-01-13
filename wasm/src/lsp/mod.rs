@@ -19,53 +19,59 @@
 //! - AST node lookup by position
 //! - Symbol-based navigation using binder data
 
-pub mod position;
-pub mod utils;
-pub mod resolver;
-pub mod jsdoc;
-pub mod definition;
-pub mod references;
+pub mod code_actions;
+pub mod code_lens;
 pub mod completions;
-pub mod hover;
-pub mod signature_help;
+pub mod definition;
+pub mod diagnostics;
 pub mod document_symbols;
-pub mod symbols;
+pub mod folding;
 pub mod formatting;
 pub mod highlighting;
-pub mod rename;
-pub mod semantic_tokens;
-pub mod code_actions;
-pub mod project;
-pub mod diagnostics;
-pub mod folding;
-pub mod code_lens;
+pub mod hover;
 pub mod inlay_hints;
+pub mod jsdoc;
+pub mod position;
+pub mod project;
+pub mod references;
+pub mod rename;
+pub mod resolver;
 pub mod selection_range;
+pub mod semantic_tokens;
+pub mod signature_help;
+pub mod symbols;
 pub mod type_definition;
+pub mod utils;
 
-#[cfg(test)]
-mod tests;
 #[cfg(test)]
 mod code_actions_tests;
 #[cfg(test)]
 mod project_tests;
+#[cfg(test)]
+mod tests;
 
-pub use definition::GoToDefinition;
-pub use references::FindReferences;
-pub use completions::{Completions, CompletionItem, CompletionItemKind};
-pub use hover::{HoverProvider, HoverInfo};
-pub use signature_help::{SignatureHelpProvider, SignatureHelp, SignatureInformation, ParameterInformation};
-pub use document_symbols::{DocumentSymbolProvider, DocumentSymbol, SymbolKind};
-pub use symbols::DocumentSymbols;
-pub use formatting::{DocumentFormattingProvider, FormattingOptions, TextEdit as FormattingTextEdit};
-pub use highlighting::{DocumentHighlightProvider, DocumentHighlight, DocumentHighlightKind};
-pub use rename::{RenameProvider, WorkspaceEdit, TextEdit};
-pub use semantic_tokens::{SemanticTokensProvider, SemanticTokenType, semantic_token_modifiers};
 pub use code_actions::{
-    CodeActionProvider, CodeAction, CodeActionKind, CodeActionContext, ImportCandidate,
+    CodeAction, CodeActionContext, CodeActionKind, CodeActionProvider, ImportCandidate,
     ImportCandidateKind,
 };
-pub use position::{Position, Location, SourceLocation, Range};
-pub use project::{Project, ProjectFile, ProjectPerformance, ProjectRequestKind, ProjectRequestTiming};
-pub use diagnostics::{LspDiagnostic, DiagnosticSeverity};
+pub use completions::{CompletionItem, CompletionItemKind, Completions};
+pub use definition::GoToDefinition;
+pub use diagnostics::{DiagnosticSeverity, LspDiagnostic};
+pub use document_symbols::{DocumentSymbol, DocumentSymbolProvider, SymbolKind};
 pub use folding::{FoldingRange, FoldingRangeProvider};
+pub use formatting::{
+    DocumentFormattingProvider, FormattingOptions, TextEdit as FormattingTextEdit,
+};
+pub use highlighting::{DocumentHighlight, DocumentHighlightKind, DocumentHighlightProvider};
+pub use hover::{HoverInfo, HoverProvider};
+pub use position::{Location, Position, Range, SourceLocation};
+pub use project::{
+    Project, ProjectFile, ProjectPerformance, ProjectRequestKind, ProjectRequestTiming,
+};
+pub use references::FindReferences;
+pub use rename::{RenameProvider, TextEdit, WorkspaceEdit};
+pub use semantic_tokens::{SemanticTokenType, SemanticTokensProvider, semantic_token_modifiers};
+pub use signature_help::{
+    ParameterInformation, SignatureHelp, SignatureHelpProvider, SignatureInformation,
+};
+pub use symbols::DocumentSymbols;

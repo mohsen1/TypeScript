@@ -29,13 +29,15 @@ fn test_callable_same_signature() {
         call_signatures: vec![sig.clone()],
         construct_signatures: vec![],
         properties: vec![],
-    ..Default::default() });
+        ..Default::default()
+    });
 
     let target = interner.callable(CallableShape {
         call_signatures: vec![sig],
         construct_signatures: vec![],
         properties: vec![],
-    ..Default::default() });
+        ..Default::default()
+    });
 
     assert!(is_subtype_of(&interner, source, target));
 }
@@ -75,13 +77,15 @@ fn test_callable_more_overloads() {
         call_signatures: vec![sig1.clone(), sig2],
         construct_signatures: vec![],
         properties: vec![],
-    ..Default::default() });
+        ..Default::default()
+    });
 
     let target = interner.callable(CallableShape {
         call_signatures: vec![sig1],
         construct_signatures: vec![],
         properties: vec![],
-    ..Default::default() });
+        ..Default::default()
+    });
 
     assert!(is_subtype_of(&interner, source, target));
 }
@@ -121,13 +125,15 @@ fn test_callable_missing_overload() {
         call_signatures: vec![sig1.clone()],
         construct_signatures: vec![],
         properties: vec![],
-    ..Default::default() });
+        ..Default::default()
+    });
 
     let target = interner.callable(CallableShape {
         call_signatures: vec![sig1, sig2],
         construct_signatures: vec![],
         properties: vec![],
-    ..Default::default() });
+        ..Default::default()
+    });
 
     assert!(!is_subtype_of(&interner, source, target));
 }
@@ -137,10 +143,14 @@ fn test_callable_with_construct() {
     let interner = TypeInterner::new();
 
     // { new(): Foo } <: { new(): Foo }
-    let obj_type = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER,
- write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
-    ]);
+    let obj_type = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
 
     let sig = CallSignature {
         type_params: vec![],
@@ -154,13 +164,15 @@ fn test_callable_with_construct() {
         call_signatures: vec![],
         construct_signatures: vec![sig.clone()],
         properties: vec![],
-    ..Default::default() });
+        ..Default::default()
+    });
 
     let target = interner.callable(CallableShape {
         call_signatures: vec![],
         construct_signatures: vec![sig],
         properties: vec![],
-    ..Default::default() });
+        ..Default::default()
+    });
 
     assert!(is_subtype_of(&interner, source, target));
 }
@@ -192,13 +204,15 @@ fn test_callable_covariant_return() {
         call_signatures: vec![source_sig],
         construct_signatures: vec![],
         properties: vec![],
-    ..Default::default() });
+        ..Default::default()
+    });
 
     let target = interner.callable(CallableShape {
         call_signatures: vec![target_sig],
         construct_signatures: vec![],
         properties: vec![],
-    ..Default::default() });
+        ..Default::default()
+    });
 
     assert!(is_subtype_of(&interner, source, target));
 }
@@ -220,7 +234,7 @@ fn test_function_to_callable() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let callable = interner.callable(CallableShape {
@@ -237,7 +251,8 @@ fn test_function_to_callable() {
             type_predicate: None,
         }],
         construct_signatures: vec![],
-        properties: vec![], ..Default::default()
+        properties: vec![],
+        ..Default::default()
     });
 
     assert!(is_subtype_of(&interner, fn_type, callable));
@@ -263,7 +278,8 @@ fn test_callable_to_function() {
             type_predicate: None,
         }],
         construct_signatures: vec![],
-        properties: vec![], ..Default::default()
+        properties: vec![],
+        ..Default::default()
     });
 
     let fn_type = interner.function(FunctionShape {
@@ -278,7 +294,7 @@ fn test_callable_to_function() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     assert!(is_subtype_of(&interner, callable, fn_type));
@@ -298,10 +314,14 @@ fn test_callable_with_properties() {
             type_predicate: None,
         }],
         construct_signatures: vec![],
-        properties: vec![
-            PropertyInfo { name: interner.intern_string("length"), type_id: TypeId::NUMBER,
- write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
-        ],
+        properties: vec![PropertyInfo {
+            name: interner.intern_string("length"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
         ..Default::default()
     });
 
@@ -314,10 +334,14 @@ fn test_callable_with_properties() {
             type_predicate: None,
         }],
         construct_signatures: vec![],
-        properties: vec![
-            PropertyInfo { name: interner.intern_string("length"), type_id: TypeId::NUMBER,
- write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
-        ],
+        properties: vec![PropertyInfo {
+            name: interner.intern_string("length"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
         ..Default::default()
     });
 
@@ -338,7 +362,8 @@ fn test_callable_missing_property() {
             type_predicate: None,
         }],
         construct_signatures: vec![],
-        properties: vec![], ..Default::default()
+        properties: vec![],
+        ..Default::default()
     });
 
     let target = interner.callable(CallableShape {
@@ -350,10 +375,14 @@ fn test_callable_missing_property() {
             type_predicate: None,
         }],
         construct_signatures: vec![],
-        properties: vec![
-            PropertyInfo { name: interner.intern_string("length"), type_id: TypeId::NUMBER,
- write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
-        ],
+        properties: vec![PropertyInfo {
+            name: interner.intern_string("length"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
         ..Default::default()
     });
 
@@ -399,13 +428,15 @@ fn test_overload_signature_exact_match() {
         call_signatures: vec![sig_string_to_number.clone(), sig_number_to_string],
         construct_signatures: vec![],
         properties: vec![],
-    ..Default::default() });
+        ..Default::default()
+    });
 
     let string_only = interner.callable(CallableShape {
         call_signatures: vec![sig_string_to_number],
         construct_signatures: vec![],
         properties: vec![],
-    ..Default::default() });
+        ..Default::default()
+    });
 
     assert!(is_subtype_of(&interner, overloaded, string_only));
 }
@@ -448,13 +479,15 @@ fn test_overload_signature_order_priority() {
         call_signatures: vec![sig_special.clone(), sig_general],
         construct_signatures: vec![],
         properties: vec![],
-    ..Default::default() });
+        ..Default::default()
+    });
 
     let specific = interner.callable(CallableShape {
         call_signatures: vec![sig_special],
         construct_signatures: vec![],
         properties: vec![],
-    ..Default::default() });
+        ..Default::default()
+    });
 
     assert!(is_subtype_of(&interner, overloaded, specific));
 }
@@ -510,23 +543,27 @@ fn test_overload_multiple_arities() {
         call_signatures: vec![sig_0.clone(), sig_1.clone(), sig_2.clone()],
         construct_signatures: vec![],
         properties: vec![],
-    ..Default::default() });
+        ..Default::default()
+    });
 
     let only_sig0 = interner.callable(CallableShape {
         call_signatures: vec![sig_0],
         construct_signatures: vec![],
         properties: vec![],
-    ..Default::default() });
+        ..Default::default()
+    });
     let only_sig1 = interner.callable(CallableShape {
         call_signatures: vec![sig_1],
         construct_signatures: vec![],
         properties: vec![],
-    ..Default::default() });
+        ..Default::default()
+    });
     let only_sig2 = interner.callable(CallableShape {
         call_signatures: vec![sig_2],
         construct_signatures: vec![],
         properties: vec![],
-    ..Default::default() });
+        ..Default::default()
+    });
 
     assert!(is_subtype_of(&interner, overloaded, only_sig0));
     assert!(is_subtype_of(&interner, overloaded, only_sig1));
@@ -571,7 +608,8 @@ fn test_generic_overload_simple() {
         call_signatures: vec![generic_sig],
         construct_signatures: vec![],
         properties: vec![],
-    ..Default::default() });
+        ..Default::default()
+    });
 
     // Verify the callable was created with proper type parameter
     let key = interner.lookup(generic_fn).expect("Should have callable");
@@ -623,7 +661,8 @@ fn test_generic_overload_with_constraint() {
         call_signatures: vec![constrained_sig],
         construct_signatures: vec![],
         properties: vec![],
-    ..Default::default() });
+        ..Default::default()
+    });
 
     let key = interner.lookup(generic_fn).expect("Should have callable");
     match key {
@@ -656,18 +695,46 @@ fn test_generic_overload_multiple_type_params() {
     }));
 
     let tuple_return = interner.tuple(vec![
-        TupleElement { type_id: t_param, name: None, optional: false, rest: false },
-        TupleElement { type_id: u_param, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: t_param,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: u_param,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     let multi_param_sig = CallSignature {
         type_params: vec![
-            TypeParamInfo { name: t_name, constraint: None, default: None },
-            TypeParamInfo { name: u_name, constraint: None, default: None },
+            TypeParamInfo {
+                name: t_name,
+                constraint: None,
+                default: None,
+            },
+            TypeParamInfo {
+                name: u_name,
+                constraint: None,
+                default: None,
+            },
         ],
         params: vec![
-            ParamInfo { name: Some(interner.intern_string("x")), type_id: t_param, optional: false, rest: false },
-            ParamInfo { name: Some(interner.intern_string("y")), type_id: u_param, optional: false, rest: false },
+            ParamInfo {
+                name: Some(interner.intern_string("x")),
+                type_id: t_param,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("y")),
+                type_id: u_param,
+                optional: false,
+                rest: false,
+            },
         ],
         this_type: None,
         return_type: tuple_return,
@@ -678,7 +745,8 @@ fn test_generic_overload_multiple_type_params() {
         call_signatures: vec![multi_param_sig],
         construct_signatures: vec![],
         properties: vec![],
-    ..Default::default() });
+        ..Default::default()
+    });
 
     let key = interner.lookup(generic_fn).expect("Should have callable");
     match key {
@@ -716,8 +784,18 @@ fn test_optional_param_overload_matching() {
     let sig_optional = CallSignature {
         type_params: vec![],
         params: vec![
-            ParamInfo { name: Some(interner.intern_string("x")), type_id: TypeId::STRING, optional: false, rest: false },
-            ParamInfo { name: Some(interner.intern_string("y")), type_id: TypeId::NUMBER, optional: true, rest: false },
+            ParamInfo {
+                name: Some(interner.intern_string("x")),
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("y")),
+                type_id: TypeId::NUMBER,
+                optional: true,
+                rest: false,
+            },
         ],
         this_type: None,
         return_type: TypeId::STRING,
@@ -728,18 +806,21 @@ fn test_optional_param_overload_matching() {
         call_signatures: vec![sig_required.clone(), sig_optional.clone()],
         construct_signatures: vec![],
         properties: vec![],
-    ..Default::default() });
+        ..Default::default()
+    });
 
     let only_required = interner.callable(CallableShape {
         call_signatures: vec![sig_required],
         construct_signatures: vec![],
         properties: vec![],
-    ..Default::default() });
+        ..Default::default()
+    });
     let only_optional = interner.callable(CallableShape {
         call_signatures: vec![sig_optional],
         construct_signatures: vec![],
         properties: vec![],
-    ..Default::default() });
+        ..Default::default()
+    });
 
     assert!(is_subtype_of(&interner, overloaded, only_required));
     assert!(is_subtype_of(&interner, overloaded, only_optional));
@@ -753,8 +834,18 @@ fn test_all_optional_params_overload() {
     let all_optional_sig = CallSignature {
         type_params: vec![],
         params: vec![
-            ParamInfo { name: Some(interner.intern_string("x")), type_id: TypeId::STRING, optional: true, rest: false },
-            ParamInfo { name: Some(interner.intern_string("y")), type_id: TypeId::NUMBER, optional: true, rest: false },
+            ParamInfo {
+                name: Some(interner.intern_string("x")),
+                type_id: TypeId::STRING,
+                optional: true,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("y")),
+                type_id: TypeId::NUMBER,
+                optional: true,
+                rest: false,
+            },
         ],
         this_type: None,
         return_type: TypeId::VOID,
@@ -765,7 +856,8 @@ fn test_all_optional_params_overload() {
         call_signatures: vec![all_optional_sig],
         construct_signatures: vec![],
         properties: vec![],
-    ..Default::default() });
+        ..Default::default()
+    });
 
     let no_params_sig = CallSignature {
         type_params: vec![],
@@ -779,7 +871,8 @@ fn test_all_optional_params_overload() {
         call_signatures: vec![no_params_sig],
         construct_signatures: vec![],
         properties: vec![],
-    ..Default::default() });
+        ..Default::default()
+    });
 
     // () => void is subtype of (x?: string, y?: number) => void
     assert!(is_subtype_of(&interner, no_params, fn_with_optional));
@@ -795,8 +888,18 @@ fn test_optional_and_rest_param_overload() {
     let rest_sig = CallSignature {
         type_params: vec![],
         params: vec![
-            ParamInfo { name: Some(interner.intern_string("x")), type_id: TypeId::STRING, optional: false, rest: false },
-            ParamInfo { name: Some(interner.intern_string("rest")), type_id: number_array, optional: false, rest: true },
+            ParamInfo {
+                name: Some(interner.intern_string("x")),
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("rest")),
+                type_id: number_array,
+                optional: false,
+                rest: true,
+            },
         ],
         this_type: None,
         return_type: TypeId::VOID,
@@ -807,7 +910,8 @@ fn test_optional_and_rest_param_overload() {
         call_signatures: vec![rest_sig],
         construct_signatures: vec![],
         properties: vec![],
-    ..Default::default() });
+        ..Default::default()
+    });
 
     let single_param_sig = CallSignature {
         type_params: vec![],
@@ -826,7 +930,8 @@ fn test_optional_and_rest_param_overload() {
         call_signatures: vec![single_param_sig],
         construct_signatures: vec![],
         properties: vec![],
-    ..Default::default() });
+        ..Default::default()
+    });
 
     assert!(is_subtype_of(&interner, single_param, fn_with_rest));
 }

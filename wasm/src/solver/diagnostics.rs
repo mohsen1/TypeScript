@@ -14,12 +14,12 @@
 //! This prevents calling `type_to_string()` thousands of times for errors that are
 //! discarded during overload resolution.
 
-use std::sync::Arc;
-use rustc_hash::FxHashMap;
-use crate::interner::Atom;
-use crate::solver::types::*;
-use crate::solver::TypeDatabase;
 use crate::binder::SymbolId;
+use crate::interner::Atom;
+use crate::solver::TypeDatabase;
+use crate::solver::types::*;
+use rustc_hash::FxHashMap;
+use std::sync::Arc;
 
 #[cfg(test)]
 use crate::solver::TypeInterner;
@@ -275,21 +275,35 @@ pub mod codes {
 pub fn get_message_template(code: u32) -> &'static str {
     match code {
         codes::TYPE_NOT_ASSIGNABLE => "Type '{0}' is not assignable to type '{1}'.",
-        codes::ARG_NOT_ASSIGNABLE => "Argument of type '{0}' is not assignable to parameter of type '{1}'.",
-        codes::PROPERTY_MISSING => "Property '{0}' is missing in type '{1}' but required in type '{2}'.",
+        codes::ARG_NOT_ASSIGNABLE => {
+            "Argument of type '{0}' is not assignable to parameter of type '{1}'."
+        }
+        codes::PROPERTY_MISSING => {
+            "Property '{0}' is missing in type '{1}' but required in type '{2}'."
+        }
         codes::PROPERTY_NOT_EXIST => "Property '{0}' does not exist on type '{1}'.",
         codes::NO_COMMON_PROPERTIES => "Type '{0}' has no properties in common with type '{1}'.",
         codes::READONLY_PROPERTY => "Cannot assign to '{0}' because it is a read-only property.",
-        codes::CONSTRAINT_NOT_SATISFIED => "Type '{0}' is not assignable to type '{1}'. '{2}' is assignable to the constraint of type '{3}', but '{3}' could be instantiated with a different subtype.",
-        codes::THIS_CONTEXT_MISMATCH => "The 'this' context of type '{0}' is not assignable to method's 'this' of type '{1}'.",
-        codes::NEVER_ASYNC_RETURN => "Type 'never' is not a valid return type for an async function.",
+        codes::CONSTRAINT_NOT_SATISFIED => {
+            "Type '{0}' is not assignable to type '{1}'. '{2}' is assignable to the constraint of type '{3}', but '{3}' could be instantiated with a different subtype."
+        }
+        codes::THIS_CONTEXT_MISMATCH => {
+            "The 'this' context of type '{0}' is not assignable to method's 'this' of type '{1}'."
+        }
+        codes::NEVER_ASYNC_RETURN => {
+            "Type 'never' is not a valid return type for an async function."
+        }
         codes::CANNOT_FIND_NAME => "Cannot find name '{0}'.",
-        codes::NOT_CALLABLE => "This expression is not callable. Type '{0}' has no call signatures.",
+        codes::NOT_CALLABLE => {
+            "This expression is not callable. Type '{0}' has no call signatures."
+        }
         codes::ARG_COUNT_MISMATCH => "Expected {0} arguments, but got {1}.",
         codes::OBJECT_POSSIBLY_UNDEFINED => "Object is possibly 'undefined'.",
         codes::OBJECT_POSSIBLY_NULL => "Object is possibly 'null'.",
         codes::OBJECT_IS_UNKNOWN => "Object is of type 'unknown'.",
-        codes::EXCESS_PROPERTY => "Object literal may only specify known properties, and '{0}' does not exist in type '{1}'.",
+        codes::EXCESS_PROPERTY => {
+            "Object literal may only specify known properties, and '{0}' does not exist in type '{1}'."
+        }
         _ => "Unknown diagnostic",
     }
 }
@@ -322,7 +336,10 @@ impl<'a> TypeFormatter<'a> {
     }
 
     /// Create a formatter with access to symbol names.
-    pub fn with_symbols(interner: &'a dyn TypeDatabase, symbol_arena: &'a crate::binder::SymbolArena) -> Self {
+    pub fn with_symbols(
+        interner: &'a dyn TypeDatabase,
+        symbol_arena: &'a crate::binder::SymbolArena,
+    ) -> Self {
         TypeFormatter {
             interner,
             symbol_arena: Some(symbol_arena),
@@ -349,14 +366,17 @@ impl<'a> TypeFormatter<'a> {
         };
 
         // Render related diagnostics, falling back to the primary span.
-        let fallback_span = pending.span.clone()
+        let fallback_span = pending
+            .span
+            .clone()
             .unwrap_or_else(|| SourceSpan::new("<unknown>", 0, 0));
         for related in &pending.related {
-            let related_msg = self.render_template(
-                get_message_template(related.code),
-                &related.args
-            );
-            let span = related.span.clone().unwrap_or_else(|| fallback_span.clone());
+            let related_msg =
+                self.render_template(get_message_template(related.code), &related.args);
+            let span = related
+                .span
+                .clone()
+                .unwrap_or_else(|| fallback_span.clone());
             diag.related.push(RelatedInformation {
                 span,
                 message: related_msg,
@@ -487,9 +507,7 @@ impl<'a> TypeFormatter<'a> {
             }
             TypeKey::Application(app) => {
                 let app = self.interner.type_application(*app);
-                let args: Vec<String> = app.args.iter()
-                    .map(|&arg| self.format(arg))
-                    .collect();
+                let args: Vec<String> = app.args.iter().map(|&arg| self.format(arg)).collect();
                 format!("{}<{}>", self.format(app.base), args.join(", "))
             }
             TypeKey::Conditional(cond_id) => {
@@ -553,7 +571,8 @@ impl<'a> TypeFormatter<'a> {
             IntrinsicKind::Bigint => "bigint",
             IntrinsicKind::Symbol => "symbol",
             IntrinsicKind::Object => "object",
-        }.to_string()
+        }
+        .to_string()
     }
 
     fn format_literal(&mut self, lit: &LiteralValue) -> String {
@@ -570,14 +589,14 @@ impl<'a> TypeFormatter<'a> {
             return "{}".to_string();
         }
         if props.len() > 3 {
-            let first_three: Vec<String> = props.iter().take(3)
+            let first_three: Vec<String> = props
+                .iter()
+                .take(3)
                 .map(|p| self.format_property(p))
                 .collect();
             return format!("{{ {}; ... }}", first_three.join("; "));
         }
-        let formatted: Vec<String> = props.iter()
-            .map(|p| self.format_property(p))
-            .collect();
+        let formatted: Vec<String> = props.iter().map(|p| self.format_property(p)).collect();
         format!("{{ {} }}", formatted.join("; "))
     }
 
@@ -607,26 +626,21 @@ impl<'a> TypeFormatter<'a> {
 
     fn format_union(&mut self, members: &[TypeId]) -> String {
         if members.len() > 5 {
-            let first_five: Vec<String> = members.iter().take(5)
-                .map(|&m| self.format(m))
-                .collect();
+            let first_five: Vec<String> = members.iter().take(5).map(|&m| self.format(m)).collect();
             return format!("{} | ...", first_five.join(" | "));
         }
-        let formatted: Vec<String> = members.iter()
-            .map(|&m| self.format(m))
-            .collect();
+        let formatted: Vec<String> = members.iter().map(|&m| self.format(m)).collect();
         formatted.join(" | ")
     }
 
     fn format_intersection(&mut self, members: &[TypeId]) -> String {
-        let formatted: Vec<String> = members.iter()
-            .map(|&m| self.format(m))
-            .collect();
+        let formatted: Vec<String> = members.iter().map(|&m| self.format(m)).collect();
         formatted.join(" & ")
     }
 
     fn format_tuple(&mut self, elements: &[TupleElement]) -> String {
-        let formatted: Vec<String> = elements.iter()
+        let formatted: Vec<String> = elements
+            .iter()
             .map(|e| {
                 let rest = if e.rest { "..." } else { "" };
                 let optional = if e.optional { "?" } else { "" };
@@ -648,14 +662,22 @@ impl<'a> TypeFormatter<'a> {
             params.push(format!("this: {}", self.format(this_type)));
         }
         for p in &shape.params {
-            let name = p.name.map(|atom| self.atom(atom)).unwrap_or_else(|| Arc::from("_"));
+            let name = p
+                .name
+                .map(|atom| self.atom(atom))
+                .unwrap_or_else(|| Arc::from("_"));
             let optional = if p.optional { "?" } else { "" };
             let rest = if p.rest { "..." } else { "" };
             let type_str = self.format(p.type_id);
             params.push(format!("{}{}{}: {}", rest, name, optional, type_str));
         }
         let arrow = if shape.is_constructor { "new " } else { "" };
-        format!("{}({}) => {}", arrow, params.join(", "), self.format(shape.return_type))
+        format!(
+            "{}({}) => {}",
+            arrow,
+            params.join(", "),
+            self.format(shape.return_type)
+        )
     }
 
     fn format_callable(&mut self, shape: &CallableShape) -> String {
@@ -678,12 +700,20 @@ impl<'a> TypeFormatter<'a> {
             params.push(format!("this: {}", self.format(this_type)));
         }
         for p in &sig.params {
-            let name = p.name.map(|atom| self.atom(atom)).unwrap_or_else(|| Arc::from("_"));
+            let name = p
+                .name
+                .map(|atom| self.atom(atom))
+                .unwrap_or_else(|| Arc::from("_"));
             let type_str = self.format(p.type_id);
             params.push(format!("{}: {}", name, type_str));
         }
         let prefix = if is_construct { "new " } else { "" };
-        format!("{}({}): {}", prefix, params.join(", "), self.format(sig.return_type))
+        format!(
+            "{}({}): {}",
+            prefix,
+            params.join(", "),
+            self.format(sig.return_type)
+        )
     }
 
     fn format_conditional(&mut self, cond: &ConditionalType) -> String {
@@ -748,13 +778,21 @@ impl<'a> DiagnosticBuilder<'a> {
         let source_str = self.formatter.format(source);
         let target_str = self.formatter.format(target);
         TypeDiagnostic::error(
-            format!("Type '{}' is not assignable to type '{}'.", source_str, target_str),
+            format!(
+                "Type '{}' is not assignable to type '{}'.",
+                source_str, target_str
+            ),
             codes::TYPE_NOT_ASSIGNABLE,
         )
     }
 
     /// Create a "Property X is missing in type Y" diagnostic.
-    pub fn property_missing(&mut self, prop_name: &str, source: TypeId, target: TypeId) -> TypeDiagnostic {
+    pub fn property_missing(
+        &mut self,
+        prop_name: &str,
+        source: TypeId,
+        target: TypeId,
+    ) -> TypeDiagnostic {
         let source_str = self.formatter.format(source);
         let target_str = self.formatter.format(target);
         TypeDiagnostic::error(
@@ -770,13 +808,20 @@ impl<'a> DiagnosticBuilder<'a> {
     pub fn property_not_exist(&mut self, prop_name: &str, type_id: TypeId) -> TypeDiagnostic {
         let type_str = self.formatter.format(type_id);
         TypeDiagnostic::error(
-            format!("Property '{}' does not exist on type '{}'.", prop_name, type_str),
+            format!(
+                "Property '{}' does not exist on type '{}'.",
+                prop_name, type_str
+            ),
             codes::PROPERTY_NOT_EXIST,
         )
     }
 
     /// Create an "Argument not assignable" diagnostic.
-    pub fn argument_not_assignable(&mut self, arg_type: TypeId, param_type: TypeId) -> TypeDiagnostic {
+    pub fn argument_not_assignable(
+        &mut self,
+        arg_type: TypeId,
+        param_type: TypeId,
+    ) -> TypeDiagnostic {
         let arg_str = self.formatter.format(arg_type);
         let param_str = self.formatter.format(param_type);
         TypeDiagnostic::error(
@@ -816,7 +861,10 @@ impl<'a> DiagnosticBuilder<'a> {
     /// Create a "Cannot assign to readonly property" diagnostic.
     pub fn readonly_property(&mut self, prop_name: &str) -> TypeDiagnostic {
         TypeDiagnostic::error(
-            format!("Cannot assign to '{}' because it is a read-only property.", prop_name),
+            format!(
+                "Cannot assign to '{}' because it is a read-only property.",
+                prop_name
+            ),
             codes::READONLY_PROPERTY,
         )
     }
@@ -857,16 +905,18 @@ impl SubtypeFailureReason {
     /// an error and want a detailed message about why the type check failed.
     pub fn to_diagnostic(&self, source: TypeId, target: TypeId) -> PendingDiagnostic {
         match self {
-            SubtypeFailureReason::MissingProperty { property_name, source_type, target_type } => {
-                PendingDiagnostic::error(
-                    codes::PROPERTY_MISSING,
-                    vec![
-                        (*property_name).into(),
-                        (*source_type).into(),
-                        (*target_type).into(),
-                    ],
-                )
-            }
+            SubtypeFailureReason::MissingProperty {
+                property_name,
+                source_type,
+                target_type,
+            } => PendingDiagnostic::error(
+                codes::PROPERTY_MISSING,
+                vec![
+                    (*property_name).into(),
+                    (*source_type).into(),
+                    (*target_type).into(),
+                ],
+            ),
 
             SubtypeFailureReason::PropertyTypeMismatch {
                 property_name,
@@ -893,7 +943,8 @@ impl SubtypeFailureReason {
 
                 // If there's a nested reason, add that too
                 if let Some(nested) = nested_reason {
-                    let nested_diag = nested.to_diagnostic(*source_property_type, *target_property_type);
+                    let nested_diag =
+                        nested.to_diagnostic(*source_property_type, *target_property_type);
                     diag = diag.with_related(nested_diag);
                 }
 
@@ -905,7 +956,8 @@ impl SubtypeFailureReason {
                 PendingDiagnostic::error(
                     codes::TYPE_NOT_ASSIGNABLE,
                     vec![source.into(), target.into()],
-                ).with_related(PendingDiagnostic::error(
+                )
+                .with_related(PendingDiagnostic::error(
                     codes::PROPERTY_MISSING, // Close enough - property is "missing" because it's optional
                     vec![(*property_name).into(), source.into(), target.into()],
                 ))
@@ -951,73 +1003,72 @@ impl SubtypeFailureReason {
                 param_index: _,
                 source_param,
                 target_param,
-            } => {
-                PendingDiagnostic::error(
-                    codes::TYPE_NOT_ASSIGNABLE,
-                    vec![source.into(), target.into()],
-                ).with_related(PendingDiagnostic::error(
-                    codes::TYPE_NOT_ASSIGNABLE,
-                    vec![(*source_param).into(), (*target_param).into()],
-                ))
-            }
+            } => PendingDiagnostic::error(
+                codes::TYPE_NOT_ASSIGNABLE,
+                vec![source.into(), target.into()],
+            )
+            .with_related(PendingDiagnostic::error(
+                codes::TYPE_NOT_ASSIGNABLE,
+                vec![(*source_param).into(), (*target_param).into()],
+            )),
 
-            SubtypeFailureReason::TooManyParameters { source_count, target_count } => {
-                PendingDiagnostic::error(
-                    codes::ARG_COUNT_MISMATCH,
-                    vec![(*target_count).into(), (*source_count).into()],
-                )
-            }
+            SubtypeFailureReason::TooManyParameters {
+                source_count,
+                target_count,
+            } => PendingDiagnostic::error(
+                codes::ARG_COUNT_MISMATCH,
+                vec![(*target_count).into(), (*source_count).into()],
+            ),
 
-            SubtypeFailureReason::TupleElementMismatch { source_count, target_count } => {
-                PendingDiagnostic::error(
-                    codes::TYPE_NOT_ASSIGNABLE,
-                    vec![source.into(), target.into()],
-                ).with_related(PendingDiagnostic::error(
-                    codes::ARG_COUNT_MISMATCH,
-                    vec![(*target_count).into(), (*source_count).into()],
-                ))
-            }
+            SubtypeFailureReason::TupleElementMismatch {
+                source_count,
+                target_count,
+            } => PendingDiagnostic::error(
+                codes::TYPE_NOT_ASSIGNABLE,
+                vec![source.into(), target.into()],
+            )
+            .with_related(PendingDiagnostic::error(
+                codes::ARG_COUNT_MISMATCH,
+                vec![(*target_count).into(), (*source_count).into()],
+            )),
 
             SubtypeFailureReason::TupleElementTypeMismatch {
                 index: _,
                 source_element,
                 target_element,
-            } => {
-                PendingDiagnostic::error(
-                    codes::TYPE_NOT_ASSIGNABLE,
-                    vec![source.into(), target.into()],
-                ).with_related(PendingDiagnostic::error(
-                    codes::TYPE_NOT_ASSIGNABLE,
-                    vec![(*source_element).into(), (*target_element).into()],
-                ))
-            }
+            } => PendingDiagnostic::error(
+                codes::TYPE_NOT_ASSIGNABLE,
+                vec![source.into(), target.into()],
+            )
+            .with_related(PendingDiagnostic::error(
+                codes::TYPE_NOT_ASSIGNABLE,
+                vec![(*source_element).into(), (*target_element).into()],
+            )),
 
             SubtypeFailureReason::ArrayElementMismatch {
                 source_element,
                 target_element,
-            } => {
-                PendingDiagnostic::error(
-                    codes::TYPE_NOT_ASSIGNABLE,
-                    vec![source.into(), target.into()],
-                ).with_related(PendingDiagnostic::error(
-                    codes::TYPE_NOT_ASSIGNABLE,
-                    vec![(*source_element).into(), (*target_element).into()],
-                ))
-            }
+            } => PendingDiagnostic::error(
+                codes::TYPE_NOT_ASSIGNABLE,
+                vec![source.into(), target.into()],
+            )
+            .with_related(PendingDiagnostic::error(
+                codes::TYPE_NOT_ASSIGNABLE,
+                vec![(*source_element).into(), (*target_element).into()],
+            )),
 
             SubtypeFailureReason::IndexSignatureMismatch {
                 index_kind: _,
                 source_value_type,
                 target_value_type,
-            } => {
-                PendingDiagnostic::error(
-                    codes::TYPE_NOT_ASSIGNABLE,
-                    vec![source.into(), target.into()],
-                ).with_related(PendingDiagnostic::error(
-                    codes::TYPE_NOT_ASSIGNABLE,
-                    vec![(*source_value_type).into(), (*target_value_type).into()],
-                ))
-            }
+            } => PendingDiagnostic::error(
+                codes::TYPE_NOT_ASSIGNABLE,
+                vec![source.into(), target.into()],
+            )
+            .with_related(PendingDiagnostic::error(
+                codes::TYPE_NOT_ASSIGNABLE,
+                vec![(*source_value_type).into(), (*target_value_type).into()],
+            )),
 
             SubtypeFailureReason::NoUnionMemberMatches {
                 source_type,
@@ -1028,7 +1079,10 @@ impl SubtypeFailureReason {
                     codes::TYPE_NOT_ASSIGNABLE,
                     vec![(*source_type).into(), target.into()],
                 );
-                for member in target_union_members.iter().take(UNION_MEMBER_DIAGNOSTIC_LIMIT) {
+                for member in target_union_members
+                    .iter()
+                    .take(UNION_MEMBER_DIAGNOSTIC_LIMIT)
+                {
                     diag.related.push(PendingDiagnostic::error(
                         codes::TYPE_NOT_ASSIGNABLE,
                         vec![(*source_type).into(), (*member).into()],
@@ -1037,22 +1091,21 @@ impl SubtypeFailureReason {
                 diag
             }
 
-            SubtypeFailureReason::NoCommonProperties { source_type, target_type } => {
-                PendingDiagnostic::error(
-                    codes::NO_COMMON_PROPERTIES,
-                    vec![(*source_type).into(), (*target_type).into()],
-                )
-            }
+            SubtypeFailureReason::NoCommonProperties {
+                source_type,
+                target_type,
+            } => PendingDiagnostic::error(
+                codes::NO_COMMON_PROPERTIES,
+                vec![(*source_type).into(), (*target_type).into()],
+            ),
 
             SubtypeFailureReason::TypeMismatch {
                 source_type,
                 target_type,
-            } => {
-                PendingDiagnostic::error(
-                    codes::TYPE_NOT_ASSIGNABLE,
-                    vec![(*source_type).into(), (*target_type).into()],
-                )
-            }
+            } => PendingDiagnostic::error(
+                codes::TYPE_NOT_ASSIGNABLE,
+                vec![(*source_type).into(), (*target_type).into()],
+            ),
         }
     }
 }
@@ -1092,34 +1145,22 @@ impl PendingDiagnosticBuilder {
 
     /// Create a "Cannot find name" pending diagnostic.
     pub fn cannot_find_name(name: &str) -> PendingDiagnostic {
-        PendingDiagnostic::error(
-            codes::CANNOT_FIND_NAME,
-            vec![name.into()],
-        )
+        PendingDiagnostic::error(codes::CANNOT_FIND_NAME, vec![name.into()])
     }
 
     /// Create a "Type is not callable" pending diagnostic.
     pub fn not_callable(type_id: TypeId) -> PendingDiagnostic {
-        PendingDiagnostic::error(
-            codes::NOT_CALLABLE,
-            vec![type_id.into()],
-        )
+        PendingDiagnostic::error(codes::NOT_CALLABLE, vec![type_id.into()])
     }
 
     /// Create an "Expected N arguments but got M" pending diagnostic.
     pub fn argument_count_mismatch(expected: usize, got: usize) -> PendingDiagnostic {
-        PendingDiagnostic::error(
-            codes::ARG_COUNT_MISMATCH,
-            vec![expected.into(), got.into()],
-        )
+        PendingDiagnostic::error(codes::ARG_COUNT_MISMATCH, vec![expected.into(), got.into()])
     }
 
     /// Create a "Cannot assign to readonly property" pending diagnostic.
     pub fn readonly_property(prop_name: &str) -> PendingDiagnostic {
-        PendingDiagnostic::error(
-            codes::READONLY_PROPERTY,
-            vec![prop_name.into()],
-        )
+        PendingDiagnostic::error(codes::READONLY_PROPERTY, vec![prop_name.into()])
     }
 
     /// Create an "Excess property" pending diagnostic.
@@ -1165,7 +1206,8 @@ impl<'a> SpannedDiagnosticBuilder<'a> {
         start: u32,
         length: u32,
     ) -> TypeDiagnostic {
-        self.builder.type_not_assignable(source, target)
+        self.builder
+            .type_not_assignable(source, target)
             .with_span(self.span(start, length))
     }
 
@@ -1178,7 +1220,8 @@ impl<'a> SpannedDiagnosticBuilder<'a> {
         start: u32,
         length: u32,
     ) -> TypeDiagnostic {
-        self.builder.property_missing(prop_name, source, target)
+        self.builder
+            .property_missing(prop_name, source, target)
             .with_span(self.span(start, length))
     }
 
@@ -1190,7 +1233,8 @@ impl<'a> SpannedDiagnosticBuilder<'a> {
         start: u32,
         length: u32,
     ) -> TypeDiagnostic {
-        self.builder.property_not_exist(prop_name, type_id)
+        self.builder
+            .property_not_exist(prop_name, type_id)
             .with_span(self.span(start, length))
     }
 
@@ -1202,18 +1246,15 @@ impl<'a> SpannedDiagnosticBuilder<'a> {
         start: u32,
         length: u32,
     ) -> TypeDiagnostic {
-        self.builder.argument_not_assignable(arg_type, param_type)
+        self.builder
+            .argument_not_assignable(arg_type, param_type)
             .with_span(self.span(start, length))
     }
 
     /// Create a "Cannot find name" diagnostic with span.
-    pub fn cannot_find_name(
-        &mut self,
-        name: &str,
-        start: u32,
-        length: u32,
-    ) -> TypeDiagnostic {
-        self.builder.cannot_find_name(name)
+    pub fn cannot_find_name(&mut self, name: &str, start: u32, length: u32) -> TypeDiagnostic {
+        self.builder
+            .cannot_find_name(name)
             .with_span(self.span(start, length))
     }
 
@@ -1225,18 +1266,15 @@ impl<'a> SpannedDiagnosticBuilder<'a> {
         start: u32,
         length: u32,
     ) -> TypeDiagnostic {
-        self.builder.argument_count_mismatch(expected, got)
+        self.builder
+            .argument_count_mismatch(expected, got)
             .with_span(self.span(start, length))
     }
 
     /// Create a "Type is not callable" diagnostic with span.
-    pub fn not_callable(
-        &mut self,
-        type_id: TypeId,
-        start: u32,
-        length: u32,
-    ) -> TypeDiagnostic {
-        self.builder.not_callable(type_id)
+    pub fn not_callable(&mut self, type_id: TypeId, start: u32, length: u32) -> TypeDiagnostic {
+        self.builder
+            .not_callable(type_id)
             .with_span(self.span(start, length))
     }
 
@@ -1248,7 +1286,8 @@ impl<'a> SpannedDiagnosticBuilder<'a> {
         start: u32,
         length: u32,
     ) -> TypeDiagnostic {
-        self.builder.excess_property(prop_name, target)
+        self.builder
+            .excess_property(prop_name, target)
             .with_span(self.span(start, length))
     }
 
@@ -1259,7 +1298,8 @@ impl<'a> SpannedDiagnosticBuilder<'a> {
         start: u32,
         length: u32,
     ) -> TypeDiagnostic {
-        self.builder.readonly_property(prop_name)
+        self.builder
+            .readonly_property(prop_name)
             .with_span(self.span(start, length))
     }
 
@@ -1287,8 +1327,13 @@ impl TypeDiagnostic {
     /// Convert to a checker::Diagnostic.
     ///
     /// Uses the provided file_name if no span is present.
-    pub fn to_checker_diagnostic(&self, default_file: &str) -> crate::checker::types::diagnostics::Diagnostic {
-        use crate::checker::types::diagnostics::{Diagnostic, DiagnosticCategory, DiagnosticRelatedInformation};
+    pub fn to_checker_diagnostic(
+        &self,
+        default_file: &str,
+    ) -> crate::checker::types::diagnostics::Diagnostic {
+        use crate::checker::types::diagnostics::{
+            Diagnostic, DiagnosticCategory, DiagnosticRelatedInformation,
+        };
 
         let (file, start, length) = if let Some(ref span) = self.span {
             (span.file.to_string(), span.start, span.length)
@@ -1303,7 +1348,9 @@ impl TypeDiagnostic {
             DiagnosticSeverity::Message => DiagnosticCategory::Message,
         };
 
-        let related_information: Vec<DiagnosticRelatedInformation> = self.related.iter()
+        let related_information: Vec<DiagnosticRelatedInformation> = self
+            .related
+            .iter()
             .map(|rel| DiagnosticRelatedInformation {
                 file: rel.span.file.to_string(),
                 start: rel.span.start,
@@ -1391,14 +1438,10 @@ impl<'a> DiagnosticCollector<'a> {
     }
 
     /// Report a type not assignable error.
-    pub fn type_not_assignable(
-        &mut self,
-        source: TypeId,
-        target: TypeId,
-        loc: &SourceLocation,
-    ) {
+    pub fn type_not_assignable(&mut self, source: TypeId, target: TypeId, loc: &SourceLocation) {
         let mut builder = DiagnosticBuilder::new(self.interner);
-        let diag = builder.type_not_assignable(source, target)
+        let diag = builder
+            .type_not_assignable(source, target)
             .with_span(loc.to_span());
         self.diagnostics.push(diag);
     }
@@ -1412,20 +1455,17 @@ impl<'a> DiagnosticCollector<'a> {
         loc: &SourceLocation,
     ) {
         let mut builder = DiagnosticBuilder::new(self.interner);
-        let diag = builder.property_missing(prop_name, source, target)
+        let diag = builder
+            .property_missing(prop_name, source, target)
             .with_span(loc.to_span());
         self.diagnostics.push(diag);
     }
 
     /// Report a property not exist error.
-    pub fn property_not_exist(
-        &mut self,
-        prop_name: &str,
-        type_id: TypeId,
-        loc: &SourceLocation,
-    ) {
+    pub fn property_not_exist(&mut self, prop_name: &str, type_id: TypeId, loc: &SourceLocation) {
         let mut builder = DiagnosticBuilder::new(self.interner);
-        let diag = builder.property_not_exist(prop_name, type_id)
+        let diag = builder
+            .property_not_exist(prop_name, type_id)
             .with_span(loc.to_span());
         self.diagnostics.push(diag);
     }
@@ -1438,7 +1478,8 @@ impl<'a> DiagnosticCollector<'a> {
         loc: &SourceLocation,
     ) {
         let mut builder = DiagnosticBuilder::new(self.interner);
-        let diag = builder.argument_not_assignable(arg_type, param_type)
+        let diag = builder
+            .argument_not_assignable(arg_type, param_type)
             .with_span(loc.to_span());
         self.diagnostics.push(diag);
     }
@@ -1446,27 +1487,23 @@ impl<'a> DiagnosticCollector<'a> {
     /// Report a cannot find name error.
     pub fn cannot_find_name(&mut self, name: &str, loc: &SourceLocation) {
         let mut builder = DiagnosticBuilder::new(self.interner);
-        let diag = builder.cannot_find_name(name)
-            .with_span(loc.to_span());
+        let diag = builder.cannot_find_name(name).with_span(loc.to_span());
         self.diagnostics.push(diag);
     }
 
     /// Report an argument count mismatch error.
-    pub fn argument_count_mismatch(
-        &mut self,
-        expected: usize,
-        got: usize,
-        loc: &SourceLocation,
-    ) {
+    pub fn argument_count_mismatch(&mut self, expected: usize, got: usize, loc: &SourceLocation) {
         let mut builder = DiagnosticBuilder::new(self.interner);
-        let diag = builder.argument_count_mismatch(expected, got)
+        let diag = builder
+            .argument_count_mismatch(expected, got)
             .with_span(loc.to_span());
         self.diagnostics.push(diag);
     }
 
     /// Convert all collected diagnostics to checker diagnostics.
     pub fn to_checker_diagnostics(&self) -> Vec<crate::checker::types::diagnostics::Diagnostic> {
-        self.diagnostics.iter()
+        self.diagnostics
+            .iter()
             .map(|d| d.to_checker_diagnostic(&self.file))
             .collect()
     }

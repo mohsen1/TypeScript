@@ -10,8 +10,8 @@
 //! - Handling of constraints and defaults
 
 use crate::interner::Atom;
-use crate::solver::types::*;
 use crate::solver::TypeDatabase;
+use crate::solver::types::*;
 use rustc_hash::FxHashMap;
 
 #[cfg(test)]
@@ -149,21 +149,26 @@ impl<'a> TypeInstantiator<'a> {
     /// Instantiate a call signature.
     fn instantiate_call_signature(&mut self, sig: &CallSignature) -> CallSignature {
         let shadowed_len = self.shadowed.len();
-        self.shadowed.extend(sig.type_params.iter().map(|tp| tp.name));
+        self.shadowed
+            .extend(sig.type_params.iter().map(|tp| tp.name));
 
         let type_predicate = sig
             .type_predicate
             .as_ref()
             .map(|predicate| self.instantiate_type_predicate(predicate));
         let this_type = sig.this_type.map(|type_id| self.instantiate(type_id));
-        let type_params: Vec<TypeParamInfo> = sig.type_params.iter()
+        let type_params: Vec<TypeParamInfo> = sig
+            .type_params
+            .iter()
             .map(|tp| TypeParamInfo {
                 name: tp.name,
                 constraint: tp.constraint.map(|c| self.instantiate(c)),
                 default: tp.default.map(|d| self.instantiate(d)),
             })
             .collect();
-        let params: Vec<ParamInfo> = sig.params.iter()
+        let params: Vec<ParamInfo> = sig
+            .params
+            .iter()
             .map(|p| ParamInfo {
                 name: p.name.clone(),
                 type_id: self.instantiate(p.type_id),
@@ -222,9 +227,7 @@ impl<'a> TypeInstantiator<'a> {
             TypeKey::Application(app_id) => {
                 let app = self.interner.type_application(*app_id);
                 let base = self.instantiate(app.base);
-                let args: Vec<TypeId> = app.args.iter()
-                    .map(|&arg| self.instantiate(arg))
-                    .collect();
+                let args: Vec<TypeId> = app.args.iter().map(|&arg| self.instantiate(arg)).collect();
                 self.interner.application(base, args)
             }
 
@@ -234,18 +237,16 @@ impl<'a> TypeInstantiator<'a> {
             // Union: instantiate all members
             TypeKey::Union(members) => {
                 let members = self.interner.type_list(*members);
-                let instantiated: Vec<TypeId> = members.iter()
-                    .map(|&m| self.instantiate(m))
-                    .collect();
+                let instantiated: Vec<TypeId> =
+                    members.iter().map(|&m| self.instantiate(m)).collect();
                 self.interner.union(instantiated)
             }
 
             // Intersection: instantiate all members
             TypeKey::Intersection(members) => {
                 let members = self.interner.type_list(*members);
-                let instantiated: Vec<TypeId> = members.iter()
-                    .map(|&m| self.instantiate(m))
-                    .collect();
+                let instantiated: Vec<TypeId> =
+                    members.iter().map(|&m| self.instantiate(m)).collect();
                 self.interner.intersection(instantiated)
             }
 
@@ -258,7 +259,8 @@ impl<'a> TypeInstantiator<'a> {
             // Tuple: instantiate all elements
             TypeKey::Tuple(elements) => {
                 let elements = self.interner.tuple_list(*elements);
-                let instantiated: Vec<TupleElement> = elements.iter()
+                let instantiated: Vec<TupleElement> = elements
+                    .iter()
                     .map(|e| TupleElement {
                         type_id: self.instantiate(e.type_id),
                         name: e.name,
@@ -272,7 +274,9 @@ impl<'a> TypeInstantiator<'a> {
             // Object: instantiate all property types
             TypeKey::Object(shape_id) => {
                 let shape = self.interner.object_shape(*shape_id);
-                let instantiated: Vec<PropertyInfo> = shape.properties.iter()
+                let instantiated: Vec<PropertyInfo> = shape
+                    .properties
+                    .iter()
                     .map(|p| PropertyInfo {
                         name: p.name,
                         type_id: self.instantiate(p.type_id),
@@ -288,7 +292,9 @@ impl<'a> TypeInstantiator<'a> {
             // Object with index signatures: instantiate all types
             TypeKey::ObjectWithIndex(shape_id) => {
                 let shape = self.interner.object_shape(*shape_id);
-                let instantiated_props: Vec<PropertyInfo> = shape.properties.iter()
+                let instantiated_props: Vec<PropertyInfo> = shape
+                    .properties
+                    .iter()
                     .map(|p| PropertyInfo {
                         name: p.name,
                         type_id: self.instantiate(p.type_id),
@@ -298,16 +304,18 @@ impl<'a> TypeInstantiator<'a> {
                         is_method: p.is_method,
                     })
                     .collect();
-                let instantiated_string_idx = shape.string_index.as_ref().map(|idx| IndexSignature {
-                    key_type: self.instantiate(idx.key_type),
-                    value_type: self.instantiate(idx.value_type),
-                    readonly: idx.readonly,
-                });
-                let instantiated_number_idx = shape.number_index.as_ref().map(|idx| IndexSignature {
-                    key_type: self.instantiate(idx.key_type),
-                    value_type: self.instantiate(idx.value_type),
-                    readonly: idx.readonly,
-                });
+                let instantiated_string_idx =
+                    shape.string_index.as_ref().map(|idx| IndexSignature {
+                        key_type: self.instantiate(idx.key_type),
+                        value_type: self.instantiate(idx.value_type),
+                        readonly: idx.readonly,
+                    });
+                let instantiated_number_idx =
+                    shape.number_index.as_ref().map(|idx| IndexSignature {
+                        key_type: self.instantiate(idx.key_type),
+                        value_type: self.instantiate(idx.value_type),
+                        readonly: idx.readonly,
+                    });
                 self.interner.object_with_index(ObjectShape {
                     properties: instantiated_props,
                     string_index: instantiated_string_idx,
@@ -320,21 +328,26 @@ impl<'a> TypeInstantiator<'a> {
             TypeKey::Function(shape_id) => {
                 let shape = self.interner.function_shape(*shape_id);
                 let shadowed_len = self.shadowed.len();
-                self.shadowed.extend(shape.type_params.iter().map(|tp| tp.name));
+                self.shadowed
+                    .extend(shape.type_params.iter().map(|tp| tp.name));
 
                 let type_predicate = shape
                     .type_predicate
                     .as_ref()
                     .map(|predicate| self.instantiate_type_predicate(predicate));
                 let this_type = shape.this_type.map(|type_id| self.instantiate(type_id));
-                let instantiated_type_params: Vec<TypeParamInfo> = shape.type_params.iter()
+                let instantiated_type_params: Vec<TypeParamInfo> = shape
+                    .type_params
+                    .iter()
                     .map(|tp| TypeParamInfo {
                         name: tp.name,
                         constraint: tp.constraint.map(|c| self.instantiate(c)),
                         default: tp.default.map(|d| self.instantiate(d)),
                     })
                     .collect();
-                let instantiated_params: Vec<ParamInfo> = shape.params.iter()
+                let instantiated_params: Vec<ParamInfo> = shape
+                    .params
+                    .iter()
                     .map(|p| ParamInfo {
                         name: p.name,
                         type_id: self.instantiate(p.type_id),
@@ -360,13 +373,19 @@ impl<'a> TypeInstantiator<'a> {
             // Callable: instantiate all signatures and properties
             TypeKey::Callable(shape_id) => {
                 let shape = self.interner.callable_shape(*shape_id);
-                let instantiated_call: Vec<CallSignature> = shape.call_signatures.iter()
+                let instantiated_call: Vec<CallSignature> = shape
+                    .call_signatures
+                    .iter()
                     .map(|sig| self.instantiate_call_signature(sig))
                     .collect();
-                let instantiated_construct: Vec<CallSignature> = shape.construct_signatures.iter()
+                let instantiated_construct: Vec<CallSignature> = shape
+                    .construct_signatures
+                    .iter()
                     .map(|sig| self.instantiate_call_signature(sig))
                     .collect();
-                let instantiated_props = shape.properties.iter()
+                let instantiated_props = shape
+                    .properties
+                    .iter()
                     .map(|p| PropertyInfo {
                         name: p.name,
                         type_id: self.instantiate(p.type_id),
@@ -381,7 +400,8 @@ impl<'a> TypeInstantiator<'a> {
                     call_signatures: instantiated_call,
                     construct_signatures: instantiated_construct,
                     properties: instantiated_props,
-                ..Default::default() })
+                    ..Default::default()
+                })
             }
 
             // Conditional: instantiate all parts
@@ -408,11 +428,10 @@ impl<'a> TypeInstantiator<'a> {
                                             cond_type,
                                             &member_subst,
                                         );
-                                        let evaluated =
-                                            crate::solver::evaluate::evaluate_type(
-                                                self.interner,
-                                                instantiated,
-                                            );
+                                        let evaluated = crate::solver::evaluate::evaluate_type(
+                                            self.interner,
+                                            instantiated,
+                                        );
                                         results.push(evaluated);
                                     }
                                     return self.interner.union(results);
@@ -459,7 +478,8 @@ impl<'a> TypeInstantiator<'a> {
             TypeKey::IndexAccess(obj, idx) => {
                 let inst_obj = self.instantiate(*obj);
                 let inst_idx = self.instantiate(*idx);
-                self.interner.intern(TypeKey::IndexAccess(inst_obj, inst_idx))
+                self.interner
+                    .intern(TypeKey::IndexAccess(inst_obj, inst_idx))
             }
 
             // KeyOf: instantiate the operand
@@ -477,7 +497,8 @@ impl<'a> TypeInstantiator<'a> {
             // Template literal: instantiate embedded types
             TypeKey::TemplateLiteral(spans) => {
                 let spans = self.interner.template_list(*spans);
-                let instantiated: Vec<TemplateSpan> = spans.iter()
+                let instantiated: Vec<TemplateSpan> = spans
+                    .iter()
                     .map(|span| match span {
                         TemplateSpan::Text(t) => TemplateSpan::Text(*t),
                         TemplateSpan::Type(t) => TemplateSpan::Type(self.instantiate(*t)),

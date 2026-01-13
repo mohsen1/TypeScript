@@ -16,11 +16,7 @@
 //! let tree = symbols.get_symbol_tree(root);
 //! ```
 
-pub use super::document_symbols::{
-    DocumentSymbolProvider,
-    DocumentSymbol,
-    SymbolKind,
-};
+pub use super::document_symbols::{DocumentSymbol, DocumentSymbolProvider, SymbolKind};
 
 /// Main API for extracting document symbols from AST.
 ///
@@ -39,7 +35,11 @@ impl<'a> DocumentSymbols<'a> {
     /// * `source_text` - The source code text
     pub fn new(arena: &'a crate::parser::thin_node::ThinNodeArena, source_text: &'a str) -> Self {
         let line_map = crate::lsp::position::LineMap::build(source_text);
-        Self { arena, line_map, source_text }
+        Self {
+            arena,
+            line_map,
+            source_text,
+        }
     }
 
     /// Extract all symbols from the AST as a hierarchical tree.

@@ -1,9 +1,9 @@
 //! Literal and identifier AST nodes.
 
-use serde::Serialize;
-use crate::scanner::SyntaxKind;
 use super::base::{NodeBase, NodeIndex, NodeList};
 use crate::parser::syntax_kind_ext;
+use crate::scanner::SyntaxKind;
+use serde::Serialize;
 
 /// An identifier node.
 #[derive(Clone, Debug, Serialize)]
@@ -65,7 +65,7 @@ pub struct RegularExpressionLiteral {
 pub struct TemplateSpan {
     pub base: NodeBase,
     pub expression: NodeIndex,
-    pub literal: NodeIndex,  // TemplateMiddle or TemplateTail
+    pub literal: NodeIndex, // TemplateMiddle or TemplateTail
 }
 
 /// The root node representing a source file.

@@ -4,10 +4,10 @@
 //! Currently delegates to external formatters (prettier, eslint, etc.)
 //! via command-line tools.
 
+use crate::lsp::position::{Position, Range};
 use std::io::Write;
-use std::process::Command;
 use std::path::Path;
-use crate::lsp::position::{Range, Position};
+use std::process::Command;
 
 /// Formatting options for a document.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -112,14 +112,14 @@ impl DocumentFormattingProvider {
         options: &FormattingOptions,
     ) -> Result<Vec<TextEdit>, String> {
         let path = Path::new(file_path);
-        let file_name = path.file_name()
+        let file_name = path
+            .file_name()
             .and_then(|n| n.to_str())
             .ok_or("Invalid file path")?;
 
         // Build prettier arguments
         let mut cmd = Command::new("prettier");
-        cmd.arg("--stdin-filepath")
-           .arg(file_name);
+        cmd.arg("--stdin-filepath").arg(file_name);
 
         if options.insert_spaces {
             cmd.arg("--use-tabs").arg("false");
@@ -140,14 +140,16 @@ impl DocumentFormattingProvider {
             .map_err(|e| format!("Failed to spawn prettier: {}", e))?;
 
         // Write source to stdin
-        output.stdin
+        output
+            .stdin
             .as_ref()
             .ok_or("Failed to open stdin")?
             .write_all(source_text.as_bytes())
             .map_err(|e| format!("Failed to write to prettier stdin: {}", e))?;
 
         // Get output
-        let result = output.wait_with_output()
+        let result = output
+            .wait_with_output()
             .map_err(|e| format!("Failed to read prettier output: {}", e))?;
 
         if !result.status.success() {
@@ -158,12 +160,10 @@ impl DocumentFormattingProvider {
         let formatted = String::from_utf8_lossy(&result.stdout);
 
         // Create a single edit replacing the entire document
-        Ok(vec![
-            TextEdit::new(
-                Range::new(Position::new(0, 0), Position::new(u32::MAX, u32::MAX)),
-                formatted.to_string()
-            )
-        ])
+        Ok(vec![TextEdit::new(
+            Range::new(Position::new(0, 0), Position::new(u32::MAX, u32::MAX)),
+            formatted.to_string(),
+        )])
     }
 
     /// Format using eslint with --fix.
@@ -183,7 +183,8 @@ impl DocumentFormattingProvider {
             .spawn()
             .map_err(|e| format!("Failed to spawn eslint: {}", e))?;
 
-        let result = output.wait_with_output()
+        let result = output
+            .wait_with_output()
             .map_err(|e| format!("Failed to read eslint output: {}", e))?;
 
         if !result.status.success() {
@@ -197,12 +198,10 @@ impl DocumentFormattingProvider {
 
         let formatted = String::from_utf8_lossy(&result.stdout);
 
-        Ok(vec![
-            TextEdit::new(
-                Range::new(Position::new(0, 0), Position::new(u32::MAX, u32::MAX)),
-                formatted.to_string()
-            )
-        ])
+        Ok(vec![TextEdit::new(
+            Range::new(Position::new(0, 0), Position::new(u32::MAX, u32::MAX)),
+            formatted.to_string(),
+        )])
     }
 
     /// Apply basic formatting when no external formatter is available.
@@ -233,7 +232,8 @@ impl DocumentFormattingProvider {
                 processed = processed.replace('\t', &tab_str);
             } else {
                 // Spaces to tabs (only for leading spaces)
-                processed = Self::convert_leading_spaces_to_tabs(&processed, options.tab_size as usize);
+                processed =
+                    Self::convert_leading_spaces_to_tabs(&processed, options.tab_size as usize);
             }
 
             formatted_lines.push(processed);
@@ -246,12 +246,10 @@ impl DocumentFormattingProvider {
 
         let formatted = formatted_lines.join("\n");
 
-        Ok(vec![
-            TextEdit::new(
-                Range::new(Position::new(0, 0), Position::new(u32::MAX, u32::MAX)),
-                formatted
-            )
-        ])
+        Ok(vec![TextEdit::new(
+            Range::new(Position::new(0, 0), Position::new(u32::MAX, u32::MAX)),
+            formatted,
+        )])
     }
 
     /// Convert leading spaces to tabs based on tab size.
@@ -359,11 +357,13 @@ mod formatting_tests {
     #[test]
     fn test_convert_leading_spaces_to_tabs() {
         // 8 spaces with tab_size 4 should become 2 tabs
-        let result = DocumentFormattingProvider::convert_leading_spaces_to_tabs("        let x = 1;", 4);
+        let result =
+            DocumentFormattingProvider::convert_leading_spaces_to_tabs("        let x = 1;", 4);
         assert_eq!(result, "\t\tlet x = 1;");
 
         // 6 spaces with tab_size 4 should become 1 tab + 2 spaces
-        let result = DocumentFormattingProvider::convert_leading_spaces_to_tabs("      let x = 1;", 4);
+        let result =
+            DocumentFormattingProvider::convert_leading_spaces_to_tabs("      let x = 1;", 4);
         assert_eq!(result, "\t  let x = 1;");
 
         // 2 spaces with tab_size 4 should stay as spaces

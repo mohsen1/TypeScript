@@ -24,9 +24,9 @@
 //! }
 //! ```
 
+use crate::parser::syntax_kind_ext;
 use crate::parser::thin_node::{ThinNode, ThinNodeArena};
 use crate::parser::{NodeIndex, NodeList};
-use crate::parser::syntax_kind_ext;
 use crate::scanner::SyntaxKind;
 use crate::source_writer::{SourcePosition, SourceWriter, source_position_from_offset};
 
@@ -71,29 +71,31 @@ impl<'a> DeclarationEmitter<'a> {
     pub fn generate_source_map_json(&mut self) -> Option<String> {
         self.writer.generate_source_map_json()
     }
-    
+
     /// Emit declaration for a source file
     pub fn emit(&mut self, root_idx: NodeIndex) -> String {
         self.reset_writer();
         self.indent_level = 0;
-        
+
         let Some(root_node) = self.arena.get(root_idx) else {
             return String::new();
         };
-        
+
         let Some(source_file) = self.arena.get_source_file(root_node) else {
             return String::new();
         };
-        
+
         for &stmt_idx in &source_file.statements.nodes {
             self.emit_statement(stmt_idx);
         }
-        
+
         self.writer.get_output().to_string()
     }
-    
+
     fn emit_statement(&mut self, stmt_idx: NodeIndex) {
-        let Some(stmt_node) = self.arena.get(stmt_idx) else { return };
+        let Some(stmt_node) = self.arena.get(stmt_idx) else {
+            return;
+        };
         let before_len = self.writer.len();
         self.queue_source_mapping(stmt_node);
 
@@ -135,52 +137,60 @@ impl<'a> DeclarationEmitter<'a> {
             self.pending_source_pos = None;
         }
     }
-    
+
     fn emit_function_declaration(&mut self, func_idx: NodeIndex) {
-        let Some(func_node) = self.arena.get(func_idx) else { return };
-        let Some(func) = self.arena.get_function(func_node) else { return };
-        
+        let Some(func_node) = self.arena.get(func_idx) else {
+            return;
+        };
+        let Some(func) = self.arena.get_function(func_node) else {
+            return;
+        };
+
         // Check for export modifier
         let is_exported = self.has_export_modifier(&func.modifiers);
-        
+
         self.write_indent();
         if is_exported {
             self.write("export ");
         }
         self.write("declare function ");
-        
+
         // Function name
         self.emit_node(func.name);
-        
+
         // Type parameters
         if let Some(ref type_params) = func.type_parameters {
             if !type_params.nodes.is_empty() {
                 self.emit_type_parameters(type_params);
             }
         }
-        
+
         // Parameters
         self.write("(");
         self.emit_parameters(&func.parameters);
         self.write(")");
-        
+
         // Return type
         if !func.type_annotation.is_none() {
             self.write(": ");
             self.emit_type(func.type_annotation);
         }
-        
+
         self.write(";");
         self.write_line();
     }
-    
+
     fn emit_class_declaration(&mut self, class_idx: NodeIndex) {
-        let Some(class_node) = self.arena.get(class_idx) else { return };
-        let Some(class) = self.arena.get_class(class_node) else { return };
-        
+        let Some(class_node) = self.arena.get(class_idx) else {
+            return;
+        };
+        let Some(class) = self.arena.get_class(class_node) else {
+            return;
+        };
+
         let is_exported = self.has_export_modifier(&class.modifiers);
         let is_abstract = self.has_modifier(&class.modifiers, SyntaxKind::AbstractKeyword as u16);
-        
+
         self.write_indent();
         if is_exported {
             self.write("export ");
@@ -190,40 +200,42 @@ impl<'a> DeclarationEmitter<'a> {
             self.write("abstract ");
         }
         self.write("class ");
-        
+
         // Class name
         self.emit_node(class.name);
-        
+
         // Type parameters
         if let Some(ref type_params) = class.type_parameters {
             if !type_params.nodes.is_empty() {
                 self.emit_type_parameters(type_params);
             }
         }
-        
+
         // Heritage clauses (extends, implements)
         if let Some(ref heritage) = class.heritage_clauses {
             self.emit_heritage_clauses(heritage);
         }
-        
+
         self.write(" {");
         self.write_line();
         self.increase_indent();
-        
+
         // Members
         for &member_idx in &class.members.nodes {
             self.emit_class_member(member_idx);
         }
-        
+
         self.decrease_indent();
         self.write_indent();
         self.write("}");
         self.write_line();
     }
-    
+
     fn emit_class_member(&mut self, member_idx: NodeIndex) {
-        let Some(member_node) = self.arena.get(member_idx) else { return };
-        
+        let Some(member_node) = self.arena.get(member_idx) else {
+            return;
+        };
+
         match member_node.kind {
             k if k == syntax_kind_ext::PROPERTY_DECLARATION => {
                 self.emit_property_declaration(member_idx);
@@ -248,179 +260,205 @@ impl<'a> DeclarationEmitter<'a> {
     }
 
     fn emit_property_declaration(&mut self, prop_idx: NodeIndex) {
-        let Some(prop_node) = self.arena.get(prop_idx) else { return };
-        let Some(prop) = self.arena.get_property_decl(prop_node) else { return };
-        
+        let Some(prop_node) = self.arena.get(prop_idx) else {
+            return;
+        };
+        let Some(prop) = self.arena.get_property_decl(prop_node) else {
+            return;
+        };
+
         self.write_indent();
-        
+
         // Modifiers
         self.emit_member_modifiers(&prop.modifiers);
-        
+
         // Name
         self.emit_node(prop.name);
-        
+
         // Optional marker
         if prop.question_token {
             self.write("?");
         }
-        
+
         // Type
         if !prop.type_annotation.is_none() {
             self.write(": ");
             self.emit_type(prop.type_annotation);
         }
-        
+
         self.write(";");
         self.write_line();
     }
-    
+
     fn emit_method_declaration(&mut self, method_idx: NodeIndex) {
-        let Some(method_node) = self.arena.get(method_idx) else { return };
-        let Some(method) = self.arena.get_method_decl(method_node) else { return };
-        
+        let Some(method_node) = self.arena.get(method_idx) else {
+            return;
+        };
+        let Some(method) = self.arena.get_method_decl(method_node) else {
+            return;
+        };
+
         self.write_indent();
-        
+
         // Modifiers
         self.emit_member_modifiers(&method.modifiers);
-        
+
         // Name
         self.emit_node(method.name);
-        
+
         // Type parameters
         if let Some(ref type_params) = method.type_parameters {
             if !type_params.nodes.is_empty() {
                 self.emit_type_parameters(type_params);
             }
         }
-        
+
         // Parameters
         self.write("(");
         self.emit_parameters(&method.parameters);
         self.write(")");
-        
+
         // Return type
         if !method.type_annotation.is_none() {
             self.write(": ");
             self.emit_type(method.type_annotation);
         }
-        
+
         self.write(";");
         self.write_line();
     }
-    
+
     fn emit_constructor_declaration(&mut self, ctor_idx: NodeIndex) {
-        let Some(ctor_node) = self.arena.get(ctor_idx) else { return };
-        let Some(ctor) = self.arena.get_constructor(ctor_node) else { return };
-        
+        let Some(ctor_node) = self.arena.get(ctor_idx) else {
+            return;
+        };
+        let Some(ctor) = self.arena.get_constructor(ctor_node) else {
+            return;
+        };
+
         self.write_indent();
         self.write("constructor(");
         self.emit_parameters(&ctor.parameters);
         self.write(");");
         self.write_line();
     }
-    
+
     fn emit_accessor_declaration(&mut self, accessor_idx: NodeIndex, is_getter: bool) {
-        let Some(accessor_node) = self.arena.get(accessor_idx) else { return };
-        let Some(accessor) = self.arena.get_accessor(accessor_node) else { return };
-        
+        let Some(accessor_node) = self.arena.get(accessor_idx) else {
+            return;
+        };
+        let Some(accessor) = self.arena.get_accessor(accessor_node) else {
+            return;
+        };
+
         self.write_indent();
-        
+
         // Modifiers
         self.emit_member_modifiers(&accessor.modifiers);
-        
+
         if is_getter {
             self.write("get ");
         } else {
             self.write("set ");
         }
-        
+
         // Name
         self.emit_node(accessor.name);
-        
+
         // Parameters
         self.write("(");
         self.emit_parameters(&accessor.parameters);
         self.write(")");
-        
+
         // Return type (for getters)
         if is_getter && !accessor.type_annotation.is_none() {
             self.write(": ");
             self.emit_type(accessor.type_annotation);
         }
-        
+
         self.write(";");
         self.write_line();
     }
-    
+
     fn emit_index_signature(&mut self, sig_idx: NodeIndex) {
-        let Some(sig_node) = self.arena.get(sig_idx) else { return };
-        let Some(sig) = self.arena.get_index_signature(sig_node) else { return };
-        
+        let Some(sig_node) = self.arena.get(sig_idx) else {
+            return;
+        };
+        let Some(sig) = self.arena.get_index_signature(sig_node) else {
+            return;
+        };
+
         self.write_indent();
-        
+
         // Modifiers
         self.emit_member_modifiers(&sig.modifiers);
-        
+
         self.write("[");
         self.emit_parameters(&sig.parameters);
         self.write("]");
-        
+
         if !sig.type_annotation.is_none() {
             self.write(": ");
             self.emit_type(sig.type_annotation);
         }
-        
+
         self.write(";");
         self.write_line();
     }
-    
+
     fn emit_interface_declaration(&mut self, iface_idx: NodeIndex) {
-        let Some(iface_node) = self.arena.get(iface_idx) else { return };
-        let Some(iface) = self.arena.get_interface(iface_node) else { return };
-        
+        let Some(iface_node) = self.arena.get(iface_idx) else {
+            return;
+        };
+        let Some(iface) = self.arena.get_interface(iface_node) else {
+            return;
+        };
+
         let is_exported = self.has_export_modifier(&iface.modifiers);
-        
+
         self.write_indent();
         if is_exported {
             self.write("export ");
         }
         self.write("interface ");
-        
+
         // Name
         self.emit_node(iface.name);
-        
+
         // Type parameters
         if let Some(ref type_params) = iface.type_parameters {
             if !type_params.nodes.is_empty() {
                 self.emit_type_parameters(type_params);
             }
         }
-        
+
         // Heritage (extends)
         if let Some(ref heritage) = iface.heritage_clauses {
             self.emit_heritage_clauses(heritage);
         }
-        
+
         self.write(" {");
         self.write_line();
         self.increase_indent();
-        
+
         // Members
         for &member_idx in &iface.members.nodes {
             self.emit_interface_member(member_idx);
         }
-        
+
         self.decrease_indent();
         self.write_indent();
         self.write("}");
         self.write_line();
     }
-    
+
     fn emit_interface_member(&mut self, member_idx: NodeIndex) {
-        let Some(member_node) = self.arena.get(member_idx) else { return };
-        
+        let Some(member_node) = self.arena.get(member_idx) else {
+            return;
+        };
+
         self.write_indent();
-        
+
         match member_node.kind {
             k if k == syntax_kind_ext::PROPERTY_SIGNATURE => {
                 if let Some(sig) = self.arena.get_signature(member_node) {
@@ -499,46 +537,54 @@ impl<'a> DeclarationEmitter<'a> {
             }
             _ => {}
         }
-        
+
         self.write(";");
         self.write_line();
     }
-    
+
     fn emit_type_alias_declaration(&mut self, alias_idx: NodeIndex) {
-        let Some(alias_node) = self.arena.get(alias_idx) else { return };
-        let Some(alias) = self.arena.get_type_alias(alias_node) else { return };
-        
+        let Some(alias_node) = self.arena.get(alias_idx) else {
+            return;
+        };
+        let Some(alias) = self.arena.get_type_alias(alias_node) else {
+            return;
+        };
+
         let is_exported = self.has_export_modifier(&alias.modifiers);
-        
+
         self.write_indent();
         if is_exported {
             self.write("export ");
         }
         self.write("type ");
-        
+
         // Name
         self.emit_node(alias.name);
-        
+
         // Type parameters
         if let Some(ref type_params) = alias.type_parameters {
             if !type_params.nodes.is_empty() {
                 self.emit_type_parameters(type_params);
             }
         }
-        
+
         self.write(" = ");
         self.emit_type(alias.type_node);
         self.write(";");
         self.write_line();
     }
-    
+
     fn emit_enum_declaration(&mut self, enum_idx: NodeIndex) {
-        let Some(enum_node) = self.arena.get(enum_idx) else { return };
-        let Some(enum_data) = self.arena.get_enum(enum_node) else { return };
-        
+        let Some(enum_node) = self.arena.get(enum_idx) else {
+            return;
+        };
+        let Some(enum_data) = self.arena.get_enum(enum_node) else {
+            return;
+        };
+
         let is_exported = self.has_export_modifier(&enum_data.modifiers);
         let is_const = self.has_modifier(&enum_data.modifiers, SyntaxKind::ConstKeyword as u16);
-        
+
         self.write_indent();
         if is_exported {
             self.write("export ");
@@ -548,13 +594,13 @@ impl<'a> DeclarationEmitter<'a> {
             self.write("const ");
         }
         self.write("enum ");
-        
+
         self.emit_node(enum_data.name);
-        
+
         self.write(" {");
         self.write_line();
         self.increase_indent();
-        
+
         for (i, &member_idx) in enum_data.members.nodes.iter().enumerate() {
             self.write_indent();
             if let Some(member_node) = self.arena.get(member_idx) {
@@ -571,22 +617,28 @@ impl<'a> DeclarationEmitter<'a> {
             }
             self.write_line();
         }
-        
+
         self.decrease_indent();
         self.write_indent();
         self.write("}");
         self.write_line();
     }
-    
+
     fn emit_variable_declaration_statement(&mut self, stmt_idx: NodeIndex) {
-        let Some(stmt_node) = self.arena.get(stmt_idx) else { return };
-        let Some(var_stmt) = self.arena.get_variable(stmt_node) else { return };
-        
+        let Some(stmt_node) = self.arena.get(stmt_idx) else {
+            return;
+        };
+        let Some(var_stmt) = self.arena.get_variable(stmt_node) else {
+            return;
+        };
+
         let is_exported = self.has_export_modifier(&var_stmt.modifiers);
-        
+
         for &decl_list_idx in &var_stmt.declarations.nodes {
-            let Some(decl_list_node) = self.arena.get(decl_list_idx) else { continue };
-            
+            let Some(decl_list_node) = self.arena.get(decl_list_idx) else {
+                continue;
+            };
+
             if decl_list_node.kind == syntax_kind_ext::VARIABLE_DECLARATION_LIST {
                 if let Some(decl_list) = self.arena.get_variable(decl_list_node) {
                     // Determine let/const/var
@@ -598,7 +650,7 @@ impl<'a> DeclarationEmitter<'a> {
                     } else {
                         "var"
                     };
-                    
+
                     for &decl_idx in &decl_list.declarations.nodes {
                         self.write_indent();
                         if is_exported {
@@ -607,7 +659,7 @@ impl<'a> DeclarationEmitter<'a> {
                         self.write("declare ");
                         self.write(keyword);
                         self.write(" ");
-                        
+
                         if let Some(decl_node) = self.arena.get(decl_idx) {
                             if let Some(decl) = self.arena.get_variable_declaration(decl_node) {
                                 self.emit_node(decl.name);
@@ -617,7 +669,7 @@ impl<'a> DeclarationEmitter<'a> {
                                 }
                             }
                         }
-                        
+
                         self.write(";");
                         self.write_line();
                     }
@@ -625,10 +677,14 @@ impl<'a> DeclarationEmitter<'a> {
             }
         }
     }
-    
+
     fn emit_export_declaration(&mut self, export_idx: NodeIndex) {
-        let Some(export_node) = self.arena.get(export_idx) else { return };
-        let Some(export) = self.arena.get_export_decl(export_node) else { return };
+        let Some(export_node) = self.arena.get(export_idx) else {
+            return;
+        };
+        let Some(export) = self.arena.get_export_decl(export_node) else {
+            return;
+        };
 
         if export.is_default_export {
             if !export.export_clause.is_none() {
@@ -650,7 +706,7 @@ impl<'a> DeclarationEmitter<'a> {
             self.emit_export_default_expression(export.export_clause);
             return;
         }
-        
+
         // Check if export_clause is a declaration (interface, class, function, type, enum)
         if !export.export_clause.is_none() {
             if let Some(clause_node) = self.arena.get(export.export_clause) {
@@ -684,7 +740,7 @@ impl<'a> DeclarationEmitter<'a> {
                 }
             }
         }
-        
+
         // Handle named exports: export { a, b } from "mod"
         // or star exports: export * from "mod"
         self.write_indent();
@@ -693,7 +749,7 @@ impl<'a> DeclarationEmitter<'a> {
         if export.is_type_only {
             self.write("type ");
         }
-        
+
         if !export.export_clause.is_none() {
             if let Some(clause_node) = self.arena.get(export.export_clause) {
                 if clause_node.kind == syntax_kind_ext::NAMED_EXPORTS {
@@ -707,19 +763,23 @@ impl<'a> DeclarationEmitter<'a> {
         } else {
             self.write("*");
         }
-        
+
         if !export.module_specifier.is_none() {
             self.write(" from ");
             self.emit_node(export.module_specifier);
         }
-        
+
         self.write(";");
         self.write_line();
     }
 
     fn emit_export_assignment(&mut self, assign_idx: NodeIndex) {
-        let Some(assign_node) = self.arena.get(assign_idx) else { return };
-        let Some(assign) = self.arena.get_export_assignment(assign_node) else { return };
+        let Some(assign_node) = self.arena.get(assign_idx) else {
+            return;
+        };
+        let Some(assign) = self.arena.get_export_assignment(assign_node) else {
+            return;
+        };
 
         self.write_indent();
         if assign.is_export_equals {
@@ -733,8 +793,12 @@ impl<'a> DeclarationEmitter<'a> {
     }
 
     fn emit_export_default_function(&mut self, func_idx: NodeIndex) {
-        let Some(func_node) = self.arena.get(func_idx) else { return };
-        let Some(func) = self.arena.get_function(func_node) else { return };
+        let Some(func_node) = self.arena.get(func_idx) else {
+            return;
+        };
+        let Some(func) = self.arena.get_function(func_node) else {
+            return;
+        };
 
         self.write_indent();
         self.write("export default function ");
@@ -760,8 +824,12 @@ impl<'a> DeclarationEmitter<'a> {
     }
 
     fn emit_export_default_class(&mut self, class_idx: NodeIndex) {
-        let Some(class_node) = self.arena.get(class_idx) else { return };
-        let Some(class) = self.arena.get_class(class_node) else { return };
+        let Some(class_node) = self.arena.get(class_idx) else {
+            return;
+        };
+        let Some(class) = self.arena.get_class(class_node) else {
+            return;
+        };
 
         let is_abstract = self.has_modifier(&class.modifiers, SyntaxKind::AbstractKeyword as u16);
 
@@ -813,8 +881,12 @@ impl<'a> DeclarationEmitter<'a> {
     }
 
     fn emit_named_exports(&mut self, exports_idx: NodeIndex, allow_type_prefix: bool) {
-        let Some(exports_node) = self.arena.get(exports_idx) else { return };
-        let Some(exports) = self.arena.get_named_imports(exports_node) else { return };
+        let Some(exports_node) = self.arena.get(exports_idx) else {
+            return;
+        };
+        let Some(exports) = self.arena.get_named_imports(exports_node) else {
+            return;
+        };
 
         if !exports.name.is_none() && exports.elements.nodes.is_empty() {
             self.write("* as ");
@@ -835,8 +907,12 @@ impl<'a> DeclarationEmitter<'a> {
     }
 
     fn emit_export_specifier(&mut self, spec_idx: NodeIndex, allow_type_prefix: bool) {
-        let Some(spec_node) = self.arena.get(spec_idx) else { return };
-        let Some(spec) = self.arena.get_specifier(spec_node) else { return };
+        let Some(spec_node) = self.arena.get(spec_idx) else {
+            return;
+        };
+        let Some(spec) = self.arena.get_specifier(spec_node) else {
+            return;
+        };
 
         if allow_type_prefix && spec.is_type_only {
             self.write("type ");
@@ -848,131 +924,151 @@ impl<'a> DeclarationEmitter<'a> {
         }
         self.emit_node(spec.name);
     }
-    
+
     // Helper to emit exported interface with "export" prefix
     fn emit_exported_interface(&mut self, iface_idx: NodeIndex) {
-        let Some(iface_node) = self.arena.get(iface_idx) else { return };
-        let Some(iface) = self.arena.get_interface(iface_node) else { return };
-        
+        let Some(iface_node) = self.arena.get(iface_idx) else {
+            return;
+        };
+        let Some(iface) = self.arena.get_interface(iface_node) else {
+            return;
+        };
+
         self.write_indent();
         self.write("export interface ");
         self.emit_node(iface.name);
-        
+
         if let Some(ref type_params) = iface.type_parameters {
             if !type_params.nodes.is_empty() {
                 self.emit_type_parameters(type_params);
             }
         }
-        
+
         if let Some(ref heritage) = iface.heritage_clauses {
             self.emit_heritage_clauses(heritage);
         }
-        
+
         self.write(" {");
         self.write_line();
         self.increase_indent();
-        
+
         for &member_idx in &iface.members.nodes {
             self.emit_interface_member(member_idx);
         }
-        
+
         self.decrease_indent();
         self.write_indent();
         self.write("}");
         self.write_line();
     }
-    
+
     fn emit_exported_class(&mut self, class_idx: NodeIndex) {
-        let Some(class_node) = self.arena.get(class_idx) else { return };
-        let Some(class) = self.arena.get_class(class_node) else { return };
-        
+        let Some(class_node) = self.arena.get(class_idx) else {
+            return;
+        };
+        let Some(class) = self.arena.get_class(class_node) else {
+            return;
+        };
+
         self.write_indent();
         self.write("export declare class ");
         self.emit_node(class.name);
-        
+
         if let Some(ref type_params) = class.type_parameters {
             if !type_params.nodes.is_empty() {
                 self.emit_type_parameters(type_params);
             }
         }
-        
+
         if let Some(ref heritage) = class.heritage_clauses {
             self.emit_heritage_clauses(heritage);
         }
-        
+
         self.write(" {");
         self.write_line();
         self.increase_indent();
-        
+
         for &member_idx in &class.members.nodes {
             self.emit_class_member(member_idx);
         }
-        
+
         self.decrease_indent();
         self.write_indent();
         self.write("}");
         self.write_line();
     }
-    
+
     fn emit_exported_function(&mut self, func_idx: NodeIndex) {
-        let Some(func_node) = self.arena.get(func_idx) else { return };
-        let Some(func) = self.arena.get_function(func_node) else { return };
-        
+        let Some(func_node) = self.arena.get(func_idx) else {
+            return;
+        };
+        let Some(func) = self.arena.get_function(func_node) else {
+            return;
+        };
+
         self.write_indent();
         self.write("export declare function ");
         self.emit_node(func.name);
-        
+
         if let Some(ref type_params) = func.type_parameters {
             if !type_params.nodes.is_empty() {
                 self.emit_type_parameters(type_params);
             }
         }
-        
+
         self.write("(");
         self.emit_parameters(&func.parameters);
         self.write(")");
-        
+
         if !func.type_annotation.is_none() {
             self.write(": ");
             self.emit_type(func.type_annotation);
         }
-        
+
         self.write(";");
         self.write_line();
     }
-    
+
     fn emit_exported_type_alias(&mut self, alias_idx: NodeIndex) {
-        let Some(alias_node) = self.arena.get(alias_idx) else { return };
-        let Some(alias) = self.arena.get_type_alias(alias_node) else { return };
-        
+        let Some(alias_node) = self.arena.get(alias_idx) else {
+            return;
+        };
+        let Some(alias) = self.arena.get_type_alias(alias_node) else {
+            return;
+        };
+
         self.write_indent();
         self.write("export type ");
         self.emit_node(alias.name);
-        
+
         if let Some(ref type_params) = alias.type_parameters {
             if !type_params.nodes.is_empty() {
                 self.emit_type_parameters(type_params);
             }
         }
-        
+
         self.write(" = ");
         self.emit_type(alias.type_node);
         self.write(";");
         self.write_line();
     }
-    
+
     fn emit_exported_enum(&mut self, enum_idx: NodeIndex) {
-        let Some(enum_node) = self.arena.get(enum_idx) else { return };
-        let Some(enum_data) = self.arena.get_enum(enum_node) else { return };
-        
+        let Some(enum_node) = self.arena.get(enum_idx) else {
+            return;
+        };
+        let Some(enum_data) = self.arena.get_enum(enum_node) else {
+            return;
+        };
+
         self.write_indent();
         self.write("export declare enum ");
         self.emit_node(enum_data.name);
-        
+
         self.write(" {");
         self.write_line();
         self.increase_indent();
-        
+
         for (i, &member_idx) in enum_data.members.nodes.iter().enumerate() {
             self.write_indent();
             if let Some(member_node) = self.arena.get(member_idx) {
@@ -989,20 +1085,26 @@ impl<'a> DeclarationEmitter<'a> {
             }
             self.write_line();
         }
-        
+
         self.decrease_indent();
         self.write_indent();
         self.write("}");
         self.write_line();
     }
-    
+
     fn emit_exported_variable(&mut self, stmt_idx: NodeIndex) {
-        let Some(stmt_node) = self.arena.get(stmt_idx) else { return };
-        let Some(var_stmt) = self.arena.get_variable(stmt_node) else { return };
-        
+        let Some(stmt_node) = self.arena.get(stmt_idx) else {
+            return;
+        };
+        let Some(var_stmt) = self.arena.get_variable(stmt_node) else {
+            return;
+        };
+
         for &decl_list_idx in &var_stmt.declarations.nodes {
-            let Some(decl_list_node) = self.arena.get(decl_list_idx) else { continue };
-            
+            let Some(decl_list_node) = self.arena.get(decl_list_idx) else {
+                continue;
+            };
+
             if decl_list_node.kind == syntax_kind_ext::VARIABLE_DECLARATION_LIST {
                 if let Some(decl_list) = self.arena.get_variable(decl_list_node) {
                     let flags = decl_list_node.flags as u32;
@@ -1013,13 +1115,13 @@ impl<'a> DeclarationEmitter<'a> {
                     } else {
                         "var"
                     };
-                    
+
                     for &decl_idx in &decl_list.declarations.nodes {
                         self.write_indent();
                         self.write("export declare ");
                         self.write(keyword);
                         self.write(" ");
-                        
+
                         if let Some(decl_node) = self.arena.get(decl_idx) {
                             if let Some(decl) = self.arena.get_variable_declaration(decl_node) {
                                 self.emit_node(decl.name);
@@ -1029,7 +1131,7 @@ impl<'a> DeclarationEmitter<'a> {
                                 }
                             }
                         }
-                        
+
                         self.write(";");
                         self.write_line();
                     }
@@ -1037,14 +1139,18 @@ impl<'a> DeclarationEmitter<'a> {
             }
         }
     }
-    
+
     fn emit_import_declaration(&mut self, import_idx: NodeIndex) {
-        let Some(import_node) = self.arena.get(import_idx) else { return };
-        let Some(import) = self.arena.get_import_decl(import_node) else { return };
-        
+        let Some(import_node) = self.arena.get(import_idx) else {
+            return;
+        };
+        let Some(import) = self.arena.get_import_decl(import_node) else {
+            return;
+        };
+
         self.write_indent();
         self.write("import ");
-        
+
         if !import.import_clause.is_none() {
             if let Some(clause_node) = self.arena.get(import.import_clause) {
                 if let Some(clause) = self.arena.get_import_clause(clause_node) {
@@ -1053,13 +1159,13 @@ impl<'a> DeclarationEmitter<'a> {
                     }
 
                     let mut has_default = false;
-                    
+
                     // Default import
                     if !clause.name.is_none() {
                         self.emit_node(clause.name);
                         has_default = true;
                     }
-                    
+
                     // Named imports
                     if !clause.named_bindings.is_none() {
                         if has_default {
@@ -1067,20 +1173,24 @@ impl<'a> DeclarationEmitter<'a> {
                         }
                         self.emit_named_imports(clause.named_bindings, !clause.is_type_only);
                     }
-                    
+
                     self.write(" from ");
                 }
             }
         }
-        
+
         self.emit_node(import.module_specifier);
         self.write(";");
         self.write_line();
     }
 
     fn emit_named_imports(&mut self, imports_idx: NodeIndex, allow_type_prefix: bool) {
-        let Some(imports_node) = self.arena.get(imports_idx) else { return };
-        let Some(imports) = self.arena.get_named_imports(imports_node) else { return };
+        let Some(imports_node) = self.arena.get(imports_idx) else {
+            return;
+        };
+        let Some(imports) = self.arena.get_named_imports(imports_node) else {
+            return;
+        };
 
         if !imports.name.is_none() && imports.elements.nodes.is_empty() {
             self.write("* as ");
@@ -1101,8 +1211,12 @@ impl<'a> DeclarationEmitter<'a> {
     }
 
     fn emit_import_specifier(&mut self, spec_idx: NodeIndex, allow_type_prefix: bool) {
-        let Some(spec_node) = self.arena.get(spec_idx) else { return };
-        let Some(spec) = self.arena.get_specifier(spec_node) else { return };
+        let Some(spec_node) = self.arena.get(spec_idx) else {
+            return;
+        };
+        let Some(spec) = self.arena.get_specifier(spec_node) else {
+            return;
+        };
 
         if allow_type_prefix && spec.is_type_only {
             self.write("type ");
@@ -1114,28 +1228,32 @@ impl<'a> DeclarationEmitter<'a> {
         }
         self.emit_node(spec.name);
     }
-    
+
     fn emit_module_declaration(&mut self, module_idx: NodeIndex) {
-        let Some(module_node) = self.arena.get(module_idx) else { return };
-        let Some(module) = self.arena.get_module(module_node) else { return };
-        
+        let Some(module_node) = self.arena.get(module_idx) else {
+            return;
+        };
+        let Some(module) = self.arena.get_module(module_node) else {
+            return;
+        };
+
         let is_exported = self.has_export_modifier(&module.modifiers);
-        
+
         self.write_indent();
         if is_exported {
             self.write("export ");
         }
         self.write("declare ");
-        
+
         // namespace or module
         self.write("namespace ");
         self.emit_node(module.name);
-        
+
         if !module.body.is_none() {
             self.write(" {");
             self.write_line();
             self.increase_indent();
-            
+
             if let Some(body_node) = self.arena.get(module.body) {
                 if let Some(block) = self.arena.get_block(body_node) {
                     for &stmt_idx in &block.statements.nodes {
@@ -1143,17 +1261,17 @@ impl<'a> DeclarationEmitter<'a> {
                     }
                 }
             }
-            
+
             self.decrease_indent();
             self.write_indent();
             self.write("}");
         }
-        
+
         self.write_line();
     }
-    
+
     // Helper methods
-    
+
     fn emit_parameters(&mut self, params: &NodeList) {
         let mut first = true;
         for &param_idx in &params.nodes {
@@ -1161,25 +1279,25 @@ impl<'a> DeclarationEmitter<'a> {
                 self.write(", ");
             }
             first = false;
-            
+
             if let Some(param_node) = self.arena.get(param_idx) {
                 if let Some(param) = self.arena.get_parameter(param_node) {
                     // Modifiers (public, private, etc for constructor parameters)
                     self.emit_member_modifiers(&param.modifiers);
-                    
+
                     // Rest parameter
                     if param.dot_dot_dot_token {
                         self.write("...");
                     }
-                    
+
                     // Name
                     self.emit_node(param.name);
-                    
+
                     // Optional
                     if param.question_token {
                         self.write("?");
                     }
-                    
+
                     // Type
                     if !param.type_annotation.is_none() {
                         self.write(": ");
@@ -1189,7 +1307,7 @@ impl<'a> DeclarationEmitter<'a> {
             }
         }
     }
-    
+
     fn emit_type_parameters(&mut self, type_params: &NodeList) {
         self.write("<");
         let mut first = true;
@@ -1198,16 +1316,16 @@ impl<'a> DeclarationEmitter<'a> {
                 self.write(", ");
             }
             first = false;
-            
+
             if let Some(param_node) = self.arena.get(param_idx) {
                 if let Some(param) = self.arena.get_type_parameter(param_node) {
                     self.emit_node(param.name);
-                    
+
                     if !param.constraint.is_none() {
                         self.write(" extends ");
                         self.emit_type(param.constraint);
                     }
-                    
+
                     if !param.default.is_none() {
                         self.write(" = ");
                         self.emit_type(param.default);
@@ -1217,11 +1335,15 @@ impl<'a> DeclarationEmitter<'a> {
         }
         self.write(">");
     }
-    
+
     fn emit_heritage_clauses(&mut self, clauses: &NodeList) {
         for &clause_idx in &clauses.nodes {
-            let Some(clause_node) = self.arena.get(clause_idx) else { continue };
-            let Some(heritage) = self.arena.get_heritage_clause(clause_node) else { continue };
+            let Some(clause_node) = self.arena.get(clause_idx) else {
+                continue;
+            };
+            let Some(heritage) = self.arena.get_heritage_clause(clause_node) else {
+                continue;
+            };
 
             let keyword = match heritage.token {
                 k if k == SyntaxKind::ExtendsKeyword as u16 => "extends",
@@ -1243,7 +1365,7 @@ impl<'a> DeclarationEmitter<'a> {
             }
         }
     }
-    
+
     fn emit_member_modifiers(&mut self, modifiers: &Option<NodeList>) {
         if let Some(mods) = modifiers {
             for &mod_idx in &mods.nodes {
@@ -1262,10 +1384,12 @@ impl<'a> DeclarationEmitter<'a> {
             }
         }
     }
-    
+
     fn emit_type(&mut self, type_idx: NodeIndex) {
-        let Some(type_node) = self.arena.get(type_idx) else { return };
-        
+        let Some(type_node) = self.arena.get(type_idx) else {
+            return;
+        };
+
         match type_node.kind {
             // Keyword types
             k if k == SyntaxKind::NumberKeyword as u16 => self.write("number"),
@@ -1281,7 +1405,7 @@ impl<'a> DeclarationEmitter<'a> {
             k if k == SyntaxKind::SymbolKeyword as u16 => self.write("symbol"),
             k if k == SyntaxKind::BigIntKeyword as u16 => self.write("bigint"),
             k if k == SyntaxKind::ThisKeyword as u16 => self.write("this"),
-            
+
             // Type reference
             k if k == syntax_kind_ext::TYPE_REFERENCE => {
                 if let Some(type_ref) = self.arena.get_type_ref(type_node) {
@@ -1321,7 +1445,7 @@ impl<'a> DeclarationEmitter<'a> {
                     }
                 }
             }
-            
+
             // Array type
             k if k == syntax_kind_ext::ARRAY_TYPE => {
                 if let Some(arr) = self.arena.get_array_type(type_node) {
@@ -1329,7 +1453,7 @@ impl<'a> DeclarationEmitter<'a> {
                     self.write("[]");
                 }
             }
-            
+
             // Union type
             k if k == syntax_kind_ext::UNION_TYPE => {
                 if let Some(union) = self.arena.get_composite_type(type_node) {
@@ -1343,7 +1467,7 @@ impl<'a> DeclarationEmitter<'a> {
                     }
                 }
             }
-            
+
             // Intersection type
             k if k == syntax_kind_ext::INTERSECTION_TYPE => {
                 if let Some(inter) = self.arena.get_composite_type(type_node) {
@@ -1357,7 +1481,7 @@ impl<'a> DeclarationEmitter<'a> {
                     }
                 }
             }
-            
+
             // Tuple type
             k if k == syntax_kind_ext::TUPLE_TYPE => {
                 if let Some(tuple) = self.arena.get_tuple_type(type_node) {
@@ -1373,7 +1497,7 @@ impl<'a> DeclarationEmitter<'a> {
                     self.write("]");
                 }
             }
-            
+
             // Function type
             k if k == syntax_kind_ext::FUNCTION_TYPE => {
                 if let Some(func) = self.arena.get_function_type(type_node) {
@@ -1386,7 +1510,7 @@ impl<'a> DeclarationEmitter<'a> {
                     self.emit_type(func.type_annotation);
                 }
             }
-            
+
             // Type literal
             k if k == syntax_kind_ext::TYPE_LITERAL => {
                 if let Some(lit) = self.arena.get_type_literal(type_node) {
@@ -1397,7 +1521,7 @@ impl<'a> DeclarationEmitter<'a> {
                     self.write(" }");
                 }
             }
-            
+
             // Parenthesized type
             k if k == syntax_kind_ext::PARENTHESIZED_TYPE => {
                 if let Some(paren) = self.arena.get_wrapped_type(type_node) {
@@ -1406,7 +1530,7 @@ impl<'a> DeclarationEmitter<'a> {
                     self.write(")");
                 }
             }
-            
+
             // Literal types
             k if k == SyntaxKind::StringLiteral as u16 => {
                 if let Some(lit) = self.arena.get_literal(type_node) {
@@ -1422,7 +1546,7 @@ impl<'a> DeclarationEmitter<'a> {
             }
             k if k == SyntaxKind::TrueKeyword as u16 => self.write("true"),
             k if k == SyntaxKind::FalseKeyword as u16 => self.write("false"),
-            
+
             _ => {
                 // Fallback: emit as node
                 self.emit_node(type_idx);
@@ -1431,7 +1555,9 @@ impl<'a> DeclarationEmitter<'a> {
     }
 
     fn emit_entity_name(&mut self, node_idx: NodeIndex) {
-        let Some(node) = self.arena.get(node_idx) else { return };
+        let Some(node) = self.arena.get(node_idx) else {
+            return;
+        };
 
         match node.kind {
             k if k == SyntaxKind::Identifier as u16 => {
@@ -1458,12 +1584,14 @@ impl<'a> DeclarationEmitter<'a> {
             _ => {}
         }
     }
-    
+
     fn emit_expression(&mut self, expr_idx: NodeIndex) {
-        let Some(expr_node) = self.arena.get(expr_idx) else { return };
+        let Some(expr_node) = self.arena.get(expr_idx) else {
+            return;
+        };
         let before_len = self.writer.len();
         self.queue_source_mapping(expr_node);
-        
+
         match expr_node.kind {
             k if k == SyntaxKind::NumericLiteral as u16 => {
                 if let Some(lit) = self.arena.get_literal(expr_node) {
@@ -1484,9 +1612,11 @@ impl<'a> DeclarationEmitter<'a> {
             self.pending_source_pos = None;
         }
     }
-    
+
     fn emit_node(&mut self, node_idx: NodeIndex) {
-        let Some(node) = self.arena.get(node_idx) else { return };
+        let Some(node) = self.arena.get(node_idx) else {
+            return;
+        };
         let before_len = self.writer.len();
         self.queue_source_mapping(node);
 
@@ -1499,7 +1629,8 @@ impl<'a> DeclarationEmitter<'a> {
             k if k == syntax_kind_ext::QUALIFIED_NAME
                 || k == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION
                 || k == SyntaxKind::ThisKeyword as u16
-                || k == SyntaxKind::SuperKeyword as u16 => {
+                || k == SyntaxKind::SuperKeyword as u16 =>
+            {
                 self.emit_entity_name(node_idx);
             }
             k if k == SyntaxKind::StringLiteral as u16 => {
@@ -1521,11 +1652,11 @@ impl<'a> DeclarationEmitter<'a> {
             self.pending_source_pos = None;
         }
     }
-    
+
     fn has_export_modifier(&self, modifiers: &Option<NodeList>) -> bool {
         self.has_modifier(modifiers, SyntaxKind::ExportKeyword as u16)
     }
-    
+
     fn has_modifier(&self, modifiers: &Option<NodeList>, kind: u16) -> bool {
         if let Some(mods) = modifiers {
             for &mod_idx in &mods.nodes {
@@ -1570,7 +1701,7 @@ impl<'a> DeclarationEmitter<'a> {
     fn write_raw(&mut self, s: &str) {
         self.writer.write(s);
     }
-    
+
     fn write(&mut self, s: &str) {
         if let Some(source_pos) = self.take_pending_source_pos() {
             self.writer.write_node(s, source_pos);
@@ -1578,21 +1709,21 @@ impl<'a> DeclarationEmitter<'a> {
             self.writer.write(s);
         }
     }
-    
+
     fn write_line(&mut self) {
         self.writer.write_line();
     }
-    
+
     fn write_indent(&mut self) {
         for _ in 0..self.indent_level {
             self.write_raw("    ");
         }
     }
-    
+
     fn increase_indent(&mut self) {
         self.indent_level += 1;
     }
-    
+
     fn decrease_indent(&mut self) {
         if self.indent_level > 0 {
             self.indent_level -= 1;
@@ -1610,16 +1741,25 @@ mod tests {
         let source = "export function add(a: number, b: number): number { return a + b; }";
         let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
         let root = parser.parse_source_file();
-        
+
         let mut emitter = DeclarationEmitter::new(&parser.arena);
         let output = emitter.emit(root);
-        
-        assert!(output.contains("export declare function add"), 
-                "Expected export declare: {}", output);
-        assert!(output.contains("a: number"), 
-                "Expected parameter type: {}", output);
-        assert!(output.contains("): number;"), 
-                "Expected return type: {}", output);
+
+        assert!(
+            output.contains("export declare function add"),
+            "Expected export declare: {}",
+            output
+        );
+        assert!(
+            output.contains("a: number"),
+            "Expected parameter type: {}",
+            output
+        );
+        assert!(
+            output.contains("): number;"),
+            "Expected return type: {}",
+            output
+        );
     }
 
     #[test]
@@ -1635,16 +1775,21 @@ mod tests {
         "#;
         let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
         let root = parser.parse_source_file();
-        
+
         let mut emitter = DeclarationEmitter::new(&parser.arena);
         let output = emitter.emit(root);
-        
-        assert!(output.contains("class Calculator"), 
-                "Expected class declaration: {}", output);
-        assert!(output.contains("value"), 
-                "Expected property: {}", output);
-        assert!(output.contains("add") && output.contains("number"), 
-                "Expected method signature with add and number: {}", output);
+
+        assert!(
+            output.contains("class Calculator"),
+            "Expected class declaration: {}",
+            output
+        );
+        assert!(output.contains("value"), "Expected property: {}", output);
+        assert!(
+            output.contains("add") && output.contains("number"),
+            "Expected method signature with add and number: {}",
+            output
+        );
     }
 
     #[test]
@@ -1652,14 +1797,20 @@ mod tests {
         let source = "export interface Point { x: number; y: number; }";
         let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
         let root = parser.parse_source_file();
-        
+
         let mut emitter = DeclarationEmitter::new(&parser.arena);
         let output = emitter.emit(root);
-        
-        assert!(output.contains("interface Point"), 
-                "Expected interface: {}", output);
-        assert!(output.contains("number"), 
-                "Expected number type: {}", output);
+
+        assert!(
+            output.contains("interface Point"),
+            "Expected interface: {}",
+            output
+        );
+        assert!(
+            output.contains("number"),
+            "Expected number type: {}",
+            output
+        );
     }
 
     #[test]
@@ -1667,14 +1818,14 @@ mod tests {
         let source = "export type ID = string | number;";
         let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
         let root = parser.parse_source_file();
-        
+
         let mut emitter = DeclarationEmitter::new(&parser.arena);
         let output = emitter.emit(root);
-        
-        assert!(output.contains("export type ID = string | number"), 
-                "Expected type alias: {}", output);
+
+        assert!(
+            output.contains("export type ID = string | number"),
+            "Expected type alias: {}",
+            output
+        );
     }
 }
-
-
-

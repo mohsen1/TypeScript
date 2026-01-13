@@ -32,14 +32,24 @@ fn test_contextual_function_parameter() {
     let handler = interner.function(FunctionShape {
         type_params: vec![],
         params: vec![
-            ParamInfo { name: Some(interner.intern_string("e")), type_id: TypeId::STRING, optional: false, rest: false },
-            ParamInfo { name: Some(interner.intern_string("i")), type_id: TypeId::NUMBER, optional: false, rest: false },
+            ParamInfo {
+                name: Some(interner.intern_string("e")),
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("i")),
+                type_id: TypeId::NUMBER,
+                optional: false,
+                rest: false,
+            },
         ],
         this_type: None,
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let ctx = ContextualTypeContext::with_expected(&interner, handler);
@@ -59,14 +69,17 @@ fn test_contextual_function_this_parameter() {
     // type Handler = (this: string, x: number) => void
     let handler = interner.function(FunctionShape {
         type_params: vec![],
-        params: vec![
-            ParamInfo { name: Some(interner.intern_string("x")), type_id: TypeId::NUMBER, optional: false, rest: false },
-        ],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::NUMBER,
+            optional: false,
+            rest: false,
+        }],
         this_type: Some(TypeId::STRING),
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let ctx = ContextualTypeContext::with_expected(&interner, handler);
@@ -86,7 +99,7 @@ fn test_contextual_function_return() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let ctx = ContextualTypeContext::with_expected(&interner, fn_type);
@@ -100,9 +113,12 @@ fn test_contextual_callable_signature() {
 
     let call_sig = CallSignature {
         type_params: vec![],
-        params: vec![
-            ParamInfo { name: Some(interner.intern_string("x")), type_id: TypeId::STRING, optional: false, rest: false },
-        ],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
         this_type: Some(TypeId::BOOLEAN),
         return_type: TypeId::NUMBER,
         type_predicate: None,
@@ -112,7 +128,8 @@ fn test_contextual_callable_signature() {
         call_signatures: vec![call_sig],
         construct_signatures: vec![],
         properties: vec![],
-    ..Default::default() });
+        ..Default::default()
+    });
 
     let ctx = ContextualTypeContext::with_expected(&interner, callable);
 
@@ -127,9 +144,12 @@ fn test_contextual_callable_overload_union() {
 
     let call_sig_a = CallSignature {
         type_params: vec![],
-        params: vec![
-            ParamInfo { name: Some(interner.intern_string("x")), type_id: TypeId::STRING, optional: false, rest: false },
-        ],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
         this_type: Some(TypeId::STRING),
         return_type: TypeId::NUMBER,
         type_predicate: None,
@@ -138,8 +158,18 @@ fn test_contextual_callable_overload_union() {
     let call_sig_b = CallSignature {
         type_params: vec![],
         params: vec![
-            ParamInfo { name: Some(interner.intern_string("x")), type_id: TypeId::NUMBER, optional: false, rest: false },
-            ParamInfo { name: Some(interner.intern_string("y")), type_id: TypeId::BOOLEAN, optional: false, rest: false },
+            ParamInfo {
+                name: Some(interner.intern_string("x")),
+                type_id: TypeId::NUMBER,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("y")),
+                type_id: TypeId::BOOLEAN,
+                optional: false,
+                rest: false,
+            },
         ],
         this_type: Some(TypeId::BOOLEAN),
         return_type: TypeId::STRING,
@@ -150,7 +180,8 @@ fn test_contextual_callable_overload_union() {
         call_signatures: vec![call_sig_a, call_sig_b],
         construct_signatures: vec![],
         properties: vec![],
-    ..Default::default() });
+        ..Default::default()
+    });
 
     let ctx = ContextualTypeContext::with_expected(&interner, callable);
 
@@ -170,9 +201,12 @@ fn test_contextual_callable_overload_by_arity() {
 
     let call_sig_a = CallSignature {
         type_params: vec![],
-        params: vec![
-            ParamInfo { name: Some(interner.intern_string("x")), type_id: TypeId::STRING, optional: false, rest: false },
-        ],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
         this_type: None,
         return_type: TypeId::VOID,
         type_predicate: None,
@@ -181,8 +215,18 @@ fn test_contextual_callable_overload_by_arity() {
     let call_sig_b = CallSignature {
         type_params: vec![],
         params: vec![
-            ParamInfo { name: Some(interner.intern_string("x")), type_id: TypeId::NUMBER, optional: false, rest: false },
-            ParamInfo { name: Some(interner.intern_string("y")), type_id: TypeId::BOOLEAN, optional: false, rest: false },
+            ParamInfo {
+                name: Some(interner.intern_string("x")),
+                type_id: TypeId::NUMBER,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("y")),
+                type_id: TypeId::BOOLEAN,
+                optional: false,
+                rest: false,
+            },
         ],
         this_type: None,
         return_type: TypeId::VOID,
@@ -193,7 +237,8 @@ fn test_contextual_callable_overload_by_arity() {
         call_signatures: vec![call_sig_a, call_sig_b],
         construct_signatures: vec![],
         properties: vec![],
-    ..Default::default() });
+        ..Default::default()
+    });
 
     let ctx = ContextualTypeContext::with_expected(&interner, callable);
 
@@ -211,14 +256,17 @@ fn test_contextual_function_rest_parameter() {
     let number_array = interner.array(TypeId::NUMBER);
     let fn_type = interner.function(FunctionShape {
         type_params: vec![],
-        params: vec![
-            ParamInfo { name: Some(interner.intern_string("args")), type_id: number_array, optional: false, rest: true },
-        ],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: number_array,
+            optional: false,
+            rest: true,
+        }],
         this_type: None,
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let ctx = ContextualTypeContext::with_expected(&interner, fn_type);
@@ -249,9 +297,24 @@ fn test_contextual_tuple_element() {
 
     // [string, number, boolean]
     let tuple = interner.tuple(vec![
-        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::BOOLEAN,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     let ctx = ContextualTypeContext::with_expected(&interner, tuple);
@@ -272,10 +335,22 @@ fn test_contextual_property() {
 
     // { x: number, y: string }
     let obj = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER,
- write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
-        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::STRING,
- write_type: TypeId::STRING, optional: false, readonly: false, is_method: false },
+        PropertyInfo {
+            name: interner.intern_string("x"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("y"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
     ]);
 
     let ctx = ContextualTypeContext::with_expected(&interner, obj);
@@ -294,14 +369,22 @@ fn test_contextual_nested_property() {
     let interner = TypeInterner::new();
 
     // { nested: { value: number } }
-    let inner = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("value"), type_id: TypeId::NUMBER,
- write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
-    ]);
-    let outer = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("nested"), type_id: inner,
- write_type: inner, optional: false, readonly: false, is_method: false },
-    ]);
+    let inner = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("value"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let outer = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("nested"),
+        type_id: inner,
+        write_type: inner,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
 
     let ctx = ContextualTypeContext::with_expected(&interner, outer);
 
@@ -331,14 +414,17 @@ fn test_contextual_for_parameter() {
     // (x: string) => void
     let fn_type = interner.function(FunctionShape {
         type_params: vec![],
-        params: vec![
-            ParamInfo { name: Some(interner.intern_string("x")), type_id: TypeId::STRING, optional: false, rest: false },
-        ],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
         this_type: None,
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let ctx = ContextualTypeContext::with_expected(&interner, fn_type);
@@ -423,7 +509,7 @@ fn test_contextual_generic_call_union_preserves_literal() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     };
 
     let literal = interner.literal_string("ready");
@@ -448,7 +534,7 @@ fn test_contextual_generic_return_union_preserves_literal() {
         return_type: union,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let ctx = ContextualTypeContext::with_expected(&interner, expected_fn);
     let return_ctx = ctx.for_return();
@@ -475,7 +561,7 @@ fn test_contextual_union_function_return_preserves_literal() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let fn_number = interner.function(FunctionShape {
         type_params: Vec::new(),
@@ -484,7 +570,7 @@ fn test_contextual_union_function_return_preserves_literal() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let union = interner.union(vec![fn_string, fn_number]);
 
@@ -507,7 +593,7 @@ fn test_contextual_generic_return_union_any_uses_context() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let fn_number = interner.function(FunctionShape {
         type_params: Vec::new(),
@@ -516,7 +602,7 @@ fn test_contextual_generic_return_union_any_uses_context() {
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let union = interner.union(vec![fn_string, fn_number]);
 
@@ -554,25 +640,31 @@ fn test_contextual_union_function() {
     // ((x: string) => void) | ((x: number) => void)
     let fn1 = interner.function(FunctionShape {
         type_params: vec![],
-        params: vec![
-            ParamInfo { name: Some(interner.intern_string("x")), type_id: TypeId::STRING, optional: false, rest: false },
-        ],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
         this_type: None,
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let fn2 = interner.function(FunctionShape {
         type_params: vec![],
-        params: vec![
-            ParamInfo { name: Some(interner.intern_string("x")), type_id: TypeId::NUMBER, optional: false, rest: false },
-        ],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::NUMBER,
+            optional: false,
+            rest: false,
+        }],
         this_type: None,
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let union = interner.union(vec![fn1, fn2]);
 
@@ -591,26 +683,39 @@ fn test_contextual_union_arity_param_preserves_literal() {
     // ((x: string) => string) | ((x: string, y: number) => string)
     let fn_one = interner.function(FunctionShape {
         type_params: vec![],
-        params: vec![
-            ParamInfo { name: Some(interner.intern_string("x")), type_id: TypeId::STRING, optional: false, rest: false },
-        ],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
         this_type: None,
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let fn_two = interner.function(FunctionShape {
         type_params: vec![],
         params: vec![
-            ParamInfo { name: Some(interner.intern_string("x")), type_id: TypeId::STRING, optional: false, rest: false },
-            ParamInfo { name: Some(interner.intern_string("y")), type_id: TypeId::NUMBER, optional: false, rest: false },
+            ParamInfo {
+                name: Some(interner.intern_string("x")),
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("y")),
+                type_id: TypeId::NUMBER,
+                optional: false,
+                rest: false,
+            },
         ],
         this_type: None,
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let union = interner.union(vec![fn_one, fn_two]);
     let ctx = ContextualTypeContext::with_expected(&interner, union);
@@ -634,26 +739,32 @@ fn test_contextual_union_rest_param_preserves_literal() {
     // ((x: string) => string) | ((...args: string[]) => string)
     let fn_one = interner.function(FunctionShape {
         type_params: vec![],
-        params: vec![
-            ParamInfo { name: Some(interner.intern_string("x")), type_id: TypeId::STRING, optional: false, rest: false },
-        ],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
         this_type: None,
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let rest_array = interner.array(TypeId::STRING);
     let fn_rest = interner.function(FunctionShape {
         type_params: vec![],
-        params: vec![
-            ParamInfo { name: Some(interner.intern_string("args")), type_id: rest_array, optional: false, rest: true },
-        ],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: rest_array,
+            optional: false,
+            rest: true,
+        }],
         this_type: None,
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let union = interner.union(vec![fn_one, fn_rest]);
 
@@ -679,18 +790,21 @@ fn test_contextual_union_empty_param_preserves_literal() {
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let fn_one = interner.function(FunctionShape {
         type_params: vec![],
-        params: vec![
-            ParamInfo { name: Some(interner.intern_string("x")), type_id: TypeId::STRING, optional: false, rest: false },
-        ],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
         this_type: None,
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let union = interner.union(vec![fn_empty, fn_one]);
 
@@ -711,25 +825,31 @@ fn test_contextual_union_optional_param_preserves_literal() {
     // ((x?: string) => string) | ((x: string) => string)
     let fn_optional = interner.function(FunctionShape {
         type_params: vec![],
-        params: vec![
-            ParamInfo { name: Some(interner.intern_string("x")), type_id: TypeId::STRING, optional: true, rest: false },
-        ],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: true,
+            rest: false,
+        }],
         this_type: None,
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let fn_required = interner.function(FunctionShape {
         type_params: vec![],
-        params: vec![
-            ParamInfo { name: Some(interner.intern_string("x")), type_id: TypeId::STRING, optional: false, rest: false },
-        ],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
         this_type: None,
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let union = interner.union(vec![fn_optional, fn_required]);
 
@@ -750,25 +870,31 @@ fn test_contextual_union_function_param_return_preserves_literal() {
     // ((x: string) => string) | ((x: number) => number)
     let fn_string = interner.function(FunctionShape {
         type_params: vec![],
-        params: vec![
-            ParamInfo { name: Some(interner.intern_string("x")), type_id: TypeId::STRING, optional: false, rest: false },
-        ],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
         this_type: None,
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let fn_number = interner.function(FunctionShape {
         type_params: vec![],
-        params: vec![
-            ParamInfo { name: Some(interner.intern_string("x")), type_id: TypeId::NUMBER, optional: false, rest: false },
-        ],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::NUMBER,
+            optional: false,
+            rest: false,
+        }],
         this_type: None,
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
     let union = interner.union(vec![fn_string, fn_number]);
 
@@ -791,14 +917,17 @@ fn test_contextual_union_param_preserves_literal() {
     let union_param = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
     let fn_type = interner.function(FunctionShape {
         type_params: vec![],
-        params: vec![
-            ParamInfo { name: Some(interner.intern_string("x")), type_id: union_param, optional: false, rest: false },
-        ],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: union_param,
+            optional: false,
+            rest: false,
+        }],
         this_type: None,
         return_type: TypeId::STRING,
         type_predicate: None,
         is_constructor: false,
-                                is_method: false,
+        is_method: false,
     });
 
     let ctx = ContextualTypeContext::with_expected(&interner, fn_type);

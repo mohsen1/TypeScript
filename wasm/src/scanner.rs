@@ -3,8 +3,8 @@
 //! This module contains the SyntaxKind enum and related token types
 //! that mirror TypeScript's scanner output.
 
-use wasm_bindgen::prelude::*;
 use serde::Serialize;
+use wasm_bindgen::prelude::*;
 
 // =============================================================================
 // SyntaxKind Enum - Token Types (Scanner Output)
@@ -278,8 +278,7 @@ pub fn token_is_literal(token: SyntaxKind) -> bool {
 #[wasm_bindgen(js_name = tokenIsTemplateLiteral)]
 pub fn token_is_template_literal(token: SyntaxKind) -> bool {
     let t = token as u16;
-    t >= SyntaxKind::NoSubstitutionTemplateLiteral as u16
-        && t <= SyntaxKind::TemplateTail as u16
+    t >= SyntaxKind::NoSubstitutionTemplateLiteral as u16 && t <= SyntaxKind::TemplateTail as u16
 }
 
 /// Check if a token is punctuation.
@@ -592,4 +591,3 @@ pub fn text_to_keyword(text: &str) -> Option<SyntaxKind> {
 pub fn string_to_token(text: &str) -> SyntaxKind {
     text_to_keyword(text).unwrap_or(SyntaxKind::Identifier)
 }
-

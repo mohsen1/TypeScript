@@ -96,7 +96,11 @@ impl<'a> ThinPrinter<'a> {
     }
 
     fn emit_string_array_literal(&mut self, parts: &[String]) {
-        let quote = if self.ctx.options.single_quote { '\'' } else { '"' };
+        let quote = if self.ctx.options.single_quote {
+            '\''
+        } else {
+            '"'
+        };
         self.write("[");
         for (i, part) in parts.iter().enumerate() {
             if i > 0 {

@@ -34,17 +34,35 @@ fn test_token_is_assignment_operator() {
 
 #[test]
 fn test_keyword_to_text() {
-    assert_eq!(keyword_to_text(SyntaxKind::BreakKeyword), Some("break".into()));
-    assert_eq!(keyword_to_text(SyntaxKind::ConstKeyword), Some("const".into()));
-    assert_eq!(keyword_to_text(SyntaxKind::AsyncKeyword), Some("async".into()));
+    assert_eq!(
+        keyword_to_text(SyntaxKind::BreakKeyword),
+        Some("break".into())
+    );
+    assert_eq!(
+        keyword_to_text(SyntaxKind::ConstKeyword),
+        Some("const".into())
+    );
+    assert_eq!(
+        keyword_to_text(SyntaxKind::AsyncKeyword),
+        Some("async".into())
+    );
     assert_eq!(keyword_to_text(SyntaxKind::Identifier), None);
 }
 
 #[test]
 fn test_punctuation_to_text() {
-    assert_eq!(punctuation_to_text(SyntaxKind::OpenBraceToken), Some("{".into()));
-    assert_eq!(punctuation_to_text(SyntaxKind::EqualsEqualsEqualsToken), Some("===".into()));
-    assert_eq!(punctuation_to_text(SyntaxKind::EqualsGreaterThanToken), Some("=>".into()));
+    assert_eq!(
+        punctuation_to_text(SyntaxKind::OpenBraceToken),
+        Some("{".into())
+    );
+    assert_eq!(
+        punctuation_to_text(SyntaxKind::EqualsEqualsEqualsToken),
+        Some("===".into())
+    );
+    assert_eq!(
+        punctuation_to_text(SyntaxKind::EqualsGreaterThanToken),
+        Some("=>".into())
+    );
     assert_eq!(punctuation_to_text(SyntaxKind::Identifier), None);
 }
 
@@ -61,7 +79,10 @@ fn test_syntax_kind_values() {
 fn test_text_to_keyword() {
     // Reserved words
     assert_eq!(text_to_keyword("const"), Some(SyntaxKind::ConstKeyword));
-    assert_eq!(text_to_keyword("function"), Some(SyntaxKind::FunctionKeyword));
+    assert_eq!(
+        text_to_keyword("function"),
+        Some(SyntaxKind::FunctionKeyword)
+    );
     assert_eq!(text_to_keyword("return"), Some(SyntaxKind::ReturnKeyword));
     // Strict mode reserved
     assert_eq!(text_to_keyword("let"), Some(SyntaxKind::LetKeyword));

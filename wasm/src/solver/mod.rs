@@ -14,69 +14,69 @@
 //!
 //! Note: Salsa integration is planned but requires nightly Rust features.
 //! For now, we use manual query caching.
-mod db;
-mod types;
-mod intern;
-mod lower;
+mod apparent;
 mod compat;
-mod subtype;
+mod contextual;
+mod db;
+mod diagnostics;
+mod evaluate;
 mod infer;
 mod instantiate;
-mod evaluate;
-mod contextual;
-mod narrowing;
-mod diagnostics;
-mod operations;
-mod apparent;
+mod intern;
 mod lawyer;
+mod lower;
+mod narrowing;
+mod operations;
+mod subtype;
+mod types;
 
-pub use db::*;
-pub use types::*;
-pub use intern::*;
-pub use lower::*;
+pub(crate) use apparent::*;
 pub use compat::*;
-pub use subtype::*;
+pub use contextual::*;
+pub use db::*;
+pub use diagnostics::*;
+pub use evaluate::*;
 pub use infer::*;
 pub use instantiate::*;
-pub use evaluate::*;
-pub use contextual::*;
-pub use narrowing::*;
-pub use diagnostics::*;
-pub use operations::*;
+pub use intern::*;
 pub use lawyer::*;
-pub(crate) use apparent::*;
+pub use lower::*;
+pub use narrowing::*;
+pub use operations::*;
+pub use subtype::*;
+pub use types::*;
 
 #[cfg(test)]
-mod db_tests;
-#[cfg(test)]
-mod intern_tests;
-#[cfg(test)]
-mod types_tests;
-#[cfg(test)]
-mod lower_tests;
+mod callable_tests;
 #[cfg(test)]
 mod compat_tests;
 #[cfg(test)]
-mod subtype_tests;
+mod contextual_tests;
+#[cfg(test)]
+mod db_tests;
+#[cfg(test)]
+mod diagnostics_tests;
+#[cfg(test)]
+mod evaluate_tests;
+#[cfg(test)]
+mod index_signature_tests;
 #[cfg(test)]
 mod infer_tests;
 #[cfg(test)]
 mod instantiate_tests;
 #[cfg(test)]
-mod evaluate_tests;
+mod intern_tests;
 #[cfg(test)]
-mod contextual_tests;
+mod lawyer_tests;
+#[cfg(test)]
+mod lower_tests;
 #[cfg(test)]
 mod narrowing_tests;
 #[cfg(test)]
-mod diagnostics_tests;
-#[cfg(test)]
 mod operations_tests;
 #[cfg(test)]
-mod callable_tests;
+mod subtype_tests;
 #[cfg(test)]
-mod index_signature_tests;
-#[cfg(test)]
-mod lawyer_tests;
+mod types_tests;
 #[cfg(test)]
 mod union_tests;

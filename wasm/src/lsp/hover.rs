@@ -2,14 +2,14 @@
 //!
 //! Displays type information and documentation for the symbol at the cursor.
 
-use crate::parser::thin_node::ThinNodeArena;
-use crate::parser::NodeIndex;
-use crate::thin_binder::ThinBinderState;
-use crate::solver::TypeInterner;
-use crate::lsp::position::{Position, Range, LineMap};
-use crate::lsp::utils::find_node_at_or_before_offset;
-use crate::lsp::resolver::{ScopeCache, ScopeCacheStats, ScopeWalker};
 use crate::lsp::jsdoc::{jsdoc_for_node, parse_jsdoc};
+use crate::lsp::position::{LineMap, Position, Range};
+use crate::lsp::resolver::{ScopeCache, ScopeCacheStats, ScopeWalker};
+use crate::lsp::utils::find_node_at_or_before_offset;
+use crate::parser::NodeIndex;
+use crate::parser::thin_node::ThinNodeArena;
+use crate::solver::TypeInterner;
+use crate::thin_binder::ThinBinderState;
 use crate::thin_checker::ThinCheckerState;
 
 /// Information returned for a hover request.
@@ -86,7 +86,9 @@ impl<'a> HoverProvider<'a> {
         mut scope_stats: Option<&mut ScopeCacheStats>,
     ) -> Option<HoverInfo> {
         // 1. Find node at position
-        let offset = self.line_map.position_to_offset(position, self.source_text)?;
+        let offset = self
+            .line_map
+            .position_to_offset(position, self.source_text)?;
         let node_idx = find_node_at_or_before_offset(self.arena, offset, self.source_text);
 
         if node_idx.is_none() {
@@ -105,7 +107,7 @@ impl<'a> HoverProvider<'a> {
 
         // 3. Compute Type Information
         // Use persistent cache if available for O(1) lookups on repeated queries
-        let strict = false;  // TODO: get from tsconfig
+        let strict = false; // TODO: get from tsconfig
         let mut checker = if let Some(cache) = type_cache.take() {
             ThinCheckerState::with_cache(
                 self.arena,
@@ -221,27 +223,39 @@ impl<'a> HoverProvider<'a> {
         use crate::binder::symbol_flags;
         let f = symbol.flags;
 
-        if f & symbol_flags::FUNCTION != 0 { "function" }
-        else if f & symbol_flags::CLASS != 0 { "class" }
-        else if f & symbol_flags::INTERFACE != 0 { "interface" }
-        else if f & symbol_flags::REGULAR_ENUM != 0 { "enum" }
-        else if f & symbol_flags::TYPE_ALIAS != 0 { "type" }
-        else if f & (symbol_flags::VALUE_MODULE | symbol_flags::NAMESPACE_MODULE) != 0 { "module" }
-        else if f & symbol_flags::METHOD != 0 { "method" }
-        else if f & symbol_flags::PROPERTY != 0 { "property" }
-        else if f & symbol_flags::BLOCK_SCOPED_VARIABLE != 0 { "let/const" }
-        else if f & symbol_flags::FUNCTION_SCOPED_VARIABLE != 0 { "var" }
-        else { "variable" }
+        if f & symbol_flags::FUNCTION != 0 {
+            "function"
+        } else if f & symbol_flags::CLASS != 0 {
+            "class"
+        } else if f & symbol_flags::INTERFACE != 0 {
+            "interface"
+        } else if f & symbol_flags::REGULAR_ENUM != 0 {
+            "enum"
+        } else if f & symbol_flags::TYPE_ALIAS != 0 {
+            "type"
+        } else if f & (symbol_flags::VALUE_MODULE | symbol_flags::NAMESPACE_MODULE) != 0 {
+            "module"
+        } else if f & symbol_flags::METHOD != 0 {
+            "method"
+        } else if f & symbol_flags::PROPERTY != 0 {
+            "property"
+        } else if f & symbol_flags::BLOCK_SCOPED_VARIABLE != 0 {
+            "let/const"
+        } else if f & symbol_flags::FUNCTION_SCOPED_VARIABLE != 0 {
+            "var"
+        } else {
+            "variable"
+        }
     }
 }
 
 #[cfg(test)]
 mod hover_tests {
     use super::*;
-    use crate::thin_parser::ThinParserState;
-    use crate::thin_binder::ThinBinderState;
-    use crate::solver::TypeInterner;
     use crate::lsp::position::LineMap;
+    use crate::solver::TypeInterner;
+    use crate::thin_binder::ThinBinderState;
+    use crate::thin_parser::ThinParserState;
 
     #[test]
     fn test_hover_variable_type() {
@@ -264,7 +278,7 @@ mod hover_tests {
             &line_map,
             &interner,
             source,
-            "test.ts".to_string()
+            "test.ts".to_string(),
         );
 
         // Hover over 'x' in the last line (line 2, column 0)
@@ -279,7 +293,10 @@ mod hover_tests {
             assert!(!info.contents.is_empty(), "Should have contents");
 
             // First content should be the type signature
-            assert!(info.contents[0].contains("x"), "Should contain variable name");
+            assert!(
+                info.contents[0].contains("x"),
+                "Should contain variable name"
+            );
 
             // Check that we have a range
             assert!(info.range.is_some(), "Should have range");
@@ -307,7 +324,7 @@ mod hover_tests {
             &line_map,
             &interner,
             source,
-            "test.ts".to_string()
+            "test.ts".to_string(),
         );
 
         // Position at EOF, just after 'x' (line 2, column 1).
@@ -317,7 +334,11 @@ mod hover_tests {
 
         assert!(info.is_some(), "Should find hover info at EOF");
         if let Some(info) = info {
-            assert!(info.contents.iter().any(|content| content.contains("The answer")));
+            assert!(
+                info.contents
+                    .iter()
+                    .any(|content| content.contains("The answer"))
+            );
         }
     }
 
@@ -339,16 +360,22 @@ mod hover_tests {
             &line_map,
             &interner,
             source,
-            "test.ts".to_string()
+            "test.ts".to_string(),
         );
 
         let pos = Position::new(1, 4); // After the trailing dot.
         let mut cache = None;
         let info = provider.get_hover(root, pos, &mut cache);
 
-        assert!(info.is_some(), "Should find hover info after incomplete member access");
+        assert!(
+            info.is_some(),
+            "Should find hover info after incomplete member access"
+        );
         if let Some(info) = info {
-            assert!(info.contents[0].contains("foo"), "Should use base identifier for hover");
+            assert!(
+                info.contents[0].contains("foo"),
+                "Should use base identifier for hover"
+            );
         }
     }
 
@@ -370,14 +397,21 @@ mod hover_tests {
             &line_map,
             &interner,
             source,
-            "test.ts".to_string()
+            "test.ts".to_string(),
         );
 
         let pos = Position::new(6, 0);
         let mut cache = None;
-        let info = provider.get_hover(root, pos, &mut cache).expect("Expected hover info");
+        let info = provider
+            .get_hover(root, pos, &mut cache)
+            .expect("Expected hover info");
 
-        let doc = info.contents.iter().find(|c| c.contains("Adds two numbers.")).cloned().unwrap_or_default();
+        let doc = info
+            .contents
+            .iter()
+            .find(|c| c.contains("Adds two numbers."))
+            .cloned()
+            .unwrap_or_default();
         assert!(doc.contains("Adds two numbers."));
         assert!(doc.contains("Parameters:"));
         assert!(doc.contains("`a` First number."));
@@ -402,7 +436,7 @@ mod hover_tests {
             &line_map,
             &interner,
             source,
-            "test.ts".to_string()
+            "test.ts".to_string(),
         );
 
         // Hover over semicolon (no symbol)
@@ -431,7 +465,7 @@ mod hover_tests {
             &line_map,
             &interner,
             source,
-            "test.ts".to_string()
+            "test.ts".to_string(),
         );
 
         // Hover over 'foo' in the call
@@ -442,7 +476,10 @@ mod hover_tests {
         assert!(info.is_some(), "Should find hover info for function");
 
         if let Some(info) = info {
-            assert!(info.contents[0].contains("foo"), "Should contain function name");
+            assert!(
+                info.contents[0].contains("foo"),
+                "Should contain function name"
+            );
         }
     }
 }

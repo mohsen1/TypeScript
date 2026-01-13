@@ -1,8 +1,8 @@
 use super::*;
-use crate::thin_parser::ThinParserState;
-use crate::parser::syntax_kind_ext;
 use crate::parser::NodeIndex;
 use crate::parser::ThinNodeArena;
+use crate::parser::syntax_kind_ext;
+use crate::thin_parser::ThinParserState;
 
 #[test]
 fn test_intrinsic_type_ids() {
@@ -474,7 +474,8 @@ fn test_lower_array_type_reference_respects_resolver() {
     let interner = TypeInterner::new();
 
     let type_resolver = |node_idx: NodeIndex| {
-        arena.get(node_idx)
+        arena
+            .get(node_idx)
             .and_then(|node| arena.get_identifier(node))
             .and_then(|ident| {
                 if ident.escaped_text == "Array" {
@@ -508,7 +509,8 @@ fn test_lower_readonly_array_type_reference_respects_resolver() {
     let interner = TypeInterner::new();
 
     let type_resolver = |node_idx: NodeIndex| {
-        arena.get(node_idx)
+        arena
+            .get(node_idx)
             .and_then(|node| arena.get_identifier(node))
             .and_then(|ident| {
                 if ident.escaped_text == "ReadonlyArray" {
@@ -577,11 +579,11 @@ fn test_lower_infer_type_with_constraint() {
         TypeKey::Conditional(cond_id) => {
             let cond = interner.conditional_type(cond_id);
             match interner.lookup(cond.extends_type) {
-            Some(TypeKey::Infer(info)) => {
-                assert_eq!(interner.resolve_atom(info.name), "R");
-                assert_eq!(info.constraint, Some(TypeId::STRING));
-            }
-            other => panic!("Expected infer type in extends, got {:?}", other),
+                Some(TypeKey::Infer(info)) => {
+                    assert_eq!(interner.resolve_atom(info.name), "R");
+                    assert_eq!(info.constraint, Some(TypeId::STRING));
+                }
+                other => panic!("Expected infer type in extends, got {:?}", other),
             }
         }
         _ => panic!("Expected Conditional type, got {:?}", key),
@@ -590,7 +592,8 @@ fn test_lower_infer_type_with_constraint() {
 
 #[test]
 fn test_lower_conditional_infer_binding() {
-    let (arena, type_idx) = parse_type_alias_type_node("type T = string extends infer R ? R : never;");
+    let (arena, type_idx) =
+        parse_type_alias_type_node("type T = string extends infer R ? R : never;");
     let interner = TypeInterner::new();
     let lowering = TypeLowering::new(&arena, &interner);
 
@@ -613,7 +616,8 @@ fn test_lower_conditional_infer_binding() {
 
 #[test]
 fn test_lower_conditional_infer_binding_false_branch() {
-    let (arena, type_idx) = parse_type_alias_type_node("type T = string extends infer R ? never : R;");
+    let (arena, type_idx) =
+        parse_type_alias_type_node("type T = string extends infer R ? never : R;");
     let interner = TypeInterner::new();
     let lowering = TypeLowering::new(&arena, &interner);
 
@@ -704,12 +708,13 @@ fn test_lower_deduplicates_identical_types() {
 
 /// Helper to parse a type alias and return the type node index
 fn parse_type_alias(source: &str) -> (ThinNodeArena, crate::parser::base::NodeIndex) {
-    let mut parser = ThinParserState::new(
-        "test.ts".to_string(),
-        source.to_string(),
-    );
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let _root = parser.parse_source_file();
-    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Parse errors: {:?}",
+        parser.get_diagnostics()
+    );
 
     // Find the type alias declaration and extract its type_node
     let arena = std::mem::take(&mut parser.arena);
@@ -719,8 +724,9 @@ fn parse_type_alias(source: &str) -> (ThinNodeArena, crate::parser::base::NodeIn
     for i in 0..arena.len() {
         let idx = crate::parser::base::NodeIndex(i as u32);
         if let Some(node) = arena.get(idx) {
-            if node.kind == syntax_kind_ext::FUNCTION_TYPE ||
-               node.kind == syntax_kind_ext::CONSTRUCTOR_TYPE {
+            if node.kind == syntax_kind_ext::FUNCTION_TYPE
+                || node.kind == syntax_kind_ext::CONSTRUCTOR_TYPE
+            {
                 return (arena, idx);
             }
         }
@@ -731,12 +737,13 @@ fn parse_type_alias(source: &str) -> (ThinNodeArena, crate::parser::base::NodeIn
 
 /// Helper to parse a type alias and return its type node index
 fn parse_type_alias_type_node(source: &str) -> (ThinNodeArena, crate::parser::base::NodeIndex) {
-    let mut parser = ThinParserState::new(
-        "test.ts".to_string(),
-        source.to_string(),
-    );
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let _root = parser.parse_source_file();
-    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Parse errors: {:?}",
+        parser.get_diagnostics()
+    );
 
     let arena = std::mem::take(&mut parser.arena);
     let mut type_node = crate::parser::base::NodeIndex::NONE;
@@ -761,12 +768,13 @@ fn parse_type_alias_type_node(source: &str) -> (ThinNodeArena, crate::parser::ba
 
 /// Helper to parse a type alias and return the tuple type node index
 fn parse_tuple_type(source: &str) -> (ThinNodeArena, crate::parser::base::NodeIndex) {
-    let mut parser = ThinParserState::new(
-        "test.ts".to_string(),
-        source.to_string(),
-    );
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let _root = parser.parse_source_file();
-    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Parse errors: {:?}",
+        parser.get_diagnostics()
+    );
 
     let arena = std::mem::take(&mut parser.arena);
     for i in 0..arena.len() {
@@ -783,12 +791,13 @@ fn parse_tuple_type(source: &str) -> (ThinNodeArena, crate::parser::base::NodeIn
 
 /// Helper to parse a type alias and return the template literal type node index
 fn parse_template_literal_type(source: &str) -> (ThinNodeArena, crate::parser::base::NodeIndex) {
-    let mut parser = ThinParserState::new(
-        "test.ts".to_string(),
-        source.to_string(),
-    );
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let _root = parser.parse_source_file();
-    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Parse errors: {:?}",
+        parser.get_diagnostics()
+    );
 
     let arena = std::mem::take(&mut parser.arena);
     for i in 0..arena.len() {
@@ -805,12 +814,13 @@ fn parse_template_literal_type(source: &str) -> (ThinNodeArena, crate::parser::b
 
 /// Helper to parse a type alias and return the mapped type node index.
 fn parse_mapped_type(source: &str) -> (ThinNodeArena, crate::parser::base::NodeIndex) {
-    let mut parser = ThinParserState::new(
-        "test.ts".to_string(),
-        source.to_string(),
-    );
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let _root = parser.parse_source_file();
-    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Parse errors: {:?}",
+        parser.get_diagnostics()
+    );
 
     let arena = std::mem::take(&mut parser.arena);
     for i in 0..arena.len() {
@@ -826,13 +836,17 @@ fn parse_mapped_type(source: &str) -> (ThinNodeArena, crate::parser::base::NodeI
 }
 
 /// Helper to parse a type alias and return the type reference node index for a name.
-fn parse_type_reference(source: &str, name: &str) -> (ThinNodeArena, crate::parser::base::NodeIndex) {
-    let mut parser = ThinParserState::new(
-        "test.ts".to_string(),
-        source.to_string(),
-    );
+fn parse_type_reference(
+    source: &str,
+    name: &str,
+) -> (ThinNodeArena, crate::parser::base::NodeIndex) {
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let _root = parser.parse_source_file();
-    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Parse errors: {:?}",
+        parser.get_diagnostics()
+    );
 
     let arena = std::mem::take(&mut parser.arena);
     for i in 0..arena.len() {
@@ -857,12 +871,13 @@ fn parse_type_reference(source: &str, name: &str) -> (ThinNodeArena, crate::pars
 
 /// Helper to parse a type alias and return the type literal node index.
 fn parse_type_literal(source: &str) -> (ThinNodeArena, crate::parser::base::NodeIndex) {
-    let mut parser = ThinParserState::new(
-        "test.ts".to_string(),
-        source.to_string(),
-    );
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let _root = parser.parse_source_file();
-    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Parse errors: {:?}",
+        parser.get_diagnostics()
+    );
 
     let arena = std::mem::take(&mut parser.arena);
     for i in 0..arena.len() {
@@ -879,12 +894,13 @@ fn parse_type_literal(source: &str) -> (ThinNodeArena, crate::parser::base::Node
 
 /// Helper to parse interface declarations by name.
 fn parse_interface_declarations(source: &str, name: &str) -> (ThinNodeArena, Vec<NodeIndex>) {
-    let mut parser = ThinParserState::new(
-        "test.ts".to_string(),
-        source.to_string(),
-    );
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let _root = parser.parse_source_file();
-    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Parse errors: {:?}",
+        parser.get_diagnostics()
+    );
 
     let arena = std::mem::take(&mut parser.arena);
     let mut declarations = Vec::new();
@@ -905,7 +921,11 @@ fn parse_interface_declarations(source: &str, name: &str) -> (ThinNodeArena, Vec
         }
     }
 
-    assert!(!declarations.is_empty(), "Could not find interface '{}'", name);
+    assert!(
+        !declarations.is_empty(),
+        "Could not find interface '{}'",
+        name
+    );
     (arena, declarations)
 }
 
@@ -926,9 +946,18 @@ fn test_lower_function_type_with_type_parameter() {
             let shape = interner.function_shape(shape_id);
             // Should have 1 type parameter named "T"
             assert_eq!(shape.type_params.len(), 1, "Expected 1 type parameter");
-            assert_eq!(interner.resolve_atom(shape.type_params[0].name).as_str(), "T");
-            assert!(shape.type_params[0].constraint.is_none(), "T should have no constraint");
-            assert!(shape.type_params[0].default.is_none(), "T should have no default");
+            assert_eq!(
+                interner.resolve_atom(shape.type_params[0].name).as_str(),
+                "T"
+            );
+            assert!(
+                shape.type_params[0].constraint.is_none(),
+                "T should have no constraint"
+            );
+            assert!(
+                shape.type_params[0].default.is_none(),
+                "T should have no default"
+            );
         }
         _ => panic!("Expected Function type, got {:?}", key),
     }
@@ -946,7 +975,10 @@ fn test_lower_function_type_with_type_predicate_return() {
         TypeKey::Function(shape_id) => {
             let shape = interner.function_shape(shape_id);
             assert_eq!(shape.return_type, TypeId::BOOLEAN);
-            let predicate = shape.type_predicate.as_ref().expect("Expected type predicate");
+            let predicate = shape
+                .type_predicate
+                .as_ref()
+                .expect("Expected type predicate");
             assert!(!predicate.asserts);
             match predicate.target {
                 TypePredicateTarget::Identifier(atom) => {
@@ -972,7 +1004,10 @@ fn test_lower_function_type_with_this_predicate_return() {
         TypeKey::Function(shape_id) => {
             let shape = interner.function_shape(shape_id);
             assert_eq!(shape.return_type, TypeId::BOOLEAN);
-            let predicate = shape.type_predicate.as_ref().expect("Expected type predicate");
+            let predicate = shape
+                .type_predicate
+                .as_ref()
+                .expect("Expected type predicate");
             assert!(!predicate.asserts);
             match predicate.target {
                 TypePredicateTarget::This => {}
@@ -996,7 +1031,10 @@ fn test_lower_function_type_with_asserts_predicate_return() {
         TypeKey::Function(shape_id) => {
             let shape = interner.function_shape(shape_id);
             assert_eq!(shape.return_type, TypeId::VOID);
-            let predicate = shape.type_predicate.as_ref().expect("Expected type predicate");
+            let predicate = shape
+                .type_predicate
+                .as_ref()
+                .expect("Expected type predicate");
             assert!(predicate.asserts);
             match predicate.target {
                 TypePredicateTarget::Identifier(atom) => {
@@ -1012,7 +1050,8 @@ fn test_lower_function_type_with_asserts_predicate_return() {
 
 #[test]
 fn test_lower_function_type_with_asserts_this_predicate_return() {
-    let (arena, func_type_idx) = parse_type_alias("type F = (this: any) => asserts this is string;");
+    let (arena, func_type_idx) =
+        parse_type_alias("type F = (this: any) => asserts this is string;");
     let interner = TypeInterner::new();
     let lowering = TypeLowering::new(&arena, &interner);
 
@@ -1022,7 +1061,10 @@ fn test_lower_function_type_with_asserts_this_predicate_return() {
         TypeKey::Function(shape_id) => {
             let shape = interner.function_shape(shape_id);
             assert_eq!(shape.return_type, TypeId::VOID);
-            let predicate = shape.type_predicate.as_ref().expect("Expected type predicate");
+            let predicate = shape
+                .type_predicate
+                .as_ref()
+                .expect("Expected type predicate");
             assert!(predicate.asserts);
             match predicate.target {
                 TypePredicateTarget::This => {}
@@ -1046,7 +1088,10 @@ fn test_lower_function_type_with_asserts_this_predicate_without_is() {
         TypeKey::Function(shape_id) => {
             let shape = interner.function_shape(shape_id);
             assert_eq!(shape.return_type, TypeId::VOID);
-            let predicate = shape.type_predicate.as_ref().expect("Expected type predicate");
+            let predicate = shape
+                .type_predicate
+                .as_ref()
+                .expect("Expected type predicate");
             assert!(predicate.asserts);
             match predicate.target {
                 TypePredicateTarget::This => {}
@@ -1070,7 +1115,10 @@ fn test_lower_function_type_with_asserts_predicate_without_is() {
         TypeKey::Function(shape_id) => {
             let shape = interner.function_shape(shape_id);
             assert_eq!(shape.return_type, TypeId::VOID);
-            let predicate = shape.type_predicate.as_ref().expect("Expected type predicate");
+            let predicate = shape
+                .type_predicate
+                .as_ref()
+                .expect("Expected type predicate");
             assert!(predicate.asserts);
             match predicate.target {
                 TypePredicateTarget::Identifier(atom) => {
@@ -1119,7 +1167,9 @@ fn test_lower_function_type_parameter_usage() {
             assert_eq!(shape.params.len(), 1);
             assert_eq!(shape.params[0].type_id, shape.return_type);
 
-            let param_key = interner.lookup(shape.params[0].type_id).expect("Type should exist");
+            let param_key = interner
+                .lookup(shape.params[0].type_id)
+                .expect("Type should exist");
             match param_key {
                 TypeKey::TypeParameter(info) => {
                     assert_eq!(interner.resolve_atom(info.name), "T");
@@ -1146,9 +1196,15 @@ fn test_lower_function_type_with_constrained_type_parameter() {
         TypeKey::Function(shape_id) => {
             let shape = interner.function_shape(shape_id);
             assert_eq!(shape.type_params.len(), 1);
-            assert_eq!(interner.resolve_atom(shape.type_params[0].name).as_str(), "T");
+            assert_eq!(
+                interner.resolve_atom(shape.type_params[0].name).as_str(),
+                "T"
+            );
             // Should have a constraint
-            assert!(shape.type_params[0].constraint.is_some(), "T should have constraint");
+            assert!(
+                shape.type_params[0].constraint.is_some(),
+                "T should have constraint"
+            );
             let constraint = shape.type_params[0].constraint.unwrap();
             assert_eq!(constraint, TypeId::STRING, "Constraint should be string");
         }
@@ -1167,7 +1223,9 @@ fn test_lower_constrained_type_parameter_usage() {
     match key {
         TypeKey::Function(shape_id) => {
             let shape = interner.function_shape(shape_id);
-            let param_key = interner.lookup(shape.params[0].type_id).expect("Type should exist");
+            let param_key = interner
+                .lookup(shape.params[0].type_id)
+                .expect("Type should exist");
             match param_key {
                 TypeKey::TypeParameter(info) => {
                     assert_eq!(info.constraint, Some(TypeId::STRING));
@@ -1194,10 +1252,16 @@ fn test_lower_function_type_with_default_type_parameter() {
         TypeKey::Function(shape_id) => {
             let shape = interner.function_shape(shape_id);
             assert_eq!(shape.type_params.len(), 1);
-            assert_eq!(interner.resolve_atom(shape.type_params[0].name).as_str(), "T");
+            assert_eq!(
+                interner.resolve_atom(shape.type_params[0].name).as_str(),
+                "T"
+            );
             assert!(shape.type_params[0].constraint.is_none());
             // Should have a default
-            assert!(shape.type_params[0].default.is_some(), "T should have default");
+            assert!(
+                shape.type_params[0].default.is_some(),
+                "T should have default"
+            );
             let default = shape.type_params[0].default.unwrap();
             assert_eq!(default, TypeId::STRING, "Default should be string");
         }
@@ -1220,9 +1284,18 @@ fn test_lower_function_type_with_multiple_type_parameters() {
         TypeKey::Function(shape_id) => {
             let shape = interner.function_shape(shape_id);
             assert_eq!(shape.type_params.len(), 3, "Expected 3 type parameters");
-            assert_eq!(interner.resolve_atom(shape.type_params[0].name).as_str(), "T");
-            assert_eq!(interner.resolve_atom(shape.type_params[1].name).as_str(), "U");
-            assert_eq!(interner.resolve_atom(shape.type_params[2].name).as_str(), "V");
+            assert_eq!(
+                interner.resolve_atom(shape.type_params[0].name).as_str(),
+                "T"
+            );
+            assert_eq!(
+                interner.resolve_atom(shape.type_params[1].name).as_str(),
+                "U"
+            );
+            assert_eq!(
+                interner.resolve_atom(shape.type_params[2].name).as_str(),
+                "V"
+            );
         }
         _ => panic!("Expected Function type, got {:?}", key),
     }
@@ -1243,10 +1316,19 @@ fn test_lower_function_type_with_constraint_and_default() {
         TypeKey::Function(shape_id) => {
             let shape = interner.function_shape(shape_id);
             assert_eq!(shape.type_params.len(), 1);
-            assert_eq!(interner.resolve_atom(shape.type_params[0].name).as_str(), "T");
+            assert_eq!(
+                interner.resolve_atom(shape.type_params[0].name).as_str(),
+                "T"
+            );
             // Should have both constraint and default
-            assert!(shape.type_params[0].constraint.is_some(), "T should have constraint");
-            assert!(shape.type_params[0].default.is_some(), "T should have default");
+            assert!(
+                shape.type_params[0].constraint.is_some(),
+                "T should have constraint"
+            );
+            assert!(
+                shape.type_params[0].default.is_some(),
+                "T should have default"
+            );
         }
         _ => panic!("Expected Function type, got {:?}", key),
     }
@@ -1287,7 +1369,10 @@ fn test_lower_tuple_type_metadata() {
             assert_eq!(elements.len(), 3);
 
             let first = &elements[0];
-            assert_eq!(first.name.map(|a| interner.resolve_atom(a)), Some("x".to_string()));
+            assert_eq!(
+                first.name.map(|a| interner.resolve_atom(a)),
+                Some("x".to_string())
+            );
             assert!(first.optional);
             assert!(!first.rest);
             assert_eq!(first.type_id, TypeId::STRING);
@@ -1330,7 +1415,8 @@ fn test_lower_union_type_normalization() {
 
 #[test]
 fn test_lower_intersection_type_normalization() {
-    let (arena, intersection_idx) = parse_type_alias_type_node("type T = string & number & string;");
+    let (arena, intersection_idx) =
+        parse_type_alias_type_node("type T = string & number & string;");
     let interner = TypeInterner::new();
     let lowering = TypeLowering::new(&arena, &interner);
 
@@ -1351,11 +1437,17 @@ fn test_lower_function_parameter_names() {
         TypeKey::Function(shape_id) => {
             let shape = interner.function_shape(shape_id);
             assert_eq!(shape.params.len(), 2);
-            assert_eq!(shape.params[0].name.map(|a| interner.resolve_atom(a)), Some("x".to_string()));
+            assert_eq!(
+                shape.params[0].name.map(|a| interner.resolve_atom(a)),
+                Some("x".to_string())
+            );
             assert_eq!(shape.params[0].type_id, TypeId::STRING);
             assert!(!shape.params[0].optional);
 
-            assert_eq!(shape.params[1].name.map(|a| interner.resolve_atom(a)), Some("y".to_string()));
+            assert_eq!(
+                shape.params[1].name.map(|a| interner.resolve_atom(a)),
+                Some("y".to_string())
+            );
             assert_eq!(shape.params[1].type_id, TypeId::NUMBER);
             assert!(shape.params[1].optional);
 
@@ -1378,11 +1470,16 @@ fn test_lower_function_rest_parameter() {
             let shape = interner.function_shape(shape_id);
             assert_eq!(shape.params.len(), 1);
             let param = &shape.params[0];
-            assert_eq!(param.name.map(|a| interner.resolve_atom(a)), Some("args".to_string()));
+            assert_eq!(
+                param.name.map(|a| interner.resolve_atom(a)),
+                Some("args".to_string())
+            );
             assert!(!param.optional);
             assert!(param.rest);
 
-            let param_key = interner.lookup(param.type_id).expect("Param type should exist");
+            let param_key = interner
+                .lookup(param.type_id)
+                .expect("Param type should exist");
             match param_key {
                 TypeKey::Array(element) => {
                     assert_eq!(element, TypeId::STRING);
@@ -1400,7 +1497,8 @@ fn test_lower_generic_type_reference_uses_type_parameter_args() {
     let interner = TypeInterner::new();
 
     let resolver = |node_idx: NodeIndex| {
-        arena.get(node_idx)
+        arena
+            .get(node_idx)
             .and_then(|node| arena.get_identifier(node))
             .and_then(|ident| {
                 if ident.escaped_text == "Box" {
@@ -1417,7 +1515,9 @@ fn test_lower_generic_type_reference_uses_type_parameter_args() {
     match key {
         TypeKey::Function(shape_id) => {
             let shape = interner.function_shape(shape_id);
-            let return_key = interner.lookup(shape.return_type).expect("Type should exist");
+            let return_key = interner
+                .lookup(shape.return_type)
+                .expect("Type should exist");
             match return_key {
                 TypeKey::Application(app_id) => {
                     let app = interner.type_application(app_id);
@@ -1449,7 +1549,8 @@ fn test_lower_type_reference_with_arguments() {
     let interner = TypeInterner::new();
 
     let resolver = |node_idx: NodeIndex| {
-        arena.get(node_idx)
+        arena
+            .get(node_idx)
             .and_then(|node| arena.get_identifier(node))
             .and_then(|ident| {
                 if ident.escaped_text == "Box" {
@@ -1519,7 +1620,8 @@ fn test_lower_type_query_with_type_arguments() {
 
     let type_resolver = |_node_idx: NodeIndex| None;
     let value_resolver = |node_idx: NodeIndex| {
-        arena.get(node_idx)
+        arena
+            .get(node_idx)
             .and_then(|node| arena.get_identifier(node))
             .and_then(|ident| {
                 if ident.escaped_text == "Foo" {
@@ -1617,7 +1719,8 @@ fn test_lower_mapped_type_remove_modifiers() {
 
 #[test]
 fn test_lower_type_literal_object_properties() {
-    let (arena, literal_idx) = parse_type_literal("type T = { readonly foo?: string; bar: number; };");
+    let (arena, literal_idx) =
+        parse_type_literal("type T = { readonly foo?: string; bar: number; };");
     let interner = TypeInterner::new();
     let lowering = TypeLowering::new(&arena, &interner);
 
@@ -1650,9 +1753,8 @@ fn test_lower_type_literal_object_properties() {
 
 #[test]
 fn test_lower_type_literal_nested_object() {
-    let (arena, literal_idx) = parse_type_alias_type_node(
-        "type T = { config: { enabled: boolean; retries?: number }; };"
-    );
+    let (arena, literal_idx) =
+        parse_type_alias_type_node("type T = { config: { enabled: boolean; retries?: number }; };");
     let interner = TypeInterner::new();
     let lowering = TypeLowering::new(&arena, &interner);
 
@@ -1695,7 +1797,8 @@ fn test_lower_type_literal_nested_object() {
 
 #[test]
 fn test_lower_type_literal_call_signature() {
-    let (arena, literal_idx) = parse_type_literal("type T = { (x: string): number; foo: string; };");
+    let (arena, literal_idx) =
+        parse_type_literal("type T = { (x: string): number; foo: string; };");
     let interner = TypeInterner::new();
     let lowering = TypeLowering::new(&arena, &interner);
 
@@ -1749,7 +1852,10 @@ fn test_lower_type_literal_call_signature_type_predicate() {
             assert_eq!(callable.call_signatures.len(), 1);
             let sig = &callable.call_signatures[0];
             assert_eq!(sig.return_type, TypeId::BOOLEAN);
-            let predicate = sig.type_predicate.as_ref().expect("Expected type predicate");
+            let predicate = sig
+                .type_predicate
+                .as_ref()
+                .expect("Expected type predicate");
             assert!(!predicate.asserts);
             match predicate.target {
                 TypePredicateTarget::Identifier(atom) => {
@@ -1777,7 +1883,10 @@ fn test_lower_type_literal_call_signature_asserts_predicate_without_is() {
             assert_eq!(callable.call_signatures.len(), 1);
             let sig = &callable.call_signatures[0];
             assert_eq!(sig.return_type, TypeId::VOID);
-            let predicate = sig.type_predicate.as_ref().expect("Expected type predicate");
+            let predicate = sig
+                .type_predicate
+                .as_ref()
+                .expect("Expected type predicate");
             assert!(predicate.asserts);
             match predicate.target {
                 TypePredicateTarget::Identifier(atom) => {
@@ -1793,9 +1902,8 @@ fn test_lower_type_literal_call_signature_asserts_predicate_without_is() {
 
 #[test]
 fn test_lower_type_literal_overloaded_call_signatures() {
-    let (arena, literal_idx) = parse_type_literal(
-        "type T = { (x: string): number; (x: number): string; };",
-    );
+    let (arena, literal_idx) =
+        parse_type_literal("type T = { (x: string): number; (x: number): string; };");
     let interner = TypeInterner::new();
     let lowering = TypeLowering::new(&arena, &interner);
 
@@ -1840,7 +1948,8 @@ fn test_lower_type_literal_construct_signature() {
 
 #[test]
 fn test_lower_type_literal_index_signature() {
-    let (arena, literal_idx) = parse_type_literal("type T = { [key: string]: number; foo: number; };");
+    let (arena, literal_idx) =
+        parse_type_literal("type T = { [key: string]: number; foo: number; };");
     let interner = TypeInterner::new();
     let lowering = TypeLowering::new(&arena, &interner);
 
@@ -1851,7 +1960,10 @@ fn test_lower_type_literal_index_signature() {
             let shape = interner.object_shape(shape_id);
             assert_eq!(shape.properties.len(), 1);
             assert_eq!(interner.resolve_atom(shape.properties[0].name), "foo");
-            let string_index = shape.string_index.as_ref().expect("Expected string index signature");
+            let string_index = shape
+                .string_index
+                .as_ref()
+                .expect("Expected string index signature");
             assert_eq!(string_index.key_type, TypeId::STRING);
             assert_eq!(string_index.value_type, TypeId::NUMBER);
         }
@@ -1894,8 +2006,20 @@ fn test_lower_interface_single_with_two_properties() {
     match key {
         TypeKey::Object(shape_id) => {
             let shape = interner.object_shape(shape_id);
-            eprintln!("Properties found: {:?}", shape.properties.iter().map(|p| interner.resolve_atom(p.name).to_string()).collect::<Vec<_>>());
-            assert_eq!(shape.properties.len(), 2, "Expected 2 properties, got {}", shape.properties.len());
+            eprintln!(
+                "Properties found: {:?}",
+                shape
+                    .properties
+                    .iter()
+                    .map(|p| interner.resolve_atom(p.name).to_string())
+                    .collect::<Vec<_>>()
+            );
+            assert_eq!(
+                shape.properties.len(),
+                2,
+                "Expected 2 properties, got {}",
+                shape.properties.len()
+            );
 
             let mut found_x = None;
             let mut found_y = None;
@@ -1976,7 +2100,8 @@ fn test_lower_interface_conflicting_property_types() {
 
 #[test]
 fn test_lower_interface_method_overload_accumulates() {
-    let source = "interface Foo { bar(x: string): number; } interface Foo { bar(x: number): string; }";
+    let source =
+        "interface Foo { bar(x: string): number; } interface Foo { bar(x: number): string; }";
     let (arena, declarations) = parse_interface_declarations(source, "Foo");
     let interner = TypeInterner::new();
     let lowering = TypeLowering::new(&arena, &interner);
@@ -2004,7 +2129,10 @@ fn test_lower_interface_method_overload_accumulates() {
                     combos.sort_by_key(|(param, _)| param.0);
                     assert_eq!(
                         combos,
-                        vec![(TypeId::NUMBER, TypeId::STRING), (TypeId::STRING, TypeId::NUMBER)]
+                        vec![
+                            (TypeId::NUMBER, TypeId::STRING),
+                            (TypeId::STRING, TypeId::NUMBER)
+                        ]
                     );
                 }
                 _ => panic!("Expected Callable type, got {:?}", prop_key),

@@ -26,7 +26,10 @@ const x = "test";
     let output = printer.get_output();
 
     assert!(output.contains("🚀"), "Emoji should be preserved in output");
-    assert!(!output.contains('\u{FFFD}'), "Should not contain replacement character");
+    assert!(
+        !output.contains('\u{FFFD}'),
+        "Should not contain replacement character"
+    );
 }
 
 #[test]
@@ -45,7 +48,10 @@ const x = 1;
     printer.emit(root);
     let output = printer.get_output();
 
-    assert!(output.contains("こんにちは"), "Japanese should be preserved");
+    assert!(
+        output.contains("こんにちは"),
+        "Japanese should be preserved"
+    );
     assert!(output.contains("你好"), "Chinese should be preserved");
     assert!(output.contains("مرحبا"), "Arabic should be preserved");
 }
@@ -66,9 +72,18 @@ const x = 1;
     printer.emit(root);
     let output = printer.get_output();
 
-    assert!(!output.contains("/// <reference"), "Reference directive should be filtered");
-    assert!(!output.contains("/// <amd"), "AMD directive should be filtered");
-    assert!(output.contains("// Regular comment"), "Regular comments should be preserved");
+    assert!(
+        !output.contains("/// <reference"),
+        "Reference directive should be filtered"
+    );
+    assert!(
+        !output.contains("/// <amd"),
+        "AMD directive should be filtered"
+    );
+    assert!(
+        output.contains("// Regular comment"),
+        "Regular comments should be preserved"
+    );
 }
 
 #[test]
@@ -88,9 +103,15 @@ const x = ts.version;
     let output = printer.get_output();
 
     // Should transform to CommonJS
-    assert!(output.contains("require(\"typescript\")"), "Should use require()");
+    assert!(
+        output.contains("require(\"typescript\")"),
+        "Should use require()"
+    );
     assert!(output.contains("\"use strict\";"), "Should have use strict");
-    assert!(output.contains("__esModule"), "Should have __esModule marker");
+    assert!(
+        output.contains("__esModule"),
+        "Should have __esModule marker"
+    );
 }
 
 #[test]
@@ -112,12 +133,20 @@ export const x = 1;
     let output = printer.get_output();
 
     // Check order: "use strict" → comment → __esModule → code
-    let strict_pos = output.find("\"use strict\";").expect("Should have use strict");
+    let strict_pos = output
+        .find("\"use strict\";")
+        .expect("Should have use strict");
     let comment_pos = output.find("License header").expect("Should have comment");
     let esmodule_pos = output.find("__esModule").expect("Should have __esModule");
 
-    assert!(strict_pos < comment_pos, "use strict should come before comment");
-    assert!(comment_pos < esmodule_pos, "comment should come before __esModule");
+    assert!(
+        strict_pos < comment_pos,
+        "use strict should come before comment"
+    );
+    assert!(
+        comment_pos < esmodule_pos,
+        "comment should come before __esModule"
+    );
 }
 
 #[test]
@@ -144,12 +173,18 @@ export = C;
     );
 
     // Should emit module.exports = C
-    assert!(output.contains("module.exports = C"), "Should emit export assignment");
+    assert!(
+        output.contains("module.exports = C"),
+        "Should emit export assignment"
+    );
 
     // Should NOT emit exports.C = C (suppressed by export =)
     let lines: Vec<&str> = output.lines().collect();
     let double_export = lines.iter().any(|line| line.contains("exports.C = C"));
-    assert!(!double_export, "Should not double-export when using export =");
+    assert!(
+        !double_export,
+        "Should not double-export when using export ="
+    );
 }
 
 #[test]
@@ -171,10 +206,16 @@ export const x = 1;
     assert!(output.contains("\"use strict\";"), "Should have use strict");
 
     // Should have __esModule marker
-    assert!(output.contains("__esModule"), "Should have __esModule marker");
+    assert!(
+        output.contains("__esModule"),
+        "Should have __esModule marker"
+    );
 
     // Should have exports assignment
-    assert!(output.contains("exports.x"), "Should have exports.x assignment");
+    assert!(
+        output.contains("exports.x"),
+        "Should have exports.x assignment"
+    );
 }
 
 #[test]
@@ -227,7 +268,10 @@ class C {
     let output = printer.get_output();
 
     // ES5 transform should capture 'this'
-    assert!(output.contains("_this"), "Should capture this as _this for ES5");
+    assert!(
+        output.contains("_this"),
+        "Should capture this as _this for ES5"
+    );
 }
 
 #[test]
@@ -244,8 +288,7 @@ class Derived extends Base {}
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_source_text(parser.get_source_text());
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
@@ -253,7 +296,10 @@ class Derived extends Base {}
 
     // Should emit __extends helper
     assert!(output.contains("__extends"), "Should emit __extends helper");
-    assert!(output.contains("extendStatics"), "Should have full __extends implementation");
+    assert!(
+        output.contains("extendStatics"),
+        "Should have full __extends implementation"
+    );
 }
 
 #[test]
@@ -272,11 +318,17 @@ import { foo, bar as baz } from "module";
     let output = printer.get_output();
 
     // Should emit require
-    assert!(output.contains("require(\"module\")"), "Should emit require");
+    assert!(
+        output.contains("require(\"module\")"),
+        "Should emit require"
+    );
 
     // Should emit bindings
     assert!(output.contains("var foo"), "Should create foo binding");
-    assert!(output.contains("var baz"), "Should create baz binding (renamed from bar)");
+    assert!(
+        output.contains("var baz"),
+        "Should create baz binding (renamed from bar)"
+    );
 }
 
 #[test]
@@ -295,8 +347,14 @@ import myDefault from "module";
     let output = printer.get_output();
 
     // Should access .default property
-    assert!(output.contains("myDefault = "), "Should create myDefault binding");
-    assert!(output.contains(".default"), "Should access .default property");
+    assert!(
+        output.contains("myDefault = "),
+        "Should create myDefault binding"
+    );
+    assert!(
+        output.contains(".default"),
+        "Should access .default property"
+    );
 }
 
 #[test]
@@ -317,7 +375,10 @@ const x = 1;
     let output = printer.get_output();
 
     assert!(output.contains("/*"), "Should preserve block comment start");
-    assert!(output.contains("Multi-line"), "Should preserve comment content");
+    assert!(
+        output.contains("Multi-line"),
+        "Should preserve comment content"
+    );
     assert!(output.contains("*/"), "Should preserve block comment end");
 }
 
@@ -338,8 +399,14 @@ export const y = x;
     let output = printer.get_output();
 
     // Should NOT transform to CommonJS
-    assert!(!output.contains("require("), "Should not use require in ES6 mode");
-    assert!(!output.contains("exports."), "Should not use exports in ES6 mode");
+    assert!(
+        !output.contains("require("),
+        "Should not use require in ES6 mode"
+    );
+    assert!(
+        !output.contains("exports."),
+        "Should not use exports in ES6 mode"
+    );
 
     // Should keep ES6 syntax
     assert!(output.contains("import"), "Should keep import statement");

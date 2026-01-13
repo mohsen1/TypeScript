@@ -9,9 +9,11 @@ fn debouncer_flushes_after_delay() {
     let now = Instant::now();
 
     debouncer.record_at(now, PathBuf::from("src/a.ts"));
-    assert!(debouncer
-        .flush_ready(now + Duration::from_millis(99))
-        .is_none());
+    assert!(
+        debouncer
+            .flush_ready(now + Duration::from_millis(99))
+            .is_none()
+    );
 
     let flushed = debouncer
         .flush_ready(now + Duration::from_millis(101))
@@ -29,9 +31,11 @@ fn debouncer_resets_timer_on_new_event() {
     debouncer.record_at(now, PathBuf::from("src/a.ts"));
     debouncer.record_at(now + Duration::from_millis(50), PathBuf::from("src/b.ts"));
 
-    assert!(debouncer
-        .flush_ready(now + Duration::from_millis(120))
-        .is_none());
+    assert!(
+        debouncer
+            .flush_ready(now + Duration::from_millis(120))
+            .is_none()
+    );
 
     let flushed = debouncer
         .flush_ready(now + Duration::from_millis(160))

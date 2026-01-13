@@ -14,8 +14,12 @@ impl<'a> ThinPrinter<'a> {
 
         let mut first = true;
         for &decl_idx in &decl_list.declarations.nodes {
-            let Some(decl_node) = self.arena.get(decl_idx) else { continue };
-            let Some(decl) = self.arena.get_variable_declaration(decl_node) else { continue };
+            let Some(decl_node) = self.arena.get(decl_idx) else {
+                continue;
+            };
+            let Some(decl) = self.arena.get_variable_declaration(decl_node) else {
+                continue;
+            };
 
             if self.is_binding_pattern(decl.name) && !decl.initializer.is_none() {
                 self.emit_es5_destructuring(decl_idx, &mut first);
@@ -31,9 +35,15 @@ impl<'a> ThinPrinter<'a> {
 
     /// Emit ES5 destructuring: { x, y } = obj → _a = obj, x = _a.x, y = _a.y
     fn emit_es5_destructuring(&mut self, decl_idx: NodeIndex, first: &mut bool) {
-        let Some(decl_node) = self.arena.get(decl_idx) else { return };
-        let Some(decl) = self.arena.get_variable_declaration(decl_node) else { return };
-        let Some(pattern_node) = self.arena.get(decl.name) else { return };
+        let Some(decl_node) = self.arena.get(decl_idx) else {
+            return;
+        };
+        let Some(decl) = self.arena.get_variable_declaration(decl_node) else {
+            return;
+        };
+        let Some(pattern_node) = self.arena.get(decl.name) else {
+            return;
+        };
 
         // Get temp variable name
         let temp_name = self.get_temp_var_name();
@@ -50,8 +60,15 @@ impl<'a> ThinPrinter<'a> {
         self.emit_es5_destructuring_pattern(pattern_node, &temp_name);
     }
 
-    fn emit_es5_destructuring_from_value(&mut self, pattern_idx: NodeIndex, result_name: &str, first: &mut bool) {
-        let Some(pattern_node) = self.arena.get(pattern_idx) else { return };
+    fn emit_es5_destructuring_from_value(
+        &mut self,
+        pattern_idx: NodeIndex,
+        result_name: &str,
+        first: &mut bool,
+    ) {
+        let Some(pattern_node) = self.arena.get(pattern_idx) else {
+            return;
+        };
 
         let temp_name = self.get_temp_var_name();
 
@@ -73,7 +90,9 @@ impl<'a> ThinPrinter<'a> {
         } else {
             elem.name
         };
-        let Some(key_node) = self.arena.get(key_idx) else { return None };
+        let Some(key_node) = self.arena.get(key_idx) else {
+            return None;
+        };
         match key_node.kind {
             k if k == syntax_kind_ext::COMPUTED_PROPERTY_NAME
                 || k == SyntaxKind::Identifier as u16
@@ -88,8 +107,12 @@ impl<'a> ThinPrinter<'a> {
 
     /// Emit a single binding element for ES5 object destructuring
     fn emit_es5_binding_element(&mut self, elem_idx: NodeIndex, temp_name: &str) {
-        let Some(elem_node) = self.arena.get(elem_idx) else { return };
-        let Some(elem) = self.arena.get_binding_element(elem_node) else { return };
+        let Some(elem_node) = self.arena.get(elem_idx) else {
+            return;
+        };
+        let Some(elem) = self.arena.get_binding_element(elem_node) else {
+            return;
+        };
         if elem.dot_dot_dot_token {
             return;
         }
@@ -148,9 +171,18 @@ impl<'a> ThinPrinter<'a> {
     }
 
     /// Emit a single binding element for ES5 array destructuring
-    fn emit_es5_array_binding_element(&mut self, elem_idx: NodeIndex, temp_name: &str, index: usize) {
-        let Some(elem_node) = self.arena.get(elem_idx) else { return };
-        let Some(elem) = self.arena.get_binding_element(elem_node) else { return };
+    fn emit_es5_array_binding_element(
+        &mut self,
+        elem_idx: NodeIndex,
+        temp_name: &str,
+        index: usize,
+    ) {
+        let Some(elem_node) = self.arena.get(elem_idx) else {
+            return;
+        };
+        let Some(elem) = self.arena.get_binding_element(elem_node) else {
+            return;
+        };
 
         if elem.dot_dot_dot_token {
             self.emit_es5_array_rest_element(elem.name, temp_name, index);
@@ -217,14 +249,20 @@ impl<'a> ThinPrinter<'a> {
 
     fn emit_es5_destructuring_pattern(&mut self, pattern_node: &ThinNode, temp_name: &str) {
         if pattern_node.kind == syntax_kind_ext::OBJECT_BINDING_PATTERN {
-            let Some(pattern) = self.arena.get_binding_pattern(pattern_node) else { return };
+            let Some(pattern) = self.arena.get_binding_pattern(pattern_node) else {
+                return;
+            };
             let rest_props = self.collect_object_rest_props(pattern);
             for &elem_idx in &pattern.elements.nodes {
                 if elem_idx.is_none() {
                     continue;
                 }
-                let Some(elem_node) = self.arena.get(elem_idx) else { continue };
-                let Some(elem) = self.arena.get_binding_element(elem_node) else { continue };
+                let Some(elem_node) = self.arena.get(elem_idx) else {
+                    continue;
+                };
+                let Some(elem) = self.arena.get_binding_element(elem_node) else {
+                    continue;
+                };
                 if elem.dot_dot_dot_token {
                     self.emit_es5_object_rest_element(elem, &rest_props, temp_name);
                 } else {
@@ -314,7 +352,9 @@ impl<'a> ThinPrinter<'a> {
         temp_name: &str,
         started: &mut bool,
     ) {
-        let Some(pattern_node) = self.arena.get(pattern_idx) else { return };
+        let Some(pattern_node) = self.arena.get(pattern_idx) else {
+            return;
+        };
 
         match pattern_node.kind {
             k if k == syntax_kind_ext::OBJECT_BINDING_PATTERN => {
@@ -324,10 +364,19 @@ impl<'a> ThinPrinter<'a> {
                         if elem_idx.is_none() {
                             continue;
                         }
-                        let Some(elem_node) = self.arena.get(elem_idx) else { continue };
-                        let Some(elem) = self.arena.get_binding_element(elem_node) else { continue };
+                        let Some(elem_node) = self.arena.get(elem_idx) else {
+                            continue;
+                        };
+                        let Some(elem) = self.arena.get_binding_element(elem_node) else {
+                            continue;
+                        };
                         if elem.dot_dot_dot_token {
-                            self.emit_param_object_rest_element(elem, &rest_props, temp_name, started);
+                            self.emit_param_object_rest_element(
+                                elem,
+                                &rest_props,
+                                temp_name,
+                                started,
+                            );
                         } else {
                             self.emit_param_object_binding_element(elem_idx, temp_name, started);
                         }
@@ -351,8 +400,12 @@ impl<'a> ThinPrinter<'a> {
         temp_name: &str,
         started: &mut bool,
     ) {
-        let Some(elem_node) = self.arena.get(elem_idx) else { return };
-        let Some(elem) = self.arena.get_binding_element(elem_node) else { return };
+        let Some(elem_node) = self.arena.get(elem_idx) else {
+            return;
+        };
+        let Some(elem) = self.arena.get_binding_element(elem_node) else {
+            return;
+        };
 
         if elem.dot_dot_dot_token {
             return;
@@ -419,8 +472,12 @@ impl<'a> ThinPrinter<'a> {
         if elem_idx.is_none() {
             return;
         }
-        let Some(elem_node) = self.arena.get(elem_idx) else { return };
-        let Some(elem) = self.arena.get_binding_element(elem_node) else { return };
+        let Some(elem_node) = self.arena.get(elem_idx) else {
+            return;
+        };
+        let Some(elem) = self.arena.get_binding_element(elem_node) else {
+            return;
+        };
 
         if elem.dot_dot_dot_token {
             self.emit_param_array_rest_element(elem.name, temp_name, index, started);
@@ -589,7 +646,12 @@ impl<'a> ThinPrinter<'a> {
         }
     }
 
-    fn emit_es5_array_rest_element(&mut self, rest_target: NodeIndex, temp_name: &str, index: usize) {
+    fn emit_es5_array_rest_element(
+        &mut self,
+        rest_target: NodeIndex,
+        temp_name: &str,
+        index: usize,
+    ) {
         let is_pattern = self.is_binding_pattern(rest_target);
         let rest_temp = if is_pattern {
             Some(self.get_temp_var_name())
@@ -618,15 +680,21 @@ impl<'a> ThinPrinter<'a> {
     }
 
     fn emit_es5_destructuring_pattern_idx(&mut self, pattern_idx: NodeIndex, temp_name: &str) {
-        let Some(pattern_node) = self.arena.get(pattern_idx) else { return };
+        let Some(pattern_node) = self.arena.get(pattern_idx) else {
+            return;
+        };
         self.emit_es5_destructuring_pattern(pattern_node, temp_name);
     }
 
     fn collect_object_rest_props(&self, pattern: &BindingPatternData) -> Vec<NodeIndex> {
         let mut props = Vec::new();
         for &elem_idx in &pattern.elements.nodes {
-            let Some(elem_node) = self.arena.get(elem_idx) else { continue };
-            let Some(elem) = self.arena.get_binding_element(elem_node) else { continue };
+            let Some(elem_node) = self.arena.get(elem_idx) else {
+                continue;
+            };
+            let Some(elem) = self.arena.get_binding_element(elem_node) else {
+                continue;
+            };
             if elem.dot_dot_dot_token {
                 continue;
             }
@@ -661,7 +729,9 @@ impl<'a> ThinPrinter<'a> {
     }
 
     fn emit_rest_property_key(&mut self, key_idx: NodeIndex) {
-        let Some(key_node) = self.arena.get(key_idx) else { return };
+        let Some(key_node) = self.arena.get(key_idx) else {
+            return;
+        };
 
         if key_node.kind == syntax_kind_ext::COMPUTED_PROPERTY_NAME {
             if let Some(computed) = self.arena.get_computed_property(key_node) {
@@ -821,9 +891,18 @@ impl<'a> ThinPrinter<'a> {
         }
     }
 
-    fn emit_for_of_declaration_value_es5(&mut self, decl_idx: NodeIndex, result_name: &str, first: &mut bool) {
-        let Some(decl_node) = self.arena.get(decl_idx) else { return };
-        let Some(decl) = self.arena.get_variable_declaration(decl_node) else { return };
+    fn emit_for_of_declaration_value_es5(
+        &mut self,
+        decl_idx: NodeIndex,
+        result_name: &str,
+        first: &mut bool,
+    ) {
+        let Some(decl_node) = self.arena.get(decl_idx) else {
+            return;
+        };
+        let Some(decl) = self.arena.get_variable_declaration(decl_node) else {
+            return;
+        };
 
         if self.is_binding_pattern(decl.name) {
             self.emit_es5_destructuring_from_value(decl.name, result_name, first);

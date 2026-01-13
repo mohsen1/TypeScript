@@ -15,38 +15,36 @@
 //! Note: CheckerState has been replaced by ThinCheckerState in thin_checker.rs
 //! The types module is still used by both ThinChecker and Solver.
 
-pub mod types;
 pub mod arena;
 pub mod context;
-pub mod expr;
-pub mod statements;
-pub mod declarations;
-pub mod flow_graph_builder;
-pub mod flow_analyzer;
-pub mod reachability_analyzer;
 pub mod control_flow;
+pub mod declarations;
+pub mod expr;
+pub mod flow_analyzer;
+pub mod flow_graph_builder;
+pub mod reachability_analyzer;
+pub mod statements;
+pub mod types;
 
 #[cfg(test)]
 mod control_flow_tests;
 
 // Re-export key types
-pub use types::{
-    type_flags, object_flags, signature_flags, diagnostic_codes,
-    Type, TypeId, LiteralValue, LiteralType, IntrinsicType,
-    ObjectType, UnionType, IntersectionType, TypeParameter,
-    ConditionalType, MappedType, IndexType, IndexedAccessType,
-    TemplateLiteralType, FunctionType, ArrayTypeInfo, TupleTypeInfo,
-    EnumTypeInfo, TypeReference, Signature, IndexInfo,
-};
 pub use arena::TypeArena;
 pub use context::{CheckerContext, EnclosingClassInfo, TypeCache};
-pub use expr::ExpressionChecker;
-pub use statements::StatementChecker;
-pub use declarations::DeclarationChecker;
-pub use flow_graph_builder::{FlowGraph, FlowGraphBuilder};
-pub use flow_analyzer::{
-    DefiniteAssignmentAnalyzer, AssignmentState, AssignmentStateMap,
-    DefiniteAssignmentResult, merge_assignment_states,
-};
-pub use reachability_analyzer::ReachabilityAnalyzer;
 pub use control_flow::{FlowAnalyzer, FlowGraph as ControlFlowGraph};
+pub use declarations::DeclarationChecker;
+pub use expr::ExpressionChecker;
+pub use flow_analyzer::{
+    AssignmentState, AssignmentStateMap, DefiniteAssignmentAnalyzer, DefiniteAssignmentResult,
+    merge_assignment_states,
+};
+pub use flow_graph_builder::{FlowGraph, FlowGraphBuilder};
+pub use reachability_analyzer::ReachabilityAnalyzer;
+pub use statements::StatementChecker;
+pub use types::{
+    ArrayTypeInfo, ConditionalType, EnumTypeInfo, FunctionType, IndexInfo, IndexType,
+    IndexedAccessType, IntersectionType, IntrinsicType, LiteralType, LiteralValue, MappedType,
+    ObjectType, Signature, TemplateLiteralType, TupleTypeInfo, Type, TypeId, TypeParameter,
+    TypeReference, UnionType, diagnostic_codes, object_flags, signature_flags, type_flags,
+};

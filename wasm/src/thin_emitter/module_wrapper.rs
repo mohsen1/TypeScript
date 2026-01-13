@@ -56,10 +56,7 @@ impl<'a> ThinPrinter<'a> {
         self.write("});");
     }
 
-    pub(super) fn emit_umd_wrapper(
-        &mut self,
-        source_node: &crate::parser::thin_node::ThinNode,
-    ) {
+    pub(super) fn emit_umd_wrapper(&mut self, source_node: &crate::parser::thin_node::ThinNode) {
         self.write("(function (factory) {");
         self.write_line();
         self.increase_indent();

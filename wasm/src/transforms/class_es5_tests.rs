@@ -122,8 +122,7 @@ fn test_class_es5_async_method_emits_awaiter() {
 
 #[test]
 fn test_class_es5_preserves_pre_super_statement_order() {
-    let source =
-        "class Base {} class Derived extends Base { y = 1; constructor() { prep(); super(); post(); } }";
+    let source = "class Base {} class Derived extends Base { y = 1; constructor() { prep(); super(); post(); } }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -518,8 +517,12 @@ class Derived extends Base {
     );
 
     // Verify ordering: super() should come before property initializer
-    let super_pos = output.find("_super.call(this").expect("expected super call");
-    let init_pos = output.find("_this[key] = 42").expect("expected initializer");
+    let super_pos = output
+        .find("_super.call(this")
+        .expect("expected super call");
+    let init_pos = output
+        .find("_this[key] = 42")
+        .expect("expected initializer");
     assert!(
         super_pos < init_pos,
         "Expected super call before computed property initializer: {}",
@@ -529,7 +532,8 @@ class Derived extends Base {
 
 #[test]
 fn test_class_es5_static_field_async_arrow() {
-    let source = "class Foo { static handler = async () => { await fetch(); return this.value; }; }";
+    let source =
+        "class Foo { static handler = async () => { await fetch(); return this.value; }; }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
@@ -813,7 +817,9 @@ class Foo {
 
     // Should use __spreadArray or concat for ES5 spread
     assert!(
-        output.contains("__spreadArray") || output.contains(".concat(") || output.contains("slice.call"),
+        output.contains("__spreadArray")
+            || output.contains(".concat(")
+            || output.contains("slice.call"),
         "Expected ES5 spread transformation using __spreadArray or concat: {}",
         output
     );
@@ -1262,7 +1268,10 @@ class Point {
     // Should have explicit property assignments (x: x, y: y) for ES5
     // or the shorthand should be preserved if the emitter handles it
     assert!(
-        output.contains("x:") || output.contains("x :") || output.contains("{ x, y }") || output.contains("{x, y}"),
+        output.contains("x:")
+            || output.contains("x :")
+            || output.contains("{ x, y }")
+            || output.contains("{x, y}"),
         "Expected object with x property in output: {}",
         output
     );
@@ -1472,7 +1481,8 @@ class DynamicObject {
 
     // Method should be on prototype
     assert!(
-        output.contains(".prototype.createObject") || output.contains("prototype[\"createObject\"]"),
+        output.contains(".prototype.createObject")
+            || output.contains("prototype[\"createObject\"]"),
         "Expected createObject method on prototype: {}",
         output
     );
@@ -1975,7 +1985,8 @@ class DataStream {
 
     // Should return the array
     assert!(
-        output.contains("return") && (output.contains("[1, 2, 3]") || output.contains("1") || output.contains("2")),
+        output.contains("return")
+            && (output.contains("[1, 2, 3]") || output.contains("1") || output.contains("2")),
         "Expected return statement with values: {}",
         output
     );
@@ -2791,8 +2802,8 @@ class Calculator {
 
     // Only the implementation should be emitted, not the overload signatures
     // There should be exactly one add method on prototype
-    let add_count = output.matches("prototype.add").count()
-        + output.matches("prototype[\"add\"]").count();
+    let add_count =
+        output.matches("prototype.add").count() + output.matches("prototype[\"add\"]").count();
     assert!(
         add_count == 1,
         "Expected exactly one add method (implementation only), found {}: {}",
@@ -3547,7 +3558,9 @@ class SecureData {
 
     // Should have WeakMap for private fields
     assert!(
-        output.contains("WeakMap") || output.contains("__classPrivateFieldSet") || output.contains("__classPrivateFieldGet"),
+        output.contains("WeakMap")
+            || output.contains("__classPrivateFieldSet")
+            || output.contains("__classPrivateFieldGet"),
         "Expected private field mechanism in output: {}",
         output
     );
@@ -3676,14 +3689,17 @@ class Config {
 
     // Property initializers should reference this
     assert!(
-        output.contains("this.baseUrl") || output.contains("this.timeout") || output.contains("this.headers"),
+        output.contains("this.baseUrl")
+            || output.contains("this.timeout")
+            || output.contains("this.headers"),
         "Expected property assignments in constructor: {}",
         output
     );
 
     // Methods should be on prototype
     assert!(
-        output.contains(".prototype.getDefaultUrl") || output.contains("prototype[\"getDefaultUrl\"]"),
+        output.contains(".prototype.getDefaultUrl")
+            || output.contains("prototype[\"getDefaultUrl\"]"),
         "Expected getDefaultUrl method on prototype: {}",
         output
     );
@@ -3840,7 +3856,9 @@ class Builder {
 
     // All methods should be on prototype
     assert!(
-        output.contains(".prototype.append") && output.contains(".prototype.prepend") && output.contains(".prototype.build"),
+        output.contains(".prototype.append")
+            && output.contains(".prototype.prepend")
+            && output.contains(".prototype.build"),
         "Expected all methods on prototype: {}",
         output
     );
@@ -4095,17 +4113,20 @@ class EventProcessor {
 
     // Async event handlers should be on prototype
     assert!(
-        output.contains(".prototype.handleUserCreated") || output.contains("prototype[\"handleUserCreated\"]"),
+        output.contains(".prototype.handleUserCreated")
+            || output.contains("prototype[\"handleUserCreated\"]"),
         "Expected handleUserCreated method on prototype: {}",
         output
     );
     assert!(
-        output.contains(".prototype.handleUserUpdated") || output.contains("prototype[\"handleUserUpdated\"]"),
+        output.contains(".prototype.handleUserUpdated")
+            || output.contains("prototype[\"handleUserUpdated\"]"),
         "Expected handleUserUpdated method on prototype: {}",
         output
     );
     assert!(
-        output.contains(".prototype.handleUserDeleted") || output.contains("prototype[\"handleUserDeleted\"]"),
+        output.contains(".prototype.handleUserDeleted")
+            || output.contains("prototype[\"handleUserDeleted\"]"),
         "Expected handleUserDeleted method on prototype: {}",
         output
     );
@@ -4370,12 +4391,14 @@ class CustomElement {
         output
     );
     assert!(
-        output.contains(".prototype.getClassName") || output.contains("prototype[\"getClassName\"]"),
+        output.contains(".prototype.getClassName")
+            || output.contains("prototype[\"getClassName\"]"),
         "Expected getClassName method on prototype: {}",
         output
     );
     assert!(
-        output.contains(".prototype.setClassName") || output.contains("prototype[\"setClassName\"]"),
+        output.contains(".prototype.setClassName")
+            || output.contains("prototype[\"setClassName\"]"),
         "Expected setClassName method on prototype: {}",
         output
     );
@@ -4425,7 +4448,9 @@ class Calculator {
 
     // Should use WeakSet or __classPrivateFieldGet for private methods
     assert!(
-        output.contains("WeakSet") || output.contains("__classPrivateFieldGet") || output.contains("_validate"),
+        output.contains("WeakSet")
+            || output.contains("__classPrivateFieldGet")
+            || output.contains("_validate"),
         "Expected private method mechanism in output: {}",
         output
     );
@@ -4699,7 +4724,9 @@ class BankAccount {
 
     // Should have WeakMap for private fields
     assert!(
-        output.contains("WeakMap") || output.contains("__classPrivateFieldGet") || output.contains("__classPrivateFieldSet"),
+        output.contains("WeakMap")
+            || output.contains("__classPrivateFieldGet")
+            || output.contains("__classPrivateFieldSet"),
         "Expected private field mechanism: {}",
         output
     );
@@ -4711,7 +4738,8 @@ class BankAccount {
         output
     );
     assert!(
-        output.contains(".prototype.getStatement") || output.contains("prototype[\"getStatement\"]"),
+        output.contains(".prototype.getStatement")
+            || output.contains("prototype[\"getStatement\"]"),
         "Expected getStatement method on prototype: {}",
         output
     );
@@ -4751,7 +4779,11 @@ class Derived extends Base {
         .get_source_file(root_node)
         .expect("expected source file data");
     // Get the Derived class (second statement)
-    let class_idx = source_file.statements.nodes.get(1).expect("expected Derived class");
+    let class_idx = source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected Derived class");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(*class_idx);
@@ -4808,7 +4840,11 @@ class Button extends EventEmitter {
         .get_source_file(root_node)
         .expect("expected source file data");
     // Get the Button class (second statement)
-    let class_idx = source_file.statements.nodes.get(1).expect("expected Button class");
+    let class_idx = source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected Button class");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(*class_idx);
@@ -4875,7 +4911,11 @@ class AppConfig extends Config {
         .get_source_file(root_node)
         .expect("expected source file data");
     // Get the AppConfig class (second statement)
-    let class_idx = source_file.statements.nodes.get(1).expect("expected AppConfig class");
+    let class_idx = source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected AppConfig class");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(*class_idx);
@@ -4944,7 +4984,11 @@ class Service extends Logger {
         .get_source_file(root_node)
         .expect("expected source file data");
     // Get the Service class (second statement)
-    let class_idx = source_file.statements.nodes.get(1).expect("expected Service class");
+    let class_idx = source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected Service class");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(*class_idx);
@@ -5034,7 +5078,11 @@ class Dog extends Mammal {
         .get_source_file(root_node)
         .expect("expected source file data");
     // Get the Dog class (third statement)
-    let class_idx = source_file.statements.nodes.get(2).expect("expected Dog class");
+    let class_idx = source_file
+        .statements
+        .nodes
+        .get(2)
+        .expect("expected Dog class");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(*class_idx);
@@ -5097,8 +5145,7 @@ const MyClass = class {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -5155,8 +5202,7 @@ const Factory = class ServiceFactory {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -5199,8 +5245,7 @@ function createClass() {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -5252,8 +5297,7 @@ const Derived = class extends Base {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -5315,8 +5359,7 @@ const Counter = class {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -5360,8 +5403,7 @@ class Person {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -5377,9 +5419,7 @@ class Person {
     // Accessor should generate getter/setter pattern
     // Either via Object.defineProperty or direct get/set
     assert!(
-        output.contains("defineProperty")
-            || output.contains("get")
-            || output.contains("name"),
+        output.contains("defineProperty") || output.contains("get") || output.contains("name"),
         "Expected accessor transformation: {}",
         output
     );
@@ -5410,8 +5450,7 @@ class Counter {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -5460,8 +5499,7 @@ class Config {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -5521,8 +5559,7 @@ class Dog extends Animal {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -5578,8 +5615,7 @@ class SecureValue {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -5594,9 +5630,7 @@ class SecureValue {
 
     // Methods should be present
     assert!(
-        output.contains("increment")
-            && output.contains("getValue")
-            && output.contains("setValue"),
+        output.contains("increment") && output.contains("getValue") && output.contains("setValue"),
         "Expected methods: {}",
         output
     );
@@ -5629,8 +5663,7 @@ class Calculator {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -5644,11 +5677,7 @@ class Calculator {
     );
 
     // Only implementation should be emitted, not overload signatures
-    assert!(
-        output.contains("add"),
-        "Expected add method: {}",
-        output
-    );
+    assert!(output.contains("add"), "Expected add method: {}", output);
 
     // Method should be on prototype
     assert!(
@@ -5680,8 +5709,7 @@ class Formatter {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -5735,8 +5763,7 @@ class Container<T> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -5787,8 +5814,7 @@ class Factory {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -5845,8 +5871,7 @@ class ExtendedService extends BaseService {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -5899,8 +5924,7 @@ class Point {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -5948,8 +5972,7 @@ class Data {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -6011,8 +6034,7 @@ class Dog extends Animal {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -6073,8 +6095,7 @@ class Config {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -6132,8 +6153,7 @@ class Container<T> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -6181,8 +6201,7 @@ class Person {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -6234,8 +6253,7 @@ class BankAccount {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -6293,8 +6311,7 @@ class Car extends Vehicle {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -6347,8 +6364,7 @@ class Config {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -6409,8 +6425,7 @@ class User {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -6474,7 +6489,11 @@ class Config {
         .arena
         .get_source_file(root_node)
         .expect("expected source file data");
-    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(class_idx);
@@ -6540,7 +6559,11 @@ class Entity {
         .arena
         .get_source_file(root_node)
         .expect("expected source file data");
-    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(class_idx);
@@ -6603,7 +6626,11 @@ class Constants {
         .arena
         .get_source_file(root_node)
         .expect("expected source file data");
-    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(class_idx);
@@ -6675,7 +6702,11 @@ class Derived extends Base {
         .get_source_file(root_node)
         .expect("expected source file data");
     // Get Derived class (second statement)
-    let class_idx = *source_file.statements.nodes.get(1).expect("expected Derived class");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected Derived class");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(class_idx);
@@ -6739,7 +6770,11 @@ class ImmutableList {
         .arena
         .get_source_file(root_node)
         .expect("expected source file data");
-    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(class_idx);
@@ -6764,11 +6799,7 @@ class ImmutableList {
     );
 
     // Methods should be present
-    assert!(
-        output.contains("get"),
-        "Expected get method: {}",
-        output
-    );
+    assert!(output.contains("get"), "Expected get method: {}", output);
     assert!(
         output.contains("contains"),
         "Expected contains method: {}",
@@ -6819,7 +6850,11 @@ class User {
         .arena
         .get_source_file(root_node)
         .expect("expected source file data");
-    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(class_idx);
@@ -6893,7 +6928,11 @@ declare class ExternalAPI {
         .arena
         .get_source_file(root_node)
         .expect("expected source file data");
-    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(class_idx);
@@ -6926,7 +6965,11 @@ declare class Database {
         .arena
         .get_source_file(root_node)
         .expect("expected source file data");
-    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(class_idx);
@@ -6965,7 +7008,11 @@ declare class MathUtils {
         .arena
         .get_source_file(root_node)
         .expect("expected source file data");
-    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(class_idx);
@@ -7009,7 +7056,11 @@ declare class MouseEvent extends BaseEvent {
         .expect("expected source file data");
 
     // Check second class (MouseEvent extends BaseEvent)
-    let class_idx = source_file.statements.nodes.get(1).expect("expected second class declaration");
+    let class_idx = source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected second class declaration");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(*class_idx);
@@ -7053,7 +7104,11 @@ declare class DataModel implements Serializable {
         .expect("expected source file data");
 
     // Second statement is the declare class
-    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
+    let class_idx = source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected class declaration");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(*class_idx);
@@ -7090,7 +7145,11 @@ declare class Config {
         .arena
         .get_source_file(root_node)
         .expect("expected source file data");
-    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(class_idx);
@@ -7134,7 +7193,11 @@ class Model {
         .expect("expected source file data");
 
     // Second statement is the class
-    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
+    let class_idx = source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected class declaration");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(*class_idx);
@@ -7180,7 +7243,11 @@ class Config {
         .expect("expected source file data");
 
     // Second statement is the class
-    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
+    let class_idx = source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected class declaration");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(*class_idx);
@@ -7224,7 +7291,11 @@ class Service {
         .expect("expected source file data");
 
     // Second statement is the class
-    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
+    let class_idx = source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected class declaration");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(*class_idx);
@@ -7274,7 +7345,11 @@ class Form {
         .expect("expected source file data");
 
     // Fourth statement is the class (after 3 function declarations)
-    let class_idx = source_file.statements.nodes.get(3).expect("expected class declaration");
+    let class_idx = source_file
+        .statements
+        .nodes
+        .get(3)
+        .expect("expected class declaration");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(*class_idx);
@@ -7287,11 +7362,7 @@ class Form {
     );
 
     // Email field should be present
-    assert!(
-        output.contains("email"),
-        "Expected email field: {}",
-        output
-    );
+    assert!(output.contains("email"), "Expected email field: {}", output);
 }
 
 #[test]
@@ -7322,7 +7393,11 @@ class User extends BaseEntity {
         .expect("expected source file data");
 
     // Third statement is the User class
-    let class_idx = source_file.statements.nodes.get(2).expect("expected class declaration");
+    let class_idx = source_file
+        .statements
+        .nodes
+        .get(2)
+        .expect("expected class declaration");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(*class_idx);
@@ -7379,7 +7454,11 @@ class ViewModel {
         .expect("expected source file data");
 
     // Third statement is the class
-    let class_idx = source_file.statements.nodes.get(2).expect("expected class declaration");
+    let class_idx = source_file
+        .statements
+        .nodes
+        .get(2)
+        .expect("expected class declaration");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(*class_idx);
@@ -7436,7 +7515,11 @@ class Dog extends Animal {
         .expect("expected source file data");
 
     // Second statement is the Dog class
-    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
+    let class_idx = source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected class declaration");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(*class_idx);
@@ -7506,7 +7589,11 @@ class Derived extends Base {
         .expect("expected source file data");
 
     // Second statement is the Derived class
-    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
+    let class_idx = source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected class declaration");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(*class_idx);
@@ -7576,7 +7663,11 @@ class Rectangle extends Shape {
         .expect("expected source file data");
 
     // Second statement is the Rectangle class
-    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
+    let class_idx = source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected class declaration");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(*class_idx);
@@ -7597,7 +7688,9 @@ class Rectangle extends Shape {
 
     // All methods should be present
     assert!(
-        output.contains("getArea") && output.contains("getPerimeter") && output.contains("describe"),
+        output.contains("getArea")
+            && output.contains("getPerimeter")
+            && output.contains("describe"),
         "Expected all override methods: {}",
         output
     );
@@ -7629,7 +7722,11 @@ class C extends B {
         .expect("expected source file data");
 
     // Third statement is class C
-    let class_idx = source_file.statements.nodes.get(2).expect("expected class declaration");
+    let class_idx = source_file
+        .statements
+        .nodes
+        .get(2)
+        .expect("expected class declaration");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(*class_idx);
@@ -7649,11 +7746,7 @@ class C extends B {
     );
 
     // Method should be present
-    assert!(
-        output.contains("foo"),
-        "Expected foo method: {}",
-        output
-    );
+    assert!(output.contains("foo"), "Expected foo method: {}", output);
 
     // Should have inheritance
     assert!(
@@ -7690,7 +7783,11 @@ class TimestampLogger extends Logger {
         .expect("expected source file data");
 
     // Second statement is the TimestampLogger class
-    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
+    let class_idx = source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected class declaration");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(*class_idx);
@@ -7710,11 +7807,7 @@ class TimestampLogger extends Logger {
     );
 
     // Method should be present
-    assert!(
-        output.contains("log"),
-        "Expected log method: {}",
-        output
-    );
+    assert!(output.contains("log"), "Expected log method: {}", output);
 
     // Super call should be transformed
     assert!(
@@ -7753,7 +7846,11 @@ class Button extends Component {
         .expect("expected source file data");
 
     // Second statement is the Button class
-    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
+    let class_idx = source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected class declaration");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(*class_idx);
@@ -7815,7 +7912,11 @@ class Server {
         .expect("expected source file data");
 
     // Second statement is the class
-    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
+    let class_idx = source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected class declaration");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(*class_idx);
@@ -7868,7 +7969,11 @@ class Geometry {
         .expect("expected source file data");
 
     // Second statement is the class
-    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
+    let class_idx = source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected class declaration");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(*class_idx);
@@ -7923,7 +8028,11 @@ class Theme {
         .expect("expected source file data");
 
     // Second statement is the class
-    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
+    let class_idx = source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected class declaration");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(*class_idx);
@@ -7981,7 +8090,11 @@ class Client {
         .expect("expected source file data");
 
     // Second statement is the class
-    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
+    let class_idx = source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected class declaration");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(*class_idx);
@@ -8035,7 +8148,11 @@ class Router {
         .expect("expected source file data");
 
     // Second statement is the class
-    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
+    let class_idx = source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected class declaration");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(*class_idx);
@@ -8090,7 +8207,11 @@ class CustomPlugin extends BasePlugin {
         .expect("expected source file data");
 
     // Third statement is the CustomPlugin class
-    let class_idx = source_file.statements.nodes.get(2).expect("expected class declaration");
+    let class_idx = source_file
+        .statements
+        .nodes
+        .get(2)
+        .expect("expected class declaration");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(*class_idx);
@@ -8151,8 +8272,7 @@ namespace Validator {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -8214,8 +8334,7 @@ namespace StringUtils {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -8282,19 +8401,14 @@ namespace Point {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
     let output = printer.get_output().to_string();
 
     // Class should be present
-    assert!(
-        output.contains("Point"),
-        "Expected Point class: {}",
-        output
-    );
+    assert!(output.contains("Point"), "Expected Point class: {}", output);
 
     // Instance method should be present
     assert!(
@@ -8350,8 +8464,7 @@ namespace Logger {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -8365,11 +8478,7 @@ namespace Logger {
     );
 
     // Instance method should be present
-    assert!(
-        output.contains("log"),
-        "Expected log method: {}",
-        output
-    );
+    assert!(output.contains("log"), "Expected log method: {}", output);
 
     // Nested namespace should be present
     assert!(
@@ -8424,8 +8533,7 @@ namespace ApiService {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -8495,8 +8603,7 @@ const Container = class<T> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -8552,8 +8659,7 @@ const Pair = class<K, V> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -8609,8 +8715,7 @@ const Measurable = class<T extends HasLength> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -8675,8 +8780,7 @@ const SortedCollection = class<T> extends BaseCollection<T> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -8743,8 +8847,7 @@ const UserRepo = createRepository<{ id: number; name: string }>();
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -8814,7 +8917,11 @@ class MyArray<T> {
         .arena
         .get_source_file(root_node)
         .expect("expected source file data");
-    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(class_idx);
@@ -8827,15 +8934,13 @@ class MyArray<T> {
     );
 
     // Method should be present
-    assert!(
-        output.contains("push"),
-        "Expected push method: {}",
-        output
-    );
+    assert!(output.contains("push"), "Expected push method: {}", output);
 
     // Symbol.species should be handled (either as computed property or defineProperty)
     assert!(
-        output.contains("Symbol.species") || output.contains("species") || output.contains("defineProperty"),
+        output.contains("Symbol.species")
+            || output.contains("species")
+            || output.contains("defineProperty"),
         "Expected Symbol.species handling: {}",
         output
     );
@@ -8873,7 +8978,11 @@ class SpecialCollection<T> extends BaseCollection<T> {
         .expect("expected source file data");
 
     // Second statement is the SpecialCollection class
-    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
+    let class_idx = source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected class declaration");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(*class_idx);
@@ -8938,7 +9047,11 @@ class CustomList<T> {
         .arena
         .get_source_file(root_node)
         .expect("expected source file data");
-    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(class_idx);
@@ -8995,7 +9108,11 @@ class BehaviorSubject<T> extends Observable<T> {
         .expect("expected source file data");
 
     // Second statement is the BehaviorSubject class
-    let class_idx = source_file.statements.nodes.get(1).expect("expected class declaration");
+    let class_idx = source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected class declaration");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(*class_idx);
@@ -9015,11 +9132,7 @@ class BehaviorSubject<T> extends Observable<T> {
     );
 
     // Method should be present
-    assert!(
-        output.contains("next"),
-        "Expected next method: {}",
-        output
-    );
+    assert!(output.contains("next"), "Expected next method: {}", output);
 }
 
 #[test]
@@ -9052,7 +9165,11 @@ class Factory<T> {
         .arena
         .get_source_file(root_node)
         .expect("expected source file data");
-    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(class_idx);
@@ -9112,7 +9229,11 @@ class ImmutableList<T> {
         .arena
         .get_source_file(root_node)
         .expect("expected source file data");
-    let class_idx = *source_file.statements.nodes.first().expect("expected class declaration");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
 
     let mut emitter = ClassES5Emitter::new(&parser.arena);
     let output = emitter.emit_class(class_idx);
@@ -9125,11 +9246,7 @@ class ImmutableList<T> {
     );
 
     // Methods should be present
-    assert!(
-        output.contains("get"),
-        "Expected get method: {}",
-        output
-    );
+    assert!(output.contains("get"), "Expected get method: {}", output);
 
     // Constructor should handle items
     assert!(
@@ -9173,8 +9290,7 @@ class SecureData {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -9236,8 +9352,7 @@ class Processor {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -9297,8 +9412,7 @@ class Child extends Parent {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -9320,7 +9434,9 @@ class Child extends Parent {
 
     // Methods should be present
     assert!(
-        output.contains("getParentSecret") && output.contains("getChildSecret") && output.contains("getBoth"),
+        output.contains("getParentSecret")
+            && output.contains("getChildSecret")
+            && output.contains("getBoth"),
         "Expected getter methods: {}",
         output
     );
@@ -9361,8 +9477,7 @@ class Registry {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -9438,8 +9553,7 @@ class BoundedValue {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -9498,8 +9612,7 @@ class Example {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -9545,19 +9658,14 @@ class Derived extends Base {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
     let output = printer.get_output().to_string();
 
     // Both classes should be present
-    assert!(
-        output.contains("Base"),
-        "Expected Base class: {}",
-        output
-    );
+    assert!(output.contains("Base"), "Expected Base class: {}", output);
     assert!(
         output.contains("Derived"),
         "Expected Derived class: {}",
@@ -9594,8 +9702,7 @@ class AbstractBase {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -9647,8 +9754,7 @@ class Factory {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -9709,8 +9815,7 @@ class Dog extends Mammal {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -9727,11 +9832,7 @@ class Dog extends Mammal {
         "Expected Mammal class: {}",
         output
     );
-    assert!(
-        output.contains("Dog"),
-        "Expected Dog class: {}",
-        output
-    );
+    assert!(output.contains("Dog"), "Expected Dog class: {}", output);
 
     // Inheritance should be set up
     assert!(
@@ -9768,8 +9869,7 @@ class Callable {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -9827,8 +9927,7 @@ class ProxyWrapper<T extends object> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -9842,11 +9941,7 @@ class ProxyWrapper<T extends object> {
     );
 
     // Proxy usage should be present
-    assert!(
-        output.contains("Proxy"),
-        "Expected Proxy usage: {}",
-        output
-    );
+    assert!(output.contains("Proxy"), "Expected Proxy usage: {}", output);
 
     // Method should be present
     assert!(
@@ -9895,8 +9990,7 @@ class ObservableObject {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -9910,11 +10004,7 @@ class ObservableObject {
     );
 
     // Proxy should be present
-    assert!(
-        output.contains("Proxy"),
-        "Expected Proxy: {}",
-        output
-    );
+    assert!(output.contains("Proxy"), "Expected Proxy: {}", output);
 
     // Methods should be present
     assert!(
@@ -9949,8 +10039,7 @@ class FunctionWrapper {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -9964,11 +10053,7 @@ class FunctionWrapper {
     );
 
     // wrap method should be present
-    assert!(
-        output.contains("wrap"),
-        "Expected wrap method: {}",
-        output
-    );
+    assert!(output.contains("wrap"), "Expected wrap method: {}", output);
 }
 
 #[test]
@@ -10005,8 +10090,7 @@ class ValidatedModel {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -10027,11 +10111,7 @@ class ValidatedModel {
     );
 
     // Proxy should be present
-    assert!(
-        output.contains("Proxy"),
-        "Expected Proxy: {}",
-        output
-    );
+    assert!(output.contains("Proxy"), "Expected Proxy: {}", output);
 
     // Instance method should be present
     assert!(
@@ -10079,8 +10159,7 @@ class LoggingProxy<T extends object> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -10094,11 +10173,7 @@ class LoggingProxy<T extends object> {
     );
 
     // Proxy should be present
-    assert!(
-        output.contains("Proxy"),
-        "Expected Proxy: {}",
-        output
-    );
+    assert!(output.contains("Proxy"), "Expected Proxy: {}", output);
 
     // Methods should be present
     assert!(
@@ -10145,8 +10220,7 @@ class RevocableAccess<T extends object> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -10160,15 +10234,13 @@ class RevocableAccess<T extends object> {
     );
 
     // Proxy.revocable should be present
-    assert!(
-        output.contains("Proxy"),
-        "Expected Proxy: {}",
-        output
-    );
+    assert!(output.contains("Proxy"), "Expected Proxy: {}", output);
 
     // Methods should be present
     assert!(
-        output.contains("createRevocable") && output.contains("revokeAccess") && output.contains("isRevoked"),
+        output.contains("createRevocable")
+            && output.contains("revokeAccess")
+            && output.contains("isRevoked"),
         "Expected createRevocable, revokeAccess, isRevoked methods: {}",
         output
     );
@@ -10206,8 +10278,7 @@ class WeakReference<T extends object> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -10221,11 +10292,7 @@ class WeakReference<T extends object> {
     );
 
     // WeakRef should be present
-    assert!(
-        output.contains("WeakRef"),
-        "Expected WeakRef: {}",
-        output
-    );
+    assert!(output.contains("WeakRef"), "Expected WeakRef: {}", output);
 
     // Methods should be present
     assert!(
@@ -10270,8 +10337,7 @@ class ObjectTracker<T extends object> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -10285,11 +10351,7 @@ class ObjectTracker<T extends object> {
     );
 
     // WeakRef should be present
-    assert!(
-        output.contains("WeakRef"),
-        "Expected WeakRef: {}",
-        output
-    );
+    assert!(output.contains("WeakRef"), "Expected WeakRef: {}", output);
 
     // Methods should be present
     assert!(
@@ -10332,8 +10394,7 @@ class ResourceManager {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -10401,8 +10462,7 @@ class ManagedResource {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -10475,8 +10535,7 @@ class WeakCache<K extends object, V> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -10490,11 +10549,7 @@ class WeakCache<K extends object, V> {
     );
 
     // WeakRef should be present
-    assert!(
-        output.contains("WeakRef"),
-        "Expected WeakRef: {}",
-        output
-    );
+    assert!(output.contains("WeakRef"), "Expected WeakRef: {}", output);
 
     // Methods should be present
     assert!(
@@ -10556,8 +10611,7 @@ class SubscriptionManager<T extends object> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -10617,8 +10671,7 @@ class PropertyAccessor {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -10632,11 +10685,7 @@ class PropertyAccessor {
     );
 
     // Reflect should be present
-    assert!(
-        output.contains("Reflect"),
-        "Expected Reflect: {}",
-        output
-    );
+    assert!(output.contains("Reflect"), "Expected Reflect: {}", output);
 
     // Methods should be present
     assert!(
@@ -10677,8 +10726,7 @@ class ObjectManager {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -10692,15 +10740,13 @@ class ObjectManager {
     );
 
     // Reflect should be present
-    assert!(
-        output.contains("Reflect"),
-        "Expected Reflect: {}",
-        output
-    );
+    assert!(output.contains("Reflect"), "Expected Reflect: {}", output);
 
     // Methods should be present
     assert!(
-        output.contains("hasProperty") && output.contains("deleteProperty") && output.contains("checkAndDelete"),
+        output.contains("hasProperty")
+            && output.contains("deleteProperty")
+            && output.contains("checkAndDelete"),
         "Expected hasProperty, deleteProperty, checkAndDelete methods: {}",
         output
     );
@@ -10732,8 +10778,7 @@ class Factory<T> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -10747,11 +10792,7 @@ class Factory<T> {
     );
 
     // Reflect.construct should be present
-    assert!(
-        output.contains("Reflect"),
-        "Expected Reflect: {}",
-        output
-    );
+    assert!(output.contains("Reflect"), "Expected Reflect: {}", output);
 
     // Methods should be present
     assert!(
@@ -10788,8 +10829,7 @@ class FunctionInvoker {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -10803,15 +10843,13 @@ class FunctionInvoker {
     );
 
     // Reflect.apply should be present
-    assert!(
-        output.contains("Reflect"),
-        "Expected Reflect: {}",
-        output
-    );
+    assert!(output.contains("Reflect"), "Expected Reflect: {}", output);
 
     // Methods should be present
     assert!(
-        output.contains("invoke") && output.contains("invokeMethod") && output.contains("bindAndCall"),
+        output.contains("invoke")
+            && output.contains("invokeMethod")
+            && output.contains("bindAndCall"),
         "Expected invoke, invokeMethod, bindAndCall methods: {}",
         output
     );
@@ -10851,8 +10889,7 @@ class ObjectInspector {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -10866,15 +10903,13 @@ class ObjectInspector {
     );
 
     // Reflect should be present
-    assert!(
-        output.contains("Reflect"),
-        "Expected Reflect: {}",
-        output
-    );
+    assert!(output.contains("Reflect"), "Expected Reflect: {}", output);
 
     // Methods should be present
     assert!(
-        output.contains("getKeys") && output.contains("getDescriptor") && output.contains("isWritable"),
+        output.contains("getKeys")
+            && output.contains("getDescriptor")
+            && output.contains("isWritable"),
         "Expected getKeys, getDescriptor, isWritable methods: {}",
         output
     );
@@ -10919,8 +10954,7 @@ class PropertyDefiner {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -10934,15 +10968,13 @@ class PropertyDefiner {
     );
 
     // Reflect should be present
-    assert!(
-        output.contains("Reflect"),
-        "Expected Reflect: {}",
-        output
-    );
+    assert!(output.contains("Reflect"), "Expected Reflect: {}", output);
 
     // Methods should be present
     assert!(
-        output.contains("defineReadonly") && output.contains("defineGetter") && output.contains("getPrototype"),
+        output.contains("defineReadonly")
+            && output.contains("defineGetter")
+            && output.contains("getPrototype"),
         "Expected defineReadonly, defineGetter, getPrototype methods: {}",
         output
     );
@@ -10974,8 +11006,7 @@ class ObjectMerger {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -11037,8 +11068,7 @@ class ConfigManager {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -11092,8 +11122,7 @@ class Cloner<T extends object> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -11115,7 +11144,9 @@ class Cloner<T extends object> {
 
     // Methods should be present
     assert!(
-        output.contains("shallowClone") && output.contains("cloneWithChanges") && output.contains("cloneArray"),
+        output.contains("shallowClone")
+            && output.contains("cloneWithChanges")
+            && output.contains("cloneArray"),
         "Expected shallowClone, cloneWithChanges, cloneArray methods: {}",
         output
     );
@@ -11155,8 +11186,7 @@ class MixinBuilder {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -11224,8 +11254,7 @@ class Component {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -11300,8 +11329,7 @@ class StateManager {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -11323,7 +11351,9 @@ class StateManager {
 
     // Methods should be present
     assert!(
-        output.contains("updateCount") && output.contains("addItem") && output.contains("setMetadata"),
+        output.contains("updateCount")
+            && output.contains("addItem")
+            && output.contains("setMetadata"),
         "Expected updateCount, addItem, setMetadata methods: {}",
         output
     );
@@ -11359,8 +11389,7 @@ class PromiseFactory<T> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -11374,11 +11403,7 @@ class PromiseFactory<T> {
     );
 
     // Promise should be present
-    assert!(
-        output.contains("Promise"),
-        "Expected Promise: {}",
-        output
-    );
+    assert!(output.contains("Promise"), "Expected Promise: {}", output);
 
     // Methods should be present
     assert!(
@@ -11415,8 +11440,7 @@ class BatchProcessor<T> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -11430,11 +11454,7 @@ class BatchProcessor<T> {
     );
 
     // Promise.all should be present
-    assert!(
-        output.contains("Promise"),
-        "Expected Promise: {}",
-        output
-    );
+    assert!(output.contains("Promise"), "Expected Promise: {}", output);
 
     // Methods should be present
     assert!(
@@ -11473,8 +11493,7 @@ class RaceRunner<T> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -11488,11 +11507,7 @@ class RaceRunner<T> {
     );
 
     // Promise.race should be present
-    assert!(
-        output.contains("Promise"),
-        "Expected Promise: {}",
-        output
-    );
+    assert!(output.contains("Promise"), "Expected Promise: {}", output);
 
     // Methods should be present
     assert!(
@@ -11541,8 +11556,7 @@ class DataFetcher {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -11610,8 +11624,7 @@ class SettledProcessor<T> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -11625,15 +11638,13 @@ class SettledProcessor<T> {
     );
 
     // Promise should be present
-    assert!(
-        output.contains("Promise"),
-        "Expected Promise: {}",
-        output
-    );
+    assert!(output.contains("Promise"), "Expected Promise: {}", output);
 
     // Methods should be present
     assert!(
-        output.contains("processAllSettled") && output.contains("getSuccessful") && output.contains("getFailed"),
+        output.contains("processAllSettled")
+            && output.contains("getSuccessful")
+            && output.contains("getFailed"),
         "Expected processAllSettled, getSuccessful, getFailed methods: {}",
         output
     );
@@ -11680,8 +11691,7 @@ class Deferred<T> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -11695,11 +11705,7 @@ class Deferred<T> {
     );
 
     // Promise constructor should be present
-    assert!(
-        output.contains("Promise"),
-        "Expected Promise: {}",
-        output
-    );
+    assert!(output.contains("Promise"), "Expected Promise: {}", output);
 
     // Methods should be present
     assert!(
@@ -11739,8 +11745,7 @@ class ArrayConverter<T> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -11762,7 +11767,9 @@ class ArrayConverter<T> {
 
     // Methods should be present
     assert!(
-        output.contains("fromIterable") && output.contains("fromString") && output.contains("fromSet"),
+        output.contains("fromIterable")
+            && output.contains("fromString")
+            && output.contains("fromSet"),
         "Expected fromIterable, fromString, fromSet methods: {}",
         output
     );
@@ -11794,8 +11801,7 @@ class ArrayMapper<T, U> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -11817,7 +11823,9 @@ class ArrayMapper<T, U> {
 
     // Methods should be present
     assert!(
-        output.contains("mapFrom") && output.contains("doubleNumbers") && output.contains("indexedMap"),
+        output.contains("mapFrom")
+            && output.contains("doubleNumbers")
+            && output.contains("indexedMap"),
         "Expected mapFrom, doubleNumbers, indexedMap methods: {}",
         output
     );
@@ -11854,8 +11862,7 @@ class ArrayLikeConverter {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -11877,7 +11884,9 @@ class ArrayLikeConverter {
 
     // Methods should be present
     assert!(
-        output.contains("fromArrayLike") && output.contains("fromArguments") && output.contains("fromNodeList"),
+        output.contains("fromArrayLike")
+            && output.contains("fromArguments")
+            && output.contains("fromNodeList"),
         "Expected fromArrayLike, fromArguments, fromNodeList methods: {}",
         output
     );
@@ -11913,8 +11922,7 @@ class CollectionConverter<K, V> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -11936,7 +11944,9 @@ class CollectionConverter<K, V> {
 
     // Methods should be present
     assert!(
-        output.contains("setToArray") && output.contains("mapKeysToArray") && output.contains("mapValuesToArray"),
+        output.contains("setToArray")
+            && output.contains("mapKeysToArray")
+            && output.contains("mapValuesToArray"),
         "Expected setToArray, mapKeysToArray, mapValuesToArray methods: {}",
         output
     );
@@ -11980,8 +11990,7 @@ class GeneratorConverter {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -12003,7 +12012,9 @@ class GeneratorConverter {
 
     // Methods should be present
     assert!(
-        output.contains("range") && output.contains("rangeToArray") && output.contains("generatorToArray"),
+        output.contains("range")
+            && output.contains("rangeToArray")
+            && output.contains("generatorToArray"),
         "Expected range, rangeToArray, generatorToArray methods: {}",
         output
     );
@@ -12041,8 +12052,7 @@ class ArrayFactory {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -12064,7 +12074,9 @@ class ArrayFactory {
 
     // Methods should be present
     assert!(
-        output.contains("createWithLength") && output.contains("createSequence") && output.contains("createFilled"),
+        output.contains("createWithLength")
+            && output.contains("createSequence")
+            && output.contains("createFilled"),
         "Expected createWithLength, createSequence, createFilled methods: {}",
         output
     );
@@ -12115,8 +12127,7 @@ class MapWrapper<K, V> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -12130,11 +12141,7 @@ class MapWrapper<K, V> {
     );
 
     // Map should be present
-    assert!(
-        output.contains("Map"),
-        "Expected Map: {}",
-        output
-    );
+    assert!(output.contains("Map"), "Expected Map: {}", output);
 
     // Methods should be present
     assert!(
@@ -12182,8 +12189,7 @@ class MapIterator<K, V> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -12197,11 +12203,7 @@ class MapIterator<K, V> {
     );
 
     // Map should be present
-    assert!(
-        output.contains("Map"),
-        "Expected Map: {}",
-        output
-    );
+    assert!(output.contains("Map"), "Expected Map: {}", output);
 
     // Methods should be present
     assert!(
@@ -12252,8 +12254,7 @@ class SetWrapper<T> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -12267,11 +12268,7 @@ class SetWrapper<T> {
     );
 
     // Set should be present
-    assert!(
-        output.contains("Set"),
-        "Expected Set: {}",
-        output
-    );
+    assert!(output.contains("Set"), "Expected Set: {}", output);
 
     // Methods should be present
     assert!(
@@ -12318,8 +12315,7 @@ class PrivateStore {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -12333,15 +12329,13 @@ class PrivateStore {
     );
 
     // WeakMap should be present
-    assert!(
-        output.contains("WeakMap"),
-        "Expected WeakMap: {}",
-        output
-    );
+    assert!(output.contains("WeakMap"), "Expected WeakMap: {}", output);
 
     // Methods should be present
     assert!(
-        output.contains("setPrivate") && output.contains("getPrivate") && output.contains("hasPrivate"),
+        output.contains("setPrivate")
+            && output.contains("getPrivate")
+            && output.contains("hasPrivate"),
         "Expected setPrivate, getPrivate, hasPrivate methods: {}",
         output
     );
@@ -12381,8 +12375,7 @@ class ObjectTracker {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -12396,11 +12389,7 @@ class ObjectTracker {
     );
 
     // WeakSet should be present
-    assert!(
-        output.contains("WeakSet"),
-        "Expected WeakSet: {}",
-        output
-    );
+    assert!(output.contains("WeakSet"), "Expected WeakSet: {}", output);
 
     // Methods should be present
     assert!(
@@ -12458,19 +12447,14 @@ class Graph<T> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
     let output = printer.get_output().to_string();
 
     // Class should be emitted
-    assert!(
-        output.contains("Graph"),
-        "Expected Graph class: {}",
-        output
-    );
+    assert!(output.contains("Graph"), "Expected Graph class: {}", output);
 
     // Map and Set should be present
     assert!(
@@ -12519,8 +12503,7 @@ class AsyncRange {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -12574,8 +12557,7 @@ class DelayedSequence<T> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -12646,8 +12628,7 @@ class PaginatedFetcher<T> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -12712,8 +12693,7 @@ class AsyncQueue<T> extends BaseAsyncCollection<T> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -12786,8 +12766,7 @@ class DataStream<T> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -12848,8 +12827,7 @@ class WordMatcher {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -12906,8 +12884,7 @@ class CaseInsensitiveMatcher {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -12974,8 +12951,7 @@ class GlobalMatcher {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -13044,8 +13020,7 @@ class PrefixMatcher extends BaseMatcher {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -13071,11 +13046,7 @@ class PrefixMatcher extends BaseMatcher {
     );
 
     // Test method should be present
-    assert!(
-        output.contains("test"),
-        "Expected test method: {}",
-        output
-    );
+    assert!(output.contains("test"), "Expected test method: {}", output);
 }
 
 #[test]
@@ -13123,8 +13094,7 @@ class CustomPattern {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -13182,8 +13152,7 @@ class SimpleReplacer {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -13239,8 +13208,7 @@ class FunctionReplacer {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -13295,8 +13263,7 @@ class GlobalReplacer {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -13379,8 +13346,7 @@ class CasePreservingReplacer extends BaseReplacer {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -13454,8 +13420,7 @@ class TemplateReplacer {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -13476,11 +13441,7 @@ class TemplateReplacer {
     );
 
     // Map usage should be preserved
-    assert!(
-        output.contains("Map"),
-        "Expected Map usage: {}",
-        output
-    );
+    assert!(output.contains("Map"), "Expected Map usage: {}", output);
 }
 
 // ============================================================================
@@ -13511,8 +13472,7 @@ class SubstringSearcher {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -13566,8 +13526,7 @@ class CaseInsensitiveSearcher {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -13633,8 +13592,7 @@ class LastIndexSearcher {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -13702,8 +13660,7 @@ class WordBoundarySearcher extends BaseSearcher {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -13784,8 +13741,7 @@ class MultiPatternSearcher {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -13841,8 +13797,7 @@ class SimpleSplitter {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -13896,8 +13851,7 @@ class LimitedSplitter {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -13965,8 +13919,7 @@ class PreservingSplitter {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -14022,8 +13975,7 @@ class WhitespaceSplitter extends BaseSplitter {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -14115,8 +14067,7 @@ class CSVSplitter {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -14184,8 +14135,7 @@ class CustomArray<T> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -14250,8 +14200,7 @@ class Collection<T> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -14320,8 +14269,7 @@ class DynamicUnscopables {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -14388,8 +14336,7 @@ class ExtendedContainer<T> extends BaseContainer<T> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -14472,8 +14419,7 @@ class ImmutableConfig {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -14501,11 +14447,7 @@ class ImmutableConfig {
     );
 
     // size getter should be present
-    assert!(
-        output.contains("size"),
-        "Expected size getter: {}",
-        output
-    );
+    assert!(output.contains("size"), "Expected size getter: {}", output);
 }
 
 // ============================================================================
@@ -14547,8 +14489,7 @@ class SymbolRegistry {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -14610,8 +14551,7 @@ class SymbolInspector {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -14671,8 +14611,7 @@ class Annotated {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -14751,8 +14690,7 @@ class User extends BaseEntity {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -14839,8 +14777,7 @@ class PluginRegistry {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -14868,11 +14805,7 @@ class PluginRegistry {
     );
 
     // list method should be present
-    assert!(
-        output.contains("list"),
-        "Expected list method: {}",
-        output
-    );
+    assert!(output.contains("list"), "Expected list method: {}", output);
 }
 
 // ============================================================================
@@ -14917,8 +14850,7 @@ class Range {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -15000,8 +14932,7 @@ class LinkedList<T> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -15067,8 +14998,7 @@ class CountdownIterator {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -15138,8 +15068,7 @@ class ReverseIterable<T> extends IterableCollection<T> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -15228,8 +15157,7 @@ class SimpleMap<K, V> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -15257,11 +15185,7 @@ class SimpleMap<K, V> {
     );
 
     // size getter should be present
-    assert!(
-        output.contains("size"),
-        "Expected size getter: {}",
-        output
-    );
+    assert!(output.contains("size"), "Expected size getter: {}", output);
 }
 
 // ============================================================================
@@ -15296,8 +15220,7 @@ class CustomCollection {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -15312,17 +15235,15 @@ class CustomCollection {
 
     // Symbol.toStringTag or defineProperty should be present
     assert!(
-        output.contains("toStringTag") || output.contains("defineProperty") || output.contains("Symbol"),
+        output.contains("toStringTag")
+            || output.contains("defineProperty")
+            || output.contains("Symbol"),
         "Expected Symbol.toStringTag handling: {}",
         output
     );
 
     // Methods should be present
-    assert!(
-        output.contains("add"),
-        "Expected add method: {}",
-        output
-    );
+    assert!(output.contains("add"), "Expected add method: {}", output);
 }
 
 #[test]
@@ -15361,8 +15282,7 @@ class StatefulObject {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -15435,8 +15355,7 @@ class AnotherDerived extends BaseType {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -15503,8 +15422,7 @@ class TypeRegistry {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -15572,8 +15490,7 @@ class AdvancedCollection<T> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -15634,8 +15551,7 @@ class ConstructorInvoker {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -15692,8 +15608,7 @@ class FunctionApplier {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -15765,8 +15680,7 @@ class NewTargetHandler {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -15840,8 +15754,7 @@ class ContextBinder {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -15911,8 +15824,7 @@ class ReflectiveClass {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -15990,8 +15902,7 @@ class ReflectUtilities {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -16059,8 +15970,7 @@ class AsyncService extends BaseService {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -16087,7 +15997,9 @@ class AsyncService extends BaseService {
 
     // super() call should be present (using _super.call pattern)
     assert!(
-        output.contains("_super.call") || output.contains("BaseService.call") || output.contains(".call(this"),
+        output.contains("_super.call")
+            || output.contains("BaseService.call")
+            || output.contains(".call(this"),
         "Expected super call: {}",
         output
     );
@@ -16137,8 +16049,7 @@ class AsyncEntity extends Entity {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -16231,8 +16142,7 @@ class AsyncWidget extends InteractiveComponent {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -16257,7 +16167,9 @@ class AsyncWidget extends InteractiveComponent {
 
     // Inheritance chain should be established (using _super.call pattern)
     assert!(
-        output.contains("_super.call") || output.contains("BaseComponent.call") || output.contains("InteractiveComponent.call"),
+        output.contains("_super.call")
+            || output.contains("BaseComponent.call")
+            || output.contains("InteractiveComponent.call"),
         "Expected super calls in chain: {}",
         output
     );
@@ -16313,8 +16225,7 @@ class AsyncDataStore extends DataStore {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -16387,8 +16298,7 @@ class UserRepository extends AbstractRepository<{ id: string; name: string }> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -16441,8 +16351,7 @@ class Counter {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -16506,8 +16415,7 @@ class Singleton {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -16579,8 +16487,7 @@ class ResourceLoader {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -16646,8 +16553,7 @@ class ComponentRegistry {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -16724,8 +16630,7 @@ class AppConfig {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -16788,8 +16693,7 @@ class Person {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -16852,8 +16756,7 @@ class User extends BaseEntity {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -16920,8 +16823,7 @@ class SecureStorage {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -16981,8 +16883,7 @@ class Configuration {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -17051,8 +16952,7 @@ class ReactiveValue<T> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -17119,8 +17019,7 @@ function processFile(path: string): string {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -17141,11 +17040,7 @@ function processFile(path: string): string {
     );
 
     // Methods should be present
-    assert!(
-        output.contains("read"),
-        "Expected read method: {}",
-        output
-    );
+    assert!(output.contains("read"), "Expected read method: {}", output);
 }
 
 #[test]
@@ -17192,8 +17087,7 @@ async function runQuery(url: string, sql: string): Promise<any[]> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -17254,8 +17148,7 @@ class CriticalSection {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -17318,8 +17211,7 @@ function useMultipleResources(): void {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -17333,11 +17225,7 @@ function useMultipleResources(): void {
     );
 
     // Methods should be present
-    assert!(
-        output.contains("use"),
-        "Expected use method: {}",
-        output
-    );
+    assert!(output.contains("use"), "Expected use method: {}", output);
 
     // Function should be present
     assert!(
@@ -17423,8 +17311,7 @@ class TransactionScope extends BaseResource {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -17491,8 +17378,7 @@ class Config {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -17564,8 +17450,7 @@ class Registry {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -17632,8 +17517,7 @@ class SecureService {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -17705,8 +17589,7 @@ class AppLogger extends BaseLogger {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -17791,8 +17674,7 @@ class DataProcessor {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -17862,8 +17744,7 @@ class User {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -17929,8 +17810,7 @@ class FormData {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -18030,8 +17910,7 @@ class Product {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -18115,8 +17994,7 @@ class Article extends Document {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -18206,8 +18084,7 @@ class Schema {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -18316,8 +18193,7 @@ class ApiClient {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -18339,7 +18215,9 @@ class ApiClient {
 
     // Methods should be present
     assert!(
-        output.contains("fetchData") && output.contains("postData") && output.contains("uploadFile"),
+        output.contains("fetchData")
+            && output.contains("postData")
+            && output.contains("uploadFile"),
         "Expected API methods: {}",
         output
     );
@@ -18426,8 +18304,7 @@ class Calculator {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -18537,8 +18414,7 @@ class DataService {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -18642,8 +18518,7 @@ class ServiceFactory {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -18755,8 +18630,7 @@ class EventHandler {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -18842,8 +18716,7 @@ class UserRepository {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -18931,8 +18804,7 @@ class ProductService {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -19021,8 +18893,7 @@ class ValidationService {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -19124,8 +18995,7 @@ class ApiController {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -19233,8 +19103,7 @@ class ApplicationService {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -19327,8 +19196,7 @@ class UserSettings {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -19444,8 +19312,7 @@ class DatabaseConnection {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -19583,8 +19450,7 @@ class ProductForm {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -19720,8 +19586,7 @@ class FormModel {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -19857,8 +19722,7 @@ class ApiResponse<T> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -19932,8 +19796,7 @@ class LogicalAndConfig extends BaseConfig {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -20016,8 +19879,7 @@ class RetryValidator extends BaseValidator {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -20093,8 +19955,7 @@ class ChainedAsync extends BaseAsync {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -20176,8 +20037,7 @@ class CachedEntity extends BaseEntity {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -20255,8 +20115,7 @@ class TransformedCollection extends BaseCollection {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -20345,8 +20204,7 @@ class ChainedCallProcessor extends BaseProcessor {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -20427,8 +20285,7 @@ class Circle extends Shape {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -20450,7 +20307,8 @@ class Circle extends Shape {
         output
     );
     assert!(
-        output.contains("Rectangle.prototype.getArea") && output.contains("Rectangle.prototype.getPerimeter"),
+        output.contains("Rectangle.prototype.getArea")
+            && output.contains("Rectangle.prototype.getPerimeter"),
         "Expected Rectangle implementing abstract methods: {}",
         output
     );
@@ -20513,8 +20371,7 @@ abstract class DecoratedAbstract {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -20531,7 +20388,8 @@ abstract class DecoratedAbstract {
         output
     );
     assert!(
-        output.contains("function UserService") && output.contains("__extends(UserService, _super)"),
+        output.contains("function UserService")
+            && output.contains("__extends(UserService, _super)"),
         "Expected UserService extending BaseService: {}",
         output
     );
@@ -20605,8 +20463,7 @@ abstract class Singleton {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -20623,12 +20480,14 @@ abstract class Singleton {
         output
     );
     assert!(
-        output.contains("function PluginRegistry") && output.contains("__extends(PluginRegistry, _super)"),
+        output.contains("function PluginRegistry")
+            && output.contains("__extends(PluginRegistry, _super)"),
         "Expected PluginRegistry extending Registry: {}",
         output
     );
     assert!(
-        output.contains("PluginRegistry.createDefault") || output.contains("PluginRegistry.prototype.getName"),
+        output.contains("PluginRegistry.createDefault")
+            || output.contains("PluginRegistry.prototype.getName"),
         "Expected PluginRegistry static or instance methods: {}",
         output
     );
@@ -20713,8 +20572,7 @@ class BehaviorSubject<T> extends Observable<T> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -20731,7 +20589,8 @@ class BehaviorSubject<T> extends Observable<T> {
         output
     );
     assert!(
-        output.contains("function FileDataSource") && output.contains("__extends(FileDataSource, _super)"),
+        output.contains("function FileDataSource")
+            && output.contains("__extends(FileDataSource, _super)"),
         "Expected FileDataSource extending DataSource: {}",
         output
     );
@@ -20808,8 +20667,7 @@ class User extends AuditableEntity {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -20821,12 +20679,14 @@ class User extends AuditableEntity {
         output
     );
     assert!(
-        output.contains("function TimestampedEntity") && output.contains("__extends(TimestampedEntity, _super)"),
+        output.contains("function TimestampedEntity")
+            && output.contains("__extends(TimestampedEntity, _super)"),
         "Expected TimestampedEntity extending Entity: {}",
         output
     );
     assert!(
-        output.contains("function AuditableEntity") && output.contains("__extends(AuditableEntity, _super)"),
+        output.contains("function AuditableEntity")
+            && output.contains("__extends(AuditableEntity, _super)"),
         "Expected AuditableEntity extending TimestampedEntity: {}",
         output
     );
@@ -20836,7 +20696,8 @@ class User extends AuditableEntity {
         output
     );
     assert!(
-        output.contains("Entity.prototype.equals") && output.contains("TimestampedEntity.prototype.isNewer"),
+        output.contains("Entity.prototype.equals")
+            && output.contains("TimestampedEntity.prototype.isNewer"),
         "Expected inherited methods on prototypes: {}",
         output
     );
@@ -20930,8 +20791,7 @@ class WidgetFactory extends AbstractFactory<{ id: number }> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -20948,7 +20808,8 @@ class WidgetFactory extends AbstractFactory<{ id: number }> {
         output
     );
     assert!(
-        output.contains("function PureComponent") && output.contains("__extends(PureComponent, _super)"),
+        output.contains("function PureComponent")
+            && output.contains("__extends(PureComponent, _super)"),
         "Expected PureComponent extending Component: {}",
         output
     );
@@ -20958,7 +20819,8 @@ class WidgetFactory extends AbstractFactory<{ id: number }> {
         output
     );
     assert!(
-        output.contains("Button.prototype.render") && output.contains("Button.prototype.shouldUpdate"),
+        output.contains("Button.prototype.render")
+            && output.contains("Button.prototype.shouldUpdate"),
         "Expected Button implementing abstract methods: {}",
         output
     );
@@ -21032,8 +20894,7 @@ namespace Logger {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -21045,12 +20906,15 @@ namespace Logger {
         output
     );
     assert!(
-        output.contains("Calculator.prototype.add") && output.contains("Calculator.prototype.subtract"),
+        output.contains("Calculator.prototype.add")
+            && output.contains("Calculator.prototype.subtract"),
         "Expected Calculator methods on prototype: {}",
         output
     );
     assert!(
-        output.contains("Calculator.VERSION") || output.contains("Calculator.MAX_VALUE") || output.contains("Calculator.isValidInput"),
+        output.contains("Calculator.VERSION")
+            || output.contains("Calculator.MAX_VALUE")
+            || output.contains("Calculator.isValidInput"),
         "Expected namespace members on Calculator: {}",
         output
     );
@@ -21126,8 +20990,7 @@ namespace Forms {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -21229,8 +21092,7 @@ namespace Database {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -21324,8 +21186,7 @@ namespace createFactory {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -21337,7 +21198,9 @@ namespace createFactory {
         output
     );
     assert!(
-        output.contains("greet.defaultName") || output.contains("greet.formal") || output.contains("greet.casual"),
+        output.contains("greet.defaultName")
+            || output.contains("greet.formal")
+            || output.contains("greet.casual"),
         "Expected namespace members on greet: {}",
         output
     );
@@ -21347,7 +21210,9 @@ namespace createFactory {
         output
     );
     assert!(
-        output.contains("createFactory.withOptions") || output.contains("createFactory.Registry") || output.contains("Registry"),
+        output.contains("createFactory.withOptions")
+            || output.contains("createFactory.Registry")
+            || output.contains("Registry"),
         "Expected namespace members on createFactory: {}",
         output
     );
@@ -21433,8 +21298,7 @@ namespace App {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -21456,7 +21320,9 @@ namespace App {
         output
     );
     assert!(
-        output.contains("Services") || output.contains("UserService") || output.contains("ProductService"),
+        output.contains("Services")
+            || output.contains("UserService")
+            || output.contains("ProductService"),
         "Expected Services namespace with classes: {}",
         output
     );
@@ -21548,8 +21414,7 @@ namespace Library {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -21676,8 +21541,7 @@ class DataGridComponent {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -21789,8 +21653,7 @@ class ReverseOrderedClass {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -21907,8 +21770,7 @@ class FinalService extends ExtendedService {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -21916,7 +21778,9 @@ class FinalService extends ExtendedService {
 
     // Classes should be converted
     assert!(
-        output.contains("BaseService") && output.contains("ExtendedService") && output.contains("FinalService"),
+        output.contains("BaseService")
+            && output.contains("ExtendedService")
+            && output.contains("FinalService"),
         "Expected inheritance decorated classes: {}",
         output
     );
@@ -22028,8 +21892,7 @@ class PostEntity {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -22171,8 +22034,7 @@ class DataProcessor {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -22257,8 +22119,7 @@ module.exports.QueryBuilder = QueryBuilder;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -22270,7 +22131,8 @@ module.exports.QueryBuilder = QueryBuilder;
         output
     );
     assert!(
-        output.contains("DatabaseConnection.prototype.connect") && output.contains("DatabaseConnection.prototype.disconnect"),
+        output.contains("DatabaseConnection.prototype.connect")
+            && output.contains("DatabaseConnection.prototype.disconnect"),
         "Expected DatabaseConnection methods on prototype: {}",
         output
     );
@@ -22280,7 +22142,8 @@ module.exports.QueryBuilder = QueryBuilder;
         output
     );
     assert!(
-        output.contains("QueryBuilder.prototype.select") && output.contains("QueryBuilder.prototype.from"),
+        output.contains("QueryBuilder.prototype.select")
+            && output.contains("QueryBuilder.prototype.from"),
         "Expected QueryBuilder methods on prototype: {}",
         output
     );
@@ -22349,8 +22212,7 @@ export class Config {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -22362,7 +22224,8 @@ export class Config {
         output
     );
     assert!(
-        output.contains("Application.prototype.getName") && output.contains("Application.prototype.getVersion"),
+        output.contains("Application.prototype.getName")
+            && output.contains("Application.prototype.getVersion"),
         "Expected Application methods on prototype: {}",
         output
     );
@@ -22445,8 +22308,7 @@ export { Logger as DefaultLogger };
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -22536,8 +22398,7 @@ export { Product as Item };
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -22644,8 +22505,7 @@ export default services;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -22657,7 +22517,8 @@ export default services;
         output
     );
     assert!(
-        output.contains("AuthService.prototype.login") && output.contains("AuthService.prototype.logout"),
+        output.contains("AuthService.prototype.login")
+            && output.contains("AuthService.prototype.logout"),
         "Expected AuthService methods: {}",
         output
     );
@@ -22751,8 +22612,7 @@ export type PipelineStage = (input: any) => any | Promise<any>;
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -22764,7 +22624,8 @@ export type PipelineStage = (input: any) => any | Promise<any>;
         output
     );
     assert!(
-        output.contains("EventEmitter.prototype.on") && output.contains("EventEmitter.prototype.emit"),
+        output.contains("EventEmitter.prototype.on")
+            && output.contains("EventEmitter.prototype.emit"),
         "Expected EventEmitter methods: {}",
         output
     );
@@ -22774,12 +22635,14 @@ export type PipelineStage = (input: any) => any | Promise<any>;
         output
     );
     assert!(
-        output.contains("function DataPipeline") && output.contains("__extends(DataPipeline, _super)"),
+        output.contains("function DataPipeline")
+            && output.contains("__extends(DataPipeline, _super)"),
         "Expected DataPipeline extending EventEmitter: {}",
         output
     );
     assert!(
-        output.contains("DataPipeline.prototype.addStage") && output.contains("DataPipeline.prototype.run"),
+        output.contains("DataPipeline.prototype.addStage")
+            && output.contains("DataPipeline.prototype.run"),
         "Expected DataPipeline methods: {}",
         output
     );
@@ -22867,8 +22730,7 @@ class DataProcessor {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -22880,7 +22742,8 @@ class DataProcessor {
         output
     );
     assert!(
-        output.contains("AnimalValidator.prototype.isCat") && output.contains("AnimalValidator.prototype.isDog"),
+        output.contains("AnimalValidator.prototype.isCat")
+            && output.contains("AnimalValidator.prototype.isDog"),
         "Expected type guard methods: {}",
         output
     );
@@ -22984,8 +22847,7 @@ class UserService {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -22997,7 +22859,8 @@ class UserService {
         output
     );
     assert!(
-        output.contains("HttpClient.prototype.isError") && output.contains("HttpClient.prototype.handleResponse"),
+        output.contains("HttpClient.prototype.isError")
+            && output.contains("HttpClient.prototype.handleResponse"),
         "Expected HttpClient methods: {}",
         output
     );
@@ -23007,7 +22870,8 @@ class UserService {
         output
     );
     assert!(
-        output.contains("UserService.prototype.isAdmin") && output.contains("UserService.prototype.getPermissions"),
+        output.contains("UserService.prototype.isAdmin")
+            && output.contains("UserService.prototype.getPermissions"),
         "Expected UserService type guard methods: {}",
         output
     );
@@ -23102,8 +22966,7 @@ class ConfigParser {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -23125,7 +22988,8 @@ class ConfigParser {
         output
     );
     assert!(
-        output.contains("ConfigParser.prototype.getString") && output.contains("ConfigParser.prototype.getNumber"),
+        output.contains("ConfigParser.prototype.getString")
+            && output.contains("ConfigParser.prototype.getNumber"),
         "Expected ConfigParser getter methods: {}",
         output
     );
@@ -23233,8 +23097,7 @@ class ShapeCalculator {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -23367,8 +23230,7 @@ class Counter {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -23380,12 +23242,14 @@ class Counter {
         output
     );
     assert!(
-        output.contains("StateManager.prototype.isLoading") && output.contains("StateManager.prototype.isSuccess"),
+        output.contains("StateManager.prototype.isLoading")
+            && output.contains("StateManager.prototype.isSuccess"),
         "Expected StateManager state check methods: {}",
         output
     );
     assert!(
-        output.contains("StateManager.prototype.render") && (output.contains("switch") || output.contains("case")),
+        output.contains("StateManager.prototype.render")
+            && (output.contains("switch") || output.contains("case")),
         "Expected render method with switch: {}",
         output
     );
@@ -23484,8 +23348,7 @@ class DataValidator {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -23497,7 +23360,8 @@ class DataValidator {
         output
     );
     assert!(
-        output.contains("Assertions.prototype.assertDefined") && output.contains("Assertions.prototype.assertString"),
+        output.contains("Assertions.prototype.assertDefined")
+            && output.contains("Assertions.prototype.assertString"),
         "Expected assertion methods: {}",
         output
     );
@@ -23507,7 +23371,8 @@ class DataValidator {
         output
     );
     assert!(
-        output.contains("SafeProcessor.prototype.processString") && output.contains("SafeProcessor.prototype.processNumber"),
+        output.contains("SafeProcessor.prototype.processString")
+            && output.contains("SafeProcessor.prototype.processNumber"),
         "Expected SafeProcessor methods: {}",
         output
     );
@@ -23598,8 +23463,7 @@ class ObjectNarrower {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -23626,7 +23490,8 @@ class ObjectNarrower {
         output
     );
     assert!(
-        output.contains("ObjectNarrower.prototype.getName") && output.contains("ObjectNarrower.prototype.getAge"),
+        output.contains("ObjectNarrower.prototype.getName")
+            && output.contains("ObjectNarrower.prototype.getAge"),
         "Expected ObjectNarrower methods: {}",
         output
     );
@@ -23716,8 +23581,7 @@ class StatusHandler {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -23744,7 +23608,8 @@ class StatusHandler {
         output
     );
     assert!(
-        output.contains("StatusHandler.prototype.getColor") && output.contains("StatusHandler.prototype.getLabel"),
+        output.contains("StatusHandler.prototype.getColor")
+            && output.contains("StatusHandler.prototype.getLabel"),
         "Expected StatusHandler methods: {}",
         output
     );
@@ -23834,8 +23699,7 @@ class EnumHandler {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -23961,8 +23825,7 @@ class OptionalChainHandler {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -23974,7 +23837,8 @@ class OptionalChainHandler {
         output
     );
     assert!(
-        output.contains("ApiClient.prototype.fetchData") && output.contains("ApiClient.prototype.processResponse"),
+        output.contains("ApiClient.prototype.fetchData")
+            && output.contains("ApiClient.prototype.processResponse"),
         "Expected ApiClient methods: {}",
         output
     );
@@ -23989,7 +23853,8 @@ class OptionalChainHandler {
         output
     );
     assert!(
-        output.contains("OptionalChainHandler.prototype.getPrimaryColor") && output.contains("OptionalChainHandler.prototype.hasFeature"),
+        output.contains("OptionalChainHandler.prototype.getPrimaryColor")
+            && output.contains("OptionalChainHandler.prototype.hasFeature"),
         "Expected OptionalChainHandler methods: {}",
         output
     );
@@ -24075,8 +23940,7 @@ class TupleHandler {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -24088,7 +23952,8 @@ class TupleHandler {
         output
     );
     assert!(
-        output.contains("ArrayProcessor.prototype.processItems") && output.contains("ArrayProcessor.prototype.filterNonNull"),
+        output.contains("ArrayProcessor.prototype.processItems")
+            && output.contains("ArrayProcessor.prototype.filterNonNull"),
         "Expected ArrayProcessor methods: {}",
         output
     );
@@ -24103,7 +23968,8 @@ class TupleHandler {
         output
     );
     assert!(
-        output.contains("TupleHandler.prototype.processPair") && output.contains("TupleHandler.prototype.isStringNumberPair"),
+        output.contains("TupleHandler.prototype.processPair")
+            && output.contains("TupleHandler.prototype.isStringNumberPair"),
         "Expected TupleHandler methods: {}",
         output
     );
@@ -24217,8 +24083,7 @@ class StateMachine<S extends string, E extends string> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -24230,7 +24095,8 @@ class StateMachine<S extends string, E extends string> {
         output
     );
     assert!(
-        output.contains("JsonValidator.prototype.isString") && output.contains("JsonValidator.prototype.isObject"),
+        output.contains("JsonValidator.prototype.isString")
+            && output.contains("JsonValidator.prototype.isObject"),
         "Expected JsonValidator type guard methods: {}",
         output
     );
@@ -24245,7 +24111,8 @@ class StateMachine<S extends string, E extends string> {
         output
     );
     assert!(
-        output.contains("StateMachine.prototype.addTransition") && output.contains("StateMachine.prototype.dispatch"),
+        output.contains("StateMachine.prototype.addTransition")
+            && output.contains("StateMachine.prototype.dispatch"),
         "Expected StateMachine methods: {}",
         output
     );
@@ -24334,8 +24201,7 @@ class UpdateHandler<T> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -24347,12 +24213,14 @@ class UpdateHandler<T> {
         output
     );
     assert!(
-        output.contains("ConfigBuilder.prototype.setName") && output.contains("ConfigBuilder.prototype.setEmail"),
+        output.contains("ConfigBuilder.prototype.setName")
+            && output.contains("ConfigBuilder.prototype.setEmail"),
         "Expected ConfigBuilder setter methods: {}",
         output
     );
     assert!(
-        output.contains("ConfigBuilder.prototype.build") && output.contains("ConfigBuilder.prototype.getPartial"),
+        output.contains("ConfigBuilder.prototype.build")
+            && output.contains("ConfigBuilder.prototype.getPartial"),
         "Expected ConfigBuilder build methods: {}",
         output
     );
@@ -24362,7 +24230,8 @@ class UpdateHandler<T> {
         output
     );
     assert!(
-        output.contains("UpdateHandler.prototype.update") && output.contains("UpdateHandler.prototype.merge"),
+        output.contains("UpdateHandler.prototype.update")
+            && output.contains("UpdateHandler.prototype.merge"),
         "Expected UpdateHandler methods: {}",
         output
     );
@@ -24443,8 +24312,7 @@ class FormValidator {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -24456,7 +24324,8 @@ class FormValidator {
         output
     );
     assert!(
-        output.contains("SettingsValidator.prototype.validate") && output.contains("SettingsValidator.prototype.isComplete"),
+        output.contains("SettingsValidator.prototype.validate")
+            && output.contains("SettingsValidator.prototype.isComplete"),
         "Expected SettingsValidator methods: {}",
         output
     );
@@ -24471,7 +24340,8 @@ class FormValidator {
         output
     );
     assert!(
-        output.contains("FormValidator.prototype.validate") && output.contains("FormValidator.prototype.toRequired"),
+        output.contains("FormValidator.prototype.validate")
+            && output.contains("FormValidator.prototype.toRequired"),
         "Expected FormValidator methods: {}",
         output
     );
@@ -24566,8 +24436,7 @@ class ReadonlyCollection<T> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -24579,7 +24448,8 @@ class ReadonlyCollection<T> {
         output
     );
     assert!(
-        output.contains("StateManager.prototype.getState") && output.contains("StateManager.prototype.freeze"),
+        output.contains("StateManager.prototype.getState")
+            && output.contains("StateManager.prototype.freeze"),
         "Expected StateManager methods: {}",
         output
     );
@@ -24589,7 +24459,8 @@ class ReadonlyCollection<T> {
         output
     );
     assert!(
-        output.contains("ImmutableRecord.prototype.get") && output.contains("ImmutableRecord.prototype.with"),
+        output.contains("ImmutableRecord.prototype.get")
+            && output.contains("ImmutableRecord.prototype.with"),
         "Expected ImmutableRecord methods: {}",
         output
     );
@@ -24688,8 +24559,7 @@ class DataProjector<T> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -24701,12 +24571,14 @@ class DataProjector<T> {
         output
     );
     assert!(
-        output.contains("UserTransformer.prototype.toPublic") && output.contains("UserTransformer.prototype.toCredentials"),
+        output.contains("UserTransformer.prototype.toPublic")
+            && output.contains("UserTransformer.prototype.toCredentials"),
         "Expected UserTransformer projection methods: {}",
         output
     );
     assert!(
-        output.contains("UserTransformer.prototype.pick") && output.contains("UserTransformer.prototype.omit"),
+        output.contains("UserTransformer.prototype.pick")
+            && output.contains("UserTransformer.prototype.omit"),
         "Expected pick and omit utility methods: {}",
         output
     );
@@ -24716,7 +24588,8 @@ class DataProjector<T> {
         output
     );
     assert!(
-        output.contains("DataProjector.prototype.select") && output.contains("DataProjector.prototype.exclude"),
+        output.contains("DataProjector.prototype.select")
+            && output.contains("DataProjector.prototype.exclude"),
         "Expected DataProjector methods: {}",
         output
     );
@@ -24818,8 +24691,7 @@ class IndexedStore<T> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -24831,7 +24703,8 @@ class IndexedStore<T> {
         output
     );
     assert!(
-        output.contains("StatusRegistry.prototype.getStatus") && output.contains("StatusRegistry.prototype.getAllStatuses"),
+        output.contains("StatusRegistry.prototype.getStatus")
+            && output.contains("StatusRegistry.prototype.getAllStatuses"),
         "Expected StatusRegistry methods: {}",
         output
     );
@@ -24841,7 +24714,8 @@ class IndexedStore<T> {
         output
     );
     assert!(
-        output.contains("DictionaryBuilder.prototype.set") && output.contains("DictionaryBuilder.prototype.get"),
+        output.contains("DictionaryBuilder.prototype.set")
+            && output.contains("DictionaryBuilder.prototype.get"),
         "Expected DictionaryBuilder methods: {}",
         output
     );
@@ -24851,7 +24725,8 @@ class IndexedStore<T> {
         output
     );
     assert!(
-        output.contains("IndexedStore.prototype.add") && output.contains("IndexedStore.prototype.remove"),
+        output.contains("IndexedStore.prototype.add")
+            && output.contains("IndexedStore.prototype.remove"),
         "Expected IndexedStore methods: {}",
         output
     );
@@ -24956,8 +24831,7 @@ class DeepTransformer<T extends object> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -24969,12 +24843,14 @@ class DeepTransformer<T extends object> {
         output
     );
     assert!(
-        output.contains("EntityService.prototype.create") && output.contains("EntityService.prototype.update"),
+        output.contains("EntityService.prototype.create")
+            && output.contains("EntityService.prototype.update"),
         "Expected EntityService CRUD methods: {}",
         output
     );
     assert!(
-        output.contains("EntityService.prototype.getSummary") && output.contains("EntityService.prototype.getReadonly"),
+        output.contains("EntityService.prototype.getSummary")
+            && output.contains("EntityService.prototype.getReadonly"),
         "Expected EntityService projection methods: {}",
         output
     );
@@ -24984,7 +24860,8 @@ class DeepTransformer<T extends object> {
         output
     );
     assert!(
-        output.contains("DeepTransformer.prototype.makeDeepPartial") && output.contains("DeepTransformer.prototype.makeDeepReadonly"),
+        output.contains("DeepTransformer.prototype.makeDeepPartial")
+            && output.contains("DeepTransformer.prototype.makeDeepReadonly"),
         "Expected DeepTransformer methods: {}",
         output
     );
@@ -25041,8 +24918,7 @@ class ArrayTypeExtractor {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -25139,8 +25015,7 @@ class UnionDistributor {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -25235,8 +25110,7 @@ class ShapeProcessor {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -25268,7 +25142,8 @@ class ShapeProcessor {
         output
     );
     assert!(
-        output.contains("ShapeProcessor.prototype.processCircle") && output.contains("ShapeProcessor.prototype.processPolygon"),
+        output.contains("ShapeProcessor.prototype.processCircle")
+            && output.contains("ShapeProcessor.prototype.processPolygon"),
         "Expected ShapeProcessor methods: {}",
         output
     );
@@ -25328,8 +25203,7 @@ class TypeFilter {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -25361,7 +25235,8 @@ class TypeFilter {
         output
     );
     assert!(
-        output.contains("TypeFilter.prototype.filterPrimitives") && output.contains("TypeFilter.prototype.excludeFalsy"),
+        output.contains("TypeFilter.prototype.filterPrimitives")
+            && output.contains("TypeFilter.prototype.excludeFalsy"),
         "Expected TypeFilter methods: {}",
         output
     );
@@ -25428,8 +25303,7 @@ class TypeNameResolver {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -25536,8 +25410,7 @@ class DataPipeline<T> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -25554,7 +25427,8 @@ class DataPipeline<T> {
         output
     );
     assert!(
-        output.contains("FunctionAnalyzer.prototype.getMetadata") && output.contains("FunctionAnalyzer.prototype.invoke"),
+        output.contains("FunctionAnalyzer.prototype.getMetadata")
+            && output.contains("FunctionAnalyzer.prototype.invoke"),
         "Expected FunctionAnalyzer methods: {}",
         output
     );
@@ -25569,12 +25443,14 @@ class DataPipeline<T> {
         output
     );
     assert!(
-        output.contains("DataPipeline.prototype.extractItems") && output.contains("DataPipeline.prototype.excludeNullish"),
+        output.contains("DataPipeline.prototype.extractItems")
+            && output.contains("DataPipeline.prototype.excludeNullish"),
         "Expected DataPipeline extraction methods: {}",
         output
     );
     assert!(
-        output.contains("DataPipeline.prototype.resolveAsync") && output.contains("DataPipeline.prototype.transform"),
+        output.contains("DataPipeline.prototype.resolveAsync")
+            && output.contains("DataPipeline.prototype.transform"),
         "Expected DataPipeline async and transform methods: {}",
         output
     );
@@ -25671,8 +25547,7 @@ class CacheService {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -25811,8 +25686,7 @@ class UserSettings {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -25820,7 +25694,9 @@ class UserSettings {
 
     // Decorator factory functions should be present
     assert!(
-        output.contains("Enumerable") && output.contains("Configurable") && output.contains("Sealed"),
+        output.contains("Enumerable")
+            && output.contains("Configurable")
+            && output.contains("Sealed"),
         "Expected decorator factory functions: {}",
         output
     );
@@ -25953,8 +25829,7 @@ class MetadataReader {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -26069,8 +25944,7 @@ class StateManager {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -26078,7 +25952,9 @@ class StateManager {
 
     // Classes should be converted
     assert!(
-        output.contains("ConfigService") && output.contains("DataProcessor") && output.contains("StateManager"),
+        output.contains("ConfigService")
+            && output.contains("DataProcessor")
+            && output.contains("StateManager"),
         "Expected complex initializer classes: {}",
         output
     );
@@ -26158,8 +26034,7 @@ class MultipleComputed {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -26167,7 +26042,9 @@ class MultipleComputed {
 
     // Classes should be converted
     assert!(
-        output.contains("DynamicFields") && output.contains("SymbolProperties") && output.contains("DynamicAccessor"),
+        output.contains("DynamicFields")
+            && output.contains("SymbolProperties")
+            && output.contains("DynamicAccessor"),
         "Expected computed field classes: {}",
         output
     );
@@ -26292,8 +26169,7 @@ class BoundMethods {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -26301,7 +26177,9 @@ class BoundMethods {
 
     // Classes should be converted
     assert!(
-        output.contains("EventHandler") && output.contains("ReactiveComponent") && output.contains("AsyncHandler"),
+        output.contains("EventHandler")
+            && output.contains("ReactiveComponent")
+            && output.contains("AsyncHandler"),
         "Expected arrow initializer classes: {}",
         output
     );
@@ -26373,8 +26251,7 @@ class ArraySpreadHandler {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -26391,7 +26268,8 @@ class ArraySpreadHandler {
         output
     );
     assert!(
-        output.contains("TupleConcatenator.prototype.prepend") && output.contains("TupleConcatenator.prototype.append"),
+        output.contains("TupleConcatenator.prototype.prepend")
+            && output.contains("TupleConcatenator.prototype.append"),
         "Expected prepend and append methods: {}",
         output
     );
@@ -26406,7 +26284,8 @@ class ArraySpreadHandler {
         output
     );
     assert!(
-        output.contains("ArraySpreadHandler.prototype.mergeArrays") && output.contains("ArraySpreadHandler.prototype.wrapInTuple"),
+        output.contains("ArraySpreadHandler.prototype.mergeArrays")
+            && output.contains("ArraySpreadHandler.prototype.wrapInTuple"),
         "Expected mergeArrays and wrapInTuple methods: {}",
         output
     );
@@ -26471,8 +26350,7 @@ class TupleTransformer {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -26484,7 +26362,8 @@ class TupleTransformer {
         output
     );
     assert!(
-        output.contains("PointFactory.prototype.create2D") && output.contains("PointFactory.prototype.create3D"),
+        output.contains("PointFactory.prototype.create2D")
+            && output.contains("PointFactory.prototype.create3D"),
         "Expected create2D and create3D methods: {}",
         output
     );
@@ -26504,7 +26383,8 @@ class TupleTransformer {
         output
     );
     assert!(
-        output.contains("TupleTransformer.prototype.createPerson") && output.contains("TupleTransformer.prototype.extendPerson"),
+        output.contains("TupleTransformer.prototype.createPerson")
+            && output.contains("TupleTransformer.prototype.extendPerson"),
         "Expected TupleTransformer methods: {}",
         output
     );
@@ -26560,8 +26440,7 @@ class RestParamHandler {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -26573,12 +26452,14 @@ class RestParamHandler {
         output
     );
     assert!(
-        output.contains("TupleDestructor.prototype.getHead") && output.contains("TupleDestructor.prototype.getTail"),
+        output.contains("TupleDestructor.prototype.getHead")
+            && output.contains("TupleDestructor.prototype.getTail"),
         "Expected getHead and getTail methods: {}",
         output
     );
     assert!(
-        output.contains("TupleDestructor.prototype.getFirstTwo") && output.contains("TupleDestructor.prototype.getLast"),
+        output.contains("TupleDestructor.prototype.getFirstTwo")
+            && output.contains("TupleDestructor.prototype.getLast"),
         "Expected getFirstTwo and getLast methods: {}",
         output
     );
@@ -26588,7 +26469,8 @@ class RestParamHandler {
         output
     );
     assert!(
-        output.contains("RestParamHandler.prototype.collectRest") && output.contains("RestParamHandler.prototype.processWithRest"),
+        output.contains("RestParamHandler.prototype.collectRest")
+            && output.contains("RestParamHandler.prototype.processWithRest"),
         "Expected RestParamHandler methods: {}",
         output
     );
@@ -26654,8 +26536,7 @@ class TupleSlice {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -26667,12 +26548,14 @@ class TupleSlice {
         output
     );
     assert!(
-        output.contains("TupleManipulator.prototype.reverse") && output.contains("TupleManipulator.prototype.getLength"),
+        output.contains("TupleManipulator.prototype.reverse")
+            && output.contains("TupleManipulator.prototype.getLength"),
         "Expected reverse and getLength methods: {}",
         output
     );
     assert!(
-        output.contains("TupleManipulator.prototype.pop") && output.contains("TupleManipulator.prototype.shift"),
+        output.contains("TupleManipulator.prototype.pop")
+            && output.contains("TupleManipulator.prototype.shift"),
         "Expected pop and shift methods: {}",
         output
     );
@@ -26682,7 +26565,8 @@ class TupleSlice {
         output
     );
     assert!(
-        output.contains("TupleSlice.prototype.take") && output.contains("TupleSlice.prototype.skip"),
+        output.contains("TupleSlice.prototype.take")
+            && output.contains("TupleSlice.prototype.skip"),
         "Expected take and skip methods: {}",
         output
     );
@@ -26755,8 +26639,7 @@ class ConfigBuilder {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -26773,7 +26656,8 @@ class ConfigBuilder {
         output
     );
     assert!(
-        output.contains("CoordinateHandler.prototype.is3D") && output.contains("CoordinateHandler.prototype.normalize"),
+        output.contains("CoordinateHandler.prototype.is3D")
+            && output.contains("CoordinateHandler.prototype.normalize"),
         "Expected is3D and normalize methods: {}",
         output
     );
@@ -26783,7 +26667,8 @@ class ConfigBuilder {
         output
     );
     assert!(
-        output.contains("ConfigBuilder.prototype.add") && output.contains("ConfigBuilder.prototype.getByName"),
+        output.contains("ConfigBuilder.prototype.add")
+            && output.contains("ConfigBuilder.prototype.getByName"),
         "Expected add and getByName methods: {}",
         output
     );
@@ -26854,8 +26739,7 @@ class PipelineBuilder<T extends unknown[]> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -26867,7 +26751,8 @@ class PipelineBuilder<T extends unknown[]> {
         output
     );
     assert!(
-        output.contains("EventEmitter.prototype.emit") && output.contains("EventEmitter.prototype.on"),
+        output.contains("EventEmitter.prototype.emit")
+            && output.contains("EventEmitter.prototype.on"),
         "Expected emit and on methods: {}",
         output
     );
@@ -26882,7 +26767,8 @@ class PipelineBuilder<T extends unknown[]> {
         output
     );
     assert!(
-        output.contains("PipelineBuilder.prototype.pipe") && output.contains("PipelineBuilder.prototype.execute"),
+        output.contains("PipelineBuilder.prototype.pipe")
+            && output.contains("PipelineBuilder.prototype.execute"),
         "Expected pipe and execute methods: {}",
         output
     );
@@ -26954,8 +26840,7 @@ class DeepTransformHandler {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -26972,7 +26857,8 @@ class DeepTransformHandler {
         output
     );
     assert!(
-        output.contains("NestedArrayHandler.prototype.depth") && output.contains("NestedArrayHandler.prototype.wrap"),
+        output.contains("NestedArrayHandler.prototype.depth")
+            && output.contains("NestedArrayHandler.prototype.wrap"),
         "Expected depth and wrap methods: {}",
         output
     );
@@ -27070,8 +26956,7 @@ class BinaryTreeBuilder<T> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -27083,12 +26968,14 @@ class BinaryTreeBuilder<T> {
         output
     );
     assert!(
-        output.contains("TreeBuilder.prototype.createNode") && output.contains("TreeBuilder.prototype.addChild"),
+        output.contains("TreeBuilder.prototype.createNode")
+            && output.contains("TreeBuilder.prototype.addChild"),
         "Expected createNode and addChild methods: {}",
         output
     );
     assert!(
-        output.contains("TreeBuilder.prototype.traverse") && output.contains("TreeBuilder.prototype.find"),
+        output.contains("TreeBuilder.prototype.traverse")
+            && output.contains("TreeBuilder.prototype.find"),
         "Expected traverse and find methods: {}",
         output
     );
@@ -27098,7 +26985,8 @@ class BinaryTreeBuilder<T> {
         output
     );
     assert!(
-        output.contains("BinaryTreeBuilder.prototype.insert") && output.contains("BinaryTreeBuilder.prototype.inOrder"),
+        output.contains("BinaryTreeBuilder.prototype.insert")
+            && output.contains("BinaryTreeBuilder.prototype.inOrder"),
         "Expected insert and inOrder methods: {}",
         output
     );
@@ -27199,8 +27087,7 @@ class DoublyLinkedList<T> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -27212,12 +27099,14 @@ class DoublyLinkedList<T> {
         output
     );
     assert!(
-        output.contains("LinkedList.prototype.append") && output.contains("LinkedList.prototype.prepend"),
+        output.contains("LinkedList.prototype.append")
+            && output.contains("LinkedList.prototype.prepend"),
         "Expected append and prepend methods: {}",
         output
     );
     assert!(
-        output.contains("LinkedList.prototype.toArray") && output.contains("LinkedList.prototype.find"),
+        output.contains("LinkedList.prototype.toArray")
+            && output.contains("LinkedList.prototype.find"),
         "Expected toArray and find methods: {}",
         output
     );
@@ -27227,7 +27116,8 @@ class DoublyLinkedList<T> {
         output
     );
     assert!(
-        output.contains("DoublyLinkedList.prototype.append") && output.contains("DoublyLinkedList.prototype.reverse"),
+        output.contains("DoublyLinkedList.prototype.append")
+            && output.contains("DoublyLinkedList.prototype.reverse"),
         "Expected DoublyLinkedList methods: {}",
         output
     );
@@ -27310,8 +27200,7 @@ class JSONValidator {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -27323,12 +27212,14 @@ class JSONValidator {
         output
     );
     assert!(
-        output.contains("JSONProcessor.prototype.stringify") && output.contains("JSONProcessor.prototype.parse"),
+        output.contains("JSONProcessor.prototype.stringify")
+            && output.contains("JSONProcessor.prototype.parse"),
         "Expected stringify and parse methods: {}",
         output
     );
     assert!(
-        output.contains("JSONProcessor.prototype.deepClone") && output.contains("JSONProcessor.prototype.merge"),
+        output.contains("JSONProcessor.prototype.deepClone")
+            && output.contains("JSONProcessor.prototype.merge"),
         "Expected deepClone and merge methods: {}",
         output
     );
@@ -27429,8 +27320,7 @@ class PathAccessor {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -27447,7 +27337,8 @@ class PathAccessor {
         output
     );
     assert!(
-        output.contains("NestedObjectHandler.prototype.get") && output.contains("NestedObjectHandler.prototype.set"),
+        output.contains("NestedObjectHandler.prototype.get")
+            && output.contains("NestedObjectHandler.prototype.set"),
         "Expected get and set methods: {}",
         output
     );
@@ -27564,8 +27455,7 @@ class RecursiveFlattener {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -27577,12 +27467,14 @@ class RecursiveFlattener {
         output
     );
     assert!(
-        output.contains("FileSystem.prototype.createFile") && output.contains("FileSystem.prototype.createDirectory"),
+        output.contains("FileSystem.prototype.createFile")
+            && output.contains("FileSystem.prototype.createDirectory"),
         "Expected createFile and createDirectory methods: {}",
         output
     );
     assert!(
-        output.contains("FileSystem.prototype.getTotalSize") && output.contains("FileSystem.prototype.listAll"),
+        output.contains("FileSystem.prototype.getTotalSize")
+            && output.contains("FileSystem.prototype.listAll"),
         "Expected getTotalSize and listAll methods: {}",
         output
     );
@@ -27660,8 +27552,7 @@ class EntityManager {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -27678,7 +27569,8 @@ class EntityManager {
         output
     );
     assert!(
-        output.contains("PersonFactory.prototype.merge") && output.contains("PersonFactory.prototype.extend"),
+        output.contains("PersonFactory.prototype.merge")
+            && output.contains("PersonFactory.prototype.extend"),
         "Expected merge and extend methods: {}",
         output
     );
@@ -27688,7 +27580,8 @@ class EntityManager {
         output
     );
     assert!(
-        output.contains("EntityManager.prototype.create") && output.contains("EntityManager.prototype.update"),
+        output.contains("EntityManager.prototype.create")
+            && output.contains("EntityManager.prototype.update"),
         "Expected EntityManager create and update methods: {}",
         output
     );
@@ -27783,8 +27676,7 @@ class JSONCodec<T> implements Serializable {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -27796,12 +27688,14 @@ class JSONCodec<T> implements Serializable {
         output
     );
     assert!(
-        output.contains("DocumentBuilder.prototype.setId") && output.contains("DocumentBuilder.prototype.setName"),
+        output.contains("DocumentBuilder.prototype.setId")
+            && output.contains("DocumentBuilder.prototype.setName"),
         "Expected setId and setName methods: {}",
         output
     );
     assert!(
-        output.contains("DocumentBuilder.prototype.setContent") && output.contains("DocumentBuilder.prototype.setVersion"),
+        output.contains("DocumentBuilder.prototype.setContent")
+            && output.contains("DocumentBuilder.prototype.setVersion"),
         "Expected setContent and setVersion methods: {}",
         output
     );
@@ -27874,8 +27768,7 @@ class SafeMerger {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -27887,12 +27780,14 @@ class SafeMerger {
         output
     );
     assert!(
-        output.contains("DataEnhancer.prototype.addId") && output.contains("DataEnhancer.prototype.addTimestamps"),
+        output.contains("DataEnhancer.prototype.addId")
+            && output.contains("DataEnhancer.prototype.addTimestamps"),
         "Expected addId and addTimestamps methods: {}",
         output
     );
     assert!(
-        output.contains("DataEnhancer.prototype.makeAuditable") && output.contains("DataEnhancer.prototype.enhance"),
+        output.contains("DataEnhancer.prototype.makeAuditable")
+            && output.contains("DataEnhancer.prototype.enhance"),
         "Expected makeAuditable and enhance methods: {}",
         output
     );
@@ -27902,7 +27797,8 @@ class SafeMerger {
         output
     );
     assert!(
-        output.contains("SafeMerger.prototype.mergeNonNull") && output.contains("SafeMerger.prototype.mergeWithDefaults"),
+        output.contains("SafeMerger.prototype.mergeNonNull")
+            && output.contains("SafeMerger.prototype.mergeWithDefaults"),
         "Expected SafeMerger methods: {}",
         output
     );
@@ -27955,8 +27851,7 @@ class MixinApplicator {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -27973,7 +27868,8 @@ class MixinApplicator {
         output
     );
     assert!(
-        output.contains("GenericMerger.prototype.merge") && output.contains("GenericMerger.prototype.getBase"),
+        output.contains("GenericMerger.prototype.merge")
+            && output.contains("GenericMerger.prototype.getBase"),
         "Expected merge and getBase methods: {}",
         output
     );
@@ -27983,7 +27879,8 @@ class MixinApplicator {
         output
     );
     assert!(
-        output.contains("MixinApplicator.prototype.apply") && output.contains("MixinApplicator.prototype.applyTwo"),
+        output.contains("MixinApplicator.prototype.apply")
+            && output.contains("MixinApplicator.prototype.applyTwo"),
         "Expected MixinApplicator apply methods: {}",
         output
     );
@@ -28070,8 +27967,7 @@ class ServiceBase implements Service {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -28088,7 +27984,8 @@ class ServiceBase implements Service {
         output
     );
     assert!(
-        output.contains("ComponentBase.prototype.dispose") && output.contains("ComponentBase.prototype.activate"),
+        output.contains("ComponentBase.prototype.dispose")
+            && output.contains("ComponentBase.prototype.activate"),
         "Expected dispose and activate methods: {}",
         output
     );
@@ -28103,7 +28000,8 @@ class ServiceBase implements Service {
         output
     );
     assert!(
-        output.contains("ServiceBase.prototype.log") && output.contains("ServiceBase.prototype.handleError"),
+        output.contains("ServiceBase.prototype.log")
+            && output.contains("ServiceBase.prototype.handleError"),
         "Expected log and handleError methods: {}",
         output
     );
@@ -28188,8 +28086,7 @@ class DataProcessor<T extends object, U extends object> implements Processor<T, 
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -28201,12 +28098,14 @@ class DataProcessor<T extends object, U extends object> implements Processor<T, 
         output
     );
     assert!(
-        output.contains("EntityFactory.prototype.createBase") && output.contains("EntityFactory.prototype.createTimestamped"),
+        output.contains("EntityFactory.prototype.createBase")
+            && output.contains("EntityFactory.prototype.createTimestamped"),
         "Expected createBase and createTimestamped methods: {}",
         output
     );
     assert!(
-        output.contains("EntityFactory.prototype.createAuditable") && output.contains("EntityFactory.prototype.upgrade"),
+        output.contains("EntityFactory.prototype.createAuditable")
+            && output.contains("EntityFactory.prototype.upgrade"),
         "Expected createAuditable and upgrade methods: {}",
         output
     );
@@ -28216,7 +28115,8 @@ class DataProcessor<T extends object, U extends object> implements Processor<T, 
         output
     );
     assert!(
-        output.contains("DataProcessor.prototype.validate") && output.contains("DataProcessor.prototype.transform"),
+        output.contains("DataProcessor.prototype.validate")
+            && output.contains("DataProcessor.prototype.transform"),
         "Expected validate and transform methods: {}",
         output
     );
@@ -28286,8 +28186,7 @@ class ResultHandler {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -28314,7 +28213,8 @@ class ResultHandler {
         output
     );
     assert!(
-        output.contains("ResultHandler.prototype.handle") && output.contains("ResultHandler.prototype.isSuccess"),
+        output.contains("ResultHandler.prototype.handle")
+            && output.contains("ResultHandler.prototype.isSuccess"),
         "Expected handle and isSuccess methods: {}",
         output
     );
@@ -28377,8 +28277,7 @@ class InstanceChecker {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -28472,8 +28371,7 @@ class Logger {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -28485,7 +28383,8 @@ class Logger {
         output
     );
     assert!(
-        output.contains("Navigator.prototype.move") && output.contains("Navigator.prototype.getOpposite"),
+        output.contains("Navigator.prototype.move")
+            && output.contains("Navigator.prototype.getOpposite"),
         "Expected move and getOpposite methods: {}",
         output
     );
@@ -28566,8 +28465,7 @@ class HttpResponse {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -28594,7 +28492,8 @@ class HttpResponse {
         output
     );
     assert!(
-        output.contains("HttpResponse.prototype.isSuccess") && output.contains("HttpResponse.prototype.isError"),
+        output.contains("HttpResponse.prototype.isSuccess")
+            && output.contains("HttpResponse.prototype.isError"),
         "Expected isSuccess and isError methods: {}",
         output
     );
@@ -28669,8 +28568,7 @@ class NullableProcessor {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -28687,12 +28585,14 @@ class NullableProcessor {
         output
     );
     assert!(
-        output.contains("OptionalHandler.prototype.setValue") && output.contains("OptionalHandler.prototype.getValue"),
+        output.contains("OptionalHandler.prototype.setValue")
+            && output.contains("OptionalHandler.prototype.getValue"),
         "Expected setValue and getValue methods: {}",
         output
     );
     assert!(
-        output.contains("OptionalHandler.prototype.getValueOrDefault") && output.contains("OptionalHandler.prototype.hasData"),
+        output.contains("OptionalHandler.prototype.getValueOrDefault")
+            && output.contains("OptionalHandler.prototype.hasData"),
         "Expected getValueOrDefault and hasData methods: {}",
         output
     );
@@ -28702,7 +28602,8 @@ class NullableProcessor {
         output
     );
     assert!(
-        output.contains("NullableProcessor.prototype.process") && output.contains("NullableProcessor.prototype.coalesce"),
+        output.contains("NullableProcessor.prototype.process")
+            && output.contains("NullableProcessor.prototype.coalesce"),
         "Expected process and coalesce methods: {}",
         output
     );
@@ -28774,8 +28675,7 @@ class PrimitiveHandler {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -28802,12 +28702,14 @@ class PrimitiveHandler {
         output
     );
     assert!(
-        output.contains("PrimitiveHandler.prototype.wrap") && output.contains("PrimitiveHandler.prototype.unwrap"),
+        output.contains("PrimitiveHandler.prototype.wrap")
+            && output.contains("PrimitiveHandler.prototype.unwrap"),
         "Expected wrap and unwrap methods: {}",
         output
     );
     assert!(
-        output.contains("PrimitiveHandler.prototype.stringify") && output.contains("PrimitiveHandler.prototype.getType"),
+        output.contains("PrimitiveHandler.prototype.stringify")
+            && output.contains("PrimitiveHandler.prototype.getType"),
         "Expected stringify and getType methods: {}",
         output
     );
@@ -28878,8 +28780,7 @@ class PartialBuilder<T> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -28891,7 +28792,8 @@ class PartialBuilder<T> {
         output
     );
     assert!(
-        output.contains("UserUpdater.prototype.update") && output.contains("UserUpdater.prototype.patch"),
+        output.contains("UserUpdater.prototype.update")
+            && output.contains("UserUpdater.prototype.patch"),
         "Expected update and patch methods: {}",
         output
     );
@@ -28906,7 +28808,8 @@ class PartialBuilder<T> {
         output
     );
     assert!(
-        output.contains("PartialBuilder.prototype.set") && output.contains("PartialBuilder.prototype.getData"),
+        output.contains("PartialBuilder.prototype.set")
+            && output.contains("PartialBuilder.prototype.getData"),
         "Expected set and getData methods: {}",
         output
     );
@@ -28970,8 +28873,7 @@ class RequiredWrapper<T> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -28983,7 +28885,8 @@ class RequiredWrapper<T> {
         output
     );
     assert!(
-        output.contains("ConfigValidator.prototype.validate") && output.contains("ConfigValidator.prototype.isComplete"),
+        output.contains("ConfigValidator.prototype.validate")
+            && output.contains("ConfigValidator.prototype.isComplete"),
         "Expected validate and isComplete methods: {}",
         output
     );
@@ -28998,7 +28901,8 @@ class RequiredWrapper<T> {
         output
     );
     assert!(
-        output.contains("RequiredWrapper.prototype.get") && output.contains("RequiredWrapper.prototype.getData"),
+        output.contains("RequiredWrapper.prototype.get")
+            && output.contains("RequiredWrapper.prototype.getData"),
         "Expected get and getData methods: {}",
         output
     );
@@ -29063,8 +28967,7 @@ class ImmutableWrapper<T> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -29076,7 +28979,8 @@ class ImmutableWrapper<T> {
         output
     );
     assert!(
-        output.contains("StateManager.prototype.getState") && output.contains("StateManager.prototype.getCount"),
+        output.contains("StateManager.prototype.getState")
+            && output.contains("StateManager.prototype.getCount"),
         "Expected getState and getCount methods: {}",
         output
     );
@@ -29091,7 +28995,8 @@ class ImmutableWrapper<T> {
         output
     );
     assert!(
-        output.contains("ImmutableWrapper.prototype.get") && output.contains("ImmutableWrapper.prototype.clone"),
+        output.contains("ImmutableWrapper.prototype.get")
+            && output.contains("ImmutableWrapper.prototype.clone"),
         "Expected get and clone methods: {}",
         output
     );
@@ -29170,8 +29075,7 @@ class PickHelper<T, K extends keyof T> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -29183,12 +29087,14 @@ class PickHelper<T, K extends keyof T> {
         output
     );
     assert!(
-        output.contains("PersonService.prototype.add") && output.contains("PersonService.prototype.getContactInfo"),
+        output.contains("PersonService.prototype.add")
+            && output.contains("PersonService.prototype.getContactInfo"),
         "Expected add and getContactInfo methods: {}",
         output
     );
     assert!(
-        output.contains("PersonService.prototype.getSummary") && output.contains("PersonService.prototype.findById"),
+        output.contains("PersonService.prototype.getSummary")
+            && output.contains("PersonService.prototype.findById"),
         "Expected getSummary and findById methods: {}",
         output
     );
@@ -29198,7 +29104,8 @@ class PickHelper<T, K extends keyof T> {
         output
     );
     assert!(
-        output.contains("PickHelper.prototype.pick") && output.contains("PickHelper.prototype.getSource"),
+        output.contains("PickHelper.prototype.pick")
+            && output.contains("PickHelper.prototype.getSource"),
         "Expected pick and getSource methods: {}",
         output
     );
@@ -29278,8 +29185,7 @@ class OmitHelper<T, K extends keyof T> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -29291,7 +29197,8 @@ class OmitHelper<T, K extends keyof T> {
         output
     );
     assert!(
-        output.contains("EntityFactory.prototype.create") && output.contains("EntityFactory.prototype.toPublic"),
+        output.contains("EntityFactory.prototype.create")
+            && output.contains("EntityFactory.prototype.toPublic"),
         "Expected create and toPublic methods: {}",
         output
     );
@@ -29306,7 +29213,8 @@ class OmitHelper<T, K extends keyof T> {
         output
     );
     assert!(
-        output.contains("OmitHelper.prototype.isExcluded") && output.contains("OmitHelper.prototype.getSource"),
+        output.contains("OmitHelper.prototype.isExcluded")
+            && output.contains("OmitHelper.prototype.getSource"),
         "Expected isExcluded and getSource methods: {}",
         output
     );
@@ -29377,8 +29285,7 @@ class RecordStore<K extends string, V> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -29390,7 +29297,8 @@ class RecordStore<K extends string, V> {
         output
     );
     assert!(
-        output.contains("StatusRegistry.prototype.getStatus") && output.contains("StatusRegistry.prototype.updateStatus"),
+        output.contains("StatusRegistry.prototype.getStatus")
+            && output.contains("StatusRegistry.prototype.updateStatus"),
         "Expected getStatus and updateStatus methods: {}",
         output
     );
@@ -29405,12 +29313,14 @@ class RecordStore<K extends string, V> {
         output
     );
     assert!(
-        output.contains("RecordStore.prototype.get") && output.contains("RecordStore.prototype.set"),
+        output.contains("RecordStore.prototype.get")
+            && output.contains("RecordStore.prototype.set"),
         "Expected get and set methods: {}",
         output
     );
     assert!(
-        output.contains("RecordStore.prototype.has") && output.contains("RecordStore.prototype.getData"),
+        output.contains("RecordStore.prototype.has")
+            && output.contains("RecordStore.prototype.getData"),
         "Expected has and getData methods: {}",
         output
     );
@@ -29470,8 +29380,7 @@ class TypeExtractor {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -29483,12 +29392,14 @@ class TypeExtractor {
         output
     );
     assert!(
-        output.contains("ArrayProcessor.prototype.getFirst") && output.contains("ArrayProcessor.prototype.getLast"),
+        output.contains("ArrayProcessor.prototype.getFirst")
+            && output.contains("ArrayProcessor.prototype.getLast"),
         "Expected getFirst and getLast methods: {}",
         output
     );
     assert!(
-        output.contains("ArrayProcessor.prototype.map") && output.contains("ArrayProcessor.prototype.getItems"),
+        output.contains("ArrayProcessor.prototype.map")
+            && output.contains("ArrayProcessor.prototype.getItems"),
         "Expected map and getItems methods: {}",
         output
     );
@@ -29498,7 +29409,8 @@ class TypeExtractor {
         output
     );
     assert!(
-        output.contains("TypeExtractor.prototype.extractElement") && output.contains("TypeExtractor.prototype.extractFirst"),
+        output.contains("TypeExtractor.prototype.extractElement")
+            && output.contains("TypeExtractor.prototype.extractFirst"),
         "Expected extractElement and extractFirst methods: {}",
         output
     );
@@ -29558,8 +29470,7 @@ class ReturnExtractor {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -29571,7 +29482,8 @@ class ReturnExtractor {
         output
     );
     assert!(
-        output.contains("FunctionWrapper.prototype.call") && output.contains("FunctionWrapper.prototype.bind"),
+        output.contains("FunctionWrapper.prototype.call")
+            && output.contains("FunctionWrapper.prototype.bind"),
         "Expected call and bind methods: {}",
         output
     );
@@ -29586,7 +29498,8 @@ class ReturnExtractor {
         output
     );
     assert!(
-        output.contains("ReturnExtractor.prototype.getReturnValue") && output.contains("ReturnExtractor.prototype.wrapReturn"),
+        output.contains("ReturnExtractor.prototype.getReturnValue")
+            && output.contains("ReturnExtractor.prototype.wrapReturn"),
         "Expected getReturnValue and wrapReturn methods: {}",
         output
     );
@@ -29647,8 +29560,7 @@ class AsyncUnwrapper {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -29660,7 +29572,8 @@ class AsyncUnwrapper {
         output
     );
     assert!(
-        output.contains("PromiseHandler.prototype.then") && output.contains("PromiseHandler.prototype.getPromise"),
+        output.contains("PromiseHandler.prototype.then")
+            && output.contains("PromiseHandler.prototype.getPromise"),
         "Expected then and getPromise methods: {}",
         output
     );
@@ -29675,7 +29588,8 @@ class AsyncUnwrapper {
         output
     );
     assert!(
-        output.contains("AsyncUnwrapper.prototype.unwrap") && output.contains("AsyncUnwrapper.prototype.unwrapNested"),
+        output.contains("AsyncUnwrapper.prototype.unwrap")
+            && output.contains("AsyncUnwrapper.prototype.unwrapNested"),
         "Expected unwrap and unwrapNested methods: {}",
         output
     );
@@ -29731,8 +29645,7 @@ class InstanceCreator {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -29744,7 +29657,8 @@ class InstanceCreator {
         output
     );
     assert!(
-        output.contains("FactoryBuilder.prototype.create") && output.contains("FactoryBuilder.prototype.getConstructor"),
+        output.contains("FactoryBuilder.prototype.create")
+            && output.contains("FactoryBuilder.prototype.getConstructor"),
         "Expected create and getConstructor methods: {}",
         output
     );
@@ -29759,7 +29673,8 @@ class InstanceCreator {
         output
     );
     assert!(
-        output.contains("InstanceCreator.prototype.instantiate") && output.contains("InstanceCreator.prototype.createEmpty"),
+        output.contains("InstanceCreator.prototype.instantiate")
+            && output.contains("InstanceCreator.prototype.createEmpty"),
         "Expected instantiate and createEmpty methods: {}",
         output
     );
@@ -29822,8 +29737,7 @@ class TupleExtractor {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -29835,12 +29749,14 @@ class TupleExtractor {
         output
     );
     assert!(
-        output.contains("TupleProcessor.prototype.head") && output.contains("TupleProcessor.prototype.last"),
+        output.contains("TupleProcessor.prototype.head")
+            && output.contains("TupleProcessor.prototype.last"),
         "Expected head and last methods: {}",
         output
     );
     assert!(
-        output.contains("TupleProcessor.prototype.length") && output.contains("TupleProcessor.prototype.getTuple"),
+        output.contains("TupleProcessor.prototype.length")
+            && output.contains("TupleProcessor.prototype.getTuple"),
         "Expected length and getTuple methods: {}",
         output
     );
@@ -29850,7 +29766,8 @@ class TupleExtractor {
         output
     );
     assert!(
-        output.contains("TupleExtractor.prototype.getHead") && output.contains("TupleExtractor.prototype.getLast"),
+        output.contains("TupleExtractor.prototype.getHead")
+            && output.contains("TupleExtractor.prototype.getLast"),
         "Expected getHead and getLast methods: {}",
         output
     );
@@ -29921,8 +29838,7 @@ class DeepProcessor {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -29934,12 +29850,14 @@ class DeepProcessor {
         output
     );
     assert!(
-        output.contains("TypeUnpacker.prototype.unpackArrayValue") && output.contains("TypeUnpacker.prototype.wrapInArray"),
+        output.contains("TypeUnpacker.prototype.unpackArrayValue")
+            && output.contains("TypeUnpacker.prototype.wrapInArray"),
         "Expected unpackArrayValue and wrapInArray methods: {}",
         output
     );
     assert!(
-        output.contains("TypeUnpacker.prototype.wrapInPromise") && output.contains("TypeUnpacker.prototype.identity"),
+        output.contains("TypeUnpacker.prototype.wrapInPromise")
+            && output.contains("TypeUnpacker.prototype.identity"),
         "Expected wrapInPromise and identity methods: {}",
         output
     );
@@ -29949,12 +29867,14 @@ class DeepProcessor {
         output
     );
     assert!(
-        output.contains("DeepProcessor.prototype.processArray") && output.contains("DeepProcessor.prototype.processPromise"),
+        output.contains("DeepProcessor.prototype.processArray")
+            && output.contains("DeepProcessor.prototype.processPromise"),
         "Expected processArray and processPromise methods: {}",
         output
     );
     assert!(
-        output.contains("DeepProcessor.prototype.flatten") && output.contains("DeepProcessor.prototype.createPair"),
+        output.contains("DeepProcessor.prototype.flatten")
+            && output.contains("DeepProcessor.prototype.createPair"),
         "Expected flatten and createPair methods: {}",
         output
     );
@@ -30031,8 +29951,7 @@ const mapping = new Mapping(["a", "b", "c"] as const, [1, 2, 3] as const);
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -30136,8 +30055,7 @@ const nestedStore = new NestedStore([
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -30145,7 +30063,9 @@ const nestedStore = new NestedStore([
 
     // Classes should be converted
     assert!(
-        output.contains("TupleStore") && output.contains("ObjectStore") && output.contains("NestedStore"),
+        output.contains("TupleStore")
+            && output.contains("ObjectStore")
+            && output.contains("NestedStore"),
         "Expected readonly inference classes: {}",
         output
     );
@@ -30242,8 +30162,7 @@ const stack = new ImmutableStack([] as const);
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -30251,7 +30170,9 @@ const stack = new ImmutableStack([] as const);
 
     // Classes should be converted
     assert!(
-        output.contains("ImmutableArrayBuilder") && output.contains("ImmutableSet") && output.contains("ImmutableStack"),
+        output.contains("ImmutableArrayBuilder")
+            && output.contains("ImmutableSet")
+            && output.contains("ImmutableStack"),
         "Expected immutable array classes: {}",
         output
     );
@@ -30265,7 +30186,10 @@ const stack = new ImmutableStack([] as const);
 
     // Methods should be preserved
     assert!(
-        output.contains("toArray") && output.contains("has") && output.contains("peek") && output.contains("isEmpty"),
+        output.contains("toArray")
+            && output.contains("has")
+            && output.contains("peek")
+            && output.contains("isEmpty"),
         "Expected methods: {}",
         output
     );
@@ -30334,8 +30258,7 @@ class PersonEditor {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -30347,12 +30270,14 @@ class PersonEditor {
         output
     );
     assert!(
-        output.contains("PropertyAccessor.prototype.get") && output.contains("PropertyAccessor.prototype.set"),
+        output.contains("PropertyAccessor.prototype.get")
+            && output.contains("PropertyAccessor.prototype.set"),
         "Expected get and set methods: {}",
         output
     );
     assert!(
-        output.contains("PropertyAccessor.prototype.has") && output.contains("PropertyAccessor.prototype.getKeys"),
+        output.contains("PropertyAccessor.prototype.has")
+            && output.contains("PropertyAccessor.prototype.getKeys"),
         "Expected has and getKeys methods: {}",
         output
     );
@@ -30362,7 +30287,8 @@ class PersonEditor {
         output
     );
     assert!(
-        output.contains("PersonEditor.prototype.updateField") && output.contains("PersonEditor.prototype.getField"),
+        output.contains("PersonEditor.prototype.updateField")
+            && output.contains("PersonEditor.prototype.getField"),
         "Expected updateField and getField methods: {}",
         output
     );
@@ -30448,8 +30374,7 @@ class UserManager {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -30461,12 +30386,14 @@ class UserManager {
         output
     );
     assert!(
-        output.contains("ConfigManager.prototype.getConfig") && output.contains("ConfigManager.prototype.setHost"),
+        output.contains("ConfigManager.prototype.getConfig")
+            && output.contains("ConfigManager.prototype.setHost"),
         "Expected getConfig and setHost methods: {}",
         output
     );
     assert!(
-        output.contains("ConfigManager.prototype.setPort") && output.contains("ConfigManager.prototype.setDebug"),
+        output.contains("ConfigManager.prototype.setPort")
+            && output.contains("ConfigManager.prototype.setDebug"),
         "Expected setPort and setDebug methods: {}",
         output
     );
@@ -30476,7 +30403,8 @@ class UserManager {
         output
     );
     assert!(
-        output.contains("UserManager.prototype.add") && output.contains("UserManager.prototype.findByName"),
+        output.contains("UserManager.prototype.add")
+            && output.contains("UserManager.prototype.findByName"),
         "Expected add and findByName methods: {}",
         output
     );
@@ -30554,8 +30482,7 @@ class IndexedAccessor<T, K extends keyof T> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -30567,12 +30494,14 @@ class IndexedAccessor<T, K extends keyof T> {
         output
     );
     assert!(
-        output.contains("ResponseHandler.prototype.getData") && output.contains("ResponseHandler.prototype.getUsers"),
+        output.contains("ResponseHandler.prototype.getData")
+            && output.contains("ResponseHandler.prototype.getUsers"),
         "Expected getData and getUsers methods: {}",
         output
     );
     assert!(
-        output.contains("ResponseHandler.prototype.getMeta") && output.contains("ResponseHandler.prototype.getStatus"),
+        output.contains("ResponseHandler.prototype.getMeta")
+            && output.contains("ResponseHandler.prototype.getStatus"),
         "Expected getMeta and getStatus methods: {}",
         output
     );
@@ -30582,7 +30511,8 @@ class IndexedAccessor<T, K extends keyof T> {
         output
     );
     assert!(
-        output.contains("IndexedAccessor.prototype.getValue") && output.contains("IndexedAccessor.prototype.setValue"),
+        output.contains("IndexedAccessor.prototype.getValue")
+            && output.contains("IndexedAccessor.prototype.setValue"),
         "Expected getValue and setValue methods: {}",
         output
     );
@@ -30661,8 +30591,7 @@ class KeyValidator<T extends object> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -30674,12 +30603,14 @@ class KeyValidator<T extends object> {
         output
     );
     assert!(
-        output.contains("ObjectMapper.prototype.pluck") && output.contains("ObjectMapper.prototype.omit"),
+        output.contains("ObjectMapper.prototype.pluck")
+            && output.contains("ObjectMapper.prototype.omit"),
         "Expected pluck and omit methods: {}",
         output
     );
     assert!(
-        output.contains("ObjectMapper.prototype.rename") && output.contains("ObjectMapper.prototype.getSource"),
+        output.contains("ObjectMapper.prototype.rename")
+            && output.contains("ObjectMapper.prototype.getSource"),
         "Expected rename and getSource methods: {}",
         output
     );
@@ -30689,7 +30620,8 @@ class KeyValidator<T extends object> {
         output
     );
     assert!(
-        output.contains("KeyValidator.prototype.isValidKey") && output.contains("KeyValidator.prototype.getValidKeys"),
+        output.contains("KeyValidator.prototype.isValidKey")
+            && output.contains("KeyValidator.prototype.getValidKeys"),
         "Expected isValidKey and getValidKeys methods: {}",
         output
     );
@@ -30769,8 +30701,7 @@ class StatusHandler {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -30782,12 +30713,14 @@ class StatusHandler {
         output
     );
     assert!(
-        output.contains("ColorPicker.prototype.setColor") && output.contains("ColorPicker.prototype.getColorValue"),
+        output.contains("ColorPicker.prototype.setColor")
+            && output.contains("ColorPicker.prototype.getColorValue"),
         "Expected setColor and getColorValue methods: {}",
         output
     );
     assert!(
-        output.contains("ColorPicker.prototype.getCurrentColor") && output.contains("ColorPicker.prototype.getAllColors"),
+        output.contains("ColorPicker.prototype.getCurrentColor")
+            && output.contains("ColorPicker.prototype.getAllColors"),
         "Expected getCurrentColor and getAllColors methods: {}",
         output
     );
@@ -30797,7 +30730,8 @@ class StatusHandler {
         output
     );
     assert!(
-        output.contains("StatusHandler.prototype.isSuccess") && output.contains("StatusHandler.prototype.isClientError"),
+        output.contains("StatusHandler.prototype.isSuccess")
+            && output.contains("StatusHandler.prototype.isClientError"),
         "Expected isSuccess and isClientError methods: {}",
         output
     );
@@ -30888,8 +30822,7 @@ class DynamicAccessor<T extends object> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -30901,12 +30834,14 @@ class DynamicAccessor<T extends object> {
         output
     );
     assert!(
-        output.contains("SchemaValidator.prototype.getType") && output.contains("SchemaValidator.prototype.hasField"),
+        output.contains("SchemaValidator.prototype.getType")
+            && output.contains("SchemaValidator.prototype.hasField"),
         "Expected getType and hasField methods: {}",
         output
     );
     assert!(
-        output.contains("SchemaValidator.prototype.getFields") && output.contains("SchemaValidator.prototype.validateType"),
+        output.contains("SchemaValidator.prototype.getFields")
+            && output.contains("SchemaValidator.prototype.validateType"),
         "Expected getFields and validateType methods: {}",
         output
     );
@@ -30916,12 +30851,14 @@ class DynamicAccessor<T extends object> {
         output
     );
     assert!(
-        output.contains("DynamicAccessor.prototype.access") && output.contains("DynamicAccessor.prototype.update"),
+        output.contains("DynamicAccessor.prototype.access")
+            && output.contains("DynamicAccessor.prototype.update"),
         "Expected access and update methods: {}",
         output
     );
     assert!(
-        output.contains("DynamicAccessor.prototype.keys") && output.contains("DynamicAccessor.prototype.values"),
+        output.contains("DynamicAccessor.prototype.keys")
+            && output.contains("DynamicAccessor.prototype.values"),
         "Expected keys and values methods: {}",
         output
     );
@@ -31008,8 +30945,7 @@ class EventEmitter {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -31021,12 +30957,14 @@ class EventEmitter {
         output
     );
     assert!(
-        output.contains("MessageBuilder.prototype.greet") && output.contains("MessageBuilder.prototype.farewell"),
+        output.contains("MessageBuilder.prototype.greet")
+            && output.contains("MessageBuilder.prototype.farewell"),
         "Expected greet and farewell methods: {}",
         output
     );
     assert!(
-        output.contains("MessageBuilder.prototype.custom") && output.contains("MessageBuilder.prototype.getName"),
+        output.contains("MessageBuilder.prototype.custom")
+            && output.contains("MessageBuilder.prototype.getName"),
         "Expected custom and getName methods: {}",
         output
     );
@@ -31036,7 +30974,8 @@ class EventEmitter {
         output
     );
     assert!(
-        output.contains("EventEmitter.prototype.on") && output.contains("EventEmitter.prototype.emit"),
+        output.contains("EventEmitter.prototype.on")
+            && output.contains("EventEmitter.prototype.emit"),
         "Expected on and emit methods: {}",
         output
     );
@@ -31124,8 +31063,7 @@ class StyleBuilder {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -31137,12 +31075,14 @@ class StyleBuilder {
         output
     );
     assert!(
-        output.contains("UrlParser.prototype.getPath") && output.contains("UrlParser.prototype.getQuery"),
+        output.contains("UrlParser.prototype.getPath")
+            && output.contains("UrlParser.prototype.getQuery"),
         "Expected getPath and getQuery methods: {}",
         output
     );
     assert!(
-        output.contains("UrlParser.prototype.getSegments") && output.contains("UrlParser.prototype.getUrl"),
+        output.contains("UrlParser.prototype.getSegments")
+            && output.contains("UrlParser.prototype.getUrl"),
         "Expected getSegments and getUrl methods: {}",
         output
     );
@@ -31152,7 +31092,8 @@ class StyleBuilder {
         output
     );
     assert!(
-        output.contains("StyleBuilder.prototype.set") && output.contains("StyleBuilder.prototype.setPx"),
+        output.contains("StyleBuilder.prototype.set")
+            && output.contains("StyleBuilder.prototype.setPx"),
         "Expected set and setPx methods: {}",
         output
     );
@@ -31238,8 +31179,7 @@ class KeyTransformer {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -31251,12 +31191,14 @@ class KeyTransformer {
         output
     );
     assert!(
-        output.contains("PropertyManager.prototype.get") && output.contains("PropertyManager.prototype.set"),
+        output.contains("PropertyManager.prototype.get")
+            && output.contains("PropertyManager.prototype.set"),
         "Expected get and set methods: {}",
         output
     );
     assert!(
-        output.contains("PropertyManager.prototype.getData") && output.contains("PropertyManager.prototype.getKeys"),
+        output.contains("PropertyManager.prototype.getData")
+            && output.contains("PropertyManager.prototype.getKeys"),
         "Expected getData and getKeys methods: {}",
         output
     );
@@ -31266,7 +31208,8 @@ class KeyTransformer {
         output
     );
     assert!(
-        output.contains("KeyTransformer.prototype.prefix") && output.contains("KeyTransformer.prototype.suffix"),
+        output.contains("KeyTransformer.prototype.prefix")
+            && output.contains("KeyTransformer.prototype.suffix"),
         "Expected prefix and suffix methods: {}",
         output
     );
@@ -31353,8 +31296,7 @@ class HtmlBuilder {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -31366,12 +31308,14 @@ class HtmlBuilder {
         output
     );
     assert!(
-        output.contains("SqlBuilder.prototype.select") && output.contains("SqlBuilder.prototype.from"),
+        output.contains("SqlBuilder.prototype.select")
+            && output.contains("SqlBuilder.prototype.from"),
         "Expected select and from methods: {}",
         output
     );
     assert!(
-        output.contains("SqlBuilder.prototype.where") && output.contains("SqlBuilder.prototype.getQuery"),
+        output.contains("SqlBuilder.prototype.where")
+            && output.contains("SqlBuilder.prototype.getQuery"),
         "Expected where and getQuery methods: {}",
         output
     );
@@ -31381,7 +31325,8 @@ class HtmlBuilder {
         output
     );
     assert!(
-        output.contains("HtmlBuilder.prototype.tag") && output.contains("HtmlBuilder.prototype.div"),
+        output.contains("HtmlBuilder.prototype.tag")
+            && output.contains("HtmlBuilder.prototype.div"),
         "Expected tag and div methods: {}",
         output
     );
@@ -31468,8 +31413,7 @@ class NameFormatter {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -31481,12 +31425,14 @@ class NameFormatter {
         output
     );
     assert!(
-        output.contains("StringTransformer.prototype.toUpperCase") && output.contains("StringTransformer.prototype.toLowerCase"),
+        output.contains("StringTransformer.prototype.toUpperCase")
+            && output.contains("StringTransformer.prototype.toLowerCase"),
         "Expected toUpperCase and toLowerCase methods: {}",
         output
     );
     assert!(
-        output.contains("StringTransformer.prototype.capitalize") && output.contains("StringTransformer.prototype.toCamelCase"),
+        output.contains("StringTransformer.prototype.capitalize")
+            && output.contains("StringTransformer.prototype.toCamelCase"),
         "Expected capitalize and toCamelCase methods: {}",
         output
     );
@@ -31496,7 +31442,8 @@ class NameFormatter {
         output
     );
     assert!(
-        output.contains("NameFormatter.prototype.getFullName") && output.contains("NameFormatter.prototype.getInitials"),
+        output.contains("NameFormatter.prototype.getFullName")
+            && output.contains("NameFormatter.prototype.getInitials"),
         "Expected getFullName and getInitials methods: {}",
         output
     );
@@ -31587,8 +31534,7 @@ class I18nManager {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -31600,12 +31546,14 @@ class I18nManager {
         output
     );
     assert!(
-        output.contains("RouteBuilder.prototype.get") && output.contains("RouteBuilder.prototype.post"),
+        output.contains("RouteBuilder.prototype.get")
+            && output.contains("RouteBuilder.prototype.post"),
         "Expected get and post methods: {}",
         output
     );
     assert!(
-        output.contains("RouteBuilder.prototype.put") && output.contains("RouteBuilder.prototype.delete"),
+        output.contains("RouteBuilder.prototype.put")
+            && output.contains("RouteBuilder.prototype.delete"),
         "Expected put and delete methods: {}",
         output
     );
@@ -31620,12 +31568,14 @@ class I18nManager {
         output
     );
     assert!(
-        output.contains("I18nManager.prototype.set") && output.contains("I18nManager.prototype.get"),
+        output.contains("I18nManager.prototype.set")
+            && output.contains("I18nManager.prototype.get"),
         "Expected set and get methods: {}",
         output
     );
     assert!(
-        output.contains("I18nManager.prototype.has") && output.contains("I18nManager.prototype.getNamespace"),
+        output.contains("I18nManager.prototype.has")
+            && output.contains("I18nManager.prototype.getNamespace"),
         "Expected has and getNamespace methods: {}",
         output
     );
@@ -31702,8 +31652,7 @@ class Cache {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -31812,8 +31761,7 @@ class PluginRegistry {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -31922,8 +31870,7 @@ class LazyLoader {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -31931,7 +31878,9 @@ class LazyLoader {
 
     // Classes should be converted
     assert!(
-        output.contains("SecureVault") && output.contains("Singleton") && output.contains("LazyLoader"),
+        output.contains("SecureVault")
+            && output.contains("Singleton")
+            && output.contains("LazyLoader"),
         "Expected static block private access classes: {}",
         output
     );
@@ -32041,8 +31990,7 @@ class MySqlDataSource extends DataSource {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -32050,14 +31998,19 @@ class MySqlDataSource extends DataSource {
 
     // Classes should be converted
     assert!(
-        output.contains("DataSource") && output.contains("PostgresDataSource") && output.contains("MySqlDataSource"),
+        output.contains("DataSource")
+            && output.contains("PostgresDataSource")
+            && output.contains("MySqlDataSource"),
         "Expected abstract implementation classes: {}",
         output
     );
 
     // Implemented methods should be present
     assert!(
-        output.contains("connect") && output.contains("disconnect") && output.contains("query") && output.contains("execute"),
+        output.contains("connect")
+            && output.contains("disconnect")
+            && output.contains("query")
+            && output.contains("execute"),
         "Expected implemented methods: {}",
         output
     );
@@ -32161,8 +32114,7 @@ class TextField extends FormField {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -32290,8 +32242,7 @@ class UserService extends Service<User> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -32415,8 +32366,7 @@ class User implements Identifiable {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -32557,8 +32507,7 @@ class ServiceBase implements EventEmitter, Logger {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -32698,8 +32647,7 @@ class HashMap<K, V> implements KeyValueStore<K, V> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -32815,8 +32763,7 @@ class EventBus {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -32913,8 +32860,7 @@ class CompositeValidator {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -32922,7 +32868,9 @@ class CompositeValidator {
 
     // Classes should be converted
     assert!(
-        output.contains("Command") && output.contains("Pipeline") && output.contains("CompositeValidator"),
+        output.contains("Command")
+            && output.contains("Pipeline")
+            && output.contains("CompositeValidator"),
         "Expected constructor rest param classes: {}",
         output
     );
@@ -32936,7 +32884,9 @@ class CompositeValidator {
 
     // Additional methods
     assert!(
-        output.contains("getArgs") && output.contains("addStage") && output.contains("addValidator"),
+        output.contains("getArgs")
+            && output.contains("addStage")
+            && output.contains("addValidator"),
         "Expected additional methods: {}",
         output
     );
@@ -33036,8 +32986,7 @@ class Color {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -33155,8 +33104,7 @@ class ComparableCollection<T extends { compareTo(other: T): number }> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -33164,7 +33112,9 @@ class ComparableCollection<T extends { compareTo(other: T): number }> {
 
     // Classes should be converted
     assert!(
-        output.contains("Repository") && output.contains("NamedRepository") && output.contains("ComparableCollection"),
+        output.contains("Repository")
+            && output.contains("NamedRepository")
+            && output.contains("ComparableCollection"),
         "Expected generic extends constraint classes: {}",
         output
     );
@@ -33275,8 +33225,7 @@ class FormBuilder<T extends Record<string, any>> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -33284,7 +33233,9 @@ class FormBuilder<T extends Record<string, any>> {
 
     // Classes should be converted
     assert!(
-        output.contains("PropertyAccessor") && output.contains("ObjectMapper") && output.contains("FormBuilder"),
+        output.contains("PropertyAccessor")
+            && output.contains("ObjectMapper")
+            && output.contains("FormBuilder"),
         "Expected generic keyof constraint classes: {}",
         output
     );
@@ -33392,8 +33343,7 @@ class ArrayProcessor<T extends any[]> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -33401,7 +33351,9 @@ class ArrayProcessor<T extends any[]> {
 
     // Classes should be converted
     assert!(
-        output.contains("TypeChecker") && output.contains("AsyncHandler") && output.contains("ArrayProcessor"),
+        output.contains("TypeChecker")
+            && output.contains("AsyncHandler")
+            && output.contains("ArrayProcessor"),
         "Expected generic conditional constraint classes: {}",
         output
     );
@@ -33519,8 +33471,7 @@ class PrimitiveParser {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -33528,7 +33479,9 @@ class PrimitiveParser {
 
     // Classes should be converted
     assert!(
-        output.contains("ValueHolder") && output.contains("ResultHandler") && output.contains("PrimitiveParser"),
+        output.contains("ValueHolder")
+            && output.contains("ResultHandler")
+            && output.contains("PrimitiveParser"),
         "Expected union type alias classes: {}",
         output
     );
@@ -33642,8 +33595,7 @@ class MixinApplier<T extends object> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -33651,14 +33603,19 @@ class MixinApplier<T extends object> {
 
     // Classes should be converted
     assert!(
-        output.contains("PersonBuilder") && output.contains("EntityManager") && output.contains("MixinApplier"),
+        output.contains("PersonBuilder")
+            && output.contains("EntityManager")
+            && output.contains("MixinApplier"),
         "Expected intersection type alias classes: {}",
         output
     );
 
     // PersonBuilder methods
     assert!(
-        output.contains("setId") && output.contains("setName") && output.contains("setAge") && output.contains("build"),
+        output.contains("setId")
+            && output.contains("setName")
+            && output.contains("setAge")
+            && output.contains("build"),
         "Expected PersonBuilder methods: {}",
         output
     );
@@ -33774,8 +33731,7 @@ class FunctionAnalyzer<T extends (...args: any[]) => any> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -33783,14 +33739,19 @@ class FunctionAnalyzer<T extends (...args: any[]) => any> {
 
     // Classes should be converted
     assert!(
-        output.contains("NullableHandler") && output.contains("ArrayExtractor") && output.contains("FunctionAnalyzer"),
+        output.contains("NullableHandler")
+            && output.contains("ArrayExtractor")
+            && output.contains("FunctionAnalyzer"),
         "Expected conditional type alias classes: {}",
         output
     );
 
     // NullableHandler methods
     assert!(
-        output.contains("isNull") && output.contains("isUndefined") && output.contains("isDefined") && output.contains("getOrDefault"),
+        output.contains("isNull")
+            && output.contains("isUndefined")
+            && output.contains("isDefined")
+            && output.contains("getOrDefault"),
         "Expected NullableHandler methods: {}",
         output
     );
@@ -33891,8 +33852,7 @@ class HttpStatusChecker {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -33900,15 +33860,16 @@ class HttpStatusChecker {
 
     // Classes should be converted to ES5
     assert!(
-        output.contains("function DirectionHandler") && output.contains("function HttpStatusChecker"),
+        output.contains("function DirectionHandler")
+            && output.contains("function HttpStatusChecker"),
         "Expected ES5 class constructors: {}",
         output
     );
 
     // Methods should be on prototype
     assert!(
-        output.contains("DirectionHandler.prototype.setDirection") &&
-        output.contains("HttpStatusChecker.prototype.isSuccess"),
+        output.contains("DirectionHandler.prototype.setDirection")
+            && output.contains("HttpStatusChecker.prototype.isSuccess"),
         "Expected methods on prototype: {}",
         output
     );
@@ -33998,8 +33959,7 @@ class Logger {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -34101,8 +34061,7 @@ class WeekdayScheduler {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -34210,8 +34169,7 @@ class PermissionManager {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -34219,7 +34177,8 @@ class PermissionManager {
 
     // Classes should be converted
     assert!(
-        output.contains("function FileSizeFormatter") && output.contains("function PermissionManager"),
+        output.contains("function FileSizeFormatter")
+            && output.contains("function PermissionManager"),
         "Expected ES5 class constructors: {}",
         output
     );
@@ -34343,8 +34302,7 @@ class User {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -34509,8 +34467,7 @@ class NotificationManager {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -34518,9 +34475,9 @@ class NotificationManager {
 
     // All classes should be converted
     assert!(
-        output.contains("function Message") &&
-        output.contains("function MessageQueue") &&
-        output.contains("function NotificationManager"),
+        output.contains("function Message")
+            && output.contains("function MessageQueue")
+            && output.contains("function NotificationManager"),
         "Expected ES5 class constructors: {}",
         output
     );
@@ -34534,14 +34491,18 @@ class NotificationManager {
 
     // Message methods
     assert!(
-        output.contains("isMedia") && output.contains("markDelivered") && output.contains("markRead"),
+        output.contains("isMedia")
+            && output.contains("markDelivered")
+            && output.contains("markRead"),
         "Expected Message methods: {}",
         output
     );
 
     // MessageQueue methods
     assert!(
-        output.contains("getByStatus") && output.contains("getHighPriority") && output.contains("countByType"),
+        output.contains("getByStatus")
+            && output.contains("getHighPriority")
+            && output.contains("countByType"),
         "Expected MessageQueue methods: {}",
         output
     );
@@ -34609,8 +34570,7 @@ class FormValidator {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -34698,8 +34658,7 @@ class Canvas {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -34802,8 +34761,7 @@ class HRManager {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -34922,8 +34880,7 @@ class UserService {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -35029,8 +34986,7 @@ class TextProcessor {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -35194,19 +35150,14 @@ class Application {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
     let output = printer.get_output().to_string();
 
     // App namespace should exist
-    assert!(
-        output.contains("App"),
-        "Expected App namespace: {}",
-        output
-    );
+    assert!(output.contains("App"), "Expected App namespace: {}", output);
 
     // Application class should be ES5 constructor
     assert!(
@@ -35217,11 +35168,11 @@ class Application {
 
     // All Application methods should exist
     assert!(
-        output.contains("createUser") &&
-        output.contains("createProduct") &&
-        output.contains("getVersion") &&
-        output.contains("getUserCount") &&
-        output.contains("getProductValue"),
+        output.contains("createUser")
+            && output.contains("createProduct")
+            && output.contains("getVersion")
+            && output.contains("getUserCount")
+            && output.contains("getProductValue"),
         "Expected Application methods: {}",
         output
     );
@@ -35363,8 +35314,7 @@ class UppercaseLogger extends Logger<UpperStatusLevel> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -35386,7 +35336,9 @@ class UppercaseLogger extends Logger<UpperStatusLevel> {
 
     // UppercaseEventRegistry methods
     assert!(
-        output.contains("registerClick") && output.contains("registerFocus") && output.contains("registerBlur"),
+        output.contains("registerClick")
+            && output.contains("registerFocus")
+            && output.contains("registerBlur"),
         "Expected UppercaseEventRegistry methods: {}",
         output
     );
@@ -35407,7 +35359,9 @@ class UppercaseLogger extends Logger<UpperStatusLevel> {
 
     // Type aliases should be stripped
     assert!(
-        !output.contains("type EventName") && !output.contains("type UpperEventName") && !output.contains("type HttpMethod"),
+        !output.contains("type EventName")
+            && !output.contains("type UpperEventName")
+            && !output.contains("type HttpMethod"),
         "Expected type aliases to be stripped: {}",
         output
     );
@@ -35555,8 +35509,7 @@ class LowercaseQueryBuilder extends QueryBuilder<LowerDatabaseAction> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -35571,14 +35524,19 @@ class LowercaseQueryBuilder extends QueryBuilder<LowerDatabaseAction> {
 
     // CommandProcessor methods
     assert!(
-        output.contains("addCommand") && output.contains("execute") && output.contains("hasCommand"),
+        output.contains("addCommand")
+            && output.contains("execute")
+            && output.contains("hasCommand"),
         "Expected CommandProcessor methods: {}",
         output
     );
 
     // LowercaseCommandProcessor methods
     assert!(
-        output.contains("start") && output.contains("stop") && output.contains("pause") && output.contains("resume"),
+        output.contains("start")
+            && output.contains("stop")
+            && output.contains("pause")
+            && output.contains("resume"),
         "Expected LowercaseCommandProcessor methods: {}",
         output
     );
@@ -35592,7 +35550,9 @@ class LowercaseQueryBuilder extends QueryBuilder<LowerDatabaseAction> {
 
     // LowercasePriorityQueue methods
     assert!(
-        output.contains("addHighPriority") && output.contains("addMediumPriority") && output.contains("addLowPriority"),
+        output.contains("addHighPriority")
+            && output.contains("addMediumPriority")
+            && output.contains("addLowPriority"),
         "Expected LowercasePriorityQueue methods: {}",
         output
     );
@@ -35606,7 +35566,9 @@ class LowercaseQueryBuilder extends QueryBuilder<LowerDatabaseAction> {
 
     // Type aliases should be stripped
     assert!(
-        !output.contains("type Command") && !output.contains("type LowerCommand") && !output.contains("type Priority"),
+        !output.contains("type Command")
+            && !output.contains("type LowerCommand")
+            && !output.contains("type Priority"),
         "Expected type aliases to be stripped: {}",
         output
     );
@@ -35762,8 +35724,7 @@ class CapitalizedApiRouter extends ApiRouter<CapitalizedEndpoint> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -35778,14 +35739,18 @@ class CapitalizedApiRouter extends ApiRouter<CapitalizedEndpoint> {
 
     // FormFieldGenerator methods
     assert!(
-        output.contains("createField") && output.contains("getField") && output.contains("hasField"),
+        output.contains("createField")
+            && output.contains("getField")
+            && output.contains("hasField"),
         "Expected FormFieldGenerator methods: {}",
         output
     );
 
     // CapitalizedFieldGenerator methods
     assert!(
-        output.contains("createNameField") && output.contains("createEmailField") && output.contains("createAddressField"),
+        output.contains("createNameField")
+            && output.contains("createEmailField")
+            && output.contains("createAddressField"),
         "Expected CapitalizedFieldGenerator methods: {}",
         output
     );
@@ -35799,7 +35764,9 @@ class CapitalizedApiRouter extends ApiRouter<CapitalizedEndpoint> {
 
     // CapitalizedComponentFactory methods
     assert!(
-        output.contains("createButton") && output.contains("createInput") && output.contains("createSelect"),
+        output.contains("createButton")
+            && output.contains("createInput")
+            && output.contains("createSelect"),
         "Expected CapitalizedComponentFactory methods: {}",
         output
     );
@@ -35813,14 +35780,18 @@ class CapitalizedApiRouter extends ApiRouter<CapitalizedEndpoint> {
 
     // CapitalizedApiRouter methods
     assert!(
-        output.contains("getUsersUrl") && output.contains("getPostsUrl") && output.contains("getCommentsUrl"),
+        output.contains("getUsersUrl")
+            && output.contains("getPostsUrl")
+            && output.contains("getCommentsUrl"),
         "Expected CapitalizedApiRouter methods: {}",
         output
     );
 
     // Type aliases should be stripped
     assert!(
-        !output.contains("type FieldName") && !output.contains("type CapitalizedField") && !output.contains("type ComponentType"),
+        !output.contains("type FieldName")
+            && !output.contains("type CapitalizedField")
+            && !output.contains("type ComponentType"),
         "Expected type aliases to be stripped: {}",
         output
     );
@@ -35939,8 +35910,7 @@ class DeepArrayFlattener<T> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -35948,7 +35918,9 @@ class DeepArrayFlattener<T> {
 
     // Classes should be converted
     assert!(
-        output.contains("ArrayProcessor") && output.contains("NumberArrayProcessor") && output.contains("StringArrayProcessor"),
+        output.contains("ArrayProcessor")
+            && output.contains("NumberArrayProcessor")
+            && output.contains("StringArrayProcessor"),
         "Expected infer array element type classes: {}",
         output
     );
@@ -35962,7 +35934,10 @@ class DeepArrayFlattener<T> {
 
     // NumberArrayProcessor methods
     assert!(
-        output.contains("sum") && output.contains("average") && output.contains("max") && output.contains("min"),
+        output.contains("sum")
+            && output.contains("average")
+            && output.contains("max")
+            && output.contains("min"),
         "Expected NumberArrayProcessor methods: {}",
         output
     );
@@ -35976,14 +35951,18 @@ class DeepArrayFlattener<T> {
 
     // DeepArrayFlattener class
     assert!(
-        output.contains("DeepArrayFlattener") && output.contains("flatten") && output.contains("isArray"),
+        output.contains("DeepArrayFlattener")
+            && output.contains("flatten")
+            && output.contains("isArray"),
         "Expected DeepArrayFlattener class: {}",
         output
     );
 
     // Type aliases should be stripped
     assert!(
-        !output.contains("type ArrayElement") && !output.contains("type FirstElement") && !output.contains("type Flatten"),
+        !output.contains("type ArrayElement")
+            && !output.contains("type FirstElement")
+            && !output.contains("type Flatten"),
         "Expected type aliases to be stripped: {}",
         output
     );
@@ -36125,8 +36104,7 @@ class ThrottledFunction<F extends (...args: unknown[]) => unknown> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -36148,28 +36126,36 @@ class ThrottledFunction<F extends (...args: unknown[]) => unknown> {
 
     // MemoizedFunction methods
     assert!(
-        output.contains("clearCache") && output.contains("getCacheSize") && output.contains("hasCache"),
+        output.contains("clearCache")
+            && output.contains("getCacheSize")
+            && output.contains("hasCache"),
         "Expected MemoizedFunction methods: {}",
         output
     );
 
     // DebouncedFunction class
     assert!(
-        output.contains("DebouncedFunction") && output.contains("cancel") && output.contains("isPending"),
+        output.contains("DebouncedFunction")
+            && output.contains("cancel")
+            && output.contains("isPending"),
         "Expected DebouncedFunction class: {}",
         output
     );
 
     // ThrottledFunction class
     assert!(
-        output.contains("ThrottledFunction") && output.contains("reset") && output.contains("getLimit"),
+        output.contains("ThrottledFunction")
+            && output.contains("reset")
+            && output.contains("getLimit"),
         "Expected ThrottledFunction class: {}",
         output
     );
 
     // Type aliases should be stripped
     assert!(
-        !output.contains("type ReturnType") && !output.contains("type Parameters") && !output.contains("type ConstructorParameters"),
+        !output.contains("type ReturnType")
+            && !output.contains("type Parameters")
+            && !output.contains("type ConstructorParameters"),
         "Expected type aliases to be stripped: {}",
         output
     );
@@ -36337,8 +36323,7 @@ class TimeoutPromise<T> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -36346,7 +36331,9 @@ class TimeoutPromise<T> {
 
     // Classes should be converted
     assert!(
-        output.contains("AsyncWrapper") && output.contains("AsyncResult") && output.contains("PromiseQueue"),
+        output.contains("AsyncWrapper")
+            && output.contains("AsyncResult")
+            && output.contains("PromiseQueue"),
         "Expected infer promise unwrap type classes: {}",
         output
     );
@@ -36374,7 +36361,9 @@ class TimeoutPromise<T> {
 
     // RetryablePromise class
     assert!(
-        output.contains("RetryablePromise") && output.contains("execute") && output.contains("getMaxRetries"),
+        output.contains("RetryablePromise")
+            && output.contains("execute")
+            && output.contains("getMaxRetries"),
         "Expected RetryablePromise class: {}",
         output
     );
@@ -36388,7 +36377,9 @@ class TimeoutPromise<T> {
 
     // Type aliases should be stripped
     assert!(
-        !output.contains("type Awaited") && !output.contains("type PromiseType") && !output.contains("type UnwrapPromise"),
+        !output.contains("type Awaited")
+            && !output.contains("type PromiseType")
+            && !output.contains("type UnwrapPromise"),
         "Expected type aliases to be stripped: {}",
         output
     );
@@ -36555,8 +36546,7 @@ class FileSystemTree {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -36564,14 +36554,19 @@ class FileSystemTree {
 
     // Classes should be converted
     assert!(
-        output.contains("Tree") && output.contains("BinaryTree") && output.contains("FileSystemTree"),
+        output.contains("Tree")
+            && output.contains("BinaryTree")
+            && output.contains("FileSystemTree"),
         "Expected recursive tree type classes: {}",
         output
     );
 
     // Tree methods
     assert!(
-        output.contains("getRoot") && output.contains("setRoot") && output.contains("addChild") && output.contains("traverse"),
+        output.contains("getRoot")
+            && output.contains("setRoot")
+            && output.contains("addChild")
+            && output.contains("traverse"),
         "Expected Tree methods: {}",
         output
     );
@@ -36805,8 +36800,7 @@ class CircularLinkedList<T> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -36814,14 +36808,19 @@ class CircularLinkedList<T> {
 
     // Classes should be converted
     assert!(
-        output.contains("LinkedList") && output.contains("DoublyLinkedList") && output.contains("CircularLinkedList"),
+        output.contains("LinkedList")
+            && output.contains("DoublyLinkedList")
+            && output.contains("CircularLinkedList"),
         "Expected recursive linked list type classes: {}",
         output
     );
 
     // LinkedList methods
     assert!(
-        output.contains("append") && output.contains("prepend") && output.contains("removeFirst") && output.contains("find"),
+        output.contains("append")
+            && output.contains("prepend")
+            && output.contains("removeFirst")
+            && output.contains("find"),
         "Expected LinkedList methods: {}",
         output
     );
@@ -37019,8 +37018,7 @@ class JSONPathQuery {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -37028,35 +37026,47 @@ class JSONPathQuery {
 
     // Classes should be converted
     assert!(
-        output.contains("JSONParser") && output.contains("JSONTransformer") && output.contains("JSONPathQuery"),
+        output.contains("JSONParser")
+            && output.contains("JSONTransformer")
+            && output.contains("JSONPathQuery"),
         "Expected recursive JSON type classes: {}",
         output
     );
 
     // JSONParser methods
     assert!(
-        output.contains("parse") && output.contains("stringify") && output.contains("isObject") && output.contains("isArray"),
+        output.contains("parse")
+            && output.contains("stringify")
+            && output.contains("isObject")
+            && output.contains("isArray"),
         "Expected JSONParser methods: {}",
         output
     );
 
     // JSONTransformer methods
     assert!(
-        output.contains("mapStrings") && output.contains("filterNulls") && output.contains("getDepth"),
+        output.contains("mapStrings")
+            && output.contains("filterNulls")
+            && output.contains("getDepth"),
         "Expected JSONTransformer methods: {}",
         output
     );
 
     // JSONPathQuery methods
     assert!(
-        output.contains("get") && output.contains("set") && output.contains("has") && output.contains("keys"),
+        output.contains("get")
+            && output.contains("set")
+            && output.contains("has")
+            && output.contains("keys"),
         "Expected JSONPathQuery methods: {}",
         output
     );
 
     // Type aliases should be stripped
     assert!(
-        !output.contains("type JSONPrimitive") && !output.contains("type JSONArray") && !output.contains("type JSONValue"),
+        !output.contains("type JSONPrimitive")
+            && !output.contains("type JSONArray")
+            && !output.contains("type JSONValue"),
         "Expected type aliases to be stripped: {}",
         output
     );
@@ -37159,8 +37169,7 @@ class FunctionComposer {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -37168,21 +37177,29 @@ class FunctionComposer {
 
     // Classes should be converted
     assert!(
-        output.contains("TupleBuilder") && output.contains("SpreadOperations") && output.contains("FunctionComposer"),
+        output.contains("TupleBuilder")
+            && output.contains("SpreadOperations")
+            && output.contains("FunctionComposer"),
         "Expected variadic tuple spread classes: {}",
         output
     );
 
     // TupleBuilder methods
     assert!(
-        output.contains("getItems") && output.contains("prepend") && output.contains("append") && output.contains("concat"),
+        output.contains("getItems")
+            && output.contains("prepend")
+            && output.contains("append")
+            && output.contains("concat"),
         "Expected TupleBuilder methods: {}",
         output
     );
 
     // SpreadOperations methods
     assert!(
-        output.contains("first") && output.contains("rest") && output.contains("last") && output.contains("init"),
+        output.contains("first")
+            && output.contains("rest")
+            && output.contains("last")
+            && output.contains("init"),
         "Expected SpreadOperations methods: {}",
         output
     );
@@ -37196,7 +37213,9 @@ class FunctionComposer {
 
     // Type aliases should be stripped
     assert!(
-        !output.contains("type Prepend") && !output.contains("type Append") && !output.contains("type Concat"),
+        !output.contains("type Prepend")
+            && !output.contains("type Append")
+            && !output.contains("type Concat"),
         "Expected type aliases to be stripped: {}",
         output
     );
@@ -37323,8 +37342,7 @@ class ColorHandler {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -37332,14 +37350,19 @@ class ColorHandler {
 
     // Classes should be converted
     assert!(
-        output.contains("Point2DHandler") && output.contains("Point3DHandler") && output.contains("ColorHandler"),
+        output.contains("Point2DHandler")
+            && output.contains("Point3DHandler")
+            && output.contains("ColorHandler"),
         "Expected variadic tuple labeled classes: {}",
         output
     );
 
     // Point2DHandler methods
     assert!(
-        output.contains("getX") && output.contains("getY") && output.contains("distanceFromOrigin") && output.contains("add"),
+        output.contains("getX")
+            && output.contains("getY")
+            && output.contains("distanceFromOrigin")
+            && output.contains("add"),
         "Expected Point2DHandler methods: {}",
         output
     );
@@ -37353,14 +37376,19 @@ class ColorHandler {
 
     // ColorHandler methods
     assert!(
-        output.contains("getRed") && output.contains("getGreen") && output.contains("getBlue") && output.contains("getAlpha"),
+        output.contains("getRed")
+            && output.contains("getGreen")
+            && output.contains("getBlue")
+            && output.contains("getAlpha"),
         "Expected ColorHandler methods: {}",
         output
     );
 
     // Type aliases should be stripped
     assert!(
-        !output.contains("type Point2D") && !output.contains("type Point3D") && !output.contains("type RGB"),
+        !output.contains("type Point2D")
+            && !output.contains("type Point3D")
+            && !output.contains("type RGB"),
         "Expected type aliases to be stripped: {}",
         output
     );
@@ -37494,8 +37522,7 @@ class OptionalArgsHandler<T extends unknown[]> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -37503,14 +37530,19 @@ class OptionalArgsHandler<T extends unknown[]> {
 
     // Classes should be converted
     assert!(
-        output.contains("ConfigManager") && output.contains("CallbackManager") && output.contains("OptionalArgsHandler"),
+        output.contains("ConfigManager")
+            && output.contains("CallbackManager")
+            && output.contains("OptionalArgsHandler"),
         "Expected variadic tuple optional classes: {}",
         output
     );
 
     // ConfigManager methods
     assert!(
-        output.contains("getHost") && output.contains("getPort") && output.contains("getSecure") && output.contains("getUrl"),
+        output.contains("getHost")
+            && output.contains("getPort")
+            && output.contains("getSecure")
+            && output.contains("getUrl"),
         "Expected ConfigManager methods: {}",
         output
     );
@@ -37524,14 +37556,19 @@ class OptionalArgsHandler<T extends unknown[]> {
 
     // OptionalArgsHandler methods
     assert!(
-        output.contains("getArgs") && output.contains("getArg") && output.contains("hasArg") && output.contains("getArgCount"),
+        output.contains("getArgs")
+            && output.contains("getArg")
+            && output.contains("hasArg")
+            && output.contains("getArgCount"),
         "Expected OptionalArgsHandler methods: {}",
         output
     );
 
     // Type aliases should be stripped
     assert!(
-        !output.contains("type OptionalTail") && !output.contains("type ConfigTuple") && !output.contains("type CallbackTuple"),
+        !output.contains("type OptionalTail")
+            && !output.contains("type ConfigTuple")
+            && !output.contains("type CallbackTuple"),
         "Expected type aliases to be stripped: {}",
         output
     );
@@ -37628,8 +37665,7 @@ class PropertyMapper<T extends object> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -37644,21 +37680,29 @@ class PropertyMapper<T extends object> {
 
     // PersonAccessors methods
     assert!(
-        output.contains("getName") && output.contains("setName") && output.contains("getAge") && output.contains("setAge"),
+        output.contains("getName")
+            && output.contains("setName")
+            && output.contains("getAge")
+            && output.contains("setAge"),
         "Expected PersonAccessors methods: {}",
         output
     );
 
     // PropertyMapper methods
     assert!(
-        output.contains("getSource") && output.contains("get") && output.contains("set") && output.contains("keys"),
+        output.contains("getSource")
+            && output.contains("get")
+            && output.contains("set")
+            && output.contains("keys"),
         "Expected PropertyMapper methods: {}",
         output
     );
 
     // Type aliases and interface should be stripped
     assert!(
-        !output.contains("type Getters") && !output.contains("type Setters") && !output.contains("interface Person"),
+        !output.contains("type Getters")
+            && !output.contains("type Setters")
+            && !output.contains("interface Person"),
         "Expected type aliases to be stripped: {}",
         output
     );
@@ -37765,8 +37809,7 @@ class PrefixedStorage<T extends object> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -37781,21 +37824,31 @@ class PrefixedStorage<T extends object> {
 
     // EventEmitter methods
     assert!(
-        output.contains("getState") && output.contains("on") && output.contains("off") && output.contains("emit") && output.contains("update"),
+        output.contains("getState")
+            && output.contains("on")
+            && output.contains("off")
+            && output.contains("emit")
+            && output.contains("update"),
         "Expected EventEmitter methods: {}",
         output
     );
 
     // PrefixedStorage methods
     assert!(
-        output.contains("getPrefix") && output.contains("set") && output.contains("get") && output.contains("has") && output.contains("delete"),
+        output.contains("getPrefix")
+            && output.contains("set")
+            && output.contains("get")
+            && output.contains("has")
+            && output.contains("delete"),
         "Expected PrefixedStorage methods: {}",
         output
     );
 
     // Type aliases should be stripped
     assert!(
-        !output.contains("type EventHandlers") && !output.contains("type PrefixedKeys") && !output.contains("type SuffixedKeys"),
+        !output.contains("type EventHandlers")
+            && !output.contains("type PrefixedKeys")
+            && !output.contains("type SuffixedKeys"),
         "Expected type aliases to be stripped: {}",
         output
     );
@@ -37918,8 +37971,7 @@ class FunctionFieldsHandler<T extends object> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -37927,14 +37979,18 @@ class FunctionFieldsHandler<T extends object> {
 
     // Classes should be converted
     assert!(
-        output.contains("StringFieldsHandler") && output.contains("NumberFieldsHandler") && output.contains("FunctionFieldsHandler"),
+        output.contains("StringFieldsHandler")
+            && output.contains("NumberFieldsHandler")
+            && output.contains("FunctionFieldsHandler"),
         "Expected conditional as clause classes: {}",
         output
     );
 
     // StringFieldsHandler methods
     assert!(
-        output.contains("getStringFields") && output.contains("getStringValue") && output.contains("setStringValue"),
+        output.contains("getStringFields")
+            && output.contains("getStringValue")
+            && output.contains("setStringValue"),
         "Expected StringFieldsHandler methods: {}",
         output
     );
@@ -37955,7 +38011,9 @@ class FunctionFieldsHandler<T extends object> {
 
     // Type aliases and interface should be stripped
     assert!(
-        !output.contains("type OnlyStrings") && !output.contains("type OnlyNumbers") && !output.contains("interface MixedData"),
+        !output.contains("type OnlyStrings")
+            && !output.contains("type OnlyNumbers")
+            && !output.contains("interface MixedData"),
         "Expected type aliases to be stripped: {}",
         output
     );
@@ -38083,8 +38141,7 @@ class DeepPropertyAccessor<T extends object> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -38099,7 +38156,10 @@ class DeepPropertyAccessor<T extends object> {
 
     // NestedConfigHandler methods
     assert!(
-        output.contains("getDatabaseHost") && output.contains("getDatabasePort") && output.contains("getServerHost") && output.contains("getServerPort"),
+        output.contains("getDatabaseHost")
+            && output.contains("getDatabasePort")
+            && output.contains("getServerHost")
+            && output.contains("getServerPort"),
         "Expected NestedConfigHandler methods: {}",
         output
     );
@@ -38113,7 +38173,9 @@ class DeepPropertyAccessor<T extends object> {
 
     // Type aliases and interface should be stripped
     assert!(
-        !output.contains("type DeepGetters") && !output.contains("type NestedKeys") && !output.contains("interface NestedConfig"),
+        !output.contains("type DeepGetters")
+            && !output.contains("type NestedKeys")
+            && !output.contains("interface NestedConfig"),
         "Expected type aliases to be stripped: {}",
         output
     );
@@ -38262,8 +38324,7 @@ class TypeFilteredHandler<T extends object> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -38271,21 +38332,29 @@ class TypeFilteredHandler<T extends object> {
 
     // Classes should be converted
     assert!(
-        output.contains("PublicUserView") && output.contains("FilteredDataHandler") && output.contains("TypeFilteredHandler"),
+        output.contains("PublicUserView")
+            && output.contains("FilteredDataHandler")
+            && output.contains("TypeFilteredHandler"),
         "Expected key filtering classes: {}",
         output
     );
 
     // PublicUserView methods
     assert!(
-        output.contains("getId") && output.contains("getName") && output.contains("getEmail") && output.contains("toJSON"),
+        output.contains("getId")
+            && output.contains("getName")
+            && output.contains("getEmail")
+            && output.contains("toJSON"),
         "Expected PublicUserView methods: {}",
         output
     );
 
     // FilteredDataHandler methods
     assert!(
-        output.contains("getFiltered") && output.contains("exclude") && output.contains("include") && output.contains("isExcluded"),
+        output.contains("getFiltered")
+            && output.contains("exclude")
+            && output.contains("include")
+            && output.contains("isExcluded"),
         "Expected FilteredDataHandler methods: {}",
         output
     );
@@ -38299,7 +38368,9 @@ class TypeFilteredHandler<T extends object> {
 
     // Type aliases and interface should be stripped
     assert!(
-        !output.contains("type ExcludeKeys") && !output.contains("type PickByType") && !output.contains("interface FullUser"),
+        !output.contains("type ExcludeKeys")
+            && !output.contains("type PickByType")
+            && !output.contains("interface FullUser"),
         "Expected type aliases to be stripped: {}",
         output
     );
@@ -38461,8 +38532,7 @@ class FormValidator<T extends object> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -38470,35 +38540,47 @@ class FormValidator<T extends object> {
 
     // Classes should be converted
     assert!(
-        output.contains("AsyncWrapper") && output.contains("ObservableState") && output.contains("FormValidator"),
+        output.contains("AsyncWrapper")
+            && output.contains("ObservableState")
+            && output.contains("FormValidator"),
         "Expected combined key remapping classes: {}",
         output
     );
 
     // AsyncWrapper methods
     assert!(
-        output.contains("getTarget") && output.contains("callAsync") && output.contains("wrapMethod"),
+        output.contains("getTarget")
+            && output.contains("callAsync")
+            && output.contains("wrapMethod"),
         "Expected AsyncWrapper methods: {}",
         output
     );
 
     // ObservableState methods
     assert!(
-        output.contains("getState") && output.contains("getValue") && output.contains("setValue") && output.contains("subscribe"),
+        output.contains("getState")
+            && output.contains("getValue")
+            && output.contains("setValue")
+            && output.contains("subscribe"),
         "Expected ObservableState methods: {}",
         output
     );
 
     // FormValidator methods
     assert!(
-        output.contains("addValidator") && output.contains("validate") && output.contains("validateAll") && output.contains("getError"),
+        output.contains("addValidator")
+            && output.contains("validate")
+            && output.contains("validateAll")
+            && output.contains("getError"),
         "Expected FormValidator methods: {}",
         output
     );
 
     // Type aliases should be stripped
     assert!(
-        !output.contains("type AsyncMethods") && !output.contains("type ObservableProps") && !output.contains("type ValidatedFields"),
+        !output.contains("type AsyncMethods")
+            && !output.contains("type ObservableProps")
+            && !output.contains("type ValidatedFields"),
         "Expected type aliases to be stripped: {}",
         output
     );
@@ -38559,8 +38641,7 @@ class DataProcessor {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -38575,7 +38656,9 @@ class DataProcessor {
 
     // Methods should exist
     assert!(
-        output.contains("processWithCallback") && output.contains("transformData") && output.contains("chainedArrows"),
+        output.contains("processWithCallback")
+            && output.contains("transformData")
+            && output.contains("chainedArrows"),
         "Expected methods: {}",
         output
     );
@@ -38647,8 +38730,7 @@ class AsyncHandler {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -38663,7 +38745,9 @@ class AsyncHandler {
 
     // Methods should exist
     assert!(
-        output.contains("handleAsync") && output.contains("fetchWithArrows") && output.contains("nestedAsyncArrows"),
+        output.contains("handleAsync")
+            && output.contains("fetchWithArrows")
+            && output.contains("nestedAsyncArrows"),
         "Expected methods: {}",
         output
     );
@@ -38738,8 +38822,7 @@ class ServiceInitializer {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -38832,8 +38915,7 @@ class CachedGetter {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -38912,8 +38994,7 @@ class RegistryInitializer {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -38928,7 +39009,8 @@ class RegistryInitializer {
 
     // Type annotations should be stripped
     assert!(
-        !output.contains("static instances: StaticInitializer[]") && !output.contains("static registry: Map"),
+        !output.contains("static instances: StaticInitializer[]")
+            && !output.contains("static registry: Map"),
         "Expected type annotations to be stripped: {}",
         output
     );
@@ -39063,8 +39145,7 @@ class EventBus<T> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -39079,7 +39160,10 @@ class EventBus<T> {
 
     // Methods should exist
     assert!(
-        output.contains("processAsync") && output.contains("on") && output.contains("emit") && output.contains("emitAsync"),
+        output.contains("processAsync")
+            && output.contains("on")
+            && output.contains("emit")
+            && output.contains("emitAsync"),
         "Expected methods: {}",
         output
     );
@@ -39155,8 +39239,7 @@ class GrandchildService extends DerivedService {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -39164,14 +39247,18 @@ class GrandchildService extends DerivedService {
 
     // Classes should be converted
     assert!(
-        output.contains("BaseService") && output.contains("DerivedService") && output.contains("GrandchildService"),
+        output.contains("BaseService")
+            && output.contains("DerivedService")
+            && output.contains("GrandchildService"),
         "Expected classes: {}",
         output
     );
 
     // Methods should exist
     assert!(
-        output.contains("fetchData") && output.contains("processItem") && output.contains("combinedOperation"),
+        output.contains("fetchData")
+            && output.contains("processItem")
+            && output.contains("combinedOperation"),
         "Expected methods: {}",
         output
     );
@@ -39246,8 +39333,7 @@ class AsyncProcessor extends BaseProcessor {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -39262,7 +39348,9 @@ class AsyncProcessor extends BaseProcessor {
 
     // Methods should exist
     assert!(
-        output.contains("processAsync") && output.contains("validateAsync") && output.contains("complexFlow"),
+        output.contains("processAsync")
+            && output.contains("validateAsync")
+            && output.contains("complexFlow"),
         "Expected methods: {}",
         output
     );
@@ -39345,8 +39433,7 @@ class AsyncLogger extends BaseLogger {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -39361,7 +39448,9 @@ class AsyncLogger extends BaseLogger {
 
     // Methods should exist
     assert!(
-        output.contains("logAndNotify") && output.contains("formatAndStore") && output.contains("logWithRetry"),
+        output.contains("logAndNotify")
+            && output.contains("formatAndStore")
+            && output.contains("logWithRetry"),
         "Expected methods: {}",
         output
     );
@@ -39435,8 +39524,7 @@ class ExtendedFactory extends AsyncFactory {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -39444,14 +39532,18 @@ class ExtendedFactory extends AsyncFactory {
 
     // Classes should be converted
     assert!(
-        output.contains("BaseFactory") && output.contains("AsyncFactory") && output.contains("ExtendedFactory"),
+        output.contains("BaseFactory")
+            && output.contains("AsyncFactory")
+            && output.contains("ExtendedFactory"),
         "Expected classes: {}",
         output
     );
 
     // Methods should exist
     assert!(
-        output.contains("createAsync") && output.contains("getVersionAsync") && output.contains("createWithConfig"),
+        output.contains("createAsync")
+            && output.contains("getVersionAsync")
+            && output.contains("createWithConfig"),
         "Expected methods: {}",
         output
     );
@@ -39555,8 +39647,7 @@ class SafeHandler extends BaseHandler {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -39571,7 +39662,9 @@ class SafeHandler extends BaseHandler {
 
     // Methods should exist
     assert!(
-        output.contains("safeHandle") && output.contains("handleWithFinally") && output.contains("nestedTryCatch"),
+        output.contains("safeHandle")
+            && output.contains("handleWithFinally")
+            && output.contains("nestedTryCatch"),
         "Expected methods: {}",
         output
     );
@@ -39740,8 +39833,7 @@ class CachedRepository<T> extends AsyncRepository<T> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -39749,14 +39841,19 @@ class CachedRepository<T> extends AsyncRepository<T> {
 
     // Classes should be converted
     assert!(
-        output.contains("BaseRepository") && output.contains("AsyncRepository") && output.contains("CachedRepository"),
+        output.contains("BaseRepository")
+            && output.contains("AsyncRepository")
+            && output.contains("CachedRepository"),
         "Expected classes: {}",
         output
     );
 
     // Methods should exist
     assert!(
-        output.contains("saveAsync") && output.contains("findAllAsync") && output.contains("deleteAsync") && output.contains("batchSave"),
+        output.contains("saveAsync")
+            && output.contains("findAllAsync")
+            && output.contains("deleteAsync")
+            && output.contains("batchSave"),
         "Expected methods: {}",
         output
     );
@@ -39841,8 +39938,7 @@ class ChainedAccessor<T> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -39856,11 +39952,7 @@ class ChainedAccessor<T> {
     );
 
     // Methods should exist
-    assert!(
-        output.contains("setName"),
-        "Expected methods: {}",
-        output
-    );
+    assert!(output.contains("setName"), "Expected methods: {}", output);
 
     // Type annotations should be stripped
     assert!(
@@ -39956,8 +40048,7 @@ class ReactiveProperty<T> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -39972,14 +40063,17 @@ class ReactiveProperty<T> {
 
     // Methods should exist
     assert!(
-        output.contains("addValidator") && output.contains("onChange") && output.contains("subscribe"),
+        output.contains("addValidator")
+            && output.contains("onChange")
+            && output.contains("subscribe"),
         "Expected methods: {}",
         output
     );
 
     // Type annotations should be stripped
     assert!(
-        !output.contains("private _value: string") && !output.contains("private _subscriptions: Set"),
+        !output.contains("private _value: string")
+            && !output.contains("private _subscriptions: Set"),
         "Expected type annotations to be stripped: {}",
         output
     );
@@ -40049,8 +40143,7 @@ class SymbolAccessors {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -40147,8 +40240,7 @@ class Registry<T> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -40162,15 +40254,12 @@ class Registry<T> {
     );
 
     // Methods should exist
-    assert!(
-        output.contains("register"),
-        "Expected methods: {}",
-        output
-    );
+    assert!(output.contains("register"), "Expected methods: {}", output);
 
     // Type annotations should be stripped
     assert!(
-        !output.contains("private static _instance: Singleton") && !output.contains("private static _entries: Map"),
+        !output.contains("private static _instance: Singleton")
+            && !output.contains("private static _entries: Map"),
         "Expected type annotations to be stripped: {}",
         output
     );
@@ -40281,8 +40370,7 @@ class ValidationAccessors {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -40514,8 +40602,7 @@ class AsyncAccessorPattern {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -40523,7 +40610,9 @@ class AsyncAccessorPattern {
 
     // Classes should be converted
     assert!(
-        output.contains("StateManager") && output.contains("ComputedStore") && output.contains("AsyncAccessorPattern"),
+        output.contains("StateManager")
+            && output.contains("ComputedStore")
+            && output.contains("AsyncAccessorPattern"),
         "Expected classes: {}",
         output
     );
@@ -40632,8 +40721,7 @@ class DataManager {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -40752,8 +40840,7 @@ class ChainedDecorators {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -40768,7 +40855,10 @@ class ChainedDecorators {
 
     // Methods should exist
     assert!(
-        output.contains("process") && output.contains("setValue") && output.contains("getValue") && output.contains("transform"),
+        output.contains("process")
+            && output.contains("setValue")
+            && output.contains("getValue")
+            && output.contains("transform"),
         "Expected methods: {}",
         output
     );
@@ -40886,8 +40976,7 @@ class ApiClient {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -40909,7 +40998,9 @@ class ApiClient {
 
     // Decorator factory functions should be present
     assert!(
-        output.contains("logWithPrefix") && output.contains("debounce") && output.contains("memoize"),
+        output.contains("logWithPrefix")
+            && output.contains("debounce")
+            && output.contains("memoize"),
         "Expected decorator factory functions: {}",
         output
     );
@@ -41016,8 +41107,7 @@ class DataProcessor {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -41032,7 +41122,10 @@ class DataProcessor {
 
     // Methods should exist
     assert!(
-        output.contains("fetchData") && output.contains("saveData") && output.contains("deleteData") && output.contains("process"),
+        output.contains("fetchData")
+            && output.contains("saveData")
+            && output.contains("deleteData")
+            && output.contains("process"),
         "Expected methods: {}",
         output
     );
@@ -41141,8 +41234,7 @@ class ConfigManager {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -41171,7 +41263,8 @@ class ConfigManager {
 
     // Type annotations should be stripped
     assert!(
-        !output.contains("private static _registry: Map") && !output.contains("private static _config: Record"),
+        !output.contains("private static _registry: Map")
+            && !output.contains("private static _config: Record"),
         "Expected type annotations to be stripped: {}",
         output
     );
@@ -41345,8 +41438,7 @@ class EventEmitter {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -41361,14 +41453,20 @@ class EventEmitter {
 
     // Methods should exist
     assert!(
-        output.contains("add") && output.contains("findAll") && output.contains("findById") && output.contains("fetchRemote"),
+        output.contains("add")
+            && output.contains("findAll")
+            && output.contains("findById")
+            && output.contains("fetchRemote"),
         "Expected methods: {}",
         output
     );
 
     // Decorator functions should be present
     assert!(
-        output.contains("log") && output.contains("validate") && output.contains("measure") && output.contains("asyncMeasure"),
+        output.contains("log")
+            && output.contains("validate")
+            && output.contains("measure")
+            && output.contains("asyncMeasure"),
         "Expected decorator functions: {}",
         output
     );
@@ -41452,8 +41550,7 @@ class Temperature {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -41489,7 +41586,9 @@ class Temperature {
 
     // Temperature methods
     assert!(
-        output.contains("setFahrenheit") && output.contains("getFahrenheit") && output.contains("getKelvin"),
+        output.contains("setFahrenheit")
+            && output.contains("getFahrenheit")
+            && output.contains("getKelvin"),
         "Expected Temperature methods: {}",
         output
     );
@@ -41572,8 +41671,7 @@ class AppState {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -41602,14 +41700,18 @@ class AppState {
 
     // Static methods should be present
     assert!(
-        output.contains("getApiUrl") && output.contains("getTimeout") && output.contains("setApiUrl"),
+        output.contains("getApiUrl")
+            && output.contains("getTimeout")
+            && output.contains("setApiUrl"),
         "Expected Configuration static methods: {}",
         output
     );
 
     // AppState methods
     assert!(
-        output.contains("initialize") && output.contains("isInitialized") && output.contains("getVersion"),
+        output.contains("initialize")
+            && output.contains("isInitialized")
+            && output.contains("getVersion"),
         "Expected AppState static methods: {}",
         output
     );
@@ -41704,8 +41806,7 @@ class Slider {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -41741,7 +41842,9 @@ class Slider {
 
     // Slider methods
     assert!(
-        output.contains("getPosition") && output.contains("setPosition") && output.contains("increment"),
+        output.contains("getPosition")
+            && output.contains("setPosition")
+            && output.contains("increment"),
         "Expected Slider methods: {}",
         output
     );
@@ -41843,8 +41946,7 @@ class Admin extends User {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -41858,18 +41960,10 @@ class Admin extends User {
     );
 
     // User class
-    assert!(
-        output.contains("User"),
-        "Expected User class: {}",
-        output
-    );
+    assert!(output.contains("User"), "Expected User class: {}", output);
 
     // Admin class
-    assert!(
-        output.contains("Admin"),
-        "Expected Admin class: {}",
-        output
-    );
+    assert!(output.contains("Admin"), "Expected Admin class: {}", output);
 
     // Observable decorator
     assert!(
@@ -41894,7 +41988,9 @@ class Admin extends User {
 
     // Admin methods
     assert!(
-        output.contains("getRole") && output.contains("getPermissions") && output.contains("addPermission"),
+        output.contains("getRole")
+            && output.contains("getPermissions")
+            && output.contains("addPermission"),
         "Expected Admin methods: {}",
         output
     );
@@ -42002,8 +42098,7 @@ class Cache {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -42017,11 +42112,7 @@ class Cache {
     );
 
     // Cache class
-    assert!(
-        output.contains("Cache"),
-        "Expected Cache class: {}",
-        output
-    );
+    assert!(output.contains("Cache"), "Expected Cache class: {}", output);
 
     // Lazy decorator
     assert!(
@@ -42032,14 +42123,19 @@ class Cache {
 
     // Settings methods
     assert!(
-        output.contains("getTheme") && output.contains("getFontSize") && output.contains("toggleNotifications"),
+        output.contains("getTheme")
+            && output.contains("getFontSize")
+            && output.contains("toggleNotifications"),
         "Expected Settings methods: {}",
         output
     );
 
     // Cache methods
     assert!(
-        output.contains("get") && output.contains("set") && output.contains("has") && output.contains("clear"),
+        output.contains("get")
+            && output.contains("set")
+            && output.contains("has")
+            && output.contains("clear"),
         "Expected Cache methods: {}",
         output
     );
@@ -42188,8 +42284,7 @@ class Store<T> {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -42203,11 +42298,7 @@ class Store<T> {
     );
 
     // Store class
-    assert!(
-        output.contains("Store"),
-        "Expected Store class: {}",
-        output
-    );
+    assert!(output.contains("Store"), "Expected Store class: {}", output);
 
     // Decorator functions
     assert!(
@@ -42218,14 +42309,20 @@ class Store<T> {
 
     // Document methods
     assert!(
-        output.contains("getId") && output.contains("getTitle") && output.contains("getContent") && output.contains("setTitle"),
+        output.contains("getId")
+            && output.contains("getTitle")
+            && output.contains("getContent")
+            && output.contains("setTitle"),
         "Expected Document methods: {}",
         output
     );
 
     // Store methods
     assert!(
-        output.contains("getState") && output.contains("setState") && output.contains("subscribe") && output.contains("getSubscriberCount"),
+        output.contains("getState")
+            && output.contains("setState")
+            && output.contains("subscribe")
+            && output.contains("getSubscriberCount"),
         "Expected Store methods: {}",
         output
     );
@@ -42316,8 +42413,7 @@ class User extends Timestamped(Named(BaseEntity)) {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -42431,8 +42527,7 @@ class FactoryService extends WithFactory(WithRegistry(Service)) {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -42440,7 +42535,9 @@ class FactoryService extends WithFactory(WithRegistry(Service)) {
 
     // Classes should be converted
     assert!(
-        output.contains("Service") && output.contains("RegisteredService") && output.contains("FactoryService"),
+        output.contains("Service")
+            && output.contains("RegisteredService")
+            && output.contains("FactoryService"),
         "Expected classes: {}",
         output
     );
@@ -42453,11 +42550,7 @@ class FactoryService extends WithFactory(WithRegistry(Service)) {
     );
 
     // Methods should exist
-    assert!(
-        output.contains("getName"),
-        "Expected methods: {}",
-        output
-    );
+    assert!(output.contains("getName"), "Expected methods: {}", output);
 }
 
 /// Test ES5 class with multiple mixins composition
@@ -42555,8 +42648,7 @@ class FormModel extends Validatable(Observable(DataModel)) {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -42564,14 +42656,18 @@ class FormModel extends Validatable(Observable(DataModel)) {
 
     // Classes should be converted
     assert!(
-        output.contains("DataModel") && output.contains("EnhancedModel") && output.contains("FormModel"),
+        output.contains("DataModel")
+            && output.contains("EnhancedModel")
+            && output.contains("FormModel"),
         "Expected classes: {}",
         output
     );
 
     // Mixin functions should exist
     assert!(
-        output.contains("Serializable") && output.contains("Validatable") && output.contains("Observable"),
+        output.contains("Serializable")
+            && output.contains("Validatable")
+            && output.contains("Observable"),
         "Expected mixin functions: {}",
         output
     );
@@ -42665,8 +42761,7 @@ class EnhancedEntity extends WithFullInfo(WithDisplayName(WithId(Entity))) {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -42681,7 +42776,9 @@ class EnhancedEntity extends WithFullInfo(WithDisplayName(WithId(Entity))) {
 
     // Mixin functions should exist
     assert!(
-        output.contains("WithId") && output.contains("WithDisplayName") && output.contains("WithFullInfo"),
+        output.contains("WithId")
+            && output.contains("WithDisplayName")
+            && output.contains("WithFullInfo"),
         "Expected mixin functions: {}",
         output
     );
@@ -42809,8 +42906,7 @@ class StatefulComponent extends WithState(WithLogger(WithCache(Component))) {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -42825,7 +42921,9 @@ class StatefulComponent extends WithState(WithLogger(WithCache(Component))) {
 
     // Mixin functions should exist
     assert!(
-        output.contains("WithCache") && output.contains("WithLogger") && output.contains("WithState"),
+        output.contains("WithCache")
+            && output.contains("WithLogger")
+            && output.contains("WithState"),
         "Expected mixin functions: {}",
         output
     );
@@ -43036,8 +43134,7 @@ class SecureResource extends Lockable(DisposableMixin(Resource)) {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -43045,14 +43142,19 @@ class SecureResource extends Lockable(DisposableMixin(Resource)) {
 
     // Classes should be converted
     assert!(
-        output.contains("Resource") && output.contains("ManagedResource") && output.contains("SecureResource"),
+        output.contains("Resource")
+            && output.contains("ManagedResource")
+            && output.contains("SecureResource"),
         "Expected classes: {}",
         output
     );
 
     // Mixin functions should exist
     assert!(
-        output.contains("Activatable") && output.contains("Lockable") && output.contains("Taggable") && output.contains("DisposableMixin"),
+        output.contains("Activatable")
+            && output.contains("Lockable")
+            && output.contains("Taggable")
+            && output.contains("DisposableMixin"),
         "Expected mixin functions: {}",
         output
     );
@@ -43139,8 +43241,7 @@ class Rectangle extends Shape {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -43229,8 +43330,7 @@ class Input extends BaseComponent {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -43238,7 +43338,10 @@ class Input extends BaseComponent {
 
     // Classes should be converted
     assert!(
-        output.contains("BaseComponent") && output.contains("Button") && output.contains("IconButton") && output.contains("Input"),
+        output.contains("BaseComponent")
+            && output.contains("Button")
+            && output.contains("IconButton")
+            && output.contains("Input"),
         "Expected classes: {}",
         output
     );
@@ -43328,8 +43431,7 @@ class CacheService extends AbstractService {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -43337,7 +43439,9 @@ class CacheService extends AbstractService {
 
     // Classes should be converted
     assert!(
-        output.contains("AbstractService") && output.contains("DataService") && output.contains("CacheService"),
+        output.contains("AbstractService")
+            && output.contains("DataService")
+            && output.contains("CacheService"),
         "Expected classes: {}",
         output
     );
@@ -43431,8 +43535,7 @@ function createTypedEntity<T extends Entity>(
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -43542,8 +43645,7 @@ class DerivedChecker extends TypeChecker {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -43551,14 +43653,19 @@ class DerivedChecker extends TypeChecker {
 
     // Classes should be converted
     assert!(
-        output.contains("Singleton") && output.contains("ExtendedSingleton") && output.contains("TypeChecker") && output.contains("DerivedChecker"),
+        output.contains("Singleton")
+            && output.contains("ExtendedSingleton")
+            && output.contains("TypeChecker")
+            && output.contains("DerivedChecker"),
         "Expected classes: {}",
         output
     );
 
     // Methods should exist
     assert!(
-        output.contains("getInstance") && output.contains("getName") && output.contains("checkType"),
+        output.contains("getInstance")
+            && output.contains("getName")
+            && output.contains("checkType"),
         "Expected methods: {}",
         output
     );
@@ -43751,8 +43858,7 @@ class DebugLogger extends Logger {
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -43760,13 +43866,17 @@ class DebugLogger extends Logger {
 
     // Classes should be converted
     assert!(
-        output.contains("AbstractFactory") && output.contains("CarFactory") && output.contains("MotorcycleFactory"),
+        output.contains("AbstractFactory")
+            && output.contains("CarFactory")
+            && output.contains("MotorcycleFactory"),
         "Expected factory classes: {}",
         output
     );
 
     assert!(
-        output.contains("ServiceRegistry") && output.contains("AuthService") && output.contains("DataService"),
+        output.contains("ServiceRegistry")
+            && output.contains("AuthService")
+            && output.contains("DataService"),
         "Expected service classes: {}",
         output
     );
@@ -43779,7 +43889,9 @@ class DebugLogger extends Logger {
 
     // Methods should exist
     assert!(
-        output.contains("create") && output.contains("getFactoryInfo") && output.contains("getService"),
+        output.contains("create")
+            && output.contains("getFactoryInfo")
+            && output.contains("getService"),
         "Expected methods: {}",
         output
     );
@@ -43860,8 +43972,7 @@ const vault = new TokenVault();
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -43876,7 +43987,9 @@ const vault = new TokenVault();
 
     // Methods should exist
     assert!(
-        output.contains("getSecret") && output.contains("getAccessCount") && output.contains("updateSecret"),
+        output.contains("getSecret")
+            && output.contains("getAccessCount")
+            && output.contains("updateSecret"),
         "Expected SecureContainer methods: {}",
         output
     );
@@ -43963,8 +44076,7 @@ const config = Configuration.getInstance();
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -43979,7 +44091,9 @@ const config = Configuration.getInstance();
 
     // Static methods should exist
     assert!(
-        output.contains("getInstance") && output.contains("setSetting") && output.contains("getSetting"),
+        output.contains("getInstance")
+            && output.contains("setSetting")
+            && output.contains("getSetting"),
         "Expected Configuration static methods: {}",
         output
     );
@@ -44072,8 +44186,7 @@ const encryptor = new Encryptor("secret-key");
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -44173,8 +44286,7 @@ const tracker = new VisitedTracker();
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -44189,20 +44301,26 @@ const tracker = new VisitedTracker();
 
     // Methods should exist
     assert!(
-        output.contains("authorize") && output.contains("isAuthorized") && output.contains("promoteToAdmin"),
+        output.contains("authorize")
+            && output.contains("isAuthorized")
+            && output.contains("promoteToAdmin"),
         "Expected PermissionManager methods: {}",
         output
     );
 
     assert!(
-        output.contains("visit") && output.contains("hasVisited") && output.contains("getVisitCount"),
+        output.contains("visit")
+            && output.contains("hasVisited")
+            && output.contains("getVisitCount"),
         "Expected VisitedTracker methods: {}",
         output
     );
 
     // Private field syntax should be transformed
     assert!(
-        !output.contains("#authorizedUsers") && !output.contains("#admins") && !output.contains("#visited"),
+        !output.contains("#authorizedUsers")
+            && !output.contains("#admins")
+            && !output.contains("#visited"),
         "Expected private fields to be transformed: {}",
         output
     );
@@ -44289,8 +44407,7 @@ const cache = new SmartCache<object>();
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -44311,7 +44428,9 @@ const cache = new SmartCache<object>();
     );
 
     assert!(
-        output.contains("acquire") && output.contains("release") && output.contains("getAvailableCount"),
+        output.contains("acquire")
+            && output.contains("release")
+            && output.contains("getAvailableCount"),
         "Expected ObjectPool methods: {}",
         output
     );
@@ -44466,8 +44585,7 @@ const cacheManager = new CacheManager();
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -44475,14 +44593,18 @@ const cacheManager = new CacheManager();
 
     // Classes should be converted
     assert!(
-        output.contains("DependencyInjector") && output.contains("EventEmitter") && output.contains("CacheManager"),
+        output.contains("DependencyInjector")
+            && output.contains("EventEmitter")
+            && output.contains("CacheManager"),
         "Expected classes: {}",
         output
     );
 
     // DependencyInjector methods
     assert!(
-        output.contains("register") && output.contains("resolve") && output.contains("isInitialized"),
+        output.contains("register")
+            && output.contains("resolve")
+            && output.contains("isInitialized"),
         "Expected DependencyInjector methods: {}",
         output
     );
@@ -44510,7 +44632,9 @@ const cacheManager = new CacheManager();
 
     // Type annotations should be stripped
     assert!(
-        !output.contains(": WeakMap<") && !output.contains(": WeakSet<") && !output.contains(": WeakRef<"),
+        !output.contains(": WeakMap<")
+            && !output.contains(": WeakSet<")
+            && !output.contains(": WeakRef<"),
         "Expected type annotations to be stripped: {}",
         output
     );
@@ -45177,8 +45301,7 @@ const chars = new StringCharIterator("hello");
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -45284,8 +45407,7 @@ const generator = new AsyncNumberGenerator(5);
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -45398,8 +45520,7 @@ const queue = new Queue<string>();
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -45519,8 +45640,7 @@ const fib = new Fibonacci(100);
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -45629,8 +45749,7 @@ const processor = new AsyncBatchProcessor<number>([1, 2, 3, 4, 5], 2);
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -45651,7 +45770,9 @@ const processor = new AsyncBatchProcessor<number>([1, 2, 3, 4, 5], 2);
     );
 
     assert!(
-        output.contains("processBatches") && output.contains("getTotalItems") && output.contains("getBatchSize"),
+        output.contains("processBatches")
+            && output.contains("getTotalItems")
+            && output.contains("getBatchSize"),
         "Expected AsyncBatchProcessor methods: {}",
         output
     );
@@ -45833,8 +45954,7 @@ const eventStream = new EventStream<string>();
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -45842,21 +45962,27 @@ const eventStream = new EventStream<string>();
 
     // Classes should be converted
     assert!(
-        output.contains("DataPipeline") && output.contains("BidirectionalIterator") && output.contains("EventStream"),
+        output.contains("DataPipeline")
+            && output.contains("BidirectionalIterator")
+            && output.contains("EventStream"),
         "Expected classes: {}",
         output
     );
 
     // DataPipeline methods
     assert!(
-        output.contains("addTransformer") && output.contains("reversed") && output.contains("filteredAsync"),
+        output.contains("addTransformer")
+            && output.contains("reversed")
+            && output.contains("filteredAsync"),
         "Expected DataPipeline methods: {}",
         output
     );
 
     // BidirectionalIterator methods
     assert!(
-        output.contains("reverseIterator") && output.contains("rangeIterator") && output.contains("reset"),
+        output.contains("reverseIterator")
+            && output.contains("rangeIterator")
+            && output.contains("reset"),
         "Expected BidirectionalIterator methods: {}",
         output
     );
@@ -45948,8 +46074,7 @@ const configService = new ConfigService();
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -46067,8 +46192,7 @@ const repo = new Repository(new Database(), new Logger());
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -46076,7 +46200,10 @@ const repo = new Repository(new Database(), new Logger());
 
     // Classes should be converted
     assert!(
-        output.contains("Logger") && output.contains("Database") && output.contains("Repository") && output.contains("Service"),
+        output.contains("Logger")
+            && output.contains("Database")
+            && output.contains("Repository")
+            && output.contains("Service"),
         "Expected classes: {}",
         output
     );
@@ -46171,8 +46298,7 @@ const authService = new AuthService();
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -46288,8 +46414,7 @@ const repo = new UserRepository();
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -46304,14 +46429,19 @@ const repo = new UserRepository();
 
     // Methods should exist
     assert!(
-        output.contains("findById") && output.contains("findAll") && output.contains("findByIdAsync") && output.contains("save"),
+        output.contains("findById")
+            && output.contains("findAll")
+            && output.contains("findByIdAsync")
+            && output.contains("save"),
         "Expected UserRepository methods: {}",
         output
     );
 
     // Decorator functions should exist
     assert!(
-        output.contains("ReturnType") && output.contains("AsyncReturn") && output.contains("Cacheable"),
+        output.contains("ReturnType")
+            && output.contains("AsyncReturn")
+            && output.contains("Cacheable"),
         "Expected decorator functions: {}",
         output
     );
@@ -46417,8 +46547,7 @@ const controller = new UserController();
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -46641,8 +46770,7 @@ const logger = new Logger();
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -46650,7 +46778,10 @@ const logger = new Logger();
 
     // Classes should be converted
     assert!(
-        output.contains("Logger") && output.contains("Database") && output.contains("UserService") && output.contains("Container"),
+        output.contains("Logger")
+            && output.contains("Database")
+            && output.contains("UserService")
+            && output.contains("Container"),
         "Expected classes: {}",
         output
     );
@@ -46685,14 +46816,19 @@ const logger = new Logger();
 
     // Decorator functions should exist
     assert!(
-        output.contains("Injectable") && output.contains("Inject") && output.contains("Property") && output.contains("Method"),
+        output.contains("Injectable")
+            && output.contains("Inject")
+            && output.contains("Property")
+            && output.contains("Method"),
         "Expected decorator functions: {}",
         output
     );
 
     // Symbol constants should exist
     assert!(
-        output.contains("INJECTABLE") && output.contains("DEPENDENCIES") && output.contains("SCOPE"),
+        output.contains("INJECTABLE")
+            && output.contains("DEPENDENCIES")
+            && output.contains("SCOPE"),
         "Expected metadata symbol constants: {}",
         output
     );
@@ -46808,8 +46944,7 @@ const logger = new LoggerModule.Logger("App");
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -46935,8 +47070,7 @@ const service = new Services.UserService(repo);
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -46951,7 +47085,9 @@ const service = new Services.UserService(repo);
 
     // Classes should be converted
     assert!(
-        output.contains("BaseEntity") && output.contains("InMemoryRepository") && output.contains("UserService"),
+        output.contains("BaseEntity")
+            && output.contains("InMemoryRepository")
+            && output.contains("UserService"),
         "Expected classes: {}",
         output
     );
@@ -47065,8 +47201,7 @@ const product = new Product("1", "Widget", 9.99);
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -47207,8 +47342,7 @@ const product = Factories.createProduct("1", "Widget", 9.99);
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -47216,7 +47350,9 @@ const product = Factories.createProduct("1", "Widget", 9.99);
 
     // Classes should be converted
     assert!(
-        output.contains("UserModel") && output.contains("ProductModel") && output.contains("OrderModel"),
+        output.contains("UserModel")
+            && output.contains("ProductModel")
+            && output.contains("OrderModel"),
         "Expected model classes: {}",
         output
     );
@@ -47230,7 +47366,9 @@ const product = Factories.createProduct("1", "Widget", 9.99);
 
     // Factory functions should exist
     assert!(
-        output.contains("createUser") && output.contains("createProduct") && output.contains("createOrder"),
+        output.contains("createUser")
+            && output.contains("createProduct")
+            && output.contains("createOrder"),
         "Expected factory functions: {}",
         output
     );
@@ -47395,8 +47533,7 @@ const cacheService = new CacheService();
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -47425,7 +47562,9 @@ const cacheService = new CacheService();
 
     // Re-export objects should exist
     assert!(
-        output.contains("CoreServices") && output.contains("FeatureServices") && output.contains("AllServices"),
+        output.contains("CoreServices")
+            && output.contains("FeatureServices")
+            && output.contains("AllServices"),
         "Expected re-export objects: {}",
         output
     );
@@ -47633,8 +47772,7 @@ app.initialize();
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -47752,8 +47890,7 @@ userService.createUser("Alice");
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -47819,8 +47956,7 @@ repo.findAll();
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -47914,8 +48050,7 @@ const apiService = new ApiService();
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -48002,8 +48137,7 @@ app.initialize();
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -48101,8 +48235,7 @@ notificationService.notify("user@example.com", "Hello!");
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -48310,8 +48443,7 @@ userRepo.save({ id: "1", name: "Alice", email: "alice@example.com" });
     let ctx = EmitContext::with_options(options.clone());
     let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
 
-    let mut printer =
-        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    let mut printer = ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
     printer.set_target_es5(ctx.target_es5);
     printer.emit(root);
 
@@ -48346,39 +48478,39 @@ userRepo.save({ id: "1", name: "Alice", email: "alice@example.com" });
 
     // Check methods
     assert!(
-        output.contains("ConsoleLogger.prototype.debug") &&
-        output.contains("ConsoleLogger.prototype.info") &&
-        output.contains("ConsoleLogger.prototype.error"),
+        output.contains("ConsoleLogger.prototype.debug")
+            && output.contains("ConsoleLogger.prototype.info")
+            && output.contains("ConsoleLogger.prototype.error"),
         "Expected logger methods: {}",
         output
     );
     assert!(
-        output.contains("MemoryCache.prototype.get") &&
-        output.contains("MemoryCache.prototype.set") &&
-        output.contains("MemoryCache.prototype.delete"),
+        output.contains("MemoryCache.prototype.get")
+            && output.contains("MemoryCache.prototype.set")
+            && output.contains("MemoryCache.prototype.delete"),
         "Expected cache methods: {}",
         output
     );
     assert!(
-        output.contains("BaseRepository.prototype.findById") &&
-        output.contains("BaseRepository.prototype.save") &&
-        output.contains("BaseRepository.prototype.delete"),
+        output.contains("BaseRepository.prototype.findById")
+            && output.contains("BaseRepository.prototype.save")
+            && output.contains("BaseRepository.prototype.delete"),
         "Expected repository methods: {}",
         output
     );
     assert!(
-        output.contains("DIContainer.getInstance") &&
-        output.contains("DIContainer.prototype.bind") &&
-        output.contains("DIContainer.prototype.get"),
+        output.contains("DIContainer.getInstance")
+            && output.contains("DIContainer.prototype.bind")
+            && output.contains("DIContainer.prototype.get"),
         "Expected container methods: {}",
         output
     );
 
     // Interfaces should be stripped
     assert!(
-        !output.contains("interface ILogger") &&
-        !output.contains("interface ICache") &&
-        !output.contains("interface IRepository"),
+        !output.contains("interface ILogger")
+            && !output.contains("interface ICache")
+            && !output.contains("interface IRepository"),
         "Expected interfaces to be stripped: {}",
         output
     );

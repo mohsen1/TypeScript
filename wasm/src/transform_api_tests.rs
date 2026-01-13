@@ -1,5 +1,5 @@
-use crate::thin_emitter::{ModuleKind, ScriptTarget};
 use crate::ThinParser;
+use crate::thin_emitter::{ModuleKind, ScriptTarget};
 
 #[test]
 fn test_generate_transforms_and_emit_with_context() {
@@ -9,10 +9,8 @@ fn test_generate_transforms_and_emit_with_context() {
     );
     parser.parse_source_file();
 
-    let transforms = parser.generate_transforms(
-        ScriptTarget::ES5 as u32,
-        ModuleKind::CommonJS as u32,
-    );
+    let transforms =
+        parser.generate_transforms(ScriptTarget::ES5 as u32, ModuleKind::CommonJS as u32);
     assert!(transforms.get_count() > 0);
 
     let output = parser.emit_with_transforms(&transforms);

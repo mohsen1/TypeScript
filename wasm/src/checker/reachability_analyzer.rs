@@ -7,9 +7,9 @@
 //! as unreachable when they follow control flow statements that prevent execution.
 
 use crate::binder::{FlowNodeId, flow_flags};
+use crate::checker::flow_graph_builder::FlowGraph;
 use crate::parser::NodeIndex;
 use crate::parser::thin_node::ThinNodeArena;
-use crate::checker::flow_graph_builder::FlowGraph;
 use rustc_hash::FxHashSet;
 
 /// Analyzer for detecting unreachable code.
@@ -134,8 +134,8 @@ impl<'a> ReachabilityAnalyzer<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::thin_parser::ThinParserState;
     use crate::checker::flow_graph_builder::FlowGraphBuilder;
+    use crate::thin_parser::ThinParserState;
 
     #[test]
     fn test_unreachable_after_return() {

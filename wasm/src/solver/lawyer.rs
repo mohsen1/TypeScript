@@ -15,8 +15,8 @@
 //! While `any` is TypeScript's escape hatch, we still want to catch real errors
 //! even when `any` is involved.
 
-use crate::solver::types::{TypeKey, TypeId};
 use crate::solver::TypeDatabase;
+use crate::solver::types::{TypeId, TypeKey};
 
 /// Rules for `any` propagation in type checking.
 ///

@@ -49,18 +49,17 @@ pub mod thin_checker;
 mod thin_checker_tests;
 
 // ThinEmitter - Emitter using ThinNodeArena (Phase 0.1)
+#[cfg(test)]
+mod emitter_edge_case_tests;
+#[cfg(test)]
+mod emitter_parity_tests;
+#[cfg(test)]
+mod emitter_transform_integration_tests;
 pub mod thin_emitter;
 #[cfg(test)]
 mod thin_emitter_tests;
 #[cfg(test)]
-mod emitter_edge_case_tests;
-#[cfg(test)]
-mod emitter_transform_integration_tests;
-#[cfg(test)]
 mod transform_api_tests;
-#[cfg(test)]
-mod emitter_parity_tests;
-
 
 // Parallel processing with Rayon (Phase 0.4)
 pub mod parallel;
@@ -131,27 +130,27 @@ pub fn create_binder() -> binder::BinderState {
 // ThinParser WASM Interface (High-Performance Parser)
 // =============================================================================
 
-use std::sync::Arc;
+use crate::checker::context::LibContext;
 use crate::emit_context::EmitContext;
+use crate::lib_loader::LibFile;
 use crate::lowering_pass::LoweringPass;
-use crate::thin_parser::ThinParserState;
+use crate::lsp::diagnostics::convert_diagnostic;
+use crate::lsp::position::{LineMap, Position, Range};
+use crate::lsp::resolver::ScopeCache;
+use crate::lsp::{
+    CodeActionContext, CodeActionProvider, Completions, DocumentSymbolProvider, FindReferences,
+    GoToDefinition, HoverProvider, ImportCandidate, ImportCandidateKind, RenameProvider,
+    SemanticTokensProvider, SignatureHelpProvider,
+};
+use crate::parser::thin_node::ThinNodeArena;
+use crate::solver::TypeInterner;
 use crate::thin_binder::ThinBinderState;
 use crate::thin_checker::ThinCheckerState;
 use crate::thin_emitter::{ModuleKind, PrinterOptions, ScriptTarget, ThinPrinter};
+use crate::thin_parser::ThinParserState;
 use crate::transform_context::TransformContext;
-use crate::solver::TypeInterner;
-use crate::lsp::position::{LineMap, Position, Range};
-use crate::lsp::resolver::ScopeCache;
-use crate::lib_loader::LibFile;
-use crate::checker::context::LibContext;
-use crate::parser::thin_node::ThinNodeArena;
-use crate::lsp::{
-    GoToDefinition, FindReferences, Completions, HoverProvider, SignatureHelpProvider,
-    DocumentSymbolProvider, RenameProvider, SemanticTokensProvider, CodeActionProvider,
-    CodeActionContext, ImportCandidate, ImportCandidateKind,
-};
-use crate::lsp::diagnostics::convert_diagnostic;
 use serde::Deserialize;
+use std::sync::Arc;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -282,7 +281,7 @@ impl ThinParser {
         // Invalidate derived state on re-parse
         self.line_map = None;
         self.binder = None;
-        self.type_cache = None;  // Invalidate type cache when file changes
+        self.type_cache = None; // Invalidate type cache when file changes
         self.scope_cache.clear();
         idx.0
     }
@@ -296,14 +295,19 @@ impl ThinParser {
     /// Get parse diagnostics as JSON.
     #[wasm_bindgen(js_name = getDiagnosticsJson)]
     pub fn get_diagnostics_json(&self) -> String {
-        let diags: Vec<_> = self.parser.get_diagnostics().iter().map(|d| {
-            serde_json::json!({
-                "message": d.message,
-                "start": d.start,
-                "length": d.length,
-                "code": d.code,
+        let diags: Vec<_> = self
+            .parser
+            .get_diagnostics()
+            .iter()
+            .map(|d| {
+                serde_json::json!({
+                    "message": d.message,
+                    "start": d.start,
+                    "length": d.length,
+                    "code": d.code,
+                })
             })
-        }).collect();
+            .collect();
         serde_json::to_string(&diags).unwrap_or_else(|_| "[]".to_string())
     }
 
@@ -317,17 +321,20 @@ impl ThinParser {
 
             // Inject lib file symbols for global type resolution (console, Array, Promise, etc.)
             if !self.lib_files.is_empty() {
-                let lib_contexts: Vec<thin_binder::LibContext> = self.lib_files.iter().map(|lib| {
-                    thin_binder::LibContext {
+                let lib_contexts: Vec<thin_binder::LibContext> = self
+                    .lib_files
+                    .iter()
+                    .map(|lib| thin_binder::LibContext {
                         arena: Arc::clone(&lib.arena),
                         binder: Arc::clone(&lib.binder),
-                    }
-                }).collect();
+                    })
+                    .collect();
                 binder.inject_lib_symbols(&lib_contexts);
             }
 
             // Collect symbol names for the result
-            let symbols: std::collections::HashMap<String, u32> = binder.file_locals
+            let symbols: std::collections::HashMap<String, u32> = binder
+                .file_locals
                 .iter()
                 .map(|(name, id)| (name.clone(), id.0))
                 .collect();
@@ -357,7 +364,7 @@ impl ThinParser {
 
         if let (Some(root_idx), Some(binder)) = (self.source_file_idx, &self.binder) {
             let file_name = self.parser.get_file_name().to_string();
-            let strict = false;  // TODO: get from tsconfig
+            let strict = false; // TODO: get from tsconfig
             let mut checker = if let Some(cache) = self.type_cache.take() {
                 ThinCheckerState::with_cache(
                     self.parser.get_arena(),
@@ -379,27 +386,34 @@ impl ThinParser {
 
             // Set up lib contexts for global type resolution (Object, Array, etc.)
             if !self.lib_files.is_empty() {
-                let lib_contexts: Vec<LibContext> = self.lib_files.iter().map(|lib| {
-                    LibContext {
+                let lib_contexts: Vec<LibContext> = self
+                    .lib_files
+                    .iter()
+                    .map(|lib| LibContext {
                         arena: Arc::clone(&lib.arena),
                         binder: Arc::clone(&lib.binder),
-                    }
-                }).collect();
+                    })
+                    .collect();
                 checker.ctx.set_lib_contexts(lib_contexts);
             }
 
             // Full source file type checking - traverse all statements
             checker.check_source_file(root_idx);
 
-            let diagnostics = checker.ctx.diagnostics.iter().map(|d| {
-                serde_json::json!({
-                    "message_text": d.message_text.clone(),
-                    "code": d.code,
-                    "start": d.start,
-                    "length": d.length,
-                    "category": format!("{:?}", d.category),
+            let diagnostics = checker
+                .ctx
+                .diagnostics
+                .iter()
+                .map(|d| {
+                    serde_json::json!({
+                        "message_text": d.message_text.clone(),
+                        "code": d.code,
+                        "start": d.start,
+                        "length": d.length,
+                        "category": format!("{:?}", d.category),
+                    })
                 })
-            }).collect::<Vec<_>>();
+                .collect::<Vec<_>>();
 
             self.type_cache = Some(checker.extract_cache());
 
@@ -419,7 +433,7 @@ impl ThinParser {
     pub fn get_type_of_node(&mut self, node_idx: u32) -> String {
         if let (Some(_), Some(binder)) = (self.source_file_idx, &self.binder) {
             let file_name = self.parser.get_file_name().to_string();
-            let strict = false;  // TODO: get from tsconfig
+            let strict = false; // TODO: get from tsconfig
             let mut checker = if let Some(cache) = self.type_cache.take() {
                 ThinCheckerState::with_cache(
                     self.parser.get_arena(),
@@ -464,7 +478,7 @@ impl ThinParser {
             String::new()
         }
     }
-    
+
     /// Emit the source file as JavaScript (ES6+ modern output).
     #[wasm_bindgen(js_name = emitModern)]
     pub fn emit_modern(&self) -> String {
@@ -546,10 +560,8 @@ impl ThinParser {
     #[wasm_bindgen(js_name = emitWithTransforms)]
     pub fn emit_with_transforms(&self, context: &WasmTransformContext) -> String {
         if let Some(root_idx) = self.source_file_idx {
-            let mut printer = ThinPrinter::with_transforms(
-                self.parser.get_arena(),
-                context.inner.clone(),
-            );
+            let mut printer =
+                ThinPrinter::with_transforms(self.parser.get_arena(), context.inner.clone());
             printer.set_target_es5(context.target_es5);
             printer.set_module_kind(context.module_kind);
             printer.set_source_text(self.parser.get_source_text());
@@ -565,7 +577,11 @@ impl ThinParser {
     pub fn get_ast_json(&self) -> String {
         if let Some(root_idx) = self.source_file_idx {
             let arena = self.parser.get_arena();
-            format!("{{\"nodeCount\": {}, \"rootIdx\": {}}}", arena.len(), root_idx.0)
+            format!(
+                "{{\"nodeCount\": {}, \"rootIdx\": {}}}",
+                arena.len(),
+                root_idx.0
+            )
         } else {
             "{}".to_string()
         }
@@ -575,7 +591,7 @@ impl ThinParser {
     #[wasm_bindgen(js_name = debugTypeLowering)]
     pub fn debug_type_lowering(&self, interface_name: &str) -> String {
         use parser::syntax_kind_ext;
-        use solver::{TypeLowering, TypeKey};
+        use solver::{TypeKey, TypeLowering};
 
         let arena = self.parser.get_arena();
         let mut result = Vec::new();
@@ -603,7 +619,11 @@ impl ThinParser {
             return format!("Interface '{}' not found", interface_name);
         }
 
-        result.push(format!("Found {} declaration(s) for '{}'", interface_decls.len(), interface_name));
+        result.push(format!(
+            "Found {} declaration(s) for '{}'",
+            interface_decls.len(),
+            interface_name
+        ));
 
         // Lower the interface
         let lowering = TypeLowering::new(arena, &self.type_interner);
@@ -616,10 +636,16 @@ impl ThinParser {
             result.push(format!("Type key: {:?}", key));
             if let TypeKey::Object(shape_id) = key {
                 let shape = self.type_interner.object_shape(shape_id);
-                result.push(format!("Object shape properties: {}", shape.properties.len()));
+                result.push(format!(
+                    "Object shape properties: {}",
+                    shape.properties.len()
+                ));
                 for prop in &shape.properties {
                     let name = self.type_interner.resolve_atom(prop.name);
-                    result.push(format!("  Property '{}': type_id={:?}, optional={}", name, prop.type_id, prop.optional));
+                    result.push(format!(
+                        "  Property '{}': type_id={:?}, optional={}",
+                        name, prop.type_id, prop.optional
+                    ));
                     // Try to show what the type_id resolves to
                     if let Some(prop_key) = self.type_interner.lookup(prop.type_id) {
                         result.push(format!("    -> {:?}", prop_key));
@@ -647,32 +673,67 @@ impl ThinParser {
                         if let Some(name_node) = arena.get(interface.name) {
                             if let Some(ident) = arena.get_identifier(name_node) {
                                 if ident.escaped_text == interface_name {
-                                    result.push(format!("Interface '{}' found at node {}", interface_name, i));
-                                    result.push(format!("  members list: {:?}", interface.members.nodes));
+                                    result.push(format!(
+                                        "Interface '{}' found at node {}",
+                                        interface_name, i
+                                    ));
+                                    result.push(format!(
+                                        "  members list: {:?}",
+                                        interface.members.nodes
+                                    ));
 
-                                    for (mi, &member_idx) in interface.members.nodes.iter().enumerate() {
+                                    for (mi, &member_idx) in
+                                        interface.members.nodes.iter().enumerate()
+                                    {
                                         if let Some(member_node) = arena.get(member_idx) {
-                                            result.push(format!("  Member {} (idx {}): kind={}", mi, member_idx.0, member_node.kind));
-                                            result.push(format!("    data_index: {}", member_node.data_index));
+                                            result.push(format!(
+                                                "  Member {} (idx {}): kind={}",
+                                                mi, member_idx.0, member_node.kind
+                                            ));
+                                            result.push(format!(
+                                                "    data_index: {}",
+                                                member_node.data_index
+                                            ));
                                             if let Some(sig) = arena.get_signature(member_node) {
-                                                result.push(format!("    name_idx: {:?}", sig.name));
-                                                result.push(format!("    type_annotation_idx: {:?}", sig.type_annotation));
+                                                result
+                                                    .push(format!("    name_idx: {:?}", sig.name));
+                                                result.push(format!(
+                                                    "    type_annotation_idx: {:?}",
+                                                    sig.type_annotation
+                                                ));
 
                                                 // Get name text
                                                 if let Some(name_n) = arena.get(sig.name) {
-                                                    if let Some(name_id) = arena.get_identifier(name_n) {
-                                                        result.push(format!("    name_text: '{}'", name_id.escaped_text));
+                                                    if let Some(name_id) =
+                                                        arena.get_identifier(name_n)
+                                                    {
+                                                        result.push(format!(
+                                                            "    name_text: '{}'",
+                                                            name_id.escaped_text
+                                                        ));
                                                     } else {
-                                                        result.push(format!("    name_node kind: {}", name_n.kind));
+                                                        result.push(format!(
+                                                            "    name_node kind: {}",
+                                                            name_n.kind
+                                                        ));
                                                     }
                                                 }
 
                                                 // Get type annotation text
-                                                if let Some(type_n) = arena.get(sig.type_annotation) {
-                                                    if let Some(type_id) = arena.get_identifier(type_n) {
-                                                        result.push(format!("    type_text: '{}'", type_id.escaped_text));
+                                                if let Some(type_n) = arena.get(sig.type_annotation)
+                                                {
+                                                    if let Some(type_id) =
+                                                        arena.get_identifier(type_n)
+                                                    {
+                                                        result.push(format!(
+                                                            "    type_text: '{}'",
+                                                            type_id.escaped_text
+                                                        ));
                                                     } else {
-                                                        result.push(format!("    type_node kind: {}", type_n.kind));
+                                                        result.push(format!(
+                                                            "    type_node kind: {}",
+                                                            type_n.kind
+                                                        ));
                                                     }
                                                 }
                                             }
@@ -697,30 +758,52 @@ impl ThinParser {
     #[wasm_bindgen(js_name = debugScopes)]
     pub fn debug_scopes(&self) -> String {
         let Some(binder) = &self.binder else {
-            return "Binder not initialized. Call parseSourceFile and bindSourceFile first.".to_string();
+            return "Binder not initialized. Call parseSourceFile and bindSourceFile first."
+                .to_string();
         };
 
         let mut result = Vec::new();
-        result.push(format!("=== Persistent Scopes ({}) ===", binder.scopes.len()));
+        result.push(format!(
+            "=== Persistent Scopes ({}) ===",
+            binder.scopes.len()
+        ));
 
         for (i, scope) in binder.scopes.iter().enumerate() {
-            result.push(format!("\nScope {} (parent: {:?}, kind: {:?}):", i, scope.parent, scope.kind));
+            result.push(format!(
+                "\nScope {} (parent: {:?}, kind: {:?}):",
+                i, scope.parent, scope.kind
+            ));
             result.push(format!("  table entries: {}", scope.table.len()));
             for (name, sym_id) in scope.table.iter() {
                 if let Some(sym) = binder.symbols.get(*sym_id) {
-                    result.push(format!("    '{}' -> SymbolId({}) [flags: 0x{:x}]", name, sym_id.0, sym.flags));
+                    result.push(format!(
+                        "    '{}' -> SymbolId({}) [flags: 0x{:x}]",
+                        name, sym_id.0, sym.flags
+                    ));
                 } else {
-                    result.push(format!("    '{}' -> SymbolId({}) [MISSING SYMBOL]", name, sym_id.0));
+                    result.push(format!(
+                        "    '{}' -> SymbolId({}) [MISSING SYMBOL]",
+                        name, sym_id.0
+                    ));
                 }
             }
         }
 
-        result.push(format!("\n=== Node -> Scope Mappings ({}) ===", binder.node_scope_ids.len()));
+        result.push(format!(
+            "\n=== Node -> Scope Mappings ({}) ===",
+            binder.node_scope_ids.len()
+        ));
         for (&node_idx, &scope_id) in binder.node_scope_ids.iter() {
-            result.push(format!("  NodeIndex({}) -> ScopeId({})", node_idx, scope_id.0));
+            result.push(format!(
+                "  NodeIndex({}) -> ScopeId({})",
+                node_idx, scope_id.0
+            ));
         }
 
-        result.push(format!("\n=== File Locals ({}) ===", binder.file_locals.len()));
+        result.push(format!(
+            "\n=== File Locals ({}) ===",
+            binder.file_locals.len()
+        ));
         for (name, sym_id) in binder.file_locals.iter() {
             result.push(format!("  '{}' -> SymbolId({})", name, sym_id.0));
         }
@@ -770,8 +853,10 @@ impl ThinParser {
                 } else {
                     String::new()
                 };
-                result.push(format!("  [{}] NodeIndex({}) {} [pos:{}-{}]{}",
-                    depth, current.0, kind_name, node.pos, node.end, scope_info));
+                result.push(format!(
+                    "  [{}] NodeIndex({}) {} [pos:{}-{}]{}",
+                    depth, current.0, kind_name, node.pos, node.end, scope_info
+                ));
             }
 
             if let Some(ext) = arena.get_extended(current) {
@@ -781,7 +866,11 @@ impl ThinParser {
                 }
                 current = ext.parent;
             } else {
-                result.push(format!("  [{}] No extended info for NodeIndex({})", depth + 1, current.0));
+                result.push(format!(
+                    "  [{}] No extended info for NodeIndex({})",
+                    depth + 1,
+                    current.0
+                ));
                 break;
             }
             depth += 1;
@@ -801,7 +890,10 @@ impl ThinParser {
         };
 
         let Some(var_decl) = arena.get_variable_declaration(node) else {
-            return format!("NodeIndex({}) is not a VARIABLE_DECLARATION (kind={})", var_decl_idx, node.kind);
+            return format!(
+                "NodeIndex({}) is not a VARIABLE_DECLARATION (kind={})",
+                var_decl_idx, node.kind
+            );
         };
 
         format!(
@@ -838,8 +930,10 @@ impl ThinParser {
                 } else {
                     String::new()
                 };
-                result.push(format!("  NodeIndex({}) kind={} [pos:{}-{}] {}{}",
-                    i, node.kind, node.pos, node.end, parent_str, extra));
+                result.push(format!(
+                    "  NodeIndex({}) kind={} [pos:{}-{}] {}{}",
+                    i, node.kind, node.pos, node.end, parent_str, extra
+                ));
             }
         }
 
@@ -870,7 +964,11 @@ impl ThinParser {
 
     /// Go to Definition: Returns array of Location objects.
     #[wasm_bindgen(js_name = getDefinitionAtPosition)]
-    pub fn get_definition_at_position(&mut self, line: u32, character: u32) -> Result<JsValue, JsValue> {
+    pub fn get_definition_at_position(
+        &mut self,
+        line: u32,
+        character: u32,
+    ) -> Result<JsValue, JsValue> {
         self.ensure_bound()?;
         self.ensure_line_map();
 
@@ -880,16 +978,27 @@ impl ThinParser {
         let file_name = self.parser.get_file_name().to_string();
         let source_text = self.parser.get_source_text();
 
-        let provider = GoToDefinition::new(self.parser.get_arena(), binder, line_map, file_name, source_text);
+        let provider = GoToDefinition::new(
+            self.parser.get_arena(),
+            binder,
+            line_map,
+            file_name,
+            source_text,
+        );
         let pos = Position::new(line, character);
 
-        let result = provider.get_definition_with_scope_cache(root, pos, &mut self.scope_cache, None);
+        let result =
+            provider.get_definition_with_scope_cache(root, pos, &mut self.scope_cache, None);
         Ok(serde_wasm_bindgen::to_value(&result)?)
     }
 
     /// Find References: Returns array of Location objects.
     #[wasm_bindgen(js_name = getReferencesAtPosition)]
-    pub fn get_references_at_position(&mut self, line: u32, character: u32) -> Result<JsValue, JsValue> {
+    pub fn get_references_at_position(
+        &mut self,
+        line: u32,
+        character: u32,
+    ) -> Result<JsValue, JsValue> {
         self.ensure_bound()?;
         self.ensure_line_map();
 
@@ -899,16 +1008,27 @@ impl ThinParser {
         let file_name = self.parser.get_file_name().to_string();
         let source_text = self.parser.get_source_text();
 
-        let provider = FindReferences::new(self.parser.get_arena(), binder, line_map, file_name, source_text);
+        let provider = FindReferences::new(
+            self.parser.get_arena(),
+            binder,
+            line_map,
+            file_name,
+            source_text,
+        );
         let pos = Position::new(line, character);
 
-        let result = provider.find_references_with_scope_cache(root, pos, &mut self.scope_cache, None);
+        let result =
+            provider.find_references_with_scope_cache(root, pos, &mut self.scope_cache, None);
         Ok(serde_wasm_bindgen::to_value(&result)?)
     }
 
     /// Completions: Returns array of CompletionItem objects.
     #[wasm_bindgen(js_name = getCompletionsAtPosition)]
-    pub fn get_completions_at_position(&mut self, line: u32, character: u32) -> Result<JsValue, JsValue> {
+    pub fn get_completions_at_position(
+        &mut self,
+        line: u32,
+        character: u32,
+    ) -> Result<JsValue, JsValue> {
         self.ensure_bound()?;
         self.ensure_line_map();
 
@@ -956,7 +1076,7 @@ impl ThinParser {
             line_map,
             &self.type_interner,
             source_text,
-            file_name
+            file_name,
         );
         let pos = Position::new(line, character);
 
@@ -972,7 +1092,11 @@ impl ThinParser {
 
     /// Signature Help: Returns SignatureHelp object.
     #[wasm_bindgen(js_name = getSignatureHelpAtPosition)]
-    pub fn get_signature_help_at_position(&mut self, line: u32, character: u32) -> Result<JsValue, JsValue> {
+    pub fn get_signature_help_at_position(
+        &mut self,
+        line: u32,
+        character: u32,
+    ) -> Result<JsValue, JsValue> {
         self.ensure_bound()?;
         self.ensure_line_map();
 
@@ -988,7 +1112,7 @@ impl ThinParser {
             line_map,
             &self.type_interner,
             source_text,
-            file_name
+            file_name,
         );
         let pos = Position::new(line, character);
 
@@ -1029,7 +1153,8 @@ impl ThinParser {
         let line_map = self.line_map.as_ref().unwrap();
         let source_text = self.parser.get_source_text();
 
-        let mut provider = SemanticTokensProvider::new(self.parser.get_arena(), binder, line_map, source_text);
+        let mut provider =
+            SemanticTokensProvider::new(self.parser.get_arena(), binder, line_map, source_text);
 
         Ok(provider.get_semantic_tokens(root))
     }
@@ -1045,7 +1170,13 @@ impl ThinParser {
         let file_name = self.parser.get_file_name().to_string();
         let source_text = self.parser.get_source_text();
 
-        let provider = RenameProvider::new(self.parser.get_arena(), binder, line_map, file_name, source_text);
+        let provider = RenameProvider::new(
+            self.parser.get_arena(),
+            binder,
+            line_map,
+            file_name,
+            source_text,
+        );
         let pos = Position::new(line, character);
 
         let result = provider.prepare_rename(pos);
@@ -1054,7 +1185,12 @@ impl ThinParser {
 
     /// Rename - Edits: Get workspace edits for rename.
     #[wasm_bindgen(js_name = getRenameEdits)]
-    pub fn get_rename_edits(&mut self, line: u32, character: u32, new_name: String) -> Result<JsValue, JsValue> {
+    pub fn get_rename_edits(
+        &mut self,
+        line: u32,
+        character: u32,
+        new_name: String,
+    ) -> Result<JsValue, JsValue> {
         self.ensure_bound()?;
         self.ensure_line_map();
 
@@ -1064,7 +1200,13 @@ impl ThinParser {
         let file_name = self.parser.get_file_name().to_string();
         let source_text = self.parser.get_source_text();
 
-        let provider = RenameProvider::new(self.parser.get_arena(), binder, line_map, file_name, source_text);
+        let provider = RenameProvider::new(
+            self.parser.get_arena(),
+            binder,
+            line_map,
+            file_name,
+            source_text,
+        );
         let pos = Position::new(line, character);
 
         match provider.provide_rename_edits_with_scope_cache(
@@ -1081,7 +1223,13 @@ impl ThinParser {
 
     /// Code Actions: Get code actions for a range.
     #[wasm_bindgen(js_name = getCodeActions)]
-    pub fn get_code_actions(&mut self, start_line: u32, start_char: u32, end_line: u32, end_char: u32) -> Result<JsValue, JsValue> {
+    pub fn get_code_actions(
+        &mut self,
+        start_line: u32,
+        start_char: u32,
+        end_line: u32,
+        end_char: u32,
+    ) -> Result<JsValue, JsValue> {
         self.ensure_bound()?;
         self.ensure_line_map();
 
@@ -1096,12 +1244,12 @@ impl ThinParser {
             binder,
             line_map,
             file_name,
-            source_text
+            source_text,
         );
 
         let range = Range::new(
             Position::new(start_line, start_char),
-            Position::new(end_line, end_char)
+            Position::new(end_line, end_char),
         );
 
         let context = CodeActionContext {
@@ -1144,7 +1292,8 @@ impl ThinParser {
         let import_candidates = if import_candidates.is_null() || import_candidates.is_undefined() {
             Vec::new()
         } else {
-            let inputs: Vec<ImportCandidateInput> = serde_wasm_bindgen::from_value(import_candidates)?;
+            let inputs: Vec<ImportCandidateInput> =
+                serde_wasm_bindgen::from_value(import_candidates)?;
             inputs
                 .into_iter()
                 .map(ImportCandidate::try_from)
@@ -1191,7 +1340,7 @@ impl ThinParser {
         let line_map = self.line_map.as_ref().unwrap();
         let file_name = self.parser.get_file_name().to_string();
         let source_text = self.parser.get_source_text();
-        let strict = false;  // TODO: get from tsconfig
+        let strict = false; // TODO: get from tsconfig
 
         let mut checker = if let Some(cache) = self.type_cache.take() {
             ThinCheckerState::with_cache(
@@ -1238,7 +1387,10 @@ pub fn create_thin_parser(file_name: String, source_text: String) -> ThinParser 
 // WasmProgram - Multi-file TypeScript Program Support
 // =============================================================================
 
-use crate::parallel::{parse_and_bind_parallel, merge_bind_results, MergedProgram, check_functions_parallel, BindResult};
+use crate::parallel::{
+    BindResult, MergedProgram, check_functions_parallel, merge_bind_results,
+    parse_and_bind_parallel,
+};
 
 /// Result of checking a single file in a multi-file program
 #[derive(serde::Serialize)]
@@ -1348,12 +1500,11 @@ impl WasmProgram {
         let bind_results = parse_and_bind_parallel(self.files.clone());
 
         // Collect parse diagnostics before merging
-        let parse_diags: Vec<Vec<_>> = bind_results.iter()
+        let parse_diags: Vec<Vec<_>> = bind_results
+            .iter()
             .map(|r| r.parse_diagnostics.clone())
             .collect();
-        let file_names: Vec<String> = bind_results.iter()
-            .map(|r| r.file_name.clone())
-            .collect();
+        let file_names: Vec<String> = bind_results.iter().map(|r| r.file_name.clone()).collect();
 
         // Merge bind results into unified program
         let merged = merge_bind_results(bind_results);
@@ -1366,7 +1517,8 @@ impl WasmProgram {
         let mut total_diagnostics = 0;
 
         for (i, file_name) in file_names.iter().enumerate() {
-            let parse_diagnostics: Vec<ParseDiagnosticJson> = parse_diags[i].iter()
+            let parse_diagnostics: Vec<ParseDiagnosticJson> = parse_diags[i]
+                .iter()
                 .map(|d| ParseDiagnosticJson {
                     message: d.message.clone(),
                     start: d.start,
@@ -1376,16 +1528,22 @@ impl WasmProgram {
                 .collect();
 
             // Find check diagnostics for this file
-            let check_diagnostics: Vec<CheckDiagnosticJson> = check_result.file_results
+            let check_diagnostics: Vec<CheckDiagnosticJson> = check_result
+                .file_results
                 .iter()
                 .find(|r| &r.file_name == file_name)
-                .map(|r| r.diagnostics.iter().map(|d| CheckDiagnosticJson {
-                    message_text: d.message_text.clone(),
-                    code: d.code,
-                    start: d.start,
-                    length: d.length,
-                    category: format!("{:?}", d.category),
-                }).collect())
+                .map(|r| {
+                    r.diagnostics
+                        .iter()
+                        .map(|d| CheckDiagnosticJson {
+                            message_text: d.message_text.clone(),
+                            code: d.code,
+                            start: d.start,
+                            length: d.length,
+                            category: format!("{:?}", d.category),
+                        })
+                        .collect()
+                })
                 .unwrap_or_default();
 
             total_diagnostics += parse_diagnostics.len() + check_diagnostics.len();
@@ -1424,7 +1582,8 @@ impl WasmProgram {
         let bind_results = parse_and_bind_parallel(self.files.clone());
 
         // Collect parse diagnostic codes
-        let mut file_codes: std::collections::HashMap<String, Vec<u32>> = std::collections::HashMap::new();
+        let mut file_codes: std::collections::HashMap<String, Vec<u32>> =
+            std::collections::HashMap::new();
         for result in &bind_results {
             let codes: Vec<u32> = result.parse_diagnostics.iter().map(|d| d.code).collect();
             file_codes.insert(result.file_name.clone(), codes);
@@ -1571,13 +1730,11 @@ fn compare_strings_case_insensitive_iter(a: &str, b: &str) -> Comparison {
             (None, None) => return Comparison::EqualTo,
             (None, Some(_)) => return Comparison::LessThan,
             (Some(_), None) => return Comparison::GreaterThan,
-            (Some(a_char), Some(b_char)) => {
-                match a_char.cmp(&b_char) {
-                    Ordering::Less => return Comparison::LessThan,
-                    Ordering::Greater => return Comparison::GreaterThan,
-                    Ordering::Equal => continue,
-                }
-            }
+            (Some(a_char), Some(b_char)) => match a_char.cmp(&b_char) {
+                Ordering::Less => return Comparison::LessThan,
+                Ordering::Greater => return Comparison::GreaterThan,
+                Ordering::Equal => continue,
+            },
         }
     }
 }
@@ -1620,13 +1777,11 @@ fn compare_strings_case_insensitive_lower_iter(a: &str, b: &str) -> Comparison {
             (None, None) => return Comparison::EqualTo,
             (None, Some(_)) => return Comparison::LessThan,
             (Some(_), None) => return Comparison::GreaterThan,
-            (Some(a_char), Some(b_char)) => {
-                match a_char.cmp(&b_char) {
-                    Ordering::Less => return Comparison::LessThan,
-                    Ordering::Greater => return Comparison::GreaterThan,
-                    Ordering::Equal => continue,
-                }
-            }
+            (Some(a_char), Some(b_char)) => match a_char.cmp(&b_char) {
+                Ordering::Less => return Comparison::LessThan,
+                Ordering::Greater => return Comparison::GreaterThan,
+                Ordering::Equal => continue,
+            },
         }
     }
 }

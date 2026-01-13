@@ -1,13 +1,13 @@
 //! Type node AST nodes.
 
-use serde::Serialize;
 use super::base::{NodeBase, NodeIndex, NodeList};
+use serde::Serialize;
 
 /// A type reference (Foo, Foo<T>).
 #[derive(Clone, Debug, Serialize)]
 pub struct TypeReference {
     pub base: NodeBase,
-    pub type_name: NodeIndex,  // Identifier or QualifiedName
+    pub type_name: NodeIndex, // Identifier or QualifiedName
     pub type_arguments: Option<NodeList>,
 }
 
@@ -17,7 +17,7 @@ pub struct FunctionType {
     pub base: NodeBase,
     pub type_parameters: Option<NodeList>,
     pub parameters: NodeList,
-    pub type_node: NodeIndex,  // Return type
+    pub type_node: NodeIndex, // Return type
 }
 
 /// A constructor type (new (x: number) => Foo).
@@ -115,7 +115,7 @@ pub struct ParenthesizedType {
 #[derive(Clone, Debug, Serialize)]
 pub struct TypeOperator {
     pub base: NodeBase,
-    pub operator: u16,  // KeyOfKeyword, UniqueKeyword, ReadonlyKeyword
+    pub operator: u16, // KeyOfKeyword, UniqueKeyword, ReadonlyKeyword
     pub type_node: NodeIndex,
 }
 
@@ -131,11 +131,11 @@ pub struct IndexedAccessType {
 #[derive(Clone, Debug, Serialize)]
 pub struct MappedType {
     pub base: NodeBase,
-    pub readonly_token: Option<u16>,  // ReadonlyKeyword, PlusToken, MinusToken
+    pub readonly_token: Option<u16>, // ReadonlyKeyword, PlusToken, MinusToken
     pub type_parameter: NodeIndex,
-    pub name_type: NodeIndex,  // Optional
+    pub name_type: NodeIndex, // Optional
     pub question_token: Option<u16>,
-    pub type_node: NodeIndex,  // Optional
+    pub type_node: NodeIndex, // Optional
     pub members: Option<NodeList>,
 }
 
@@ -168,7 +168,7 @@ pub struct NamedTupleMember {
 #[derive(Clone, Debug, Serialize)]
 pub struct TypePredicate {
     pub base: NodeBase,
-    pub asserts_modifier: bool,       // true if `asserts` keyword present
-    pub parameter_name: NodeIndex,    // Identifier or ThisKeyword token
-    pub type_node: NodeIndex,         // The type after 'is' (optional, NONE for just `asserts x`)
+    pub asserts_modifier: bool,    // true if `asserts` keyword present
+    pub parameter_name: NodeIndex, // Identifier or ThisKeyword token
+    pub type_node: NodeIndex,      // The type after 'is' (optional, NONE for just `asserts x`)
 }

@@ -1,8 +1,8 @@
 //! Node arena for AST storage.
 
-use serde::Serialize;
 use super::ast::{Node, NodeIndex};
 use super::thin_node::{NodeAccess, NodeInfo};
+use serde::Serialize;
 
 /// Arena-based storage for AST nodes.
 /// Nodes are stored contiguously and referenced by index.
@@ -17,7 +17,9 @@ impl NodeArena {
     }
 
     pub fn with_capacity(capacity: usize) -> NodeArena {
-        NodeArena { nodes: Vec::with_capacity(capacity) }
+        NodeArena {
+            nodes: Vec::with_capacity(capacity),
+        }
     }
 
     /// Add a node to the arena and return its index
@@ -51,9 +53,9 @@ impl NodeArena {
         if index.is_none() {
             None
         } else {
-            self.nodes.get_mut(index.0 as usize).map(|old| {
-                std::mem::replace(old, new_node)
-            })
+            self.nodes
+                .get_mut(index.0 as usize)
+                .map(|old| std::mem::replace(old, new_node))
         }
     }
 
@@ -94,19 +96,18 @@ impl NodeAccess for NodeArena {
 
     fn get_identifier_text(&self, index: NodeIndex) -> Option<&str> {
         match self.get(index)? {
-            Node::Identifier(ident) | Node::PrivateIdentifier(ident) => {
-                Some(&ident.escaped_text)
-            }
+            Node::Identifier(ident) | Node::PrivateIdentifier(ident) => Some(&ident.escaped_text),
             _ => None,
         }
     }
 
     fn get_literal_text(&self, index: NodeIndex) -> Option<&str> {
         match self.get(index)? {
-            Node::StringLiteral(lit) | Node::NoSubstitutionTemplateLiteral(lit) |
-            Node::TemplateHead(lit) | Node::TemplateMiddle(lit) | Node::TemplateTail(lit) => {
-                Some(&lit.text)
-            }
+            Node::StringLiteral(lit)
+            | Node::NoSubstitutionTemplateLiteral(lit)
+            | Node::TemplateHead(lit)
+            | Node::TemplateMiddle(lit)
+            | Node::TemplateTail(lit) => Some(&lit.text),
             Node::NumericLiteral(lit) => Some(&lit.text),
             Node::BigIntLiteral(lit) => Some(&lit.text),
             Node::RegularExpressionLiteral(lit) => Some(&lit.text),

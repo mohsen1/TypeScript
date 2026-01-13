@@ -1,9 +1,9 @@
 //! Tests for the Lawyer layer (Any propagation rules).
 
 use super::*;
-use crate::solver::types::*;
-use crate::interner::Atom;
 use crate::TypeInterner;
+use crate::interner::Atom;
+use crate::solver::types::*;
 
 /// Helper function to create an object type with properties
 fn make_test_object(interner: &TypeInterner, props: Vec<(Atom, TypeId)>) -> TypeId {
@@ -76,9 +76,11 @@ fn test_non_any_types_return_none() {
     let rules = AnyPropagationRules::new();
 
     // Neither type is any - should return None (delegate to structural checker)
-    assert!(rules
-        .check_any_propagation(TypeId::STRING, TypeId::NUMBER, &interner)
-        .is_none());
+    assert!(
+        rules
+            .check_any_propagation(TypeId::STRING, TypeId::NUMBER, &interner)
+            .is_none()
+    );
 }
 
 #[test]

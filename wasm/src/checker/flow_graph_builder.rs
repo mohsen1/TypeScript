@@ -11,8 +11,8 @@
 //! This enables type narrowing analysis without mutating AST nodes.
 
 use crate::binder::{FlowNode, FlowNodeArena, FlowNodeId, flow_flags};
-use crate::parser::{NodeIndex, NodeList, syntax_kind_ext};
 use crate::parser::thin_node::ThinNodeArena;
+use crate::parser::{NodeIndex, NodeList, syntax_kind_ext};
 use crate::scanner::SyntaxKind;
 use rustc_hash::FxHashMap;
 use rustc_hash::FxHashSet;
@@ -249,7 +249,9 @@ impl<'a> FlowGraphBuilder<'a> {
             }
 
             // Function declaration - check if async
-            syntax_kind_ext::FUNCTION_DECLARATION | syntax_kind_ext::FUNCTION_EXPRESSION | syntax_kind_ext::ARROW_FUNCTION => {
+            syntax_kind_ext::FUNCTION_DECLARATION
+            | syntax_kind_ext::FUNCTION_EXPRESSION
+            | syntax_kind_ext::ARROW_FUNCTION => {
                 if let Some(func) = self.arena.get_function(node) {
                     if func.is_async {
                         // Enter async context
@@ -407,11 +409,8 @@ impl<'a> FlowGraphBuilder<'a> {
         self.current_flow = loop_label;
 
         // Create flow for entering loop body
-        let true_flow = self.create_flow_node(
-            flow_flags::TRUE_CONDITION,
-            loop_label,
-            loop_data.condition,
-        );
+        let true_flow =
+            self.create_flow_node(flow_flags::TRUE_CONDITION, loop_label, loop_data.condition);
 
         // Bind loop body
         self.current_flow = true_flow;
@@ -421,11 +420,8 @@ impl<'a> FlowGraphBuilder<'a> {
         self.add_antecedent(loop_label, self.current_flow);
 
         // Create flow for exiting loop
-        let false_flow = self.create_flow_node(
-            flow_flags::FALSE_CONDITION,
-            loop_label,
-            loop_data.condition,
-        );
+        let false_flow =
+            self.create_flow_node(flow_flags::FALSE_CONDITION, loop_label, loop_data.condition);
 
         // Add to merge label
         self.add_antecedent(merge_label, false_flow);
@@ -521,11 +517,8 @@ impl<'a> FlowGraphBuilder<'a> {
 
         // Handle condition if present
         if !loop_data.condition.is_none() {
-            let true_flow = self.create_flow_node(
-                flow_flags::TRUE_CONDITION,
-                loop_label,
-                loop_data.condition,
-            );
+            let true_flow =
+                self.create_flow_node(flow_flags::TRUE_CONDITION, loop_label, loop_data.condition);
             self.current_flow = true_flow;
 
             // Bind loop body
@@ -535,11 +528,8 @@ impl<'a> FlowGraphBuilder<'a> {
             self.add_antecedent(loop_label, self.current_flow);
 
             // False flow: exit loop
-            let false_flow = self.create_flow_node(
-                flow_flags::FALSE_CONDITION,
-                loop_label,
-                loop_data.condition,
-            );
+            let false_flow =
+                self.create_flow_node(flow_flags::FALSE_CONDITION, loop_label, loop_data.condition);
             self.add_antecedent(merge_label, false_flow);
         } else {
             // No condition: infinite loop
@@ -549,7 +539,11 @@ impl<'a> FlowGraphBuilder<'a> {
 
         // Handle incrementor
         if !loop_data.incrementor.is_none() {
-            let flow = self.create_flow_node(flow_flags::ASSIGNMENT, self.current_flow, loop_data.incrementor);
+            let flow = self.create_flow_node(
+                flow_flags::ASSIGNMENT,
+                self.current_flow,
+                loop_data.incrementor,
+            );
             self.current_flow = flow;
             self.add_antecedent(loop_label, self.current_flow);
         }
@@ -811,7 +805,11 @@ impl<'a> FlowGraphBuilder<'a> {
     }
 
     /// Build flow graph for a variable declaration.
-    fn build_variable_declaration(&mut self, var_decl: &crate::parser::thin_node::VariableDeclarationData, idx: NodeIndex) {
+    fn build_variable_declaration(
+        &mut self,
+        var_decl: &crate::parser::thin_node::VariableDeclarationData,
+        idx: NodeIndex,
+    ) {
         // Check for await expressions in initializer
         if !var_decl.initializer.is_none() {
             self.handle_expression_for_await(var_decl.initializer);
@@ -880,7 +878,12 @@ impl<'a> FlowGraphBuilder<'a> {
     }
 
     /// Create a new flow node and link it to an antecedent.
-    fn create_flow_node(&mut self, flags: u32, antecedent: FlowNodeId, node: NodeIndex) -> FlowNodeId {
+    fn create_flow_node(
+        &mut self,
+        flags: u32,
+        antecedent: FlowNodeId,
+        node: NodeIndex,
+    ) -> FlowNodeId {
         let id = self.graph.nodes.alloc(flags);
         if let Some(flow) = self.graph.nodes.get_mut(id) {
             if !antecedent.is_none() && antecedent != self.graph.unreachable_flow {
@@ -984,7 +987,8 @@ impl<'a> FlowGraphBuilder<'a> {
                     }
                 }
             }
-            syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION | syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION => {
+            syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION
+            | syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION => {
                 if let Some(access) = self.arena.get_access_expr(node) {
                     self.handle_expression_for_await(access.expression);
                     if !access.name_or_argument.is_none() {
@@ -1003,11 +1007,8 @@ impl<'a> FlowGraphBuilder<'a> {
     fn handle_await_expression(&mut self, await_node: NodeIndex) {
         if self.in_async_function() {
             // Create an AWAIT_POINT flow node to track this suspension point
-            let await_point = self.create_flow_node(
-                flow_flags::AWAIT_POINT,
-                self.current_flow,
-                await_node,
-            );
+            let await_point =
+                self.create_flow_node(flow_flags::AWAIT_POINT, self.current_flow, await_node);
             self.current_flow = await_point;
         }
         // If not in async function, this is a semantic error but we still continue flow analysis

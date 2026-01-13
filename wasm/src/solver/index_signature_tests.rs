@@ -99,10 +99,22 @@ fn test_object_with_props_to_index_signature() {
 
     // { foo: number, bar: number } <: { [key: string]: number }
     let source = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("foo"), type_id: TypeId::NUMBER,
- write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
-        PropertyInfo { name: interner.intern_string("bar"), type_id: TypeId::NUMBER,
- write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
+        PropertyInfo {
+            name: interner.intern_string("foo"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("bar"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
     ]);
 
     let target = interner.object_with_index(ObjectShape {
@@ -124,10 +136,22 @@ fn test_object_with_incompatible_props_not_subtype() {
 
     // { foo: string, bar: number } NOT <: { [key: string]: number }
     let source = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("foo"), type_id: TypeId::STRING,
- write_type: TypeId::STRING, optional: false, readonly: false, is_method: false },
-        PropertyInfo { name: interner.intern_string("bar"), type_id: TypeId::NUMBER,
- write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
+        PropertyInfo {
+            name: interner.intern_string("foo"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("bar"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
     ]);
 
     let target = interner.object_with_index(ObjectShape {
@@ -149,10 +173,14 @@ fn test_index_with_props_to_simple_object() {
 
     // { [key: string]: number, foo: number } <: { foo: number }
     let source = interner.object_with_index(ObjectShape {
-        properties: vec![
-            PropertyInfo { name: interner.intern_string("foo"), type_id: TypeId::NUMBER,
- write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
-        ],
+        properties: vec![PropertyInfo {
+            name: interner.intern_string("foo"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
         string_index: Some(IndexSignature {
             key_type: TypeId::STRING,
             value_type: TypeId::NUMBER,
@@ -161,10 +189,14 @@ fn test_index_with_props_to_simple_object() {
         number_index: None,
     });
 
-    let target = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("foo"), type_id: TypeId::NUMBER,
- write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
-    ]);
+    let target = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("foo"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
 
     assert!(is_subtype_of(&interner, source, target));
 }
@@ -236,10 +268,14 @@ fn test_index_signature_with_named_property() {
 
     // { [key: string]: number, length: number } <: { [key: string]: number, length: number }
     let source = interner.object_with_index(ObjectShape {
-        properties: vec![
-            PropertyInfo { name: interner.intern_string("length"), type_id: TypeId::NUMBER,
- write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
-        ],
+        properties: vec![PropertyInfo {
+            name: interner.intern_string("length"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
         string_index: Some(IndexSignature {
             key_type: TypeId::STRING,
             value_type: TypeId::NUMBER,
@@ -249,10 +285,14 @@ fn test_index_signature_with_named_property() {
     });
 
     let target = interner.object_with_index(ObjectShape {
-        properties: vec![
-            PropertyInfo { name: interner.intern_string("length"), type_id: TypeId::NUMBER,
- write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
-        ],
+        properties: vec![PropertyInfo {
+            name: interner.intern_string("length"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
         string_index: Some(IndexSignature {
             key_type: TypeId::STRING,
             value_type: TypeId::NUMBER,
@@ -270,10 +310,14 @@ fn test_index_signature_source_property_mismatch() {
 
     // { [key: string]: string, foo: number } NOT <: { [key: string]: string }
     let source = interner.object_with_index(ObjectShape {
-        properties: vec![
-            PropertyInfo { name: interner.intern_string("foo"), type_id: TypeId::NUMBER,
- write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
-        ],
+        properties: vec![PropertyInfo {
+            name: interner.intern_string("foo"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
         string_index: Some(IndexSignature {
             key_type: TypeId::STRING,
             value_type: TypeId::STRING,
@@ -301,10 +345,14 @@ fn test_number_index_signature_source_property_mismatch() {
 
     // { [key: number]: number, "0": string } NOT <: { [key: number]: number }
     let source = interner.object_with_index(ObjectShape {
-        properties: vec![
-            PropertyInfo { name: interner.intern_string("0"), type_id: TypeId::STRING,
- write_type: TypeId::STRING, optional: false, readonly: false, is_method: false },
-        ],
+        properties: vec![PropertyInfo {
+            name: interner.intern_string("0"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
         string_index: None,
         number_index: Some(IndexSignature {
             key_type: TypeId::NUMBER,

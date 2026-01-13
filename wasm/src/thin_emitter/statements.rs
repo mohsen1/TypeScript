@@ -1,7 +1,7 @@
-use super::{get_trailing_comment_ranges, ThinPrinter};
-use crate::parser::{NodeIndex, NodeList};
-use crate::parser::thin_node::ThinNode;
+use super::{ThinPrinter, get_trailing_comment_ranges};
 use crate::parser::syntax_kind_ext;
+use crate::parser::thin_node::ThinNode;
+use crate::parser::{NodeIndex, NodeList};
 use crate::scanner::SyntaxKind;
 
 impl<'a> ThinPrinter<'a> {
@@ -104,12 +104,20 @@ impl<'a> ThinPrinter<'a> {
     fn collect_variable_names(&self, declarations: &NodeList) -> Vec<String> {
         let mut names = Vec::new();
         for &decl_list_idx in &declarations.nodes {
-            let Some(decl_list_node) = self.arena.get(decl_list_idx) else { continue };
-            let Some(decl_list) = self.arena.get_variable(decl_list_node) else { continue };
+            let Some(decl_list_node) = self.arena.get(decl_list_idx) else {
+                continue;
+            };
+            let Some(decl_list) = self.arena.get_variable(decl_list_node) else {
+                continue;
+            };
 
             for &decl_idx in &decl_list.declarations.nodes {
-                let Some(decl_node) = self.arena.get(decl_idx) else { continue };
-                let Some(decl) = self.arena.get_variable_declaration(decl_node) else { continue };
+                let Some(decl_node) = self.arena.get(decl_idx) else {
+                    continue;
+                };
+                let Some(decl) = self.arena.get_variable_declaration(decl_node) else {
+                    continue;
+                };
                 self.collect_binding_names(decl.name, &mut names);
             }
         }
@@ -151,7 +159,11 @@ impl<'a> ThinPrinter<'a> {
         }
     }
 
-    pub(super) fn collect_binding_names_from_element(&self, elem_idx: NodeIndex, names: &mut Vec<String>) {
+    pub(super) fn collect_binding_names_from_element(
+        &self,
+        elem_idx: NodeIndex,
+        names: &mut Vec<String>,
+    ) {
         if elem_idx.is_none() {
             return;
         }

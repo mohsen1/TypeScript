@@ -1,11 +1,11 @@
+use super::is_valid_identifier_name;
 use super::{ModuleKind, ThinPrinter};
-use crate::parser::{NodeIndex, NodeList};
 use crate::parser::syntax_kind_ext;
 use crate::parser::thin_node::ThinNode;
+use crate::parser::{NodeIndex, NodeList};
 use crate::scanner::SyntaxKind;
 use crate::transform_context::IdentifierId;
 use crate::transforms::class_es5::ClassES5Emitter;
-use super::is_valid_identifier_name;
 
 impl<'a> ThinPrinter<'a> {
     pub(super) fn emit_commonjs_export<F>(
@@ -13,8 +13,7 @@ impl<'a> ThinPrinter<'a> {
         names: &[IdentifierId],
         is_default: bool,
         mut emit_inner: F,
-    )
-    where
+    ) where
         F: FnMut(&mut Self),
     {
         if names.is_empty() {
@@ -55,7 +54,11 @@ impl<'a> ThinPrinter<'a> {
         });
     }
 
-    pub(super) fn emit_commonjs_default_export_expr_inner(&mut self, node: &ThinNode, idx: NodeIndex) {
+    pub(super) fn emit_commonjs_default_export_expr_inner(
+        &mut self,
+        node: &ThinNode,
+        idx: NodeIndex,
+    ) {
         match node.kind {
             k if k == syntax_kind_ext::FUNCTION_DECLARATION => {
                 self.emit_function_expression(node, idx);
@@ -105,7 +108,8 @@ impl<'a> ThinPrinter<'a> {
             self.writer.write("");
             let base_line = self.writer.current_line();
             let base_column = self.writer.current_column();
-            self.writer.add_offset_mappings(base_line, base_column, &mappings);
+            self.writer
+                .add_offset_mappings(base_line, base_column, &mappings);
             self.writer.write(&es5_output);
         } else {
             self.write(&es5_output);
@@ -175,7 +179,8 @@ impl<'a> ThinPrinter<'a> {
             }
         }
 
-        let has_named = namespace_name.is_some() || !value_specs.is_empty() || raw_named_bindings.is_some();
+        let has_named =
+            namespace_name.is_some() || !value_specs.is_empty() || raw_named_bindings.is_some();
         if !has_default && !has_named {
             return;
         }
@@ -548,8 +553,8 @@ impl<'a> ThinPrinter<'a> {
                     k if k == syntax_kind_ext::FUNCTION_DECLARATION => {
                         if let Some(func) = self.arena.get_function(clause_node) {
                             let func_name = self.get_identifier_text_idx(func.name);
-                            is_anonymous_default = func_name == "function"
-                                || !is_valid_identifier_name(&func_name);
+                            is_anonymous_default =
+                                func_name == "function" || !is_valid_identifier_name(&func_name);
                         }
                     }
                     k if k == syntax_kind_ext::CLASS_DECLARATION => {
@@ -811,7 +816,9 @@ impl<'a> ThinPrinter<'a> {
     pub(super) fn get_identifier_text_opt(&self, idx: NodeIndex) -> Option<String> {
         let node = self.arena.get(idx)?;
         if node.kind == SyntaxKind::Identifier as u16 {
-            self.arena.get_identifier(node).map(|id| id.escaped_text.clone())
+            self.arena
+                .get_identifier(node)
+                .map(|id| id.escaped_text.clone())
         } else {
             None
         }
@@ -824,7 +831,10 @@ impl<'a> ThinPrinter<'a> {
 
         let node = self.arena.get(name_idx)?;
         if node.kind == SyntaxKind::Identifier as u16 {
-            return self.arena.get_identifier(node).map(|id| id.escaped_text.clone());
+            return self
+                .arena
+                .get_identifier(node)
+                .map(|id| id.escaped_text.clone());
         }
 
         if node.kind == syntax_kind_ext::QUALIFIED_NAME {
@@ -954,7 +964,6 @@ impl<'a> ThinPrinter<'a> {
         }
     }
 
-
     /// Check if the file contains an export assignment (export =)
     pub(super) fn has_export_assignment(&self, statements: &NodeList) -> bool {
         for &stmt_idx in &statements.nodes {
@@ -1021,7 +1030,10 @@ impl<'a> ThinPrinter<'a> {
                         if let Some(enum_decl) = self.arena.get_enum(node) {
                             if self.has_export_modifier(&enum_decl.modifiers)
                                 && !self.has_declare_modifier(&enum_decl.modifiers)
-                                && !self.has_modifier(&enum_decl.modifiers, SyntaxKind::ConstKeyword as u16)
+                                && !self.has_modifier(
+                                    &enum_decl.modifiers,
+                                    SyntaxKind::ConstKeyword as u16,
+                                )
                             {
                                 return true;
                             }
@@ -1057,8 +1069,7 @@ impl<'a> ThinPrinter<'a> {
                     if !self.import_decl_has_runtime_value(import_decl) {
                         continue;
                     }
-                    if let Some(text) =
-                        self.get_module_specifier_text(import_decl.module_specifier)
+                    if let Some(text) = self.get_module_specifier_text(import_decl.module_specifier)
                     {
                         if !deps.contains(&text) {
                             deps.push(text);
@@ -1073,8 +1084,7 @@ impl<'a> ThinPrinter<'a> {
                     if !self.export_decl_has_runtime_value(export_decl) {
                         continue;
                     }
-                    if let Some(text) =
-                        self.get_module_specifier_text(export_decl.module_specifier)
+                    if let Some(text) = self.get_module_specifier_text(export_decl.module_specifier)
                     {
                         if !deps.contains(&text) {
                             deps.push(text);
@@ -1292,7 +1302,10 @@ impl<'a> ThinPrinter<'a> {
                         if let Some(enum_decl) = self.arena.get_enum(node) {
                             if self.has_export_modifier(&enum_decl.modifiers)
                                 && !self.has_declare_modifier(&enum_decl.modifiers)
-                                && !self.has_modifier(&enum_decl.modifiers, SyntaxKind::ConstKeyword as u16)
+                                && !self.has_modifier(
+                                    &enum_decl.modifiers,
+                                    SyntaxKind::ConstKeyword as u16,
+                                )
                             {
                                 return true;
                             }
@@ -1347,11 +1360,17 @@ impl<'a> ThinPrinter<'a> {
     }
 
     /// Detect which CommonJS import/export helpers are needed for the file
-    pub(super) fn detect_commonjs_helpers(&self, statements: &NodeList, helpers: &mut crate::transforms::helpers::HelpersNeeded) {
+    pub(super) fn detect_commonjs_helpers(
+        &self,
+        statements: &NodeList,
+        helpers: &mut crate::transforms::helpers::HelpersNeeded,
+    ) {
         use crate::parser::syntax_kind_ext;
 
         for &stmt_idx in &statements.nodes {
-            let Some(node) = self.arena.get(stmt_idx) else { continue };
+            let Some(node) = self.arena.get(stmt_idx) else {
+                continue;
+            };
 
             match node.kind {
                 k if k == syntax_kind_ext::IMPORT_DECLARATION => {
@@ -1367,8 +1386,12 @@ impl<'a> ThinPrinter<'a> {
                                     if bindings_node.kind == syntax_kind_ext::NAMESPACE_IMPORT {
                                         helpers.import_star = true;
                                         helpers.create_binding = true; // __importStar depends on __createBinding
-                                    } else if let Some(named_imports) = self.arena.get_named_imports(bindings_node) {
-                                        if !named_imports.name.is_none() && named_imports.elements.nodes.is_empty() {
+                                    } else if let Some(named_imports) =
+                                        self.arena.get_named_imports(bindings_node)
+                                    {
+                                        if !named_imports.name.is_none()
+                                            && named_imports.elements.nodes.is_empty()
+                                        {
                                             helpers.import_star = true;
                                             helpers.create_binding = true;
                                         }

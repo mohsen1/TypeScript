@@ -27,7 +27,11 @@ impl<'a> ThinPrinter<'a> {
 
     pub(super) fn emit_string_literal(&mut self, node: &ThinNode) {
         if let Some(lit) = self.arena.get_literal(node) {
-            let quote = if self.ctx.options.single_quote { '\'' } else { '"' };
+            let quote = if self.ctx.options.single_quote {
+                '\''
+            } else {
+                '"'
+            };
             self.write_char(quote);
             self.emit_escaped_string(&lit.text, quote);
             self.write_char(quote);
@@ -35,7 +39,11 @@ impl<'a> ThinPrinter<'a> {
     }
 
     pub(super) fn emit_string_literal_text(&mut self, text: &str) {
-        let quote = if self.ctx.options.single_quote { '\'' } else { '"' };
+        let quote = if self.ctx.options.single_quote {
+            '\''
+        } else {
+            '"'
+        };
         self.write_char(quote);
         self.emit_escaped_string(text, quote);
         self.write_char(quote);

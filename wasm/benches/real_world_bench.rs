@@ -3,11 +3,8 @@
 //! Measures emitter throughput on actual TypeScript compiler source files
 //! instead of synthetic test data.
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
-use wasm::{
-    thin_parser::ThinParserState,
-    thin_emitter::ThinPrinter,
-};
+use criterion::{Criterion, Throughput, black_box, criterion_group, criterion_main};
+use wasm::{thin_emitter::ThinPrinter, thin_parser::ThinParserState};
 
 const CHECKER_TS: &str = include_str!("../../src/compiler/checker.ts");
 
@@ -21,10 +18,7 @@ fn bench_checker_parse_emit(c: &mut Criterion) {
 
     group.bench_function("checker_ts_full_pipeline", |b| {
         b.iter(|| {
-            let mut parser = ThinParserState::new(
-                "checker.ts".to_string(),
-                CHECKER_TS.to_string(),
-            );
+            let mut parser = ThinParserState::new("checker.ts".to_string(), CHECKER_TS.to_string());
             let root = parser.parse_source_file();
 
             // Pre-allocate based on source size (1.5x for downleveling)
@@ -43,10 +37,7 @@ fn bench_checker_emit_only(c: &mut Criterion) {
     let bytes = CHECKER_TS.len() as u64;
 
     // Pre-parse once
-    let mut parser = ThinParserState::new(
-        "checker.ts".to_string(),
-        CHECKER_TS.to_string(),
-    );
+    let mut parser = ThinParserState::new("checker.ts".to_string(), CHECKER_TS.to_string());
     let root = parser.parse_source_file();
 
     let mut group = c.benchmark_group("real_world");
@@ -65,10 +56,6 @@ fn bench_checker_emit_only(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(
-    benches,
-    bench_checker_parse_emit,
-    bench_checker_emit_only,
-);
+criterion_group!(benches, bench_checker_parse_emit, bench_checker_emit_only,);
 
 criterion_main!(benches);

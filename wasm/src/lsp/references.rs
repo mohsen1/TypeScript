@@ -3,13 +3,13 @@
 //! Given a position in the source, finds all references to the symbol at that position.
 
 use crate::binder::SymbolId;
+use crate::lsp::position::{LineMap, Location, Position, Range};
+use crate::lsp::resolver::{ScopeCache, ScopeCacheStats, ScopeWalker};
+use crate::lsp::utils::find_node_at_offset;
 use crate::parser::thin_node::ThinNodeArena;
 use crate::parser::{NodeIndex, syntax_kind_ext};
-use crate::thin_binder::ThinBinderState;
-use crate::lsp::position::{Position, Location, LineMap, Range};
-use crate::lsp::utils::find_node_at_offset;
-use crate::lsp::resolver::{ScopeCache, ScopeCacheStats, ScopeWalker};
 use crate::scanner::SyntaxKind;
+use crate::thin_binder::ThinBinderState;
 
 /// Find References provider.
 ///
@@ -73,7 +73,9 @@ impl<'a> FindReferences<'a> {
         scope_stats: Option<&mut ScopeCacheStats>,
     ) -> Option<Vec<Location>> {
         // 1. Convert position to byte offset
-        let offset = self.line_map.position_to_offset(position, self.source_text)?;
+        let offset = self
+            .line_map
+            .position_to_offset(position, self.source_text)?;
 
         // 2. Find the most specific node at this offset
         let node_idx = find_node_at_offset(self.arena, offset);
@@ -113,7 +115,11 @@ impl<'a> FindReferences<'a> {
     /// Find references for a specific node (by NodeIndex).
     ///
     /// This is useful when you already have the node index from another operation.
-    pub fn find_references_for_node(&self, root: NodeIndex, node_idx: NodeIndex) -> Option<Vec<Location>> {
+    pub fn find_references_for_node(
+        &self,
+        root: NodeIndex,
+        node_idx: NodeIndex,
+    ) -> Option<Vec<Location>> {
         self.find_references_for_node_internal(root, node_idx, None, None)
     }
 
@@ -127,7 +133,11 @@ impl<'a> FindReferences<'a> {
         self.find_references_for_node_internal(root, node_idx, Some(scope_cache), scope_stats)
     }
 
-    pub fn find_references_for_symbol(&self, root: NodeIndex, symbol_id: SymbolId) -> Option<Vec<Location>> {
+    pub fn find_references_for_symbol(
+        &self,
+        root: NodeIndex,
+        symbol_id: SymbolId,
+    ) -> Option<Vec<Location>> {
         if symbol_id.is_none() {
             return None;
         }
@@ -216,7 +226,9 @@ impl<'a> FindReferences<'a> {
         scope_cache: Option<&mut ScopeCache>,
         scope_stats: Option<&mut ScopeCacheStats>,
     ) -> Option<Vec<Location>> {
-        let offset = self.line_map.position_to_offset(position, self.source_text)?;
+        let offset = self
+            .line_map
+            .position_to_offset(position, self.source_text)?;
         let node_idx = find_node_at_offset(self.arena, offset);
         if node_idx.is_none() {
             return None;
@@ -258,52 +270,101 @@ impl<'a> FindReferences<'a> {
         match node.kind {
             k if k == syntax_kind_ext::VARIABLE_DECLARATION => {
                 let decl = self.arena.get_variable_declaration(node)?;
-                if decl.name.is_none() { None } else { Some(decl.name) }
+                if decl.name.is_none() {
+                    None
+                } else {
+                    Some(decl.name)
+                }
             }
             k if k == syntax_kind_ext::PARAMETER => {
                 let param = self.arena.get_parameter(node)?;
-                if param.name.is_none() { None } else { Some(param.name) }
+                if param.name.is_none() {
+                    None
+                } else {
+                    Some(param.name)
+                }
             }
             k if k == syntax_kind_ext::FUNCTION_DECLARATION => {
                 let func = self.arena.get_function(node)?;
-                if func.name.is_none() { None } else { Some(func.name) }
+                if func.name.is_none() {
+                    None
+                } else {
+                    Some(func.name)
+                }
             }
             k if k == syntax_kind_ext::CLASS_DECLARATION
-                || k == syntax_kind_ext::CLASS_EXPRESSION => {
+                || k == syntax_kind_ext::CLASS_EXPRESSION =>
+            {
                 let class = self.arena.get_class(node)?;
-                if class.name.is_none() { None } else { Some(class.name) }
+                if class.name.is_none() {
+                    None
+                } else {
+                    Some(class.name)
+                }
             }
             k if k == syntax_kind_ext::INTERFACE_DECLARATION => {
                 let iface = self.arena.get_interface(node)?;
-                if iface.name.is_none() { None } else { Some(iface.name) }
+                if iface.name.is_none() {
+                    None
+                } else {
+                    Some(iface.name)
+                }
             }
             k if k == syntax_kind_ext::TYPE_ALIAS_DECLARATION => {
                 let alias = self.arena.get_type_alias(node)?;
-                if alias.name.is_none() { None } else { Some(alias.name) }
+                if alias.name.is_none() {
+                    None
+                } else {
+                    Some(alias.name)
+                }
             }
             k if k == syntax_kind_ext::ENUM_DECLARATION => {
                 let enm = self.arena.get_enum(node)?;
-                if enm.name.is_none() { None } else { Some(enm.name) }
+                if enm.name.is_none() {
+                    None
+                } else {
+                    Some(enm.name)
+                }
             }
             k if k == syntax_kind_ext::ENUM_MEMBER => {
                 let member = self.arena.get_enum_member(node)?;
-                if member.name.is_none() { None } else { Some(member.name) }
+                if member.name.is_none() {
+                    None
+                } else {
+                    Some(member.name)
+                }
             }
             k if k == syntax_kind_ext::MODULE_DECLARATION => {
                 let module = self.arena.get_module(node)?;
-                if module.name.is_none() { None } else { Some(module.name) }
+                if module.name.is_none() {
+                    None
+                } else {
+                    Some(module.name)
+                }
             }
             k if k == syntax_kind_ext::METHOD_DECLARATION => {
                 let method = self.arena.get_method_decl(node)?;
-                if method.name.is_none() { None } else { Some(method.name) }
+                if method.name.is_none() {
+                    None
+                } else {
+                    Some(method.name)
+                }
             }
             k if k == syntax_kind_ext::PROPERTY_DECLARATION => {
                 let prop = self.arena.get_property_decl(node)?;
-                if prop.name.is_none() { None } else { Some(prop.name) }
+                if prop.name.is_none() {
+                    None
+                } else {
+                    Some(prop.name)
+                }
             }
             k if k == syntax_kind_ext::GET_ACCESSOR || k == syntax_kind_ext::SET_ACCESSOR => {
                 let accessor = self.arena.get_accessor(node)?;
-                if accessor.name.is_none() { None } else { Some(accessor.name) }
+                if accessor.name.is_none() {
+                    None
+                } else {
+                    Some(accessor.name)
+                }
             }
             k if k == syntax_kind_ext::IMPORT_SPECIFIER => {
                 let spec = self.arena.get_specifier(node)?;
@@ -339,7 +400,11 @@ impl<'a> FindReferences<'a> {
             }
             k if k == syntax_kind_ext::TYPE_PARAMETER => {
                 let param = self.arena.get_type_parameter(node)?;
-                if param.name.is_none() { None } else { Some(param.name) }
+                if param.name.is_none() {
+                    None
+                } else {
+                    Some(param.name)
+                }
             }
             _ => None,
         }
@@ -422,9 +487,9 @@ impl<'a> FindReferences<'a> {
 #[cfg(test)]
 mod references_tests {
     use super::*;
-    use crate::thin_parser::ThinParserState;
-    use crate::thin_binder::ThinBinderState;
     use crate::lsp::position::LineMap;
+    use crate::thin_binder::ThinBinderState;
+    use crate::thin_parser::ThinParserState;
 
     #[test]
     fn test_find_references_simple() {
@@ -443,14 +508,18 @@ mod references_tests {
         // Position at the first 'x' in "x + x" (line 1, column 0)
         let position = Position::new(1, 0);
 
-        let find_refs = FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let find_refs =
+            FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
         let references = find_refs.find_references(root, position);
 
         assert!(references.is_some(), "Should find references for x");
 
         if let Some(refs) = references {
             // Should find at least the declaration and two usages
-            assert!(refs.len() >= 2, "Should find at least 2 references (declaration + usages)");
+            assert!(
+                refs.len() >= 2,
+                "Should find at least 2 references (declaration + usages)"
+            );
         }
     }
 
@@ -464,18 +533,19 @@ mod references_tests {
         let mut binder = ThinBinderState::new();
         binder.bind_source_file(arena, root);
 
-        let symbol_id = binder
-            .file_locals
-            .get("x")
-            .expect("Expected symbol for x");
+        let symbol_id = binder.file_locals.get("x").expect("Expected symbol for x");
 
         let line_map = LineMap::build(source);
-        let find_refs = FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let find_refs =
+            FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
         let references = find_refs.find_references_for_symbol(root, symbol_id);
 
         assert!(references.is_some(), "Should find references for x");
         if let Some(refs) = references {
-            assert!(refs.len() >= 2, "Should find at least 2 references (declaration + usages)");
+            assert!(
+                refs.len() >= 2,
+                "Should find at least 2 references (declaration + usages)"
+            );
         }
     }
 
@@ -494,11 +564,15 @@ mod references_tests {
         // Position outside any identifier
         let position = Position::new(0, 11); // At the semicolon
 
-        let find_refs = FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let find_refs =
+            FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
         let references = find_refs.find_references(root, position);
 
         // Should not find references
-        assert!(references.is_none(), "Should not find references at semicolon");
+        assert!(
+            references.is_none(),
+            "Should not find references at semicolon"
+        );
     }
 
     #[test]
@@ -516,12 +590,19 @@ mod references_tests {
         // Position at the 'name' inside the template expression (line 1)
         let position = Position::new(1, 18);
 
-        let find_refs = FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let find_refs =
+            FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
         let references = find_refs.find_references(root, position);
 
-        assert!(references.is_some(), "Should find references in template expression");
+        assert!(
+            references.is_some(),
+            "Should find references in template expression"
+        );
         let refs = references.unwrap();
-        assert!(refs.len() >= 2, "Should find declaration and template usage");
+        assert!(
+            refs.len() >= 2,
+            "Should find declaration and template usage"
+        );
     }
 
     #[test]
@@ -539,10 +620,14 @@ mod references_tests {
         // Position at the 'name' inside JSX expression (line 1)
         let position = Position::new(1, 17);
 
-        let find_refs = FindReferences::new(arena, &binder, &line_map, "test.tsx".to_string(), source);
+        let find_refs =
+            FindReferences::new(arena, &binder, &line_map, "test.tsx".to_string(), source);
         let references = find_refs.find_references(root, position);
 
-        assert!(references.is_some(), "Should find references in JSX expression");
+        assert!(
+            references.is_some(),
+            "Should find references in JSX expression"
+        );
         let refs = references.unwrap();
         assert!(refs.len() >= 2, "Should find declaration and JSX usage");
     }
@@ -562,17 +647,22 @@ mod references_tests {
         // Position at the 'value' inside await (line 2)
         let position = Position::new(2, 8);
 
-        let find_refs = FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let find_refs =
+            FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
         let references = find_refs.find_references(root, position);
 
-        assert!(references.is_some(), "Should find references in await expression");
+        assert!(
+            references.is_some(),
+            "Should find references in await expression"
+        );
         let refs = references.unwrap();
         assert!(refs.len() >= 2, "Should find declaration and await usage");
     }
 
     #[test]
     fn test_find_references_tagged_template_expression() {
-        let source = "const tag = (strings: TemplateStringsArray) => strings[0];\nconst msg = tag`hello`;";
+        let source =
+            "const tag = (strings: TemplateStringsArray) => strings[0];\nconst msg = tag`hello`;";
         let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
         let root = parser.parse_source_file();
         let arena = parser.get_arena();
@@ -585,12 +675,19 @@ mod references_tests {
         // Position at the 'tag' inside tagged template (line 1)
         let position = Position::new(1, 16);
 
-        let find_refs = FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let find_refs =
+            FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
         let references = find_refs.find_references(root, position);
 
-        assert!(references.is_some(), "Should find references in tagged template");
+        assert!(
+            references.is_some(),
+            "Should find references in tagged template"
+        );
         let refs = references.unwrap();
-        assert!(refs.len() >= 2, "Should find declaration and tagged template usage");
+        assert!(
+            refs.len() >= 2,
+            "Should find declaration and tagged template usage"
+        );
     }
 
     #[test]
@@ -608,12 +705,19 @@ mod references_tests {
         // Position at the 'value' inside the as-expression (line 1)
         let position = Position::new(1, 15);
 
-        let find_refs = FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let find_refs =
+            FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
         let references = find_refs.find_references(root, position);
 
-        assert!(references.is_some(), "Should find references in as expression");
+        assert!(
+            references.is_some(),
+            "Should find references in as expression"
+        );
         let refs = references.unwrap();
-        assert!(refs.len() >= 2, "Should find declaration and as-expression usage");
+        assert!(
+            refs.len() >= 2,
+            "Should find declaration and as-expression usage"
+        );
     }
 
     #[test]
@@ -631,10 +735,14 @@ mod references_tests {
         // Position at the 'foo' usage (line 1)
         let position = Position::new(1, 0);
 
-        let find_refs = FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let find_refs =
+            FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
         let references = find_refs.find_references(root, position);
 
-        assert!(references.is_some(), "Should find references for binding pattern name");
+        assert!(
+            references.is_some(),
+            "Should find references for binding pattern name"
+        );
         let refs = references.unwrap();
         assert!(refs.len() >= 2, "Should find declaration and usage");
     }
@@ -654,12 +762,19 @@ mod references_tests {
         // Position at the 'value' inside the initializer (line 1)
         let position = Position::new(1, 14);
 
-        let find_refs = FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let find_refs =
+            FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
         let references = find_refs.find_references(root, position);
 
-        assert!(references.is_some(), "Should find references in binding pattern initializer");
+        assert!(
+            references.is_some(),
+            "Should find references in binding pattern initializer"
+        );
         let refs = references.unwrap();
-        assert!(refs.len() >= 2, "Should find declaration and initializer usage");
+        assert!(
+            refs.len() >= 2,
+            "Should find declaration and initializer usage"
+        );
     }
 
     #[test]
@@ -677,12 +792,19 @@ mod references_tests {
         // Position at the 'foo' usage in the return (line 1)
         let position = Position::new(1, 9);
 
-        let find_refs = FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let find_refs =
+            FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
         let references = find_refs.find_references(root, position);
 
-        assert!(references.is_some(), "Should find references for parameter binding name");
+        assert!(
+            references.is_some(),
+            "Should find references for parameter binding name"
+        );
         let refs = references.unwrap();
-        assert!(refs.len() >= 2, "Should find parameter declaration and usage");
+        assert!(
+            refs.len() >= 2,
+            "Should find parameter declaration and usage"
+        );
     }
 
     #[test]
@@ -700,12 +822,19 @@ mod references_tests {
         // Position at the 'foo' usage in the return (line 1)
         let position = Position::new(1, 9);
 
-        let find_refs = FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let find_refs =
+            FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
         let references = find_refs.find_references(root, position);
 
-        assert!(references.is_some(), "Should find references for array binding name");
+        assert!(
+            references.is_some(),
+            "Should find references for array binding name"
+        );
         let refs = references.unwrap();
-        assert!(refs.len() >= 2, "Should find parameter declaration and usage");
+        assert!(
+            refs.len() >= 2,
+            "Should find parameter declaration and usage"
+        );
     }
 
     #[test]
@@ -723,10 +852,14 @@ mod references_tests {
         // Position at the 'value' usage (line 3)
         let position = Position::new(3, 11);
 
-        let find_refs = FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let find_refs =
+            FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
         let references = find_refs.find_references(root, position);
 
-        assert!(references.is_some(), "Should find references for switch case locals");
+        assert!(
+            references.is_some(),
+            "Should find references for switch case locals"
+        );
         let refs = references.unwrap();
         assert!(refs.len() >= 2, "Should find declaration and usage");
     }
@@ -746,10 +879,14 @@ mod references_tests {
         // Position at the 'value' usage (line 2)
         let position = Position::new(2, 9);
 
-        let find_refs = FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let find_refs =
+            FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
         let references = find_refs.find_references(root, position);
 
-        assert!(references.is_some(), "Should find references for nested arrow locals in condition");
+        assert!(
+            references.is_some(),
+            "Should find references for nested arrow locals in condition"
+        );
         let refs = references.unwrap();
         assert!(refs.len() >= 2, "Should find declaration and usage");
     }
@@ -769,10 +906,14 @@ mod references_tests {
         // Position at the 'value' usage (line 2)
         let position = Position::new(2, 9);
 
-        let find_refs = FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let find_refs =
+            FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
         let references = find_refs.find_references(root, position);
 
-        assert!(references.is_some(), "Should find references for export default expression locals");
+        assert!(
+            references.is_some(),
+            "Should find references for export default expression locals"
+        );
         let refs = references.unwrap();
         assert!(refs.len() >= 2, "Should find declaration and usage");
     }
@@ -792,10 +933,14 @@ mod references_tests {
         // Position at the 'value' usage (line 2)
         let position = Position::new(2, 2);
 
-        let find_refs = FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let find_refs =
+            FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
         let references = find_refs.find_references(root, position);
 
-        assert!(references.is_some(), "Should find references for labeled statement locals");
+        assert!(
+            references.is_some(),
+            "Should find references for labeled statement locals"
+        );
         let refs = references.unwrap();
         assert!(refs.len() >= 2, "Should find declaration and usage");
     }
@@ -815,10 +960,14 @@ mod references_tests {
         // Position at the 'value' usage (line 2)
         let position = Position::new(2, 2);
 
-        let find_refs = FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let find_refs =
+            FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
         let references = find_refs.find_references(root, position);
 
-        assert!(references.is_some(), "Should find references for with statement locals");
+        assert!(
+            references.is_some(),
+            "Should find references for with statement locals"
+        );
         let refs = references.unwrap();
         assert!(refs.len() >= 2, "Should find declaration and usage");
     }
@@ -838,10 +987,14 @@ mod references_tests {
         // Position at the 'value' usage before the declaration (line 1)
         let position = Position::new(1, 2);
 
-        let find_refs = FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let find_refs =
+            FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
         let references = find_refs.find_references(root, position);
 
-        assert!(references.is_some(), "Should find references for hoisted var");
+        assert!(
+            references.is_some(),
+            "Should find references for hoisted var"
+        );
         let refs = references.unwrap();
         assert!(refs.len() >= 2, "Should find declaration and usage");
     }
@@ -861,10 +1014,14 @@ mod references_tests {
         // Position at the 'deco' usage in the decorator (line 1)
         let position = Position::new(1, 1);
 
-        let find_refs = FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let find_refs =
+            FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
         let references = find_refs.find_references(root, position);
 
-        assert!(references.is_some(), "Should find references for decorator usage");
+        assert!(
+            references.is_some(),
+            "Should find references for decorator usage"
+        );
         let refs = references.unwrap();
         assert!(refs.len() >= 2, "Should find declaration and usage");
     }
@@ -884,10 +1041,14 @@ mod references_tests {
         // Position at the 'value' usage (line 3)
         let position = Position::new(3, 11);
 
-        let find_refs = FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let find_refs =
+            FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
         let references = find_refs.find_references(root, position);
 
-        assert!(references.is_some(), "Should find references for method local");
+        assert!(
+            references.is_some(),
+            "Should find references for method local"
+        );
         let refs = references.unwrap();
         assert!(refs.len() >= 2, "Should find declaration and usage");
     }
@@ -907,10 +1068,14 @@ mod references_tests {
         // Position at the 'Foo' usage inside the method (line 2)
         let position = Position::new(2, 11);
 
-        let find_refs = FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let find_refs =
+            FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
         let references = find_refs.find_references(root, position);
 
-        assert!(references.is_some(), "Should find references for class self name");
+        assert!(
+            references.is_some(),
+            "Should find references for class self name"
+        );
         let refs = references.unwrap();
         assert!(refs.len() >= 2, "Should find declaration and usage");
     }
@@ -930,10 +1095,14 @@ mod references_tests {
         // Position at the 'Bar' usage inside the method (line 2)
         let position = Position::new(2, 11);
 
-        let find_refs = FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let find_refs =
+            FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
         let references = find_refs.find_references(root, position);
 
-        assert!(references.is_some(), "Should find references for class expression name");
+        assert!(
+            references.is_some(),
+            "Should find references for class expression name"
+        );
         let refs = references.unwrap();
         assert!(refs.len() >= 2, "Should find declaration and usage");
     }
@@ -953,10 +1122,14 @@ mod references_tests {
         // Position at the 'value' usage inside the static block (line 3)
         let position = Position::new(3, 4);
 
-        let find_refs = FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let find_refs =
+            FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
         let references = find_refs.find_references(root, position);
 
-        assert!(references.is_some(), "Should find references for static block locals");
+        assert!(
+            references.is_some(),
+            "Should find references for static block locals"
+        );
         let refs = references.unwrap();
         assert!(refs.len() >= 2, "Should find declaration and usage");
     }

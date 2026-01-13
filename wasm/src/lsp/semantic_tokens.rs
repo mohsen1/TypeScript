@@ -11,12 +11,12 @@
 //!
 //! Each token is encoded relative to the previous token for efficiency.
 
+use crate::binder::{Symbol, SymbolId, symbol_flags};
+use crate::lsp::position::{LineMap, Position};
 use crate::parser::thin_node::ThinNodeArena;
 use crate::parser::{NodeIndex, syntax_kind_ext};
 use crate::scanner::SyntaxKind;
 use crate::thin_binder::ThinBinderState;
-use crate::binder::{SymbolId, symbol_flags, Symbol};
-use crate::lsp::position::{LineMap, Position};
 
 /// LSP Semantic Token Types (mapped to indices 0-N).
 /// These match the standard LSP semantic token types.
@@ -95,7 +95,7 @@ impl SemanticTokensBuilder {
         let delta_start = if delta_line == 0 {
             start_char - self.prev_char
         } else {
-            start_char  // New line, so absolute position
+            start_char // New line, so absolute position
         };
 
         self.data.push(delta_line);
@@ -161,7 +161,9 @@ impl<'a> SemanticTokensProvider<'a> {
 
     /// Visit a node and its children recursively.
     fn visit_node(&mut self, node_idx: NodeIndex) {
-        let Some(node) = self.arena.get(node_idx) else { return };
+        let Some(node) = self.arena.get(node_idx) else {
+            return;
+        };
 
         // Handle modifiers (keywords like public, private, static, readonly)
         if self.is_modifier(node.kind) {
@@ -218,16 +220,26 @@ impl<'a> SemanticTokensProvider<'a> {
     }
 
     /// Emit a semantic token for a specific node.
-    fn emit_token_for_node(&mut self, node_idx: NodeIndex, token_type: SemanticTokenType, modifiers: u32) {
-        let Some(node) = self.arena.get(node_idx) else { return };
+    fn emit_token_for_node(
+        &mut self,
+        node_idx: NodeIndex,
+        token_type: SemanticTokenType,
+        modifiers: u32,
+    ) {
+        let Some(node) = self.arena.get(node_idx) else {
+            return;
+        };
         let pos = self.line_map.offset_to_position(node.pos, self.source_text);
         let length = node.end - node.pos;
-        self.builder.push(pos.line, pos.character, length, token_type, modifiers);
+        self.builder
+            .push(pos.line, pos.character, length, token_type, modifiers);
     }
 
     /// Visit all children of a node in document order.
     fn visit_children(&mut self, node_idx: NodeIndex) {
-        let Some(node) = self.arena.get(node_idx) else { return };
+        let Some(node) = self.arena.get(node_idx) else {
+            return;
+        };
 
         // Don't recurse into identifiers - they're already handled
         if node.kind == SyntaxKind::Identifier as u16 {
@@ -537,13 +549,16 @@ impl<'a> SemanticTokensProvider<'a> {
     ///
     /// Extracts the name identifier from the declaration and emits a token for it.
     fn emit_token_for_declaration(&mut self, decl_idx: NodeIndex, symbol: &Symbol) {
-        let Some(decl_node) = self.arena.get(decl_idx) else { return };
+        let Some(decl_node) = self.arena.get(decl_idx) else {
+            return;
+        };
 
         // Extract the name identifier from the declaration
         let name_idx = match decl_node.kind {
-            k if k == syntax_kind_ext::VARIABLE_DECLARATION => {
-                self.arena.get_variable_declaration(decl_node).map(|v| v.name)
-            }
+            k if k == syntax_kind_ext::VARIABLE_DECLARATION => self
+                .arena
+                .get_variable_declaration(decl_node)
+                .map(|v| v.name),
             k if k == syntax_kind_ext::FUNCTION_DECLARATION => {
                 self.arena.get_function(decl_node).map(|f| f.name)
             }
@@ -589,7 +604,9 @@ impl<'a> SemanticTokensProvider<'a> {
 
     /// Emit a semantic token for a name identifier.
     fn emit_token_for_name(&mut self, node_idx: NodeIndex, symbol: &Symbol, is_declaration: bool) {
-        let Some(node) = self.arena.get(node_idx) else { return };
+        let Some(node) = self.arena.get(node_idx) else {
+            return;
+        };
 
         let pos = self.line_map.offset_to_position(node.pos, self.source_text);
         let length = node.end - node.pos;
@@ -600,13 +617,8 @@ impl<'a> SemanticTokensProvider<'a> {
             modifiers |= semantic_token_modifiers::DECLARATION;
         }
 
-        self.builder.push(
-            pos.line,
-            pos.character,
-            length,
-            token_type,
-            modifiers,
-        );
+        self.builder
+            .push(pos.line, pos.character, length, token_type, modifiers);
     }
 
     /// Map a symbol to a semantic token type and modifiers.
@@ -667,8 +679,8 @@ impl<'a> SemanticTokensProvider<'a> {
 #[cfg(test)]
 mod semantic_tokens_tests {
     use super::*;
-    use crate::thin_parser::ThinParserState;
     use crate::thin_binder::ThinBinderState;
+    use crate::thin_parser::ThinParserState;
 
     #[test]
     fn test_semantic_tokens_basic() {
@@ -690,7 +702,10 @@ mod semantic_tokens_tests {
         assert_eq!(tokens.len() % 5, 0, "Token array should be divisible by 5");
 
         // Should have at least 3 tokens (x, foo, Bar)
-        assert!(tokens.len() >= 15, "Should have at least 3 tokens (15 values)");
+        assert!(
+            tokens.len() >= 15,
+            "Should have at least 3 tokens (15 values)"
+        );
     }
 
     #[test]
@@ -715,7 +730,10 @@ mod semantic_tokens_tests {
         assert_eq!(tokens[3], SemanticTokenType::Function as u32);
 
         // Check DECLARATION modifier is set (bit 0)
-        assert_eq!(tokens[4] & semantic_token_modifiers::DECLARATION, semantic_token_modifiers::DECLARATION);
+        assert_eq!(
+            tokens[4] & semantic_token_modifiers::DECLARATION,
+            semantic_token_modifiers::DECLARATION
+        );
     }
 
     #[test]

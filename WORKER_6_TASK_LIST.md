@@ -1,12 +1,6 @@
 # Worker 6 Task List - Binder Squad
 
 ## Current Task
-- [ ] **BIND-12: Test namespace and enum resolution**
-  - Verify namespace member resolution works correctly
-  - Test enum accessibility across imports
-  - Ensure `namespace.subsymbol` resolution works
-
-## Queue
 - [ ] **BIND-17: Fix value namespace vs type namespace collision**
   - Handle cases where same name is used as value and type
   - Test: `interface X { } const X: number;`
@@ -26,6 +20,20 @@
   - Test end-to-end type checking with all improvements integrated
 
 ## Completed
+- [x] **BIND-12: Test namespace and enum resolution**
+  - Created test file: `tests/cases/conformance/enums/namespaceMemberResolution.ts`
+  - Created test file: `tests/cases/conformance/enums/enumAccessibilityAcrossImports.ts`
+  - Added 11 Rust unit tests in `wasm/src/thin_binder_tests.rs`:
+    - test_namespace_member_resolution_basic
+    - test_namespace_member_resolution_nested
+    - test_namespace_member_resolution_non_exported
+    - test_namespace_deep_chain_resolution
+    - test_enum_member_access
+    - test_enum_namespace_merging_access
+    - test_enum_with_initialized_members
+    - test_const_enum_declaration
+    - test_namespace_reopening_exports
+    - test_enum_namespace_merging_with_exports
 - [x] **BIND-9: Write conformance tests for Binder**
   - Created test file: `tests/conformance/binder_tests.ts`
   - Added cases for global symbols, module augmentation, ambient contexts

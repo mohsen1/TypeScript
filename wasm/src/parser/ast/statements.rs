@@ -1,7 +1,7 @@
 //! Statement AST nodes.
 
-use serde::Serialize;
 use super::base::{NodeBase, NodeIndex, NodeList};
+use serde::Serialize;
 
 /// Variable declaration kind.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -18,14 +18,14 @@ pub enum VariableDeclarationKind {
 pub struct VariableStatement {
     pub base: NodeBase,
     pub modifiers: Option<NodeList>,
-    pub declaration_list: NodeIndex,  // VariableDeclarationList
+    pub declaration_list: NodeIndex, // VariableDeclarationList
 }
 
 /// A variable declaration list.
 #[derive(Clone, Debug, Serialize)]
 pub struct VariableDeclarationList {
     pub base: NodeBase,
-    pub declarations: NodeList,  // VariableDeclaration[]
+    pub declarations: NodeList, // VariableDeclaration[]
 }
 
 /// A single variable declaration.
@@ -51,14 +51,14 @@ pub struct IfStatement {
     pub base: NodeBase,
     pub expression: NodeIndex,
     pub then_statement: NodeIndex,
-    pub else_statement: NodeIndex,  // Optional
+    pub else_statement: NodeIndex, // Optional
 }
 
 /// A return statement.
 #[derive(Clone, Debug, Serialize)]
 pub struct ReturnStatement {
     pub base: NodeBase,
-    pub expression: NodeIndex,  // Optional
+    pub expression: NodeIndex, // Optional
 }
 
 /// A block statement.
@@ -89,9 +89,9 @@ pub struct DoStatement {
 #[derive(Clone, Debug, Serialize)]
 pub struct ForStatement {
     pub base: NodeBase,
-    pub initializer: NodeIndex,  // Optional
-    pub condition: NodeIndex,    // Optional
-    pub incrementor: NodeIndex,  // Optional
+    pub initializer: NodeIndex, // Optional
+    pub condition: NodeIndex,   // Optional
+    pub incrementor: NodeIndex, // Optional
     pub statement: NodeIndex,
 }
 
@@ -157,14 +157,14 @@ pub struct TryStatement {
     pub base: NodeBase,
     pub try_block: NodeIndex,
     pub catch_clause: NodeIndex,  // Optional
-    pub finally_block: NodeIndex,  // Optional
+    pub finally_block: NodeIndex, // Optional
 }
 
 /// A catch clause.
 #[derive(Clone, Debug, Serialize)]
 pub struct CatchClause {
     pub base: NodeBase,
-    pub variable_declaration: NodeIndex,  // Optional
+    pub variable_declaration: NodeIndex, // Optional
     pub block: NodeIndex,
 }
 
@@ -180,14 +180,14 @@ pub struct LabeledStatement {
 #[derive(Clone, Debug, Serialize)]
 pub struct BreakStatement {
     pub base: NodeBase,
-    pub label: NodeIndex,  // Optional
+    pub label: NodeIndex, // Optional
 }
 
 /// A continue statement.
 #[derive(Clone, Debug, Serialize)]
 pub struct ContinueStatement {
     pub base: NodeBase,
-    pub label: NodeIndex,  // Optional
+    pub label: NodeIndex, // Optional
 }
 
 /// A with statement.

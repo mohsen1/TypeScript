@@ -241,7 +241,8 @@ pub trait QueryDatabase: TypeDatabase {
         object_type: TypeId,
         prop_name: &str,
     ) -> crate::solver::PropertyAccessResult {
-        let evaluator = crate::solver::operations::PropertyAccessEvaluator::new(self.as_type_database());
+        let evaluator =
+            crate::solver::operations::PropertyAccessEvaluator::new(self.as_type_database());
         evaluator.resolve_property_access(object_type, prop_name)
     }
 
@@ -254,10 +255,8 @@ pub trait QueryDatabase: TypeDatabase {
     }
 
     fn contextual_property_type(&self, expected: TypeId, prop_name: &str) -> Option<TypeId> {
-        let ctx = crate::solver::ContextualTypeContext::with_expected(
-            self.as_type_database(),
-            expected,
-        );
+        let ctx =
+            crate::solver::ContextualTypeContext::with_expected(self.as_type_database(), expected);
         ctx.get_property_type(prop_name)
     }
 
@@ -329,10 +328,7 @@ impl<'a> QueryCache<'a> {
 
     #[cfg(test)]
     pub fn subtype_cache_len(&self) -> usize {
-        self.subtype_cache
-            .read()
-            .expect("subtype cache lock")
-            .len()
+        self.subtype_cache.read().expect("subtype cache lock").len()
     }
 }
 
@@ -488,7 +484,12 @@ impl QueryDatabase for QueryCache<'_> {
     }
 
     fn evaluate_type(&self, type_id: TypeId) -> TypeId {
-        if let Some(&cached) = self.eval_cache.read().expect("eval cache lock").get(&type_id) {
+        if let Some(&cached) = self
+            .eval_cache
+            .read()
+            .expect("eval cache lock")
+            .get(&type_id)
+        {
             return cached;
         }
 
@@ -511,8 +512,7 @@ impl QueryDatabase for QueryCache<'_> {
             return cached;
         }
 
-        let result =
-            crate::solver::subtype::is_subtype_of(self.as_type_database(), source, target);
+        let result = crate::solver::subtype::is_subtype_of(self.as_type_database(), source, target);
         self.subtype_cache
             .write()
             .expect("subtype cache lock")

@@ -42,8 +42,8 @@ use crate::parser::syntax_kind_ext;
 use crate::parser::thin_node::{ThinNode, ThinNodeArena};
 use crate::parser::{NodeIndex, NodeList};
 use crate::scanner::SyntaxKind;
-use crate::transform_context::{IdentifierId, ModuleFormat, TransformContext, TransformDirective};
 use crate::thin_emitter::ModuleKind;
+use crate::transform_context::{IdentifierId, ModuleFormat, TransformContext, TransformDirective};
 use crate::transforms::arrow_es5::contains_this_reference;
 use crate::transforms::private_fields_es5::is_private_identifier;
 use std::sync::Arc;
@@ -88,13 +88,23 @@ impl<'a> LoweringPass<'a> {
 
         match node.kind {
             k if k == syntax_kind_ext::CLASS_DECLARATION => self.visit_class_declaration(node, idx),
-            k if k == syntax_kind_ext::FUNCTION_DECLARATION => self.visit_function_declaration(node, idx),
-            k if k == syntax_kind_ext::FUNCTION_EXPRESSION => self.visit_function_expression(node, idx),
+            k if k == syntax_kind_ext::FUNCTION_DECLARATION => {
+                self.visit_function_declaration(node, idx)
+            }
+            k if k == syntax_kind_ext::FUNCTION_EXPRESSION => {
+                self.visit_function_expression(node, idx)
+            }
             k if k == syntax_kind_ext::ARROW_FUNCTION => self.visit_arrow_function(node, idx),
-            k if k == syntax_kind_ext::VARIABLE_STATEMENT => self.visit_variable_statement(node, idx),
+            k if k == syntax_kind_ext::VARIABLE_STATEMENT => {
+                self.visit_variable_statement(node, idx)
+            }
             k if k == syntax_kind_ext::ENUM_DECLARATION => self.visit_enum_declaration(node, idx),
-            k if k == syntax_kind_ext::MODULE_DECLARATION => self.visit_module_declaration(node, idx),
-            k if k == syntax_kind_ext::EXPORT_DECLARATION => self.visit_export_declaration(node, idx),
+            k if k == syntax_kind_ext::MODULE_DECLARATION => {
+                self.visit_module_declaration(node, idx)
+            }
+            k if k == syntax_kind_ext::EXPORT_DECLARATION => {
+                self.visit_export_declaration(node, idx)
+            }
             k if k == syntax_kind_ext::FOR_IN_STATEMENT => self.visit_for_in_statement(node),
             k if k == syntax_kind_ext::FOR_OF_STATEMENT => self.visit_for_of_statement(node, idx),
             _ => self.visit_children(idx),
@@ -247,9 +257,7 @@ impl<'a> LoweringPass<'a> {
                     }
                 }
             }
-            k if k == syntax_kind_ext::GET_ACCESSOR
-                || k == syntax_kind_ext::SET_ACCESSOR =>
-            {
+            k if k == syntax_kind_ext::GET_ACCESSOR || k == syntax_kind_ext::SET_ACCESSOR => {
                 if let Some(accessor) = self.arena.get_accessor(node) {
                     if let Some(mods) = &accessor.modifiers {
                         for &mod_idx in &mods.nodes {
@@ -360,9 +368,7 @@ impl<'a> LoweringPass<'a> {
                 if self.ctx.target_es5 {
                     self.transforms.insert(
                         idx,
-                        TransformDirective::ES5TemplateLiteral {
-                            template_node: idx,
-                        },
+                        TransformDirective::ES5TemplateLiteral { template_node: idx },
                     );
                 }
             }
@@ -370,9 +376,7 @@ impl<'a> LoweringPass<'a> {
                 if self.ctx.target_es5 {
                     self.transforms.insert(
                         idx,
-                        TransformDirective::ES5TemplateLiteral {
-                            template_node: idx,
-                        },
+                        TransformDirective::ES5TemplateLiteral { template_node: idx },
                     );
                     self.transforms.helpers_mut().make_template_object = true;
                 }
@@ -385,9 +389,7 @@ impl<'a> LoweringPass<'a> {
                 if self.ctx.target_es5 {
                     self.transforms.insert(
                         idx,
-                        TransformDirective::ES5TemplateLiteral {
-                            template_node: idx,
-                        },
+                        TransformDirective::ES5TemplateLiteral { template_node: idx },
                     );
                 }
                 if let Some(template) = self.arena.get_template_expr(node) {
@@ -494,9 +496,7 @@ impl<'a> LoweringPass<'a> {
                     self.visit(switch.case_block);
                 }
             }
-            k if k == syntax_kind_ext::CASE_CLAUSE
-                || k == syntax_kind_ext::DEFAULT_CLAUSE =>
-            {
+            k if k == syntax_kind_ext::CASE_CLAUSE || k == syntax_kind_ext::DEFAULT_CLAUSE => {
                 if let Some(clause) = self.arena.get_case_clause(node) {
                     if !clause.expression.is_none() {
                         self.visit(clause.expression);
@@ -525,8 +525,7 @@ impl<'a> LoweringPass<'a> {
                     self.visit(catch.block);
                 }
             }
-            _ => {
-            }
+            _ => {}
         }
     }
 
@@ -546,10 +545,8 @@ impl<'a> LoweringPass<'a> {
         };
 
         if self.ctx.target_es5 && !for_in_of.await_modifier {
-            self.transforms.insert(
-                idx,
-                TransformDirective::ES5ForOf { for_of_node: idx },
-            );
+            self.transforms
+                .insert(idx, TransformDirective::ES5ForOf { for_of_node: idx });
             self.transforms.helpers_mut().values = true;
         }
 
@@ -586,8 +583,7 @@ impl<'a> LoweringPass<'a> {
                     if let Some(func) = self.arena.get_function(export_node) {
                         let is_anonymous = {
                             let func_name = self.get_identifier_text_ref(func.name).unwrap_or("");
-                            func_name == "function"
-                                || !Self::is_valid_identifier_name(func_name)
+                            func_name == "function" || !Self::is_valid_identifier_name(func_name)
                         };
                         if is_anonymous {
                             let directive = self.commonjs_default_export_function_directive(
@@ -623,8 +619,7 @@ impl<'a> LoweringPass<'a> {
                         };
                         if is_anonymous {
                             let directive = if self.ctx.target_es5 {
-                                let heritage =
-                                    self.get_extends_heritage(&class.heritage_clauses);
+                                let heritage = self.get_extends_heritage(&class.heritage_clauses);
                                 self.mark_class_helpers(export_decl.export_clause, heritage);
                                 TransformDirective::CommonJSExportDefaultClassES5 {
                                     class_node: export_decl.export_clause,
@@ -768,7 +763,10 @@ impl<'a> LoweringPass<'a> {
         // Determine the base transform
         let base_directive = if self.ctx.target_es5 {
             // ES5 class transform
-            TransformDirective::ES5Class { class_node: idx, heritage }
+            TransformDirective::ES5Class {
+                class_node: idx,
+                heritage,
+            }
         } else {
             // No transform needed for ES6+ targets
             TransformDirective::Identity
@@ -845,7 +843,9 @@ impl<'a> LoweringPass<'a> {
         let base_directive = if self.ctx.target_es5 && self.has_async_modifier(idx) {
             self.mark_async_helpers();
             TransformDirective::ES5AsyncFunction { function_node: idx }
-        } else if self.ctx.target_es5 && self.function_parameters_need_es5_transform(&func.parameters) {
+        } else if self.ctx.target_es5
+            && self.function_parameters_need_es5_transform(&func.parameters)
+        {
             TransformDirective::ES5FunctionParameters { function_node: idx }
         } else {
             TransformDirective::Identity
@@ -883,12 +883,7 @@ impl<'a> LoweringPass<'a> {
         }
     }
 
-    fn lower_enum_declaration(
-        &mut self,
-        node: &ThinNode,
-        idx: NodeIndex,
-        force_export: bool,
-    ) {
+    fn lower_enum_declaration(&mut self, node: &ThinNode, idx: NodeIndex, force_export: bool) {
         let Some(enum_decl) = self.arena.get_enum(node) else {
             return;
         };
@@ -954,12 +949,7 @@ impl<'a> LoweringPass<'a> {
         }
     }
 
-    fn lower_module_declaration(
-        &mut self,
-        node: &ThinNode,
-        idx: NodeIndex,
-        force_export: bool,
-    ) {
+    fn lower_module_declaration(&mut self, node: &ThinNode, idx: NodeIndex, force_export: bool) {
         let Some(module_decl) = self.arena.get_module(node) else {
             return;
         };
@@ -983,7 +973,9 @@ impl<'a> LoweringPass<'a> {
         };
 
         let base_directive = if self.ctx.target_es5 {
-            TransformDirective::ES5Namespace { namespace_node: idx }
+            TransformDirective::ES5Namespace {
+                namespace_node: idx,
+            }
         } else {
             TransformDirective::Identity
         };
@@ -1053,12 +1045,7 @@ impl<'a> LoweringPass<'a> {
         self.lower_variable_statement(node, idx, false);
     }
 
-    fn lower_variable_statement(
-        &mut self,
-        node: &ThinNode,
-        idx: NodeIndex,
-        force_export: bool,
-    ) {
+    fn lower_variable_statement(&mut self, node: &ThinNode, idx: NodeIndex, force_export: bool) {
         let Some(var_stmt) = self.arena.get_variable(node) else {
             return;
         };
@@ -1263,12 +1250,11 @@ impl<'a> LoweringPass<'a> {
         }
     }
 
-    fn class_has_private_members(
-        &self,
-        class_data: &crate::parser::thin_node::ClassData,
-    ) -> bool {
+    fn class_has_private_members(&self, class_data: &crate::parser::thin_node::ClassData) -> bool {
         for &member_idx in &class_data.members.nodes {
-            let Some(member_node) = self.arena.get(member_idx) else { continue };
+            let Some(member_node) = self.arena.get(member_idx) else {
+                continue;
+            };
 
             match member_node.kind {
                 k if k == syntax_kind_ext::PROPERTY_DECLARATION => {
@@ -1330,10 +1316,13 @@ impl<'a> LoweringPass<'a> {
     }
 
     fn is_binding_pattern_idx(&self, idx: NodeIndex) -> bool {
-        self.arena.get(idx).map(|node| {
-            node.kind == syntax_kind_ext::OBJECT_BINDING_PATTERN
-                || node.kind == syntax_kind_ext::ARRAY_BINDING_PATTERN
-        }).unwrap_or(false)
+        self.arena
+            .get(idx)
+            .map(|node| {
+                node.kind == syntax_kind_ext::OBJECT_BINDING_PATTERN
+                    || node.kind == syntax_kind_ext::ARRAY_BINDING_PATTERN
+            })
+            .unwrap_or(false)
     }
 
     fn is_computed_property_member(&self, idx: NodeIndex) -> bool {
@@ -1493,7 +1482,11 @@ impl<'a> LoweringPass<'a> {
         }
     }
 
-    fn collect_binding_names_from_element(&self, elem_idx: NodeIndex, names: &mut Vec<IdentifierId>) {
+    fn collect_binding_names_from_element(
+        &self,
+        elem_idx: NodeIndex,
+        names: &mut Vec<IdentifierId>,
+    ) {
         if elem_idx.is_none() {
             return;
         }
@@ -1635,7 +1628,8 @@ impl<'a> LoweringPass<'a> {
                     if !self.import_has_runtime_dependency(import_decl) {
                         continue;
                     }
-                    if let Some(text) = self.get_module_specifier_text(import_decl.module_specifier) {
+                    if let Some(text) = self.get_module_specifier_text(import_decl.module_specifier)
+                    {
                         if !deps.contains(&text) {
                             deps.push(text);
                         }
@@ -1649,7 +1643,8 @@ impl<'a> LoweringPass<'a> {
                     if !self.export_has_runtime_dependency(export_decl) {
                         continue;
                     }
-                    if let Some(text) = self.get_module_specifier_text(export_decl.module_specifier) {
+                    if let Some(text) = self.get_module_specifier_text(export_decl.module_specifier)
+                    {
                         if !deps.contains(&text) {
                             deps.push(text);
                         }
@@ -1965,11 +1960,7 @@ mod tests {
         let source = arena
             .get_source_file(root_node)
             .expect("expected source file data");
-        let stmt_idx = *source
-            .statements
-            .nodes
-            .first()
-            .expect("expected statement");
+        let stmt_idx = *source.statements.nodes.first().expect("expected statement");
         let stmt_node = arena.get(stmt_idx).expect("expected statement node");
         let var_stmt_idx = if stmt_node.kind == syntax_kind_ext::EXPORT_DECLARATION {
             let export_decl = arena

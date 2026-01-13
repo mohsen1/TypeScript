@@ -1,11 +1,11 @@
 use super::*;
-use crate::thin_binder::ThinBinderState;
-use crate::thin_parser::ThinParserState;
-use crate::solver::TypeInterner;
-use crate::lsp::position::LineMap;
 use crate::lsp::jsdoc::jsdoc_for_node;
+use crate::lsp::position::LineMap;
 use crate::lsp::utils::find_node_at_offset;
 use crate::parser::syntax_kind_ext;
+use crate::solver::TypeInterner;
+use crate::thin_binder::ThinBinderState;
+use crate::thin_parser::ThinParserState;
 
 #[test]
 fn test_signature_help_simple() {
@@ -71,7 +71,10 @@ fn test_signature_help_no_call() {
     let mut cache = None;
     let help = provider.get_signature_help(root, pos, &mut cache);
 
-    assert!(help.is_none(), "Should not find signature help outside call");
+    assert!(
+        help.is_none(),
+        "Should not find signature help outside call"
+    );
 }
 
 #[test]
@@ -137,7 +140,10 @@ fn test_signature_help_incomplete_call_eof() {
     let mut cache = None;
     let help = provider.get_signature_help(root, pos, &mut cache);
 
-    assert!(help.is_some(), "Should find signature help in incomplete call");
+    assert!(
+        help.is_some(),
+        "Should find signature help in incomplete call"
+    );
     if let Some(h) = help {
         assert_eq!(h.active_parameter, 0, "Should be on first parameter");
     }
@@ -259,7 +265,10 @@ fn test_signature_help_trailing_comma() {
     assert!(help.is_some(), "Should find signature help");
 
     if let Some(h) = help {
-        assert_eq!(h.active_parameter, 1, "Should be on second parameter after trailing comma");
+        assert_eq!(
+            h.active_parameter, 1,
+            "Should be on second parameter after trailing comma"
+        );
     }
 }
 
@@ -292,7 +301,10 @@ fn test_signature_help_comment_comma_ignored() {
     assert!(help.is_some(), "Should find signature help");
 
     if let Some(h) = help {
-        assert_eq!(h.active_parameter, 0, "Should stay on first parameter when comma is only in comment");
+        assert_eq!(
+            h.active_parameter, 0,
+            "Should stay on first parameter when comma is only in comment"
+        );
     }
 }
 
@@ -320,7 +332,10 @@ fn test_signature_help_overload_selection() {
     let mut cache = None;
     let pos_first = Position::new(5, 3); // At "1"
     let help_first = provider.get_signature_help(root, pos_first, &mut cache);
-    assert!(help_first.is_some(), "Should find signature help for first call");
+    assert!(
+        help_first.is_some(),
+        "Should find signature help for first call"
+    );
     let first = help_first.unwrap();
     assert!(first.signatures.len() >= 2, "Expected overload signatures");
     let first_active = &first.signatures[first.active_signature as usize];
@@ -331,7 +346,10 @@ fn test_signature_help_overload_selection() {
 
     let pos_second = Position::new(6, 6); // At "\"x\""
     let help_second = provider.get_signature_help(root, pos_second, &mut cache);
-    assert!(help_second.is_some(), "Should find signature help for second call");
+    assert!(
+        help_second.is_some(),
+        "Should find signature help for second call"
+    );
     let second = help_second.unwrap();
     assert!(second.signatures.len() >= 2, "Expected overload signatures");
     let second_active = &second.signatures[second.active_signature as usize];
@@ -365,9 +383,15 @@ fn test_signature_help_new_overload_selection() {
     let mut cache = None;
     let pos_first = Position::new(6, 9); // At "1"
     let help_first = provider.get_signature_help(root, pos_first, &mut cache);
-    assert!(help_first.is_some(), "Should find signature help for first new");
+    assert!(
+        help_first.is_some(),
+        "Should find signature help for first new"
+    );
     let first = help_first.unwrap();
-    assert!(!first.signatures.is_empty(), "Expected constructor signatures");
+    assert!(
+        !first.signatures.is_empty(),
+        "Expected constructor signatures"
+    );
     let first_active = &first.signatures[first.active_signature as usize];
     assert!(
         first_active.label.starts_with("new ("),
@@ -380,9 +404,15 @@ fn test_signature_help_new_overload_selection() {
 
     let pos_second = Position::new(7, 13); // At "x"
     let help_second = provider.get_signature_help(root, pos_second, &mut cache);
-    assert!(help_second.is_some(), "Should find signature help for second new");
+    assert!(
+        help_second.is_some(),
+        "Should find signature help for second new"
+    );
     let second = help_second.unwrap();
-    assert!(!second.signatures.is_empty(), "Expected constructor signatures");
+    assert!(
+        !second.signatures.is_empty(),
+        "Expected constructor signatures"
+    );
     let second_active = &second.signatures[second.active_signature as usize];
     assert!(
         second_active.label.contains("b: string"),
@@ -569,13 +599,24 @@ fn test_signature_help_method_overload_jsdoc_this_rest() {
             .nodes
             .iter()
             .copied()
-            .find(|stmt| arena.get(*stmt).and_then(|node| arena.get_class(node)).is_some())
+            .find(|stmt| {
+                arena
+                    .get(*stmt)
+                    .and_then(|node| arena.get_class(node))
+                    .is_some()
+            })
             .expect("class declaration")
     };
-    let class_data = arena.get_class(arena.get(class_decl).expect("class node")).expect("class data");
+    let class_data = arena
+        .get_class(arena.get(class_decl).expect("class node"))
+        .expect("class data");
     let has_method_jsdoc = class_data.members.nodes.iter().any(|&member| {
-        let Some(member_node) = arena.get(member) else { return false; };
-        let Some(method) = arena.get_method_decl(member_node) else { return false; };
+        let Some(member_node) = arena.get(member) else {
+            return false;
+        };
+        let Some(method) = arena.get_method_decl(member_node) else {
+            return false;
+        };
         if !method.body.is_none() {
             return false;
         }
@@ -591,12 +632,16 @@ fn test_signature_help_method_overload_jsdoc_this_rest() {
     let mut current = leaf;
     let mut call_expr_idx = None;
     for _ in 0..100 {
-        let Some(node) = arena.get(current) else { break; };
+        let Some(node) = arena.get(current) else {
+            break;
+        };
         if node.kind == syntax_kind_ext::CALL_EXPRESSION {
             call_expr_idx = Some(current);
             break;
         }
-        let Some(ext) = arena.get_extended(current) else { break; };
+        let Some(ext) = arena.get_extended(current) else {
+            break;
+        };
         current = ext.parent;
     }
     let call_expr_idx = call_expr_idx.expect("call expression");

@@ -1,6 +1,6 @@
 use super::args::CliArgs;
 use super::driver::{
-    compile, compile_with_cache, compile_with_cache_and_changes, CompilationCache,
+    CompilationCache, compile, compile_with_cache, compile_with_cache_and_changes,
 };
 use serde_json::Value;
 use std::path::{Path, PathBuf};
@@ -18,7 +18,11 @@ impl TempDir {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        path.push(format!("tsz_cli_driver_test_{}_{}", std::process::id(), nanos));
+        path.push(format!(
+            "tsz_cli_driver_test_{}_{}",
+            std::process::id(),
+            nanos
+        ));
         std::fs::create_dir_all(&path)?;
         Ok(Self { path })
     }
@@ -354,7 +358,10 @@ fn compile_with_jsx_preserve_emits_jsx_extension() {
           "include": ["src/**/*.tsx"]
         }"#,
     );
-    write_file(&base.join("src/view.tsx"), "export const View = () => <div />;");
+    write_file(
+        &base.join("src/view.tsx"),
+        "export const View = () => <div />;",
+    );
 
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
@@ -456,10 +463,12 @@ fn compile_resolves_node_modules_types() {
     let result = compile(&args, base).expect("compile should succeed");
 
     assert!(!result.diagnostics.is_empty());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diag.file.contains("node_modules/pkg/index.d.ts")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diag| diag.file.contains("node_modules/pkg/index.d.ts"))
+    );
     assert!(!base.join("dist/src/index.js").is_file());
 }
 
@@ -493,14 +502,18 @@ fn compile_resolves_tsconfig_types_includes_selected_packages() {
     let result = compile(&args, base).expect("compile should succeed");
 
     assert!(!result.diagnostics.is_empty());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diag.file.contains("node_modules/@types/foo/index.d.ts")));
-    assert!(!result
-        .diagnostics
-        .iter()
-        .any(|diag| diag.file.contains("node_modules/@types/bar/index.d.ts")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diag| diag.file.contains("node_modules/@types/foo/index.d.ts"))
+    );
+    assert!(
+        !result
+            .diagnostics
+            .iter()
+            .any(|diag| diag.file.contains("node_modules/@types/bar/index.d.ts"))
+    );
     assert!(!base.join("dist/src/index.js").is_file());
 }
 
@@ -521,19 +534,18 @@ fn compile_resolves_tsconfig_type_roots_includes_packages() {
         }"#,
     );
     write_file(&base.join("src/index.ts"), "export const value = 1;");
-    write_file(
-        &base.join("types/foo/index.d.ts"),
-        "export const foo = ;",
-    );
+    write_file(&base.join("types/foo/index.d.ts"), "export const foo = ;");
 
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
 
     assert!(!result.diagnostics.is_empty());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diag.file.contains("types/foo/index.d.ts")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diag| diag.file.contains("types/foo/index.d.ts"))
+    );
     assert!(!base.join("dist/src/index.js").is_file());
 }
 
@@ -574,10 +586,10 @@ fn compile_resolves_node_modules_exports_subpath() {
     let result = compile(&args, base).expect("compile should succeed");
 
     assert!(!result.diagnostics.is_empty());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diag.file.contains("node_modules/pkg/types/feature/widget.d.ts")));
+    assert!(result.diagnostics.iter().any(|diag| {
+        diag.file
+            .contains("node_modules/pkg/types/feature/widget.d.ts")
+    }));
     assert!(!base.join("dist/src/index.js").is_file());
 }
 
@@ -623,10 +635,10 @@ fn compile_resolves_node_modules_types_versions() {
     let result = compile(&args, base).expect("compile should succeed");
 
     assert!(!result.diagnostics.is_empty());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diag.file.contains("node_modules/pkg/types/feature/widget.d.ts")));
+    assert!(result.diagnostics.iter().any(|diag| {
+        diag.file
+            .contains("node_modules/pkg/types/feature/widget.d.ts")
+    }));
     assert!(!base.join("dist/src/index.js").is_file());
 }
 
@@ -682,10 +694,10 @@ fn compile_resolves_node_modules_types_versions_best_match() {
     let result = compile(&args, base).expect("compile should succeed");
 
     assert!(!result.diagnostics.is_empty());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diag.file.contains("node_modules/pkg/types/v5/feature/widget.d.ts")));
+    assert!(result.diagnostics.iter().any(|diag| {
+        diag.file
+            .contains("node_modules/pkg/types/v5/feature/widget.d.ts")
+    }));
     assert!(!base.join("dist/src/index.js").is_file());
 }
 
@@ -741,10 +753,10 @@ fn compile_resolves_node_modules_types_versions_prefers_specific_range() {
     let result = compile(&args, base).expect("compile should succeed");
 
     assert!(!result.diagnostics.is_empty());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diag.file.contains("node_modules/pkg/types/ranged/feature/widget.d.ts")));
+    assert!(result.diagnostics.iter().any(|diag| {
+        diag.file
+            .contains("node_modules/pkg/types/ranged/feature/widget.d.ts")
+    }));
     assert!(!base.join("dist/src/index.js").is_file());
 }
 
@@ -794,10 +806,10 @@ fn compile_resolves_node_modules_types_versions_respects_cli_version_override() 
     let result = compile(&args, base).expect("compile should succeed");
 
     assert!(!result.diagnostics.is_empty());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diag.file.contains("node_modules/pkg/types/v7/feature/widget.d.ts")));
+    assert!(result.diagnostics.iter().any(|diag| {
+        diag.file
+            .contains("node_modules/pkg/types/v7/feature/widget.d.ts")
+    }));
     assert!(!base.join("dist/src/index.js").is_file());
 }
 
@@ -848,10 +860,10 @@ fn compile_resolves_node_modules_types_versions_respects_env_version_override() 
     });
 
     assert!(!result.diagnostics.is_empty());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diag.file.contains("node_modules/pkg/types/v7/feature/widget.d.ts")));
+    assert!(result.diagnostics.iter().any(|diag| {
+        diag.file
+            .contains("node_modules/pkg/types/v7/feature/widget.d.ts")
+    }));
     assert!(!base.join("dist/src/index.js").is_file());
 }
 
@@ -903,10 +915,10 @@ fn compile_resolves_node_modules_types_versions_respects_tsconfig_version_overri
     });
 
     assert!(!result.diagnostics.is_empty());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diag.file.contains("node_modules/pkg/types/v7/feature/widget.d.ts")));
+    assert!(result.diagnostics.iter().any(|diag| {
+        diag.file
+            .contains("node_modules/pkg/types/v7/feature/widget.d.ts")
+    }));
     assert!(!base.join("dist/src/index.js").is_file());
 }
 
@@ -966,10 +978,10 @@ fn compile_resolves_node_modules_types_versions_tsconfig_extends_inherits_overri
     });
 
     assert!(!result.diagnostics.is_empty());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diag.file.contains("node_modules/pkg/types/v71/feature/widget.d.ts")));
+    assert!(result.diagnostics.iter().any(|diag| {
+        diag.file
+            .contains("node_modules/pkg/types/v71/feature/widget.d.ts")
+    }));
     assert!(!base.join("dist/src/index.js").is_file());
 }
 
@@ -1021,10 +1033,10 @@ fn compile_resolves_node_modules_types_versions_env_overrides_tsconfig() {
     });
 
     assert!(!result.diagnostics.is_empty());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diag.file.contains("node_modules/pkg/types/v7/feature/widget.d.ts")));
+    assert!(result.diagnostics.iter().any(|diag| {
+        diag.file
+            .contains("node_modules/pkg/types/v7/feature/widget.d.ts")
+    }));
     assert!(!base.join("dist/src/index.js").is_file());
 }
 
@@ -1076,10 +1088,10 @@ fn compile_resolves_node_modules_types_versions_empty_env_uses_tsconfig() {
     });
 
     assert!(!result.diagnostics.is_empty());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diag.file.contains("node_modules/pkg/types/v71/feature/widget.d.ts")));
+    assert!(result.diagnostics.iter().any(|diag| {
+        diag.file
+            .contains("node_modules/pkg/types/v71/feature/widget.d.ts")
+    }));
     assert!(!base.join("dist/src/index.js").is_file());
 }
 
@@ -1139,10 +1151,10 @@ fn compile_resolves_node_modules_types_versions_cli_overrides_env_and_tsconfig()
     });
 
     assert!(!result.diagnostics.is_empty());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diag.file.contains("node_modules/pkg/types/v72/feature/widget.d.ts")));
+    assert!(result.diagnostics.iter().any(|diag| {
+        diag.file
+            .contains("node_modules/pkg/types/v72/feature/widget.d.ts")
+    }));
     assert!(!base.join("dist/src/index.js").is_file());
 }
 
@@ -1192,10 +1204,10 @@ fn compile_resolves_node_modules_types_versions_invalid_override_falls_back() {
     let result = compile(&args, base).expect("compile should succeed");
 
     assert!(!result.diagnostics.is_empty());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diag.file.contains("node_modules/pkg/types/v6/feature/widget.d.ts")));
+    assert!(result.diagnostics.iter().any(|diag| {
+        diag.file
+            .contains("node_modules/pkg/types/v6/feature/widget.d.ts")
+    }));
     assert!(!base.join("dist/src/index.js").is_file());
 }
 
@@ -1246,10 +1258,10 @@ fn compile_resolves_node_modules_types_versions_invalid_env_falls_back() {
     });
 
     assert!(!result.diagnostics.is_empty());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diag.file.contains("node_modules/pkg/types/v6/feature/widget.d.ts")));
+    assert!(result.diagnostics.iter().any(|diag| {
+        diag.file
+            .contains("node_modules/pkg/types/v6/feature/widget.d.ts")
+    }));
     assert!(!base.join("dist/src/index.js").is_file());
 }
 
@@ -1301,10 +1313,10 @@ fn compile_resolves_node_modules_types_versions_invalid_tsconfig_falls_back() {
     });
 
     assert!(!result.diagnostics.is_empty());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diag.file.contains("node_modules/pkg/types/v6/feature/widget.d.ts")));
+    assert!(result.diagnostics.iter().any(|diag| {
+        diag.file
+            .contains("node_modules/pkg/types/v6/feature/widget.d.ts")
+    }));
     assert!(!base.join("dist/src/index.js").is_file());
 }
 
@@ -1353,10 +1365,10 @@ fn compile_resolves_node_modules_types_versions_falls_back_to_wildcard() {
     let result = compile(&args, base).expect("compile should succeed");
 
     assert!(!result.diagnostics.is_empty());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diag.file.contains("node_modules/pkg/types/fallback/feature/widget.d.ts")));
+    assert!(result.diagnostics.iter().any(|diag| {
+        diag.file
+            .contains("node_modules/pkg/types/fallback/feature/widget.d.ts")
+    }));
     assert!(!base.join("dist/src/index.js").is_file());
 }
 
@@ -1387,19 +1399,18 @@ fn compile_resolves_package_imports_wildcard() {
           }
         }"##,
     );
-    write_file(
-        &base.join("types/widget.d.ts"),
-        "export const widget = ;",
-    );
+    write_file(&base.join("types/widget.d.ts"), "export const widget = ;");
 
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
 
     assert!(!result.diagnostics.is_empty());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diag.file.contains("types/widget.d.ts")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diag| diag.file.contains("types/widget.d.ts"))
+    );
     assert!(!base.join("dist/src/index.js").is_file());
 }
 
@@ -1433,10 +1444,7 @@ fn compile_resolves_package_imports_prefers_types_condition() {
           }
         }"##,
     );
-    write_file(
-        &base.join("types/feature.d.ts"),
-        "export const feature = ;",
-    );
+    write_file(&base.join("types/feature.d.ts"), "export const feature = ;");
     write_file(
         &base.join("default/feature.d.ts"),
         "export const feature = 1;",
@@ -1446,10 +1454,12 @@ fn compile_resolves_package_imports_prefers_types_condition() {
     let result = compile(&args, base).expect("compile should succeed");
 
     assert!(!result.diagnostics.is_empty());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diag.file.contains("types/feature.d.ts")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diag| diag.file.contains("types/feature.d.ts"))
+    );
     assert!(!base.join("dist/src/index.js").is_file());
 }
 
@@ -1484,27 +1494,25 @@ fn compile_resolves_package_imports_prefers_require_condition_for_commonjs() {
           }
         }"##,
     );
-    write_file(
-        &base.join("types/require.d.ts"),
-        "export const feature = ;",
-    );
-    write_file(
-        &base.join("types/import.d.ts"),
-        "export const feature = 1;",
-    );
+    write_file(&base.join("types/require.d.ts"), "export const feature = ;");
+    write_file(&base.join("types/import.d.ts"), "export const feature = 1;");
 
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
 
     assert!(!result.diagnostics.is_empty());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diag.file.contains("types/require.d.ts")));
-    assert!(!result
-        .diagnostics
-        .iter()
-        .any(|diag| diag.file.contains("types/import.d.ts")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diag| diag.file.contains("types/require.d.ts"))
+    );
+    assert!(
+        !result
+            .diagnostics
+            .iter()
+            .any(|diag| diag.file.contains("types/import.d.ts"))
+    );
     assert!(!base.join("dist/src/index.js").is_file());
 }
 
@@ -1539,10 +1547,7 @@ fn compile_resolves_package_imports_prefers_import_condition_for_esm() {
           }
         }"##,
     );
-    write_file(
-        &base.join("types/import.d.ts"),
-        "export const feature = ;",
-    );
+    write_file(&base.join("types/import.d.ts"), "export const feature = ;");
     write_file(
         &base.join("types/require.d.ts"),
         "export const feature = 1;",
@@ -1552,14 +1557,18 @@ fn compile_resolves_package_imports_prefers_import_condition_for_esm() {
     let result = compile(&args, base).expect("compile should succeed");
 
     assert!(!result.diagnostics.is_empty());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diag.file.contains("types/import.d.ts")));
-    assert!(!result
-        .diagnostics
-        .iter()
-        .any(|diag| diag.file.contains("types/require.d.ts")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diag| diag.file.contains("types/import.d.ts"))
+    );
+    assert!(
+        !result
+            .diagnostics
+            .iter()
+            .any(|diag| diag.file.contains("types/require.d.ts"))
+    );
     assert!(!base.join("dist/src/index.js").is_file());
 }
 
@@ -1607,10 +1616,12 @@ fn compile_prefers_browser_exports_for_bundler() {
     let result = compile(&args, base).expect("compile should succeed");
 
     assert!(!result.diagnostics.is_empty());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diag.file.contains("node_modules/pkg/browser.d.ts")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diag| diag.file.contains("node_modules/pkg/browser.d.ts"))
+    );
     assert!(!base.join("dist/src/index.js").is_file());
 }
 
@@ -1640,10 +1651,12 @@ fn compile_node_next_resolves_js_extension_to_ts() {
     let result = compile(&args, base).expect("compile should succeed");
 
     assert!(!result.diagnostics.is_empty());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diag.file.contains("src/util.ts")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diag| diag.file.contains("src/util.ts"))
+    );
     assert!(!base.join("dist/src/index.js").is_file());
 }
 
@@ -1686,10 +1699,12 @@ fn compile_node_next_prefers_mts_for_module_package() {
     let result = compile(&args, base).expect("compile should succeed");
 
     assert!(!result.diagnostics.is_empty());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diag.file.contains("node_modules/pkg/index.mts")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diag| diag.file.contains("node_modules/pkg/index.mts"))
+    );
     assert!(!base.join("dist/src/index.js").is_file());
 }
 
@@ -1732,10 +1747,12 @@ fn compile_node_next_prefers_cts_for_commonjs_package() {
     let result = compile(&args, base).expect("compile should succeed");
 
     assert!(!result.diagnostics.is_empty());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diag.file.contains("node_modules/pkg/index.cts")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diag| diag.file.contains("node_modules/pkg/index.cts"))
+    );
     assert!(!base.join("dist/src/index.js").is_file());
 }
 
@@ -1812,10 +1829,12 @@ fn compile_with_cache_updates_dependencies_for_changed_files() {
     let args = default_args();
 
     let result = compile_with_cache(&args, base, &mut cache).expect("compile should succeed");
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diag.file.contains("util.ts")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diag| diag.file.contains("util.ts"))
+    );
 
     write_file(
         &index_path,
@@ -1826,14 +1845,18 @@ fn compile_with_cache_updates_dependencies_for_changed_files() {
     let canonical = std::fs::canonicalize(&index_path).unwrap_or(index_path.clone());
     let result = compile_with_cache_and_changes(&args, base, &mut cache, &[canonical])
         .expect("compile should succeed");
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diag.file.contains("extra.ts")));
-    assert!(!result
-        .diagnostics
-        .iter()
-        .any(|diag| diag.file.contains("util.ts")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diag| diag.file.contains("extra.ts"))
+    );
+    assert!(
+        !result
+            .diagnostics
+            .iter()
+            .any(|diag| diag.file.contains("util.ts"))
+    );
 }
 
 #[test]
@@ -2128,7 +2151,10 @@ fn invalidate_paths_with_dependents_symbols_handles_import_equals() {
     if !result.diagnostics.is_empty() {
         eprintln!("\n=== DIAGNOSTICS FOUND ===");
         for diag in &result.diagnostics {
-            eprintln!("  TS{}: {} (at {}:{})", diag.code, diag.message_text, diag.file, diag.start);
+            eprintln!(
+                "  TS{}: {} (at {}:{})",
+                diag.code, diag.message_text, diag.file, diag.start
+            );
         }
         eprintln!("=========================\n");
     }
@@ -2393,8 +2419,8 @@ export { UserService } from './services/user-service';
     );
 
     // Verify user-service.js has correct CommonJS require statements
-    let service_js =
-        std::fs::read_to_string(base.join("dist/services/user-service.js")).expect("read service js");
+    let service_js = std::fs::read_to_string(base.join("dist/services/user-service.js"))
+        .expect("read service js");
     assert!(
         service_js.contains("require(") || service_js.contains("import"),
         "Service JS should have require or import statements: {}",
@@ -2414,7 +2440,8 @@ export { UserService } from './services/user-service';
     // Verify index.js has re-exports (CommonJS uses Object.defineProperty pattern)
     let index_js = std::fs::read_to_string(base.join("dist/index.js")).expect("read index js");
     assert!(
-        index_js.contains("exports") && (index_js.contains("require(") || index_js.contains("Object.defineProperty")),
+        index_js.contains("exports")
+            && (index_js.contains("require(") || index_js.contains("Object.defineProperty")),
         "Index JS should have CommonJS exports: {}",
         index_js
     );
@@ -2437,13 +2464,8 @@ export { UserService } from './services/user-service';
         .get("sources")
         .and_then(|v| v.as_array())
         .expect("sources array");
-    assert!(
-        !sources.is_empty(),
-        "Source map should have sources"
-    );
-    let sources_content = service_map
-        .get("sourcesContent")
-        .and_then(|v| v.as_array());
+    assert!(!sources.is_empty(), "Source map should have sources");
+    let sources_content = service_map.get("sourcesContent").and_then(|v| v.as_array());
     assert!(
         sources_content.is_some(),
         "Source map should have sourcesContent"
@@ -2641,7 +2663,8 @@ export { ConsoleLogger, createLogger } from './logger';
     assert!(base.join("dist/src/index.d.ts").is_file());
 
     // Verify declaration file has type exports
-    let index_dts = std::fs::read_to_string(base.join("dist/src/index.d.ts")).expect("read index d.ts");
+    let index_dts =
+        std::fs::read_to_string(base.join("dist/src/index.d.ts")).expect("read index d.ts");
     assert!(
         index_dts.contains("Logger") && index_dts.contains("LogLevel"),
         "Index d.ts should have type exports for Logger and LogLevel: {}",
@@ -2649,7 +2672,8 @@ export { ConsoleLogger, createLogger } from './logger';
     );
 
     // Verify logger.js has the class implementation
-    let logger_js = std::fs::read_to_string(base.join("dist/src/logger.js")).expect("read logger js");
+    let logger_js =
+        std::fs::read_to_string(base.join("dist/src/logger.js")).expect("read logger js");
     assert!(
         logger_js.contains("ConsoleLogger") && logger_js.contains("createLogger"),
         "Logger JS should have class and function exports: {}",
@@ -3068,7 +3092,10 @@ fn compile_outdir_with_rootdir_flattens_paths() {
         }"#,
     );
     write_file(&base.join("src/index.ts"), "export const value = 42;");
-    write_file(&base.join("src/utils/helpers.ts"), "export const helper = 1;");
+    write_file(
+        &base.join("src/utils/helpers.ts"),
+        "export const helper = 1;",
+    );
 
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
@@ -3109,8 +3136,14 @@ fn compile_outdir_nested_structure() {
     );
     write_file(&base.join("src/index.ts"), "export const main = 1;");
     write_file(&base.join("src/models/user.ts"), "export const user = 2;");
-    write_file(&base.join("src/utils/helpers.ts"), "export const helper = 3;");
-    write_file(&base.join("src/services/api/client.ts"), "export const client = 4;");
+    write_file(
+        &base.join("src/utils/helpers.ts"),
+        "export const helper = 3;",
+    );
+    write_file(
+        &base.join("src/services/api/client.ts"),
+        "export const client = 4;",
+    );
 
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
@@ -3196,7 +3229,10 @@ fn compile_outdir_with_declaration_and_sourcemap() {
     let map_contents = std::fs::read_to_string(base.join("dist/index.js.map")).expect("read map");
     let map_json: Value = serde_json::from_str(&map_contents).expect("parse map");
     let file_field = map_json.get("file").and_then(|v| v.as_str()).unwrap_or("");
-    assert_eq!(file_field, "index.js", "Source map file field should be index.js");
+    assert_eq!(
+        file_field, "index.js",
+        "Source map file field should be index.js"
+    );
 }
 
 #[test]
@@ -3370,10 +3406,7 @@ fn compile_missing_tsconfig_in_project_dir_returns_error() {
 
     // Create project directory but no tsconfig.json
     std::fs::create_dir_all(base.join("myproject")).expect("create dir");
-    write_file(
-        &base.join("myproject/index.ts"),
-        "export const value = 42;",
-    );
+    write_file(&base.join("myproject/index.ts"), "export const value = 42;");
 
     let mut args = default_args();
     args.project = Some(PathBuf::from("myproject"));
@@ -3471,9 +3504,18 @@ export function reduce<T, U>(arr: T[], fn: (acc: U, item: T) => U, initial: U): 
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
 
-    assert!(result.diagnostics.is_empty(), "Should compile without errors");
-    assert!(base.join("dist/src/array.js").is_file(), "JS output should exist");
-    assert!(base.join("dist/src/array.d.ts").is_file(), "Declaration should exist");
+    assert!(
+        result.diagnostics.is_empty(),
+        "Should compile without errors"
+    );
+    assert!(
+        base.join("dist/src/array.js").is_file(),
+        "JS output should exist"
+    );
+    assert!(
+        base.join("dist/src/array.d.ts").is_file(),
+        "Declaration should exist"
+    );
 
     // Verify JS output has type annotations stripped
     let js = std::fs::read_to_string(base.join("dist/src/array.js")).expect("read js");
@@ -3486,8 +3528,14 @@ export function reduce<T, U>(arr: T[], fn: (acc: U, item: T) => U, initial: U): 
 
     // Verify declarations preserve types
     let dts = std::fs::read_to_string(base.join("dist/src/array.d.ts")).expect("read dts");
-    assert!(dts.contains("map<T, U>") || dts.contains("map<T,U>"), "Generic should be in declaration");
-    assert!(dts.contains("filter<T>"), "Generic should be in declaration");
+    assert!(
+        dts.contains("map<T, U>") || dts.contains("map<T,U>"),
+        "Generic should be in declaration"
+    );
+    assert!(
+        dts.contains("filter<T>"),
+        "Generic should be in declaration"
+    );
 }
 
 #[test]
@@ -3566,26 +3614,50 @@ export function isNonNull<T>(value: T | null | undefined): value is T {
     if !result.diagnostics.is_empty() {
         eprintln!("\n=== DIAGNOSTICS FOUND ===");
         for diag in &result.diagnostics {
-            eprintln!("  TS{}: {} (at {}:{})", diag.code, diag.message_text, diag.file, diag.start);
+            eprintln!(
+                "  TS{}: {} (at {}:{})",
+                diag.code, diag.message_text, diag.file, diag.start
+            );
         }
         eprintln!("=========================\n");
     }
 
-    assert!(result.diagnostics.is_empty(), "Should compile without errors");
-    assert!(base.join("dist/src/types.js").is_file(), "JS output should exist");
-    assert!(base.join("dist/src/types.d.ts").is_file(), "Declaration should exist");
+    assert!(
+        result.diagnostics.is_empty(),
+        "Should compile without errors"
+    );
+    assert!(
+        base.join("dist/src/types.js").is_file(),
+        "JS output should exist"
+    );
+    assert!(
+        base.join("dist/src/types.d.ts").is_file(),
+        "Declaration should exist"
+    );
 
     // Verify JS output - type aliases should be completely erased
     let js = std::fs::read_to_string(base.join("dist/src/types.js")).expect("read js");
     assert!(!js.contains("DeepReadonly"), "Type alias should be erased");
     assert!(!js.contains("DeepPartial"), "Type alias should be erased");
-    assert!(js.contains("function deepFreeze"), "Runtime function should be present");
-    assert!(js.contains("function isNonNull"), "Runtime function should be present");
+    assert!(
+        js.contains("function deepFreeze"),
+        "Runtime function should be present"
+    );
+    assert!(
+        js.contains("function isNonNull"),
+        "Runtime function should be present"
+    );
 
     // Verify declarations preserve type utilities
     let dts = std::fs::read_to_string(base.join("dist/src/types.d.ts")).expect("read dts");
-    assert!(dts.contains("DeepReadonly"), "Type alias should be in declaration");
-    assert!(dts.contains("DeepPartial"), "Type alias should be in declaration");
+    assert!(
+        dts.contains("DeepReadonly"),
+        "Type alias should be in declaration"
+    );
+    assert!(
+        dts.contains("DeepPartial"),
+        "Type alias should be in declaration"
+    );
 }
 
 #[test]
@@ -3667,7 +3739,10 @@ export { identity, constant, noop } from "./function";
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
 
-    assert!(result.diagnostics.is_empty(), "Should compile without errors");
+    assert!(
+        result.diagnostics.is_empty(),
+        "Should compile without errors"
+    );
 
     // All JS files should exist
     assert!(base.join("dist/src/array.js").is_file());
@@ -3760,19 +3835,40 @@ export function wrap<T>(value: T, count: number = 1): T[] {
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
 
-    assert!(result.diagnostics.is_empty(), "Should compile without errors");
+    assert!(
+        result.diagnostics.is_empty(),
+        "Should compile without errors"
+    );
 
     let js = std::fs::read_to_string(base.join("dist/src/constrained.js")).expect("read js");
-    assert!(!js.contains("extends keyof"), "Constraints should be stripped");
-    assert!(!js.contains("extends object"), "Constraints should be stripped");
-    assert!(js.contains("function getProperty"), "Function should be present");
+    assert!(
+        !js.contains("extends keyof"),
+        "Constraints should be stripped"
+    );
+    assert!(
+        !js.contains("extends object"),
+        "Constraints should be stripped"
+    );
+    assert!(
+        js.contains("function getProperty"),
+        "Function should be present"
+    );
     assert!(js.contains("function wrap"), "Function should be present");
 
     let dts = std::fs::read_to_string(base.join("dist/src/constrained.d.ts")).expect("read dts");
     // Check that generic functions are present in declaration
-    assert!(dts.contains("getProperty"), "getProperty should be in declaration");
-    assert!(dts.contains("setProperty"), "setProperty should be in declaration");
-    assert!(dts.contains("createArray"), "createArray should be in declaration");
+    assert!(
+        dts.contains("getProperty"),
+        "getProperty should be in declaration"
+    );
+    assert!(
+        dts.contains("setProperty"),
+        "setProperty should be in declaration"
+    );
+    assert!(
+        dts.contains("createArray"),
+        "createArray should be in declaration"
+    );
     assert!(dts.contains("wrap"), "wrap should be in declaration");
 }
 
@@ -3873,7 +3969,10 @@ export class Result<T, E> {
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
 
-    assert!(result.diagnostics.is_empty(), "Should compile without errors");
+    assert!(
+        result.diagnostics.is_empty(),
+        "Should compile without errors"
+    );
 
     let js = std::fs::read_to_string(base.join("dist/src/collections.js")).expect("read js");
     assert!(js.contains("class Stack"), "Class should be present");
@@ -3881,12 +3980,24 @@ export class Result<T, E> {
     assert!(js.contains("class Result"), "Class should be present");
     assert!(!js.contains("<T>"), "Generic parameters should be stripped");
     assert!(!js.contains("T[]"), "Type annotations should be stripped");
-    assert!(!js.contains(": void"), "Return type annotations should be stripped");
+    assert!(
+        !js.contains(": void"),
+        "Return type annotations should be stripped"
+    );
 
     let dts = std::fs::read_to_string(base.join("dist/src/collections.d.ts")).expect("read dts");
-    assert!(dts.contains("Stack<T>"), "Generic class should be in declaration");
-    assert!(dts.contains("Queue<T>"), "Generic class should be in declaration");
-    assert!(dts.contains("Result<T, E>") || dts.contains("Result<T,E>"), "Generic class should be in declaration");
+    assert!(
+        dts.contains("Stack<T>"),
+        "Generic class should be in declaration"
+    );
+    assert!(
+        dts.contains("Queue<T>"),
+        "Generic class should be in declaration"
+    );
+    assert!(
+        dts.contains("Result<T, E>") || dts.contains("Result<T,E>"),
+        "Generic class should be in declaration"
+    );
 }
 
 // =============================================================================
@@ -3935,7 +4046,10 @@ export { add, multiply, PI } from "./utils";
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
 
-    assert!(result.diagnostics.is_empty(), "Should compile without errors");
+    assert!(
+        result.diagnostics.is_empty(),
+        "Should compile without errors"
+    );
     assert!(base.join("dist/src/utils.js").is_file());
     assert!(base.join("dist/src/index.js").is_file());
     assert!(base.join("dist/src/index.d.ts").is_file());
@@ -3943,7 +4057,10 @@ export { add, multiply, PI } from "./utils";
     // Verify index re-exports
     let index_dts = std::fs::read_to_string(base.join("dist/src/index.d.ts")).expect("read dts");
     assert!(index_dts.contains("add"), "add should be re-exported");
-    assert!(index_dts.contains("multiply"), "multiply should be re-exported");
+    assert!(
+        index_dts.contains("multiply"),
+        "multiply should be re-exported"
+    );
     assert!(index_dts.contains("PI"), "PI should be re-exported");
 }
 
@@ -3985,7 +4102,10 @@ export { internalHelper as helper, internalValue as value } from "./internal";
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
 
-    assert!(result.diagnostics.is_empty(), "Should compile without errors");
+    assert!(
+        result.diagnostics.is_empty(),
+        "Should compile without errors"
+    );
 
     let index_dts = std::fs::read_to_string(base.join("dist/src/index.d.ts")).expect("read dts");
     assert!(index_dts.contains("helper"), "helper should be re-exported");
@@ -4036,10 +4156,16 @@ export * from "./math";
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
 
-    assert!(result.diagnostics.is_empty(), "Should compile without errors");
+    assert!(
+        result.diagnostics.is_empty(),
+        "Should compile without errors"
+    );
 
     let index_dts = std::fs::read_to_string(base.join("dist/src/index.d.ts")).expect("read dts");
-    assert!(index_dts.contains("sum") || index_dts.contains("*"), "sum should be re-exported or star export present");
+    assert!(
+        index_dts.contains("sum") || index_dts.contains("*"),
+        "sum should be re-exported or star export present"
+    );
 }
 
 #[test]
@@ -4094,7 +4220,10 @@ export { coreFunction, CORE_VERSION, intermediateFunction } from "./intermediate
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
 
-    assert!(result.diagnostics.is_empty(), "Should compile without errors");
+    assert!(
+        result.diagnostics.is_empty(),
+        "Should compile without errors"
+    );
 
     // All files should be compiled
     assert!(base.join("dist/src/core.js").is_file());
@@ -4102,8 +4231,14 @@ export { coreFunction, CORE_VERSION, intermediateFunction } from "./intermediate
     assert!(base.join("dist/src/index.js").is_file());
 
     let index_dts = std::fs::read_to_string(base.join("dist/src/index.d.ts")).expect("read dts");
-    assert!(index_dts.contains("coreFunction"), "coreFunction should be re-exported");
-    assert!(index_dts.contains("intermediateFunction"), "intermediateFunction should be re-exported");
+    assert!(
+        index_dts.contains("coreFunction"),
+        "coreFunction should be re-exported"
+    );
+    assert!(
+        index_dts.contains("intermediateFunction"),
+        "intermediateFunction should be re-exported"
+    );
 }
 
 #[test]
@@ -4154,15 +4289,30 @@ export const LOCAL_CONSTANT = "local";
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
 
-    assert!(result.diagnostics.is_empty(), "Should compile without errors");
+    assert!(
+        result.diagnostics.is_empty(),
+        "Should compile without errors"
+    );
 
     let index_js = std::fs::read_to_string(base.join("dist/src/index.js")).expect("read js");
-    assert!(index_js.contains("localFunction"), "Local function should be in output");
+    assert!(
+        index_js.contains("localFunction"),
+        "Local function should be in output"
+    );
 
     let index_dts = std::fs::read_to_string(base.join("dist/src/index.d.ts")).expect("read dts");
-    assert!(index_dts.contains("helperA"), "helperA should be re-exported");
-    assert!(index_dts.contains("localFunction"), "localFunction should be exported");
-    assert!(index_dts.contains("LOCAL_CONSTANT"), "LOCAL_CONSTANT should be exported");
+    assert!(
+        index_dts.contains("helperA"),
+        "helperA should be re-exported"
+    );
+    assert!(
+        index_dts.contains("localFunction"),
+        "localFunction should be exported"
+    );
+    assert!(
+        index_dts.contains("LOCAL_CONSTANT"),
+        "LOCAL_CONSTANT should be exported"
+    );
 }
 
 #[test]
@@ -4209,15 +4359,27 @@ export { createId } from "./types";
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
 
-    assert!(result.diagnostics.is_empty(), "Should compile without errors");
+    assert!(
+        result.diagnostics.is_empty(),
+        "Should compile without errors"
+    );
 
     let index_js = std::fs::read_to_string(base.join("dist/src/index.js")).expect("read js");
     // Type-only exports should not appear in runtime output, but createId should
-    assert!(index_js.contains("createId"), "createId should be in output");
+    assert!(
+        index_js.contains("createId"),
+        "createId should be in output"
+    );
 
     let index_dts = std::fs::read_to_string(base.join("dist/src/index.d.ts")).expect("read dts");
-    assert!(index_dts.contains("UserId"), "UserId type should be in declaration");
-    assert!(index_dts.contains("createId"), "createId should be in declaration");
+    assert!(
+        index_dts.contains("UserId"),
+        "UserId type should be in declaration"
+    );
+    assert!(
+        index_dts.contains("createId"),
+        "createId should be in declaration"
+    );
 }
 
 #[test]
@@ -4258,11 +4420,20 @@ export { default, version } from "./component";
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
 
-    assert!(result.diagnostics.is_empty(), "Should compile without errors");
+    assert!(
+        result.diagnostics.is_empty(),
+        "Should compile without errors"
+    );
 
     let index_dts = std::fs::read_to_string(base.join("dist/src/index.d.ts")).expect("read dts");
-    assert!(index_dts.contains("default") || index_dts.contains("Component"), "default export should be re-exported");
-    assert!(index_dts.contains("version"), "version should be re-exported");
+    assert!(
+        index_dts.contains("default") || index_dts.contains("Component"),
+        "default export should be re-exported"
+    );
+    assert!(
+        index_dts.contains("version"),
+        "version should be re-exported"
+    );
 }
 
 #[test]
@@ -4327,7 +4498,10 @@ export { login, logout, fetchData, saveData } from "./features";
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
 
-    assert!(result.diagnostics.is_empty(), "Should compile without errors");
+    assert!(
+        result.diagnostics.is_empty(),
+        "Should compile without errors"
+    );
 
     // All files should be compiled
     assert!(base.join("dist/src/features/auth.js").is_file());
@@ -4337,7 +4511,10 @@ export { login, logout, fetchData, saveData } from "./features";
 
     let index_dts = std::fs::read_to_string(base.join("dist/src/index.d.ts")).expect("read dts");
     assert!(index_dts.contains("login"), "login should be re-exported");
-    assert!(index_dts.contains("fetchData"), "fetchData should be re-exported");
+    assert!(
+        index_dts.contains("fetchData"),
+        "fetchData should be re-exported"
+    );
 }
 
 // =============================================================================
@@ -4390,7 +4567,10 @@ export class Builder<T> {
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
 
-    assert!(result.diagnostics.is_empty(), "Should compile without errors");
+    assert!(
+        result.diagnostics.is_empty(),
+        "Should compile without errors"
+    );
 
     let js = std::fs::read_to_string(base.join("dist/src/builder.js")).expect("read js");
     assert!(js.contains("class Builder"), "Class should be present");
@@ -4398,8 +4578,14 @@ export class Builder<T> {
     assert!(!js.contains("<T>"), "Generic should be stripped");
 
     let dts = std::fs::read_to_string(base.join("dist/src/builder.d.ts")).expect("read dts");
-    assert!(dts.contains("Builder<T>"), "Generic class should be in declaration");
-    assert!(dts.contains("transform<U>"), "Generic method should be in declaration");
+    assert!(
+        dts.contains("Builder<T>"),
+        "Generic class should be in declaration"
+    );
+    assert!(
+        dts.contains("transform<U>"),
+        "Generic method should be in declaration"
+    );
 }
 
 // =============================================================================
@@ -4437,7 +4623,11 @@ export namespace Utils {
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
 
-    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+    assert!(
+        result.diagnostics.is_empty(),
+        "Should compile without errors: {:?}",
+        result.diagnostics
+    );
 
     let js = std::fs::read_to_string(base.join("dist/src/utils.js")).expect("read js");
     // Namespace should produce some output
@@ -4482,7 +4672,11 @@ export namespace API {
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
 
-    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+    assert!(
+        result.diagnostics.is_empty(),
+        "Should compile without errors: {:?}",
+        result.diagnostics
+    );
 
     let js = std::fs::read_to_string(base.join("dist/src/api.js")).expect("read js");
     assert!(!js.is_empty(), "JS output should not be empty");
@@ -4521,7 +4715,11 @@ export namespace Models {
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
 
-    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+    assert!(
+        result.diagnostics.is_empty(),
+        "Should compile without errors: {:?}",
+        result.diagnostics
+    );
 
     let js = std::fs::read_to_string(base.join("dist/src/models.js")).expect("read js");
     assert!(!js.is_empty(), "JS output should not be empty");
@@ -4567,7 +4765,11 @@ export function getStatusName(status: Status): string {
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
 
-    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+    assert!(
+        result.diagnostics.is_empty(),
+        "Should compile without errors: {:?}",
+        result.diagnostics
+    );
 
     let js = std::fs::read_to_string(base.join("dist/src/status.js")).expect("read js");
     assert!(js.contains("Status"), "Enum should be present in JS");
@@ -4610,7 +4812,11 @@ export function move(dir: Direction): void {
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
 
-    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+    assert!(
+        result.diagnostics.is_empty(),
+        "Should compile without errors: {:?}",
+        result.diagnostics
+    );
 
     let js = std::fs::read_to_string(base.join("dist/src/direction.js")).expect("read js");
     assert!(js.contains("Direction"), "Enum should be present in JS");
@@ -4652,7 +4858,11 @@ export function hasFlag(flags: Flags, flag: Flags): boolean {
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
 
-    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+    assert!(
+        result.diagnostics.is_empty(),
+        "Should compile without errors: {:?}",
+        result.diagnostics
+    );
 
     let js = std::fs::read_to_string(base.join("dist/src/flags.js")).expect("read js");
     // Const enums may be inlined, so just verify compilation succeeded
@@ -4690,7 +4900,11 @@ export enum Size {
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
 
-    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+    assert!(
+        result.diagnostics.is_empty(),
+        "Should compile without errors: {:?}",
+        result.diagnostics
+    );
 
     let js = std::fs::read_to_string(base.join("dist/src/sizes.js")).expect("read js");
     assert!(js.contains("Size"), "Enum should be present in JS");
@@ -4732,10 +4946,17 @@ export const identity = <T>(x: T): T => x;
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
 
-    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+    assert!(
+        result.diagnostics.is_empty(),
+        "Should compile without errors: {:?}",
+        result.diagnostics
+    );
 
     let js = std::fs::read_to_string(base.join("dist/src/utils.js")).expect("read js");
-    assert!(js.contains("=>") || js.contains("function"), "Arrow or function should be present");
+    assert!(
+        js.contains("=>") || js.contains("function"),
+        "Arrow or function should be present"
+    );
     assert!(!js.is_empty(), "JS output should not be empty");
 }
 
@@ -4773,7 +4994,11 @@ export const first = <T>(...items: T[]): T => items[0];
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
 
-    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+    assert!(
+        result.diagnostics.is_empty(),
+        "Should compile without errors: {:?}",
+        result.diagnostics
+    );
 
     let js = std::fs::read_to_string(base.join("dist/src/helpers.js")).expect("read js");
     assert!(!js.is_empty(), "JS output should not be empty");
@@ -4815,7 +5040,11 @@ export const repeat = (str: string, times: number = 1): string => {
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
 
-    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+    assert!(
+        result.diagnostics.is_empty(),
+        "Should compile without errors: {:?}",
+        result.diagnostics
+    );
 
     let js = std::fs::read_to_string(base.join("dist/src/greet.js")).expect("read js");
     assert!(!js.is_empty(), "JS output should not be empty");
@@ -4861,7 +5090,11 @@ export class Counter {
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
 
-    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+    assert!(
+        result.diagnostics.is_empty(),
+        "Should compile without errors: {:?}",
+        result.diagnostics
+    );
 
     let js = std::fs::read_to_string(base.join("dist/src/counter.js")).expect("read js");
     assert!(js.contains("Counter"), "Class should be present");
@@ -4904,7 +5137,11 @@ export function copy(a: number[]): number[] {
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
 
-    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+    assert!(
+        result.diagnostics.is_empty(),
+        "Should compile without errors: {:?}",
+        result.diagnostics
+    );
 
     let js = std::fs::read_to_string(base.join("dist/src/arrays.js")).expect("read js");
     assert!(!js.is_empty(), "JS output should not be empty");
@@ -4947,7 +5184,11 @@ export function update(obj: Person, updates: Person): Person {
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
 
-    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+    assert!(
+        result.diagnostics.is_empty(),
+        "Should compile without errors: {:?}",
+        result.diagnostics
+    );
 
     let js = std::fs::read_to_string(base.join("dist/src/objects.js")).expect("read js");
     assert!(!js.is_empty(), "JS output should not be empty");
@@ -4985,7 +5226,11 @@ export function log(...items: string[]): void {
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
 
-    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+    assert!(
+        result.diagnostics.is_empty(),
+        "Should compile without errors: {:?}",
+        result.diagnostics
+    );
 
     let js = std::fs::read_to_string(base.join("dist/src/calls.js")).expect("read js");
     assert!(!js.is_empty(), "JS output should not be empty");
@@ -5027,7 +5272,11 @@ export function format(a: number, b: number): string {
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
 
-    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+    assert!(
+        result.diagnostics.is_empty(),
+        "Should compile without errors: {:?}",
+        result.diagnostics
+    );
 
     let js = std::fs::read_to_string(base.join("dist/src/greet.js")).expect("read js");
     assert!(!js.is_empty(), "JS output should not be empty");
@@ -5062,7 +5311,11 @@ export function createDiv(content: string): string {
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
 
-    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+    assert!(
+        result.diagnostics.is_empty(),
+        "Should compile without errors: {:?}",
+        result.diagnostics
+    );
 
     let js = std::fs::read_to_string(base.join("dist/src/html.js")).expect("read js");
     assert!(!js.is_empty(), "JS output should not be empty");
@@ -5096,7 +5349,11 @@ export function wrap(inner: string, outer: string): string {
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
 
-    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+    assert!(
+        result.diagnostics.is_empty(),
+        "Should compile without errors: {:?}",
+        result.diagnostics
+    );
 
     let js = std::fs::read_to_string(base.join("dist/src/nested.js")).expect("read js");
     assert!(!js.is_empty(), "JS output should not be empty");
@@ -5140,7 +5397,11 @@ export function getX(point: Point): number {
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
 
-    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+    assert!(
+        result.diagnostics.is_empty(),
+        "Should compile without errors: {:?}",
+        result.diagnostics
+    );
 
     let js = std::fs::read_to_string(base.join("dist/src/extract.js")).expect("read js");
     assert!(!js.is_empty(), "JS output should not be empty");
@@ -5180,7 +5441,11 @@ export function getSecond(arr: number[]): number {
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
 
-    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+    assert!(
+        result.diagnostics.is_empty(),
+        "Should compile without errors: {:?}",
+        result.diagnostics
+    );
 
     let js = std::fs::read_to_string(base.join("dist/src/arrays.js")).expect("read js");
     assert!(!js.is_empty(), "JS output should not be empty");
@@ -5220,7 +5485,11 @@ export function getPort(config: Config): number {
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
 
-    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+    assert!(
+        result.diagnostics.is_empty(),
+        "Should compile without errors: {:?}",
+        result.diagnostics
+    );
 
     let js = std::fs::read_to_string(base.join("dist/src/defaults.js")).expect("read js");
     assert!(!js.is_empty(), "JS output should not be empty");
@@ -5265,7 +5534,11 @@ export function getLength(arr?: string[]): number | undefined {
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
 
-    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+    assert!(
+        result.diagnostics.is_empty(),
+        "Should compile without errors: {:?}",
+        result.diagnostics
+    );
 
     let js = std::fs::read_to_string(base.join("dist/src/optional.js")).expect("read js");
     assert!(!js.is_empty(), "JS output should not be empty");
@@ -5303,7 +5576,11 @@ export function getNumberOrZero(num: number | null): number {
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
 
-    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+    assert!(
+        result.diagnostics.is_empty(),
+        "Should compile without errors: {:?}",
+        result.diagnostics
+    );
 
     let js = std::fs::read_to_string(base.join("dist/src/nullish.js")).expect("read js");
     assert!(!js.is_empty(), "JS output should not be empty");
@@ -5341,7 +5618,11 @@ export function maybeLog(logger: Logger, msg: string): void {
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
 
-    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+    assert!(
+        result.diagnostics.is_empty(),
+        "Should compile without errors: {:?}",
+        result.diagnostics
+    );
 
     let js = std::fs::read_to_string(base.join("dist/src/optcall.js")).expect("read js");
     assert!(!js.is_empty(), "JS output should not be empty");
@@ -5387,7 +5668,11 @@ export class Dog extends Animal {
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
 
-    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+    assert!(
+        result.diagnostics.is_empty(),
+        "Should compile without errors: {:?}",
+        result.diagnostics
+    );
 
     let js = std::fs::read_to_string(base.join("dist/src/classes.js")).expect("read js");
     assert!(!js.is_empty(), "JS output should not be empty");
@@ -5430,7 +5715,11 @@ export class Counter {
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
 
-    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+    assert!(
+        result.diagnostics.is_empty(),
+        "Should compile without errors: {:?}",
+        result.diagnostics
+    );
 
     let js = std::fs::read_to_string(base.join("dist/src/staticclass.js")).expect("read js");
     assert!(!js.is_empty(), "JS output should not be empty");
@@ -5477,7 +5766,11 @@ export class Rectangle {
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
 
-    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+    assert!(
+        result.diagnostics.is_empty(),
+        "Should compile without errors: {:?}",
+        result.diagnostics
+    );
 
     let js = std::fs::read_to_string(base.join("dist/src/accessors.js")).expect("read js");
     assert!(!js.is_empty(), "JS output should not be empty");
@@ -5518,7 +5811,11 @@ export function getProp(key: string): { [k: string]: number } {
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
 
-    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+    assert!(
+        result.diagnostics.is_empty(),
+        "Should compile without errors: {:?}",
+        result.diagnostics
+    );
 
     let js = std::fs::read_to_string(base.join("dist/src/computed.js")).expect("read js");
     assert!(!js.is_empty(), "JS output should not be empty");
@@ -5564,7 +5861,11 @@ export function joinStrings(arr: string[]): string {
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
 
-    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+    assert!(
+        result.diagnostics.is_empty(),
+        "Should compile without errors: {:?}",
+        result.diagnostics
+    );
 
     let js = std::fs::read_to_string(base.join("dist/src/forof.js")).expect("read js");
     assert!(!js.is_empty(), "JS output should not be empty");
@@ -5603,7 +5904,11 @@ export const calculator = {
     let args = default_args();
     let result = compile(&args, base).expect("compile should succeed");
 
-    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+    assert!(
+        result.diagnostics.is_empty(),
+        "Should compile without errors: {:?}",
+        result.diagnostics
+    );
 
     let js = std::fs::read_to_string(base.join("dist/src/methods.js")).expect("read js");
     assert!(!js.is_empty(), "JS output should not be empty");

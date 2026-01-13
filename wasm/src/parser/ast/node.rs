@@ -1,14 +1,14 @@
 //! The main Node enum containing all possible AST node types.
 
-use serde::Serialize;
-use crate::scanner::SyntaxKind;
 use super::base::{NodeBase, NodeIndex};
-use super::literals::*;
-use super::expressions::*;
-use super::statements::*;
 use super::declarations::*;
-use super::types::*;
+use super::expressions::*;
 use super::jsx::*;
+use super::literals::*;
+use super::statements::*;
+use super::types::*;
+use crate::scanner::SyntaxKind;
+use serde::Serialize;
 
 /// The main AST node enum containing all possible node types.
 /// Uses enum variants to store node-specific data while sharing common fields.
@@ -20,8 +20,15 @@ pub enum Node {
     // Names
     Identifier(Identifier),
     PrivateIdentifier(Identifier),
-    QualifiedName { base: NodeBase, left: NodeIndex, right: NodeIndex },
-    ComputedPropertyName { base: NodeBase, expression: NodeIndex },
+    QualifiedName {
+        base: NodeBase,
+        left: NodeIndex,
+        right: NodeIndex,
+    },
+    ComputedPropertyName {
+        base: NodeBase,
+        expression: NodeIndex,
+    },
 
     // Literals
     StringLiteral(StringLiteral),
@@ -190,8 +197,11 @@ impl Node {
             Node::Token(base) | Node::EndOfFileToken(base) => base,
             Node::Identifier(n) | Node::PrivateIdentifier(n) => &n.base,
             Node::QualifiedName { base, .. } | Node::ComputedPropertyName { base, .. } => base,
-            Node::StringLiteral(n) | Node::NoSubstitutionTemplateLiteral(n)
-                | Node::TemplateHead(n) | Node::TemplateMiddle(n) | Node::TemplateTail(n) => &n.base,
+            Node::StringLiteral(n)
+            | Node::NoSubstitutionTemplateLiteral(n)
+            | Node::TemplateHead(n)
+            | Node::TemplateMiddle(n)
+            | Node::TemplateTail(n) => &n.base,
             Node::NumericLiteral(n) => &n.base,
             Node::BigIntLiteral(n) => &n.base,
             Node::RegularExpressionLiteral(n) => &n.base,
@@ -328,8 +338,11 @@ impl Node {
             Node::Token(base) | Node::EndOfFileToken(base) => base,
             Node::Identifier(n) | Node::PrivateIdentifier(n) => &mut n.base,
             Node::QualifiedName { base, .. } | Node::ComputedPropertyName { base, .. } => base,
-            Node::StringLiteral(n) | Node::NoSubstitutionTemplateLiteral(n)
-                | Node::TemplateHead(n) | Node::TemplateMiddle(n) | Node::TemplateTail(n) => &mut n.base,
+            Node::StringLiteral(n)
+            | Node::NoSubstitutionTemplateLiteral(n)
+            | Node::TemplateHead(n)
+            | Node::TemplateMiddle(n)
+            | Node::TemplateTail(n) => &mut n.base,
             Node::NumericLiteral(n) => &mut n.base,
             Node::BigIntLiteral(n) => &mut n.base,
             Node::RegularExpressionLiteral(n) => &mut n.base,

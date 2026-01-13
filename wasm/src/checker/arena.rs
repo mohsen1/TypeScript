@@ -3,17 +3,16 @@
 //! This module contains the TypeArena which manages type allocation
 //! and provides singleton caching for intrinsic types.
 
-use serde::Serialize;
+use super::types::{
+    ArrayTypeInfo, ConditionalType, EnumTypeInfo, FunctionType, IndexInfo, IndexType,
+    IndexedAccessType, IntersectionType, IntrinsicType, LiteralType, LiteralValue, MappedType,
+    MappedTypeModifier, ObjectType, Signature, TemplateLiteralType, ThisTypeMarker, TupleTypeInfo,
+    Type, TypeId, TypeParameter, UnionType, UniqueSymbolType, element_flags, object_flags,
+    type_flags,
+};
 use crate::binder::{SymbolId, SymbolTable};
 use crate::parser::NodeIndex;
-use super::types::{
-    type_flags, object_flags, element_flags,
-    Type, TypeId, LiteralValue, LiteralType, IntrinsicType,
-    ObjectType, UnionType, IntersectionType, TypeParameter,
-    ConditionalType, MappedType, MappedTypeModifier, IndexType, IndexedAccessType,
-    TemplateLiteralType, FunctionType, ArrayTypeInfo, TupleTypeInfo,
-    EnumTypeInfo, ThisTypeMarker, UniqueSymbolType, Signature, IndexInfo,
-};
+use serde::Serialize;
 
 /// Arena allocator for types with singleton caching.
 #[derive(Debug, Serialize)]
@@ -310,7 +309,9 @@ impl TypeArena {
             return flattened[0];
         }
 
-        self.alloc(Type::Intersection(Box::new(IntersectionType::new(flattened))))
+        self.alloc(Type::Intersection(Box::new(IntersectionType::new(
+            flattened,
+        ))))
     }
 
     /// Create an array type (T[] or Array<T>).
@@ -361,8 +362,12 @@ impl TypeArena {
         element_names: Option<Vec<Option<String>>>,
         is_readonly: bool,
     ) -> TypeId {
-        let has_optional = element_flags.iter().any(|&f| f & element_flags::OPTIONAL != 0);
-        let has_rest = element_flags.iter().any(|&f| f & (element_flags::REST | element_flags::VARIADIC) != 0);
+        let has_optional = element_flags
+            .iter()
+            .any(|&f| f & element_flags::OPTIONAL != 0);
+        let has_rest = element_flags
+            .iter()
+            .any(|&f| f & (element_flags::REST | element_flags::VARIADIC) != 0);
 
         self.alloc(Type::Tuple(Box::new(TupleTypeInfo {
             flags: type_flags::OBJECT,
@@ -470,7 +475,11 @@ impl TypeArena {
 
     /// Create a template literal type (`hello ${T}`).
     /// If all substitution types are string literals, evaluates to a single string literal.
-    pub fn create_template_literal_type(&mut self, texts: Vec<String>, types: Vec<TypeId>) -> TypeId {
+    pub fn create_template_literal_type(
+        &mut self,
+        texts: Vec<String>,
+        types: Vec<TypeId>,
+    ) -> TypeId {
         // If no substitutions, just return a string literal of the first text
         if types.is_empty() {
             if texts.is_empty() {
@@ -486,18 +495,30 @@ impl TypeArena {
         for type_id in &types {
             if let Some(typ) = self.get(*type_id) {
                 match typ {
-                    Type::Literal(LiteralType { value: LiteralValue::String(s), .. }) => {
+                    Type::Literal(LiteralType {
+                        value: LiteralValue::String(s),
+                        ..
+                    }) => {
                         string_values.push(Some(s.clone()));
                     }
-                    Type::Literal(LiteralType { value: LiteralValue::Number(n), .. }) => {
+                    Type::Literal(LiteralType {
+                        value: LiteralValue::Number(n),
+                        ..
+                    }) => {
                         // Numbers can be stringified
                         string_values.push(Some(n.to_string()));
                     }
-                    Type::Literal(LiteralType { value: LiteralValue::Boolean(b), .. }) => {
+                    Type::Literal(LiteralType {
+                        value: LiteralValue::Boolean(b),
+                        ..
+                    }) => {
                         // Booleans can be stringified
                         string_values.push(Some(b.to_string()));
                     }
-                    Type::Literal(LiteralType { value: LiteralValue::BigInt(b), .. }) => {
+                    Type::Literal(LiteralType {
+                        value: LiteralValue::BigInt(b),
+                        ..
+                    }) => {
                         // BigInt can be stringified
                         string_values.push(Some(b.clone()));
                     }
@@ -587,7 +608,11 @@ impl TypeArena {
     }
 
     /// Create an indexed access type (T[K]).
-    pub fn create_indexed_access_type(&mut self, object_type: TypeId, index_type: TypeId) -> TypeId {
+    pub fn create_indexed_access_type(
+        &mut self,
+        object_type: TypeId,
+        index_type: TypeId,
+    ) -> TypeId {
         self.alloc(Type::IndexedAccess(Box::new(IndexedAccessType {
             flags: type_flags::INDEXED_ACCESS,
             object_type,
@@ -672,7 +697,12 @@ impl TypeArena {
     }
 
     /// Create a type parameter.
-    pub fn create_type_parameter(&mut self, symbol: SymbolId, constraint: TypeId, default: TypeId) -> TypeId {
+    pub fn create_type_parameter(
+        &mut self,
+        symbol: SymbolId,
+        constraint: TypeId,
+        default: TypeId,
+    ) -> TypeId {
         self.alloc(Type::TypeParameter(Box::new(TypeParameter {
             flags: type_flags::TYPE_PARAMETER,
             symbol,
@@ -685,7 +715,12 @@ impl TypeArena {
     }
 
     /// Create a const type parameter (TS 5.0+: `function foo<const T>()`).
-    pub fn create_const_type_parameter(&mut self, symbol: SymbolId, constraint: TypeId, default: TypeId) -> TypeId {
+    pub fn create_const_type_parameter(
+        &mut self,
+        symbol: SymbolId,
+        constraint: TypeId,
+        default: TypeId,
+    ) -> TypeId {
         self.alloc(Type::TypeParameter(Box::new(TypeParameter {
             flags: type_flags::TYPE_PARAMETER,
             symbol,
@@ -705,7 +740,11 @@ impl TypeArena {
     }
 
     /// Create an anonymous object type with properties and members table.
-    pub fn create_object_type_with_members(&mut self, properties: Vec<SymbolId>, members: SymbolTable) -> TypeId {
+    pub fn create_object_type_with_members(
+        &mut self,
+        properties: Vec<SymbolId>,
+        members: SymbolTable,
+    ) -> TypeId {
         let mut obj = ObjectType::new(object_flags::ANONYMOUS, SymbolId::NONE);
         obj.properties = properties;
         obj.members = members;
@@ -714,10 +753,14 @@ impl TypeArena {
 
     /// Create a fresh object literal type with properties and members table.
     /// Fresh object literal types are subject to excess property checks.
-    pub fn create_fresh_object_literal_type(&mut self, properties: Vec<SymbolId>, members: SymbolTable) -> TypeId {
+    pub fn create_fresh_object_literal_type(
+        &mut self,
+        properties: Vec<SymbolId>,
+        members: SymbolTable,
+    ) -> TypeId {
         let mut obj = ObjectType::new(
             object_flags::ANONYMOUS | object_flags::OBJECT_LITERAL | object_flags::FRESH_LITERAL,
-            SymbolId::NONE
+            SymbolId::NONE,
         );
         obj.properties = properties;
         obj.members = members;

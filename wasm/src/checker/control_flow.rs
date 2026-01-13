@@ -18,12 +18,15 @@
 //! }
 //! ```
 
-use crate::binder::{FlowNode, FlowNodeId, FlowNodeArena, flow_flags, symbol_flags, SymbolId};
+use crate::binder::{FlowNode, FlowNodeArena, FlowNodeId, SymbolId, flow_flags, symbol_flags};
 use crate::interner::Atom;
 use crate::parser::thin_node::{BinaryExprData, CallExprData, ThinNodeArena};
 use crate::parser::{NodeIndex, NodeList, node_flags, syntax_kind_ext};
 use crate::scanner::SyntaxKind;
-use crate::solver::{LiteralValue, ParamInfo, TypeId, TypeInterner, TypeKey, TypePredicate, TypePredicateTarget, NarrowingContext};
+use crate::solver::{
+    LiteralValue, NarrowingContext, ParamInfo, TypeId, TypeInterner, TypeKey, TypePredicate,
+    TypePredicateTarget,
+};
 use crate::thin_binder::ThinBinderState;
 use rustc_hash::FxHashMap;
 use std::borrow::Cow;
@@ -135,7 +138,13 @@ impl<'a> FlowAnalyzer<'a> {
         interner: &'a TypeInterner,
     ) -> Self {
         let flow_graph = Some(FlowGraph::new(&binder.flow_nodes));
-        Self { arena, binder, interner, node_types: None, flow_graph }
+        Self {
+            arena,
+            binder,
+            interner,
+            node_types: None,
+            flow_graph,
+        }
     }
 
     pub fn with_node_types(
@@ -145,7 +154,13 @@ impl<'a> FlowAnalyzer<'a> {
         node_types: &'a FxHashMap<u32, TypeId>,
     ) -> Self {
         let flow_graph = Some(FlowGraph::new(&binder.flow_nodes));
-        Self { arena, binder, interner, node_types: Some(node_types), flow_graph }
+        Self {
+            arena,
+            binder,
+            interner,
+            node_types: Some(node_types),
+            flow_graph,
+        }
     }
 
     /// Get a reference to the flow graph.
@@ -347,7 +362,9 @@ impl<'a> FlowAnalyzer<'a> {
         }
 
         // Get types from all incoming branches
-        let branch_types: Vec<TypeId> = flow.antecedent.iter()
+        let branch_types: Vec<TypeId> = flow
+            .antecedent
+            .iter()
             .map(|&ant| self.check_flow(reference, type_id, ant, &mut visited.clone()))
             .collect();
 
@@ -465,7 +482,12 @@ impl<'a> FlowAnalyzer<'a> {
         if flow.antecedent.len() > 1 {
             let mut fallthrough_types = Vec::new();
             for &ant in flow.antecedent.iter().skip(1) {
-                fallthrough_types.push(self.check_flow(reference, type_id, ant, &mut visited.clone()));
+                fallthrough_types.push(self.check_flow(
+                    reference,
+                    type_id,
+                    ant,
+                    &mut visited.clone(),
+                ));
             }
 
             let fallthrough_type = if fallthrough_types.len() == 1 {
@@ -515,7 +537,11 @@ impl<'a> FlowAnalyzer<'a> {
 
     /// Check if this is a direct assignment to a reference (e.g., `x = value`)
     /// as opposed to a destructuring assignment (e.g., `[x] = [value]`)
-    fn is_direct_assignment_to_reference(&self, assignment_node: NodeIndex, target: NodeIndex) -> bool {
+    fn is_direct_assignment_to_reference(
+        &self,
+        assignment_node: NodeIndex,
+        target: NodeIndex,
+    ) -> bool {
         let Some(node) = self.arena.get(assignment_node) else {
             return false;
         };
@@ -642,11 +668,9 @@ impl<'a> FlowAnalyzer<'a> {
                         return Some(decl.initializer);
                     }
                     if !decl.initializer.is_none() {
-                        if let Some(rhs) = self.match_destructuring_rhs(
-                            decl.name,
-                            decl.initializer,
-                            reference,
-                        ) {
+                        if let Some(rhs) =
+                            self.match_destructuring_rhs(decl.name, decl.initializer, reference)
+                        {
                             return Some(rhs);
                         }
                     }
@@ -701,7 +725,9 @@ impl<'a> FlowAnalyzer<'a> {
                 let elements = if k == syntax_kind_ext::ARRAY_LITERAL_EXPRESSION {
                     self.arena.get_literal_expr(node).map(|lit| &lit.elements)?
                 } else {
-                    self.arena.get_binding_pattern(node).map(|pat| &pat.elements)?
+                    self.arena
+                        .get_binding_pattern(node)
+                        .map(|pat| &pat.elements)?
                 };
                 let rhs_elements = self.array_literal_elements(rhs);
                 for (index, &elem) in elements.nodes.iter().enumerate() {
@@ -729,7 +755,9 @@ impl<'a> FlowAnalyzer<'a> {
                 let elements = if k == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION {
                     self.arena.get_literal_expr(node).map(|lit| &lit.elements)?
                 } else {
-                    self.arena.get_binding_pattern(node).map(|pat| &pat.elements)?
+                    self.arena
+                        .get_binding_pattern(node)
+                        .map(|pat| &pat.elements)?
                 };
                 for &elem in &elements.nodes {
                     if elem.is_none() {
@@ -753,11 +781,9 @@ impl<'a> FlowAnalyzer<'a> {
                         }
                     }
                     if !binding.initializer.is_none() {
-                        if let Some(found) = self.match_destructuring_rhs(
-                            binding.name,
-                            binding.initializer,
-                            target,
-                        ) {
+                        if let Some(found) =
+                            self.match_destructuring_rhs(binding.name, binding.initializer, target)
+                        {
                             return Some(found);
                         }
                         return Some(binding.initializer);
@@ -857,7 +883,12 @@ impl<'a> FlowAnalyzer<'a> {
         if rhs_node.kind == syntax_kind_ext::ARRAY_LITERAL_EXPRESSION {
             let lit = self.arena.get_literal_expr(rhs_node)?;
             if let PropertyKey::Index(index) = key {
-                return lit.elements.nodes.get(index).copied().filter(|n| !n.is_none());
+                return lit
+                    .elements
+                    .nodes
+                    .get(index)
+                    .copied()
+                    .filter(|n| !n.is_none());
             }
             return None;
         }
@@ -914,26 +945,33 @@ impl<'a> FlowAnalyzer<'a> {
         };
 
         if node.kind == syntax_kind_ext::BINARY_EXPRESSION {
-            return self.arena
+            return self
+                .arena
                 .get_binary_expr(node)
-                .map(|bin| self.is_assignment_operator(bin.operator_token)
-                    && self.assignment_affects_reference(bin.left, target))
+                .map(|bin| {
+                    self.is_assignment_operator(bin.operator_token)
+                        && self.assignment_affects_reference(bin.left, target)
+                })
                 .unwrap_or(false);
         }
 
         if node.kind == syntax_kind_ext::PREFIX_UNARY_EXPRESSION
             || node.kind == syntax_kind_ext::POSTFIX_UNARY_EXPRESSION
         {
-            return self.arena
+            return self
+                .arena
                 .get_unary_expr(node)
-                .map(|unary| (unary.operator == SyntaxKind::PlusPlusToken as u16
-                    || unary.operator == SyntaxKind::MinusMinusToken as u16)
-                    && self.assignment_affects_reference(unary.operand, target))
+                .map(|unary| {
+                    (unary.operator == SyntaxKind::PlusPlusToken as u16
+                        || unary.operator == SyntaxKind::MinusMinusToken as u16)
+                        && self.assignment_affects_reference(unary.operand, target)
+                })
                 .unwrap_or(false);
         }
 
         if node.kind == syntax_kind_ext::VARIABLE_DECLARATION {
-            return self.arena
+            return self
+                .arena
                 .get_variable_declaration(node)
                 .map(|decl| self.assignment_affects_reference(decl.name, target))
                 .unwrap_or(false);
@@ -961,7 +999,11 @@ impl<'a> FlowAnalyzer<'a> {
         self.assignment_affects_reference(assignment_node, target)
     }
 
-    pub fn assignment_targets_reference(&self, assignment_node: NodeIndex, target: NodeIndex) -> bool {
+    pub fn assignment_targets_reference(
+        &self,
+        assignment_node: NodeIndex,
+        target: NodeIndex,
+    ) -> bool {
         self.assignment_targets_reference_node(assignment_node, target)
     }
 
@@ -975,26 +1017,33 @@ impl<'a> FlowAnalyzer<'a> {
         };
 
         if node.kind == syntax_kind_ext::BINARY_EXPRESSION {
-            return self.arena
+            return self
+                .arena
                 .get_binary_expr(node)
-                .map(|bin| self.is_assignment_operator(bin.operator_token)
-                    && self.assignment_targets_reference_internal(bin.left, target))
+                .map(|bin| {
+                    self.is_assignment_operator(bin.operator_token)
+                        && self.assignment_targets_reference_internal(bin.left, target)
+                })
                 .unwrap_or(false);
         }
 
         if node.kind == syntax_kind_ext::PREFIX_UNARY_EXPRESSION
             || node.kind == syntax_kind_ext::POSTFIX_UNARY_EXPRESSION
         {
-            return self.arena
+            return self
+                .arena
                 .get_unary_expr(node)
-                .map(|unary| (unary.operator == SyntaxKind::PlusPlusToken as u16
-                    || unary.operator == SyntaxKind::MinusMinusToken as u16)
-                    && self.assignment_targets_reference_internal(unary.operand, target))
+                .map(|unary| {
+                    (unary.operator == SyntaxKind::PlusPlusToken as u16
+                        || unary.operator == SyntaxKind::MinusMinusToken as u16)
+                        && self.assignment_targets_reference_internal(unary.operand, target)
+                })
                 .unwrap_or(false);
         }
 
         if node.kind == syntax_kind_ext::VARIABLE_DECLARATION {
-            return self.arena
+            return self
+                .arena
                 .get_variable_declaration(node)
                 .map(|decl| self.assignment_targets_reference_internal(decl.name, target))
                 .unwrap_or(false);
@@ -1083,11 +1132,9 @@ impl<'a> FlowAnalyzer<'a> {
             return pre_type;
         }
 
-        let Some(predicate_target) = self.predicate_target_expression(
-            call,
-            &signature.predicate,
-            &signature.params,
-        ) else {
+        let Some(predicate_target) =
+            self.predicate_target_expression(call, &signature.predicate, &signature.params)
+        else {
             return pre_type;
         };
         if !self.is_matching_reference(predicate_target, reference) {
@@ -1215,7 +1262,13 @@ impl<'a> FlowAnalyzer<'a> {
                     ) {
                         return narrowed;
                     }
-                    return self.narrow_by_binary_expr(type_id, bin, target, is_true_branch, &narrowing);
+                    return self.narrow_by_binary_expr(
+                        type_id,
+                        bin,
+                        target,
+                        is_true_branch,
+                        &narrowing,
+                    );
                 }
             }
 
@@ -1237,19 +1290,17 @@ impl<'a> FlowAnalyzer<'a> {
 
             k if k == syntax_kind_ext::CALL_EXPRESSION => {
                 if let Some(call) = self.arena.get_call_expr(cond_node) {
-                    if let Some(narrowed) = self.narrow_by_call_predicate(type_id, call, target, is_true_branch) {
+                    if let Some(narrowed) =
+                        self.narrow_by_call_predicate(type_id, call, target, is_true_branch)
+                    {
                         return narrowed;
                     }
                     if is_true_branch {
                         let optional_call =
                             (cond_node.flags as u32 & node_flags::OPTIONAL_CHAIN) != 0;
                         if optional_call && self.is_matching_reference(call.expression, target) {
-                            let narrowed =
-                                narrowing.narrow_excluding_type(type_id, TypeId::NULL);
-                            return narrowing.narrow_excluding_type(
-                                narrowed,
-                                TypeId::UNDEFINED,
-                            );
+                            let narrowed = narrowing.narrow_excluding_type(type_id, TypeId::NULL);
+                            return narrowing.narrow_excluding_type(narrowed, TypeId::UNDEFINED);
                         }
                         if let Some(callee_node) = self.arena.get(call.expression) {
                             if let Some(access) = self.arena.get_access_expr(callee_node) {
@@ -1258,10 +1309,8 @@ impl<'a> FlowAnalyzer<'a> {
                                 {
                                     let narrowed =
                                         narrowing.narrow_excluding_type(type_id, TypeId::NULL);
-                                    return narrowing.narrow_excluding_type(
-                                        narrowed,
-                                        TypeId::UNDEFINED,
-                                    );
+                                    return narrowing
+                                        .narrow_excluding_type(narrowed, TypeId::UNDEFINED);
                                 }
                             }
                         }
@@ -1289,7 +1338,11 @@ impl<'a> FlowAnalyzer<'a> {
                     if is_true_branch {
                         return narrowing.narrow_by_discriminant(type_id, prop_name, literal_true);
                     }
-                    return narrowing.narrow_by_excluding_discriminant(type_id, prop_name, literal_true);
+                    return narrowing.narrow_by_excluding_discriminant(
+                        type_id,
+                        prop_name,
+                        literal_true,
+                    );
                 }
 
                 // Handle truthiness narrowing for property/element access: if (y.a)
@@ -1398,7 +1451,11 @@ impl<'a> FlowAnalyzer<'a> {
             _ => return type_id,
         };
 
-        let effective_truth = if is_equals { is_true_branch } else { !is_true_branch };
+        let effective_truth = if is_equals {
+            is_true_branch
+        } else {
+            !is_true_branch
+        };
 
         if let Some(type_name) = self.typeof_comparison_literal(bin.left, bin.right, target) {
             if effective_truth {
@@ -1823,7 +1880,8 @@ impl<'a> FlowAnalyzer<'a> {
         let node_types = self.node_types?;
         let callee_type = *node_types.get(&call.expression.0)?;
         let signature = self.predicate_signature_for_type(callee_type)?;
-        let predicate_target = self.predicate_target_expression(call, &signature.predicate, &signature.params)?;
+        let predicate_target =
+            self.predicate_target_expression(call, &signature.predicate, &signature.params)?;
 
         if !self.is_matching_reference(predicate_target, target) {
             return None;
@@ -1979,9 +2037,7 @@ impl<'a> FlowAnalyzer<'a> {
                 let members = self.interner.type_list(members);
                 let mut instance_types = Vec::new();
                 for &member in members.iter() {
-                    if let Some(instance_type) =
-                        self.instance_type_from_constructor_type(member)
-                    {
+                    if let Some(instance_type) = self.instance_type_from_constructor_type(member) {
                         instance_types.push(instance_type);
                     }
                 }
@@ -2138,11 +2194,7 @@ impl<'a> FlowAnalyzer<'a> {
         self.literal_atom_and_kind_from_node_or_type(idx)
     }
 
-    fn keep_in_operator_member(
-        &self,
-        presence: PropertyPresence,
-        is_true_branch: bool,
-    ) -> bool {
+    fn keep_in_operator_member(&self, presence: PropertyPresence, is_true_branch: bool) -> bool {
         match (presence, is_true_branch) {
             (PropertyPresence::Required, false) => false,
             (PropertyPresence::Absent, true) => false,
@@ -2330,7 +2382,10 @@ impl<'a> FlowAnalyzer<'a> {
 
         // Handle private identifiers (e.g., #a) for `in` operator narrowing
         if node.kind == SyntaxKind::PrivateIdentifier as u16 {
-            return self.arena.get_identifier(node).map(|ident| ident.escaped_text.as_str());
+            return self
+                .arena
+                .get_identifier(node)
+                .map(|ident| ident.escaped_text.as_str());
         }
 
         None
@@ -2373,7 +2428,11 @@ impl<'a> FlowAnalyzer<'a> {
                     k if k == SyntaxKind::NumericLiteral as u16 => {
                         let lit = self.arena.get_literal(operand_node)?;
                         let value = self.parse_numeric_literal_value(lit.value, &lit.text)?;
-                        let value = if op == SyntaxKind::MinusToken as u16 { -value } else { value };
+                        let value = if op == SyntaxKind::MinusToken as u16 {
+                            -value
+                        } else {
+                            value
+                        };
                         Some(self.interner.literal_number(value))
                     }
                     k if k == SyntaxKind::BigIntLiteral as u16 => {
@@ -2381,7 +2440,10 @@ impl<'a> FlowAnalyzer<'a> {
                         let text = lit.text.strip_suffix('n').unwrap_or(&lit.text);
                         let normalized = self.normalize_bigint_literal(text)?;
                         let negative = op == SyntaxKind::MinusToken as u16;
-                        Some(self.interner.literal_bigint_with_sign(negative, normalized.as_ref()))
+                        Some(
+                            self.interner
+                                .literal_bigint_with_sign(negative, normalized.as_ref()),
+                        )
                     }
                     _ => None,
                 }
@@ -2923,7 +2985,9 @@ impl<'a> FlowAnalyzer<'a> {
         let type_id = *node_types.get(&idx.0)?;
         match self.interner.lookup(type_id)? {
             TypeKey::Literal(LiteralValue::String(atom)) => Some(atom),
-            TypeKey::Literal(LiteralValue::Number(num)) => Some(self.atom_from_numeric_value(num.0)),
+            TypeKey::Literal(LiteralValue::Number(num)) => {
+                Some(self.atom_from_numeric_value(num.0))
+            }
             _ => None,
         }
     }
@@ -2946,7 +3010,9 @@ impl<'a> FlowAnalyzer<'a> {
         }
 
         if let Some(ident) = self.arena.get_identifier(node) {
-            return Some(PropertyKey::Atom(self.interner.intern_string(&ident.escaped_text)));
+            return Some(PropertyKey::Atom(
+                self.interner.intern_string(&ident.escaped_text),
+            ));
         }
 
         if let Some((atom, _)) = self.literal_atom_and_kind_from_node_or_type(name_idx) {
@@ -2978,7 +3044,11 @@ impl<'a> FlowAnalyzer<'a> {
                 }
                 let lit = self.arena.get_literal(operand_node)?;
                 let value = self.parse_numeric_literal_value(lit.value, &lit.text)?;
-                Some(if op == SyntaxKind::MinusToken as u16 { -value } else { value })
+                Some(if op == SyntaxKind::MinusToken as u16 {
+                    -value
+                } else {
+                    value
+                })
             }
             _ => None,
         }
@@ -3036,7 +3106,9 @@ impl<'a> FlowAnalyzer<'a> {
         visited: &mut Vec<SymbolId>,
     ) -> Option<SymbolId> {
         let idx = self.skip_parenthesized(idx);
-        if let Some(sym_id) = self.binder.get_node_symbol(idx)
+        if let Some(sym_id) = self
+            .binder
+            .get_node_symbol(idx)
             .or_else(|| self.binder.resolve_identifier(self.arena, idx))
         {
             return self.resolve_alias_symbol(sym_id, visited);
@@ -3059,7 +3131,11 @@ impl<'a> FlowAnalyzer<'a> {
             if access.question_dot_token {
                 return None;
             }
-            return self.resolve_namespace_member(access.expression, access.name_or_argument, visited);
+            return self.resolve_namespace_member(
+                access.expression,
+                access.name_or_argument,
+                visited,
+            );
         }
 
         if node.kind == syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION {
@@ -3080,7 +3156,9 @@ impl<'a> FlowAnalyzer<'a> {
         right: NodeIndex,
         visited: &mut Vec<SymbolId>,
     ) -> Option<SymbolId> {
-        let right_name = self.arena.get(right)
+        let right_name = self
+            .arena
+            .get(right)
             .and_then(|node| self.arena.get_identifier(node))
             .map(|ident| ident.escaped_text.as_str())?;
         self.resolve_namespace_member_by_name(left, right_name, visited)
@@ -3155,7 +3233,11 @@ mod tests {
     fn get_if_condition(arena: &ThinNodeArena, root: NodeIndex, stmt_index: usize) -> NodeIndex {
         let root_node = arena.get(root).expect("root node");
         let source_file = arena.get_source_file(root_node).expect("source file");
-        let if_idx = *source_file.statements.nodes.get(stmt_index).expect("if statement");
+        let if_idx = *source_file
+            .statements
+            .nodes
+            .get(stmt_index)
+            .expect("if statement");
         let if_node = arena.get(if_idx).expect("if node");
         let if_data = arena.get_if_statement(if_node).expect("if data");
         if_data.expression
@@ -3186,7 +3268,8 @@ if (x) {}
             TypeId::NULL,
             TypeId::UNDEFINED,
         ]);
-        let narrowed = analyzer.narrow_type_by_condition(union, condition_idx, condition_idx, false);
+        let narrowed =
+            analyzer.narrow_type_by_condition(union, condition_idx, condition_idx, false);
 
         let falsy_string = types.literal_string("");
         let falsy_number = types.literal_number(0.0);
@@ -3225,7 +3308,9 @@ if (typeof x === "string") {}
 
         let condition_idx = get_if_condition(arena, root, 1);
         let condition_node = arena.get(condition_idx).expect("condition node");
-        let binary = arena.get_binary_expr(condition_node).expect("binary condition");
+        let binary = arena
+            .get_binary_expr(condition_node)
+            .expect("binary condition");
         let typeof_node = arena.get(binary.left).expect("typeof node");
         let unary = arena.get_unary_expr(typeof_node).expect("typeof data");
         let target_idx = unary.operand;
@@ -3254,7 +3339,9 @@ if (x && typeof x === "string") {}
 
         let condition_idx = get_if_condition(arena, root, 1);
         let condition_node = arena.get(condition_idx).expect("condition node");
-        let binary = arena.get_binary_expr(condition_node).expect("binary condition");
+        let binary = arena
+            .get_binary_expr(condition_node)
+            .expect("binary condition");
         let target_idx = binary.left;
 
         let union = types.union(vec![TypeId::STRING, TypeId::NUMBER]);
@@ -3281,7 +3368,9 @@ if (x === "a" || x === "b") {}
 
         let condition_idx = get_if_condition(arena, root, 1);
         let condition_node = arena.get(condition_idx).expect("condition node");
-        let binary = arena.get_binary_expr(condition_node).expect("binary condition");
+        let binary = arena
+            .get_binary_expr(condition_node)
+            .expect("binary condition");
         let left_node = arena.get(binary.left).expect("left condition");
         let left_eq = arena.get_binary_expr(left_node).expect("left equality");
         let target_idx = left_eq.left;
@@ -3291,8 +3380,10 @@ if (x === "a" || x === "b") {}
         let lit_c = types.literal_string("c");
         let union = types.union(vec![lit_a, lit_b, lit_c]);
 
-        let narrowed_true = analyzer.narrow_type_by_condition(union, condition_idx, target_idx, true);
-        let narrowed_false = analyzer.narrow_type_by_condition(union, condition_idx, target_idx, false);
+        let narrowed_true =
+            analyzer.narrow_type_by_condition(union, condition_idx, target_idx, true);
+        let narrowed_false =
+            analyzer.narrow_type_by_condition(union, condition_idx, target_idx, false);
 
         assert_eq!(narrowed_true, types.union(vec![lit_a, lit_b]));
         assert_eq!(narrowed_false, lit_c);
@@ -3317,27 +3408,41 @@ if (action.type === "add") {}
 
         let condition_idx = get_if_condition(arena, root, 1);
         let condition_node = arena.get(condition_idx).expect("condition node");
-        let binary = arena.get_binary_expr(condition_node).expect("binary condition");
+        let binary = arena
+            .get_binary_expr(condition_node)
+            .expect("binary condition");
         let access_node = arena.get(binary.left).expect("property access node");
-        let access = arena.get_access_expr(access_node).expect("property access data");
+        let access = arena
+            .get_access_expr(access_node)
+            .expect("property access data");
         let target_idx = access.expression;
 
         let type_key = types.intern_string("type");
         let type_add = types.literal_string("add");
         let type_remove = types.literal_string("remove");
 
-        let add_member = types.object(vec![
-            PropertyInfo { name: type_key, type_id: type_add,
- write_type: type_add, optional: false, readonly: false, is_method: false },
-        ]);
-        let remove_member = types.object(vec![
-            PropertyInfo { name: type_key, type_id: type_remove,
- write_type: type_remove, optional: false, readonly: false, is_method: false },
-        ]);
+        let add_member = types.object(vec![PropertyInfo {
+            name: type_key,
+            type_id: type_add,
+            write_type: type_add,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }]);
+        let remove_member = types.object(vec![PropertyInfo {
+            name: type_key,
+            type_id: type_remove,
+            write_type: type_remove,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }]);
 
         let union = types.union(vec![add_member, remove_member]);
-        let narrowed_true = analyzer.narrow_type_by_condition(union, condition_idx, target_idx, true);
-        let narrowed_false = analyzer.narrow_type_by_condition(union, condition_idx, target_idx, false);
+        let narrowed_true =
+            analyzer.narrow_type_by_condition(union, condition_idx, target_idx, true);
+        let narrowed_false =
+            analyzer.narrow_type_by_condition(union, condition_idx, target_idx, false);
 
         assert_eq!(narrowed_true, add_member);
         assert_eq!(narrowed_false, remove_member);
@@ -3362,7 +3467,9 @@ if (x === "a") {}
 
         let condition_idx = get_if_condition(arena, root, 1);
         let condition_node = arena.get(condition_idx).expect("condition node");
-        let binary = arena.get_binary_expr(condition_node).expect("binary condition");
+        let binary = arena
+            .get_binary_expr(condition_node)
+            .expect("binary condition");
         let target_idx = binary.left;
 
         let union = types.union(vec![TypeId::STRING, TypeId::NUMBER]);
@@ -3391,14 +3498,18 @@ if (x == null) {}
 
         let condition_idx = get_if_condition(arena, root, 1);
         let condition_node = arena.get(condition_idx).expect("condition node");
-        let binary = arena.get_binary_expr(condition_node).expect("binary condition");
+        let binary = arena
+            .get_binary_expr(condition_node)
+            .expect("binary condition");
         let target_idx = binary.left;
 
         let union = types.union(vec![TypeId::STRING, TypeId::NULL, TypeId::UNDEFINED]);
         let expected_true = types.union(vec![TypeId::NULL, TypeId::UNDEFINED]);
 
-        let narrowed_true = analyzer.narrow_type_by_condition(union, condition_idx, target_idx, true);
-        let narrowed_false = analyzer.narrow_type_by_condition(union, condition_idx, target_idx, false);
+        let narrowed_true =
+            analyzer.narrow_type_by_condition(union, condition_idx, target_idx, true);
+        let narrowed_false =
+            analyzer.narrow_type_by_condition(union, condition_idx, target_idx, false);
 
         assert_eq!(narrowed_true, expected_true);
         assert_eq!(narrowed_false, TypeId::STRING);

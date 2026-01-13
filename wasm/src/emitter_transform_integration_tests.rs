@@ -232,11 +232,15 @@ fn test_lowering_pass_es5_class_heritage_clause() {
 
     let mut derived_idx = None;
     for &stmt_idx in &source_file.statements.nodes {
-        let Some(stmt_node) = arena.get(stmt_idx) else { continue };
+        let Some(stmt_node) = arena.get(stmt_idx) else {
+            continue;
+        };
         if stmt_node.kind != syntax_kind_ext::CLASS_DECLARATION {
             continue;
         }
-        let Some(class_data) = arena.get_class(stmt_node) else { continue };
+        let Some(class_data) = arena.get_class(stmt_node) else {
+            continue;
+        };
         if let Some(clauses) = &class_data.heritage_clauses {
             if !clauses.nodes.is_empty() {
                 derived_idx = Some(stmt_idx);
@@ -926,7 +930,8 @@ class Derived extends Base {
 }
 
 #[test]
-fn test_two_phase_emission_es5_class_async_return_arrow_super_computed_key_this_arguments_capture() {
+fn test_two_phase_emission_es5_class_async_return_arrow_super_computed_key_this_arguments_capture()
+{
     let source = r#"
 class Base { m(x) { return x; } }
 class Derived extends Base {
@@ -1078,7 +1083,8 @@ class Derived extends Base {
 }
 
 #[test]
-fn test_two_phase_emission_es5_class_async_return_nested_arrow_super_computed_key_this_arguments_capture() {
+fn test_two_phase_emission_es5_class_async_return_nested_arrow_super_computed_key_this_arguments_capture()
+ {
     let source = r#"
 class Base { m(x) { return x; } }
 class Derived extends Base {
@@ -2022,7 +2028,8 @@ class Derived extends Base {
 }
 
 #[test]
-fn test_two_phase_emission_es5_class_async_nested_arrow_super_computed_key_this_arguments_capture() {
+fn test_two_phase_emission_es5_class_async_nested_arrow_super_computed_key_this_arguments_capture()
+{
     let source = r#"
 class Base { m(x) { return x; } }
 class Derived extends Base {
@@ -2932,7 +2939,8 @@ fn test_two_phase_emission_es6_class_no_transform() {
 
 #[test]
 fn test_two_phase_emission_es5_class_try_throw_parenthesized() {
-    let source = "class Foo { method() { try { throw new Error(\"x\"); } catch (e) { return (e); } } }";
+    let source =
+        "class Foo { method() { try { throw new Error(\"x\"); } catch (e) { return (e); } } }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
     let arena = parser.arena;
@@ -3124,7 +3132,9 @@ fn test_lowering_pass_es5_object_literal_directive() {
         .nodes
         .first()
         .expect("expected declaration list");
-    let decl_list_node = arena.get(decl_list_idx).expect("expected declaration list node");
+    let decl_list_node = arena
+        .get(decl_list_idx)
+        .expect("expected declaration list node");
     let decl_list = arena
         .get_variable(decl_list_node)
         .expect("expected declaration list data");
@@ -3404,7 +3414,8 @@ fn test_two_phase_emission_es5_object_literal_shorthand_method() {
 
 #[test]
 fn test_two_phase_emission_es5_class_for_in_of() {
-    let source = "class Foo { method(obj, arr) { for (var k in obj) { k; } for (var v of arr) { v; } } }";
+    let source =
+        "class Foo { method(obj, arr) { for (var k in obj) { k; } for (var v of arr) { v; } } }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
     let arena = parser.arena;
@@ -4133,8 +4144,7 @@ fn test_two_phase_emission_es5_async_function_multi_decl_this_capture() {
         output
     );
     assert!(
-        output.contains("bar = ")
-            && output.contains("_this.x"),
+        output.contains("bar = ") && output.contains("_this.x"),
         "ES5 async output should downlevel arrow and capture this: {}",
         output
     );
@@ -4162,8 +4172,7 @@ fn test_two_phase_emission_es5_async_function_let_arrow_this_capture() {
 
     let output = printer.get_output();
     assert!(
-        output.contains("bar = ")
-            && output.contains("_this.x"),
+        output.contains("bar = ") && output.contains("_this.x"),
         "ES5 async output should downlevel arrow and capture this: {}",
         output
     );
@@ -4204,7 +4213,8 @@ fn test_two_phase_emission_es5_async_function_deep_nested_arrow_this_capture() {
 
 #[test]
 fn test_two_phase_emission_es5_async_function_nested_arrow_arguments_capture() {
-    let source = "async function foo(a) { const bar = () => () => this.x + arguments[0]; await bar()(); }";
+    let source =
+        "async function foo(a) { const bar = () => () => this.x + arguments[0]; await bar()(); }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
     let arena = parser.arena;
@@ -4535,7 +4545,10 @@ fn test_lowering_pass_commonjs_default_anonymous_function_directive() {
 
     let directive = transforms.get(export_decl.export_clause);
     assert!(
-        matches!(directive, Some(TransformDirective::CommonJSExportDefaultExpr)),
+        matches!(
+            directive,
+            Some(TransformDirective::CommonJSExportDefaultExpr)
+        ),
         "LoweringPass should emit default export directive for anonymous function, got: {:?}",
         directive
     );
@@ -4570,7 +4583,10 @@ fn test_lowering_pass_commonjs_default_anonymous_class_directive() {
 
     let directive = transforms.get(export_decl.export_clause);
     assert!(
-        matches!(directive, Some(TransformDirective::CommonJSExportDefaultExpr)),
+        matches!(
+            directive,
+            Some(TransformDirective::CommonJSExportDefaultExpr)
+        ),
         "LoweringPass should emit default export directive for anonymous class"
     );
 }
@@ -4604,7 +4620,10 @@ fn test_lowering_pass_commonjs_default_anonymous_class_directive_es5() {
 
     let directive = transforms.get(export_decl.export_clause);
     assert!(
-        matches!(directive, Some(TransformDirective::CommonJSExportDefaultClassES5 { .. })),
+        matches!(
+            directive,
+            Some(TransformDirective::CommonJSExportDefaultClassES5 { .. })
+        ),
         "LoweringPass should emit ES5 default export directive for anonymous class"
     );
 }

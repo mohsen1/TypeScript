@@ -2,10 +2,10 @@
 //!
 //! This module contains the main `Type` enum and all type variant structs.
 
-use serde::Serialize;
+use super::flags::{signature_flags, type_flags};
 use crate::binder::{SymbolId, SymbolTable};
 use crate::parser::NodeIndex;
-use super::flags::{type_flags, signature_flags};
+use serde::Serialize;
 
 // =============================================================================
 // Type ID
@@ -32,7 +32,7 @@ impl TypeId {
 pub enum LiteralValue {
     String(String),
     Number(f64),
-    BigInt(String),  // Store as string for precision
+    BigInt(String), // Store as string for precision
     Boolean(bool),
 }
 
@@ -95,8 +95,8 @@ pub struct IntrinsicType {
 pub struct LiteralType {
     pub flags: u32,
     pub value: LiteralValue,
-    pub fresh_type: TypeId,    // Widening version
-    pub regular_type: TypeId,  // Non-widening version
+    pub fresh_type: TypeId,   // Widening version
+    pub regular_type: TypeId, // Non-widening version
 }
 
 /// An object type (class, interface, object literal, etc.)
@@ -185,9 +185,9 @@ impl IntersectionType {
 pub struct TypeParameter {
     pub flags: u32,
     pub symbol: SymbolId,
-    pub constraint: TypeId,    // extends clause
-    pub default: TypeId,       // default type
-    pub target: TypeId,        // For substitution
+    pub constraint: TypeId, // extends clause
+    pub default: TypeId,    // default type
+    pub target: TypeId,     // For substitution
     pub is_this_type: bool,
     /// Whether this is a `const` type parameter (TS 5.0+): function foo<const T>()
     /// Const type parameters cause literal inference (e.g., ['a', 'b'] instead of string[])
@@ -239,7 +239,7 @@ pub struct MappedType {
     pub declaration: NodeIndex,
     pub type_parameter: TypeId,
     pub constraint_type: TypeId,
-    pub name_type: TypeId,      // as clause
+    pub name_type: TypeId, // as clause
     pub template_type: TypeId,
     /// Readonly modifier: None (preserve), Plus (+readonly), Minus (-readonly)
     pub readonly_modifier: MappedTypeModifier,

@@ -37,30 +37,54 @@ fn range_for_substring(source: &str, line_map: &LineMap, needle: &str) -> Range 
 fn test_project_cross_file_references_named_import() {
     let mut project = Project::new();
 
-    project.set_file("a.ts".to_string(), "export const foo = 1;\nfoo;\n".to_string());
-    project.set_file("b.ts".to_string(), "import { foo } from \"./a\";\nfoo;\n".to_string());
+    project.set_file(
+        "a.ts".to_string(),
+        "export const foo = 1;\nfoo;\n".to_string(),
+    );
+    project.set_file(
+        "b.ts".to_string(),
+        "import { foo } from \"./a\";\nfoo;\n".to_string(),
+    );
 
     let refs = project.find_references("b.ts", Position::new(1, 0));
     assert!(refs.is_some(), "Should find references for imported foo");
 
     let refs = refs.unwrap();
-    assert!(refs.iter().any(|loc| loc.file_path == "a.ts"), "Should include references from a.ts");
-    assert!(refs.iter().any(|loc| loc.file_path == "b.ts"), "Should include references from b.ts");
+    assert!(
+        refs.iter().any(|loc| loc.file_path == "a.ts"),
+        "Should include references from a.ts"
+    );
+    assert!(
+        refs.iter().any(|loc| loc.file_path == "b.ts"),
+        "Should include references from b.ts"
+    );
 }
 
 #[test]
 fn test_project_cross_file_references_default_import() {
     let mut project = Project::new();
 
-    project.set_file("a.ts".to_string(), "export default function foo() {}\nfoo();".to_string());
-    project.set_file("b.ts".to_string(), "import foo from \"./a\";\nfoo();".to_string());
+    project.set_file(
+        "a.ts".to_string(),
+        "export default function foo() {}\nfoo();".to_string(),
+    );
+    project.set_file(
+        "b.ts".to_string(),
+        "import foo from \"./a\";\nfoo();".to_string(),
+    );
 
     let refs = project.find_references("b.ts", Position::new(1, 0));
     assert!(refs.is_some(), "Should find references for default import");
 
     let refs = refs.unwrap();
-    assert!(refs.iter().any(|loc| loc.file_path == "a.ts"), "Should include references from a.ts");
-    assert!(refs.iter().any(|loc| loc.file_path == "b.ts"), "Should include references from b.ts");
+    assert!(
+        refs.iter().any(|loc| loc.file_path == "a.ts"),
+        "Should include references from a.ts"
+    );
+    assert!(
+        refs.iter().any(|loc| loc.file_path == "b.ts"),
+        "Should include references from b.ts"
+    );
 }
 
 #[test]
@@ -68,13 +92,22 @@ fn test_project_cross_file_references_namespace_import() {
     let mut project = Project::new();
 
     project.set_file("a.ts".to_string(), "export const foo = 1;\n".to_string());
-    project.set_file("b.ts".to_string(), "import * as ns from \"./a\";\nns.foo;\n".to_string());
+    project.set_file(
+        "b.ts".to_string(),
+        "import * as ns from \"./a\";\nns.foo;\n".to_string(),
+    );
 
     let refs = project.find_references("a.ts", Position::new(0, 13));
-    assert!(refs.is_some(), "Should find references for namespace import");
+    assert!(
+        refs.is_some(),
+        "Should find references for namespace import"
+    );
 
     let refs = refs.unwrap();
-    assert!(refs.iter().any(|loc| loc.file_path == "b.ts"), "Should include references from b.ts");
+    assert!(
+        refs.iter().any(|loc| loc.file_path == "b.ts"),
+        "Should include references from b.ts"
+    );
 }
 
 #[test]
@@ -82,14 +115,23 @@ fn test_project_cross_file_references_tsx_import() {
     let mut project = Project::new();
 
     project.set_file("a.tsx".to_string(), "export const foo = 1;\n".to_string());
-    project.set_file("b.ts".to_string(), "import { foo } from \"./a\";\nfoo;\n".to_string());
+    project.set_file(
+        "b.ts".to_string(),
+        "import { foo } from \"./a\";\nfoo;\n".to_string(),
+    );
 
     let refs = project.find_references("b.ts", Position::new(1, 0));
     assert!(refs.is_some(), "Should find references for tsx import");
 
     let refs = refs.unwrap();
-    assert!(refs.iter().any(|loc| loc.file_path == "a.tsx"), "Should include references from a.tsx");
-    assert!(refs.iter().any(|loc| loc.file_path == "b.ts"), "Should include references from b.ts");
+    assert!(
+        refs.iter().any(|loc| loc.file_path == "a.tsx"),
+        "Should include references from a.tsx"
+    );
+    assert!(
+        refs.iter().any(|loc| loc.file_path == "b.ts"),
+        "Should include references from b.ts"
+    );
 }
 
 #[test]
@@ -156,7 +198,9 @@ fn test_project_update_file_applies_edits() {
     let range = range_for_substring(file.source_text(), file.line_map(), "1");
     let edit = TextEdit::new(range, "2".to_string());
 
-    project.update_file("a.ts", &[edit]).expect("Expected update to succeed");
+    project
+        .update_file("a.ts", &[edit])
+        .expect("Expected update to succeed");
 
     let updated = project.file("a.ts").unwrap().source_text();
     assert_eq!(updated, "const value = 2;\n");
@@ -174,11 +218,7 @@ fn test_project_update_file_reuses_prefix_nodes() {
         let root = file.root();
         let source_node = arena.get(root).unwrap();
         let source_file = arena.get_source_file(source_node).unwrap();
-        (
-            root,
-            source_file.statements.nodes[0],
-            arena.len(),
-        )
+        (root, source_file.statements.nodes[0], arena.len())
     };
 
     let edit = {
@@ -186,7 +226,9 @@ fn test_project_update_file_reuses_prefix_nodes() {
         let range = range_for_substring(file.source_text(), file.line_map(), "beta");
         TextEdit::new(range, "gamma".to_string())
     };
-    project.update_file("a.ts", &[edit]).expect("Expected update to succeed");
+    project
+        .update_file("a.ts", &[edit])
+        .expect("Expected update to succeed");
 
     let file = project.file("a.ts").unwrap();
     assert_eq!(file.source_text(), "const alpha = 1;\nconst gamma = 2;\n");
@@ -197,7 +239,10 @@ fn test_project_update_file_reuses_prefix_nodes() {
     let source_file = arena.get_source_file(source_node).unwrap();
     assert_eq!(root_after, root_before);
     assert_eq!(source_file.statements.nodes[0], first_stmt_before);
-    assert!(arena.len() > arena_len_before, "Expected incremental parse to append nodes");
+    assert!(
+        arena.len() > arena_len_before,
+        "Expected incremental parse to append nodes"
+    );
 
     let parent = arena.get_extended(first_stmt_before).unwrap().parent;
     assert_eq!(parent, root_after);
@@ -222,7 +267,9 @@ fn test_project_update_file_reuses_binder_prefix_symbols() {
         let range = range_for_substring(file.source_text(), file.line_map(), "beta");
         TextEdit::new(range, "gamma".to_string())
     };
-    project.update_file("a.ts", &[edit]).expect("Expected update to succeed");
+    project
+        .update_file("a.ts", &[edit])
+        .expect("Expected update to succeed");
 
     let alpha_symbol_after = {
         let file = project.file("a.ts").unwrap();
@@ -254,7 +301,9 @@ fn test_project_update_file_function_body_edit_preserves_prefix_symbol() {
         let range = range_for_substring(file.source_text(), file.line_map(), "inner = 1");
         TextEdit::new(range, "inner = 2".to_string())
     };
-    project.update_file("a.ts", &[edit]).expect("Expected update to succeed");
+    project
+        .update_file("a.ts", &[edit])
+        .expect("Expected update to succeed");
 
     let alpha_symbol_after = {
         let file = project.file("a.ts").unwrap();
@@ -278,7 +327,9 @@ fn test_project_update_file_refreshes_file_locals_for_suffix() {
         let range = range_for_substring(file.source_text(), file.line_map(), "beta");
         TextEdit::new(range, "gamma".to_string())
     };
-    project.update_file("a.ts", &[edit]).expect("Expected update to succeed");
+    project
+        .update_file("a.ts", &[edit])
+        .expect("Expected update to succeed");
 
     let file = project.file("a.ts").unwrap();
     let locals = &file.binder().file_locals;
@@ -316,7 +367,9 @@ fn test_project_update_file_removes_suffix_symbol_mappings() {
         let range = range_for_substring(file.source_text(), file.line_map(), "const beta = 2;\n");
         TextEdit::new(range, "".to_string())
     };
-    project.update_file("a.ts", &[edit]).expect("Expected update to succeed");
+    project
+        .update_file("a.ts", &[edit])
+        .expect("Expected update to succeed");
 
     let file = project.file("a.ts").unwrap();
     assert_eq!(file.source_text(), "const alpha = 1;\n");
@@ -347,10 +400,7 @@ fn test_project_update_file_removes_suffix_flow_mappings() {
 
     {
         let file = project.file("a.ts").unwrap();
-        assert!(file
-            .binder()
-            .get_node_flow(beta_ident_idx)
-            .is_some());
+        assert!(file.binder().get_node_flow(beta_ident_idx).is_some());
     }
 
     let edit = {
@@ -358,7 +408,9 @@ fn test_project_update_file_removes_suffix_flow_mappings() {
         let range = range_for_substring(file.source_text(), file.line_map(), "beta;\n");
         TextEdit::new(range, "".to_string())
     };
-    project.update_file("a.ts", &[edit]).expect("Expected update to succeed");
+    project
+        .update_file("a.ts", &[edit])
+        .expect("Expected update to succeed");
 
     let file = project.file("a.ts").unwrap();
     assert!(file.binder().get_node_flow(beta_ident_idx).is_none());
@@ -378,7 +430,9 @@ fn test_project_update_file_inserts_suffix_statement() {
         let range = Range::new(pos, pos);
         TextEdit::new(range, "const beta = 2;\n".to_string())
     };
-    project.update_file("a.ts", &[edit]).expect("Expected update to succeed");
+    project
+        .update_file("a.ts", &[edit])
+        .expect("Expected update to succeed");
 
     let file = project.file("a.ts").unwrap();
     assert_eq!(file.source_text(), "const alpha = 1;\nconst beta = 2;\n");
@@ -406,14 +460,18 @@ fn test_project_update_file_preserves_prefix_symbol_across_edits() {
         let range = range_for_substring(file.source_text(), file.line_map(), "beta");
         TextEdit::new(range, "gamma".to_string())
     };
-    project.update_file("a.ts", &[edit_one]).expect("Expected update to succeed");
+    project
+        .update_file("a.ts", &[edit_one])
+        .expect("Expected update to succeed");
 
     let edit_two = {
         let file = project.file("a.ts").unwrap();
         let range = range_for_substring(file.source_text(), file.line_map(), "gamma");
         TextEdit::new(range, "delta".to_string())
     };
-    project.update_file("a.ts", &[edit_two]).expect("Expected update to succeed");
+    project
+        .update_file("a.ts", &[edit_two])
+        .expect("Expected update to succeed");
 
     let alpha_symbol_after = {
         let file = project.file("a.ts").unwrap();
@@ -462,7 +520,9 @@ fn test_project_update_file_multiple_edits_preserve_prefix_symbol() {
             TextEdit::new(update_gamma, "4".to_string()),
         ]
     };
-    project.update_file("a.ts", &edits).expect("Expected update to succeed");
+    project
+        .update_file("a.ts", &edits)
+        .expect("Expected update to succeed");
 
     let alpha_symbol_after = {
         let file = project.file("a.ts").unwrap();
@@ -532,7 +592,9 @@ fn test_project_update_file_append_preserves_prefix_symbol() {
         let range = Range::new(pos, pos);
         TextEdit::new(range, "const beta = 2;\n".to_string())
     };
-    project.update_file("a.ts", &[edit]).expect("Expected update to succeed");
+    project
+        .update_file("a.ts", &[edit])
+        .expect("Expected update to succeed");
 
     let alpha_symbol_after = {
         let file = project.file("a.ts").unwrap();
@@ -598,7 +660,9 @@ fn test_project_update_file_append_multiple_statements_preserves_prefix_symbol()
         let range = Range::new(pos, pos);
         TextEdit::new(range, "const beta = 2;\nconst gamma = 3;\n".to_string())
     };
-    project.update_file("a.ts", &[edit]).expect("Expected update to succeed");
+    project
+        .update_file("a.ts", &[edit])
+        .expect("Expected update to succeed");
 
     let alpha_symbol_after = {
         let file = project.file("a.ts").unwrap();
@@ -687,7 +751,9 @@ fn test_project_update_file_append_preserves_multiple_prefix_symbols() {
         let range = Range::new(pos, pos);
         TextEdit::new(range, "const gamma = 3;\n".to_string())
     };
-    project.update_file("a.ts", &[edit]).expect("Expected update to succeed");
+    project
+        .update_file("a.ts", &[edit])
+        .expect("Expected update to succeed");
 
     let (alpha_symbol_after, beta_symbol_after) = {
         let file = project.file("a.ts").unwrap();
@@ -774,7 +840,9 @@ fn test_project_update_file_remove_suffix_preserves_prefix_symbol() {
         let range = range_for_substring(file.source_text(), file.line_map(), "const beta = 2;\n");
         TextEdit::new(range, "".to_string())
     };
-    project.update_file("a.ts", &[edit]).expect("Expected update to succeed");
+    project
+        .update_file("a.ts", &[edit])
+        .expect("Expected update to succeed");
 
     let alpha_symbol_after = {
         let file = project.file("a.ts").unwrap();
@@ -856,7 +924,9 @@ fn test_project_update_file_preserves_multiple_prefix_symbols() {
         let range = range_for_substring(file.source_text(), file.line_map(), "gamma");
         TextEdit::new(range, "delta".to_string())
     };
-    project.update_file("a.ts", &[edit]).expect("Expected update to succeed");
+    project
+        .update_file("a.ts", &[edit])
+        .expect("Expected update to succeed");
 
     let (alpha_symbol_after, beta_symbol_after) = {
         let file = project.file("a.ts").unwrap();
@@ -916,7 +986,10 @@ fn test_project_update_file_refreshes_cross_file_references() {
     let mut project = Project::new();
 
     project.set_file("a.ts".to_string(), "export const foo = 1;\n".to_string());
-    project.set_file("b.ts".to_string(), "import { foo } from \"./a\";\nfoo;\n".to_string());
+    project.set_file(
+        "b.ts".to_string(),
+        "import { foo } from \"./a\";\nfoo;\n".to_string(),
+    );
 
     let before_refs = project
         .find_references("b.ts", Position::new(1, 0))
@@ -948,7 +1021,11 @@ fn test_project_hover_includes_jsdoc() {
         .get_hover("a.ts", Position::new(2, 0))
         .expect("Expected hover info");
 
-    assert!(info.contents.iter().any(|content| content.contains("The answer")));
+    assert!(
+        info.contents
+            .iter()
+            .any(|content| content.contains("The answer"))
+    );
 }
 
 #[test]
@@ -990,10 +1067,15 @@ fn test_project_completions_auto_import_named() {
         }
         let detail = item.detail.as_deref().unwrap_or("");
         let doc = item.documentation.as_deref().unwrap_or("");
-        detail.contains("auto-import") && detail.contains("./a") && doc.contains("import { foo } from \"./a\";")
+        detail.contains("auto-import")
+            && detail.contains("./a")
+            && doc.contains("import { foo } from \"./a\";")
     });
 
-    assert!(has_auto_import, "Should include auto-import completion for foo");
+    assert!(
+        has_auto_import,
+        "Should include auto-import completion for foo"
+    );
 }
 
 #[test]
@@ -1033,8 +1115,14 @@ fn test_project_performance_scope_cache_hits_definition() {
         .timing(ProjectRequestKind::Definition)
         .expect("Expected timing data for definition");
 
-    assert!(first.scope_misses > 0, "Expected scope cache misses on first request");
-    assert!(second.scope_hits > 0, "Expected scope cache hits on second request");
+    assert!(
+        first.scope_misses > 0,
+        "Expected scope cache misses on first request"
+    );
+    assert!(
+        second.scope_hits > 0,
+        "Expected scope cache hits on second request"
+    );
 }
 
 #[test]
@@ -1056,8 +1144,14 @@ fn test_project_performance_scope_cache_hits_hover() {
         .timing(ProjectRequestKind::Hover)
         .expect("Expected timing data for hover");
 
-    assert!(first.scope_misses > 0, "Expected scope cache misses on first request");
-    assert!(second.scope_hits > 0, "Expected scope cache hits on second request");
+    assert!(
+        first.scope_misses > 0,
+        "Expected scope cache misses on first request"
+    );
+    assert!(
+        second.scope_hits > 0,
+        "Expected scope cache hits on second request"
+    );
 }
 
 #[test]
@@ -1087,8 +1181,14 @@ fn test_project_performance_scope_cache_hits_completions() {
         .timing(ProjectRequestKind::Completions)
         .expect("Expected timing data for completions");
 
-    assert!(first.scope_misses > 0, "Expected scope cache misses on first request");
-    assert!(second.scope_hits > 0, "Expected scope cache hits on second request");
+    assert!(
+        first.scope_misses > 0,
+        "Expected scope cache misses on first request"
+    );
+    assert!(
+        second.scope_hits > 0,
+        "Expected scope cache hits on second request"
+    );
 }
 
 #[test]
@@ -1113,8 +1213,14 @@ fn test_project_performance_scope_cache_hits_signature_help() {
         .timing(ProjectRequestKind::SignatureHelp)
         .expect("Expected timing data for signature help");
 
-    assert!(first.scope_misses > 0, "Expected scope cache misses on first request");
-    assert!(second.scope_hits > 0, "Expected scope cache hits on second request");
+    assert!(
+        first.scope_misses > 0,
+        "Expected scope cache misses on first request"
+    );
+    assert!(
+        second.scope_hits > 0,
+        "Expected scope cache hits on second request"
+    );
 }
 
 #[test]
@@ -1136,8 +1242,14 @@ fn test_project_performance_scope_cache_hits_references() {
         .timing(ProjectRequestKind::References)
         .expect("Expected timing data for references");
 
-    assert!(first.scope_misses > 0, "Expected scope cache misses on first request");
-    assert!(second.scope_hits > 0, "Expected scope cache hits on second request");
+    assert!(
+        first.scope_misses > 0,
+        "Expected scope cache misses on first request"
+    );
+    assert!(
+        second.scope_hits > 0,
+        "Expected scope cache hits on second request"
+    );
 }
 
 #[test]
@@ -1163,8 +1275,14 @@ fn test_project_performance_scope_cache_hits_rename() {
         .timing(ProjectRequestKind::Rename)
         .expect("Expected timing data for rename");
 
-    assert!(first.scope_misses > 0, "Expected scope cache misses on first request");
-    assert!(second.scope_hits > 0, "Expected scope cache hits on second request");
+    assert!(
+        first.scope_misses > 0,
+        "Expected scope cache misses on first request"
+    );
+    assert!(
+        second.scope_hits > 0,
+        "Expected scope cache hits on second request"
+    );
 }
 
 #[test]
@@ -1189,8 +1307,14 @@ fn test_project_scope_cache_cleared_after_update() {
         .timing(ProjectRequestKind::Definition)
         .expect("Expected timing data for definition");
 
-    assert!(first.scope_misses > 0, "Expected scope cache misses on first request");
-    assert!(second.scope_hits > 0, "Expected scope cache hits on second request");
+    assert!(
+        first.scope_misses > 0,
+        "Expected scope cache misses on first request"
+    );
+    assert!(
+        second.scope_hits > 0,
+        "Expected scope cache hits on second request"
+    );
 
     let edit = {
         let file = project.file("a.ts").unwrap();
@@ -1208,7 +1332,10 @@ fn test_project_scope_cache_cleared_after_update() {
         .expect("Expected timing data for definition");
 
     assert!(third.scope_misses > 0, "Expected cache misses after edit");
-    assert_eq!(third.scope_hits, 0, "Expected cache hits cleared after edit");
+    assert_eq!(
+        third.scope_hits, 0,
+        "Expected cache hits cleared after edit"
+    );
 }
 
 #[test]
@@ -1235,10 +1362,12 @@ fn test_project_scope_cache_reuse_hover_to_definition_after_edit() {
         .timing(ProjectRequestKind::Definition)
         .expect("Expected timing data for definition");
 
-    assert!(timing.scope_hits > 0, "Expected scope cache hit from prior hover after edit");
+    assert!(
+        timing.scope_hits > 0,
+        "Expected scope cache hit from prior hover after edit"
+    );
     assert_eq!(
-        timing.scope_misses,
-        0,
+        timing.scope_misses, 0,
         "Expected definition to reuse cached scope after edit"
     );
 }
@@ -1271,10 +1400,12 @@ fn test_project_scope_cache_reuse_hover_to_definition_after_edit_across_files() 
         .timing(ProjectRequestKind::Definition)
         .expect("Expected timing data for definition");
 
-    assert!(timing.scope_hits > 0, "Expected scope cache hit from prior hover after edit");
+    assert!(
+        timing.scope_hits > 0,
+        "Expected scope cache hit from prior hover after edit"
+    );
     assert_eq!(
-        timing.scope_misses,
-        0,
+        timing.scope_misses, 0,
         "Expected definition to reuse cached scope after edit across files"
     );
 }
@@ -1307,10 +1438,12 @@ fn test_project_scope_cache_reuse_hover_to_references_after_edit_across_files() 
         .timing(ProjectRequestKind::References)
         .expect("Expected timing data for references");
 
-    assert!(timing.scope_hits > 0, "Expected scope cache hit from prior hover after edit");
+    assert!(
+        timing.scope_hits > 0,
+        "Expected scope cache hit from prior hover after edit"
+    );
     assert_eq!(
-        timing.scope_misses,
-        0,
+        timing.scope_misses, 0,
         "Expected references to reuse cached scope after edit across files"
     );
 }
@@ -1345,10 +1478,12 @@ fn test_project_scope_cache_reuse_hover_to_rename_after_edit_across_files() {
         .timing(ProjectRequestKind::Rename)
         .expect("Expected timing data for rename");
 
-    assert!(timing.scope_hits > 0, "Expected scope cache hit from prior hover after edit");
+    assert!(
+        timing.scope_hits > 0,
+        "Expected scope cache hit from prior hover after edit"
+    );
     assert_eq!(
-        timing.scope_misses,
-        0,
+        timing.scope_misses, 0,
         "Expected rename to reuse cached scope after edit across files"
     );
 }
@@ -1381,17 +1516,23 @@ fn test_project_scope_cache_reuse_hover_to_signature_help_after_edit_across_file
         .expect("Expected update to succeed");
 
     assert!(project.get_hover("b.ts", hover_position).is_some());
-    assert!(project.get_signature_help("b.ts", signature_position).is_some());
+    assert!(
+        project
+            .get_signature_help("b.ts", signature_position)
+            .is_some()
+    );
 
     let timing = project
         .performance()
         .timing(ProjectRequestKind::SignatureHelp)
         .expect("Expected timing data for signature help");
 
-    assert!(timing.scope_hits > 0, "Expected scope cache hit from prior hover after edit");
+    assert!(
+        timing.scope_hits > 0,
+        "Expected scope cache hit from prior hover after edit"
+    );
     assert_eq!(
-        timing.scope_misses,
-        0,
+        timing.scope_misses, 0,
         "Expected signature help to reuse cached scope after edit across files"
     );
 }
@@ -1424,10 +1565,12 @@ fn test_project_scope_cache_reuse_hover_to_completions_after_edit_across_files()
         .timing(ProjectRequestKind::Completions)
         .expect("Expected timing data for completions");
 
-    assert!(timing.scope_hits > 0, "Expected scope cache hit from prior hover after edit");
+    assert!(
+        timing.scope_hits > 0,
+        "Expected scope cache hit from prior hover after edit"
+    );
     assert_eq!(
-        timing.scope_misses,
-        0,
+        timing.scope_misses, 0,
         "Expected completions to reuse cached scope after edit across files"
     );
 }
@@ -1459,10 +1602,12 @@ fn test_project_scope_cache_reuse_hover_to_completions_after_edit() {
         .timing(ProjectRequestKind::Completions)
         .expect("Expected timing data for completions");
 
-    assert!(timing.scope_hits > 0, "Expected scope cache hit from prior hover after edit");
+    assert!(
+        timing.scope_hits > 0,
+        "Expected scope cache hit from prior hover after edit"
+    );
     assert_eq!(
-        timing.scope_misses,
-        0,
+        timing.scope_misses, 0,
         "Expected completions to reuse cached scope after edit"
     );
 }
@@ -1488,17 +1633,23 @@ fn test_project_scope_cache_reuse_hover_to_signature_help_after_edit() {
         .expect("Expected update to succeed");
 
     assert!(project.get_hover("a.ts", hover_position).is_some());
-    assert!(project.get_signature_help("a.ts", signature_position).is_some());
+    assert!(
+        project
+            .get_signature_help("a.ts", signature_position)
+            .is_some()
+    );
 
     let timing = project
         .performance()
         .timing(ProjectRequestKind::SignatureHelp)
         .expect("Expected timing data for signature help");
 
-    assert!(timing.scope_hits > 0, "Expected scope cache hit from prior hover after edit");
+    assert!(
+        timing.scope_hits > 0,
+        "Expected scope cache hit from prior hover after edit"
+    );
     assert_eq!(
-        timing.scope_misses,
-        0,
+        timing.scope_misses, 0,
         "Expected signature help to reuse cached scope after edit"
     );
 }
@@ -1527,10 +1678,12 @@ fn test_project_scope_cache_reuse_hover_to_references_after_edit() {
         .timing(ProjectRequestKind::References)
         .expect("Expected timing data for references");
 
-    assert!(timing.scope_hits > 0, "Expected scope cache hit from prior hover after edit");
+    assert!(
+        timing.scope_hits > 0,
+        "Expected scope cache hit from prior hover after edit"
+    );
     assert_eq!(
-        timing.scope_misses,
-        0,
+        timing.scope_misses, 0,
         "Expected references to reuse cached scope after edit"
     );
 }
@@ -1561,10 +1714,12 @@ fn test_project_scope_cache_reuse_hover_to_rename_after_edit() {
         .timing(ProjectRequestKind::Rename)
         .expect("Expected timing data for rename");
 
-    assert!(timing.scope_hits > 0, "Expected scope cache hit from prior hover after edit");
+    assert!(
+        timing.scope_hits > 0,
+        "Expected scope cache hit from prior hover after edit"
+    );
     assert_eq!(
-        timing.scope_misses,
-        0,
+        timing.scope_misses, 0,
         "Expected rename to reuse cached scope after edit"
     );
 }
@@ -1584,8 +1739,14 @@ fn test_project_scope_cache_reuse_across_requests() {
         .timing(ProjectRequestKind::Definition)
         .expect("Expected timing data for definition");
 
-    assert!(timing.scope_hits > 0, "Expected scope cache hit from prior hover");
-    assert_eq!(timing.scope_misses, 0, "Expected definition to reuse cached scope");
+    assert!(
+        timing.scope_hits > 0,
+        "Expected scope cache hit from prior hover"
+    );
+    assert_eq!(
+        timing.scope_misses, 0,
+        "Expected definition to reuse cached scope"
+    );
 }
 
 #[test]
@@ -1606,8 +1767,14 @@ fn test_project_scope_cache_reuse_hover_to_completions() {
         .timing(ProjectRequestKind::Completions)
         .expect("Expected timing data for completions");
 
-    assert!(timing.scope_hits > 0, "Expected scope cache hit from prior hover");
-    assert_eq!(timing.scope_misses, 0, "Expected completions to reuse cached scope");
+    assert!(
+        timing.scope_hits > 0,
+        "Expected scope cache hit from prior hover"
+    );
+    assert_eq!(
+        timing.scope_misses, 0,
+        "Expected completions to reuse cached scope"
+    );
 }
 
 #[test]
@@ -1622,15 +1789,25 @@ fn test_project_scope_cache_reuse_hover_to_signature_help() {
     let signature_position = Position::new(1, 0);
 
     assert!(project.get_hover("a.ts", hover_position).is_some());
-    assert!(project.get_signature_help("a.ts", signature_position).is_some());
+    assert!(
+        project
+            .get_signature_help("a.ts", signature_position)
+            .is_some()
+    );
 
     let timing = project
         .performance()
         .timing(ProjectRequestKind::SignatureHelp)
         .expect("Expected timing data for signature help");
 
-    assert!(timing.scope_hits > 0, "Expected scope cache hit from prior hover");
-    assert_eq!(timing.scope_misses, 0, "Expected signature help to reuse cached scope");
+    assert!(
+        timing.scope_hits > 0,
+        "Expected scope cache hit from prior hover"
+    );
+    assert_eq!(
+        timing.scope_misses, 0,
+        "Expected signature help to reuse cached scope"
+    );
 }
 
 #[test]
@@ -1648,8 +1825,14 @@ fn test_project_scope_cache_reuse_hover_to_references() {
         .timing(ProjectRequestKind::References)
         .expect("Expected timing data for references");
 
-    assert!(timing.scope_hits > 0, "Expected scope cache hit from prior hover");
-    assert_eq!(timing.scope_misses, 0, "Expected references to reuse cached scope");
+    assert!(
+        timing.scope_hits > 0,
+        "Expected scope cache hit from prior hover"
+    );
+    assert_eq!(
+        timing.scope_misses, 0,
+        "Expected references to reuse cached scope"
+    );
 }
 
 #[test]
@@ -1669,8 +1852,14 @@ fn test_project_scope_cache_reuse_hover_to_rename() {
         .timing(ProjectRequestKind::Rename)
         .expect("Expected timing data for rename");
 
-    assert!(timing.scope_hits > 0, "Expected scope cache hit from prior hover");
-    assert_eq!(timing.scope_misses, 0, "Expected rename to reuse cached scope");
+    assert!(
+        timing.scope_hits > 0,
+        "Expected scope cache hit from prior hover"
+    );
+    assert_eq!(
+        timing.scope_misses, 0,
+        "Expected rename to reuse cached scope"
+    );
 }
 
 #[test]
@@ -1679,7 +1868,8 @@ fn test_project_cross_file_function_body_edit_preserves_symbol_and_scope_cache()
 
     project.set_file(
         "a.ts".to_string(),
-        "export const alpha = 1;\nfunction foo() {\n  const inner = 1;\n  return inner;\n}\n".to_string(),
+        "export const alpha = 1;\nfunction foo() {\n  const inner = 1;\n  return inner;\n}\n"
+            .to_string(),
     );
     project.set_file(
         "b.ts".to_string(),
@@ -1722,8 +1912,14 @@ fn test_project_cross_file_function_body_edit_preserves_symbol_and_scope_cache()
         .timing(ProjectRequestKind::Definition)
         .expect("Expected timing data for definition");
 
-    assert!(timing.scope_hits > 0, "Expected scope cache hit from prior hover");
-    assert_eq!(timing.scope_misses, 0, "Expected definition to reuse cached scope");
+    assert!(
+        timing.scope_hits > 0,
+        "Expected scope cache hit from prior hover"
+    );
+    assert_eq!(
+        timing.scope_misses, 0,
+        "Expected definition to reuse cached scope"
+    );
 }
 
 #[test]
@@ -1758,10 +1954,12 @@ fn test_project_scope_cache_reuse_after_other_file_edit() {
         .timing(ProjectRequestKind::Definition)
         .expect("Expected timing data for definition");
 
-    assert!(timing.scope_hits > 0, "Expected scope cache hit after other file edit");
+    assert!(
+        timing.scope_hits > 0,
+        "Expected scope cache hit after other file edit"
+    );
     assert_eq!(
-        timing.scope_misses,
-        0,
+        timing.scope_misses, 0,
         "Expected definition to reuse cached scope after other file edit"
     );
 }
@@ -1803,8 +2001,7 @@ fn test_project_scope_cache_reuse_after_nested_edit_suffix_export_across_files()
         "Expected scope cache hit after nested edit in other file"
     );
     assert_eq!(
-        timing.scope_misses,
-        0,
+        timing.scope_misses, 0,
         "Expected definition to reuse cached scope after nested edit in other file"
     );
 }
@@ -1861,8 +2058,7 @@ fn test_project_nested_function_body_edit_preserves_prefix_symbol_and_scope_cach
 
     if first.scope_hits > 0 {
         assert_eq!(
-            first.scope_misses,
-            0,
+            first.scope_misses, 0,
             "Expected definition to reuse cached scope after nested edit"
         );
     } else {
@@ -1872,10 +2068,12 @@ fn test_project_nested_function_body_edit_preserves_prefix_symbol_and_scope_cach
         );
     }
 
-    assert!(second.scope_hits > 0, "Expected scope cache hit after nested edit");
+    assert!(
+        second.scope_hits > 0,
+        "Expected scope cache hit after nested edit"
+    );
     assert_eq!(
-        second.scope_misses,
-        0,
+        second.scope_misses, 0,
         "Expected definition to reuse cached scope after cache warm"
     );
 }
@@ -1915,8 +2113,7 @@ fn test_project_nested_function_body_edit_preserves_suffix_definition_scope_cach
         "Expected scope cache hit for suffix symbol after nested edit"
     );
     assert_eq!(
-        timing.scope_misses,
-        0,
+        timing.scope_misses, 0,
         "Expected definition to reuse cached scope for suffix symbol after nested edit"
     );
 }
@@ -1952,9 +2149,9 @@ fn test_project_nested_function_body_edit_suffix_definition_without_hover() {
         .get_definition("a.ts", position)
         .expect("Expected definition for suffix symbol");
     assert!(
-        definitions.iter().any(|loc| {
-            loc.file_path == "a.ts" && loc.range.start == expected_decl_start
-        }),
+        definitions
+            .iter()
+            .any(|loc| { loc.file_path == "a.ts" && loc.range.start == expected_decl_start }),
         "Expected definition to point at beta declaration after nested edit"
     );
 
@@ -1968,8 +2165,7 @@ fn test_project_nested_function_body_edit_suffix_definition_without_hover() {
         "Expected cache misses on cold definition after nested edit"
     );
     assert_eq!(
-        timing.scope_hits,
-        0,
+        timing.scope_hits, 0,
         "Expected no cache hits on cold definition after nested edit"
     );
 }
@@ -1979,15 +2175,27 @@ fn test_project_cross_file_references_reexport_named() {
     let mut project = Project::new();
 
     project.set_file("a.ts".to_string(), "export const foo = 1;\n".to_string());
-    project.set_file("b.ts".to_string(), "export { foo as bar } from \"./a\";\n".to_string());
-    project.set_file("c.ts".to_string(), "import { bar } from \"./b\";\nbar;\n".to_string());
+    project.set_file(
+        "b.ts".to_string(),
+        "export { foo as bar } from \"./a\";\n".to_string(),
+    );
+    project.set_file(
+        "c.ts".to_string(),
+        "import { bar } from \"./b\";\nbar;\n".to_string(),
+    );
 
     let refs = project.find_references("a.ts", Position::new(0, 13));
     assert!(refs.is_some(), "Should find references across re-exports");
 
     let refs = refs.unwrap();
-    assert!(refs.iter().any(|loc| loc.file_path == "b.ts"), "Should include re-export reference in b.ts");
-    assert!(refs.iter().any(|loc| loc.file_path == "c.ts"), "Should include references from c.ts");
+    assert!(
+        refs.iter().any(|loc| loc.file_path == "b.ts"),
+        "Should include re-export reference in b.ts"
+    );
+    assert!(
+        refs.iter().any(|loc| loc.file_path == "c.ts"),
+        "Should include references from c.ts"
+    );
 }
 
 #[test]
@@ -1995,14 +2203,26 @@ fn test_project_cross_file_references_namespace_reexport() {
     let mut project = Project::new();
 
     project.set_file("a.ts".to_string(), "export const foo = 1;\n".to_string());
-    project.set_file("b.ts".to_string(), "export * as ns from \"./a\";\n".to_string());
-    project.set_file("c.ts".to_string(), "import { ns } from \"./b\";\nns.foo;\n".to_string());
+    project.set_file(
+        "b.ts".to_string(),
+        "export * as ns from \"./a\";\n".to_string(),
+    );
+    project.set_file(
+        "c.ts".to_string(),
+        "import { ns } from \"./b\";\nns.foo;\n".to_string(),
+    );
 
     let refs = project.find_references("a.ts", Position::new(0, 13));
-    assert!(refs.is_some(), "Should find references through namespace re-export");
+    assert!(
+        refs.is_some(),
+        "Should find references through namespace re-export"
+    );
 
     let refs = refs.unwrap();
-    assert!(refs.iter().any(|loc| loc.file_path == "c.ts"), "Should include namespace member reference in c.ts");
+    assert!(
+        refs.iter().any(|loc| loc.file_path == "c.ts"),
+        "Should include namespace member reference in c.ts"
+    );
 }
 
 #[test]
@@ -2049,7 +2269,10 @@ fn test_project_code_actions_missing_import_named() {
 fn test_project_code_actions_missing_import_default_export() {
     let mut project = Project::new();
 
-    project.set_file("a.ts".to_string(), "export default function bar() {}\n".to_string());
+    project.set_file(
+        "a.ts".to_string(),
+        "export default function bar() {}\n".to_string(),
+    );
     project.set_file("b.ts".to_string(), "foo();\n".to_string());
 
     let file = project.file("b.ts").unwrap();
@@ -2129,8 +2352,14 @@ fn test_project_code_actions_missing_import_tsx() {
 fn test_project_code_actions_missing_import_default_reexport() {
     let mut project = Project::new();
 
-    project.set_file("a.ts".to_string(), "export default function bar() {}\n".to_string());
-    project.set_file("index.ts".to_string(), "export { default } from \"./a\";\n".to_string());
+    project.set_file(
+        "a.ts".to_string(),
+        "export default function bar() {}\n".to_string(),
+    );
+    project.set_file(
+        "index.ts".to_string(),
+        "export { default } from \"./a\";\n".to_string(),
+    );
     project.set_file("b.ts".to_string(), "foo();\n".to_string());
 
     let file = project.file("b.ts").unwrap();
@@ -2171,7 +2400,10 @@ fn test_project_code_actions_missing_import_reexport() {
     let mut project = Project::new();
 
     project.set_file("a.ts".to_string(), "export const foo = 1;\n".to_string());
-    project.set_file("index.ts".to_string(), "export { foo as bar } from \"./a\";\n".to_string());
+    project.set_file(
+        "index.ts".to_string(),
+        "export { foo as bar } from \"./a\";\n".to_string(),
+    );
     project.set_file("b.ts".to_string(), "bar();\n".to_string());
 
     let file = project.file("b.ts").unwrap();

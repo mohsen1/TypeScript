@@ -9,7 +9,7 @@ pub struct CharacterCodes;
 
 impl CharacterCodes {
     // Line terminators
-    pub const LINE_FEED: u32 = 0x0A;       // \n
+    pub const LINE_FEED: u32 = 0x0A; // \n
     pub const CARRIAGE_RETURN: u32 = 0x0D; // \r
     pub const LINE_SEPARATOR: u32 = 0x2028;
     pub const PARAGRAPH_SEPARATOR: u32 = 0x2029;
@@ -108,36 +108,36 @@ impl CharacterCodes {
     pub const LOWER_Z: u32 = 0x7A;
 
     // Punctuation and operators
-    pub const EXCLAMATION: u32 = 0x21;      // !
-    pub const DOUBLE_QUOTE: u32 = 0x22;     // "
-    pub const HASH: u32 = 0x23;             // #
-    pub const DOLLAR: u32 = 0x24;           // $
-    pub const PERCENT: u32 = 0x25;          // %
-    pub const AMPERSAND: u32 = 0x26;        // &
-    pub const SINGLE_QUOTE: u32 = 0x27;     // '
-    pub const OPEN_PAREN: u32 = 0x28;       // (
-    pub const CLOSE_PAREN: u32 = 0x29;      // )
-    pub const ASTERISK: u32 = 0x2A;         // *
-    pub const PLUS: u32 = 0x2B;             // +
-    pub const COMMA: u32 = 0x2C;            // ,
-    pub const MINUS: u32 = 0x2D;            // -
-    pub const DOT: u32 = 0x2E;              // .
-    pub const SLASH: u32 = 0x2F;            // /
-    pub const COLON: u32 = 0x3A;            // :
-    pub const SEMICOLON: u32 = 0x3B;        // ;
-    pub const LESS_THAN: u32 = 0x3C;        // <
-    pub const EQUALS: u32 = 0x3D;           // =
-    pub const GREATER_THAN: u32 = 0x3E;     // >
-    pub const QUESTION: u32 = 0x3F;         // ?
-    pub const AT: u32 = 0x40;               // @
-    pub const OPEN_BRACKET: u32 = 0x5B;     // [
-    pub const BACKSLASH: u32 = 0x5C;        // \
-    pub const CLOSE_BRACKET: u32 = 0x5D;    // ]
-    pub const CARET: u32 = 0x5E;            // ^
-    pub const UNDERSCORE: u32 = 0x5F;       // _
-    pub const BACKTICK: u32 = 0x60;         // `
-    pub const OPEN_BRACE: u32 = 0x7B;       // {
-    pub const BAR: u32 = 0x7C;              // |
-    pub const CLOSE_BRACE: u32 = 0x7D;      // }
-    pub const TILDE: u32 = 0x7E;            // ~
+    pub const EXCLAMATION: u32 = 0x21; // !
+    pub const DOUBLE_QUOTE: u32 = 0x22; // "
+    pub const HASH: u32 = 0x23; // #
+    pub const DOLLAR: u32 = 0x24; // $
+    pub const PERCENT: u32 = 0x25; // %
+    pub const AMPERSAND: u32 = 0x26; // &
+    pub const SINGLE_QUOTE: u32 = 0x27; // '
+    pub const OPEN_PAREN: u32 = 0x28; // (
+    pub const CLOSE_PAREN: u32 = 0x29; // )
+    pub const ASTERISK: u32 = 0x2A; // *
+    pub const PLUS: u32 = 0x2B; // +
+    pub const COMMA: u32 = 0x2C; // ,
+    pub const MINUS: u32 = 0x2D; // -
+    pub const DOT: u32 = 0x2E; // .
+    pub const SLASH: u32 = 0x2F; // /
+    pub const COLON: u32 = 0x3A; // :
+    pub const SEMICOLON: u32 = 0x3B; // ;
+    pub const LESS_THAN: u32 = 0x3C; // <
+    pub const EQUALS: u32 = 0x3D; // =
+    pub const GREATER_THAN: u32 = 0x3E; // >
+    pub const QUESTION: u32 = 0x3F; // ?
+    pub const AT: u32 = 0x40; // @
+    pub const OPEN_BRACKET: u32 = 0x5B; // [
+    pub const BACKSLASH: u32 = 0x5C; // \
+    pub const CLOSE_BRACKET: u32 = 0x5D; // ]
+    pub const CARET: u32 = 0x5E; // ^
+    pub const UNDERSCORE: u32 = 0x5F; // _
+    pub const BACKTICK: u32 = 0x60; // `
+    pub const OPEN_BRACE: u32 = 0x7B; // {
+    pub const BAR: u32 = 0x7C; // |
+    pub const CLOSE_BRACE: u32 = 0x7D; // }
+    pub const TILDE: u32 = 0x7E; // ~
 }

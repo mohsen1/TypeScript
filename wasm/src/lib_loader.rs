@@ -4,10 +4,10 @@
 //! (like lib.d.ts) and merging their global symbols into the binder's root scope.
 //! This enables proper resolution of built-in types like `Object`, `Function`, `console`, etc.
 
-use std::sync::Arc;
-use crate::parser::thin_node::ThinNodeArena;
 use crate::binder::{SymbolId, SymbolTable};
+use crate::parser::thin_node::ThinNodeArena;
 use crate::thin_binder::ThinBinderState;
+use std::sync::Arc;
 
 /// Loaded lib file with its arena and binder state.
 #[derive(Clone)]
@@ -22,12 +22,12 @@ pub struct LibFile {
 
 impl LibFile {
     /// Create a new LibFile from a parsed and bound lib file.
-    pub fn new(
-        file_name: String,
-        arena: Arc<ThinNodeArena>,
-        binder: Arc<ThinBinderState>,
-    ) -> Self {
-        Self { file_name, arena, binder }
+    pub fn new(file_name: String, arena: Arc<ThinNodeArena>, binder: Arc<ThinBinderState>) -> Self {
+        Self {
+            file_name,
+            arena,
+            binder,
+        }
     }
 
     /// Get the file locals (global symbols) from this lib file.
@@ -74,11 +74,8 @@ mod tests {
         lib_file_locals.set("Function".to_string(), function_id);
         lib_file_locals.set("console".to_string(), console_id);
 
-        let mut lib_binder = ThinBinderState::from_bound_state(
-            arena,
-            lib_file_locals,
-            Default::default(),
-        );
+        let mut lib_binder =
+            ThinBinderState::from_bound_state(arena, lib_file_locals, Default::default());
 
         let lib = Arc::new(LibFile::new(
             "lib.d.ts".to_string(),

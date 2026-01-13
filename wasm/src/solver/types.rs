@@ -3,8 +3,8 @@
 //! Types are represented as lightweight `TypeId` handles that point into
 //! an interning table. The actual structure is stored in `TypeKey`.
 
-use serde::Serialize;
 use crate::interner::Atom;
+use serde::Serialize;
 
 /// A lightweight handle to an interned type.
 /// Equality check is O(1) - just compare the u32 values.

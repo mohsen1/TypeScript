@@ -24,7 +24,7 @@
 //! ```
 
 use crate::parser::thin_node::ThinNodeArena;
-use crate::parser::{syntax_kind_ext, NodeIndex, NodeList};
+use crate::parser::{NodeIndex, NodeList, syntax_kind_ext};
 use crate::scanner::SyntaxKind;
 
 /// Information about a private field in a class
@@ -196,8 +196,7 @@ pub fn collect_private_fields(
 
             // Check if this is a private field
             if is_private_identifier(arena, prop_data.name) {
-                let field_name = get_private_field_name(arena, prop_data.name)
-                    .unwrap_or_default();
+                let field_name = get_private_field_name(arena, prop_data.name).unwrap_or_default();
                 let clean_name = field_name.strip_prefix('#').unwrap_or(&field_name);
                 let weakmap_name = format!("_{}_{}", class_name, clean_name);
                 let is_static = has_static_modifier(arena, &prop_data.modifiers);
@@ -238,7 +237,8 @@ pub fn collect_private_accessors(
     class_idx: NodeIndex,
     class_name: &str,
 ) -> Vec<PrivateAccessorInfo> {
-    let mut accessors: std::collections::HashMap<String, PrivateAccessorInfo> = std::collections::HashMap::new();
+    let mut accessors: std::collections::HashMap<String, PrivateAccessorInfo> =
+        std::collections::HashMap::new();
 
     let Some(class_node) = arena.get(class_idx) else {
         return Vec::new();
@@ -265,23 +265,23 @@ pub fn collect_private_accessors(
                 continue;
             }
 
-            let field_name = get_private_field_name(arena, accessor_data.name)
-                .unwrap_or_default();
+            let field_name = get_private_field_name(arena, accessor_data.name).unwrap_or_default();
             let clean_name = field_name.strip_prefix('#').unwrap_or(&field_name);
             let is_static = has_static_modifier(arena, &accessor_data.modifiers);
 
             // Get or create the accessor info for this name
-            let entry = accessors
-                .entry(clean_name.to_string())
-                .or_insert_with(|| PrivateAccessorInfo {
-                    name: clean_name.to_string(),
-                    get_var_name: Some(format!("_{}_{}_get", class_name, clean_name)),
-                    set_var_name: Some(format!("_{}_{}_set", class_name, clean_name)),
-                    getter_body: None,
-                    setter_body: None,
-                    setter_param: None,
-                    is_static,
-                });
+            let entry =
+                accessors
+                    .entry(clean_name.to_string())
+                    .or_insert_with(|| PrivateAccessorInfo {
+                        name: clean_name.to_string(),
+                        get_var_name: Some(format!("_{}_{}_get", class_name, clean_name)),
+                        set_var_name: Some(format!("_{}_{}_set", class_name, clean_name)),
+                        getter_body: None,
+                        setter_body: None,
+                        setter_param: None,
+                        is_static,
+                    });
 
             // Update based on accessor type
             if member_node.kind == syntax_kind_ext::GET_ACCESSOR {
@@ -348,8 +348,14 @@ mod tests {
         state.register_private_field("#count", false, NodeIndex::NONE, false);
 
         assert!(state.has_private_fields());
-        assert_eq!(state.get_weakmap_name("#value"), Some("_MyClass_value".to_string()));
-        assert_eq!(state.get_weakmap_name("value"), Some("_MyClass_value".to_string()));
+        assert_eq!(
+            state.get_weakmap_name("#value"),
+            Some("_MyClass_value".to_string())
+        );
+        assert_eq!(
+            state.get_weakmap_name("value"),
+            Some("_MyClass_value".to_string())
+        );
 
         let names = state.get_weakmap_names();
         assert_eq!(names.len(), 2);

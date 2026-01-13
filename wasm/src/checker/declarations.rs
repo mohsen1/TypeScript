@@ -3,9 +3,9 @@
 //! Handles classes, interfaces, functions, and variable declarations.
 //! This module separates declaration checking logic from the monolithic ThinCheckerState.
 
+use super::context::CheckerContext;
 use crate::parser::NodeIndex;
 use crate::parser::syntax_kind_ext;
-use super::context::CheckerContext;
 
 /// Declaration type checker that operates on the shared context.
 ///
@@ -143,8 +143,8 @@ impl<'a, 'ctx> DeclarationChecker<'a, 'ctx> {
 
     /// Check a module/namespace declaration.
     pub fn check_module_declaration(&mut self, module_idx: NodeIndex) {
-        use crate::scanner::SyntaxKind;
         use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
+        use crate::scanner::SyntaxKind;
 
         let Some(node) = self.ctx.arena.get(module_idx) else {
             return;
@@ -153,7 +153,10 @@ impl<'a, 'ctx> DeclarationChecker<'a, 'ctx> {
         if let Some(module) = self.ctx.arena.get_module(node) {
             // TS5061: Check for relative module names in ambient declarations
             // declare module "./foo" { } -> Error
-            if self.ctx.has_modifier(&module.modifiers, SyntaxKind::DeclareKeyword as u16) {
+            if self
+                .ctx
+                .has_modifier(&module.modifiers, SyntaxKind::DeclareKeyword as u16)
+            {
                 if let Some(name_node) = self.ctx.arena.get(module.name) {
                     if name_node.kind == SyntaxKind::StringLiteral as u16 {
                         if let Some(lit) = self.ctx.arena.get_literal(name_node) {
@@ -241,9 +244,9 @@ impl<'a, 'ctx> DeclarationChecker<'a, 'ctx> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::thin_parser::ThinParserState;
-    use crate::thin_binder::ThinBinderState;
     use crate::solver::TypeInterner;
+    use crate::thin_binder::ThinBinderState;
+    use crate::thin_parser::ThinParserState;
 
     #[test]
     fn test_declaration_checker_variable() {
@@ -255,12 +258,8 @@ mod tests {
         binder.bind_source_file(parser.get_arena(), root);
 
         let types = TypeInterner::new();
-        let mut ctx = CheckerContext::new(
-            parser.get_arena(),
-            &binder,
-            &types,
-            "test.ts".to_string(),
-        );
+        let mut ctx =
+            CheckerContext::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
 
         // Get the variable statement
         if let Some(root_node) = parser.get_arena().get(root) {

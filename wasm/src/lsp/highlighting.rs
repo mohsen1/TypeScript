@@ -5,14 +5,14 @@
 //! between reads (references) and writes (assignments).
 
 use crate::binder::SymbolId;
-use crate::parser::thin_node::ThinNodeArena;
+use crate::lsp::position::{LineMap, Position, Range};
+use crate::lsp::references::FindReferences;
+use crate::lsp::utils::find_node_at_offset;
 use crate::parser::NodeIndex;
 use crate::parser::syntax_kind_ext;
-use crate::thin_binder::ThinBinderState;
-use crate::lsp::position::{Range, Position, LineMap};
-use crate::lsp::utils::find_node_at_offset;
-use crate::lsp::references::FindReferences;
+use crate::parser::thin_node::ThinNodeArena;
 use crate::scanner::SyntaxKind;
+use crate::thin_binder::ThinBinderState;
 
 /// The kind of highlight - distinguishes between reads and writes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -44,17 +44,26 @@ impl DocumentHighlight {
 
     /// Create a read highlight.
     pub fn read(range: Range) -> Self {
-        Self { range, kind: Some(DocumentHighlightKind::Read) }
+        Self {
+            range,
+            kind: Some(DocumentHighlightKind::Read),
+        }
     }
 
     /// Create a write highlight.
     pub fn write(range: Range) -> Self {
-        Self { range, kind: Some(DocumentHighlightKind::Write) }
+        Self {
+            range,
+            kind: Some(DocumentHighlightKind::Write),
+        }
     }
 
     /// Create a text highlight (read and write).
     pub fn text(range: Range) -> Self {
-        Self { range, kind: Some(DocumentHighlightKind::Text) }
+        Self {
+            range,
+            kind: Some(DocumentHighlightKind::Text),
+        }
     }
 }
 
@@ -123,11 +132,19 @@ impl<'a> DocumentHighlightProvider<'a> {
     /// This is a heuristic-based approach that checks the surrounding
     /// context to determine if the identifier is being read or written.
     fn detect_access_kind(&self, range: Range) -> Option<DocumentHighlightKind> {
-        let start_offset = self.line_map.position_to_offset(range.start, self.source_text)?;
-        let end_offset = self.line_map.position_to_offset(range.end, self.source_text)?;
+        let start_offset = self
+            .line_map
+            .position_to_offset(range.start, self.source_text)?;
+        let end_offset = self
+            .line_map
+            .position_to_offset(range.end, self.source_text)?;
 
         // Look at a small window before the identifier to detect assignment
-        let context_start = if start_offset > 20 { start_offset - 20 } else { 0 };
+        let context_start = if start_offset > 20 {
+            start_offset - 20
+        } else {
+            0
+        };
         let context_end = if end_offset + 20 < self.source_text.len() as u32 {
             end_offset + 20
         } else {
@@ -137,8 +154,12 @@ impl<'a> DocumentHighlightProvider<'a> {
         let context = &self.source_text[context_start as usize..context_end as usize];
 
         // Check for assignment patterns before the identifier
-        let before = context.get(..(start_offset - context_start) as usize).unwrap_or("");
-        let after = context.get((end_offset - context_start) as usize..).unwrap_or("");
+        let before = context
+            .get(..(start_offset - context_start) as usize)
+            .unwrap_or("");
+        let after = context
+            .get((end_offset - context_start) as usize..)
+            .unwrap_or("");
 
         // Check if this is a write (assignment)
         let is_write = self.is_write_context(before, after);
@@ -211,9 +232,7 @@ impl<'a> DocumentHighlightProvider<'a> {
 
         // Check for destructuring assignment pattern
         // { identifier } or { identifier: ... }
-        if before_trimmed.ends_with('{')
-            || (before_trimmed.ends_with('{') && after.contains(':'))
-        {
+        if before_trimmed.ends_with('{') || (before_trimmed.ends_with('{') && after.contains(':')) {
             return true;
         }
 
@@ -240,9 +259,9 @@ impl<'a> DocumentHighlightProvider<'a> {
 #[cfg(test)]
 mod highlighting_tests {
     use super::*;
-    use crate::thin_parser::ThinParserState;
-    use crate::thin_binder::ThinBinderState;
     use crate::lsp::position::LineMap;
+    use crate::thin_binder::ThinBinderState;
+    use crate::thin_parser::ThinParserState;
 
     #[test]
     fn test_document_highlight_simple_variable() {

@@ -2,8 +2,8 @@
 //!
 //! Provides efficient node lookup using the flat ThinNodeArena structure.
 
-use crate::parser::thin_node::ThinNodeArena;
 use crate::parser::NodeIndex;
+use crate::parser::thin_node::ThinNodeArena;
 
 /// Find the most specific node containing the given byte offset.
 ///
@@ -37,7 +37,11 @@ pub fn find_node_at_offset(arena: &ThinNodeArena, offset: u32) -> NodeIndex {
 
 /// Find the nearest node at or before an offset, skipping whitespace and
 /// optional chaining/member access punctuation when no node is found.
-pub fn find_node_at_or_before_offset(arena: &ThinNodeArena, offset: u32, source: &str) -> NodeIndex {
+pub fn find_node_at_or_before_offset(
+    arena: &ThinNodeArena,
+    offset: u32,
+    source: &str,
+) -> NodeIndex {
     let node = find_node_at_offset(arena, offset);
     if node.is_some() {
         return node;
@@ -110,7 +114,10 @@ mod utils_tests {
 
         // Check that we got the identifier, not a larger container
         if let Some(n) = arena.get(node) {
-            assert!(n.end - n.pos < 10, "Should find a small node (identifier), not the whole statement");
+            assert!(
+                n.end - n.pos < 10,
+                "Should find a small node (identifier), not the whole statement"
+            );
         }
     }
 
@@ -127,7 +134,10 @@ mod utils_tests {
 
     #[test]
     fn test_find_nodes_in_range() {
-        let mut parser = ThinParserState::new("test.ts".to_string(), "const x = 1;\nlet y = 2;".to_string());
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "const x = 1;\nlet y = 2;".to_string(),
+        );
         let _ = parser.parse_source_file();
         let arena = parser.get_arena();
 

@@ -16,11 +16,15 @@ use crate::lsp::code_actions::{
     ImportCandidateKind,
 };
 use crate::lsp::completions::{CompletionItem, CompletionItemKind, Completions};
-use crate::lsp::diagnostics::{convert_diagnostic, LspDiagnostic};
+use crate::lsp::definition::GoToDefinition;
+use crate::lsp::diagnostics::{LspDiagnostic, convert_diagnostic};
 use crate::lsp::hover::{HoverInfo, HoverProvider};
+use crate::lsp::position::{LineMap, Location, Position, Range};
+use crate::lsp::references::FindReferences;
+use crate::lsp::rename::{RenameProvider, TextEdit, WorkspaceEdit};
+use crate::lsp::resolver::{ScopeCache, ScopeCacheStats};
 use crate::lsp::signature_help::{SignatureHelp, SignatureHelpProvider};
 use crate::lsp::utils::find_node_at_offset;
-use crate::lsp::resolver::{ScopeCache, ScopeCacheStats};
 use crate::parser::thin_node::NodeAccess;
 use crate::parser::{NodeIndex, NodeList, syntax_kind_ext, thin_node::ThinNodeArena};
 use crate::scanner::SyntaxKind;
@@ -28,10 +32,6 @@ use crate::solver::TypeInterner;
 use crate::thin_binder::ThinBinderState;
 use crate::thin_checker::ThinCheckerState;
 use crate::thin_parser::ThinParserState;
-use crate::lsp::definition::GoToDefinition;
-use crate::lsp::references::FindReferences;
-use crate::lsp::rename::{RenameProvider, TextEdit, WorkspaceEdit};
-use crate::lsp::position::{LineMap, Position, Location, Range};
 
 enum ImportKind {
     Named(String),
@@ -237,11 +237,19 @@ impl ProjectFile {
         Some((min_start?, max_end?))
     }
 
-    fn apply_incremental_update(&mut self, source_text: String, plan: IncrementalUpdatePlan) -> bool {
+    fn apply_incremental_update(
+        &mut self,
+        source_text: String,
+        plan: IncrementalUpdatePlan,
+    ) -> bool {
         let old_suffix_nodes = {
             let arena = self.parser.get_arena();
-            let Some(root_node) = arena.get(self.root) else { return false; };
-            let Some(source_file) = arena.get_source_file(root_node) else { return false; };
+            let Some(root_node) = arena.get(self.root) else {
+                return false;
+            };
+            let Some(source_file) = arena.get_source_file(root_node) else {
+                return false;
+            };
             let prefix_len = plan.prefix_nodes.len();
             if prefix_len > source_file.statements.nodes.len() {
                 return false;
@@ -262,9 +270,8 @@ impl ProjectFile {
         let line_map = LineMap::build(&new_text);
         let comments = crate::comments::get_comment_ranges(&new_text);
 
-        let mut combined_nodes = Vec::with_capacity(
-            plan.prefix_nodes.len() + parse_result.statements.nodes.len(),
-        );
+        let mut combined_nodes =
+            Vec::with_capacity(plan.prefix_nodes.len() + parse_result.statements.nodes.len());
         combined_nodes.extend(plan.prefix_nodes.iter().copied());
         combined_nodes.extend(parse_result.statements.nodes.iter().copied());
 
@@ -289,9 +296,13 @@ impl ProjectFile {
             if let Some(root_node) = arena.get_mut(root) {
                 root_node.end = parse_result.end_pos;
             }
-            let Some(root_node) = arena.get(root) else { return false; };
+            let Some(root_node) = arena.get(root) else {
+                return false;
+            };
             let data_index = root_node.data_index as usize;
-            let Some(source_file) = arena.source_files.get_mut(data_index) else { return false; };
+            let Some(source_file) = arena.source_files.get_mut(data_index) else {
+                return false;
+            };
 
             source_file.statements = new_statements;
             source_file.end_of_file_token = parse_result.end_of_file_token;
@@ -402,7 +413,7 @@ impl ProjectFile {
     pub fn get_diagnostics(&mut self) -> Vec<LspDiagnostic> {
         let file_name = self.file_name.clone();
         let source_text = self.parser.get_source_text();
-        let strict = false;  // TODO: get from tsconfig
+        let strict = false; // TODO: get from tsconfig
 
         let mut checker = if let Some(cache) = self.type_cache.take() {
             ThinCheckerState::with_cache(
@@ -438,8 +449,12 @@ impl ProjectFile {
 
     fn node_location(&self, node_idx: NodeIndex) -> Option<Location> {
         let node = self.arena().get(node_idx)?;
-        let start = self.line_map.offset_to_position(node.pos, self.source_text());
-        let end = self.line_map.offset_to_position(node.end, self.source_text());
+        let start = self
+            .line_map
+            .offset_to_position(node.pos, self.source_text());
+        let end = self
+            .line_map
+            .offset_to_position(node.end, self.source_text());
         Some(Location {
             file_path: self.file_name.clone(),
             range: Range::new(start, end),
@@ -470,15 +485,23 @@ impl ProjectFile {
         let binder = self.binder();
         let mut nodes = Vec::new();
 
-        let Some(root_node) = arena.get(self.root()) else { return Vec::new(); };
-        let Some(source_file) = arena.get_source_file(root_node) else { return Vec::new(); };
+        let Some(root_node) = arena.get(self.root()) else {
+            return Vec::new();
+        };
+        let Some(source_file) = arena.get_source_file(root_node) else {
+            return Vec::new();
+        };
 
         for &stmt_idx in &source_file.statements.nodes {
-            let Some(stmt_node) = arena.get(stmt_idx) else { continue; };
+            let Some(stmt_node) = arena.get(stmt_idx) else {
+                continue;
+            };
             if stmt_node.kind != syntax_kind_ext::EXPORT_DECLARATION {
                 continue;
             }
-            let Some(export) = arena.get_export_decl(stmt_node) else { continue; };
+            let Some(export) = arena.get_export_decl(stmt_node) else {
+                continue;
+            };
             if !export.module_specifier.is_none() {
                 continue;
             }
@@ -494,7 +517,9 @@ impl ProjectFile {
                 continue;
             }
 
-            let Some(clause_node) = arena.get(export.export_clause) else { continue; };
+            let Some(clause_node) = arena.get(export.export_clause) else {
+                continue;
+            };
             if clause_node.kind == syntax_kind_ext::NAMED_EXPORTS {
                 self.push_named_export_nodes(export.export_clause, export_name, &mut nodes);
                 continue;
@@ -519,24 +544,36 @@ impl ProjectFile {
     fn exported_names_for_symbol(&self, sym_id: SymbolId) -> Vec<String> {
         let mut names = Vec::new();
         let arena = self.arena();
-        let Some(symbol) = self.binder.symbols.get(sym_id) else { return names; };
+        let Some(symbol) = self.binder.symbols.get(sym_id) else {
+            return names;
+        };
         let local_name = symbol.escaped_name.as_str();
 
-        let Some(root_node) = arena.get(self.root()) else { return names; };
-        let Some(source_file) = arena.get_source_file(root_node) else { return names; };
+        let Some(root_node) = arena.get(self.root()) else {
+            return names;
+        };
+        let Some(source_file) = arena.get_source_file(root_node) else {
+            return names;
+        };
 
         for &stmt_idx in &source_file.statements.nodes {
-            let Some(stmt_node) = arena.get(stmt_idx) else { continue; };
+            let Some(stmt_node) = arena.get(stmt_idx) else {
+                continue;
+            };
             if stmt_node.kind != syntax_kind_ext::EXPORT_DECLARATION {
                 continue;
             }
-            let Some(export) = arena.get_export_decl(stmt_node) else { continue; };
+            let Some(export) = arena.get_export_decl(stmt_node) else {
+                continue;
+            };
             if !export.module_specifier.is_none() {
                 continue;
             }
 
             if export.is_default_export {
-                if !export.export_clause.is_none() && self.resolve_symbol(export.export_clause) == Some(sym_id) {
+                if !export.export_clause.is_none()
+                    && self.resolve_symbol(export.export_clause) == Some(sym_id)
+                {
                     names.push("default".to_string());
                 }
                 continue;
@@ -546,12 +583,18 @@ impl ProjectFile {
                 continue;
             }
 
-            let Some(clause_node) = arena.get(export.export_clause) else { continue; };
+            let Some(clause_node) = arena.get(export.export_clause) else {
+                continue;
+            };
             if clause_node.kind == syntax_kind_ext::NAMED_EXPORTS {
                 if let Some(named) = arena.get_named_imports(clause_node) {
                     for &spec_idx in &named.elements.nodes {
-                        let Some(spec_node) = arena.get(spec_idx) else { continue; };
-                        let Some(spec) = arena.get_specifier(spec_node) else { continue; };
+                        let Some(spec_node) = arena.get(spec_idx) else {
+                            continue;
+                        };
+                        let Some(spec) = arena.get_specifier(spec_node) else {
+                            continue;
+                        };
 
                         let local_ident = if !spec.property_name.is_none() {
                             spec.property_name
@@ -589,25 +632,40 @@ impl ProjectFile {
         let mut targets = Vec::new();
         let arena = self.arena();
 
-        let Some(root_node) = arena.get(self.root()) else { return targets; };
-        let Some(source_file) = arena.get_source_file(root_node) else { return targets; };
+        let Some(root_node) = arena.get(self.root()) else {
+            return targets;
+        };
+        let Some(source_file) = arena.get_source_file(root_node) else {
+            return targets;
+        };
 
         for &stmt_idx in &source_file.statements.nodes {
-            let Some(stmt_node) = arena.get(stmt_idx) else { continue; };
+            let Some(stmt_node) = arena.get(stmt_idx) else {
+                continue;
+            };
             if stmt_node.kind != syntax_kind_ext::IMPORT_DECLARATION
-                && stmt_node.kind != syntax_kind_ext::IMPORT_EQUALS_DECLARATION {
+                && stmt_node.kind != syntax_kind_ext::IMPORT_EQUALS_DECLARATION
+            {
                 continue;
             }
-            let Some(import) = arena.get_import_decl(stmt_node) else { continue; };
-            let Some(module_specifier) = arena.get_literal_text(import.module_specifier) else { continue; };
+            let Some(import) = arena.get_import_decl(stmt_node) else {
+                continue;
+            };
+            let Some(module_specifier) = arena.get_literal_text(import.module_specifier) else {
+                continue;
+            };
             let module_specifier = module_specifier.to_string();
 
             if import.import_clause.is_none() {
                 continue;
             }
 
-            let Some(clause_node) = arena.get(import.import_clause) else { continue; };
-            let Some(clause) = arena.get_import_clause(clause_node) else { continue; };
+            let Some(clause_node) = arena.get(import.import_clause) else {
+                continue;
+            };
+            let Some(clause) = arena.get_import_clause(clause_node) else {
+                continue;
+            };
 
             if !clause.name.is_none() {
                 if let Some(name) = arena.get_identifier_text(clause.name) {
@@ -624,7 +682,9 @@ impl ProjectFile {
                 continue;
             }
 
-            let Some(bindings_node) = arena.get(clause.named_bindings) else { continue; };
+            let Some(bindings_node) = arena.get(clause.named_bindings) else {
+                continue;
+            };
             if bindings_node.kind == SyntaxKind::Identifier as u16 {
                 if let Some(name) = arena.get_identifier_text(clause.named_bindings) {
                     if name == local_name {
@@ -636,7 +696,9 @@ impl ProjectFile {
                 }
                 continue;
             }
-            let Some(named) = arena.get_named_imports(bindings_node) else { continue; };
+            let Some(named) = arena.get_named_imports(bindings_node) else {
+                continue;
+            };
 
             if !named.name.is_none() {
                 if let Some(name) = arena.get_identifier_text(named.name) {
@@ -650,15 +712,21 @@ impl ProjectFile {
             }
 
             for &spec_idx in &named.elements.nodes {
-                let Some(spec_node) = arena.get(spec_idx) else { continue; };
-                let Some(spec) = arena.get_specifier(spec_node) else { continue; };
+                let Some(spec_node) = arena.get(spec_idx) else {
+                    continue;
+                };
+                let Some(spec) = arena.get_specifier(spec_node) else {
+                    continue;
+                };
 
                 let local_ident = if !spec.name.is_none() {
                     spec.name
                 } else {
                     spec.property_name
                 };
-                let Some(local_text) = arena.get_identifier_text(local_ident) else { continue; };
+                let Some(local_text) = arena.get_identifier_text(local_ident) else {
+                    continue;
+                };
                 if local_text != local_name {
                     continue;
                 }
@@ -668,7 +736,9 @@ impl ProjectFile {
                 } else {
                     spec.name
                 };
-                let Some(export_text) = arena.get_identifier_text(export_ident) else { continue; };
+                let Some(export_text) = arena.get_identifier_text(export_ident) else {
+                    continue;
+                };
 
                 targets.push(ImportTarget {
                     module_specifier: module_specifier.clone(),
@@ -698,23 +768,38 @@ impl ProjectFile {
         nodes.push(clause_idx);
     }
 
-    fn push_named_export_nodes(&self, clause_idx: NodeIndex, export_name: &str, nodes: &mut Vec<NodeIndex>) {
+    fn push_named_export_nodes(
+        &self,
+        clause_idx: NodeIndex,
+        export_name: &str,
+        nodes: &mut Vec<NodeIndex>,
+    ) {
         let arena = self.arena();
         let binder = self.binder();
 
-        let Some(clause_node) = arena.get(clause_idx) else { return; };
-        let Some(named) = arena.get_named_imports(clause_node) else { return; };
+        let Some(clause_node) = arena.get(clause_idx) else {
+            return;
+        };
+        let Some(named) = arena.get_named_imports(clause_node) else {
+            return;
+        };
 
         for &spec_idx in &named.elements.nodes {
-            let Some(spec_node) = arena.get(spec_idx) else { continue; };
-            let Some(spec) = arena.get_specifier(spec_node) else { continue; };
+            let Some(spec_node) = arena.get(spec_idx) else {
+                continue;
+            };
+            let Some(spec) = arena.get_specifier(spec_node) else {
+                continue;
+            };
 
             let export_ident = if !spec.name.is_none() {
                 spec.name
             } else {
                 spec.property_name
             };
-            let Some(export_text) = arena.get_identifier_text(export_ident) else { continue; };
+            let Some(export_text) = arena.get_identifier_text(export_ident) else {
+                continue;
+            };
             if export_text != export_name {
                 continue;
             }
@@ -742,7 +827,9 @@ impl ProjectFile {
 
     fn declaration_has_name(&self, decl_idx: NodeIndex, export_name: &str) -> bool {
         let arena = self.arena();
-        let Some(node) = arena.get(decl_idx) else { return false; };
+        let Some(node) = arena.get(decl_idx) else {
+            return false;
+        };
 
         match node.kind {
             k if k == syntax_kind_ext::FUNCTION_DECLARATION => arena
@@ -771,11 +858,14 @@ impl ProjectFile {
                 .map_or(false, |name| name == export_name),
             k if k == syntax_kind_ext::VARIABLE_STATEMENT
                 || k == syntax_kind_ext::VARIABLE_DECLARATION_LIST
-                || k == syntax_kind_ext::VARIABLE_DECLARATION => {
+                || k == syntax_kind_ext::VARIABLE_DECLARATION =>
+            {
                 let mut decls = Vec::new();
                 self.collect_variable_declarations(decl_idx, &mut decls);
                 decls.into_iter().any(|decl_idx| {
-                    let Some(decl_node) = arena.get(decl_idx) else { return false; };
+                    let Some(decl_node) = arena.get(decl_idx) else {
+                        return false;
+                    };
                     arena
                         .get_variable_declaration(decl_node)
                         .and_then(|decl| arena.get_identifier_text(decl.name))
@@ -788,14 +878,18 @@ impl ProjectFile {
 
     fn collect_variable_declarations(&self, node_idx: NodeIndex, output: &mut Vec<NodeIndex>) {
         let arena = self.arena();
-        let Some(node) = arena.get(node_idx) else { return; };
+        let Some(node) = arena.get(node_idx) else {
+            return;
+        };
 
         if node.kind == syntax_kind_ext::VARIABLE_DECLARATION {
             output.push(node_idx);
             return;
         }
 
-        if node.kind == syntax_kind_ext::VARIABLE_STATEMENT || node.kind == syntax_kind_ext::VARIABLE_DECLARATION_LIST {
+        if node.kind == syntax_kind_ext::VARIABLE_STATEMENT
+            || node.kind == syntax_kind_ext::VARIABLE_DECLARATION_LIST
+        {
             if let Some(var) = arena.get_variable(node) {
                 for &child in &var.declarations.nodes {
                     self.collect_variable_declarations(child, output);
@@ -947,13 +1041,7 @@ impl Project {
             let source_text = file.parser.get_source_text();
             let file_name = file.file_name.clone();
             let root = file.root;
-            let goto_def = GoToDefinition::new(
-                arena,
-                binder,
-                line_map,
-                file_name,
-                source_text,
-            );
+            let goto_def = GoToDefinition::new(arena, binder, line_map, file_name, source_text);
             goto_def.get_definition_with_scope_cache(
                 root,
                 position,
@@ -984,7 +1072,11 @@ impl Project {
     }
 
     /// Signature help within a single file.
-    pub fn get_signature_help(&mut self, file_name: &str, position: Position) -> Option<SignatureHelp> {
+    pub fn get_signature_help(
+        &mut self,
+        file_name: &str,
+        position: Position,
+    ) -> Option<SignatureHelp> {
         let start = Instant::now();
         let mut scope_stats = ScopeCacheStats::default();
         let result = self
@@ -992,14 +1084,21 @@ impl Project {
             .get_mut(file_name)?
             .get_signature_help_with_stats(position, Some(&mut scope_stats));
 
-        self.performance
-            .record(ProjectRequestKind::SignatureHelp, start.elapsed(), scope_stats);
+        self.performance.record(
+            ProjectRequestKind::SignatureHelp,
+            start.elapsed(),
+            scope_stats,
+        );
 
         result
     }
 
     /// Completions within a single file.
-    pub fn get_completions(&mut self, file_name: &str, position: Position) -> Option<Vec<CompletionItem>> {
+    pub fn get_completions(
+        &mut self,
+        file_name: &str,
+        position: Position,
+    ) -> Option<Vec<CompletionItem>> {
         let start = Instant::now();
         let mut scope_stats = ScopeCacheStats::default();
         let mut completions = {
@@ -1028,7 +1127,12 @@ impl Project {
                 let file = self.files.get(file_name)?;
                 let mut candidates = Vec::new();
                 let mut seen = FxHashSet::default();
-                self.collect_import_candidates_for_name(file, &missing_name, &mut candidates, &mut seen);
+                self.collect_import_candidates_for_name(
+                    file,
+                    &missing_name,
+                    &mut candidates,
+                    &mut seen,
+                );
 
                 for candidate in candidates {
                     if existing.contains(&candidate.local_name) {
@@ -1046,8 +1150,11 @@ impl Project {
             Some(completions)
         };
 
-        self.performance
-            .record(ProjectRequestKind::Completions, start.elapsed(), scope_stats);
+        self.performance.record(
+            ProjectRequestKind::Completions,
+            start.elapsed(),
+            scope_stats,
+        );
 
         result
     }
@@ -1061,8 +1168,11 @@ impl Project {
             Some(file.get_diagnostics())
         };
 
-        self.performance
-            .record(ProjectRequestKind::Diagnostics, start.elapsed(), scope_stats);
+        self.performance.record(
+            ProjectRequestKind::Diagnostics,
+            start.elapsed(),
+            scope_stats,
+        );
 
         result
     }
@@ -1162,23 +1272,42 @@ impl Project {
         }
     }
 
-    fn import_binding_nodes(&self, file: &ProjectFile, target_file: &str, export_name: &str) -> Vec<NodeIndex> {
+    fn import_binding_nodes(
+        &self,
+        file: &ProjectFile,
+        target_file: &str,
+        export_name: &str,
+    ) -> Vec<NodeIndex> {
         let mut bindings = Vec::new();
         let arena = file.arena();
 
-        let Some(root_node) = arena.get(file.root()) else { return bindings; };
-        let Some(source_file) = arena.get_source_file(root_node) else { return bindings; };
+        let Some(root_node) = arena.get(file.root()) else {
+            return bindings;
+        };
+        let Some(source_file) = arena.get_source_file(root_node) else {
+            return bindings;
+        };
 
         for &stmt_idx in &source_file.statements.nodes {
-            let Some(stmt_node) = arena.get(stmt_idx) else { continue; };
+            let Some(stmt_node) = arena.get(stmt_idx) else {
+                continue;
+            };
             if stmt_node.kind != syntax_kind_ext::IMPORT_DECLARATION
-                && stmt_node.kind != syntax_kind_ext::IMPORT_EQUALS_DECLARATION {
+                && stmt_node.kind != syntax_kind_ext::IMPORT_EQUALS_DECLARATION
+            {
                 continue;
             }
 
-            let Some(import) = arena.get_import_decl(stmt_node) else { continue; };
-            let Some(module_specifier) = arena.get_literal_text(import.module_specifier) else { continue; };
-            let Some(resolved) = self.resolve_module_specifier(file.file_name(), module_specifier) else { continue; };
+            let Some(import) = arena.get_import_decl(stmt_node) else {
+                continue;
+            };
+            let Some(module_specifier) = arena.get_literal_text(import.module_specifier) else {
+                continue;
+            };
+            let Some(resolved) = self.resolve_module_specifier(file.file_name(), module_specifier)
+            else {
+                continue;
+            };
             if resolved != target_file {
                 continue;
             }
@@ -1187,8 +1316,12 @@ impl Project {
                 continue;
             }
 
-            let Some(clause_node) = arena.get(import.import_clause) else { continue; };
-            let Some(clause) = arena.get_import_clause(clause_node) else { continue; };
+            let Some(clause_node) = arena.get(import.import_clause) else {
+                continue;
+            };
+            let Some(clause) = arena.get_import_clause(clause_node) else {
+                continue;
+            };
 
             if export_name == "default" && !clause.name.is_none() {
                 bindings.push(clause.name);
@@ -1198,19 +1331,29 @@ impl Project {
                 continue;
             }
 
-            let Some(bindings_node) = arena.get(clause.named_bindings) else { continue; };
-            let Some(named) = arena.get_named_imports(bindings_node) else { continue; };
+            let Some(bindings_node) = arena.get(clause.named_bindings) else {
+                continue;
+            };
+            let Some(named) = arena.get_named_imports(bindings_node) else {
+                continue;
+            };
 
             for &spec_idx in &named.elements.nodes {
-                let Some(spec_node) = arena.get(spec_idx) else { continue; };
-                let Some(spec) = arena.get_specifier(spec_node) else { continue; };
+                let Some(spec_node) = arena.get(spec_idx) else {
+                    continue;
+                };
+                let Some(spec) = arena.get_specifier(spec_node) else {
+                    continue;
+                };
 
                 let export_ident = if !spec.property_name.is_none() {
                     spec.property_name
                 } else {
                     spec.name
                 };
-                let Some(imported_name) = arena.get_identifier_text(export_ident) else { continue; };
+                let Some(imported_name) = arena.get_identifier_text(export_ident) else {
+                    continue;
+                };
                 if imported_name != export_name {
                     continue;
                 }
@@ -1231,19 +1374,33 @@ impl Project {
         let mut targets = Vec::new();
         let arena = file.arena();
 
-        let Some(root_node) = arena.get(file.root()) else { return targets; };
-        let Some(source_file) = arena.get_source_file(root_node) else { return targets; };
+        let Some(root_node) = arena.get(file.root()) else {
+            return targets;
+        };
+        let Some(source_file) = arena.get_source_file(root_node) else {
+            return targets;
+        };
 
         for &stmt_idx in &source_file.statements.nodes {
-            let Some(stmt_node) = arena.get(stmt_idx) else { continue; };
+            let Some(stmt_node) = arena.get(stmt_idx) else {
+                continue;
+            };
             if stmt_node.kind != syntax_kind_ext::IMPORT_DECLARATION
-                && stmt_node.kind != syntax_kind_ext::IMPORT_EQUALS_DECLARATION {
+                && stmt_node.kind != syntax_kind_ext::IMPORT_EQUALS_DECLARATION
+            {
                 continue;
             }
 
-            let Some(import) = arena.get_import_decl(stmt_node) else { continue; };
-            let Some(module_specifier) = arena.get_literal_text(import.module_specifier) else { continue; };
-            let Some(resolved) = self.resolve_module_specifier(file.file_name(), module_specifier) else { continue; };
+            let Some(import) = arena.get_import_decl(stmt_node) else {
+                continue;
+            };
+            let Some(module_specifier) = arena.get_literal_text(import.module_specifier) else {
+                continue;
+            };
+            let Some(resolved) = self.resolve_module_specifier(file.file_name(), module_specifier)
+            else {
+                continue;
+            };
             if resolved != target_file {
                 continue;
             }
@@ -1252,30 +1409,44 @@ impl Project {
                 continue;
             }
 
-            let Some(clause_node) = arena.get(import.import_clause) else { continue; };
-            let Some(clause) = arena.get_import_clause(clause_node) else { continue; };
+            let Some(clause_node) = arena.get(import.import_clause) else {
+                continue;
+            };
+            let Some(clause) = arena.get_import_clause(clause_node) else {
+                continue;
+            };
 
             if clause.named_bindings.is_none() {
                 continue;
             }
 
-            let Some(bindings_node) = arena.get(clause.named_bindings) else { continue; };
+            let Some(bindings_node) = arena.get(clause.named_bindings) else {
+                continue;
+            };
             if bindings_node.kind == SyntaxKind::Identifier as u16 {
                 continue;
             }
 
-            let Some(named) = arena.get_named_imports(bindings_node) else { continue; };
+            let Some(named) = arena.get_named_imports(bindings_node) else {
+                continue;
+            };
 
             for &spec_idx in &named.elements.nodes {
-                let Some(spec_node) = arena.get(spec_idx) else { continue; };
-                let Some(spec) = arena.get_specifier(spec_node) else { continue; };
+                let Some(spec_node) = arena.get(spec_idx) else {
+                    continue;
+                };
+                let Some(spec) = arena.get_specifier(spec_node) else {
+                    continue;
+                };
 
                 let export_ident = if !spec.property_name.is_none() {
                     spec.property_name
                 } else {
                     spec.name
                 };
-                let Some(export_text) = arena.get_identifier_text(export_ident) else { continue; };
+                let Some(export_text) = arena.get_identifier_text(export_ident) else {
+                    continue;
+                };
                 if export_text != export_name {
                     continue;
                 }
@@ -1301,23 +1472,42 @@ impl Project {
         targets
     }
 
-    fn named_import_local_names(&self, file: &ProjectFile, target_file: &str, export_name: &str) -> Vec<String> {
+    fn named_import_local_names(
+        &self,
+        file: &ProjectFile,
+        target_file: &str,
+        export_name: &str,
+    ) -> Vec<String> {
         let mut locals = Vec::new();
         let arena = file.arena();
 
-        let Some(root_node) = arena.get(file.root()) else { return locals; };
-        let Some(source_file) = arena.get_source_file(root_node) else { return locals; };
+        let Some(root_node) = arena.get(file.root()) else {
+            return locals;
+        };
+        let Some(source_file) = arena.get_source_file(root_node) else {
+            return locals;
+        };
 
         for &stmt_idx in &source_file.statements.nodes {
-            let Some(stmt_node) = arena.get(stmt_idx) else { continue; };
+            let Some(stmt_node) = arena.get(stmt_idx) else {
+                continue;
+            };
             if stmt_node.kind != syntax_kind_ext::IMPORT_DECLARATION
-                && stmt_node.kind != syntax_kind_ext::IMPORT_EQUALS_DECLARATION {
+                && stmt_node.kind != syntax_kind_ext::IMPORT_EQUALS_DECLARATION
+            {
                 continue;
             }
 
-            let Some(import) = arena.get_import_decl(stmt_node) else { continue; };
-            let Some(module_specifier) = arena.get_literal_text(import.module_specifier) else { continue; };
-            let Some(resolved) = self.resolve_module_specifier(file.file_name(), module_specifier) else { continue; };
+            let Some(import) = arena.get_import_decl(stmt_node) else {
+                continue;
+            };
+            let Some(module_specifier) = arena.get_literal_text(import.module_specifier) else {
+                continue;
+            };
+            let Some(resolved) = self.resolve_module_specifier(file.file_name(), module_specifier)
+            else {
+                continue;
+            };
             if resolved != target_file {
                 continue;
             }
@@ -1326,30 +1516,44 @@ impl Project {
                 continue;
             }
 
-            let Some(clause_node) = arena.get(import.import_clause) else { continue; };
-            let Some(clause) = arena.get_import_clause(clause_node) else { continue; };
+            let Some(clause_node) = arena.get(import.import_clause) else {
+                continue;
+            };
+            let Some(clause) = arena.get_import_clause(clause_node) else {
+                continue;
+            };
 
             if clause.named_bindings.is_none() {
                 continue;
             }
 
-            let Some(bindings_node) = arena.get(clause.named_bindings) else { continue; };
+            let Some(bindings_node) = arena.get(clause.named_bindings) else {
+                continue;
+            };
             if bindings_node.kind == SyntaxKind::Identifier as u16 {
                 continue;
             }
 
-            let Some(named) = arena.get_named_imports(bindings_node) else { continue; };
+            let Some(named) = arena.get_named_imports(bindings_node) else {
+                continue;
+            };
 
             for &spec_idx in &named.elements.nodes {
-                let Some(spec_node) = arena.get(spec_idx) else { continue; };
-                let Some(spec) = arena.get_specifier(spec_node) else { continue; };
+                let Some(spec_node) = arena.get(spec_idx) else {
+                    continue;
+                };
+                let Some(spec) = arena.get_specifier(spec_node) else {
+                    continue;
+                };
 
                 let export_ident = if !spec.property_name.is_none() {
                     spec.property_name
                 } else {
                     spec.name
                 };
-                let Some(export_text) = arena.get_identifier_text(export_ident) else { continue; };
+                let Some(export_text) = arena.get_identifier_text(export_ident) else {
+                    continue;
+                };
                 if export_text != export_name {
                     continue;
                 }
@@ -1359,7 +1563,9 @@ impl Project {
                 } else {
                     spec.property_name
                 };
-                let Some(local_text) = arena.get_identifier_text(local_ident) else { continue; };
+                let Some(local_text) = arena.get_identifier_text(local_ident) else {
+                    continue;
+                };
                 locals.push(local_text.to_string());
             }
         }
@@ -1378,22 +1584,34 @@ impl Project {
 
         for (file_name, file) in &self.files {
             let arena = file.arena();
-            let Some(root_node) = arena.get(file.root()) else { continue; };
-            let Some(source_file_node) = arena.get_source_file(root_node) else { continue; };
+            let Some(root_node) = arena.get(file.root()) else {
+                continue;
+            };
+            let Some(source_file_node) = arena.get_source_file(root_node) else {
+                continue;
+            };
 
             for &stmt_idx in &source_file_node.statements.nodes {
-                let Some(stmt_node) = arena.get(stmt_idx) else { continue; };
+                let Some(stmt_node) = arena.get(stmt_idx) else {
+                    continue;
+                };
                 if stmt_node.kind != syntax_kind_ext::EXPORT_DECLARATION {
                     continue;
                 }
 
-                let Some(export) = arena.get_export_decl(stmt_node) else { continue; };
+                let Some(export) = arena.get_export_decl(stmt_node) else {
+                    continue;
+                };
                 if export.module_specifier.is_none() {
                     continue;
                 }
 
-                let Some(module_specifier) = arena.get_literal_text(export.module_specifier) else { continue; };
-                let Some(resolved) = self.resolve_module_specifier(file.file_name(), module_specifier) else {
+                let Some(module_specifier) = arena.get_literal_text(export.module_specifier) else {
+                    continue;
+                };
+                let Some(resolved) =
+                    self.resolve_module_specifier(file.file_name(), module_specifier)
+                else {
                     continue;
                 };
                 if resolved != source_file {
@@ -1407,7 +1625,9 @@ impl Project {
                     continue;
                 }
 
-                let Some(clause_node) = arena.get(export.export_clause) else { continue; };
+                let Some(clause_node) = arena.get(export.export_clause) else {
+                    continue;
+                };
                 if clause_node.kind != syntax_kind_ext::NAMED_EXPORTS {
                     if clause_node.kind == SyntaxKind::Identifier as u16 {
                         if let Some(ns_name) = arena.get_identifier_text(export.export_clause) {
@@ -1421,17 +1641,25 @@ impl Project {
                     continue;
                 }
 
-                let Some(named) = arena.get_named_imports(clause_node) else { continue; };
+                let Some(named) = arena.get_named_imports(clause_node) else {
+                    continue;
+                };
                 for &spec_idx in &named.elements.nodes {
-                    let Some(spec_node) = arena.get(spec_idx) else { continue; };
-                    let Some(spec) = arena.get_specifier(spec_node) else { continue; };
+                    let Some(spec_node) = arena.get(spec_idx) else {
+                        continue;
+                    };
+                    let Some(spec) = arena.get_specifier(spec_node) else {
+                        continue;
+                    };
 
                     let import_ident = if !spec.property_name.is_none() {
                         spec.property_name
                     } else {
                         spec.name
                     };
-                    let Some(import_text) = arena.get_identifier_text(import_ident) else { continue; };
+                    let Some(import_text) = arena.get_identifier_text(import_ident) else {
+                        continue;
+                    };
                     if import_text != export_name {
                         continue;
                     }
@@ -1459,19 +1687,33 @@ impl Project {
         let mut names = Vec::new();
         let arena = file.arena();
 
-        let Some(root_node) = arena.get(file.root()) else { return names; };
-        let Some(source_file) = arena.get_source_file(root_node) else { return names; };
+        let Some(root_node) = arena.get(file.root()) else {
+            return names;
+        };
+        let Some(source_file) = arena.get_source_file(root_node) else {
+            return names;
+        };
 
         for &stmt_idx in &source_file.statements.nodes {
-            let Some(stmt_node) = arena.get(stmt_idx) else { continue; };
+            let Some(stmt_node) = arena.get(stmt_idx) else {
+                continue;
+            };
             if stmt_node.kind != syntax_kind_ext::IMPORT_DECLARATION
-                && stmt_node.kind != syntax_kind_ext::IMPORT_EQUALS_DECLARATION {
+                && stmt_node.kind != syntax_kind_ext::IMPORT_EQUALS_DECLARATION
+            {
                 continue;
             }
 
-            let Some(import) = arena.get_import_decl(stmt_node) else { continue; };
-            let Some(module_specifier) = arena.get_literal_text(import.module_specifier) else { continue; };
-            let Some(resolved) = self.resolve_module_specifier(file.file_name(), module_specifier) else { continue; };
+            let Some(import) = arena.get_import_decl(stmt_node) else {
+                continue;
+            };
+            let Some(module_specifier) = arena.get_literal_text(import.module_specifier) else {
+                continue;
+            };
+            let Some(resolved) = self.resolve_module_specifier(file.file_name(), module_specifier)
+            else {
+                continue;
+            };
             if resolved != target_file {
                 continue;
             }
@@ -1480,19 +1722,27 @@ impl Project {
                 continue;
             }
 
-            let Some(clause_node) = arena.get(import.import_clause) else { continue; };
-            let Some(clause) = arena.get_import_clause(clause_node) else { continue; };
+            let Some(clause_node) = arena.get(import.import_clause) else {
+                continue;
+            };
+            let Some(clause) = arena.get_import_clause(clause_node) else {
+                continue;
+            };
 
             if clause.named_bindings.is_none() {
                 continue;
             }
 
-            let Some(bindings_node) = arena.get(clause.named_bindings) else { continue; };
+            let Some(bindings_node) = arena.get(clause.named_bindings) else {
+                continue;
+            };
             if bindings_node.kind != syntax_kind_ext::NAMESPACE_IMPORT {
                 continue;
             }
 
-            let Some(bindings) = arena.get_named_imports(bindings_node) else { continue; };
+            let Some(bindings) = arena.get_named_imports(bindings_node) else {
+                continue;
+            };
             if let Some(name) = arena.get_identifier_text(bindings.name) {
                 names.push(name.to_string());
             }
@@ -1513,18 +1763,25 @@ impl Project {
 
         for node in arena.nodes.iter() {
             if node.kind != syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION
-                && node.kind != syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION {
+                && node.kind != syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION
+            {
                 continue;
             }
 
-            let Some(access) = arena.get_access_expr(node) else { continue; };
+            let Some(access) = arena.get_access_expr(node) else {
+                continue;
+            };
             let expr_idx = access.expression;
-            let Some(expr_node) = arena.get(expr_idx) else { continue; };
+            let Some(expr_node) = arena.get(expr_idx) else {
+                continue;
+            };
             if expr_node.kind != SyntaxKind::Identifier as u16 {
                 continue;
             }
 
-            let Some(expr_text) = arena.get_identifier_text(expr_idx) else { continue; };
+            let Some(expr_text) = arena.get_identifier_text(expr_idx) else {
+                continue;
+            };
             if expr_text != namespace_name {
                 continue;
             }
@@ -1537,9 +1794,13 @@ impl Project {
 
             let member_idx = access.name_or_argument;
             let matches = if node.kind == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION {
-                arena.get_identifier_text(member_idx).map_or(false, |name| name == export_name)
+                arena
+                    .get_identifier_text(member_idx)
+                    .map_or(false, |name| name == export_name)
             } else {
-                arena.get_literal_text(member_idx).map_or(false, |name| name == export_name)
+                arena
+                    .get_literal_text(member_idx)
+                    .map_or(false, |name| name == export_name)
             };
 
             if !matches {
@@ -1553,7 +1814,11 @@ impl Project {
     }
 
     /// Find references within a single file.
-    pub fn find_references(&mut self, file_name: &str, position: Position) -> Option<Vec<Location>> {
+    pub fn find_references(
+        &mut self,
+        file_name: &str,
+        position: Position,
+    ) -> Option<Vec<Location>> {
         let start = Instant::now();
         let mut scope_stats = ScopeCacheStats::default();
         let result = (|| {
@@ -1588,7 +1853,12 @@ impl Project {
             let mut locations = Vec::new();
             {
                 let file = self.files.get_mut(file_name)?;
-                Self::collect_file_references(file, node_idx, Some(&mut scope_stats), &mut locations);
+                Self::collect_file_references(
+                    file,
+                    node_idx,
+                    Some(&mut scope_stats),
+                    &mut locations,
+                );
             }
 
             let (import_targets, export_names, source_file_name) = {
@@ -1605,12 +1875,16 @@ impl Project {
             let mut cross_targets: Vec<(String, String)> = Vec::new();
             if !import_targets.is_empty() {
                 for target in import_targets {
-                    let Some(resolved) = self.resolve_module_specifier(&source_file_name, &target.module_specifier) else {
+                    let Some(resolved) =
+                        self.resolve_module_specifier(&source_file_name, &target.module_specifier)
+                    else {
                         continue;
                     };
                     match target.kind {
                         ImportKind::Named(name) => cross_targets.push((resolved, name)),
-                        ImportKind::Default => cross_targets.push((resolved, "default".to_string())),
+                        ImportKind::Default => {
+                            cross_targets.push((resolved, "default".to_string()))
+                        }
                         ImportKind::Namespace => {}
                     }
                 }
@@ -1706,7 +1980,8 @@ impl Project {
                 }
             }
 
-            let mut seen_namespace_targets: FxHashSet<(String, String, String)> = FxHashSet::default();
+            let mut seen_namespace_targets: FxHashSet<(String, String, String)> =
+                FxHashSet::default();
             for target in namespace_targets {
                 if !seen_namespace_targets.insert((
                     target.file.clone(),
@@ -1724,7 +1999,9 @@ impl Project {
                     let local_names = {
                         let other_file = self.files.get(other_name);
                         other_file
-                            .map(|file| self.named_import_local_names(file, &target.file, &target.namespace))
+                            .map(|file| {
+                                self.named_import_local_names(file, &target.file, &target.namespace)
+                            })
                             .unwrap_or_default()
                     };
                     if local_names.is_empty() {
@@ -1867,7 +2144,9 @@ impl Project {
 
             if !import_targets.is_empty() {
                 for target in import_targets {
-                    let Some(resolved) = self.resolve_module_specifier(&source_file_name, &target.module_specifier) else {
+                    let Some(resolved) =
+                        self.resolve_module_specifier(&source_file_name, &target.module_specifier)
+                    else {
                         continue;
                     };
 
@@ -1958,14 +2237,21 @@ impl Project {
                     let import_targets = {
                         let other_file = self.files.get(other_name);
                         other_file
-                            .map(|file| self.import_specifier_targets_for_export(file, &def_file, &export_name))
+                            .map(|file| {
+                                self.import_specifier_targets_for_export(
+                                    file,
+                                    &def_file,
+                                    &export_name,
+                                )
+                            })
                             .unwrap_or_default()
                     };
                     if !import_targets.is_empty() {
                         if let Some(other_file) = self.files.get_mut(other_name) {
                             for target in import_targets {
                                 if let Some(property_name) = target.property_name {
-                                    if let Some(location) = other_file.node_location(property_name) {
+                                    if let Some(location) = other_file.node_location(property_name)
+                                    {
                                         workspace_edit.add_edit(
                                             location.file_path,
                                             TextEdit::new(location.range, normalized_name.clone()),
@@ -2014,7 +2300,8 @@ impl Project {
                 }
             }
 
-            let mut seen_namespace_targets: FxHashSet<(String, String, String)> = FxHashSet::default();
+            let mut seen_namespace_targets: FxHashSet<(String, String, String)> =
+                FxHashSet::default();
             for target in namespace_targets {
                 if !seen_namespace_targets.insert((
                     target.file.clone(),
@@ -2032,7 +2319,9 @@ impl Project {
                     let local_names = {
                         let other_file = self.files.get(other_name);
                         other_file
-                            .map(|file| self.named_import_local_names(file, &target.file, &target.namespace))
+                            .map(|file| {
+                                self.named_import_local_names(file, &target.file, &target.namespace)
+                            })
                             .unwrap_or_default()
                     };
                     if local_names.is_empty() {
@@ -2069,7 +2358,11 @@ impl Project {
         result
     }
 
-    fn definition_from_import(&self, file: &ProjectFile, position: Position) -> Option<Vec<Location>> {
+    fn definition_from_import(
+        &self,
+        file: &ProjectFile,
+        position: Position,
+    ) -> Option<Vec<Location>> {
         let target = self.import_target_at_position(file, position)?;
         let resolved = self.resolve_module_specifier(file.file_name(), &target.module_specifier)?;
         let target_file = self.files.get(&resolved)?;
@@ -2081,11 +2374,19 @@ impl Project {
             }
             ImportKind::Default => {
                 let locations = target_file.export_locations("default");
-                if locations.is_empty() { None } else { Some(locations) }
+                if locations.is_empty() {
+                    None
+                } else {
+                    Some(locations)
+                }
             }
             ImportKind::Named(name) => {
                 let locations = target_file.export_locations(&name);
-                if locations.is_empty() { None } else { Some(locations) }
+                if locations.is_empty() {
+                    None
+                } else {
+                    Some(locations)
+                }
             }
         }
     }
@@ -2099,7 +2400,9 @@ impl Project {
         let mut seen = FxHashSet::default();
 
         for diag in diagnostics {
-            if diag.code != Some(crate::checker::types::diagnostics::diagnostic_codes::CANNOT_FIND_NAME) {
+            if diag.code
+                != Some(crate::checker::types::diagnostics::diagnostic_codes::CANNOT_FIND_NAME)
+            {
                 continue;
             }
 
@@ -2107,7 +2410,12 @@ impl Project {
                 continue;
             };
 
-            self.collect_import_candidates_for_name(file, &missing_name, &mut candidates, &mut seen);
+            self.collect_import_candidates_for_name(
+                file,
+                &missing_name,
+                &mut candidates,
+                &mut seen,
+            );
         }
 
         candidates
@@ -2125,7 +2433,9 @@ impl Project {
                 continue;
             }
 
-            let Some(module_specifier) = self.module_specifier_from_files(from_file.file_name(), file_name) else {
+            let Some(module_specifier) =
+                self.module_specifier_from_files(from_file.file_name(), file_name)
+            else {
                 continue;
             };
 
@@ -2162,7 +2472,8 @@ impl Project {
         let detail = self.auto_import_detail(candidate);
         let documentation = self.auto_import_documentation(candidate);
 
-        let mut item = CompletionItem::new(candidate.local_name.clone(), CompletionItemKind::Variable);
+        let mut item =
+            CompletionItem::new(candidate.local_name.clone(), CompletionItemKind::Variable);
         item = item.with_detail(detail);
         if let Some(doc) = documentation {
             item = item.with_documentation(doc);
@@ -2199,13 +2510,22 @@ impl Project {
 
         let snippet = match &candidate.kind {
             ImportCandidateKind::Named { export_name } => {
-                format!("{} {{ {} }} from \"{}\";", import_kw, export_name, candidate.module_specifier)
+                format!(
+                    "{} {{ {} }} from \"{}\";",
+                    import_kw, export_name, candidate.module_specifier
+                )
             }
             ImportCandidateKind::Default => {
-                format!("{} {} from \"{}\";", import_kw, candidate.local_name, candidate.module_specifier)
+                format!(
+                    "{} {} from \"{}\";",
+                    import_kw, candidate.local_name, candidate.module_specifier
+                )
             }
             ImportCandidateKind::Namespace => {
-                format!("{} * as {} from \"{}\";", import_kw, candidate.local_name, candidate.module_specifier)
+                format!(
+                    "{} * as {} from \"{}\";",
+                    import_kw, candidate.local_name, candidate.module_specifier
+                )
             }
         };
 
@@ -2222,20 +2542,30 @@ impl Project {
             return Vec::new();
         }
 
-        let Some(file) = self.files.get(file_name) else { return Vec::new(); };
+        let Some(file) = self.files.get(file_name) else {
+            return Vec::new();
+        };
         let arena = file.arena();
-        let Some(root_node) = arena.get(file.root()) else { return Vec::new(); };
-        let Some(source_file) = arena.get_source_file(root_node) else { return Vec::new(); };
+        let Some(root_node) = arena.get(file.root()) else {
+            return Vec::new();
+        };
+        let Some(source_file) = arena.get_source_file(root_node) else {
+            return Vec::new();
+        };
 
         let mut matches = Vec::new();
 
         for &stmt_idx in &source_file.statements.nodes {
-            let Some(stmt_node) = arena.get(stmt_idx) else { continue; };
+            let Some(stmt_node) = arena.get(stmt_idx) else {
+                continue;
+            };
             if stmt_node.kind != syntax_kind_ext::EXPORT_DECLARATION {
                 continue;
             }
 
-            let Some(export) = arena.get_export_decl(stmt_node) else { continue; };
+            let Some(export) = arena.get_export_decl(stmt_node) else {
+                continue;
+            };
 
             if export.is_default_export {
                 matches.push(ExportMatch {
@@ -2250,19 +2580,29 @@ impl Project {
                     continue;
                 }
 
-                let Some(clause_node) = arena.get(export.export_clause) else { continue; };
+                let Some(clause_node) = arena.get(export.export_clause) else {
+                    continue;
+                };
                 if clause_node.kind == syntax_kind_ext::NAMED_EXPORTS {
-                    let Some(named) = arena.get_named_imports(clause_node) else { continue; };
+                    let Some(named) = arena.get_named_imports(clause_node) else {
+                        continue;
+                    };
                     for &spec_idx in &named.elements.nodes {
-                        let Some(spec_node) = arena.get(spec_idx) else { continue; };
-                        let Some(spec) = arena.get_specifier(spec_node) else { continue; };
+                        let Some(spec_node) = arena.get(spec_idx) else {
+                            continue;
+                        };
+                        let Some(spec) = arena.get_specifier(spec_node) else {
+                            continue;
+                        };
 
                         let export_ident = if !spec.name.is_none() {
                             spec.name
                         } else {
                             spec.property_name
                         };
-                        let Some(export_text) = arena.get_identifier_text(export_ident) else { continue; };
+                        let Some(export_text) = arena.get_identifier_text(export_ident) else {
+                            continue;
+                        };
                         if export_text == "default" {
                             matches.push(ExportMatch {
                                 kind: ImportCandidateKind::Default,
@@ -2318,19 +2658,29 @@ impl Project {
                 continue;
             }
 
-            let Some(clause_node) = arena.get(export.export_clause) else { continue; };
+            let Some(clause_node) = arena.get(export.export_clause) else {
+                continue;
+            };
             if clause_node.kind == syntax_kind_ext::NAMED_EXPORTS {
-                let Some(named) = arena.get_named_imports(clause_node) else { continue; };
+                let Some(named) = arena.get_named_imports(clause_node) else {
+                    continue;
+                };
                 for &spec_idx in &named.elements.nodes {
-                    let Some(spec_node) = arena.get(spec_idx) else { continue; };
-                    let Some(spec) = arena.get_specifier(spec_node) else { continue; };
+                    let Some(spec_node) = arena.get(spec_idx) else {
+                        continue;
+                    };
+                    let Some(spec) = arena.get_specifier(spec_node) else {
+                        continue;
+                    };
 
                     let export_ident = if !spec.name.is_none() {
                         spec.name
                     } else {
                         spec.property_name
                     };
-                    let Some(export_text) = arena.get_identifier_text(export_ident) else { continue; };
+                    let Some(export_text) = arena.get_identifier_text(export_ident) else {
+                        continue;
+                    };
                     if export_text == "default" {
                         matches.push(ExportMatch {
                             kind: ImportCandidateKind::Default,
@@ -2377,7 +2727,9 @@ impl Project {
     }
 
     fn identifier_at_range(&self, file: &ProjectFile, range: Range) -> Option<String> {
-        let offset = file.line_map().position_to_offset(range.start, file.source_text())?;
+        let offset = file
+            .line_map()
+            .position_to_offset(range.start, file.source_text())?;
         let node_idx = find_node_at_offset(file.arena(), offset);
         if node_idx.is_none() {
             return None;
@@ -2393,8 +2745,14 @@ impl Project {
             .map(|text| text.to_string())
     }
 
-    fn identifier_at_position(&self, file: &ProjectFile, position: Position) -> Option<(NodeIndex, String)> {
-        let offset = file.line_map().position_to_offset(position, file.source_text())?;
+    fn identifier_at_position(
+        &self,
+        file: &ProjectFile,
+        position: Position,
+    ) -> Option<(NodeIndex, String)> {
+        let offset = file
+            .line_map()
+            .position_to_offset(position, file.source_text())?;
         let mut node_idx = find_node_at_offset(file.arena(), offset);
         if node_idx.is_none() && offset > 0 {
             node_idx = find_node_at_offset(file.arena(), offset - 1);
@@ -2415,7 +2773,9 @@ impl Project {
     fn is_member_access_node(&self, arena: &ThinNodeArena, node_idx: NodeIndex) -> bool {
         let mut current = node_idx;
         while !current.is_none() {
-            let Some(node) = arena.get(current) else { break; };
+            let Some(node) = arena.get(current) else {
+                break;
+            };
             if node.kind == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION
                 || node.kind == syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION
                 || node.kind == syntax_kind_ext::QUALIFIED_NAME
@@ -2423,15 +2783,23 @@ impl Project {
                 return true;
             }
 
-            let Some(ext) = arena.get_extended(current) else { break; };
+            let Some(ext) = arena.get_extended(current) else {
+                break;
+            };
             current = ext.parent;
         }
 
         false
     }
 
-    fn import_target_at_position(&self, file: &ProjectFile, position: Position) -> Option<ImportTarget> {
-        let offset = file.line_map().position_to_offset(position, file.source_text())?;
+    fn import_target_at_position(
+        &self,
+        file: &ProjectFile,
+        position: Position,
+    ) -> Option<ImportTarget> {
+        let offset = file
+            .line_map()
+            .position_to_offset(position, file.source_text())?;
         let node_idx = find_node_at_offset(file.arena(), offset);
         if node_idx.is_none() {
             return None;
@@ -2439,7 +2807,11 @@ impl Project {
         self.import_target_from_node(file, node_idx)
     }
 
-    fn import_target_from_node(&self, file: &ProjectFile, node_idx: NodeIndex) -> Option<ImportTarget> {
+    fn import_target_from_node(
+        &self,
+        file: &ProjectFile,
+        node_idx: NodeIndex,
+    ) -> Option<ImportTarget> {
         let arena = file.arena();
         let mut current = node_idx;
         let mut import_specifier = None;
@@ -2456,7 +2828,8 @@ impl Project {
                     import_clause = Some(current);
                 }
                 k if k == syntax_kind_ext::IMPORT_DECLARATION
-                    || k == syntax_kind_ext::IMPORT_EQUALS_DECLARATION => {
+                    || k == syntax_kind_ext::IMPORT_EQUALS_DECLARATION =>
+                {
                     import_decl = Some(current);
                     break;
                 }
@@ -2468,7 +2841,9 @@ impl Project {
         let import_decl_idx = import_decl?;
         let import_decl_node = arena.get(import_decl_idx)?;
         let import_decl = arena.get_import_decl(import_decl_node)?;
-        let module_specifier = arena.get_literal_text(import_decl.module_specifier)?.to_string();
+        let module_specifier = arena
+            .get_literal_text(import_decl.module_specifier)?
+            .to_string();
 
         let kind = if let Some(spec_idx) = import_specifier {
             let spec_node = arena.get(spec_idx)?;
@@ -2513,7 +2888,9 @@ impl Project {
     }
 
     fn module_specifier_from_files(&self, from_file: &str, target_file: &str) -> Option<String> {
-        let from_dir = Path::new(from_file).parent().unwrap_or_else(|| Path::new(""));
+        let from_dir = Path::new(from_file)
+            .parent()
+            .unwrap_or_else(|| Path::new(""));
         let target_path = strip_ts_extension(Path::new(target_file));
         let relative = relative_path(from_dir, &target_path);
 
@@ -2531,7 +2908,9 @@ impl Project {
         let mut candidates = Vec::new();
 
         if module_specifier.starts_with('.') {
-            let base_dir = Path::new(from_file).parent().unwrap_or_else(|| Path::new(""));
+            let base_dir = Path::new(from_file)
+                .parent()
+                .unwrap_or_else(|| Path::new(""));
             let joined = normalize_path(&base_dir.join(module_specifier));
 
             if joined.extension().is_some() {
@@ -2558,7 +2937,8 @@ impl Project {
 }
 
 const TS_EXTENSION_CANDIDATES: [&str; 7] = ["ts", "tsx", "d.ts", "mts", "cts", "d.mts", "d.cts"];
-const TS_EXTENSION_SUFFIXES: [&str; 7] = [".d.ts", ".d.mts", ".d.cts", ".ts", ".tsx", ".mts", ".cts"];
+const TS_EXTENSION_SUFFIXES: [&str; 7] =
+    [".d.ts", ".d.mts", ".d.cts", ".ts", ".tsx", ".mts", ".cts"];
 
 fn normalize_path(path: &Path) -> PathBuf {
     let mut normalized = PathBuf::new();

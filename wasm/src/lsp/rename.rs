@@ -3,16 +3,16 @@
 //! Handles renaming symbols across the codebase, including validation
 //! and workspace edit generation.
 
-use std::collections::HashMap;
 use crate::binder::SymbolId;
-use crate::parser::thin_node::ThinNodeArena;
-use crate::parser::NodeIndex;
-use crate::thin_binder::ThinBinderState;
-use crate::lsp::position::{Position, Range, LineMap};
-use crate::lsp::utils::find_node_at_offset;
+use crate::lsp::position::{LineMap, Position, Range};
 use crate::lsp::references::FindReferences;
 use crate::lsp::resolver::{ScopeCache, ScopeCacheStats};
+use crate::lsp::utils::find_node_at_offset;
+use crate::parser::NodeIndex;
+use crate::parser::thin_node::ThinNodeArena;
 use crate::scanner::{self, SyntaxKind};
+use crate::thin_binder::ThinBinderState;
+use std::collections::HashMap;
 
 /// A single text edit.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
@@ -48,7 +48,10 @@ impl WorkspaceEdit {
 
     /// Add an edit to the workspace edit.
     pub fn add_edit(&mut self, file_path: String, edit: TextEdit) {
-        self.changes.entry(file_path).or_insert_with(Vec::new).push(edit);
+        self.changes
+            .entry(file_path)
+            .or_insert_with(Vec::new)
+            .push(edit);
     }
 }
 
@@ -159,10 +162,7 @@ impl<'a> RenameProvider<'a> {
 
         let mut workspace_edit = WorkspaceEdit::new();
         for loc in locations {
-            workspace_edit.add_edit(
-                loc.file_path,
-                TextEdit::new(loc.range, new_name.clone()),
-            );
+            workspace_edit.add_edit(loc.file_path, TextEdit::new(loc.range, new_name.clone()));
         }
 
         Ok(workspace_edit)
@@ -179,7 +179,10 @@ impl<'a> RenameProvider<'a> {
         let node_idx = self
             .rename_target_node(position)
             .ok_or_else(|| "You cannot rename this element.".to_string())?;
-        let node = self.arena.get(node_idx).ok_or_else(|| "You cannot rename this element.".to_string())?;
+        let node = self
+            .arena
+            .get(node_idx)
+            .ok_or_else(|| "You cannot rename this element.".to_string())?;
         let normalized_name = self.normalize_rename_name(node.kind, &new_name)?;
 
         // 3. Find all references (declarations + usages)
@@ -194,13 +197,12 @@ impl<'a> RenameProvider<'a> {
 
         // We use find_references which includes the definition
         let locations = if let Some(scope_cache) = scope_cache {
-            finder
-                .find_references_with_scope_cache(
-                    root,
-                    position,
-                    scope_cache,
-                    scope_stats.as_deref_mut(),
-                )
+            finder.find_references_with_scope_cache(
+                root,
+                position,
+                scope_cache,
+                scope_stats.as_deref_mut(),
+            )
         } else {
             finder.find_references(root, position)
         }
@@ -220,7 +222,9 @@ impl<'a> RenameProvider<'a> {
     }
 
     fn rename_target_node(&self, position: Position) -> Option<NodeIndex> {
-        let offset = self.line_map.position_to_offset(position, self.source_text)?;
+        let offset = self
+            .line_map
+            .position_to_offset(position, self.source_text)?;
         let node_idx = find_node_at_offset(self.arena, offset);
         if node_idx.is_none() {
             return None;
@@ -251,8 +255,9 @@ impl<'a> RenameProvider<'a> {
         // Check if it's a reserved word or strict mode reserved word
         // Allow contextual keywords (async, await, type, string, number, etc.)
         if let Some(kind) = scanner::text_to_keyword(name) {
-            if scanner::token_is_reserved_word(kind) ||
-               scanner::token_is_strict_mode_reserved_word(kind) {
+            if scanner::token_is_reserved_word(kind)
+                || scanner::token_is_strict_mode_reserved_word(kind)
+            {
                 return false;
             }
         }
@@ -282,7 +287,10 @@ impl<'a> RenameProvider<'a> {
         if is_private {
             let stripped = new_name.strip_prefix('#').unwrap_or(new_name);
             if !is_valid_private_identifier(stripped) {
-                return Err(format!("'{}' is not a valid private identifier name", new_name));
+                return Err(format!(
+                    "'{}' is not a valid private identifier name",
+                    new_name
+                ));
             }
             return Ok(format!("#{}", stripped));
         }
@@ -332,10 +340,10 @@ fn is_valid_private_identifier(name: &str) -> bool {
 #[cfg(test)]
 mod rename_tests {
     use super::*;
-    use crate::thin_parser::ThinParserState;
-    use crate::thin_binder::ThinBinderState;
     use crate::lsp::position::LineMap;
     use crate::lsp::resolver::ScopeCache;
+    use crate::thin_binder::ThinBinderState;
+    use crate::thin_parser::ThinParserState;
 
     #[test]
     fn test_rename_variable() {
@@ -349,7 +357,8 @@ mod rename_tests {
         binder.bind_source_file(arena, root);
 
         let line_map = LineMap::build(source);
-        let rename_provider = RenameProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let rename_provider =
+            RenameProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
         // Rename 'oldName' at declaration (0, 4)
         let pos = Position::new(0, 4);
@@ -366,7 +375,10 @@ mod rename_tests {
         let edits = workspace_edit.changes.get("test.ts").unwrap();
 
         // Should have at least 2 edits: the declaration and the usage
-        assert!(edits.len() >= 2, "Should have at least 2 edits (declaration + usage)");
+        assert!(
+            edits.len() >= 2,
+            "Should have at least 2 edits (declaration + usage)"
+        );
 
         // Check all texts are newName
         for edit in edits {
@@ -385,7 +397,8 @@ mod rename_tests {
         binder.bind_source_file(arena, root);
 
         let line_map = LineMap::build(source);
-        let rename_provider = RenameProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let rename_provider =
+            RenameProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
         let mut scope_cache = ScopeCache::default();
         let pos = Position::new(1, 0);
@@ -398,7 +411,10 @@ mod rename_tests {
             None,
         );
         assert!(result.is_ok(), "Rename should succeed with scope cache");
-        assert!(!scope_cache.is_empty(), "Expected scope cache to populate for rename");
+        assert!(
+            !scope_cache.is_empty(),
+            "Expected scope cache to populate for rename"
+        );
     }
 
     #[test]
@@ -410,7 +426,8 @@ mod rename_tests {
         let mut binder = ThinBinderState::new();
         binder.bind_source_file(arena, root);
         let line_map = LineMap::build(source);
-        let rename_provider = RenameProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let rename_provider =
+            RenameProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
         let pos = Position::new(0, 4);
 
@@ -428,7 +445,8 @@ mod rename_tests {
         let mut binder = ThinBinderState::new();
         binder.bind_source_file(arena, root);
         let line_map = LineMap::build(source);
-        let rename_provider = RenameProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let rename_provider =
+            RenameProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
         let pos = Position::new(0, 4);
 
@@ -449,7 +467,8 @@ mod rename_tests {
         binder.bind_source_file(arena, root);
 
         let line_map = LineMap::build(source);
-        let rename_provider = RenameProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let rename_provider =
+            RenameProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
         // Rename 'foo' at the call site (1, 0)
         let pos = Position::new(1, 0);
@@ -480,17 +499,15 @@ mod rename_tests {
         binder.bind_source_file(arena, root);
 
         let line_map = LineMap::build(source);
-        let rename_provider = RenameProvider::new(
-            arena,
-            &binder,
-            &line_map,
-            "test.ts".to_string(),
-            source,
-        );
+        let rename_provider =
+            RenameProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
         let pos = Position::new(3, 9); // on '#bar'
         let result = rename_provider.provide_rename_edits(root, pos, "baz".to_string());
-        assert!(result.is_ok(), "Rename should succeed for private identifier");
+        assert!(
+            result.is_ok(),
+            "Rename should succeed for private identifier"
+        );
 
         let workspace_edit = result.unwrap();
         let edits = workspace_edit.changes.get("test.ts").unwrap();
@@ -511,17 +528,15 @@ mod rename_tests {
         binder.bind_source_file(arena, root);
 
         let line_map = LineMap::build(source);
-        let rename_provider = RenameProvider::new(
-            arena,
-            &binder,
-            &line_map,
-            "test.ts".to_string(),
-            source,
-        );
+        let rename_provider =
+            RenameProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
         let pos = Position::new(3, 9); // on '#bar'
         let result = rename_provider.provide_rename_edits(root, pos, "#qux".to_string());
-        assert!(result.is_ok(), "Rename should accept '#qux' for private identifier");
+        assert!(
+            result.is_ok(),
+            "Rename should accept '#qux' for private identifier"
+        );
 
         let workspace_edit = result.unwrap();
         let edits = workspace_edit.changes.get("test.ts").unwrap();
@@ -539,13 +554,17 @@ mod rename_tests {
         let mut binder = ThinBinderState::new();
         binder.bind_source_file(arena, root);
         let line_map = LineMap::build(source);
-        let rename_provider = RenameProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let rename_provider =
+            RenameProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
         // Position on the number literal '1', not an identifier
         let pos = Position::new(0, 8);
 
         let range = rename_provider.prepare_rename(pos);
-        assert!(range.is_none(), "Should not be able to rename non-identifier");
+        assert!(
+            range.is_none(),
+            "Should not be able to rename non-identifier"
+        );
     }
 
     #[test]
@@ -557,17 +576,15 @@ mod rename_tests {
         let mut binder = ThinBinderState::new();
         binder.bind_source_file(arena, root);
         let line_map = LineMap::build(source);
-        let rename_provider = RenameProvider::new(
-            arena,
-            &binder,
-            &line_map,
-            "test.ts".to_string(),
-            source,
-        );
+        let rename_provider =
+            RenameProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
         let pos = Position::new(0, 4);
         let result = rename_provider.provide_rename_edits(root, pos, "#foo".to_string());
-        assert!(result.is_err(), "Should not allow private names for identifiers");
+        assert!(
+            result.is_err(),
+            "Should not allow private names for identifiers"
+        );
     }
 
     #[test]
@@ -580,18 +597,28 @@ mod rename_tests {
         let mut binder = ThinBinderState::new();
         binder.bind_source_file(arena, root);
         let line_map = LineMap::build(source);
-        let rename_provider = RenameProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let rename_provider =
+            RenameProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
         let pos = Position::new(0, 4);
 
         // Should allow renaming to contextual keywords
         let result = rename_provider.provide_rename_edits(root, pos, "string".to_string());
-        assert!(result.is_ok(), "Should allow renaming to 'string' (contextual keyword)");
+        assert!(
+            result.is_ok(),
+            "Should allow renaming to 'string' (contextual keyword)"
+        );
 
         let result = rename_provider.provide_rename_edits(root, pos, "type".to_string());
-        assert!(result.is_ok(), "Should allow renaming to 'type' (contextual keyword)");
+        assert!(
+            result.is_ok(),
+            "Should allow renaming to 'type' (contextual keyword)"
+        );
 
         let result = rename_provider.provide_rename_edits(root, pos, "async".to_string());
-        assert!(result.is_ok(), "Should allow renaming to 'async' (contextual keyword)");
+        assert!(
+            result.is_ok(),
+            "Should allow renaming to 'async' (contextual keyword)"
+        );
     }
 }

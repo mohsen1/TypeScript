@@ -3,10 +3,10 @@
 //! Provides an outline/structure view of a TypeScript file showing all
 //! functions, classes, interfaces, types, variables, etc.
 
+use crate::lsp::position::{LineMap, Position, Range};
 use crate::parser::thin_node::ThinNodeArena;
-use crate::parser::{NodeIndex, syntax_kind_ext, node_flags};
+use crate::parser::{NodeIndex, node_flags, syntax_kind_ext};
 use crate::scanner::SyntaxKind;
-use crate::lsp::position::{Range, Position, LineMap};
 
 /// A symbol kind (matches LSP SymbolKind values).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -59,12 +59,7 @@ pub struct DocumentSymbol {
 
 impl DocumentSymbol {
     /// Create a new document symbol.
-    pub fn new(
-        name: String,
-        kind: SymbolKind,
-        range: Range,
-        selection_range: Range,
-    ) -> Self {
+    pub fn new(name: String, kind: SymbolKind, range: Range, selection_range: Range) -> Self {
         Self {
             name,
             detail: None,
@@ -97,7 +92,11 @@ pub struct DocumentSymbolProvider<'a> {
 impl<'a> DocumentSymbolProvider<'a> {
     /// Create a new document symbol provider.
     pub fn new(arena: &'a ThinNodeArena, line_map: &'a LineMap, source_text: &'a str) -> Self {
-        Self { arena, line_map, source_text }
+        Self {
+            arena,
+            line_map,
+            source_text,
+        }
     }
 
     /// Get all symbols in the document.
@@ -127,7 +126,9 @@ impl<'a> DocumentSymbolProvider<'a> {
             k if k == syntax_kind_ext::FUNCTION_DECLARATION => {
                 if let Some(func) = self.arena.get_function(node) {
                     let name_node = func.name;
-                    let name = self.get_name(name_node).unwrap_or_else(|| "<anonymous>".to_string());
+                    let name = self
+                        .get_name(name_node)
+                        .unwrap_or_else(|| "<anonymous>".to_string());
 
                     let range = self.get_range(node_idx);
                     let selection_range = if !name_node.is_none() {
@@ -156,7 +157,9 @@ impl<'a> DocumentSymbolProvider<'a> {
             k if k == syntax_kind_ext::CLASS_DECLARATION => {
                 if let Some(class) = self.arena.get_class(node) {
                     let name_node = class.name;
-                    let name = self.get_name(name_node).unwrap_or_else(|| "<class>".to_string());
+                    let name = self
+                        .get_name(name_node)
+                        .unwrap_or_else(|| "<class>".to_string());
 
                     let range = self.get_range(node_idx);
                     let selection_range = if !name_node.is_none() {
@@ -187,7 +190,9 @@ impl<'a> DocumentSymbolProvider<'a> {
             k if k == syntax_kind_ext::INTERFACE_DECLARATION => {
                 if let Some(iface) = self.arena.get_interface(node) {
                     let name_node = iface.name;
-                    let name = self.get_name(name_node).unwrap_or_else(|| "<interface>".to_string());
+                    let name = self
+                        .get_name(name_node)
+                        .unwrap_or_else(|| "<interface>".to_string());
 
                     let range = self.get_range(node_idx);
                     let selection_range = if !name_node.is_none() {
@@ -218,7 +223,9 @@ impl<'a> DocumentSymbolProvider<'a> {
             k if k == syntax_kind_ext::TYPE_ALIAS_DECLARATION => {
                 if let Some(alias) = self.arena.get_type_alias(node) {
                     let name_node = alias.name;
-                    let name = self.get_name(name_node).unwrap_or_else(|| "<type>".to_string());
+                    let name = self
+                        .get_name(name_node)
+                        .unwrap_or_else(|| "<type>".to_string());
 
                     let range = self.get_range(node_idx);
                     let selection_range = if !name_node.is_none() {
@@ -249,12 +256,18 @@ impl<'a> DocumentSymbolProvider<'a> {
                         if let Some(list_node) = self.arena.get(decl_list_idx) {
                             // Check if this is const/let/var based on list node flags
                             let is_const = (list_node.flags as u32 & node_flags::CONST) != 0;
-                            let kind = if is_const { SymbolKind::Constant } else { SymbolKind::Variable };
+                            let kind = if is_const {
+                                SymbolKind::Constant
+                            } else {
+                                SymbolKind::Variable
+                            };
 
                             if let Some(list) = self.arena.get_variable(list_node) {
                                 for &decl_idx in &list.declarations.nodes {
                                     if let Some(decl_node) = self.arena.get(decl_idx) {
-                                        if let Some(decl) = self.arena.get_variable_declaration(decl_node) {
+                                        if let Some(decl) =
+                                            self.arena.get_variable_declaration(decl_node)
+                                        {
                                             if let Some(name) = self.get_name(decl.name) {
                                                 let range = self.get_range(decl_idx);
                                                 let selection_range = self.get_range(decl.name);
@@ -282,7 +295,9 @@ impl<'a> DocumentSymbolProvider<'a> {
             k if k == syntax_kind_ext::ENUM_DECLARATION => {
                 if let Some(enum_decl) = self.arena.get_enum(node) {
                     let name_node = enum_decl.name;
-                    let name = self.get_name(name_node).unwrap_or_else(|| "<enum>".to_string());
+                    let name = self
+                        .get_name(name_node)
+                        .unwrap_or_else(|| "<enum>".to_string());
 
                     let range = self.get_range(node_idx);
                     let selection_range = self.get_range(name_node);
@@ -309,7 +324,9 @@ impl<'a> DocumentSymbolProvider<'a> {
             k if k == syntax_kind_ext::ENUM_MEMBER => {
                 if let Some(member) = self.arena.get_enum_member(node) {
                     let name_node = member.name;
-                    let name = self.get_name(name_node).unwrap_or_else(|| "<member>".to_string());
+                    let name = self
+                        .get_name(name_node)
+                        .unwrap_or_else(|| "<member>".to_string());
 
                     let range = self.get_range(node_idx);
                     let selection_range = self.get_range(name_node);
@@ -330,7 +347,9 @@ impl<'a> DocumentSymbolProvider<'a> {
             // Method Declaration (Class Member)
             k if k == syntax_kind_ext::METHOD_DECLARATION => {
                 if let Some(method) = self.arena.get_method_decl(node) {
-                    let name = self.get_name(method.name).unwrap_or_else(|| "<method>".to_string());
+                    let name = self
+                        .get_name(method.name)
+                        .unwrap_or_else(|| "<method>".to_string());
                     let range = self.get_range(node_idx);
                     let selection_range = self.get_range(method.name);
 
@@ -350,7 +369,9 @@ impl<'a> DocumentSymbolProvider<'a> {
             // Property Declaration (Class Member)
             k if k == syntax_kind_ext::PROPERTY_DECLARATION => {
                 if let Some(prop) = self.arena.get_property_decl(node) {
-                    let name = self.get_name(prop.name).unwrap_or_else(|| "<property>".to_string());
+                    let name = self
+                        .get_name(prop.name)
+                        .unwrap_or_else(|| "<property>".to_string());
                     let range = self.get_range(node_idx);
                     let selection_range = self.get_range(prop.name);
 
@@ -389,7 +410,9 @@ impl<'a> DocumentSymbolProvider<'a> {
             k if k == syntax_kind_ext::GET_ACCESSOR || k == syntax_kind_ext::SET_ACCESSOR => {
                 if let Some(accessor) = self.arena.get_accessor(node) {
                     let name_node = accessor.name;
-                    let name = self.get_name(name_node).unwrap_or_else(|| "<accessor>".to_string());
+                    let name = self
+                        .get_name(name_node)
+                        .unwrap_or_else(|| "<accessor>".to_string());
                     let range = self.get_range(node_idx);
                     let selection_range = self.get_range(name_node);
 
@@ -409,7 +432,9 @@ impl<'a> DocumentSymbolProvider<'a> {
             // Module / Namespace Declaration
             k if k == syntax_kind_ext::MODULE_DECLARATION => {
                 if let Some(module) = self.arena.get_module(node) {
-                    let name = self.get_name(module.name).unwrap_or_else(|| "<module>".to_string());
+                    let name = self
+                        .get_name(module.name)
+                        .unwrap_or_else(|| "<module>".to_string());
                     let range = self.get_range(node_idx);
                     let selection_range = self.get_range(module.name);
 
@@ -464,7 +489,7 @@ impl<'a> DocumentSymbolProvider<'a> {
             }
 
             // Default fallback
-            _ => vec![]
+            _ => vec![],
         }
     }
 
@@ -482,8 +507,9 @@ impl<'a> DocumentSymbolProvider<'a> {
                     for &stmt in &block.statements.nodes {
                         // Only collect declarations (functions, classes) - not variables
                         if let Some(stmt_node) = self.arena.get(stmt) {
-                            if stmt_node.kind == syntax_kind_ext::FUNCTION_DECLARATION ||
-                               stmt_node.kind == syntax_kind_ext::CLASS_DECLARATION {
+                            if stmt_node.kind == syntax_kind_ext::FUNCTION_DECLARATION
+                                || stmt_node.kind == syntax_kind_ext::CLASS_DECLARATION
+                            {
                                 symbols.extend(self.collect_symbols(stmt));
                             }
                         }
@@ -496,12 +522,12 @@ impl<'a> DocumentSymbolProvider<'a> {
 
     /// Check if a node kind is a declaration.
     fn is_declaration(&self, kind: u16) -> bool {
-        kind == syntax_kind_ext::FUNCTION_DECLARATION ||
-        kind == syntax_kind_ext::CLASS_DECLARATION ||
-        kind == syntax_kind_ext::VARIABLE_STATEMENT ||
-        kind == syntax_kind_ext::INTERFACE_DECLARATION ||
-        kind == syntax_kind_ext::TYPE_ALIAS_DECLARATION ||
-        kind == syntax_kind_ext::ENUM_DECLARATION
+        kind == syntax_kind_ext::FUNCTION_DECLARATION
+            || kind == syntax_kind_ext::CLASS_DECLARATION
+            || kind == syntax_kind_ext::VARIABLE_STATEMENT
+            || kind == syntax_kind_ext::INTERFACE_DECLARATION
+            || kind == syntax_kind_ext::TYPE_ALIAS_DECLARATION
+            || kind == syntax_kind_ext::ENUM_DECLARATION
     }
 
     /// Convert node range to LSP Range.
@@ -519,7 +545,9 @@ impl<'a> DocumentSymbolProvider<'a> {
     fn get_range_keyword(&self, node_idx: NodeIndex, len: u32) -> Range {
         if let Some(node) = self.arena.get(node_idx) {
             let start = self.line_map.offset_to_position(node.pos, self.source_text);
-            let end = self.line_map.offset_to_position(node.pos + len, self.source_text);
+            let end = self
+                .line_map
+                .offset_to_position(node.pos + len, self.source_text);
             Range::new(start, end)
         } else {
             Range::new(Position::new(0, 0), Position::new(0, 0))
@@ -533,9 +561,13 @@ impl<'a> DocumentSymbolProvider<'a> {
         }
         if let Some(node) = self.arena.get(node_idx) {
             if node.kind == SyntaxKind::Identifier as u16 {
-                return self.arena.get_identifier(node).map(|id| id.escaped_text.clone());
+                return self
+                    .arena
+                    .get_identifier(node)
+                    .map(|id| id.escaped_text.clone());
             } else if node.kind == SyntaxKind::StringLiteral as u16
-                   || node.kind == SyntaxKind::NumericLiteral as u16 {
+                || node.kind == SyntaxKind::NumericLiteral as u16
+            {
                 return self.arena.get_literal(node).map(|l| l.text.clone());
             }
         }
@@ -546,8 +578,8 @@ impl<'a> DocumentSymbolProvider<'a> {
 #[cfg(test)]
 mod document_symbols_tests {
     use super::*;
-    use crate::thin_parser::ThinParserState;
     use crate::lsp::position::LineMap;
+    use crate::thin_parser::ThinParserState;
 
     #[test]
     fn test_document_symbols_class_with_members() {

@@ -145,14 +145,7 @@ fn test_scan_numeric_separators_valid() {
 #[test]
 fn test_scan_numeric_separators_invalid() {
     let cases = [
-        "1__0",
-        "1_",
-        "0x_FF",
-        "1_.0",
-        "1._0",
-        "1e_2",
-        "1e+_2",
-        "0b_1",
+        "1__0", "1_", "0x_FF", "1_.0", "1._0", "1e_2", "1e+_2", "0b_1",
     ];
 
     for source in cases {

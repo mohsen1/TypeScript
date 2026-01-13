@@ -6,13 +6,13 @@
 // Allow dead code for binder infrastructure methods that will be used in future phases
 #![allow(dead_code)]
 
-use serde::Serialize;
-use rustc_hash::FxHashMap;
 use crate::parser::NodeIndex;
 use crate::parser::node_flags;
+use crate::parser::syntax_kind_ext;
 use crate::parser::thin_node::NodeAccess;
 use crate::scanner::SyntaxKind;
-use crate::parser::syntax_kind_ext; // For syntax kind constants like MODULE_BLOCK, etc.
+use rustc_hash::FxHashMap;
+use serde::Serialize; // For syntax kind constants like MODULE_BLOCK, etc.
 
 // =============================================================================
 // Symbol Flags
@@ -22,47 +22,55 @@ use crate::parser::syntax_kind_ext; // For syntax kind constants like MODULE_BLO
 /// Matches TypeScript's SymbolFlags enum in src/compiler/types.ts
 pub mod symbol_flags {
     pub const NONE: u32 = 0;
-    pub const FUNCTION_SCOPED_VARIABLE: u32 = 1 << 0;   // Variable (var) or parameter
-    pub const BLOCK_SCOPED_VARIABLE: u32 = 1 << 1;      // Block-scoped variable (let or const)
-    pub const PROPERTY: u32 = 1 << 2;                   // Property or enum member
-    pub const ENUM_MEMBER: u32 = 1 << 3;                // Enum member
-    pub const FUNCTION: u32 = 1 << 4;                   // Function
-    pub const CLASS: u32 = 1 << 5;                      // Class
-    pub const INTERFACE: u32 = 1 << 6;                  // Interface
-    pub const CONST_ENUM: u32 = 1 << 7;                 // Const enum
-    pub const REGULAR_ENUM: u32 = 1 << 8;               // Enum
-    pub const VALUE_MODULE: u32 = 1 << 9;               // Instantiated module
-    pub const NAMESPACE_MODULE: u32 = 1 << 10;          // Uninstantiated module
-    pub const TYPE_LITERAL: u32 = 1 << 11;              // Type Literal or mapped type
-    pub const OBJECT_LITERAL: u32 = 1 << 12;            // Object Literal
-    pub const METHOD: u32 = 1 << 13;                    // Method
-    pub const CONSTRUCTOR: u32 = 1 << 14;               // Constructor
-    pub const GET_ACCESSOR: u32 = 1 << 15;              // Get accessor
-    pub const SET_ACCESSOR: u32 = 1 << 16;              // Set accessor
-    pub const SIGNATURE: u32 = 1 << 17;                 // Call, construct, or index signature
-    pub const TYPE_PARAMETER: u32 = 1 << 18;            // Type parameter
-    pub const TYPE_ALIAS: u32 = 1 << 19;                // Type alias
-    pub const EXPORT_VALUE: u32 = 1 << 20;              // Exported value marker
-    pub const ALIAS: u32 = 1 << 21;                     // Alias for another symbol
-    pub const PROTOTYPE: u32 = 1 << 22;                 // Prototype property
-    pub const EXPORT_STAR: u32 = 1 << 23;               // Export * declaration
-    pub const OPTIONAL: u32 = 1 << 24;                  // Optional property
-    pub const TRANSIENT: u32 = 1 << 25;                 // Transient symbol
-    pub const ASSIGNMENT: u32 = 1 << 26;                // Assignment treated as declaration
-    pub const MODULE_EXPORTS: u32 = 1 << 27;            // CommonJS module.exports
-    pub const PRIVATE: u32 = 1 << 28;                   // Private member
-    pub const PROTECTED: u32 = 1 << 29;                 // Protected member
-    pub const ABSTRACT: u32 = 1 << 30;                  // Abstract member
-    pub const STATIC: u32 = 1 << 31;                    // Static member
+    pub const FUNCTION_SCOPED_VARIABLE: u32 = 1 << 0; // Variable (var) or parameter
+    pub const BLOCK_SCOPED_VARIABLE: u32 = 1 << 1; // Block-scoped variable (let or const)
+    pub const PROPERTY: u32 = 1 << 2; // Property or enum member
+    pub const ENUM_MEMBER: u32 = 1 << 3; // Enum member
+    pub const FUNCTION: u32 = 1 << 4; // Function
+    pub const CLASS: u32 = 1 << 5; // Class
+    pub const INTERFACE: u32 = 1 << 6; // Interface
+    pub const CONST_ENUM: u32 = 1 << 7; // Const enum
+    pub const REGULAR_ENUM: u32 = 1 << 8; // Enum
+    pub const VALUE_MODULE: u32 = 1 << 9; // Instantiated module
+    pub const NAMESPACE_MODULE: u32 = 1 << 10; // Uninstantiated module
+    pub const TYPE_LITERAL: u32 = 1 << 11; // Type Literal or mapped type
+    pub const OBJECT_LITERAL: u32 = 1 << 12; // Object Literal
+    pub const METHOD: u32 = 1 << 13; // Method
+    pub const CONSTRUCTOR: u32 = 1 << 14; // Constructor
+    pub const GET_ACCESSOR: u32 = 1 << 15; // Get accessor
+    pub const SET_ACCESSOR: u32 = 1 << 16; // Set accessor
+    pub const SIGNATURE: u32 = 1 << 17; // Call, construct, or index signature
+    pub const TYPE_PARAMETER: u32 = 1 << 18; // Type parameter
+    pub const TYPE_ALIAS: u32 = 1 << 19; // Type alias
+    pub const EXPORT_VALUE: u32 = 1 << 20; // Exported value marker
+    pub const ALIAS: u32 = 1 << 21; // Alias for another symbol
+    pub const PROTOTYPE: u32 = 1 << 22; // Prototype property
+    pub const EXPORT_STAR: u32 = 1 << 23; // Export * declaration
+    pub const OPTIONAL: u32 = 1 << 24; // Optional property
+    pub const TRANSIENT: u32 = 1 << 25; // Transient symbol
+    pub const ASSIGNMENT: u32 = 1 << 26; // Assignment treated as declaration
+    pub const MODULE_EXPORTS: u32 = 1 << 27; // CommonJS module.exports
+    pub const PRIVATE: u32 = 1 << 28; // Private member
+    pub const PROTECTED: u32 = 1 << 29; // Protected member
+    pub const ABSTRACT: u32 = 1 << 30; // Abstract member
+    pub const STATIC: u32 = 1 << 31; // Static member
 
     // Composite flags
     pub const ENUM: u32 = REGULAR_ENUM | CONST_ENUM;
     pub const VARIABLE: u32 = FUNCTION_SCOPED_VARIABLE | BLOCK_SCOPED_VARIABLE;
-    pub const VALUE: u32 = VARIABLE | PROPERTY | ENUM_MEMBER | OBJECT_LITERAL |
-                           FUNCTION | CLASS | ENUM | VALUE_MODULE | METHOD |
-                           GET_ACCESSOR | SET_ACCESSOR;
-    pub const TYPE: u32 = CLASS | INTERFACE | ENUM | ENUM_MEMBER | TYPE_LITERAL |
-                          TYPE_PARAMETER | TYPE_ALIAS;
+    pub const VALUE: u32 = VARIABLE
+        | PROPERTY
+        | ENUM_MEMBER
+        | OBJECT_LITERAL
+        | FUNCTION
+        | CLASS
+        | ENUM
+        | VALUE_MODULE
+        | METHOD
+        | GET_ACCESSOR
+        | SET_ACCESSOR;
+    pub const TYPE: u32 =
+        CLASS | INTERFACE | ENUM | ENUM_MEMBER | TYPE_LITERAL | TYPE_PARAMETER | TYPE_ALIAS;
     pub const NAMESPACE: u32 = VALUE_MODULE | NAMESPACE_MODULE | ENUM;
     pub const MODULE: u32 = VALUE_MODULE | NAMESPACE_MODULE;
     pub const ACCESSOR: u32 = GET_ACCESSOR | SET_ACCESSOR;
@@ -78,7 +86,8 @@ pub mod symbol_flags {
     pub const INTERFACE_EXCLUDES: u32 = TYPE & !INTERFACE & !CLASS;
     pub const REGULAR_ENUM_EXCLUDES: u32 = VALUE | TYPE & !REGULAR_ENUM;
     pub const CONST_ENUM_EXCLUDES: u32 = VALUE | TYPE & !CONST_ENUM;
-    pub const VALUE_MODULE_EXCLUDES: u32 = VALUE & !FUNCTION & !CLASS & !REGULAR_ENUM & !VALUE_MODULE;
+    pub const VALUE_MODULE_EXCLUDES: u32 =
+        VALUE & !FUNCTION & !CLASS & !REGULAR_ENUM & !VALUE_MODULE;
     pub const NAMESPACE_MODULE_EXCLUDES: u32 = NONE;
     pub const METHOD_EXCLUDES: u32 = VALUE & !METHOD;
     pub const GET_ACCESSOR_EXCLUDES: u32 = VALUE & !SET_ACCESSOR;
@@ -402,19 +411,19 @@ impl SymbolArena {
 /// Flags for flow nodes describing their type and properties.
 /// Matches TypeScript's FlowFlags in src/compiler/types.ts
 pub mod flow_flags {
-    pub const UNREACHABLE: u32 = 1 << 0;      // Unreachable code
-    pub const START: u32 = 1 << 1;             // Start of flow graph
-    pub const BRANCH_LABEL: u32 = 1 << 2;      // Branch label
-    pub const LOOP_LABEL: u32 = 1 << 3;        // Loop label
-    pub const ASSIGNMENT: u32 = 1 << 4;        // Assignment
-    pub const TRUE_CONDITION: u32 = 1 << 5;    // True condition
-    pub const FALSE_CONDITION: u32 = 1 << 6;   // False condition
-    pub const SWITCH_CLAUSE: u32 = 1 << 7;     // Switch clause
-    pub const ARRAY_MUTATION: u32 = 1 << 8;    // Array mutation
-    pub const CALL: u32 = 1 << 9;              // Call expression
-    pub const REDUCE_LABEL: u32 = 1 << 10;     // Reduce label
-    pub const REFERENCED: u32 = 1 << 11;       // Referenced
-    pub const AWAIT_POINT: u32 = 1 << 12;      // Await expression (suspension point)
+    pub const UNREACHABLE: u32 = 1 << 0; // Unreachable code
+    pub const START: u32 = 1 << 1; // Start of flow graph
+    pub const BRANCH_LABEL: u32 = 1 << 2; // Branch label
+    pub const LOOP_LABEL: u32 = 1 << 3; // Loop label
+    pub const ASSIGNMENT: u32 = 1 << 4; // Assignment
+    pub const TRUE_CONDITION: u32 = 1 << 5; // True condition
+    pub const FALSE_CONDITION: u32 = 1 << 6; // False condition
+    pub const SWITCH_CLAUSE: u32 = 1 << 7; // Switch clause
+    pub const ARRAY_MUTATION: u32 = 1 << 8; // Array mutation
+    pub const CALL: u32 = 1 << 9; // Call expression
+    pub const REDUCE_LABEL: u32 = 1 << 10; // Reduce label
+    pub const REFERENCED: u32 = 1 << 11; // Referenced
+    pub const AWAIT_POINT: u32 = 1 << 12; // Await expression (suspension point)
 
     // Composite flags
     pub const LABEL: u32 = BRANCH_LABEL | LOOP_LABEL;
@@ -572,7 +581,10 @@ impl Scope {
 
     /// Check if this scope is a function scope (where var hoisting happens)
     pub fn is_function_scope(&self) -> bool {
-        matches!(self.kind, ContainerKind::SourceFile | ContainerKind::Function | ContainerKind::Module)
+        matches!(
+            self.kind,
+            ContainerKind::SourceFile | ContainerKind::Function | ContainerKind::Module
+        )
     }
 }
 
@@ -580,8 +592,8 @@ impl Scope {
 // Binder State
 // =============================================================================
 
-use wasm_bindgen::prelude::*;
 use crate::parser::{Node, NodeArena};
+use wasm_bindgen::prelude::*;
 
 /// Scope context - tracks scope chain and hoisting
 #[derive(Clone, Debug)]
@@ -614,7 +626,10 @@ impl ScopeContext {
 
     /// Check if this scope is a function scope (where var hoisting happens)
     pub fn is_function_scope(&self) -> bool {
-        matches!(self.container_kind, ContainerKind::SourceFile | ContainerKind::Function | ContainerKind::Module)
+        matches!(
+            self.container_kind,
+            ContainerKind::SourceFile | ContainerKind::Function | ContainerKind::Module
+        )
     }
 }
 
@@ -672,7 +687,8 @@ impl BinderState {
     pub fn bind_source_file(&mut self, arena: &NodeArena, root: NodeIndex) {
         // Initialize scope chain with source file scope
         self.scope_chain.clear();
-        self.scope_chain.push(ScopeContext::new(ContainerKind::SourceFile, root, None));
+        self.scope_chain
+            .push(ScopeContext::new(ContainerKind::SourceFile, root, None));
         self.current_scope_idx = 0;
         self.current_scope = SymbolTable::new();
 
@@ -708,14 +724,21 @@ impl BinderState {
                 match node {
                     // var declarations are hoisted
                     Node::VariableStatement(stmt) => {
-                        if let Some(Node::VariableDeclarationList(list)) = arena.get(stmt.declaration_list) {
+                        if let Some(Node::VariableDeclarationList(list)) =
+                            arena.get(stmt.declaration_list)
+                        {
                             // Check if this is a var declaration (not let/const)
                             // Use proper flags instead of magic numbers
-                            let is_var = (list.base.flags & (node_flags::LET | node_flags::CONST)) == 0;
+                            let is_var =
+                                (list.base.flags & (node_flags::LET | node_flags::CONST)) == 0;
                             if is_var {
                                 for &decl_idx in &list.declarations.nodes {
-                                    if let Some(Node::VariableDeclaration(decl)) = arena.get(decl_idx) {
-                                        if let Some(name) = self.get_identifier_name(arena, decl.name) {
+                                    if let Some(Node::VariableDeclaration(decl)) =
+                                        arena.get(decl_idx)
+                                    {
+                                        if let Some(name) =
+                                            self.get_identifier_name(arena, decl.name)
+                                        {
                                             self.add_hoisted_var(name.to_string(), decl_idx);
                                         }
                                     }
@@ -859,7 +882,12 @@ impl BinderState {
     }
 
     /// Create a new flow node and set it as current.
-    fn create_flow_node(&mut self, flags: u32, antecedent: FlowNodeId, node: NodeIndex) -> FlowNodeId {
+    fn create_flow_node(
+        &mut self,
+        flags: u32,
+        antecedent: FlowNodeId,
+        node: NodeIndex,
+    ) -> FlowNodeId {
         let flow_id = self.flow_nodes.alloc(flags);
         if let Some(flow) = self.flow_nodes.get_mut(flow_id) {
             if !antecedent.is_none() {
@@ -1069,7 +1097,8 @@ impl BinderState {
                         || (flags & symbol_flags::REGULAR_ENUM) != 0
                     {
                         sym.value_declaration = declaration;
-                    } else if sym.value_declaration.is_none() && (flags & symbol_flags::VALUE) != 0 {
+                    } else if sym.value_declaration.is_none() && (flags & symbol_flags::VALUE) != 0
+                    {
                         sym.value_declaration = declaration;
                     }
                 } else {
@@ -1121,20 +1150,23 @@ impl BinderState {
         }
 
         // Namespace/module can merge with namespace/module
-        if (existing_flags & symbol_flags::MODULE) != 0
-            && (new_flags & symbol_flags::MODULE) != 0
-        {
+        if (existing_flags & symbol_flags::MODULE) != 0 && (new_flags & symbol_flags::MODULE) != 0 {
             return true;
         }
 
         // Namespace can merge with class, function, or enum
         if (existing_flags & symbol_flags::MODULE) != 0 {
-            if (new_flags & (symbol_flags::CLASS | symbol_flags::FUNCTION | symbol_flags::ENUM)) != 0 {
+            if (new_flags & (symbol_flags::CLASS | symbol_flags::FUNCTION | symbol_flags::ENUM))
+                != 0
+            {
                 return true;
             }
         }
         if (new_flags & symbol_flags::MODULE) != 0 {
-            if (existing_flags & (symbol_flags::CLASS | symbol_flags::FUNCTION | symbol_flags::ENUM)) != 0 {
+            if (existing_flags
+                & (symbol_flags::CLASS | symbol_flags::FUNCTION | symbol_flags::ENUM))
+                != 0
+            {
                 return true;
             }
         }
@@ -1147,9 +1179,7 @@ impl BinderState {
         }
 
         // Enum can merge with enum (members are combined)
-        if (existing_flags & symbol_flags::ENUM) != 0
-            && (new_flags & symbol_flags::ENUM) != 0
-        {
+        if (existing_flags & symbol_flags::ENUM) != 0 && (new_flags & symbol_flags::ENUM) != 0 {
             return true;
         }
 
@@ -1167,7 +1197,11 @@ impl BinderState {
     }
 
     /// Get modifier flags (PRIVATE, PROTECTED, ABSTRACT, STATIC) from modifier list.
-    fn get_modifier_flags(&self, arena: &NodeArena, modifiers: &Option<crate::parser::NodeList>) -> u32 {
+    fn get_modifier_flags(
+        &self,
+        arena: &NodeArena,
+        modifiers: &Option<crate::parser::NodeList>,
+    ) -> u32 {
         let mut flags = 0u32;
         if let Some(mods) = modifiers {
             for &mod_idx in &mods.nodes {
@@ -1270,7 +1304,11 @@ impl BinderState {
             for &param_idx in &func.parameters.nodes {
                 if let Some(Node::ParameterDeclaration(param)) = arena.get(param_idx) {
                     if let Some(name) = self.get_identifier_name(arena, param.name) {
-                        self.declare_symbol(name.to_string(), symbol_flags::FUNCTION_SCOPED_VARIABLE, param_idx);
+                        self.declare_symbol(
+                            name.to_string(),
+                            symbol_flags::FUNCTION_SCOPED_VARIABLE,
+                            param_idx,
+                        );
                     }
                 }
             }
@@ -1305,7 +1343,11 @@ impl BinderState {
             for &param_idx in &method.parameters.nodes {
                 if let Some(Node::ParameterDeclaration(param)) = arena.get(param_idx) {
                     if let Some(name) = self.get_identifier_name(arena, param.name) {
-                        self.declare_symbol(name.to_string(), symbol_flags::FUNCTION_SCOPED_VARIABLE, param_idx);
+                        self.declare_symbol(
+                            name.to_string(),
+                            symbol_flags::FUNCTION_SCOPED_VARIABLE,
+                            param_idx,
+                        );
                     }
                 }
             }
@@ -1344,7 +1386,11 @@ impl BinderState {
             for &param_idx in &func.parameters.nodes {
                 if let Some(Node::ParameterDeclaration(param)) = arena.get(param_idx) {
                     if let Some(name) = self.get_identifier_name(arena, param.name) {
-                        self.declare_symbol(name.to_string(), symbol_flags::FUNCTION_SCOPED_VARIABLE, param_idx);
+                        self.declare_symbol(
+                            name.to_string(),
+                            symbol_flags::FUNCTION_SCOPED_VARIABLE,
+                            param_idx,
+                        );
                     }
                 }
             }
@@ -1377,7 +1423,11 @@ impl BinderState {
             for &param_idx in &arrow.parameters.nodes {
                 if let Some(Node::ParameterDeclaration(param)) = arena.get(param_idx) {
                     if let Some(name) = self.get_identifier_name(arena, param.name) {
-                        self.declare_symbol(name.to_string(), symbol_flags::FUNCTION_SCOPED_VARIABLE, param_idx);
+                        self.declare_symbol(
+                            name.to_string(),
+                            symbol_flags::FUNCTION_SCOPED_VARIABLE,
+                            param_idx,
+                        );
                     }
                 }
             }
@@ -1412,13 +1462,21 @@ impl BinderState {
                 Node::MethodDeclaration(method) => {
                     if let Some(name) = self.get_identifier_name(arena, method.name) {
                         let visibility = self.get_modifier_flags(arena, &method.modifiers);
-                        self.declare_symbol(name.to_string(), symbol_flags::METHOD | visibility, idx);
+                        self.declare_symbol(
+                            name.to_string(),
+                            symbol_flags::METHOD | visibility,
+                            idx,
+                        );
                     }
                 }
                 Node::PropertyDeclaration(prop) => {
                     if let Some(name) = self.get_identifier_name(arena, prop.name) {
                         let visibility = self.get_modifier_flags(arena, &prop.modifiers);
-                        self.declare_symbol(name.to_string(), symbol_flags::PROPERTY | visibility, idx);
+                        self.declare_symbol(
+                            name.to_string(),
+                            symbol_flags::PROPERTY | visibility,
+                            idx,
+                        );
                     }
                 }
                 Node::ConstructorDeclaration(_) => {
@@ -1603,12 +1661,10 @@ impl BinderState {
         module_idx: NodeIndex,
     ) {
         // Get module name (identifier or string literal for external modules)
-        let name = self.get_identifier_name(arena, module.name)
+        let name = self
+            .get_identifier_name(arena, module.name)
             .map(|n| n.to_string())
-            .or_else(|| {
-                arena.get_literal_text(module.name)
-                    .map(str::to_string)
-            });
+            .or_else(|| arena.get_literal_text(module.name).map(str::to_string));
 
         let mut module_symbol_id = SymbolId::NONE;
         if let Some(name) = name {
@@ -1633,7 +1689,11 @@ impl BinderState {
     }
 
     /// Check if a modifier list contains the export keyword.
-    fn has_export_modifier(&self, arena: &NodeArena, modifiers: &Option<crate::parser::NodeList>) -> bool {
+    fn has_export_modifier(
+        &self,
+        arena: &NodeArena,
+        modifiers: &Option<crate::parser::NodeList>,
+    ) -> bool {
         if let Some(mods) = modifiers {
             for &mod_idx in &mods.nodes {
                 if let Some(Node::Token(base)) = arena.get(mod_idx) {
@@ -1647,8 +1707,15 @@ impl BinderState {
     }
 
     /// Populate the exports table of a module/namespace symbol based on exported declarations in its body.
-    fn populate_module_exports(&mut self, arena: &NodeArena, body_idx: NodeIndex, module_symbol_id: SymbolId) {
-        let Some(node) = arena.get(body_idx) else { return };
+    fn populate_module_exports(
+        &mut self,
+        arena: &NodeArena,
+        body_idx: NodeIndex,
+        module_symbol_id: SymbolId,
+    ) {
+        let Some(node) = arena.get(body_idx) else {
+            return;
+        };
 
         // Body can be a Block (ModuleBlock) or another ModuleDeclaration (nested namespace)
         let statements = if node.kind() == syntax_kind_ext::MODULE_BLOCK {
@@ -1684,49 +1751,58 @@ impl BinderState {
 
                     match stmt_node {
                         Node::VariableStatement(stmt) => {
-                            if let Some(Node::VariableDeclarationList(list)) = arena.get(stmt.declaration_list) {
+                            if let Some(Node::VariableDeclarationList(list)) =
+                                arena.get(stmt.declaration_list)
+                            {
                                 for &decl_idx in &list.declarations.nodes {
-                                    if let Some(Node::VariableDeclaration(decl)) = arena.get(decl_idx) {
-                                        if let Some(name) = self.get_identifier_name(arena, decl.name) {
+                                    if let Some(Node::VariableDeclaration(decl)) =
+                                        arena.get(decl_idx)
+                                    {
+                                        if let Some(name) =
+                                            self.get_identifier_name(arena, decl.name)
+                                        {
                                             exported_names.push(name.to_string());
                                         }
                                     }
                                 }
                             }
-                        },
+                        }
                         Node::FunctionDeclaration(func) => {
                             if let Some(name) = self.get_identifier_name(arena, func.name) {
                                 exported_names.push(name.to_string());
                             }
-                        },
+                        }
                         Node::ClassDeclaration(class) => {
                             if let Some(name) = self.get_identifier_name(arena, class.name) {
                                 exported_names.push(name.to_string());
                             }
-                        },
+                        }
                         Node::EnumDeclaration(enm) => {
                             if let Some(name) = self.get_identifier_name(arena, enm.name) {
                                 exported_names.push(name.to_string());
                             }
-                        },
+                        }
                         Node::InterfaceDeclaration(iface) => {
                             if let Some(name) = self.get_identifier_name(arena, iface.name) {
                                 exported_names.push(name.to_string());
                             }
-                        },
+                        }
                         Node::TypeAliasDeclaration(alias) => {
                             if let Some(name) = self.get_identifier_name(arena, alias.name) {
                                 exported_names.push(name.to_string());
                             }
-                        },
+                        }
                         Node::ModuleDeclaration(module) => {
-                            let name = self.get_identifier_name(arena, module.name)
+                            let name = self
+                                .get_identifier_name(arena, module.name)
                                 .map(|n| n.to_string())
-                                .or_else(|| arena.get_literal_text(module.name).map(str::to_string));
+                                .or_else(|| {
+                                    arena.get_literal_text(module.name).map(str::to_string)
+                                });
                             if let Some(name) = name {
                                 exported_names.push(name);
                             }
-                        },
+                        }
                         _ => {}
                     }
 
@@ -1734,7 +1810,9 @@ impl BinderState {
                     for name in &exported_names {
                         if let Some(sym_id) = self.current_scope.get(name) {
                             if let Some(module_sym) = self.symbols.get_mut(module_symbol_id) {
-                                let exports = module_sym.exports.get_or_insert_with(|| Box::new(SymbolTable::new()));
+                                let exports = module_sym
+                                    .exports
+                                    .get_or_insert_with(|| Box::new(SymbolTable::new()));
                                 exports.set(name.clone(), sym_id);
                             }
                             // Mark the child symbol as exported
@@ -1835,9 +1913,15 @@ impl BinderState {
 
                 // Bind catch variable if present
                 if !catch.variable_declaration.is_none() {
-                    if let Some(Node::VariableDeclaration(decl)) = arena.get(catch.variable_declaration) {
+                    if let Some(Node::VariableDeclaration(decl)) =
+                        arena.get(catch.variable_declaration)
+                    {
                         if let Some(name) = self.get_identifier_name(arena, decl.name) {
-                            self.declare_symbol(name.to_string(), symbol_flags::BLOCK_SCOPED_VARIABLE, catch.variable_declaration);
+                            self.declare_symbol(
+                                name.to_string(),
+                                symbol_flags::BLOCK_SCOPED_VARIABLE,
+                                catch.variable_declaration,
+                            );
                         }
                     }
                 }
@@ -1918,4 +2002,3 @@ impl BinderState {
         self.file_locals.has(name)
     }
 }
-

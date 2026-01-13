@@ -2,10 +2,7 @@ use super::*;
 
 #[test]
 fn test_parse_single_file() {
-    let result = parse_file_single(
-        "test.ts".to_string(),
-        "let x = 42;".to_string(),
-    );
+    let result = parse_file_single("test.ts".to_string(), "let x = 42;".to_string());
 
     assert_eq!(result.file_name, "test.ts");
     assert!(!result.source_file.is_none());
@@ -32,8 +29,14 @@ fn test_parse_multiple_files_parallel() {
 #[test]
 fn test_parse_with_stats() {
     let files = vec![
-        ("a.ts".to_string(), "function foo() { return 1; }".to_string()),
-        ("b.ts".to_string(), "class Bar { constructor() {} }".to_string()),
+        (
+            "a.ts".to_string(),
+            "function foo() { return 1; }".to_string(),
+        ),
+        (
+            "b.ts".to_string(),
+            "class Bar { constructor() {} }".to_string(),
+        ),
     ];
 
     let (results, stats) = parse_files_with_stats(files);
@@ -49,7 +52,8 @@ fn test_parse_with_stats() {
 fn test_parallel_parsing_consistency() {
     // Parse the same file multiple times in parallel
     // Results should be consistent
-    let source = "const x: number = 42; function add(a: number, b: number): number { return a + b; }";
+    let source =
+        "const x: number = 42; function add(a: number, b: number): number { return a + b; }";
     let files: Vec<_> = (0..10)
         .map(|i| (format!("file{}.ts", i), source.to_string()))
         .collect();
@@ -87,7 +91,10 @@ fn test_large_batch_parsing() {
 
     // Each file should have similar node counts
     for result in &results {
-        assert!(result.arena.len() >= 5, "Each file should have at least 5 nodes");
+        assert!(
+            result.arena.len() >= 5,
+            "Each file should have at least 5 nodes"
+        );
     }
 }
 
@@ -131,7 +138,10 @@ fn test_bind_multiple_files_parallel() {
 #[test]
 fn test_bind_with_stats() {
     let files = vec![
-        ("a.ts".to_string(), "function foo() { return 1; }".to_string()),
+        (
+            "a.ts".to_string(),
+            "function foo() { return 1; }".to_string(),
+        ),
         ("b.ts".to_string(), "class Bar { x: number; }".to_string()),
     ];
 
@@ -148,7 +158,8 @@ fn test_bind_with_stats() {
 fn test_parallel_binding_consistency() {
     // Bind the same file multiple times in parallel
     // Results should be consistent
-    let source = "const x: number = 42; function add(a: number, b: number): number { return a + b; }";
+    let source =
+        "const x: number = 42; function add(a: number, b: number): number { return a + b; }";
     let files: Vec<_> = (0..10)
         .map(|i| (format!("file{}.ts", i), source.to_string()))
         .collect();
@@ -180,14 +191,27 @@ fn test_large_batch_binding() {
 
     assert_eq!(results.len(), 100);
     assert_eq!(stats.file_count, 100);
-    assert!(stats.total_symbols >= 200, "Should have at least 200 symbols (2 per file)");
+    assert!(
+        stats.total_symbols >= 200,
+        "Should have at least 200 symbols (2 per file)"
+    );
 
     // Each file should have its function and variable
     for (i, result) in results.iter().enumerate() {
         let fn_name = format!("fn{}", i);
         let var_name = format!("val{}", i);
-        assert!(result.file_locals.has(&fn_name), "File {} missing {}", i, fn_name);
-        assert!(result.file_locals.has(&var_name), "File {} missing {}", i, var_name);
+        assert!(
+            result.file_locals.has(&fn_name),
+            "File {} missing {}",
+            i,
+            fn_name
+        );
+        assert!(
+            result.file_locals.has(&var_name),
+            "File {} missing {}",
+            i,
+            var_name
+        );
     }
 }
 
@@ -197,9 +221,10 @@ fn test_large_batch_binding() {
 
 #[test]
 fn test_merge_single_file() {
-    let files = vec![
-        ("a.ts".to_string(), "let x = 1; function foo() {}".to_string()),
-    ];
+    let files = vec![(
+        "a.ts".to_string(),
+        "let x = 1; function foo() {}".to_string(),
+    )];
 
     let program = compile_files(files);
 
@@ -284,7 +309,11 @@ fn test_compile_large_program() {
 
     assert_eq!(program.files.len(), 50);
     // Should have at least 100 symbols (2 per file: fn + val)
-    assert!(program.symbols.len() >= 100, "Expected at least 100 symbols, got {}", program.symbols.len());
+    assert!(
+        program.symbols.len() >= 100,
+        "Expected at least 100 symbols, got {}",
+        program.symbols.len()
+    );
 
     // All function and value names should be in globals
     for i in 0..50 {
@@ -299,8 +328,14 @@ fn test_compile_large_program() {
 fn test_compile_with_exports() {
     // Test that export function/class/const are properly bound
     let files = vec![
-        ("a.ts".to_string(), "export function add(x: number, y: number) { return x + y; }".to_string()),
-        ("b.ts".to_string(), "export class Calculator { add(x: number, y: number) { return x + y; } }".to_string()),
+        (
+            "a.ts".to_string(),
+            "export function add(x: number, y: number) { return x + y; }".to_string(),
+        ),
+        (
+            "b.ts".to_string(),
+            "export class Calculator { add(x: number, y: number) { return x + y; } }".to_string(),
+        ),
         ("c.ts".to_string(), "export const PI = 3.14159;".to_string()),
     ];
 
@@ -308,9 +343,18 @@ fn test_compile_with_exports() {
 
     assert_eq!(program.files.len(), 3);
     // All exported declarations should be in globals
-    assert!(program.globals.has("add"), "Exported function 'add' should be in globals");
-    assert!(program.globals.has("Calculator"), "Exported class 'Calculator' should be in globals");
-    assert!(program.globals.has("PI"), "Exported const 'PI' should be in globals");
+    assert!(
+        program.globals.has("add"),
+        "Exported function 'add' should be in globals"
+    );
+    assert!(
+        program.globals.has("Calculator"),
+        "Exported class 'Calculator' should be in globals"
+    );
+    assert!(
+        program.globals.has("PI"),
+        "Exported const 'PI' should be in globals"
+    );
 }
 
 // =========================================================================
@@ -320,7 +364,9 @@ fn test_compile_with_exports() {
 #[test]
 fn test_check_redux_lodash_style_generics() {
     let files = vec![
-        ("types.ts".to_string(), r#"
+        (
+            "types.ts".to_string(),
+            r#"
 type AnyAction = { type: string; payload?: any };
 
 type Reducer<S, A extends AnyAction> = (state: S | undefined, action: A) => S;
@@ -349,8 +395,12 @@ interface Store<S, A> {
   dispatch: (action: A) => A;
   replaceState: (next: DeepPartial<S>) => void;
 }
-"#.to_string()),
-        ("reducers.ts".to_string(), r#"
+"#
+            .to_string(),
+        ),
+        (
+            "reducers.ts".to_string(),
+            r#"
 type CounterAction = { type: "inc" } | { type: "dec" };
 type MessageAction = { type: "set"; payload: string };
 type AppAction = CounterAction | MessageAction;
@@ -381,8 +431,12 @@ const rootReducers: RootReducers = {
 };
 
 const incAction: ActionByType<AppAction, "inc"> = { type: "inc" };
-"#.to_string()),
-        ("store.ts".to_string(), r#"
+"#
+            .to_string(),
+        ),
+        (
+            "store.ts".to_string(),
+            r#"
 type StateFromReducer<R> = R extends Reducer<infer S, AnyAction> ? S : never;
 type ActionFromReducer<R> = R extends Reducer<any, infer A> ? A : AnyAction;
 
@@ -404,8 +458,12 @@ function createStore<R extends Reducer<any, AnyAction>>(
     replaceState: (_next: DeepPartial<StateFromReducer<R>>) => {},
   };
 }
-"#.to_string()),
-        ("app.ts".to_string(), r#"
+"#
+            .to_string(),
+        ),
+        (
+            "app.ts".to_string(),
+            r#"
 const rootReducer = combineReducers(rootReducers);
 
 function runApp() {
@@ -423,7 +481,9 @@ function runApp() {
   const sample: ValueOf<PickValue<RootState, number>> = count;
   return sample + count + state.tags["a"];
 }
-"#.to_string()),
+"#
+            .to_string(),
+        ),
     ];
 
     let program = compile_files(files);
@@ -445,10 +505,7 @@ function runApp() {
             for diag in &file_result.diagnostics {
                 eprintln!(
                     "  [{}:{}] code={}: {}",
-                    file_result.file_name,
-                    diag.start,
-                    diag.code,
-                    diag.message_text
+                    file_result.file_name, diag.start, diag.code, diag.message_text
                 );
             }
         }
@@ -474,9 +531,10 @@ function runApp() {
 
 #[test]
 fn test_check_single_function() {
-    let files = vec![
-        ("a.ts".to_string(), "function add(x: number, y: number): number { return x + y; }".to_string()),
-    ];
+    let files = vec![(
+        "a.ts".to_string(),
+        "function add(x: number, y: number): number { return x + y; }".to_string(),
+    )];
 
     let program = compile_files(files);
     let result = check_functions_parallel(&program);
@@ -489,8 +547,14 @@ fn test_check_single_function() {
 #[test]
 fn test_check_multiple_functions_parallel() {
     let files = vec![
-        ("a.ts".to_string(), "function foo() { return 1; } function bar() { return 2; }".to_string()),
-        ("b.ts".to_string(), "function baz(x: number) { return x * 2; }".to_string()),
+        (
+            "a.ts".to_string(),
+            "function foo() { return 1; } function bar() { return 2; }".to_string(),
+        ),
+        (
+            "b.ts".to_string(),
+            "function baz(x: number) { return x * 2; }".to_string(),
+        ),
     ];
 
     let program = compile_files(files);
@@ -498,7 +562,9 @@ fn test_check_multiple_functions_parallel() {
 
     assert_eq!(result.file_results.len(), 2);
     // File a has 2 functions, file b has 1
-    let total_functions: usize = result.file_results.iter()
+    let total_functions: usize = result
+        .file_results
+        .iter()
         .map(|r| r.function_results.len())
         .sum();
     assert_eq!(total_functions, 3);
@@ -507,18 +573,29 @@ fn test_check_multiple_functions_parallel() {
 #[test]
 fn test_check_arrow_functions() {
     let files = vec![
-        ("a.ts".to_string(), "const add = (x: number, y: number) => x + y;".to_string()),
-        ("b.ts".to_string(), "const double = (x: number) => { return x * 2; };".to_string()),
+        (
+            "a.ts".to_string(),
+            "const add = (x: number, y: number) => x + y;".to_string(),
+        ),
+        (
+            "b.ts".to_string(),
+            "const double = (x: number) => { return x * 2; };".to_string(),
+        ),
     ];
 
     let program = compile_files(files);
     let result = check_functions_parallel(&program);
 
     // Should find the arrow functions
-    let total_functions: usize = result.file_results.iter()
+    let total_functions: usize = result
+        .file_results
+        .iter()
         .map(|r| r.function_results.len())
         .sum();
-    assert!(total_functions >= 2, "Should find at least 2 arrow functions");
+    assert!(
+        total_functions >= 2,
+        "Should find at least 2 arrow functions"
+    );
 }
 
 #[test]
@@ -531,7 +608,9 @@ fn test_check_class_methods() {
     let result = check_functions_parallel(&program);
 
     // Should find the class methods
-    let total_functions: usize = result.file_results.iter()
+    let total_functions: usize = result
+        .file_results
+        .iter()
         .map(|r| r.function_results.len())
         .sum();
     assert!(total_functions >= 2, "Should find at least 2 class methods");
@@ -540,9 +619,18 @@ fn test_check_class_methods() {
 #[test]
 fn test_check_with_stats() {
     let files = vec![
-        ("a.ts".to_string(), "function foo() { return 1; }".to_string()),
-        ("b.ts".to_string(), "function bar() { return 2; }".to_string()),
-        ("c.ts".to_string(), "function baz() { return 3; }".to_string()),
+        (
+            "a.ts".to_string(),
+            "function foo() { return 1; }".to_string(),
+        ),
+        (
+            "b.ts".to_string(),
+            "function bar() { return 2; }".to_string(),
+        ),
+        (
+            "c.ts".to_string(),
+            "function baz() { return 3; }".to_string(),
+        ),
     ];
 
     let program = compile_files(files);
@@ -571,15 +659,20 @@ fn test_check_large_program_parallel() {
 
     assert_eq!(stats.file_count, 50);
     // Each file has 1 function declaration
-    assert!(stats.function_count >= 50, "Expected at least 50 functions, got {}", stats.function_count);
+    assert!(
+        stats.function_count >= 50,
+        "Expected at least 50 functions, got {}",
+        stats.function_count
+    );
 }
 
 #[test]
 fn test_check_consistency() {
     // Check the same program multiple times - results should be consistent
-    let files = vec![
-        ("a.ts".to_string(), "function add(x: number, y: number): number { return x + y; }".to_string()),
-    ];
+    let files = vec![(
+        "a.ts".to_string(),
+        "function add(x: number, y: number): number { return x + y; }".to_string(),
+    )];
 
     let program = compile_files(files);
 
@@ -593,32 +686,46 @@ fn test_check_consistency() {
 
 #[test]
 fn test_check_nested_functions() {
-    let files = vec![
-        ("a.ts".to_string(), "function outer() { function inner() { return 1; } return inner(); }".to_string()),
-    ];
+    let files = vec![(
+        "a.ts".to_string(),
+        "function outer() { function inner() { return 1; } return inner(); }".to_string(),
+    )];
 
     let program = compile_files(files);
     let result = check_functions_parallel(&program);
 
     // Should find both outer and inner functions
-    let total_functions: usize = result.file_results.iter()
+    let total_functions: usize = result
+        .file_results
+        .iter()
         .map(|r| r.function_results.len())
         .sum();
-    assert!(total_functions >= 2, "Should find both outer and inner functions");
+    assert!(
+        total_functions >= 2,
+        "Should find both outer and inner functions"
+    );
 }
 
 #[test]
 fn test_check_exported_functions() {
     let files = vec![
-        ("a.ts".to_string(), "export function add(x: number, y: number) { return x + y; }".to_string()),
-        ("b.ts".to_string(), "export function subtract(x: number, y: number) { return x - y; }".to_string()),
+        (
+            "a.ts".to_string(),
+            "export function add(x: number, y: number) { return x + y; }".to_string(),
+        ),
+        (
+            "b.ts".to_string(),
+            "export function subtract(x: number, y: number) { return x - y; }".to_string(),
+        ),
     ];
 
     let program = compile_files(files);
     let result = check_functions_parallel(&program);
 
     // Should find the exported functions
-    let total_functions: usize = result.file_results.iter()
+    let total_functions: usize = result
+        .file_results
+        .iter()
         .map(|r| r.function_results.len())
         .sum();
     assert!(total_functions >= 2, "Should find exported functions");

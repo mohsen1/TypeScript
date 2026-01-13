@@ -8,12 +8,12 @@
 //! - Memory efficient (each unique structure stored once)
 //! - Cache-friendly (work with u32 arrays instead of heap objects)
 
-use std::hash::{Hash, Hasher};
-use std::sync::{Arc, RwLock};
+use crate::interner::{Atom, ShardedInterner};
+use crate::solver::types::*;
 use rustc_hash::{FxHashMap, FxHashSet, FxHasher};
 use smallvec::SmallVec;
-use crate::solver::types::*;
-use crate::interner::{Atom, ShardedInterner};
+use std::hash::{Hash, Hasher};
+use std::sync::{Arc, RwLock};
 
 const SHARD_BITS: u32 = 6;
 const SHARD_COUNT: usize = 1 << SHARD_BITS; // 64 shards
@@ -238,11 +238,13 @@ impl TypeInterner {
             .read()
             .unwrap()
             .get(id.0)
-            .unwrap_or_else(|| Arc::new(ObjectShape {
-                properties: Vec::new(),
-                string_index: None,
-                number_index: None,
-            }))
+            .unwrap_or_else(|| {
+                Arc::new(ObjectShape {
+                    properties: Vec::new(),
+                    string_index: None,
+                    number_index: None,
+                })
+            })
     }
 
     pub fn object_property_index(&self, shape_id: ObjectShapeId, name: Atom) -> PropertyLookup {
@@ -299,15 +301,17 @@ impl TypeInterner {
             .read()
             .unwrap()
             .get(id.0)
-            .unwrap_or_else(|| Arc::new(FunctionShape {
-                type_params: Vec::new(),
-                params: Vec::new(),
-                this_type: None,
-                return_type: TypeId::ERROR,
-                type_predicate: None,
-                is_constructor: false,
-                is_method: false,
-            }))
+            .unwrap_or_else(|| {
+                Arc::new(FunctionShape {
+                    type_params: Vec::new(),
+                    params: Vec::new(),
+                    this_type: None,
+                    return_type: TypeId::ERROR,
+                    type_predicate: None,
+                    is_constructor: false,
+                    is_method: false,
+                })
+            })
     }
 
     pub fn callable_shape(&self, id: CallableShapeId) -> Arc<CallableShape> {
@@ -315,11 +319,14 @@ impl TypeInterner {
             .read()
             .unwrap()
             .get(id.0)
-            .unwrap_or_else(|| Arc::new(CallableShape {
-                call_signatures: Vec::new(),
-                construct_signatures: Vec::new(),
-                properties: Vec::new(),
-            ..Default::default() }))
+            .unwrap_or_else(|| {
+                Arc::new(CallableShape {
+                    call_signatures: Vec::new(),
+                    construct_signatures: Vec::new(),
+                    properties: Vec::new(),
+                    ..Default::default()
+                })
+            })
     }
 
     pub fn conditional_type(&self, id: ConditionalTypeId) -> Arc<ConditionalType> {
@@ -327,13 +334,15 @@ impl TypeInterner {
             .read()
             .unwrap()
             .get(id.0)
-            .unwrap_or_else(|| Arc::new(ConditionalType {
-                check_type: TypeId::ERROR,
-                extends_type: TypeId::ERROR,
-                true_type: TypeId::ERROR,
-                false_type: TypeId::ERROR,
-                is_distributive: false,
-            }))
+            .unwrap_or_else(|| {
+                Arc::new(ConditionalType {
+                    check_type: TypeId::ERROR,
+                    extends_type: TypeId::ERROR,
+                    true_type: TypeId::ERROR,
+                    false_type: TypeId::ERROR,
+                    is_distributive: false,
+                })
+            })
     }
 
     pub fn mapped_type(&self, id: MappedTypeId) -> Arc<MappedType> {
@@ -341,18 +350,20 @@ impl TypeInterner {
             .read()
             .unwrap()
             .get(id.0)
-            .unwrap_or_else(|| Arc::new(MappedType {
-                type_param: TypeParamInfo {
-                    name: self.intern_string("_"),
-                    constraint: None,
-                    default: None,
-                },
-                constraint: TypeId::ERROR,
-                name_type: None,
-                template: TypeId::ERROR,
-                readonly_modifier: None,
-                optional_modifier: None,
-            }))
+            .unwrap_or_else(|| {
+                Arc::new(MappedType {
+                    type_param: TypeParamInfo {
+                        name: self.intern_string("_"),
+                        constraint: None,
+                        default: None,
+                    },
+                    constraint: TypeId::ERROR,
+                    name_type: None,
+                    template: TypeId::ERROR,
+                    readonly_modifier: None,
+                    optional_modifier: None,
+                })
+            })
     }
 
     pub fn type_application(&self, id: TypeApplicationId) -> Arc<TypeApplication> {
@@ -360,10 +371,12 @@ impl TypeInterner {
             .read()
             .unwrap()
             .get(id.0)
-            .unwrap_or_else(|| Arc::new(TypeApplication {
-                base: TypeId::ERROR,
-                args: Vec::new(),
-            }))
+            .unwrap_or_else(|| {
+                Arc::new(TypeApplication {
+                    base: TypeId::ERROR,
+                    args: Vec::new(),
+                })
+            })
     }
 
     /// Intern a type key and return its TypeId.

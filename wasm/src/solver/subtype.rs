@@ -9,11 +9,13 @@
 //! - Set-theoretic operations for unions and intersections
 //! - TypeResolver trait for lazy symbol resolution
 
-use std::collections::HashSet;
 use crate::interner::Atom;
 use crate::solver::infer::InferenceContext;
 use crate::solver::types::*;
-use crate::solver::{apparent_primitive_members, ApparentMemberKind, AssignabilityChecker, TypeDatabase};
+use crate::solver::{
+    ApparentMemberKind, AssignabilityChecker, TypeDatabase, apparent_primitive_members,
+};
+use std::collections::HashSet;
 
 #[cfg(test)]
 use crate::solver::TypeInterner;
@@ -89,7 +91,12 @@ impl TypeEnvironment {
     }
 
     /// Register a symbol's resolved type with type parameters.
-    pub fn insert_with_params(&mut self, symbol: SymbolRef, type_id: TypeId, params: Vec<TypeParamInfo>) {
+    pub fn insert_with_params(
+        &mut self,
+        symbol: SymbolRef,
+        type_id: TypeId,
+        params: Vec<TypeParamInfo>,
+    ) {
         self.types.insert(symbol.0, type_id);
         if !params.is_empty() {
             self.type_params.insert(symbol.0, params);
@@ -319,9 +326,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             return self.check_subtype(source_eval, target_eval);
         }
 
-        if !self.strict_null_checks
-            && (source == TypeId::NULL || source == TypeId::UNDEFINED)
-        {
+        if !self.strict_null_checks && (source == TypeId::NULL || source == TypeId::UNDEFINED) {
             return SubtypeResult::True;
         }
 
@@ -375,9 +380,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
         match (&source_key, &target_key) {
             // Intrinsic to intrinsic
-            (TypeKey::Intrinsic(s), TypeKey::Intrinsic(t)) => {
-                self.check_intrinsic_subtype(*s, *t)
-            }
+            (TypeKey::Intrinsic(s), TypeKey::Intrinsic(t)) => self.check_intrinsic_subtype(*s, *t),
 
             // Literal to intrinsic
             (TypeKey::Literal(lit), TypeKey::Intrinsic(t)) => {
@@ -445,16 +448,13 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 // by the other members. This handles cases like:
                 // `T & string` where T extends `string | undefined` should be a subtype of `string`
                 for &member in members.iter() {
-                    if let Some(TypeKey::TypeParameter(param_info)) | Some(TypeKey::Infer(param_info)) =
-                        self.interner.lookup(member)
+                    if let Some(TypeKey::TypeParameter(param_info))
+                    | Some(TypeKey::Infer(param_info)) = self.interner.lookup(member)
                     {
                         if let Some(constraint) = param_info.constraint {
                             // Create intersection of constraint with other members
-                            let other_members: Vec<TypeId> = members
-                                .iter()
-                                .filter(|&&m| m != member)
-                                .copied()
-                                .collect();
+                            let other_members: Vec<TypeId> =
+                                members.iter().filter(|&&m| m != member).copied().collect();
 
                             if !other_members.is_empty() {
                                 let mut all_members = vec![constraint];
@@ -484,8 +484,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 SubtypeResult::True
             }
 
-            (TypeKey::TypeParameter(s_info), target_key)
-            | (TypeKey::Infer(s_info), target_key) => {
+            (TypeKey::TypeParameter(s_info), target_key) | (TypeKey::Infer(s_info), target_key) => {
                 if let TypeKey::TypeParameter(t_info) | TypeKey::Infer(t_info) = target_key {
                     if s_info.name == t_info.name {
                         return SubtypeResult::True;
@@ -558,7 +557,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             (TypeKey::Object(s_shape_id), TypeKey::Object(t_shape_id)) => {
                 let s_shape = self.interner.object_shape(*s_shape_id);
                 let t_shape = self.interner.object_shape(*t_shape_id);
-                self.check_object_subtype(&s_shape.properties, Some(*s_shape_id), &t_shape.properties)
+                self.check_object_subtype(
+                    &s_shape.properties,
+                    Some(*s_shape_id),
+                    &t_shape.properties,
+                )
             }
 
             // Object with index to object with index
@@ -617,7 +620,10 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 let t_fn = self.interner.function_shape(*t_fn_id);
                 if t_fn.is_constructor {
                     for s_sig in &s_callable.construct_signatures {
-                        if self.check_call_signature_subtype_to_fn(s_sig, &t_fn).is_true() {
+                        if self
+                            .check_call_signature_subtype_to_fn(s_sig, &t_fn)
+                            .is_true()
+                        {
                             return SubtypeResult::True;
                         }
                     }
@@ -625,7 +631,10 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 }
 
                 for s_sig in &s_callable.call_signatures {
-                    if self.check_call_signature_subtype_to_fn(s_sig, &t_fn).is_true() {
+                    if self
+                        .check_call_signature_subtype_to_fn(s_sig, &t_fn)
+                        .is_true()
+                    {
                         return SubtypeResult::True;
                     }
                 }
@@ -876,7 +885,10 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
     /// Try to expand a Mapped type to its structural form.
     /// Returns None if the mapped type cannot be expanded (unresolvable constraint).
     fn try_expand_mapped(&mut self, mapped_id: MappedTypeId) -> Option<TypeId> {
-        use crate::solver::{PropertyInfo, LiteralValue, instantiate_type, TypeSubstitution, MappedModifier, evaluate_type};
+        use crate::solver::{
+            LiteralValue, MappedModifier, PropertyInfo, TypeSubstitution, evaluate_type,
+            instantiate_type,
+        };
 
         let mapped = self.interner.mapped_type(mapped_id);
 
@@ -889,7 +901,9 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         // Build properties by instantiating template for each key
         let mut properties = Vec::new();
         for key_name in keys {
-            let key_literal = self.interner.intern(TypeKey::Literal(LiteralValue::String(key_name)));
+            let key_literal = self
+                .interner
+                .intern(TypeKey::Literal(LiteralValue::String(key_name)));
 
             let mut subst = TypeSubstitution::new();
             subst.insert(mapped.type_param.name, key_literal);
@@ -916,7 +930,10 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
     /// Try to evaluate a mapped type constraint to get concrete string keys.
     /// Returns None if the constraint can't be resolved to concrete keys.
-    fn try_evaluate_mapped_constraint(&self, constraint: TypeId) -> Option<Vec<crate::interner::Atom>> {
+    fn try_evaluate_mapped_constraint(
+        &self,
+        constraint: TypeId,
+    ) -> Option<Vec<crate::interner::Atom>> {
         use crate::solver::LiteralValue;
 
         let key = self.interner.lookup(constraint)?;
@@ -926,14 +943,14 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 // Try to resolve the operand to get concrete keys
                 self.try_get_keyof_keys(operand)
             }
-            TypeKey::Literal(LiteralValue::String(name)) => {
-                Some(vec![name])
-            }
+            TypeKey::Literal(LiteralValue::String(name)) => Some(vec![name]),
             TypeKey::Union(list_id) => {
                 let members = self.interner.type_list(list_id);
                 let mut keys = Vec::new();
                 for &member in members.iter() {
-                    if let Some(TypeKey::Literal(LiteralValue::String(name))) = self.interner.lookup(member) {
+                    if let Some(TypeKey::Literal(LiteralValue::String(name))) =
+                        self.interner.lookup(member)
+                    {
                         keys.push(name);
                     }
                 }
@@ -968,7 +985,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
     }
 
     /// Check intrinsic to intrinsic subtyping
-    fn check_intrinsic_subtype(&self, source: IntrinsicKind, target: IntrinsicKind) -> SubtypeResult {
+    fn check_intrinsic_subtype(
+        &self,
+        source: IntrinsicKind,
+        target: IntrinsicKind,
+    ) -> SubtypeResult {
         if source == target {
             return SubtypeResult::True;
         }
@@ -1000,8 +1021,12 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             return SubtypeResult::False;
         }
 
-        if self.check_subtype(source.true_type, target.true_type).is_true()
-            && self.check_subtype(source.false_type, target.false_type).is_true()
+        if self
+            .check_subtype(source.true_type, target.true_type)
+            .is_true()
+            && self
+                .check_subtype(source.false_type, target.false_type)
+                .is_true()
         {
             SubtypeResult::True
         } else {
@@ -1009,7 +1034,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         }
     }
 
-    fn conditional_branches_subtype(&mut self, cond: &ConditionalType, target: TypeId) -> SubtypeResult {
+    fn conditional_branches_subtype(
+        &mut self,
+        cond: &ConditionalType,
+        target: TypeId,
+    ) -> SubtypeResult {
         if self.check_subtype(cond.true_type, target).is_true()
             && self.check_subtype(cond.false_type, target).is_true()
         {
@@ -1019,7 +1048,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         }
     }
 
-    fn subtype_of_conditional_target(&mut self, source: TypeId, target: &ConditionalType) -> SubtypeResult {
+    fn subtype_of_conditional_target(
+        &mut self,
+        source: TypeId,
+        target: &ConditionalType,
+    ) -> SubtypeResult {
         if self.check_subtype(source, target.true_type).is_true()
             && self.check_subtype(source, target.false_type).is_true()
         {
@@ -1183,7 +1216,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
     }
 
     /// Check literal to intrinsic subtyping
-    fn check_literal_to_intrinsic(&self, literal: &LiteralValue, target: IntrinsicKind) -> SubtypeResult {
+    fn check_literal_to_intrinsic(
+        &self,
+        literal: &LiteralValue,
+        target: IntrinsicKind,
+    ) -> SubtypeResult {
         let matches = match literal {
             LiteralValue::String(_) => target == IntrinsicKind::String,
             LiteralValue::Number(_) => target == IntrinsicKind::Number,
@@ -1199,7 +1236,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
     }
 
     /// Check tuple subtyping
-    fn check_tuple_subtype(&mut self, source: &[TupleElement], target: &[TupleElement]) -> SubtypeResult {
+    fn check_tuple_subtype(
+        &mut self,
+        source: &[TupleElement],
+        target: &[TupleElement],
+    ) -> SubtypeResult {
         // Count required elements
         let source_required = source.iter().filter(|e| !e.optional && !e.rest).count();
         let target_required = target.iter().filter(|e| !e.optional && !e.rest).count();
@@ -1229,7 +1270,9 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                         }
                         break;
                     }
-                    let assignable = self.check_subtype(s_elem.type_id, tail_elem.type_id).is_true();
+                    let assignable = self
+                        .check_subtype(s_elem.type_id, tail_elem.type_id)
+                        .is_true();
                     if tail_elem.optional && !assignable {
                         break;
                     }
@@ -1247,7 +1290,10 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                             if s_elem.rest {
                                 return SubtypeResult::False;
                             }
-                            if !self.check_subtype(s_elem.type_id, t_fixed.type_id).is_true() {
+                            if !self
+                                .check_subtype(s_elem.type_id, t_fixed.type_id)
+                                .is_true()
+                            {
                                 return SubtypeResult::False;
                             }
                         }
@@ -1314,7 +1360,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         SubtypeResult::True
     }
 
-    fn check_array_to_tuple_subtype(&mut self, source_elem: TypeId, target: &[TupleElement]) -> SubtypeResult {
+    fn check_array_to_tuple_subtype(
+        &mut self,
+        source_elem: TypeId,
+        target: &[TupleElement],
+    ) -> SubtypeResult {
         if source_elem != TypeId::NEVER {
             return SubtypeResult::False;
         }
@@ -1402,7 +1452,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         }
     }
 
-    fn has_common_property(&self, source_props: &[PropertyInfo], target_props: &[PropertyInfo]) -> bool {
+    fn has_common_property(
+        &self,
+        source_props: &[PropertyInfo],
+        target_props: &[PropertyInfo],
+    ) -> bool {
         let mut source_idx = 0;
         let mut target_idx = 0;
 
@@ -1465,7 +1519,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                     let target_type = self.optional_property_type(t_prop);
                     let allow_bivariant = sp.is_method || t_prop.is_method;
                     if !self
-                        .check_subtype_with_method_variance(source_type, target_type, allow_bivariant)
+                        .check_subtype_with_method_variance(
+                            source_type,
+                            target_type,
+                            allow_bivariant,
+                        )
                         .is_true()
                     {
                         return SubtypeResult::False;
@@ -1476,7 +1534,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                         let source_write = self.optional_property_write_type(sp);
                         let target_write = self.optional_property_write_type(t_prop);
                         if !self
-                            .check_subtype_with_method_variance(target_write, source_write, allow_bivariant)
+                            .check_subtype_with_method_variance(
+                                target_write,
+                                source_write,
+                                allow_bivariant,
+                            )
                             .is_true()
                         {
                             return SubtypeResult::False;
@@ -1518,7 +1580,10 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                     if s_string_idx.readonly && !t_string_idx.readonly {
                         return SubtypeResult::False;
                     }
-                    if !self.check_subtype(s_string_idx.value_type, t_string_idx.value_type).is_true() {
+                    if !self
+                        .check_subtype(s_string_idx.value_type, t_string_idx.value_type)
+                        .is_true()
+                    {
                         return SubtypeResult::False;
                     }
                 }
@@ -1530,7 +1595,10 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                             return SubtypeResult::False;
                         }
                         let prop_type = self.optional_property_type(prop);
-                        if !self.check_subtype(prop_type, t_string_idx.value_type).is_true() {
+                        if !self
+                            .check_subtype(prop_type, t_string_idx.value_type)
+                            .is_true()
+                        {
                             return SubtypeResult::False;
                         }
                     }
@@ -1546,7 +1614,10 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                     if s_number_idx.readonly && !t_number_idx.readonly {
                         return SubtypeResult::False;
                     }
-                    if !self.check_subtype(s_number_idx.value_type, t_number_idx.value_type).is_true() {
+                    if !self
+                        .check_subtype(s_number_idx.value_type, t_number_idx.value_type)
+                        .is_true()
+                    {
                         return SubtypeResult::False;
                     }
                 }
@@ -1566,8 +1637,13 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
         // If source has string index, all number-indexed properties must be compatible
         // (since number converts to string for property access)
-        if let (Some(s_string_idx), Some(s_number_idx)) = (&source.string_index, &source.number_index) {
-            if !self.check_subtype(s_number_idx.value_type, s_string_idx.value_type).is_true() {
+        if let (Some(s_string_idx), Some(s_number_idx)) =
+            (&source.string_index, &source.number_index)
+        {
+            if !self
+                .check_subtype(s_number_idx.value_type, s_string_idx.value_type)
+                .is_true()
+            {
                 // This is a constraint violation in the source itself
                 return SubtypeResult::False;
             }
@@ -1583,7 +1659,9 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         target: &[PropertyInfo],
     ) -> SubtypeResult {
         for t_prop in target {
-            if let Some(sp) = self.lookup_property(&source.properties, Some(source_shape_id), t_prop.name) {
+            if let Some(sp) =
+                self.lookup_property(&source.properties, Some(source_shape_id), t_prop.name)
+            {
                 // Check optional compatibility
                 if sp.optional && !t_prop.optional {
                     return SubtypeResult::False;
@@ -1607,7 +1685,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                     let source_write = self.optional_property_write_type(sp);
                     let target_write = self.optional_property_write_type(t_prop);
                     if !self
-                        .check_subtype_with_method_variance(target_write, source_write, allow_bivariant)
+                        .check_subtype_with_method_variance(
+                            target_write,
+                            source_write,
+                            allow_bivariant,
+                        )
                         .is_true()
                     {
                         return SubtypeResult::False;
@@ -1714,7 +1796,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                     return SubtypeResult::False;
                 }
                 if !self
-                    .check_subtype_with_method_variance(prop_type, string_idx.value_type, allow_bivariant)
+                    .check_subtype_with_method_variance(
+                        prop_type,
+                        string_idx.value_type,
+                        allow_bivariant,
+                    )
                     .is_true()
                 {
                     return SubtypeResult::False;
@@ -1754,9 +1840,14 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
     /// Check parameter compatibility with method bivariance support.
     /// Methods are bivariant even when strict_function_types is enabled.
-    fn are_parameters_compatible_impl(&mut self, source_type: TypeId, target_type: TypeId, is_method: bool) -> bool {
-        let contains_this = self.type_contains_this_type(source_type)
-            || self.type_contains_this_type(target_type);
+    fn are_parameters_compatible_impl(
+        &mut self,
+        source_type: TypeId,
+        target_type: TypeId,
+        is_method: bool,
+    ) -> bool {
+        let contains_this =
+            self.type_contains_this_type(source_type) || self.type_contains_this_type(target_type);
 
         // Contravariant check: Target <: Source
         // Example: (x: Animal) => void <: (x: Cat) => void
@@ -1852,34 +1943,32 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                     .params
                     .iter()
                     .any(|param| self.type_contains_this_type_inner(param.type_id, visited))
-                    || shape
-                        .this_type
-                        .is_some_and(|this_type| {
-                            self.type_contains_this_type_inner(this_type, visited)
-                        })
+                    || shape.this_type.is_some_and(|this_type| {
+                        self.type_contains_this_type_inner(this_type, visited)
+                    })
                     || self.type_contains_this_type_inner(shape.return_type, visited)
             }
             TypeKey::Callable(shape_id) => {
                 let shape = self.interner.callable_shape(shape_id);
                 if shape.call_signatures.iter().any(|sig| {
-                    sig.params.iter().any(|param| {
-                        self.type_contains_this_type_inner(param.type_id, visited)
-                    }) || sig
-                        .this_type
-                        .is_some_and(|this_type| {
+                    sig.params
+                        .iter()
+                        .any(|param| self.type_contains_this_type_inner(param.type_id, visited))
+                        || sig.this_type.is_some_and(|this_type| {
                             self.type_contains_this_type_inner(this_type, visited)
-                        }) || self.type_contains_this_type_inner(sig.return_type, visited)
+                        })
+                        || self.type_contains_this_type_inner(sig.return_type, visited)
                 }) {
                     return true;
                 }
                 if shape.construct_signatures.iter().any(|sig| {
-                    sig.params.iter().any(|param| {
-                        self.type_contains_this_type_inner(param.type_id, visited)
-                    }) || sig
-                        .this_type
-                        .is_some_and(|this_type| {
+                    sig.params
+                        .iter()
+                        .any(|param| self.type_contains_this_type_inner(param.type_id, visited))
+                        || sig.this_type.is_some_and(|this_type| {
                             self.type_contains_this_type_inner(this_type, visited)
-                        }) || self.type_contains_this_type_inner(sig.return_type, visited)
+                        })
+                        || self.type_contains_this_type_inner(sig.return_type, visited)
                 }) {
                     return true;
                 }
@@ -1889,14 +1978,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 })
             }
             TypeKey::TypeParameter(info) | TypeKey::Infer(info) => {
-                info.constraint
-                    .is_some_and(|constraint| {
-                        self.type_contains_this_type_inner(constraint, visited)
-                    }) || info
+                info.constraint.is_some_and(|constraint| {
+                    self.type_contains_this_type_inner(constraint, visited)
+                }) || info
                     .default
-                    .is_some_and(|default| {
-                        self.type_contains_this_type_inner(default, visited)
-                    })
+                    .is_some_and(|default| self.type_contains_this_type_inner(default, visited))
             }
             TypeKey::Application(app_id) => {
                 let app = self.interner.type_application(app_id);
@@ -1915,22 +2001,17 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             }
             TypeKey::Mapped(mapped_id) => {
                 let mapped = self.interner.mapped_type(mapped_id);
-                mapped
-                    .type_param
-                    .constraint
-                    .is_some_and(|constraint| {
-                        self.type_contains_this_type_inner(constraint, visited)
-                    }) || mapped
+                mapped.type_param.constraint.is_some_and(|constraint| {
+                    self.type_contains_this_type_inner(constraint, visited)
+                }) || mapped
                     .type_param
                     .default
-                    .is_some_and(|default| {
-                        self.type_contains_this_type_inner(default, visited)
-                    }) || self.type_contains_this_type_inner(mapped.constraint, visited)
-                    || mapped
-                        .name_type
-                        .is_some_and(|name_type| {
-                            self.type_contains_this_type_inner(name_type, visited)
-                        }) || self.type_contains_this_type_inner(mapped.template, visited)
+                    .is_some_and(|default| self.type_contains_this_type_inner(default, visited))
+                    || self.type_contains_this_type_inner(mapped.constraint, visited)
+                    || mapped.name_type.is_some_and(|name_type| {
+                        self.type_contains_this_type_inner(name_type, visited)
+                    })
+                    || self.type_contains_this_type_inner(mapped.template, visited)
             }
             TypeKey::IndexAccess(obj, idx) => {
                 self.type_contains_this_type_inner(obj, visited)
@@ -1971,7 +2052,10 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
     }
 
     fn required_param_count(&self, params: &[ParamInfo]) -> usize {
-        params.iter().filter(|param| !param.optional && !param.rest).count()
+        params
+            .iter()
+            .filter(|param| !param.optional && !param.rest)
+            .count()
     }
 
     fn extra_required_accepts_undefined(
@@ -1984,11 +2068,18 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             .iter()
             .take(required_count)
             .skip(from_index)
-            .all(|param| self.check_subtype(TypeId::UNDEFINED, param.type_id).is_true())
+            .all(|param| {
+                self.check_subtype(TypeId::UNDEFINED, param.type_id)
+                    .is_true()
+            })
     }
 
     /// Check return type compatibility with void special-casing.
-    fn check_return_compat(&mut self, source_return: TypeId, target_return: TypeId) -> SubtypeResult {
+    fn check_return_compat(
+        &mut self,
+        source_return: TypeId,
+        target_return: TypeId,
+    ) -> SubtypeResult {
         if self.allow_void_return && target_return == TypeId::VOID {
             // `() => void` treats the return value as ignored. See https://github.com/microsoft/TypeScript/issues/25274.
             return SubtypeResult::True;
@@ -2056,14 +2147,21 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
     }
 
     /// Check function subtyping
-    fn check_function_subtype(&mut self, source: &FunctionShape, target: &FunctionShape) -> SubtypeResult {
+    fn check_function_subtype(
+        &mut self,
+        source: &FunctionShape,
+        target: &FunctionShape,
+    ) -> SubtypeResult {
         // Constructor vs non-constructor
         if source.is_constructor != target.is_constructor {
             return SubtypeResult::False;
         }
 
         // Return type is covariant
-        if !self.check_return_compat(source.return_type, target.return_type).is_true() {
+        if !self
+            .check_return_compat(source.return_type, target.return_type)
+            .is_true()
+        {
             return SubtypeResult::False;
         }
 
@@ -2089,7 +2187,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         let target_required = self.required_param_count(&target.params);
         let extra_required_ok = target_has_rest
             && source_required > target_required
-            && self.extra_required_accepts_undefined(&source.params, target_required, source_required);
+            && self.extra_required_accepts_undefined(
+                &source.params,
+                target_required,
+                source_required,
+            );
         if !self.allow_bivariant_param_count
             && !rest_is_top
             && source_required > target_required
@@ -2099,8 +2201,16 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         }
 
         // Count non-rest parameters
-        let target_fixed_count = if target_has_rest { target.params.len().saturating_sub(1) } else { target.params.len() };
-        let source_fixed_count = if source_has_rest { source.params.len().saturating_sub(1) } else { source.params.len() };
+        let target_fixed_count = if target_has_rest {
+            target.params.len().saturating_sub(1)
+        } else {
+            target.params.len()
+        };
+        let source_fixed_count = if source_has_rest {
+            source.params.len().saturating_sub(1)
+        } else {
+            source.params.len()
+        };
 
         // Compare fixed parameters
         let fixed_compare_count = std::cmp::min(source_fixed_count, target_fixed_count);
@@ -2125,7 +2235,8 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             for i in target_fixed_count..source_fixed_count {
                 let s_param = &source.params[i];
                 // Check parameter compatibility against rest element type
-                if !self.are_parameters_compatible_impl(s_param.type_id, rest_elem_type, is_method) {
+                if !self.are_parameters_compatible_impl(s_param.type_id, rest_elem_type, is_method)
+                {
                     return SubtypeResult::False;
                 }
             }
@@ -2150,7 +2261,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             if !rest_is_top {
                 for i in source_fixed_count..target_fixed_count {
                     let t_param = &target.params[i];
-                    if !self.are_parameters_compatible_impl(rest_elem_type, t_param.type_id, is_method) {
+                    if !self.are_parameters_compatible_impl(
+                        rest_elem_type,
+                        t_param.type_id,
+                        is_method,
+                    ) {
                         return SubtypeResult::False;
                     }
                 }
@@ -2214,7 +2329,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
     }
 
     /// Check callable subtyping (overloaded signatures)
-    fn check_callable_subtype(&mut self, source: &CallableShape, target: &CallableShape) -> SubtypeResult {
+    fn check_callable_subtype(
+        &mut self,
+        source: &CallableShape,
+        target: &CallableShape,
+    ) -> SubtypeResult {
         // For each target call signature, at least one source signature must match
         for t_sig in &target.call_signatures {
             let mut found_match = false;
@@ -2245,11 +2364,15 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
         // Check properties (if any), excluding private fields (starting with #)
         // Private fields should not affect structural typing for constructor types
-        let source_props: Vec<_> = source.properties.iter()
+        let source_props: Vec<_> = source
+            .properties
+            .iter()
             .filter(|p| !self.interner.resolve_atom(p.name).starts_with('#'))
             .cloned()
             .collect();
-        let target_props: Vec<_> = target.properties.iter()
+        let target_props: Vec<_> = target
+            .properties
+            .iter()
             .filter(|p| !self.interner.resolve_atom(p.name).starts_with('#'))
             .cloned()
             .collect();
@@ -2264,9 +2387,16 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
     }
 
     /// Check call signature subtyping
-    fn check_call_signature_subtype(&mut self, source: &CallSignature, target: &CallSignature) -> SubtypeResult {
+    fn check_call_signature_subtype(
+        &mut self,
+        source: &CallSignature,
+        target: &CallSignature,
+    ) -> SubtypeResult {
         // Return type is covariant
-        if !self.check_return_compat(source.return_type, target.return_type).is_true() {
+        if !self
+            .check_return_compat(source.return_type, target.return_type)
+            .is_true()
+        {
             return SubtypeResult::False;
         }
 
@@ -2285,7 +2415,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         let target_required = self.required_param_count(&target.params);
         let extra_required_ok = target_has_rest
             && source_required > target_required
-            && self.extra_required_accepts_undefined(&source.params, target_required, source_required);
+            && self.extra_required_accepts_undefined(
+                &source.params,
+                target_required,
+                source_required,
+            );
         if !self.allow_bivariant_param_count
             && !rest_is_top
             && source_required > target_required
@@ -2295,8 +2429,16 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         }
 
         // Count non-rest parameters
-        let target_fixed_count = if target_has_rest { target.params.len().saturating_sub(1) } else { target.params.len() };
-        let source_fixed_count = if source_has_rest { source.params.len().saturating_sub(1) } else { source.params.len() };
+        let target_fixed_count = if target_has_rest {
+            target.params.len().saturating_sub(1)
+        } else {
+            target.params.len()
+        };
+        let source_fixed_count = if source_has_rest {
+            source.params.len().saturating_sub(1)
+        } else {
+            source.params.len()
+        };
 
         // Compare fixed parameters
         let fixed_compare_count = std::cmp::min(source_fixed_count, target_fixed_count);
@@ -2353,9 +2495,16 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
     }
 
     /// Check call signature subtype to function shape
-    fn check_call_signature_subtype_to_fn(&mut self, source: &CallSignature, target: &FunctionShape) -> SubtypeResult {
+    fn check_call_signature_subtype_to_fn(
+        &mut self,
+        source: &CallSignature,
+        target: &FunctionShape,
+    ) -> SubtypeResult {
         // Return type is covariant
-        if !self.check_return_compat(source.return_type, target.return_type).is_true() {
+        if !self
+            .check_return_compat(source.return_type, target.return_type)
+            .is_true()
+        {
             return SubtypeResult::False;
         }
 
@@ -2378,7 +2527,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         let target_required = self.required_param_count(&target.params);
         let extra_required_ok = target_has_rest
             && source_required > target_required
-            && self.extra_required_accepts_undefined(&source.params, target_required, source_required);
+            && self.extra_required_accepts_undefined(
+                &source.params,
+                target_required,
+                source_required,
+            );
         if !self.allow_bivariant_param_count
             && !rest_is_top
             && source_required > target_required
@@ -2388,8 +2541,16 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         }
 
         // Count non-rest parameters
-        let target_fixed_count = if target_has_rest { target.params.len().saturating_sub(1) } else { target.params.len() };
-        let source_fixed_count = if source_has_rest { source.params.len().saturating_sub(1) } else { source.params.len() };
+        let target_fixed_count = if target_has_rest {
+            target.params.len().saturating_sub(1)
+        } else {
+            target.params.len()
+        };
+        let source_fixed_count = if source_has_rest {
+            source.params.len().saturating_sub(1)
+        } else {
+            source.params.len()
+        };
 
         // Compare fixed parameters
         let fixed_compare_count = std::cmp::min(source_fixed_count, target_fixed_count);
@@ -2446,9 +2607,16 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
     }
 
     /// Check function shape subtype to call signature
-    fn check_call_signature_subtype_fn(&mut self, source: &FunctionShape, target: &CallSignature) -> SubtypeResult {
+    fn check_call_signature_subtype_fn(
+        &mut self,
+        source: &FunctionShape,
+        target: &CallSignature,
+    ) -> SubtypeResult {
         // Return type is covariant
-        if !self.check_return_compat(source.return_type, target.return_type).is_true() {
+        if !self
+            .check_return_compat(source.return_type, target.return_type)
+            .is_true()
+        {
             return SubtypeResult::False;
         }
 
@@ -2471,7 +2639,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         let target_required = self.required_param_count(&target.params);
         let extra_required_ok = target_has_rest
             && source_required > target_required
-            && self.extra_required_accepts_undefined(&source.params, target_required, source_required);
+            && self.extra_required_accepts_undefined(
+                &source.params,
+                target_required,
+                source_required,
+            );
         if !self.allow_bivariant_param_count
             && !rest_is_top
             && source_required > target_required
@@ -2481,8 +2653,16 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         }
 
         // Count non-rest parameters
-        let target_fixed_count = if target_has_rest { target.params.len().saturating_sub(1) } else { target.params.len() };
-        let source_fixed_count = if source_has_rest { source.params.len().saturating_sub(1) } else { source.params.len() };
+        let target_fixed_count = if target_has_rest {
+            target.params.len().saturating_sub(1)
+        } else {
+            target.params.len()
+        };
+        let source_fixed_count = if source_has_rest {
+            source.params.len().saturating_sub(1)
+        } else {
+            source.params.len()
+        };
 
         // Compare fixed parameters
         let fixed_compare_count = std::cmp::min(source_fixed_count, target_fixed_count);
@@ -2561,13 +2741,9 @@ pub enum SubtypeFailureReason {
         nested_reason: Option<Box<SubtypeFailureReason>>,
     },
     /// Optional property cannot satisfy required property.
-    OptionalPropertyRequired {
-        property_name: Atom,
-    },
+    OptionalPropertyRequired { property_name: Atom },
     /// Readonly property cannot satisfy mutable property.
-    ReadonlyPropertyMismatch {
-        property_name: Atom,
-    },
+    ReadonlyPropertyMismatch { property_name: Atom },
     /// Return types are incompatible.
     ReturnTypeMismatch {
         source_return: TypeId,
@@ -2633,15 +2809,17 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
     ///
     /// Returns `None` if the types are actually compatible (shouldn't happen
     /// if called correctly after a failed check).
-    pub fn explain_failure(&mut self, source: TypeId, target: TypeId) -> Option<SubtypeFailureReason> {
+    pub fn explain_failure(
+        &mut self,
+        source: TypeId,
+        target: TypeId,
+    ) -> Option<SubtypeFailureReason> {
         // Fast path: if types are equal, no failure
         if source == target {
             return None;
         }
 
-        if !self.strict_null_checks
-            && (source == TypeId::NULL || source == TypeId::UNDEFINED)
-        {
+        if !self.strict_null_checks && (source == TypeId::NULL || source == TypeId::UNDEFINED) {
             return None;
         }
 
@@ -2691,13 +2869,8 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 }
                 TypeKey::ObjectWithIndex(t_shape_id) => {
                     let t_shape = self.interner.object_shape(*t_shape_id);
-                    return self.explain_indexed_object_failure(
-                        source,
-                        target,
-                        &shape,
-                        None,
-                        &t_shape,
-                    );
+                    return self
+                        .explain_indexed_object_failure(source, target, &shape, None, &t_shape);
                 }
                 _ => {}
             }
@@ -2747,22 +2920,23 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             (TypeKey::Object(s_shape_id), TypeKey::ObjectWithIndex(t_shape_id)) => {
                 let s_shape = self.interner.object_shape(*s_shape_id);
                 let t_shape = self.interner.object_shape(*t_shape_id);
-                if let Some(reason) =
-                    self.explain_object_failure(
-                        source,
-                        target,
-                        &s_shape.properties,
-                        Some(*s_shape_id),
-                        &t_shape.properties,
-                    )
-                {
+                if let Some(reason) = self.explain_object_failure(
+                    source,
+                    target,
+                    &s_shape.properties,
+                    Some(*s_shape_id),
+                    &t_shape.properties,
+                ) {
                     return Some(reason);
                 }
                 // Then check index signature constraints
                 if let Some(ref string_idx) = t_shape.string_index {
                     for prop in &s_shape.properties {
                         let prop_type = self.optional_property_type(prop);
-                        if !self.check_subtype(prop_type, string_idx.value_type).is_true() {
+                        if !self
+                            .check_subtype(prop_type, string_idx.value_type)
+                            .is_true()
+                        {
                             return Some(SubtypeFailureReason::IndexSignatureMismatch {
                                 index_kind: "string",
                                 source_value_type: prop_type,
@@ -2849,12 +3023,19 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                     let target_type = self.optional_property_type(t_prop);
                     let allow_bivariant = sp.is_method || t_prop.is_method;
                     if !self
-                        .check_subtype_with_method_variance(source_type, target_type, allow_bivariant)
+                        .check_subtype_with_method_variance(
+                            source_type,
+                            target_type,
+                            allow_bivariant,
+                        )
                         .is_true()
                     {
                         // Recursively explain the nested failure
-                        let nested = self
-                            .explain_failure_with_method_variance(source_type, target_type, allow_bivariant);
+                        let nested = self.explain_failure_with_method_variance(
+                            source_type,
+                            target_type,
+                            allow_bivariant,
+                        );
                         return Some(SubtypeFailureReason::PropertyTypeMismatch {
                             property_name: t_prop.name,
                             source_property_type: source_type,
@@ -2868,11 +3049,18 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                         let source_write = self.optional_property_write_type(sp);
                         let target_write = self.optional_property_write_type(t_prop);
                         if !self
-                            .check_subtype_with_method_variance(target_write, source_write, allow_bivariant)
+                            .check_subtype_with_method_variance(
+                                target_write,
+                                source_write,
+                                allow_bivariant,
+                            )
                             .is_true()
                         {
-                            let nested = self
-                                .explain_failure_with_method_variance(target_write, source_write, allow_bivariant);
+                            let nested = self.explain_failure_with_method_variance(
+                                target_write,
+                                source_write,
+                                allow_bivariant,
+                            );
                             return Some(SubtypeFailureReason::PropertyTypeMismatch {
                                 property_name: t_prop.name,
                                 source_property_type: source_write,
@@ -2928,7 +3116,10 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                             target_type: target,
                         });
                     }
-                    if !self.check_subtype(s_string_idx.value_type, t_string_idx.value_type).is_true() {
+                    if !self
+                        .check_subtype(s_string_idx.value_type, t_string_idx.value_type)
+                        .is_true()
+                    {
                         return Some(SubtypeFailureReason::IndexSignatureMismatch {
                             index_kind: "string",
                             source_value_type: s_string_idx.value_type,
@@ -2939,7 +3130,10 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 None => {
                     for prop in &source_shape.properties {
                         let prop_type = self.optional_property_type(prop);
-                        if !self.check_subtype(prop_type, t_string_idx.value_type).is_true() {
+                        if !self
+                            .check_subtype(prop_type, t_string_idx.value_type)
+                            .is_true()
+                        {
                             return Some(SubtypeFailureReason::IndexSignatureMismatch {
                                 index_kind: "string",
                                 source_value_type: prop_type,
@@ -2960,7 +3154,10 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                         target_type: target,
                     });
                 }
-                if !self.check_subtype(s_number_idx.value_type, t_number_idx.value_type).is_true() {
+                if !self
+                    .check_subtype(s_number_idx.value_type, t_number_idx.value_type)
+                    .is_true()
+                {
                     return Some(SubtypeFailureReason::IndexSignatureMismatch {
                         index_kind: "number",
                         source_value_type: s_number_idx.value_type,
@@ -3009,8 +3206,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                     .check_subtype_with_method_variance(source_type, target_type, allow_bivariant)
                     .is_true()
                 {
-                    let nested =
-                        self.explain_failure_with_method_variance(source_type, target_type, allow_bivariant);
+                    let nested = self.explain_failure_with_method_variance(
+                        source_type,
+                        target_type,
+                        allow_bivariant,
+                    );
                     return Some(SubtypeFailureReason::PropertyTypeMismatch {
                         property_name: t_prop.name,
                         source_property_type: source_type,
@@ -3024,11 +3224,18 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                     let source_write = self.optional_property_write_type(sp);
                     let target_write = self.optional_property_write_type(t_prop);
                     if !self
-                        .check_subtype_with_method_variance(target_write, source_write, allow_bivariant)
+                        .check_subtype_with_method_variance(
+                            target_write,
+                            source_write,
+                            allow_bivariant,
+                        )
                         .is_true()
                     {
-                        let nested = self
-                            .explain_failure_with_method_variance(target_write, source_write, allow_bivariant);
+                        let nested = self.explain_failure_with_method_variance(
+                            target_write,
+                            source_write,
+                            allow_bivariant,
+                        );
                         return Some(SubtypeFailureReason::PropertyTypeMismatch {
                             property_name: t_prop.name,
                             source_property_type: source_write,
@@ -3151,7 +3358,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                     });
                 }
                 if !self
-                    .check_subtype_with_method_variance(prop_type, string_idx.value_type, allow_bivariant)
+                    .check_subtype_with_method_variance(
+                        prop_type,
+                        string_idx.value_type,
+                        allow_bivariant,
+                    )
                     .is_true()
                 {
                     return Some(SubtypeFailureReason::IndexSignatureMismatch {
@@ -3174,7 +3385,9 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
     ) -> Option<SubtypeFailureReason> {
         // Check return type
         if !(self.allow_void_return && target.return_type == TypeId::VOID)
-            && !self.check_subtype(source.return_type, target.return_type).is_true()
+            && !self
+                .check_subtype(source.return_type, target.return_type)
+                .is_true()
         {
             let nested = self.explain_failure(source.return_type, target.return_type);
             return Some(SubtypeFailureReason::ReturnTypeMismatch {
@@ -3197,7 +3410,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         let target_required = self.required_param_count(&target.params);
         let extra_required_ok = target_has_rest
             && source_required > target_required
-            && self.extra_required_accepts_undefined(&source.params, target_required, source_required);
+            && self.extra_required_accepts_undefined(
+                &source.params,
+                target_required,
+                source_required,
+            );
         let too_many_params = !self.allow_bivariant_param_count
             && !rest_is_top
             && source_required > target_required
@@ -3336,7 +3553,9 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                         }
                         break;
                     }
-                    let assignable = self.check_subtype(s_elem.type_id, tail_elem.type_id).is_true();
+                    let assignable = self
+                        .check_subtype(s_elem.type_id, tail_elem.type_id)
+                        .is_true();
                     if tail_elem.optional && !assignable {
                         break;
                     }
@@ -3361,7 +3580,10 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                                     target_count: target.len(),
                                 });
                             }
-                            if !self.check_subtype(s_elem.type_id, t_fixed.type_id).is_true() {
+                            if !self
+                                .check_subtype(s_elem.type_id, t_fixed.type_id)
+                                .is_true()
+                            {
                                 return Some(SubtypeFailureReason::TupleElementTypeMismatch {
                                     index: j,
                                     source_element: s_elem.type_id,
@@ -3383,7 +3605,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 if let Some(variadic) = expansion.variadic {
                     let variadic_array = self.interner.array(variadic);
                     for (j, s_elem) in source_iter {
-                        let target_type = if s_elem.rest { variadic_array } else { variadic };
+                        let target_type = if s_elem.rest {
+                            variadic_array
+                        } else {
+                            variadic
+                        };
                         if !self.check_subtype(s_elem.type_id, target_type).is_true() {
                             return Some(SubtypeFailureReason::TupleElementTypeMismatch {
                                 index: j,

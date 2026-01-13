@@ -55,13 +55,8 @@ fn test_extract_variable_property_access() {
     binder.bind_source_file(arena, root);
 
     let line_map = LineMap::build(source);
-    let provider = CodeActionProvider::new(
-        arena,
-        &binder,
-        &line_map,
-        "test.tsx".to_string(),
-        source,
-    );
+    let provider =
+        CodeActionProvider::new(arena, &binder, &line_map, "test.tsx".to_string(), source);
 
     let range = Range {
         start: Position::new(0, 10),
@@ -102,13 +97,8 @@ fn test_extract_variable_avoids_name_collision() {
     binder.bind_source_file(arena, root);
 
     let line_map = LineMap::build(source);
-    let provider = CodeActionProvider::new(
-        arena,
-        &binder,
-        &line_map,
-        "test.ts".to_string(),
-        source,
-    );
+    let provider =
+        CodeActionProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
     let range = range_for_substring(source, &line_map, "foo.bar");
     let actions = provider.provide_code_actions(
@@ -143,13 +133,8 @@ fn test_extract_variable_parenthesizes_comma_expression() {
     binder.bind_source_file(arena, root);
 
     let line_map = LineMap::build(source);
-    let provider = CodeActionProvider::new(
-        arena,
-        &binder,
-        &line_map,
-        "test.ts".to_string(),
-        source,
-    );
+    let provider =
+        CodeActionProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
     let range = range_for_substring(source, &line_map, "foo(), bar()");
     let actions = provider.provide_code_actions(
@@ -168,9 +153,11 @@ fn test_extract_variable_parenthesizes_comma_expression() {
     let edits = edit.changes.get("test.ts").unwrap();
     assert_eq!(edits.len(), 2);
 
-    assert!(edits[0]
-        .new_text
-        .contains("const extracted = (foo(), bar());"));
+    assert!(
+        edits[0]
+            .new_text
+            .contains("const extracted = (foo(), bar());")
+    );
     assert_eq!(edits[1].new_text, "extracted");
 }
 
@@ -185,13 +172,8 @@ fn test_extract_variable_parenthesizes_comma_expression_with_parens() {
     binder.bind_source_file(arena, root);
 
     let line_map = LineMap::build(source);
-    let provider = CodeActionProvider::new(
-        arena,
-        &binder,
-        &line_map,
-        "test.ts".to_string(),
-        source,
-    );
+    let provider =
+        CodeActionProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
     let range = range_for_substring(source, &line_map, "(foo(), bar())");
     let actions = provider.provide_code_actions(
@@ -210,9 +192,11 @@ fn test_extract_variable_parenthesizes_comma_expression_with_parens() {
     let edits = edit.changes.get("test.ts").unwrap();
     assert_eq!(edits.len(), 2);
 
-    assert!(edits[0]
-        .new_text
-        .contains("const extracted = (foo(), bar());"));
+    assert!(
+        edits[0]
+            .new_text
+            .contains("const extracted = (foo(), bar());")
+    );
     assert_eq!(edits[1].new_text, "extracted");
 }
 
@@ -227,13 +211,8 @@ fn test_extract_variable_preserves_parenthesized_replacement() {
     binder.bind_source_file(arena, root);
 
     let line_map = LineMap::build(source);
-    let provider = CodeActionProvider::new(
-        arena,
-        &binder,
-        &line_map,
-        "test.ts".to_string(),
-        source,
-    );
+    let provider =
+        CodeActionProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
     let range = range_for_substring(source, &line_map, "(foo + bar)");
     let actions = provider.provide_code_actions(
@@ -267,13 +246,8 @@ fn test_extract_variable_preserves_parenthesized_conditional_replacement() {
     binder.bind_source_file(arena, root);
 
     let line_map = LineMap::build(source);
-    let provider = CodeActionProvider::new(
-        arena,
-        &binder,
-        &line_map,
-        "test.ts".to_string(),
-        source,
-    );
+    let provider =
+        CodeActionProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
     let range = range_for_substring(source, &line_map, "(foo ? bar : baz)");
     let actions = provider.provide_code_actions(
@@ -292,7 +266,11 @@ fn test_extract_variable_preserves_parenthesized_conditional_replacement() {
     let edits = edit.changes.get("test.ts").unwrap();
     assert_eq!(edits.len(), 2);
 
-    assert!(edits[0].new_text.contains("const extracted = (foo ? bar : baz);"));
+    assert!(
+        edits[0]
+            .new_text
+            .contains("const extracted = (foo ? bar : baz);")
+    );
     assert_eq!(edits[1].new_text, "(extracted)");
 }
 
@@ -307,13 +285,8 @@ fn test_extract_variable_call_expression_span() {
     binder.bind_source_file(arena, root);
 
     let line_map = LineMap::build(source);
-    let provider = CodeActionProvider::new(
-        arena,
-        &binder,
-        &line_map,
-        "test.ts".to_string(),
-        source,
-    );
+    let provider =
+        CodeActionProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
     let range = range_for_substring(source, &line_map, "foo()");
     let actions = provider.provide_code_actions(
@@ -347,13 +320,8 @@ fn test_extract_variable_array_literal_span() {
     binder.bind_source_file(arena, root);
 
     let line_map = LineMap::build(source);
-    let provider = CodeActionProvider::new(
-        arena,
-        &binder,
-        &line_map,
-        "test.ts".to_string(),
-        source,
-    );
+    let provider =
+        CodeActionProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
     let range = range_for_substring(source, &line_map, "[foo]");
     let actions = provider.provide_code_actions(
@@ -387,13 +355,8 @@ fn test_extract_variable_object_literal_span() {
     binder.bind_source_file(arena, root);
 
     let line_map = LineMap::build(source);
-    let provider = CodeActionProvider::new(
-        arena,
-        &binder,
-        &line_map,
-        "test.ts".to_string(),
-        source,
-    );
+    let provider =
+        CodeActionProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
     let range = range_for_substring(source, &line_map, "{ foo: 1 }");
     let actions = provider.provide_code_actions(
@@ -427,13 +390,8 @@ fn test_extract_variable_jsx_child_wraps_expression() {
     binder.bind_source_file(arena, root);
 
     let line_map = LineMap::build(source);
-    let provider = CodeActionProvider::new(
-        arena,
-        &binder,
-        &line_map,
-        "test.tsx".to_string(),
-        source,
-    );
+    let provider =
+        CodeActionProvider::new(arena, &binder, &line_map, "test.tsx".to_string(), source);
 
     let range = range_for_substring(source, &line_map, "<Foo />");
     let actions = provider.provide_code_actions(
@@ -468,13 +426,8 @@ fn test_extract_variable_blocks_tdz_for_loop_initializer() {
     binder.bind_source_file(arena, root);
 
     let line_map = LineMap::build(source);
-    let provider = CodeActionProvider::new(
-        arena,
-        &binder,
-        &line_map,
-        "test.ts".to_string(),
-        source,
-    );
+    let provider =
+        CodeActionProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
     let range = range_for_substring(source, &line_map, "i < limit");
     let actions = provider.provide_code_actions(
@@ -501,13 +454,8 @@ fn test_extract_variable_blocks_tdz_in_jsx_tag() {
     binder.bind_source_file(arena, root);
 
     let line_map = LineMap::build(source);
-    let provider = CodeActionProvider::new(
-        arena,
-        &binder,
-        &line_map,
-        "test.tsx".to_string(),
-        source,
-    );
+    let provider =
+        CodeActionProvider::new(arena, &binder, &line_map, "test.tsx".to_string(), source);
 
     let range = range_for_substring(source, &line_map, "<Widget />");
     let actions = provider.provide_code_actions(
@@ -534,13 +482,8 @@ fn test_extract_variable_blocks_tdz_in_jsx_attribute() {
     binder.bind_source_file(arena, root);
 
     let line_map = LineMap::build(source);
-    let provider = CodeActionProvider::new(
-        arena,
-        &binder,
-        &line_map,
-        "test.tsx".to_string(),
-        source,
-    );
+    let provider =
+        CodeActionProvider::new(arena, &binder, &line_map, "test.tsx".to_string(), source);
 
     let range = range_for_substring(source, &line_map, "<div value={Value} />");
     let actions = provider.provide_code_actions(
@@ -567,13 +510,8 @@ fn test_extract_variable_blocks_tdz_in_jsx_child() {
     binder.bind_source_file(arena, root);
 
     let line_map = LineMap::build(source);
-    let provider = CodeActionProvider::new(
-        arena,
-        &binder,
-        &line_map,
-        "test.tsx".to_string(),
-        source,
-    );
+    let provider =
+        CodeActionProvider::new(arena, &binder, &line_map, "test.tsx".to_string(), source);
 
     let range = range_for_substring(source, &line_map, "<div>{Value}</div>");
     let actions = provider.provide_code_actions(
@@ -600,13 +538,8 @@ fn test_extract_variable_no_action_cross_scope() {
     binder.bind_source_file(arena, root);
 
     let line_map = LineMap::build(source);
-    let provider = CodeActionProvider::new(
-        arena,
-        &binder,
-        &line_map,
-        "test.ts".to_string(),
-        source,
-    );
+    let provider =
+        CodeActionProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
     let range = range_for_substring(source, &line_map, "x + 1");
     let actions = provider.provide_code_actions(
@@ -633,13 +566,8 @@ fn test_extract_variable_no_action_for_simple_literal() {
     binder.bind_source_file(arena, root);
 
     let line_map = LineMap::build(source);
-    let provider = CodeActionProvider::new(
-        arena,
-        &binder,
-        &line_map,
-        "test.ts".to_string(),
-        source,
-    );
+    let provider =
+        CodeActionProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
     let range = Range {
         start: Position::new(0, 10),
@@ -670,13 +598,8 @@ fn test_extract_variable_empty_range() {
     binder.bind_source_file(arena, root);
 
     let line_map = LineMap::build(source);
-    let provider = CodeActionProvider::new(
-        arena,
-        &binder,
-        &line_map,
-        "test.ts".to_string(),
-        source,
-    );
+    let provider =
+        CodeActionProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
     let range = Range {
         start: Position::new(0, 10),
@@ -707,13 +630,8 @@ fn test_organize_imports_sort_only() {
     binder.bind_source_file(arena, root);
 
     let line_map = LineMap::build(source);
-    let provider = CodeActionProvider::new(
-        arena,
-        &binder,
-        &line_map,
-        "test.ts".to_string(),
-        source,
-    );
+    let provider =
+        CodeActionProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
     let range = Range {
         start: Position::new(0, 0),
@@ -738,7 +656,10 @@ fn test_organize_imports_sort_only() {
     let new_text = &edits[0].new_text;
     let pos_a = new_text.find("import { a } from \"a\";").unwrap();
     let pos_b = new_text.find("import { b } from \"b\";").unwrap();
-    assert!(pos_a < pos_b, "Imports should be sorted by module specifier");
+    assert!(
+        pos_a < pos_b,
+        "Imports should be sorted by module specifier"
+    );
 }
 
 #[test]
@@ -762,13 +683,8 @@ fn test_quickfix_remove_unused_named_import() {
         related_information: None,
     };
 
-    let provider = CodeActionProvider::new(
-        arena,
-        &binder,
-        &line_map,
-        "test.ts".to_string(),
-        source,
-    );
+    let provider =
+        CodeActionProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
     let empty_range = Range::new(Position::new(0, 0), Position::new(0, 0));
     let actions = provider.provide_code_actions(
@@ -809,13 +725,8 @@ fn test_quickfix_remove_unused_named_import_entire_decl() {
         related_information: None,
     };
 
-    let provider = CodeActionProvider::new(
-        arena,
-        &binder,
-        &line_map,
-        "test.ts".to_string(),
-        source,
-    );
+    let provider =
+        CodeActionProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
     let empty_range = Range::new(Position::new(0, 0), Position::new(0, 0));
     let actions = provider.provide_code_actions(
@@ -856,13 +767,8 @@ fn test_quickfix_remove_unused_default_import() {
         related_information: None,
     };
 
-    let provider = CodeActionProvider::new(
-        arena,
-        &binder,
-        &line_map,
-        "test.ts".to_string(),
-        source,
-    );
+    let provider =
+        CodeActionProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
     let empty_range = Range::new(Position::new(0, 0), Position::new(0, 0));
     let actions = provider.provide_code_actions(
@@ -903,13 +809,8 @@ fn test_quickfix_preserves_type_only_named_import() {
         related_information: None,
     };
 
-    let provider = CodeActionProvider::new(
-        arena,
-        &binder,
-        &line_map,
-        "test.ts".to_string(),
-        source,
-    );
+    let provider =
+        CodeActionProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
     let empty_range = Range::new(Position::new(0, 0), Position::new(0, 0));
     let actions = provider.provide_code_actions(
@@ -953,13 +854,8 @@ fn test_quickfix_add_missing_property_object_literal_single_line() {
         related_information: None,
     };
 
-    let provider = CodeActionProvider::new(
-        arena,
-        &binder,
-        &line_map,
-        "test.ts".to_string(),
-        source,
-    );
+    let provider =
+        CodeActionProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
     let empty_range = Range::new(Position::new(0, 0), Position::new(0, 0));
     let actions = provider.provide_code_actions(
@@ -976,10 +872,7 @@ fn test_quickfix_add_missing_property_object_literal_single_line() {
     let edit = actions[0].edit.as_ref().unwrap();
     let edits = edit.changes.get("test.ts").unwrap();
     let updated = apply_text_edits(source, &line_map, edits);
-    assert_eq!(
-        updated,
-        "const foo = { a: 1, b: undefined }; foo.b;\n"
-    );
+    assert_eq!(updated, "const foo = { a: 1, b: undefined }; foo.b;\n");
 }
 
 #[test]
@@ -1006,13 +899,8 @@ fn test_quickfix_add_missing_property_object_literal_single_line_trailing_comma(
         related_information: None,
     };
 
-    let provider = CodeActionProvider::new(
-        arena,
-        &binder,
-        &line_map,
-        "test.ts".to_string(),
-        source,
-    );
+    let provider =
+        CodeActionProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
     let empty_range = Range::new(Position::new(0, 0), Position::new(0, 0));
     let actions = provider.provide_code_actions(
@@ -1029,10 +917,7 @@ fn test_quickfix_add_missing_property_object_literal_single_line_trailing_comma(
     let edit = actions[0].edit.as_ref().unwrap();
     let edits = edit.changes.get("test.ts").unwrap();
     let updated = apply_text_edits(source, &line_map, edits);
-    assert_eq!(
-        updated,
-        "const foo = { a: 1, b: undefined, }; foo.b;\n"
-    );
+    assert_eq!(updated, "const foo = { a: 1, b: undefined, }; foo.b;\n");
 }
 
 #[test]
@@ -1057,13 +942,8 @@ fn test_quickfix_add_missing_property_object_literal_element_access() {
         related_information: None,
     };
 
-    let provider = CodeActionProvider::new(
-        arena,
-        &binder,
-        &line_map,
-        "test.ts".to_string(),
-        source,
-    );
+    let provider =
+        CodeActionProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
     let empty_range = Range::new(Position::new(0, 0), Position::new(0, 0));
     let actions = provider.provide_code_actions(
@@ -1110,13 +990,8 @@ fn test_quickfix_add_missing_property_object_literal_multiline() {
         related_information: None,
     };
 
-    let provider = CodeActionProvider::new(
-        arena,
-        &binder,
-        &line_map,
-        "test.ts".to_string(),
-        source,
-    );
+    let provider =
+        CodeActionProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
     let empty_range = Range::new(Position::new(0, 0), Position::new(0, 0));
     let actions = provider.provide_code_actions(
@@ -1163,13 +1038,8 @@ fn test_quickfix_add_missing_property_to_class() {
         related_information: None,
     };
 
-    let provider = CodeActionProvider::new(
-        arena,
-        &binder,
-        &line_map,
-        "test.ts".to_string(),
-        source,
-    );
+    let provider =
+        CodeActionProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
     let empty_range = Range::new(Position::new(0, 0), Position::new(0, 0));
     let actions = provider.provide_code_actions(
@@ -1214,13 +1084,8 @@ fn test_quickfix_add_missing_property_to_class_element_access() {
         related_information: None,
     };
 
-    let provider = CodeActionProvider::new(
-        arena,
-        &binder,
-        &line_map,
-        "test.ts".to_string(),
-        source,
-    );
+    let provider =
+        CodeActionProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
     let empty_range = Range::new(Position::new(0, 0), Position::new(0, 0));
     let actions = provider.provide_code_actions(
@@ -1265,13 +1130,8 @@ fn test_quickfix_add_missing_import_named() {
         related_information: None,
     };
 
-    let provider = CodeActionProvider::new(
-        arena,
-        &binder,
-        &line_map,
-        "test.ts".to_string(),
-        source,
-    );
+    let provider =
+        CodeActionProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
     let empty_range = Range::new(Position::new(0, 0), Position::new(0, 0));
     let actions = provider.provide_code_actions(
@@ -1317,13 +1177,8 @@ fn test_quickfix_add_missing_import_after_existing_import() {
         related_information: None,
     };
 
-    let provider = CodeActionProvider::new(
-        arena,
-        &binder,
-        &line_map,
-        "test.ts".to_string(),
-        source,
-    );
+    let provider =
+        CodeActionProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
     let empty_range = Range::new(Position::new(0, 0), Position::new(0, 0));
     let actions = provider.provide_code_actions(
@@ -1372,13 +1227,8 @@ fn test_quickfix_add_missing_import_merge_named_same_module() {
         related_information: None,
     };
 
-    let provider = CodeActionProvider::new(
-        arena,
-        &binder,
-        &line_map,
-        "test.ts".to_string(),
-        source,
-    );
+    let provider =
+        CodeActionProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
     let empty_range = Range::new(Position::new(0, 0), Position::new(0, 0));
     let actions = provider.provide_code_actions(
@@ -1424,13 +1274,8 @@ fn test_quickfix_add_missing_import_merge_named_multiline() {
         related_information: None,
     };
 
-    let provider = CodeActionProvider::new(
-        arena,
-        &binder,
-        &line_map,
-        "test.ts".to_string(),
-        source,
-    );
+    let provider =
+        CodeActionProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
     let empty_range = Range::new(Position::new(0, 0), Position::new(0, 0));
     let actions = provider.provide_code_actions(
@@ -1479,13 +1324,8 @@ fn test_quickfix_add_missing_import_merge_named_with_default() {
         related_information: None,
     };
 
-    let provider = CodeActionProvider::new(
-        arena,
-        &binder,
-        &line_map,
-        "test.ts".to_string(),
-        source,
-    );
+    let provider =
+        CodeActionProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
     let empty_range = Range::new(Position::new(0, 0), Position::new(0, 0));
     let actions = provider.provide_code_actions(
@@ -1531,13 +1371,8 @@ fn test_quickfix_add_missing_import_merge_default_with_named() {
         related_information: None,
     };
 
-    let provider = CodeActionProvider::new(
-        arena,
-        &binder,
-        &line_map,
-        "test.ts".to_string(),
-        source,
-    );
+    let provider =
+        CodeActionProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
     let empty_range = Range::new(Position::new(0, 0), Position::new(0, 0));
     let actions = provider.provide_code_actions(
@@ -1582,13 +1417,8 @@ fn test_quickfix_add_missing_import_merge_default_with_namespace() {
         related_information: None,
     };
 
-    let provider = CodeActionProvider::new(
-        arena,
-        &binder,
-        &line_map,
-        "test.ts".to_string(),
-        source,
-    );
+    let provider =
+        CodeActionProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
     let empty_range = Range::new(Position::new(0, 0), Position::new(0, 0));
     let actions = provider.provide_code_actions(
@@ -1633,13 +1463,8 @@ fn test_quickfix_add_missing_import_default() {
         related_information: None,
     };
 
-    let provider = CodeActionProvider::new(
-        arena,
-        &binder,
-        &line_map,
-        "test.ts".to_string(),
-        source,
-    );
+    let provider =
+        CodeActionProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
     let empty_range = Range::new(Position::new(0, 0), Position::new(0, 0));
     let actions = provider.provide_code_actions(
@@ -1684,13 +1509,8 @@ fn test_quickfix_add_missing_import_namespace() {
         related_information: None,
     };
 
-    let provider = CodeActionProvider::new(
-        arena,
-        &binder,
-        &line_map,
-        "test.ts".to_string(),
-        source,
-    );
+    let provider =
+        CodeActionProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
     let empty_range = Range::new(Position::new(0, 0), Position::new(0, 0));
     let actions = provider.provide_code_actions(
@@ -1735,13 +1555,8 @@ fn test_quickfix_add_missing_import_type_position_uses_import_type() {
         related_information: None,
     };
 
-    let provider = CodeActionProvider::new(
-        arena,
-        &binder,
-        &line_map,
-        "test.ts".to_string(),
-        source,
-    );
+    let provider =
+        CodeActionProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
     let empty_range = Range::new(Position::new(0, 0), Position::new(0, 0));
     let actions = provider.provide_code_actions(
@@ -1762,7 +1577,10 @@ fn test_quickfix_add_missing_import_type_position_uses_import_type() {
     let edit = actions[0].edit.as_ref().unwrap();
     let edits = edit.changes.get("test.ts").unwrap();
     let updated = apply_text_edits(source, &line_map, edits);
-    assert_eq!(updated, "import type { Foo } from \"./foo\";\nlet x: Foo;\n");
+    assert_eq!(
+        updated,
+        "import type { Foo } from \"./foo\";\nlet x: Foo;\n"
+    );
 }
 
 #[test]
@@ -1787,20 +1605,12 @@ fn test_quickfix_add_missing_import_value_skips_type_only_candidate() {
         related_information: None,
     };
 
-    let mut candidate = ImportCandidate::named(
-        "./foo".to_string(),
-        "Foo".to_string(),
-        "Foo".to_string(),
-    );
+    let mut candidate =
+        ImportCandidate::named("./foo".to_string(), "Foo".to_string(), "Foo".to_string());
     candidate.is_type_only = true;
 
-    let provider = CodeActionProvider::new(
-        arena,
-        &binder,
-        &line_map,
-        "test.ts".to_string(),
-        source,
-    );
+    let provider =
+        CodeActionProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
     let empty_range = Range::new(Position::new(0, 0), Position::new(0, 0));
     let actions = provider.provide_code_actions(
@@ -1838,13 +1648,8 @@ fn test_quickfix_add_missing_import_type_query_uses_value_import() {
         related_information: None,
     };
 
-    let provider = CodeActionProvider::new(
-        arena,
-        &binder,
-        &line_map,
-        "test.ts".to_string(),
-        source,
-    );
+    let provider =
+        CodeActionProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
     let empty_range = Range::new(Position::new(0, 0), Position::new(0, 0));
     let actions = provider.provide_code_actions(
@@ -1865,7 +1670,10 @@ fn test_quickfix_add_missing_import_type_query_uses_value_import() {
     let edit = actions[0].edit.as_ref().unwrap();
     let edits = edit.changes.get("test.ts").unwrap();
     let updated = apply_text_edits(source, &line_map, edits);
-    assert_eq!(updated, "import { Foo } from \"./foo\";\ntype T = typeof Foo;\n");
+    assert_eq!(
+        updated,
+        "import { Foo } from \"./foo\";\ntype T = typeof Foo;\n"
+    );
 }
 
 #[test]
@@ -1890,13 +1698,8 @@ fn test_quickfix_add_missing_import_class_extends_uses_value_import() {
         related_information: None,
     };
 
-    let provider = CodeActionProvider::new(
-        arena,
-        &binder,
-        &line_map,
-        "test.ts".to_string(),
-        source,
-    );
+    let provider =
+        CodeActionProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
     let empty_range = Range::new(Position::new(0, 0), Position::new(0, 0));
     let actions = provider.provide_code_actions(
@@ -1917,7 +1720,10 @@ fn test_quickfix_add_missing_import_class_extends_uses_value_import() {
     let edit = actions[0].edit.as_ref().unwrap();
     let edits = edit.changes.get("test.ts").unwrap();
     let updated = apply_text_edits(source, &line_map, edits);
-    assert_eq!(updated, "import { Foo } from \"./foo\";\nclass Bar extends Foo {}\n");
+    assert_eq!(
+        updated,
+        "import { Foo } from \"./foo\";\nclass Bar extends Foo {}\n"
+    );
 }
 
 #[test]
@@ -1942,13 +1748,8 @@ fn test_quickfix_add_missing_import_class_implements_uses_import_type() {
         related_information: None,
     };
 
-    let provider = CodeActionProvider::new(
-        arena,
-        &binder,
-        &line_map,
-        "test.ts".to_string(),
-        source,
-    );
+    let provider =
+        CodeActionProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
     let empty_range = Range::new(Position::new(0, 0), Position::new(0, 0));
     let actions = provider.provide_code_actions(
@@ -1969,5 +1770,8 @@ fn test_quickfix_add_missing_import_class_implements_uses_import_type() {
     let edit = actions[0].edit.as_ref().unwrap();
     let edits = edit.changes.get("test.ts").unwrap();
     let updated = apply_text_edits(source, &line_map, edits);
-    assert_eq!(updated, "import type { Foo } from \"./foo\";\nclass Bar implements Foo {}\n");
+    assert_eq!(
+        updated,
+        "import type { Foo } from \"./foo\";\nclass Bar implements Foo {}\n"
+    );
 }
