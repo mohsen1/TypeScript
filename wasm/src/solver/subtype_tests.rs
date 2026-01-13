@@ -23569,18 +23569,16 @@ fn test_this_type_with_this_constraint() {
     // method<T extends MyClass>(this: T): T
     let interner = TypeInterner::new();
 
-    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+    let t_param_info = TypeParamInfo {
         name: interner.intern_string("T"),
         constraint: Some(interner.reference(SymbolRef(1))),
         default: None,
-    }));
+    };
+
+    let t_param = interner.intern(TypeKey::TypeParameter(t_param_info.clone()));
 
     let constrained_method = interner.function(FunctionShape {
-        type_params: vec![TypeParamInfo {
-            name: interner.intern_string("T"),
-            constraint: Some(interner.reference(SymbolRef(1))),
-            default: None,
-        }],
+        type_params: vec![t_param_info],
         params: vec![],
         this_type: Some(t_param),
         return_type: t_param,
@@ -23674,17 +23672,18 @@ fn test_this_type_with_generic_method() {
     let interner = TypeInterner::new();
 
     let this_type = interner.intern(TypeKey::ThisType);
-    let t_ref = interner.reference(SymbolRef(50));
+    let t_param_info = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    };
+    let t_param = interner.intern(TypeKey::TypeParameter(t_param_info.clone()));
 
     let generic_fluent = interner.function(FunctionShape {
-        type_params: vec![TypeParamInfo {
-            name: interner.intern_string("T"),
-            constraint: None,
-            default: None,
-        }],
+        type_params: vec![t_param_info],
         params: vec![ParamInfo {
             name: Some(interner.intern_string("value")),
-            type_id: t_ref,
+            type_id: t_param,
             optional: false,
             rest: false,
         }],
@@ -23839,18 +23838,8 @@ fn test_this_type_in_tuple() {
 
     let this_type = interner.intern(TypeKey::ThisType);
     let tuple_with_this = interner.tuple(vec![
-        TupleElement {
-            type_id: this_type,
-            name: None,
-            optional: false,
-            rest: false,
-        },
-        TupleElement {
-            type_id: TypeId::NUMBER,
-            name: None,
-            optional: false,
-            rest: false,
-        },
+        TupleElement { type_id: this_type, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
     ]);
 
     assert!(tuple_with_this != TypeId::ERROR);
@@ -23862,7 +23851,12 @@ fn test_this_type_map_method() {
     let interner = TypeInterner::new();
 
     let this_type = interner.intern(TypeKey::ThisType);
-    let u_ref = interner.reference(SymbolRef(50));
+    let u_param_info = TypeParamInfo {
+        name: interner.intern_string("U"),
+        constraint: None,
+        default: None,
+    };
+    let u_param = interner.intern(TypeKey::TypeParameter(u_param_info.clone()));
 
     let mapper_fn = interner.function(FunctionShape {
         type_params: vec![],
@@ -23873,18 +23867,14 @@ fn test_this_type_map_method() {
             rest: false,
         }],
         this_type: None,
-        return_type: u_ref,
+        return_type: u_param,
         type_predicate: None,
         is_constructor: false,
         is_method: false,
     });
 
     let map_method = interner.function(FunctionShape {
-        type_params: vec![TypeParamInfo {
-            name: interner.intern_string("U"),
-            constraint: None,
-            default: None,
-        }],
+        type_params: vec![u_param_info],
         params: vec![ParamInfo {
             name: Some(interner.intern_string("fn")),
             type_id: mapper_fn,
@@ -23892,7 +23882,7 @@ fn test_this_type_map_method() {
             rest: false,
         }],
         this_type: None,
-        return_type: u_ref,
+        return_type: u_param,
         type_predicate: None,
         is_constructor: false,
         is_method: false,
