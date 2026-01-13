@@ -6443,6 +6443,18 @@ impl<'a> ThinCheckerState<'a> {
                         diagnostic_codes::TOKEN_EXPECTED,
                     );
                 }
+
+                // For setters, check implicit any on parameters (error 7006)
+                if elem_node.kind == syntax_kind_ext::SET_ACCESSOR {
+                    for &param_idx in &accessor.parameters.nodes {
+                        if let Some(param_node) = self.ctx.arena.get(param_idx) {
+                            if let Some(param) = self.ctx.arena.get_parameter(param_node) {
+                                self.maybe_report_implicit_any_parameter(param, false);
+                            }
+                        }
+                    }
+                }
+
                 if let Some(name) = self.get_property_name(accessor.name) {
                     // For getter, infer return type; for setter, it's void
                     let accessor_type = if elem_node.kind == syntax_kind_ext::GET_ACCESSOR {
@@ -14565,6 +14577,10 @@ impl<'a> ThinCheckerState<'a> {
                     diagnostic_codes::SETTER_CANNOT_HAVE_REST_PARAMETER,
                 );
             }
+
+            // Check for implicit any (error 7006)
+            // Setter parameters without type annotation implicitly have 'any' type
+            self.maybe_report_implicit_any_parameter(param, false);
         }
     }
 
