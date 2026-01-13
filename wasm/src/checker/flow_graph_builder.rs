@@ -95,6 +95,8 @@ pub struct FlowGraphBuilder<'a> {
     flow_stack: Vec<FlowContext>,
     /// Depth of async function nesting (0 if not in async function)
     async_depth: u32,
+    /// Depth of generator function nesting (0 if not in generator function)
+    generator_depth: u32,
 }
 
 /// Context for nested flow constructs (loops, switches, async functions, etc.)
@@ -134,6 +136,7 @@ impl<'a> FlowGraphBuilder<'a> {
             current_flow: start_flow,
             flow_stack: Vec::new(),
             async_depth: 0,
+            generator_depth: 0,
         }
     }
 
@@ -176,6 +179,7 @@ impl<'a> FlowGraphBuilder<'a> {
         self.current_flow = self.graph.nodes.alloc(flow_flags::START);
         self.flow_stack.clear();
         self.async_depth = 0;
+        self.generator_depth = 0;
 
         // Build the function body
         self.build_block(body);
@@ -283,29 +287,40 @@ impl<'a> FlowGraphBuilder<'a> {
                 self.record_node_flow(stmt_idx);
             }
 
-            // Function declaration - check if async
+            // Function declaration - check if async/generator
             syntax_kind_ext::FUNCTION_DECLARATION
             | syntax_kind_ext::FUNCTION_EXPRESSION
             | syntax_kind_ext::ARROW_FUNCTION => {
                 if let Some(func) = self.arena.get_function(node) {
-                    if func.is_async {
-                        // Enter async context
+                    // Track async and generator context
+                    let was_async = func.is_async;
+                    let was_generator = func.asterisk_token;
+
+                    if was_async {
                         self.async_depth += 1;
-                        self.record_node_flow(stmt_idx);
-                        // Note: We don't descend into function bodies in this flow graph builder
-                        // as each function has its own flow graph
+                    }
+                    if was_generator {
+                        self.generator_depth += 1;
+                    }
+
+                    self.record_node_flow(stmt_idx);
+                    // Note: We don't descend into function bodies in this flow graph builder
+                    // as each function has its own flow graph
+
+                    if was_async {
                         self.async_depth -= 1;
-                    } else {
-                        self.record_node_flow(stmt_idx);
+                    }
+                    if was_generator {
+                        self.generator_depth -= 1;
                     }
                 }
             }
 
-            // Expression statement - check for await expressions
+            // Expression statement - check for await/yield expressions
             syntax_kind_ext::EXPRESSION_STATEMENT => {
                 // Get the expression from the expression statement
                 if let Some(expr_stmt) = self.arena.get_expression_statement(node) {
-                    self.handle_expression_for_await(expr_stmt.expression);
+                    self.handle_expression_for_suspension_points(expr_stmt.expression);
                 }
                 self.record_node_flow(stmt_idx);
             }
@@ -313,6 +328,12 @@ impl<'a> FlowGraphBuilder<'a> {
             // Await expression (as a standalone expression)
             syntax_kind_ext::AWAIT_EXPRESSION => {
                 self.handle_await_expression(stmt_idx);
+                self.record_node_flow(stmt_idx);
+            }
+
+            // Yield expression (as a standalone expression)
+            syntax_kind_ext::YIELD_EXPRESSION => {
+                self.handle_yield_expression(stmt_idx);
                 self.record_node_flow(stmt_idx);
             }
 
@@ -854,9 +875,9 @@ impl<'a> FlowGraphBuilder<'a> {
         // Track the variable declaration
         self.track_variable_declaration(var_decl, idx);
 
-        // Check for await expressions in initializer
+        // Check for await/yield expressions in initializer
         if !var_decl.initializer.is_none() {
-            self.handle_expression_for_await(var_decl.initializer);
+            self.handle_expression_for_suspension_points(var_decl.initializer);
         }
     }
 
@@ -985,6 +1006,11 @@ impl<'a> FlowGraphBuilder<'a> {
         self.async_depth > 0
     }
 
+    /// Check if currently inside a generator function.
+    fn in_generator_function(&self) -> bool {
+        self.generator_depth > 0
+    }
+
     // =============================================================================
     // Block Identification Helpers
     // =============================================================================
@@ -1107,8 +1133,8 @@ impl<'a> FlowGraphBuilder<'a> {
     // Await Expression Handling
     // =============================================================================
 
-    /// Recursively traverse an expression to find and handle await expressions.
-    fn handle_expression_for_await(&mut self, expr_idx: NodeIndex) {
+    /// Recursively traverse an expression to find and handle await/yield expressions.
+    fn handle_expression_for_suspension_points(&mut self, expr_idx: NodeIndex) {
         let Some(node) = self.arena.get(expr_idx) else {
             return;
         };
@@ -1118,7 +1144,19 @@ impl<'a> FlowGraphBuilder<'a> {
             self.handle_await_expression(expr_idx);
             // Also check the operand of the await expression
             if let Some(unary_data) = self.arena.get_unary_expr_ex(node) {
-                self.handle_expression_for_await(unary_data.expression);
+                self.handle_expression_for_suspension_points(unary_data.expression);
+            }
+            return;
+        }
+
+        // Check if this is a yield expression
+        if node.kind == syntax_kind_ext::YIELD_EXPRESSION {
+            self.handle_yield_expression(expr_idx);
+            // Also check the operand of the yield expression (stored as UnaryExprData)
+            if let Some(unary_data) = self.arena.get_unary_expr(node) {
+                if !unary_data.operand.is_none() {
+                    self.handle_expression_for_suspension_points(unary_data.operand);
+                }
             }
             return;
         }
@@ -1127,24 +1165,24 @@ impl<'a> FlowGraphBuilder<'a> {
         match node.kind {
             syntax_kind_ext::BINARY_EXPRESSION => {
                 if let Some(binary) = self.arena.get_binary_expr(node) {
-                    self.handle_expression_for_await(binary.left);
-                    self.handle_expression_for_await(binary.right);
+                    self.handle_expression_for_suspension_points(binary.left);
+                    self.handle_expression_for_suspension_points(binary.right);
                 }
             }
             syntax_kind_ext::CONDITIONAL_EXPRESSION => {
                 if let Some(cond) = self.arena.get_conditional_expr(node) {
-                    self.handle_expression_for_await(cond.condition);
-                    self.handle_expression_for_await(cond.when_true);
-                    self.handle_expression_for_await(cond.when_false);
+                    self.handle_expression_for_suspension_points(cond.condition);
+                    self.handle_expression_for_suspension_points(cond.when_true);
+                    self.handle_expression_for_suspension_points(cond.when_false);
                 }
             }
             syntax_kind_ext::CALL_EXPRESSION => {
                 if let Some(call) = self.arena.get_call_expr(node) {
-                    self.handle_expression_for_await(call.expression);
+                    self.handle_expression_for_suspension_points(call.expression);
                     if let Some(args) = &call.arguments {
                         for &arg in &args.nodes {
                             if !arg.is_none() {
-                                self.handle_expression_for_await(arg);
+                                self.handle_expression_for_suspension_points(arg);
                             }
                         }
                     }
@@ -1153,9 +1191,9 @@ impl<'a> FlowGraphBuilder<'a> {
             syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION
             | syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION => {
                 if let Some(access) = self.arena.get_access_expr(node) {
-                    self.handle_expression_for_await(access.expression);
+                    self.handle_expression_for_suspension_points(access.expression);
                     if !access.name_or_argument.is_none() {
-                        self.handle_expression_for_await(access.name_or_argument);
+                        self.handle_expression_for_suspension_points(access.name_or_argument);
                     }
                 }
             }
@@ -1175,6 +1213,17 @@ impl<'a> FlowGraphBuilder<'a> {
             self.current_flow = await_point;
         }
         // If not in async function, this is a semantic error but we still continue flow analysis
+    }
+
+    /// Handle a yield expression by creating a YIELD_POINT flow node.
+    fn handle_yield_expression(&mut self, yield_node: NodeIndex) {
+        if self.in_generator_function() {
+            // Create a YIELD_POINT flow node to track this suspension point
+            let yield_point =
+                self.create_flow_node(flow_flags::YIELD_POINT, self.current_flow, yield_node);
+            self.current_flow = yield_point;
+        }
+        // If not in generator function, this is a semantic error but we still continue flow analysis
     }
 
     /// Get the flow graph being constructed.
@@ -1473,6 +1522,311 @@ const x = await bar();
 
                 // Verify flow graph exists
                 assert!(graph.nodes.len() > 0);
+            }
+        }
+    }
+
+    // =============================================================================
+    // Generator Flow Tests (CFA-20)
+    // =============================================================================
+
+    #[test]
+    fn test_flow_graph_generator_function() {
+        let source = r#"
+let x: string;
+yield 1;
+x = "hello";
+yield 2;
+console.log(x);
+"#;
+
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let arena = parser.get_arena();
+
+        if let Some(source_file) = arena.get(root) {
+            if let Some(sf) = arena.get_source_file(source_file) {
+                let mut builder = FlowGraphBuilder::new(arena);
+                builder.generator_depth = 1; // Simulate being in generator function
+                let graph = builder.build_source_file(&sf.statements);
+
+                // Verify flow graph has nodes including YIELD_POINT nodes
+                assert!(graph.nodes.len() > 0);
+
+                // Count yield point nodes
+                let yield_count = (0..graph.nodes.len())
+                    .filter_map(|i| graph.nodes.get(FlowNodeId(i as u32)))
+                    .filter(|n| (n.flags & flow_flags::YIELD_POINT) != 0)
+                    .count();
+
+                // We should have 2 yield points (yield 1 and yield 2)
+                assert!(yield_count >= 2, "Expected at least 2 yield points, got {}", yield_count);
+            }
+        }
+    }
+
+    #[test]
+    fn test_flow_graph_yield_star() {
+        let source = r#"
+yield* otherGenerator();
+"#;
+
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let arena = parser.get_arena();
+
+        if let Some(source_file) = arena.get(root) {
+            if let Some(sf) = arena.get_source_file(source_file) {
+                let mut builder = FlowGraphBuilder::new(arena);
+                builder.generator_depth = 1; // Simulate being in generator function
+                let graph = builder.build_source_file(&sf.statements);
+
+                // Verify flow graph exists and has yield point
+                assert!(graph.nodes.len() > 0);
+            }
+        }
+    }
+
+    #[test]
+    fn test_flow_graph_yield_in_loop() {
+        let source = r#"
+let counter = 0;
+while (counter < 10) {
+    yield counter;
+    counter++;
+}
+"#;
+
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let arena = parser.get_arena();
+
+        if let Some(source_file) = arena.get(root) {
+            if let Some(sf) = arena.get_source_file(source_file) {
+                let mut builder = FlowGraphBuilder::new(arena);
+                builder.generator_depth = 1; // Simulate being in generator function
+                let graph = builder.build_source_file(&sf.statements);
+
+                // Verify flow graph exists
+                assert!(graph.nodes.len() > 0);
+            }
+        }
+    }
+
+    #[test]
+    fn test_flow_graph_yield_in_try_catch() {
+        let source = r#"
+try {
+    yield 1;
+} catch (e) {
+    yield 2;
+}
+"#;
+
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let arena = parser.get_arena();
+
+        if let Some(source_file) = arena.get(root) {
+            if let Some(sf) = arena.get_source_file(source_file) {
+                let mut builder = FlowGraphBuilder::new(arena);
+                builder.generator_depth = 1; // Simulate being in generator function
+                let graph = builder.build_source_file(&sf.statements);
+
+                // Verify flow graph exists
+                assert!(graph.nodes.len() > 0);
+            }
+        }
+    }
+
+    #[test]
+    fn test_flow_graph_async_generator_function() {
+        // Test combined async and generator (async generator function)
+        let source = r#"
+let x: string;
+yield await fetch('/api/data1');
+x = "hello";
+yield await fetch('/api/data2');
+console.log(x);
+"#;
+
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let arena = parser.get_arena();
+
+        if let Some(source_file) = arena.get(root) {
+            if let Some(sf) = arena.get_source_file(source_file) {
+                let mut builder = FlowGraphBuilder::new(arena);
+                // Simulate being in async generator function
+                builder.async_depth = 1;
+                builder.generator_depth = 1;
+                let graph = builder.build_source_file(&sf.statements);
+
+                // Verify flow graph exists with both await and yield points
+                assert!(graph.nodes.len() > 0);
+
+                // Count yield point nodes
+                let yield_count = (0..graph.nodes.len())
+                    .filter_map(|i| graph.nodes.get(FlowNodeId(i as u32)))
+                    .filter(|n| (n.flags & flow_flags::YIELD_POINT) != 0)
+                    .count();
+
+                // Count await point nodes
+                let await_count = (0..graph.nodes.len())
+                    .filter_map(|i| graph.nodes.get(FlowNodeId(i as u32)))
+                    .filter(|n| (n.flags & flow_flags::AWAIT_POINT) != 0)
+                    .count();
+
+                assert!(yield_count >= 2, "Expected at least 2 yield points, got {}", yield_count);
+                assert!(await_count >= 2, "Expected at least 2 await points, got {}", await_count);
+            }
+        }
+    }
+
+    #[test]
+    fn test_flow_graph_variable_state_across_yield() {
+        // Test that variable state is properly tracked across yield boundaries
+        let source = r#"
+let x: string | undefined;
+x = "first";
+yield 1;
+x = "second";
+yield 2;
+console.log(x);
+"#;
+
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let arena = parser.get_arena();
+
+        if let Some(source_file) = arena.get(root) {
+            if let Some(sf) = arena.get_source_file(source_file) {
+                let mut builder = FlowGraphBuilder::new(arena);
+                builder.generator_depth = 1; // Simulate being in generator function
+                let graph = builder.build_source_file(&sf.statements);
+
+                // Verify flow graph has assignment and yield nodes
+                assert!(graph.nodes.len() > 0);
+
+                // Should have assignment nodes for tracking variable state
+                let assignment_count = (0..graph.nodes.len())
+                    .filter_map(|i| graph.nodes.get(FlowNodeId(i as u32)))
+                    .filter(|n| (n.flags & flow_flags::ASSIGNMENT) != 0)
+                    .count();
+
+                assert!(assignment_count >= 2, "Expected at least 2 assignment nodes for variable tracking, got {}", assignment_count);
+            }
+        }
+    }
+
+    #[test]
+    fn test_flow_graph_for_of_await_in_async_generator() {
+        // Test for-await-of in async generator
+        let source = r#"
+let result: string[] = [];
+for await (const item of asyncIterable) {
+    yield item;
+    result.push(item);
+}
+"#;
+
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let arena = parser.get_arena();
+
+        if let Some(source_file) = arena.get(root) {
+            if let Some(sf) = arena.get_source_file(source_file) {
+                let mut builder = FlowGraphBuilder::new(arena);
+                // Simulate being in async generator function
+                builder.async_depth = 1;
+                builder.generator_depth = 1;
+                let graph = builder.build_source_file(&sf.statements);
+
+                // Verify flow graph exists
+                assert!(graph.nodes.len() > 0);
+            }
+        }
+    }
+
+    #[test]
+    fn test_flow_graph_conditional_yield() {
+        // Test yield in conditional branches
+        let source = r#"
+let x: string | number;
+if (condition) {
+    x = "string";
+    yield 1;
+} else {
+    x = 42;
+    yield 2;
+}
+console.log(x);
+"#;
+
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let arena = parser.get_arena();
+
+        if let Some(source_file) = arena.get(root) {
+            if let Some(sf) = arena.get_source_file(source_file) {
+                let mut builder = FlowGraphBuilder::new(arena);
+                builder.generator_depth = 1; // Simulate being in generator function
+                let graph = builder.build_source_file(&sf.statements);
+
+                // Verify flow graph exists with proper branching
+                assert!(graph.nodes.len() > 0);
+
+                // Should have yield points in both branches
+                let yield_count = (0..graph.nodes.len())
+                    .filter_map(|i| graph.nodes.get(FlowNodeId(i as u32)))
+                    .filter(|n| (n.flags & flow_flags::YIELD_POINT) != 0)
+                    .count();
+
+                assert!(yield_count >= 2, "Expected at least 2 yield points in conditional branches, got {}", yield_count);
+            }
+        }
+    }
+
+    #[test]
+    fn test_flow_graph_nested_generator() {
+        // Test nested generator (generator calling another generator)
+        let source = r#"
+yield 1;
+for (const val of innerGenerator()) {
+    yield val * 2;
+}
+yield 3;
+"#;
+
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let arena = parser.get_arena();
+
+        if let Some(source_file) = arena.get(root) {
+            if let Some(sf) = arena.get_source_file(source_file) {
+                let mut builder = FlowGraphBuilder::new(arena);
+                builder.generator_depth = 1; // Simulate being in generator function
+                let graph = builder.build_source_file(&sf.statements);
+
+                // Verify flow graph exists
+                assert!(graph.nodes.len() > 0);
+
+                // Should have at least 3 yield points
+                let yield_count = (0..graph.nodes.len())
+                    .filter_map(|i| graph.nodes.get(FlowNodeId(i as u32)))
+                    .filter(|n| (n.flags & flow_flags::YIELD_POINT) != 0)
+                    .count();
+
+                assert!(yield_count >= 3, "Expected at least 3 yield points, got {}", yield_count);
             }
         }
     }

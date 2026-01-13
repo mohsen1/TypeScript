@@ -424,6 +424,7 @@ pub mod flow_flags {
     pub const REDUCE_LABEL: u32 = 1 << 10; // Reduce label
     pub const REFERENCED: u32 = 1 << 11; // Referenced
     pub const AWAIT_POINT: u32 = 1 << 12; // Await expression (suspension point)
+    pub const YIELD_POINT: u32 = 1 << 13; // Yield expression (generator suspension point)
 
     // Composite flags
     pub const LABEL: u32 = BRANCH_LABEL | LOOP_LABEL;
