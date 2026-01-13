@@ -1,22 +1,22 @@
 # Worker 7 Task List - Solver Squad
 
 ## Current Task
-- [ ] **SOLV-18: Fix tuple type subtyping**
-  - Implement covariant tuple subtyping
-  - Handle tuple length differences correctly
-  - Test: `[number, string]` vs `[number, string, boolean]`
-
-## Queue
 - [ ] **SOLV-19: Strengthen function type variance**
   - Implement proper contravariance for parameter types
   - Handle function type assignability correctly
   - Test: `(x: number) => void` vs `(x: string | number) => void`
+
+## Queue
 - [ ] **SOLV-20: Add solver integration tests**
   - Create comprehensive test suite for solver strictness
   - Verify TS2322 and TS7006 error counts improve
   - Goal: Convert missing TS2322 errors to exact matches
 
 ## Completed
+- [x] **SOLV-18: Fix tuple type subtyping**
+  - Implemented covariant tuple subtyping
+  - Handled tuple length differences correctly
+  - Tested `[number, string]` vs `[number, string, boolean]`
 - [x] **SOLV-15: Implement strict subtyping for generic types**
   - Modified erase_placeholders_for_inference to use constraint when available
   - No longer bail to Any when generic parameters have constraints
