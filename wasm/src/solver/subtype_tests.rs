@@ -18705,6 +18705,7 @@ fn test_variance_method_bivariant_params() {
                     type_id: TypeId::STRING,
                     optional: false,
                     rest: false,
+                    ..Default::default()
                 }],
                 this_type: None,
                 return_type: TypeId::VOID,
@@ -18734,6 +18735,7 @@ fn test_variance_method_bivariant_params() {
                     type_id: wide_type,
                     optional: false,
                     rest: false,
+                    ..Default::default()
                 }],
                 this_type: None,
                 return_type: TypeId::VOID,
@@ -19787,6 +19789,7 @@ fn test_this_parameter_in_callable_method() {
             optional: false,
             readonly: false,
             is_method: true,
+            ..Default::default()
         }],
         string_index: None,
         number_index: None,
@@ -19813,6 +19816,7 @@ fn test_this_parameter_in_callable_method() {
             optional: false,
             readonly: false,
             is_method: true,
+            ..Default::default()
         }],
         string_index: None,
         number_index: None,
@@ -23565,15 +23569,18 @@ fn test_this_type_with_this_constraint() {
     // method<T extends MyClass>(this: T): T
     let interner = TypeInterner::new();
 
-    let t_info = TypeParamInfo {
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
         name: interner.intern_string("T"),
         constraint: Some(interner.reference(SymbolRef(1))),
         default: None,
-    };
-    let t_param = interner.intern(TypeKey::TypeParameter(t_info.clone()));
+    }));
 
     let constrained_method = interner.function(FunctionShape {
-        type_params: vec![t_info],
+        type_params: vec![TypeParamInfo {
+            name: interner.intern_string("T"),
+            constraint: Some(interner.reference(SymbolRef(1))),
+            default: None,
+        }],
         params: vec![],
         this_type: Some(t_param),
         return_type: t_param,
@@ -23667,15 +23674,14 @@ fn test_this_type_with_generic_method() {
     let interner = TypeInterner::new();
 
     let this_type = interner.intern(TypeKey::ThisType);
-    let t_info = TypeParamInfo {
-        name: interner.intern_string("T"),
-        constraint: None,
-        default: None,
-    };
-    let t_ref = interner.intern(TypeKey::TypeParameter(t_info.clone()));
+    let t_ref = interner.reference(SymbolRef(50));
 
     let generic_fluent = interner.function(FunctionShape {
-        type_params: vec![t_info],
+        type_params: vec![TypeParamInfo {
+            name: interner.intern_string("T"),
+            constraint: None,
+            default: None,
+        }],
         params: vec![ParamInfo {
             name: Some(interner.intern_string("value")),
             type_id: t_ref,
@@ -23833,8 +23839,18 @@ fn test_this_type_in_tuple() {
 
     let this_type = interner.intern(TypeKey::ThisType);
     let tuple_with_this = interner.tuple(vec![
-        TupleElement { type_id: this_type, name: None, optional: false, rest: false },
-        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement {
+            type_id: this_type,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
     ]);
 
     assert!(tuple_with_this != TypeId::ERROR);
@@ -23846,12 +23862,7 @@ fn test_this_type_map_method() {
     let interner = TypeInterner::new();
 
     let this_type = interner.intern(TypeKey::ThisType);
-    let u_info = TypeParamInfo {
-        name: interner.intern_string("U"),
-        constraint: None,
-        default: None,
-    };
-    let u_ref = interner.intern(TypeKey::TypeParameter(u_info.clone()));
+    let u_ref = interner.reference(SymbolRef(50));
 
     let mapper_fn = interner.function(FunctionShape {
         type_params: vec![],
@@ -23869,7 +23880,11 @@ fn test_this_type_map_method() {
     });
 
     let map_method = interner.function(FunctionShape {
-        type_params: vec![u_info],
+        type_params: vec![TypeParamInfo {
+            name: interner.intern_string("U"),
+            constraint: None,
+            default: None,
+        }],
         params: vec![ParamInfo {
             name: Some(interner.intern_string("fn")),
             type_id: mapper_fn,
