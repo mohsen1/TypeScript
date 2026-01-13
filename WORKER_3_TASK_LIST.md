@@ -29,3 +29,9 @@
   - Called `FlowGraphBuilder` after binding phase
   - Added `check_flow_usage` method to query the graph
   - Stored FlowGraph reference in TypeCheck context
+- [x] **CFA-6: Handle try/catch/finally flow**
+  - Verified try/catch/finally flow edges in FlowGraphBuilder are correct
+  - Tracked variable state across catch blocks
+  - Ensured finally blocks affect all exit paths
+  - Tested: `let x; try { x = 1; } finally { } console.log(x);`
+  - Coordinated with Worker 2 on FlowGraphBuilder implementation
