@@ -1,7 +1,7 @@
 # Worker 10 Task List - Solver Squad
 
 ## Current Task
-- [ ] **SOLV-38: Add optional chaining type checking**
+- [x] **SOLV-38: Add optional chaining type checking**
   - Implement `obj?.prop` type checking
   - Handle `obj?.method()` return types
   - Test optional chaining with null/undefined
