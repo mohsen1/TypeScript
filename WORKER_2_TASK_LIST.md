@@ -1,15 +1,16 @@
 # Worker 2 Task List - CFA Squad
 
 ## Current Task
-- [ ] **CFA-20: Add support for async generators**
+All tasks completed!
+
+## Queue
+(none)
+
+## Completed
+- [x] **CFA-20: Add support for async generators**
   - Handle async generator functions with yield/await
   - Track variable state through async generator control flow
   - Test complex async generator scenarios
-
-## Queue
-(none - await new task assignment)
-
-## Completed
 - [x] **CFA-19: Test callback closure flow tracking**
   - Added 12 comprehensive tests for closure/callback flow tracking
   - Tested variable capture in arrow functions and callbacks
