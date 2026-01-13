@@ -11,25 +11,26 @@
 
 The architectural foundation (Data-Oriented Design, ThinNodes, SoA) is proving to be fast and memory-efficient. We have a high-performance compiler infrastructure that runs well in WASM. However, semantically, we are **too permissive**—an "optimistic" compiler that accepts code `tsc` rejects because our solver defaults to `Any` when things get hard.
 
-### Current Status: ~30.8% Exact Match
+### Current Status: 30.1% Exact Match
 
-| Metric | Value | Trend |
+| Metric | Value | Notes |
 |--------|-------|-------|
-| **Exact Match** | ~30.8% | ↑ from 23.4% |
-| **Missing Errors** | ~57.8% | ↓ from 68.2% |
-| **Performance** | Excellent | ✓ |
-| **Stability** | Good | ✓ |
+| **Exact Match** | 30.1% | 1488/4939 tests |
+| **Missing Errors** | 60.0% | 2961 tests - compiler too permissive |
+| **Extra Errors** | 30.9% | 1528 tests - false positives |
+| **Performance** | 41.7 tests/sec | ✓ |
+| **Stability** | Good | 2 crashes (stack overflow) |
 
 ### Component Status Overview
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| **Parser/Scanner** | ✅ Done | ThinNode architecture solid. Error recovery working (92% improvement). |
+| **Parser/Scanner** | 🟠 **Needs Work** | **701 false positive errors** (TS1005 + TS1109) polluting measurements. |
 | **Emitter** | ✅ Done | Fast, Source Maps work, ES6→ES5 downleveling complete. |
 | **LSP** | ✅ Working | Go-to-def, Rename, Hover, Semantic Tokens via ScopeWalker. |
-| **CFA** | 🟡 Just Landed | **Major win.** 84% reduction in TS2454, 96% in TS2564. Needs edge-case polish. |
-| **Binder** | 🟠 In Progress | Persistent scopes work. Global symbol resolution (`lib.d.ts`) still flaky. |
-| **Solver** | 🟠 Refactoring | Switching default fallback from `Any` to `Unknown` to expose bugs. |
+| **CFA** | 🟡 Partial | Landed but TS2564 still #1 missing (413), TS2454 still has 225 extra. |
+| **Binder** | 🔴 Critical | TS2304 is both missing (116) AND extra (343). Error poisoning. |
+| **Solver** | 🟠 In Progress | Switching default fallback from `Any` to `Unknown` to expose bugs. |
 
 ---
 
@@ -43,12 +44,18 @@ The biggest enemy is **Error Poisoning**. When the Binder fails to find `Promise
 
 ### Squad Directives
 
-#### 1. Control Flow Analysis (CFA) - The "Flow Graph" Squad ✅ MAJOR PROGRESS
+#### 0. Parser/Scanner - The "Syntax" Squad 🟠 NEW PRIORITY
+*   **Problem:** **701 false positive errors** (TS1005: 439, TS1109: 262) polluting all measurements.
+*   **Impact:** These parser errors mask real progress and inflate "Extra Errors" by 14%.
+*   **Directive:** Fix parser error emission.
+    *   Audit TS1005 ("expected X") emission - likely over-triggering on valid syntax.
+    *   Audit TS1109 ("expression expected") - false positives on edge cases.
+    *   **Goal:** Reduce parser false positives to <100.
+
+#### 1. Control Flow Analysis (CFA) - The "Flow Graph" Squad 🟡 PARTIAL
 *   **Status:** Flow Graph Side-Table implemented and landed.
-*   **Results:**
-    *   TS2454 (Variable used before assigned): **84% reduction**
-    *   TS2564 (Property not initialized): **96% reduction**
-*   **Remaining Work:** Edge-case polish, complex control flow patterns.
+*   **Reality Check:** TS2564 is still the #1 missing error (413 occurrences). TS2454 has 225 extra errors.
+*   **Remaining Work:** The framework is in place, but edge cases need significant work.
 
 #### 2. Binding & Scope Resolution - The "Binder" Squad 🔴 CRITICAL
 *   **Problem:** **TS2304** (Cannot find name) remains the #1 source of error poisoning.
@@ -87,9 +94,10 @@ The biggest enemy is **Error Poisoning**. When the Binder fails to find `Promise
 
 ### Resource Allocation (10 Engineers)
 
-*   **CFA Squad (2):** Edge-case polish, complex control flow patterns. *(reduced from 3 after major milestone)*
-*   **Binder Squad (4):** Scope resolution, `lib.d.ts` integration, module resolution. *(increased - this is the critical path)*
-*   **Solver Squad (4):** Subtyping logic, generic inference, error message parity.
+*   **Parser Squad (2):** Fix TS1005/TS1109 false positives. *(new - unblocks accurate measurement)*
+*   **CFA Squad (1):** Edge-case polish for TS2564/TS2454. *(reduced - framework done, needs polish)*
+*   **Binder Squad (4):** Scope resolution, `lib.d.ts` integration, module resolution. *(critical path)*
+*   **Solver Squad (3):** Subtyping logic, generic inference, error message parity.
 
 ---
 
@@ -97,9 +105,10 @@ The biggest enemy is **Error Poisoning**. When the Binder fails to find `Promise
 
 | Metric | Current | Target |
 |--------|---------|--------|
-| **Exact Match** | ~30.8% | **40%** |
-| **Missing Errors** | ~57.8% | **<35%** |
-| **TS2304 extra errors** | High | **<50** |
+| **Exact Match** | 30.1% | **40%** |
+| **Missing Errors** | 60.0% | **<50%** |
+| **Parser false positives** | 701 | **<100** |
+| **TS2304 extra errors** | 343 | **<50** |
 
 ---
 
