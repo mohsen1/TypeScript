@@ -1,11 +1,6 @@
 # Worker 10 Task List - Solver Squad
 
 ## Current Task
-- [ ] **SOLV-26: Add readonly modifier handling**
-  - Implement readonly property type checking
-  - Ensure readonly is covariant (can assign readonly to mutable)
-  - Test: `readonly x: number` vs `x: number` assignability
-  - Coordinate with Worker 9 on intersection types
 - [ ] **SOLV-37: Implement discriminated union narrowing**
   - Narrow union types based on discriminant property
   - Test: `type Shape = { kind: "circle", radius: number } | { kind: "square", side: number }`
@@ -21,7 +16,15 @@
   - Verify Unknown fallback doesn't conflict with fixed global scope
   - Test end-to-end type checking with all improvements integrated
 
+## Queue
+(none yet)
+
 ## Completed
+- [x] **SOLV-26: Add readonly modifier handling**
+  - Implement readonly property type checking
+  - Ensure readonly is covariant (can assign readonly to mutable)
+  - Test: `readonly x: number` vs `x: number` assignability
+  - Coordinate with Worker 9 on intersection types
 - [x] **SOLV-25: Test discriminated union type checking**
   - Expanded Section 20 with comprehensive discriminated union tests
   - Added if statement narrowing tests
