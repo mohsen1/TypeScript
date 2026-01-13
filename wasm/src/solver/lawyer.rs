@@ -30,7 +30,7 @@ pub struct AnyPropagationRules {
     /// Whether to allow `any` to silence structural mismatches.
     /// When false, `any` is treated more strictly and structural errors
     /// are still reported even when `any` is involved.
-    allow_any_suppression: bool,
+    pub(crate) allow_any_suppression: bool,
 }
 
 impl AnyPropagationRules {
