@@ -1,11 +1,7 @@
 # Worker 7 Task List - Solver Squad
 
 ## Current Task
-- [ ] **SOLV-15: Implement strict subtyping for generic types**
-  - Don't bail to Any when generic parameters are complex
-  - Add proper constraint checking in solve_subtype
-  - Handle generic instantiation with unknown type arguments
-  - Coordinate with Worker 8 on generic parameter checking
+- [ ] No current task assigned
 
 ## Queue
 - [ ] **SOLV-18: Fix tuple type subtyping**
@@ -22,6 +18,11 @@
   - Goal: Convert missing TS2322 errors to exact matches
 
 ## Completed
+- [x] **SOLV-15: Implement strict subtyping for generic types**
+  - Modified erase_placeholders_for_inference to use constraint when available
+  - No longer bail to Any when generic parameters have constraints
+  - Proper constraint checking during generic type instantiation
+  - Maintained existing behavior for unconstrained type parameters
 - [x] **SOLV-14: Integrate Lawyer layer into CompatChecker**
   - Added AnyPropagationRules field to CompatChecker struct
   - Integrated Lawyer layer into both constructors (new, with_resolver)
