@@ -7,6 +7,11 @@ All CFA edge case tasks completed!
 (none yet)
 
 ## Completed
+- [x] **CFA-28: Enable strict mode by default for type checking**
+  - Changed `let strict = false` to `let strict = true` in lib.rs
+  - Enables proper TS2454 (variable used before assigned) detection
+  - Required for conformance with TypeScript's strict mode behavior
+  - Affects checkSourceFile(), getTypeOfNode(), and getLspDiagnostics()
 - [x] **CFA-27: Add class heritage clause CFA**
   - Added `find_enclosing_heritage_clause` helper to detect if code is inside an extends/implements clause
   - Added `find_class_for_heritage_clause` helper to get the enclosing class/interface
