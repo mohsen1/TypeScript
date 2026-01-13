@@ -878,6 +878,7 @@ impl<'a> ThinCheckerState<'a> {
             call_signatures: shape.call_signatures.clone(),
             construct_signatures: shape.construct_signatures.clone(),
             properties,
+            ..Default::default()
         })
     }
 
@@ -1826,6 +1827,8 @@ impl<'a> ThinCheckerState<'a> {
                 call_signatures,
                 construct_signatures,
                 properties,
+                string_index,
+                number_index,
             });
         }
 
@@ -2050,6 +2053,8 @@ impl<'a> ThinCheckerState<'a> {
                 call_signatures,
                 construct_signatures,
                 properties,
+                string_index,
+                number_index,
             };
             self.ctx.types.callable(shape)
         } else if string_index.is_some() || number_index.is_some() {
@@ -2247,6 +2252,7 @@ impl<'a> ThinCheckerState<'a> {
                     call_signatures,
                     construct_signatures,
                     properties,
+                    ..Default::default()
                 })
             }
             (Some(TypeKey::Callable(derived_shape_id)), Some(TypeKey::Object(base_shape_id))) => {
@@ -2257,6 +2263,7 @@ impl<'a> ThinCheckerState<'a> {
                     call_signatures: derived_shape.call_signatures.clone(),
                     construct_signatures: derived_shape.construct_signatures.clone(),
                     properties,
+                    ..Default::default()
                 })
             }
             (Some(TypeKey::Callable(derived_shape_id)), Some(TypeKey::ObjectWithIndex(base_shape_id))) => {
@@ -2267,6 +2274,7 @@ impl<'a> ThinCheckerState<'a> {
                     call_signatures: derived_shape.call_signatures.clone(),
                     construct_signatures: derived_shape.construct_signatures.clone(),
                     properties,
+                    ..Default::default()
                 })
             }
             (Some(TypeKey::Object(derived_shape_id)), Some(TypeKey::Callable(base_shape_id))) => {
@@ -2277,6 +2285,7 @@ impl<'a> ThinCheckerState<'a> {
                     call_signatures: base_shape.call_signatures.clone(),
                     construct_signatures: base_shape.construct_signatures.clone(),
                     properties,
+                    ..Default::default()
                 })
             }
             (Some(TypeKey::ObjectWithIndex(derived_shape_id)), Some(TypeKey::Callable(base_shape_id))) => {
@@ -2287,6 +2296,7 @@ impl<'a> ThinCheckerState<'a> {
                     call_signatures: base_shape.call_signatures.clone(),
                     construct_signatures: base_shape.construct_signatures.clone(),
                     properties,
+                    ..Default::default()
                 })
             }
             (Some(TypeKey::Object(derived_shape_id)), Some(TypeKey::Object(base_shape_id))) => {
@@ -2916,6 +2926,7 @@ impl<'a> ThinCheckerState<'a> {
                 call_signatures: signatures,
                 construct_signatures: Vec::new(),
                 properties: Vec::new(),
+                ..Default::default()
             });
             properties.insert(name, PropertyInfo {
                 name,
@@ -3415,6 +3426,7 @@ impl<'a> ThinCheckerState<'a> {
                 call_signatures: signatures,
                 construct_signatures: Vec::new(),
                 properties: Vec::new(),
+                ..Default::default()
             });
             properties.insert(name, PropertyInfo {
                 name,
@@ -3591,6 +3603,7 @@ impl<'a> ThinCheckerState<'a> {
             call_signatures: Vec::new(),
             construct_signatures,
             properties,
+            ..Default::default()
         });
 
         if let Some(level) = constructor_access {
@@ -3752,6 +3765,7 @@ impl<'a> ThinCheckerState<'a> {
             call_signatures: vec![call_signature],
             construct_signatures: Vec::new(),
             properties,
+            ..Default::default()
         })
     }
 
@@ -4170,6 +4184,7 @@ impl<'a> ThinCheckerState<'a> {
                     call_signatures: overloads,
                     construct_signatures: Vec::new(),
                     properties: Vec::new(),
+                    ..Default::default()
                 };
                 return (self.ctx.types.callable(shape), Vec::new());
             }
@@ -4979,6 +4994,7 @@ impl<'a> ThinCheckerState<'a> {
                         call_signatures: shape.construct_signatures.clone(),
                         construct_signatures: Vec::new(),
                         properties: Vec::new(),
+                        ..Default::default()
                     }))
                 }
             }
@@ -8033,6 +8049,7 @@ impl<'a> ThinCheckerState<'a> {
                         call_signatures,
                         construct_signatures,
                         properties,
+                        ..Default::default()
                     })
                 } else {
                     type_id
