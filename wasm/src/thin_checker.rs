@@ -2008,11 +2008,11 @@ impl<'a> ThinCheckerState<'a> {
     /// Returns the type of the rightmost member, or reports TS2694 if not found.
     fn resolve_qualified_name(&mut self, idx: NodeIndex) -> TypeId {
         let Some(node) = self.ctx.arena.get(idx) else {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Missing node - propagate error
         };
 
         let Some(qn) = self.ctx.arena.get_qualified_name(node) else {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Missing qualified name data - propagate error
         };
 
         // Resolve the left side (could be Identifier or another QualifiedName)
@@ -2023,14 +2023,14 @@ impl<'a> ThinCheckerState<'a> {
                 // Resolve identifier as a type reference
                 self.get_type_from_type_reference_by_name(qn.left)
             } else {
-                TypeId::ANY
+                TypeId::ERROR // Unknown node kind - propagate error
             }
         } else {
-            TypeId::ANY
+            TypeId::ERROR // Missing left node - propagate error
         };
 
         if left_type == TypeId::ANY || left_type == TypeId::ERROR {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Propagate error from left side
         }
 
         // Get the right side name (B in A.B)
@@ -2038,10 +2038,10 @@ impl<'a> ThinCheckerState<'a> {
             if let Some(id) = self.ctx.arena.get_identifier(right_node) {
                 id.escaped_text.clone()
             } else {
-                return TypeId::ANY;
+                return TypeId::ERROR; // Missing identifier data - propagate error
             }
         } else {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Missing right node - propagate error
         };
 
         // First, try to resolve the left side as a symbol and check its exports.
@@ -2119,7 +2119,7 @@ impl<'a> ThinCheckerState<'a> {
     /// Helper to resolve an identifier as a type reference (for qualified name left sides).
     fn get_type_from_type_reference_by_name(&mut self, idx: NodeIndex) -> TypeId {
         let Some(node) = self.ctx.arena.get(idx) else {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Missing node - propagate error
         };
 
         if let Some(ident) = self.ctx.arena.get_identifier(node) {
@@ -2134,13 +2134,13 @@ impl<'a> ThinCheckerState<'a> {
             return TypeId::ERROR;
         }
 
-        TypeId::ANY
+        TypeId::ERROR // Not an identifier - propagate error
     }
 
     /// Get type from a union type node (A | B).
     fn get_type_from_union_type(&mut self, idx: NodeIndex) -> TypeId {
         let Some(node) = self.ctx.arena.get(idx) else {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Missing node - propagate error
         };
 
         // UnionType uses CompositeTypeData which has a types list
@@ -2161,13 +2161,13 @@ impl<'a> ThinCheckerState<'a> {
             return self.ctx.types.union(member_types);
         }
 
-        TypeId::ANY
+        TypeId::ERROR // Missing composite type data - propagate error
     }
 
     /// Get type from an intersection type node (A & B).
     fn get_type_from_intersection_type(&mut self, idx: NodeIndex) -> TypeId {
         let Some(node) = self.ctx.arena.get(idx) else {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Missing node - propagate error
         };
 
         // IntersectionType uses CompositeTypeData which has a types list
@@ -2179,7 +2179,7 @@ impl<'a> ThinCheckerState<'a> {
             }
 
             if member_types.is_empty() {
-                return TypeId::ANY;
+                return TypeId::UNKNOWN; // Empty intersection is unknown
             }
             if member_types.len() == 1 {
                 return member_types[0];
@@ -2188,7 +2188,7 @@ impl<'a> ThinCheckerState<'a> {
             return self.ctx.types.intersection(member_types);
         }
 
-        TypeId::ANY
+        TypeId::ERROR // Missing composite type data - propagate error
     }
 
     /// Get type from a type query node (typeof X).
@@ -2198,11 +2198,11 @@ impl<'a> ThinCheckerState<'a> {
         use crate::solver::{SymbolRef, TypeKey};
 
         let Some(node) = self.ctx.arena.get(idx) else {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Missing node - propagate error
         };
 
         let Some(type_query) = self.ctx.arena.get_type_query(node) else {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Missing type query data - propagate error
         };
 
         let name_text = self.entity_name_text(type_query.expr_name);
