@@ -5,6 +5,8 @@
   - Handle async generator functions with yield/await
   - Track variable state through async generator control flow
   - Test complex async generator scenarios
+
+## Queue
 - [ ] **CFA-26: Fix destructuring pattern definite assignment**
   - Analyze nested destructuring: `const { a: { b } } = obj;`
   - Handle array destructuring with defaults: `const [x = 1] = arr;`
@@ -19,9 +21,6 @@
   - Emit TS2448 error for TDZ violations
   - Test: `console.log(x); let x;` should error
   - Verify TDZ works with block scoping and loops
-
-## Queue
-(none - await new task assignment)
 
 ## Completed
 - [x] **CFA-19: Test callback closure flow tracking**
