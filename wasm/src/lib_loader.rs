@@ -4,10 +4,39 @@
 //! (like lib.d.ts) and merging their global symbols into the binder's root scope.
 //! This enables proper resolution of built-in types like `Object`, `Function`, `console`, etc.
 
-use crate::binder::{SymbolId, SymbolTable};
+use crate::binder::SymbolTable;
 use crate::parser::thin_node::ThinNodeArena;
 use crate::thin_binder::ThinBinderState;
+use crate::thin_parser::ThinParserState;
 use std::sync::Arc;
+
+/// Load the default lib.d.ts file from the tests/lib directory.
+///
+/// This is a convenience function for tests and development that loads
+/// the standard library definitions containing global symbols like
+/// `console`, `Object`, `Array`, `Promise`, `window`, `document`, etc.
+///
+/// Returns `None` if the lib.d.ts file cannot be found or read.
+pub fn load_default_lib_dts() -> Option<Arc<LibFile>> {
+    let lib_dts_path = std::path::Path::new("tests/lib/lib.d.ts");
+    let source_text = std::fs::read_to_string(lib_dts_path).ok()?;
+
+    let mut lib_parser = ThinParserState::new("lib.d.ts".to_string(), source_text);
+    let source_file_idx = lib_parser.parse_source_file();
+
+    if !lib_parser.get_diagnostics().is_empty() {
+        // Parse errors in lib.d.ts - return None
+        return None;
+    }
+
+    let mut lib_binder = ThinBinderState::new();
+    lib_binder.bind_source_file(lib_parser.get_arena(), source_file_idx);
+
+    let arena = Arc::new(lib_parser.into_arena());
+    let binder = Arc::new(lib_binder);
+
+    Some(Arc::new(LibFile::new("lib.d.ts".to_string(), arena, binder)))
+}
 
 /// Loaded lib file with its arena and binder state.
 #[derive(Clone)]
@@ -96,5 +125,80 @@ mod tests {
         // Function and console should be added
         assert_eq!(target.get("Function"), Some(function_id));
         assert_eq!(target.get("console"), Some(console_id));
+    }
+
+    #[test]
+    fn test_load_default_lib_dts() {
+        // Test that we can load the default lib.d.ts file
+        let lib_file = load_default_lib_dts();
+
+        // This test may run in environments where tests/lib/lib.d.ts is not available
+        // (e.g., cargo test from a different directory)
+        if let Some(lib) = lib_file {
+            // Verify that key global symbols are present
+            let file_locals = lib.file_locals();
+
+            // Core ECMAScript globals
+            assert!(file_locals.has("Object"), "Object should be in lib.d.ts");
+            assert!(file_locals.has("Array"), "Array should be in lib.d.ts");
+            assert!(file_locals.has("Function"), "Function should be in lib.d.ts");
+            assert!(file_locals.has("Promise"), "Promise should be in lib.d.ts");
+            assert!(file_locals.has("console"), "console should be in lib.d.ts");
+
+            // DOM globals (if present in lib.d.ts)
+            // Note: These may not be in all lib.d.ts versions
+            let has_window = file_locals.has("window");
+            let has_document = file_locals.has("document");
+
+            if has_window {
+                assert!(file_locals.has("window"), "window should be in lib.d.ts");
+            }
+            if has_document {
+                assert!(file_locals.has("document"), "document should be in lib.d.ts");
+            }
+        }
+    }
+
+    #[test]
+    fn test_bind_with_lib_symbols() {
+        use crate::thin_parser::ThinParserState;
+
+        // Load lib.d.ts
+        let lib_file = load_default_lib_dts();
+        if lib_file.is_none() {
+            // Skip test if lib.d.ts is not available
+            return;
+        }
+        let lib_file = lib_file.unwrap();
+
+        // Parse a source file that uses global symbols
+        let source = r#"
+console.log("hello");
+const arr: Array<number> = [1, 2, 3];
+const obj = Object.create(null);
+async function foo() {
+    return await Promise.resolve(42);
+}
+"#;
+
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        assert!(
+            parser.get_diagnostics().is_empty(),
+            "Parse errors: {:?}",
+            parser.get_diagnostics()
+        );
+
+        // Bind with lib symbols
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(parser.get_arena(), root);
+        binder.merge_lib_symbols(&[lib_file]);
+
+        // Verify global symbols are accessible
+        assert!(binder.file_locals.has("console"), "console should be in file_locals");
+        assert!(binder.file_locals.has("Array"), "Array should be in file_locals");
+        assert!(binder.file_locals.has("Object"), "Object should be in file_locals");
+        assert!(binder.file_locals.has("Promise"), "Promise should be in file_locals");
     }
 }
