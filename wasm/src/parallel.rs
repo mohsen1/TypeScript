@@ -272,11 +272,67 @@ pub struct MergedProgram {
     pub type_interner: TypeInterner,
 }
 
+/// Check if two symbols can be merged across multiple files.
+///
+/// TypeScript allows merging:
+/// - Interface + Interface (declaration merging)
+/// - Namespace + Namespace (declaration merging)
+/// - Class + Interface (merging for class declarations)
+/// - Function + Function (overloads - handled per-file)
+fn can_merge_symbols_cross_file(existing_flags: u32, new_flags: u32) -> bool {
+    use crate::binder::symbol_flags;
+
+    // Interface can merge with interface
+    if (existing_flags & symbol_flags::INTERFACE) != 0
+        && (new_flags & symbol_flags::INTERFACE) != 0
+    {
+        return true;
+    }
+
+    // Class can merge with interface
+    if ((existing_flags & symbol_flags::CLASS) != 0
+        && (new_flags & symbol_flags::INTERFACE) != 0)
+        || ((existing_flags & symbol_flags::INTERFACE) != 0
+            && (new_flags & symbol_flags::CLASS) != 0)
+    {
+        return true;
+    }
+
+    // Namespace/module can merge with namespace/module
+    if (existing_flags & symbol_flags::MODULE) != 0 && (new_flags & symbol_flags::MODULE) != 0 {
+        return true;
+    }
+
+    // Namespace can merge with class, function, or enum
+    if (existing_flags & symbol_flags::MODULE) != 0 {
+        if (new_flags & (symbol_flags::CLASS | symbol_flags::FUNCTION | symbol_flags::ENUM))
+            != 0
+        {
+            return true;
+        }
+    }
+    if (new_flags & symbol_flags::MODULE) != 0 {
+        if (existing_flags
+            & (symbol_flags::CLASS | symbol_flags::FUNCTION | symbol_flags::ENUM))
+            != 0
+        {
+            return true;
+        }
+    }
+
+    // Enum can merge with enum
+    if (existing_flags & symbol_flags::ENUM) != 0 && (new_flags & symbol_flags::ENUM) != 0 {
+        return true;
+    }
+
+    false
+}
+
 /// Merge bind results into a unified program state
 ///
 /// This is a sequential operation that combines:
 /// - All symbol arenas into a single global arena
-/// - All file_locals into the global scope (for now, simple merge)
+/// - Merges symbols with the same name across files (for interfaces, namespaces, etc.)
 /// - Remaps symbol IDs in node_symbols to use global IDs
 ///
 /// # Arguments
@@ -290,6 +346,8 @@ pub fn merge_bind_results(results: Vec<BindResult>) -> MergedProgram {
 }
 
 pub fn merge_bind_results_ref(results: &[&BindResult]) -> MergedProgram {
+    use crate::binder::symbol_flags;
+
     // Calculate total symbols needed
     let total_symbols: usize = results.iter().map(|r| r.symbols.len()).sum();
 
@@ -301,6 +359,9 @@ pub fn merge_bind_results_ref(results: &[&BindResult]) -> MergedProgram {
     let mut file_locals_list = Vec::with_capacity(results.len());
     let mut declared_modules = FxHashSet::default();
 
+    // Track which symbols have been merged to avoid duplicate processing
+    let mut merged_symbols: FxHashMap<String, SymbolId> = FxHashMap::default();
+
     for result in results {
         declared_modules.extend(result.declared_modules.iter().cloned());
         // Copy symbols from this file to global arena, getting new IDs
@@ -308,9 +369,36 @@ pub fn merge_bind_results_ref(results: &[&BindResult]) -> MergedProgram {
         for i in 0..result.symbols.len() {
             let old_id = SymbolId(i as u32);
             if let Some(sym) = result.symbols.get(old_id) {
-                let new_id = global_symbols.alloc(sym.flags, sym.escaped_name.clone());
+                // Check if symbol already exists in globals (cross-file merging)
+                let new_id = if let Some(&existing_id) = merged_symbols.get(&sym.escaped_name) {
+                    // Symbol exists - check if we can merge
+                    if let Some(existing_sym) = global_symbols.get(existing_id) {
+                        // Check if symbols can merge (interface+interface, namespace+namespace, etc.)
+                        if can_merge_symbols_cross_file(existing_sym.flags, sym.flags) {
+                            // Merge: reuse existing symbol ID, will merge declarations below
+                            existing_id
+                        } else {
+                            // Cannot merge - allocate new symbol (shadowing or duplicate)
+                            let new_id = global_symbols.alloc(sym.flags, sym.escaped_name.clone());
+                            symbol_arenas.insert(new_id, Arc::clone(&result.arena));
+                            merged_symbols.insert(sym.escaped_name.clone(), new_id);
+                            new_id
+                        }
+                    } else {
+                        // Shouldn't happen - allocate new
+                        let new_id = global_symbols.alloc(sym.flags, sym.escaped_name.clone());
+                        symbol_arenas.insert(new_id, Arc::clone(&result.arena));
+                        merged_symbols.insert(sym.escaped_name.clone(), new_id);
+                        new_id
+                    }
+                } else {
+                    // New symbol - allocate
+                    let new_id = global_symbols.alloc(sym.flags, sym.escaped_name.clone());
+                    symbol_arenas.insert(new_id, Arc::clone(&result.arena));
+                    merged_symbols.insert(sym.escaped_name.clone(), new_id);
+                    new_id
+                };
                 id_remap.insert(old_id, new_id);
-                symbol_arenas.insert(new_id, Arc::clone(&result.arena));
             }
         }
 
@@ -330,24 +418,70 @@ pub fn merge_bind_results_ref(results: &[&BindResult]) -> MergedProgram {
                 continue;
             };
             if let Some(new_sym) = global_symbols.get_mut(new_id) {
-                let mut updated = old_sym.clone();
-                updated.id = new_id;
-                updated.parent = id_remap
-                    .get(&old_sym.parent)
-                    .copied()
-                    .unwrap_or(SymbolId::NONE);
-                updated.value_declaration = old_sym.value_declaration;
-                updated.declarations = old_sym.declarations.clone();
-                updated.is_exported = old_sym.is_exported;
-                updated.exports = old_sym
-                    .exports
-                    .as_ref()
-                    .map(|table| Box::new(remap_symbol_table(table.as_ref(), &id_remap)));
-                updated.members = old_sym
-                    .members
-                    .as_ref()
-                    .map(|table| Box::new(remap_symbol_table(table.as_ref(), &id_remap)));
-                *new_sym = updated;
+                // Check if this is a cross-file merge (same symbol already has data)
+                let is_cross_file_merge = !new_sym.declarations.is_empty()
+                    && new_sym.declarations != old_sym.declarations;
+
+                if is_cross_file_merge {
+                    // Cross-file merge: append declarations and merge flags
+                    new_sym.flags |= old_sym.flags;
+                    // Append new declarations from this file
+                    for decl in &old_sym.declarations {
+                        if !new_sym.declarations.contains(decl) {
+                            new_sym.declarations.push(*decl);
+                        }
+                    }
+                    // Update value_declaration if the old one was NONE
+                    if new_sym.value_declaration.is_none() && !old_sym.value_declaration.is_none() {
+                        new_sym.value_declaration = old_sym.value_declaration;
+                    }
+                    // Merge exports (if both have exports)
+                    if let (Some(old_exports), Some(new_exports)) =
+                        (old_sym.exports.as_ref(), new_sym.exports.as_mut())
+                    {
+                        for (name, sym_id) in old_exports.iter() {
+                            if !new_exports.has(name) {
+                                // Remap the symbol ID and add to exports
+                                if let Some(&remapped_id) = id_remap.get(sym_id) {
+                                    new_exports.set(name.clone(), remapped_id);
+                                }
+                            }
+                        }
+                    }
+                    // Merge members (if both have members)
+                    if let (Some(old_members), Some(new_members)) =
+                        (old_sym.members.as_ref(), new_sym.members.as_mut())
+                    {
+                        for (name, sym_id) in old_members.iter() {
+                            if !new_members.has(name) {
+                                // Remap the symbol ID and add to members
+                                if let Some(&remapped_id) = id_remap.get(sym_id) {
+                                    new_members.set(name.clone(), remapped_id);
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // First time seeing this symbol - full update
+                    let mut updated = old_sym.clone();
+                    updated.id = new_id;
+                    updated.parent = id_remap
+                        .get(&old_sym.parent)
+                        .copied()
+                        .unwrap_or(SymbolId::NONE);
+                    updated.value_declaration = old_sym.value_declaration;
+                    updated.declarations = old_sym.declarations.clone();
+                    updated.is_exported = old_sym.is_exported;
+                    updated.exports = old_sym
+                        .exports
+                        .as_ref()
+                        .map(|table| Box::new(remap_symbol_table(table.as_ref(), &id_remap)));
+                    updated.members = old_sym
+                        .members
+                        .as_ref()
+                        .map(|table| Box::new(remap_symbol_table(table.as_ref(), &id_remap)));
+                    *new_sym = updated;
+                }
             }
         }
 
@@ -396,6 +530,12 @@ pub fn merge_bind_results_ref(results: &[&BindResult]) -> MergedProgram {
             node_scope_ids: result.node_scope_ids.clone(),
             parse_diagnostics: result.parse_diagnostics.clone(),
         });
+    }
+
+    // Populate globals from merged_symbols (contains all symbols across all files)
+    // This ensures cross-file merged symbols are properly registered in globals
+    for (name, sym_id) in merged_symbols.iter() {
+        globals.set(name.clone(), *sym_id);
     }
 
     MergedProgram {
