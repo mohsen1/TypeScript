@@ -7,6 +7,14 @@
 (none yet)
 
 ## Completed
+- [x] **SOLV-41: Fix error-case fallbacks in lower.rs**
+  - Changed operand retrieval failure from ANY to ERROR (lower.rs:1914)
+  - Changed unknown operand kind fallback from ANY to ERROR (lower.rs:1957)
+  - Changed missing unary expression data fallback from ANY to ERROR (lower.rs:1960)
+  - Changed unknown literal kind fallback from ANY to ERROR (lower.rs:1963)
+  - Changed missing literal node fallback from ANY to ERROR (lower.rs:1966)
+  - Changed missing literal type data fallback from ANY to ERROR (lower.rs:1969)
+  - Hardened lower_literal_type function to propagate errors instead of silently accepting
 - [x] **SOLV-40: Fix type lowering fallback and repair broken merges**
   - Changed catch-all `_ => TypeId::ANY` to `_ => TypeId::ERROR` in lower.rs:448
   - This aligns with PROJECT_DIRECTION.md directive to propagate errors
