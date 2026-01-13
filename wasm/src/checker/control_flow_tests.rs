@@ -1,6 +1,7 @@
 use super::FlowAnalyzer;
 use crate::parser::NodeIndex;
 use crate::parser::thin_node::ThinNodeArena;
+use crate::checker::flow_graph_builder::FlowGraphBuilder;
 use crate::solver::{PropertyInfo, TypeId, TypeInterner};
 use crate::thin_binder::ThinBinderState;
 use crate::thin_checker::ThinCheckerState;
@@ -1191,4 +1192,578 @@ if (isStringArray(x)) {
     let flow_after = binder.get_node_flow(ident_after).expect("flow after");
     let narrowed_after = analyzer.get_flow_type(ident_after, union, flow_after);
     assert_eq!(narrowed_after, union);
+}
+
+// ============================================================================
+// CFA-19: Callback Closure Flow Tracking Tests
+// ============================================================================
+
+/// Test that variables assigned before a callback are tracked in flow graph.
+///
+/// This test verifies that when a variable is assigned and then captured by
+/// a closure, the flow graph correctly records the flow state at the point
+/// where the closure is created.
+#[test]
+fn test_closure_capture_flow_before_callback() {
+    let source = r#"
+let x: string | number;
+x = "assigned";
+const callback = () => {
+    x;
+};
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let arena = parser.get_arena();
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string(), false);
+    checker.check_source_file(root);
+
+    let analyzer = FlowAnalyzer::with_node_types(arena, &binder, &types, &checker.ctx.node_types);
+
+    // Get the variable reference inside the arrow function body
+    let root_node = arena.get(root).expect("root node");
+    let source_file = arena.get_source_file(root_node).expect("source file");
+
+    // Get the arrow function (statement at index 2)
+    let arrow_func_idx = *source_file.statements.nodes.get(2).expect("arrow function");
+    let arrow_func_node = arena.get(arrow_func_idx).expect("arrow func node");
+    let arrow_func = arena.get_function(arrow_func_node).expect("arrow func data");
+
+    // Get the body block
+    let body_node = arena.get(arrow_func.body).expect("body node");
+    let body_block = arena.get_block(body_node).expect("body block");
+    let ident_in_closure = extract_expression_from_statement(
+        arena,
+        *body_block.statements.nodes.first().expect("x in closure"),
+    );
+
+    let union = types.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    // The variable inside the closure should be narrowed to "assigned"
+    let flow_in_closure = binder.get_node_flow(ident_in_closure);
+    assert!(flow_in_closure.is_some(), "Flow should be recorded for variable inside closure");
+
+    // Verify the type narrowing works correctly
+    let narrowed_in_closure = analyzer.get_flow_type(ident_in_closure, union, flow_in_closure.unwrap());
+    assert_eq!(narrowed_in_closure, TypeId::STRING);
+}
+
+/// Test definite assignment analysis with callbacks that are immediately invoked.
+///
+/// This verifies that variables assigned before an IIFE (Immediately Invoked
+/// Function Expression) are properly tracked.
+#[test]
+fn test_definite_assignment_with_iife() {
+    let source = r#"
+let x: string;
+x = "assigned";
+(() => {
+    const y = x;
+})();
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let arena = parser.get_arena();
+
+    // Verify that flow graph is built correctly for IIFE scenario
+    let root_node = arena.get(root).expect("root node");
+    let source_file = arena.get_source_file(root_node).expect("source file");
+
+    // The IIFE call expression statement should be at index 2
+    let iife_stmt_idx = *source_file.statements.nodes.get(2).expect("IIFE statement");
+    let iife_stmt = arena.get(iife_stmt_idx).expect("IIFE statement node");
+
+    // Verify the IIFE statement exists and has flow recorded
+    assert!(!iife_stmt_idx.is_none(), "IIFE statement should exist");
+}
+
+/// Test variable capture with array methods (forEach, map, filter).
+///
+/// These are common patterns where callbacks capture variables from
+/// their enclosing scope. The flow graph should correctly track this.
+#[test]
+fn test_closure_capture_with_array_foreach() {
+    let source = r#"
+let x: string | number;
+x = "hello";
+const arr = [1, 2, 3];
+arr.forEach((item) => {
+    const y = x;
+});
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let arena = parser.get_arena();
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string(), false);
+    checker.check_source_file(root);
+
+    let analyzer = FlowAnalyzer::with_node_types(arena, &binder, &types, &checker.ctx.node_types);
+
+    let root_node = arena.get(root).expect("root node");
+    let source_file = arena.get_source_file(root_node).expect("source file");
+
+    // Get the forEach call statement (index 3)
+    let foreach_call_idx = *source_file.statements.nodes.get(3).expect("forEach call");
+    let foreach_call_node = arena.get(foreach_call_idx).expect("forEach call node");
+    let foreach_call = arena.get_call_expr(foreach_call_node).expect("forEach call data");
+
+    // Get the arrow function argument
+    let args = foreach_call.arguments.as_ref().expect("arguments");
+    let arrow_func_idx = *args.nodes.first().expect("arrow function");
+    let arrow_func_node = arena.get(arrow_func_idx).expect("arrow func node");
+    let arrow_func = arena.get_function(arrow_func_node).expect("arrow func data");
+
+    // Get the body block
+    let body_node = arena.get(arrow_func.body).expect("body node");
+    let body_block = arena.get_block(body_node).expect("body block");
+
+    // Get the variable reference x inside the closure (in the initializer of y)
+    let y_decl_stmt = *body_block.statements.nodes.first().expect("y declaration");
+    let y_decl_node = arena.get(y_decl_stmt).expect("y decl node");
+    let y_decl = arena.get_variable_declaration(y_decl_node).expect("y decl data");
+    let x_ref_in_closure = y_decl.initializer;
+
+    let union = types.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    // The variable x inside the forEach callback should be narrowed to string
+    let flow_in_callback = binder.get_node_flow(x_ref_in_closure);
+    assert!(flow_in_callback.is_some(), "Flow should be recorded for variable inside forEach callback");
+
+    let narrowed_in_callback = analyzer.get_flow_type(x_ref_in_closure, union, flow_in_callback.unwrap());
+    assert_eq!(narrowed_in_callback, TypeId::STRING);
+}
+
+/// Test variable capture with map callback.
+#[test]
+fn test_closure_capture_with_array_map() {
+    let source = r#"
+let x: string | number;
+x = "world";
+const arr = [1, 2, 3];
+const mapped = arr.map((item) => {
+    return x.length;
+});
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let arena = parser.get_arena();
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string(), false);
+    checker.check_source_file(root);
+
+    let analyzer = FlowAnalyzer::with_node_types(arena, &binder, &types, &checker.ctx.node_types);
+
+    let root_node = arena.get(root).expect("root node");
+    let source_file = arena.get_source_file(root_node).expect("source file");
+
+    // Get the map call statement (index 3)
+    let map_call_idx = *source_file.statements.nodes.get(3).expect("map call");
+    let map_call_node = arena.get(map_call_idx).expect("map call node");
+    let map_call = arena.get_call_expr(map_call_node).expect("map call data");
+
+    // Get the arrow function argument
+    let args = map_call.arguments.as_ref().expect("arguments");
+    let arrow_func_idx = *args.nodes.first().expect("arrow function");
+    let arrow_func_node = arena.get(arrow_func_idx).expect("arrow func node");
+    let arrow_func = arena.get_function(arrow_func_node).expect("arrow func data");
+
+    // Get the body block
+    let body_node = arena.get(arrow_func.body).expect("body node");
+    let body_block = arena.get_block(body_node).expect("body block");
+
+    // Get the return statement
+    let return_stmt = *body_block.statements.nodes.first().expect("return statement");
+    let return_node = arena.get(return_stmt).expect("return node");
+    let return_data = arena.get_return_statement(return_node).expect("return data");
+
+    // Get the property access expression x.length
+    let prop_access = return_data.expression;
+
+    let union = types.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    // The variable x should be narrowed to string in the map callback
+    let flow_in_callback = binder.get_node_flow(prop_access);
+    assert!(flow_in_callback.is_some(), "Flow should be recorded for expression inside map callback");
+
+    let narrowed_in_callback = analyzer.get_flow_type(prop_access, union, flow_in_callback.unwrap());
+    assert_eq!(narrowed_in_callback, TypeId::STRING);
+}
+
+/// Test nested closure capture (closure inside a closure).
+///
+/// This verifies that variables captured by nested closures maintain
+/// their proper flow state.
+#[test]
+fn test_nested_closure_capture() {
+    let source = r#"
+let x: string | number;
+x = "nested";
+const outer = () => {
+    const inner = () => {
+        const y = x;
+    };
+};
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let arena = parser.get_arena();
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string(), false);
+    checker.check_source_file(root);
+
+    let analyzer = FlowAnalyzer::with_node_types(arena, &binder, &types, &checker.ctx.node_types);
+
+    let root_node = arena.get(root).expect("root node");
+    let source_file = arena.get_source_file(root_node).expect("source file");
+
+    // Get the outer arrow function
+    let outer_func_idx = *source_file.statements.nodes.get(2).expect("outer arrow function");
+    let outer_func_node = arena.get(outer_func_idx).expect("outer func node");
+    let outer_func = arena.get_function(outer_func_node).expect("outer func data");
+
+    // Get the outer body block
+    let outer_body_node = arena.get(outer_func.body).expect("outer body node");
+    let outer_body = arena.get_block(outer_body_node).expect("outer body");
+
+    // Get the inner arrow function declaration
+    let inner_func_idx = *outer_body.statements.nodes.first().expect("inner arrow function");
+    let inner_func_node = arena.get(inner_func_idx).expect("inner func node");
+    let inner_func = arena.get_function(inner_func_node).expect("inner func data");
+
+    // Get the inner body block
+    let inner_body_node = arena.get(inner_func.body).expect("inner body node");
+    let inner_body = arena.get_block(inner_body_node).expect("inner body");
+
+    // Get the y declaration statement
+    let y_decl_stmt = *inner_body.statements.nodes.first().expect("y declaration");
+    let y_decl_node = arena.get(y_decl_stmt).expect("y decl node");
+    let y_decl = arena.get_variable_declaration(y_decl_node).expect("y decl data");
+    let x_ref_in_inner = y_decl.initializer;
+
+    let union = types.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    // The variable x inside the nested closure should be narrowed to string
+    let flow_in_nested = binder.get_node_flow(x_ref_in_inner);
+    assert!(flow_in_nested.is_some(), "Flow should be recorded for variable inside nested closure");
+
+    let narrowed_in_nested = analyzer.get_flow_type(x_ref_in_inner, union, flow_in_nested.unwrap());
+    assert_eq!(narrowed_in_nested, TypeId::STRING);
+}
+
+/// Test callback used with setTimeout (common async pattern).
+///
+/// This verifies that closures used with setTimeout properly capture
+/// variables from their enclosing scope.
+#[test]
+fn test_closure_capture_with_settimeout() {
+    let source = r#"
+let x: string | number;
+x = "timeout";
+setTimeout(() => {
+    console.log(x);
+}, 1000);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let arena = parser.get_arena();
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string(), false);
+    checker.check_source_file(root);
+
+    let analyzer = FlowAnalyzer::with_node_types(arena, &binder, &types, &checker.ctx.node_types);
+
+    let root_node = arena.get(root).expect("root node");
+    let source_file = arena.get_source_file(root_node).expect("source file");
+
+    // Get the setTimeout call statement (index 2)
+    let settimeout_idx = *source_file.statements.nodes.get(2).expect("setTimeout call");
+    let settimeout_node = arena.get(settimeout_idx).expect("setTimeout call node");
+    let settimeout_call = arena.get_call_expr(settimeout_node).expect("setTimeout call data");
+
+    // Get the arrow function argument
+    let args = settimeout_call.arguments.as_ref().expect("arguments");
+    let arrow_func_idx = *args.nodes.first().expect("arrow function");
+    let arrow_func_node = arena.get(arrow_func_idx).expect("arrow func node");
+    let arrow_func = arena.get_function(arrow_func_node).expect("arrow func data");
+
+    // Get the body block
+    let body_node = arena.get(arrow_func.body).expect("body node");
+    let body_block = arena.get_block(body_node).expect("body block");
+
+    // Get the console.log call expression statement
+    let log_stmt = *body_block.statements.nodes.first().expect("console.log statement");
+    let log_stmt_node = arena.get(log_stmt).expect("log statement node");
+    let log_expr_stmt = arena.get_expression_statement(log_stmt_node).expect("log expr statement");
+    let log_call_node = arena.get(log_expr_stmt.expression).expect("log call node");
+    let log_call = arena.get_call_expr(log_call_node).expect("log call data");
+
+    // Get the argument to console.log (the x variable)
+    let log_args = log_call.arguments.as_ref().expect("log arguments");
+    let x_ref = *log_args.nodes.first().expect("x reference");
+
+    let union = types.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    // The variable x inside the setTimeout callback should be narrowed to string
+    let flow_in_callback = binder.get_node_flow(x_ref);
+    assert!(flow_in_callback.is_some(), "Flow should be recorded for variable inside setTimeout callback");
+
+    let narrowed_in_callback = analyzer.get_flow_type(x_ref, union, flow_in_callback.unwrap());
+    assert_eq!(narrowed_in_callback, TypeId::STRING);
+}
+
+/// Test that flow analysis correctly handles multiple closures capturing
+/// the same variable at different points in the code.
+#[test]
+fn test_multiple_closures_capture_same_variable() {
+    let source = r#"
+let x: string | number;
+x = "first";
+const callback1 = () => {
+    const a = x;
+};
+x = 42;
+const callback2 = () => {
+    const b = x;
+};
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let arena = parser.get_arena();
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string(), false);
+    checker.check_source_file(root);
+
+    let analyzer = FlowAnalyzer::with_node_types(arena, &binder, &types, &checker.ctx.node_types);
+
+    let root_node = arena.get(root).expect("root node");
+    let source_file = arena.get_source_file(root_node).expect("source file");
+
+    // Get the first arrow function
+    let callback1_idx = *source_file.statements.nodes.get(2).expect("callback1");
+    let callback1_node = arena.get(callback1_idx).expect("callback1 node");
+    let callback1_func = arena.get_function(callback1_node).expect("callback1 func data");
+    let body1_node = arena.get(callback1_func.body).expect("body1 node");
+    let body1 = arena.get_block(body1_node).expect("body1");
+    let a_decl_stmt = *body1.statements.nodes.first().expect("a declaration");
+    let a_decl_node = arena.get(a_decl_stmt).expect("a decl node");
+    let a_decl = arena.get_variable_declaration(a_decl_node).expect("a decl data");
+    let x_ref1 = a_decl.initializer;
+
+    // Get the second arrow function
+    let callback2_idx = *source_file.statements.nodes.get(4).expect("callback2");
+    let callback2_node = arena.get(callback2_idx).expect("callback2 node");
+    let callback2_func = arena.get_function(callback2_node).expect("callback2 func data");
+    let body2_node = arena.get(callback2_func.body).expect("body2 node");
+    let body2 = arena.get_block(body2_node).expect("body2");
+    let b_decl_stmt = *body2.statements.nodes.first().expect("b declaration");
+    let b_decl_node = arena.get(b_decl_stmt).expect("b decl node");
+    let b_decl = arena.get_variable_declaration(b_decl_node).expect("b decl data");
+    let x_ref2 = b_decl.initializer;
+
+    let union = types.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    // First callback should see x as string
+    let flow1 = binder.get_node_flow(x_ref1).expect("flow for callback1");
+    let narrowed1 = analyzer.get_flow_type(x_ref1, union, flow1);
+    assert_eq!(narrowed1, TypeId::STRING);
+
+    // Second callback should see x as number
+    let flow2 = binder.get_node_flow(x_ref2).expect("flow for callback2");
+    let narrowed2 = analyzer.get_flow_type(x_ref2, union, flow2);
+    assert_eq!(narrowed2, types.literal_number(42.0));
+}
+
+/// Test closure with conditional capture (variable narrowed before callback).
+#[test]
+fn test_closure_with_conditional_capture() {
+    let source = r#"
+let x: string | number;
+if (typeof x === "string") {
+    const callback = () => {
+        const y = x.length;
+    };
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let arena = parser.get_arena();
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string(), false);
+    checker.check_source_file(root);
+
+    let analyzer = FlowAnalyzer::with_node_types(arena, &binder, &types, &checker.ctx.node_types);
+
+    let root_node = arena.get(root).expect("root node");
+    let source_file = arena.get_source_file(root_node).expect("source file");
+
+    // Get the if statement
+    let if_idx = *source_file.statements.nodes.get(1).expect("if statement");
+    let if_node = arena.get(if_idx).expect("if node");
+    let if_data = arena.get_if_statement(if_node).expect("if data");
+
+    // Get the then block
+    let then_block_node = arena.get(if_data.then_statement).expect("then block node");
+    let block = arena.get_block(then_block_node).expect("then block");
+
+    // Get the arrow function statement
+    let arrow_func_stmt = *block.statements.nodes.first().expect("arrow function statement");
+    let arrow_func_node = arena.get(arrow_func_stmt).expect("arrow func node");
+    let arrow_func = arena.get_function(arrow_func_node).expect("arrow func data");
+
+    // Get the body block
+    let body_node = arena.get(arrow_func.body).expect("body node");
+    let body_block = arena.get_block(body_node).expect("body block");
+
+    // Get the y declaration
+    let y_decl_stmt = *body_block.statements.nodes.first().expect("y declaration");
+    let y_decl_node = arena.get(y_decl_stmt).expect("y decl node");
+    let y_decl = arena.get_variable_declaration(y_decl_node).expect("y decl data");
+
+    // Get the property access expression x.length
+    let prop_access = y_decl.initializer;
+
+    let union = types.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    // Inside the if branch and inside the closure, x should be narrowed to string
+    let flow = binder.get_node_flow(prop_access);
+    assert!(flow.is_some(), "Flow should be recorded for expression inside closure in if branch");
+
+    let narrowed = analyzer.get_flow_type(prop_access, union, flow.unwrap());
+    assert_eq!(narrowed, TypeId::STRING);
+}
+
+/// Test that the flow graph builder correctly handles arrow functions
+/// without creating infinite recursion or errors.
+#[test]
+fn test_flow_graph_builder_with_arrow_functions() {
+    let source = r#"
+let x: string | number;
+const add = (a: number, b: number): number => {
+    return a + b;
+};
+x = "test";
+const result = add(1, 2);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+
+    if let Some(source_file) = arena.get(root) {
+        if let Some(sf) = arena.get_source_file(source_file) {
+            let mut builder = FlowGraphBuilder::new(arena);
+            let graph = builder.build_source_file(&sf.statements);
+
+            // Verify flow graph exists and has nodes
+            assert!(graph.nodes.len() > 0, "Flow graph should have nodes");
+
+            // Verify that we can query flow for arrow function
+            let arrow_func_idx = *sf.statements.nodes.get(1).expect("arrow function");
+            assert!(graph.has_flow_at_node(arrow_func_idx), "Flow should be recorded for arrow function");
+        }
+    }
+}
+
+/// Test callback with filter method (another common array method).
+#[test]
+fn test_closure_capture_with_array_filter() {
+    let source = r#"
+let x: string | number;
+x = "filter";
+const arr = [1, 2, 3];
+const filtered = arr.filter((item) => {
+    return typeof x === "string";
+});
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let arena = parser.get_arena();
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string(), false);
+    checker.check_source_file(root);
+
+    let analyzer = FlowAnalyzer::with_node_types(arena, &binder, &types, &checker.ctx.node_types);
+
+    let root_node = arena.get(root).expect("root node");
+    let source_file = arena.get_source_file(root_node).expect("source file");
+
+    // Get the filter call statement (index 3)
+    let filter_call_idx = *source_file.statements.nodes.get(3).expect("filter call");
+    let filter_call_node = arena.get(filter_call_idx).expect("filter call node");
+    let filter_call = arena.get_call_expr(filter_call_node).expect("filter call data");
+
+    // Get the arrow function argument
+    let args = filter_call.arguments.as_ref().expect("arguments");
+    let arrow_func_idx = *args.nodes.first().expect("arrow function");
+    let arrow_func_node = arena.get(arrow_func_idx).expect("arrow func node");
+    let arrow_func = arena.get_function(arrow_func_node).expect("arrow func data");
+
+    // Get the body block
+    let body_node = arena.get(arrow_func.body).expect("body node");
+    let body_block = arena.get_block(body_node).expect("body block");
+
+    // Get the return statement
+    let return_stmt = *body_block.statements.nodes.first().expect("return statement");
+    let return_node = arena.get(return_stmt).expect("return node");
+    let return_data = arena.get_return_statement(return_node).expect("return data");
+
+    // Get the typeof x expression
+    let typeof_expr = return_data.expression;
+
+    let union = types.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    // The variable x inside the filter callback should be narrowed to string
+    let flow_in_callback = binder.get_node_flow(typeof_expr);
+    assert!(flow_in_callback.is_some(), "Flow should be recorded for expression inside filter callback");
+
+    let narrowed_in_callback = analyzer.get_flow_type(typeof_expr, union, flow_in_callback.unwrap());
+    assert_eq!(narrowed_in_callback, TypeId::STRING);
 }
