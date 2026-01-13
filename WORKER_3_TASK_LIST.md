@@ -1,19 +1,22 @@
 # Worker 3 Task List - CFA Squad
 
 ## Current Task
-- [ ] **CFA-13: Test complex control flow scenarios**
-  - Add tests for nested try/catch/finally blocks
-  - Test loops with break/continue and definite assignment
-  - Verify switch statement fallthrough tracking
-  - Test conditional assignments with all branch paths
-
-## Queue
 - [ ] **CFA-14: Coordinate CFA integration with Worker 1**
   - Work with Worker 1 to merge FlowGraph integration
   - Ensure Checker integration is complete
   - Verify all CFA components work together
 
+## Queue
+*No tasks in queue*
+
 ## Completed
+- [x] **CFA-13: Test complex control flow scenarios**
+  - Created test file: `tests/cases/conformance/controlFlow/complexControlFlowScenarios.ts`
+  - Added 50 test cases covering complex control flow
+  - Tests nested try/catch/finally blocks (8 tests)
+  - Tests loops with break/continue and definite assignment (12 tests)
+  - Tests switch statement fallthrough tracking (10 tests)
+  - Tests conditional assignments with all branch paths (20 tests)
 - [x] **CFA-9: Write conformance tests for CFA**
   - Created test file: `tests/conformance/cfa_tests.ts`
   - Added 50+ cases covering all CFA error codes (TS2454, TS2564)
