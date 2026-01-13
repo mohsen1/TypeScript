@@ -1,24 +1,28 @@
 # Worker 2 Task List - CFA Squad
 
 ## Current Task
-- [ ] **CFA-16: Add generator function flow tracking**
-  - Implement yield expression handling in FlowGraph
-  - Track variable state across yield points
-  - Test generator function definite assignment
-
-## Queue
 - [ ] **CFA-19: Test callback closure flow tracking**
   - Analyze variable capture in closure functions
   - Test definite assignment across callback boundaries
   - Verify flow analysis for arrow functions and callbacks
+
+## Queue
 - [ ] **CFA-20: Add support for async generators**
   - Handle async generator functions with yield/await
   - Track variable state through async generator control flow
   - Test complex async generator scenarios
 
 ## Completed
+- [x] **CFA-16: Add generator function flow tracking**
+  - Implemented yield expression handling in FlowGraph
+  - Tracked variable state across yield points
+  - Tested generator function definite assignment
 - [x] **CFA-15: Test async/await flow analysis**
   - Added FlowGraphBuilder support for async functions
+  - Added async_depth tracking in FlowGraphBuilder
+  - Implemented handle_await_expression() for creating AWAIT_POINT flow nodes
+  - Implemented handle_expression_for_await() for recursive await detection
+  - Added 6 comprehensive async/await flow tests
   - Tested variable state across await boundaries
   - Ensured promise rejection paths are tracked
   - Verified definite assignment with async control flow
