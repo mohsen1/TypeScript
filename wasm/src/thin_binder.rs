@@ -77,6 +77,17 @@ pub struct ThinBinderState {
     current_scope_id: ScopeId,
 }
 
+/// Validation result describing issues found in the symbol table
+#[derive(Debug, Clone, PartialEq)]
+pub enum ValidationError {
+    /// A node->symbol mapping points to a non-existent symbol
+    BrokenSymbolLink { node_index: u32, symbol_id: u32 },
+    /// A symbol exists but has no declarations (orphaned)
+    OrphanedSymbol { symbol_id: u32, name: String },
+    /// A symbol's value_declaration points to a non-existent node
+    InvalidValueDeclaration { symbol_id: u32, name: String },
+}
+
 impl ThinBinderState {
     pub fn new() -> Self {
         let mut flow_nodes = FlowNodeArena::new();
@@ -3583,17 +3594,6 @@ impl ThinBinderState {
         self.bind_node(arena, idx);
     }
 
-    /// Validation result describing issues found in the symbol table
-    #[derive(Debug, Clone, PartialEq)]
-    pub enum ValidationError {
-        /// A node->symbol mapping points to a non-existent symbol
-        BrokenSymbolLink { node_index: u32, symbol_id: u32 },
-        /// A symbol exists but has no declarations (orphaned)
-        OrphanedSymbol { symbol_id: u32, name: String },
-        /// A symbol's value_declaration points to a non-existent node
-        InvalidValueDeclaration { symbol_id: u32, name: String },
-    }
-
     /// Run post-binding validation checks on the symbol table.
     /// Returns a list of validation errors found.
     pub fn validate_symbol_table(&self) -> Vec<ValidationError> {
@@ -3613,7 +3613,7 @@ impl ThinBinderState {
             if let Some(sym) = self.symbols.get(sym_id) {
                 if sym.declarations.is_empty() {
                     errors.push(ValidationError::OrphanedSymbol {
-                        symbol_id: i,
+                        symbol_id: i as u32,
                         name: sym.escaped_name.clone(),
                     });
                 }
@@ -3627,7 +3627,7 @@ impl ThinBinderState {
                     let has_node_mapping = self.node_symbols.contains_key(&sym.value_declaration.0);
                     if !has_node_mapping {
                         errors.push(ValidationError::InvalidValueDeclaration {
-                            symbol_id: i,
+                            symbol_id: i as u32,
                             name: sym.escaped_name.clone(),
                         });
                     }
