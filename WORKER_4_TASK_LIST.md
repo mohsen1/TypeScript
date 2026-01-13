@@ -1,15 +1,16 @@
 # Worker 4 Task List
 
 ## Current Task
-- [ ] Fix global symbol type binding
+All tasks completed!
+
+## Queue
+(none)
+
+## Completed
+- [x] Fix global symbol type binding
   - Ensure global types (PromiseConstructor, ArrayConstructor) are correctly typed
   - Verify type parameters are bound
   - Test with generic global types
-
-## Queue
-(none yet)
-
-## Completed
 - [x] Debug why global symbols show as "Cannot find name" (TS2304)
   - Add logging to symbol resolution path
   - Verify SymbolTable lookup chain reaches global scope
