@@ -1736,3 +1736,159 @@ function test() {
     assert!(x_symbol.flags & symbol_flags::FUNCTION_SCOPED_VARIABLE != 0);
     assert!(x_symbol.flags & symbol_flags::BLOCK_SCOPED_VARIABLE == 0);
 }
+
+#[test]
+fn test_imported_symbol_visibility() {
+    use crate::thin_binder::ThinBinderState;
+    use crate::thin_parser::ThinParserState;
+    use crate::binder::symbol_flags;
+
+    let source = r#"
+import { foo, bar as baz } from 'module';
+
+function test() {
+    return foo + baz;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    assert!(binder.file_locals.has("foo"));
+    assert!(binder.file_locals.has("baz"));
+    assert!(!binder.file_locals.has("bar"));
+
+    let foo_sym_id = binder.file_locals.get("foo").expect("foo should exist");
+    let foo_symbol = binder.get_symbol(foo_sym_id).expect("foo symbol should exist");
+    assert!(foo_symbol.flags & symbol_flags::ALIAS != 0);
+}
+
+#[test]
+fn test_default_import_visibility() {
+    use crate::thin_binder::ThinBinderState;
+    use crate::thin_parser::ThinParserState;
+    use crate::binder::symbol_flags;
+
+    let source = r#"
+import defaultExport from 'module';
+const value = defaultExport;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    assert!(binder.file_locals.has("defaultExport"));
+
+    let sym_id = binder.file_locals.get("defaultExport").expect("defaultExport should exist");
+    let symbol = binder.get_symbol(sym_id).expect("symbol should exist");
+    assert!(symbol.flags & symbol_flags::ALIAS != 0);
+}
+
+#[test]
+fn test_namespace_import_visibility() {
+    use crate::thin_binder::ThinBinderState;
+    use crate::thin_parser::ThinParserState;
+    use crate::binder::symbol_flags;
+
+    let source = r#"
+import * as ns from 'module';
+const value = ns.foo;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    assert!(binder.file_locals.has("ns"));
+
+    let sym_id = binder.file_locals.get("ns").expect("ns should exist");
+    let symbol = binder.get_symbol(sym_id).expect("symbol should exist");
+    assert!(symbol.flags & symbol_flags::ALIAS != 0);
+}
+
+#[test]
+fn test_type_only_imports() {
+    use crate::thin_binder::ThinBinderState;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+import type { Type1, Type2 as Alias2 } from 'module';
+import type Type3 from 'module';
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    assert!(binder.file_locals.has("Type1"));
+    assert!(binder.file_locals.has("Alias2"));
+    assert!(binder.file_locals.has("Type3"));
+
+    let type1_sym_id = binder.file_locals.get("Type1").expect("Type1 should exist");
+    let type1_symbol = binder.get_symbol(type1_sym_id).expect("Type1 symbol should exist");
+    assert!(type1_symbol.is_type_only);
+}
+
+#[test]
+fn test_re_export_from_module() {
+    use crate::thin_binder::ThinBinderState;
+    use crate::thin_parser::ThinParserState;
+    use crate::binder::symbol_flags;
+
+    let source = r#"
+export { foo, bar as baz } from 'module';
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    assert!(binder.file_locals.has("foo"));
+    assert!(binder.file_locals.has("baz"));
+
+    let foo_sym_id = binder.file_locals.get("foo").expect("foo should exist");
+    let foo_symbol = binder.get_symbol(foo_sym_id).expect("foo symbol should exist");
+    assert!(foo_symbol.flags & symbol_flags::ALIAS != 0);
+}
+
+#[test]
+fn test_import_and_export_in_same_file() {
+    use crate::thin_binder::ThinBinderState;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+import { importedFunc } from 'module';
+export const localValue = importedFunc();
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    assert!(binder.file_locals.has("importedFunc"));
+    assert!(binder.file_locals.has("localValue"));
+
+    let local_value_sym_id = binder.file_locals.get("localValue").expect("localValue should exist");
+    let local_value_symbol = binder.get_symbol(local_value_sym_id).expect("localValue symbol should exist");
+    assert!(local_value_symbol.is_exported);
+}
