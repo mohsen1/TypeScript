@@ -1,13 +1,15 @@
 # Worker 14 Task List - Solver Squad
 
 ## Current Task
-- [ ] **SOLV-45: Add function bivariance configuration**
-  - Implement the "Lawyer" layer for function parameter checking
-  - Support `strictFunctionTypes` compiler option
-  - Methods should remain bivariant, standalone functions contravariant
-  - Test: callback assignment compatibility
+(All solver tasks complete - awaiting new assignments)
 
 ## Completed
+- [x] **SOLV-45: Add function bivariance configuration** (already implemented)
+  - Lawyer layer in lawyer.rs for function parameter checking
+  - strict_function_types in compat.rs and subtype.rs
+  - is_method distinguishes methods (bivariant) from functions (contravariant)
+  - 39 bivariance tests passing
+
 - [x] **SOLV-44: Implement mapped type evaluation** (already implemented)
   - evaluate_mapped handles `{ [K in Keys]: Transform<K> }` lowering
   - readonly/optional modifiers and key remapping (as clause) supported
