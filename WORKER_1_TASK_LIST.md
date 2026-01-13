@@ -1,14 +1,15 @@
 # Worker 1 Task List
 
 ## Current Task
-- [ ] Integrate with Checker for flow queries
-  - Add `check_flow_usage()` method to Checker
-  - Wire FlowGraph into type checking pipeline
+All CFA tasks completed!
 
 ## Queue
 (none yet)
 
 ## Completed
+- [x] Integrate with Checker for flow queries
+  - Add `check_flow_usage()` method to Checker
+  - Wire FlowGraph into type checking pipeline
 - [x] Add basic block identification logic
   - Detect block boundaries (if/else, loops, try/catch)
   - Track variable declarations and assignments
