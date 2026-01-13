@@ -296,6 +296,14 @@ impl<'a> ThinCheckerState<'a> {
         let node = self.ctx.arena.get(idx)?;
         let name = self.ctx.arena.get_identifier(node)?.escaped_text.as_str();
 
+        // Debug logging for symbol resolution (enabled via BINDER_DEBUG env var)
+        if std::env::var("BIND_DEBUG").is_ok() {
+            eprintln!(
+                "[BIND_RESOLVE] Looking up identifier '{}' at node {:?}",
+                name, idx
+            );
+        }
+
         if let Some(mut scope_id) = self.find_enclosing_scope(idx) {
             let require_export = false;
             while !scope_id.is_none() {
@@ -307,9 +315,15 @@ impl<'a> ThinCheckerState<'a> {
                                 || symbol.is_exported
                                 || (symbol.flags & symbol_flags::EXPORT_VALUE) != 0;
                             if export_ok && !Self::is_class_member_symbol(symbol.flags) {
+                                if std::env::var("BIND_DEBUG").is_ok() {
+                                    eprintln!("[BIND_RESOLVE] Found '{}' in scope {:?}", name, scope_id);
+                                }
                                 return Some(sym_id);
                             }
                         } else if !require_export || scope.kind != ContainerKind::Module {
+                            if std::env::var("BIND_DEBUG").is_ok() {
+                                eprintln!("[BIND_RESOLVE] Found '{}' in scope {:?} (no symbol data)", name, scope_id);
+                            }
                             return Some(sym_id);
                         }
                     }
@@ -326,9 +340,15 @@ impl<'a> ThinCheckerState<'a> {
                                             self.ctx.binder.get_symbol(member_id)
                                         {
                                             if !Self::is_class_member_symbol(member_symbol.flags) {
+                                                if std::env::var("BIND_DEBUG").is_ok() {
+                                                    eprintln!("[BIND_RESOLVE] Found '{}' in module exports", name);
+                                                }
                                                 return Some(member_id);
                                             }
                                         } else {
+                                            if std::env::var("BIND_DEBUG").is_ok() {
+                                                eprintln!("[BIND_RESOLVE] Found '{}' in module exports (no symbol data)", name);
+                                            }
                                             return Some(member_id);
                                         }
                                     }
@@ -345,13 +365,40 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
 
+        // Check file_locals (global scope from lib.d.ts)
+        if std::env::var("BIND_DEBUG").is_ok() {
+            eprintln!(
+                "[BIND_RESOLVE] '{}' not found in scope chain, checking file_locals ({} symbols)",
+                name,
+                self.ctx.binder.file_locals.len()
+            );
+        }
+
         if let Some(sym_id) = self.ctx.binder.file_locals.get(name) {
             if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
                 if !Self::is_class_member_symbol(symbol.flags) {
+                    if std::env::var("BIND_DEBUG").is_ok() {
+                        eprintln!("[BIND_RESOLVE] Found '{}' in file_locals", name);
+                    }
                     return Some(sym_id);
                 }
             } else {
+                if std::env::var("BIND_DEBUG").is_ok() {
+                    eprintln!("[BIND_RESOLVE] Found '{}' in file_locals (no symbol data)", name);
+                }
                 return Some(sym_id);
+            }
+        }
+
+        // Symbol not found - log diagnostic info
+        if std::env::var("BIND_DEBUG").is_ok() {
+            eprintln!("[BIND_RESOLVE] '{}' NOT FOUND - returning None", name);
+            // Dump file_locals for debugging (if not too large)
+            if self.ctx.binder.file_locals.len() < 50 {
+                eprintln!("[BIND_RESOLVE] file_locals contents:");
+                for (n, _) in self.ctx.binder.file_locals.iter() {
+                    eprintln!("  - {}", n);
+                }
             }
         }
 
