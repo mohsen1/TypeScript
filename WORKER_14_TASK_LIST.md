@@ -1,14 +1,6 @@
 # Worker 14 Task List - Solver Squad
 
 ## Current Task
-- [ ] **SOLV-44: Implement mapped type evaluation**
-  - Add `{ [K in Keys]: Transform<K> }` lowering
-  - Handle readonly/optional modifiers
-  - Support key remapping with `as` clause
-  - Test with `Partial<T>`, `Required<T>`, `Readonly<T>`
-
-## Queue
-
 - [ ] **SOLV-45: Add function bivariance configuration**
   - Implement the "Lawyer" layer for function parameter checking
   - Support `strictFunctionTypes` compiler option
@@ -16,6 +8,11 @@
   - Test: callback assignment compatibility
 
 ## Completed
+- [x] **SOLV-44: Implement mapped type evaluation** (already implemented)
+  - evaluate_mapped handles `{ [K in Keys]: Transform<K> }` lowering
+  - readonly/optional modifiers and key remapping (as clause) supported
+  - 136 mapped type tests passing
+
 - [x] **SOLV-43: Add index access type evaluation** (already implemented)
   - evaluate_index_access handles T[K] type resolution
   - evaluate_object_index handles literal key access
