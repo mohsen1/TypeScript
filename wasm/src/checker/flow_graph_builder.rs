@@ -851,12 +851,12 @@ impl<'a> FlowGraphBuilder<'a> {
         var_decl: &crate::parser::thin_node::VariableDeclarationData,
         idx: NodeIndex,
     ) {
+        // Track the variable declaration
+        self.track_variable_declaration(var_decl, idx);
+
         // Check for await expressions in initializer
         if !var_decl.initializer.is_none() {
             self.handle_expression_for_await(var_decl.initializer);
-            // Create assignment flow node for the declaration
-            let flow = self.create_flow_node(flow_flags::ASSIGNMENT, self.current_flow, idx);
-            self.current_flow = flow;
         }
     }
 
@@ -984,6 +984,128 @@ impl<'a> FlowGraphBuilder<'a> {
     fn in_async_function(&self) -> bool {
         self.async_depth > 0
     }
+
+    // =============================================================================
+    // Block Identification Helpers
+    // =============================================================================
+
+    /// Check if a node kind represents a block boundary.
+    ///
+    /// Block boundaries are statements that create new control flow scopes:
+    /// - Block statements ({ ... })
+    /// - Conditional statements (if/else)
+    /// - Loop statements (while, do-while, for, for-in, for-of)
+    /// - Switch statements
+    /// - Try/catch/finally statements
+    ///
+    /// # Returns
+    /// true if the node kind creates a new control flow block
+    fn is_block_boundary(kind: u16) -> bool {
+        kind == syntax_kind_ext::BLOCK
+            || kind == syntax_kind_ext::IF_STATEMENT
+            || kind == syntax_kind_ext::WHILE_STATEMENT
+            || kind == syntax_kind_ext::DO_STATEMENT
+            || kind == syntax_kind_ext::FOR_STATEMENT
+            || kind == syntax_kind_ext::FOR_IN_STATEMENT
+            || kind == syntax_kind_ext::FOR_OF_STATEMENT
+            || kind == syntax_kind_ext::SWITCH_STATEMENT
+            || kind == syntax_kind_ext::TRY_STATEMENT
+    }
+
+    /// Check if a node kind represents a loop statement.
+    ///
+    /// Loop statements create back-edges in the control flow graph:
+    /// - while, do-while, for, for-in, for-of
+    ///
+    /// # Returns
+    /// true if the node kind is a loop statement
+    fn is_loop_statement(kind: u16) -> bool {
+        kind == syntax_kind_ext::WHILE_STATEMENT
+            || kind == syntax_kind_ext::DO_STATEMENT
+            || kind == syntax_kind_ext::FOR_STATEMENT
+            || kind == syntax_kind_ext::FOR_IN_STATEMENT
+            || kind == syntax_kind_ext::FOR_OF_STATEMENT
+    }
+
+    /// Check if a node kind represents a conditional statement.
+    ///
+    /// Conditional statements create branches in the control flow graph:
+    /// - if/else, switch/case
+    ///
+    /// # Returns
+    /// true if the node kind is a conditional statement
+    fn is_conditional_statement(kind: u16) -> bool {
+        kind == syntax_kind_ext::IF_STATEMENT || kind == syntax_kind_ext::SWITCH_STATEMENT
+    }
+
+    /// Check if a node kind represents a variable declaration.
+    ///
+    /// Variable declarations introduce new variables that may need
+    /// definite assignment tracking.
+    ///
+    /// # Returns
+    /// true if the node kind is a variable declaration
+    fn is_variable_declaration(kind: u16) -> bool {
+        kind == syntax_kind_ext::VARIABLE_DECLARATION
+            || kind == syntax_kind_ext::VARIABLE_STATEMENT
+            || kind == syntax_kind_ext::VARIABLE_DECLARATION_LIST
+    }
+
+    /// Check if a node kind represents an assignment.
+    ///
+    /// Assignments affect variable state for definite assignment analysis.
+    ///
+    /// # Returns
+    /// true if the node kind is an assignment expression
+    fn is_assignment(kind: u16) -> bool {
+        kind == syntax_kind_ext::BINARY_EXPRESSION
+            || kind == syntax_kind_ext::PREFIX_UNARY_EXPRESSION
+            || kind == syntax_kind_ext::POSTFIX_UNARY_EXPRESSION
+    }
+
+    // =============================================================================
+    // Variable Tracking
+    // =============================================================================
+
+    /// Track a variable declaration at the current flow point.
+    ///
+    /// Variable declarations are tracked to support:
+    /// - Definite assignment analysis
+    /// - Temporal dead zone (TDZ) checking
+    /// - Variable scope tracking
+    ///
+    /// # Arguments
+    /// * `var_decl` - The variable declaration node
+    /// * `decl_node` - The AST node index of the declaration
+    fn track_variable_declaration(
+        &mut self,
+        var_decl: &crate::parser::thin_node::VariableDeclarationData,
+        decl_node: NodeIndex,
+    ) {
+        // Record the flow node at the declaration point
+        self.record_node_flow(decl_node);
+
+        // If the variable has an initializer, track it as an assignment
+        if !var_decl.initializer.is_none() {
+            self.track_assignment(decl_node);
+        }
+    }
+
+    /// Track an assignment at the current flow point.
+    ///
+    /// Assignments affect the definite assignment state of variables.
+    ///
+    /// # Arguments
+    /// * `target` - The AST node being assigned to
+    fn track_assignment(&mut self, target: NodeIndex) {
+        // Create an assignment flow node
+        let flow = self.create_flow_node(flow_flags::ASSIGNMENT, self.current_flow, target);
+        self.current_flow = flow;
+    }
+
+    // =============================================================================
+    // Await Expression Handling
+    // =============================================================================
 
     /// Recursively traverse an expression to find and handle await expressions.
     fn handle_expression_for_await(&mut self, expr_idx: NodeIndex) {
