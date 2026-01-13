@@ -1,18 +1,19 @@
 # Worker 7 Task List
 
 ## Current Task
-- [ ] Audit all bail-out points in solve_subtype
-  - Search for early returns that default to permissive results
-  - Replace with conservative assumptions (Unknown, error types)
-  - Ensure complex generics don't silently accept invalid code
-
-## Queue
 - [ ] Add Unknown type propagation rules
   - Unknown should force explicit type annotations
   - Unknown should trigger errors in unsafe operations
   - Verify Unknown doesn't spread too aggressively
 
+## Queue
+(none)
+
 ## Completed
+- [x] Audit all bail-out points in solve_subtype
+  - Search for early returns that default to permissive results
+  - Replace with conservative assumptions (Unknown, error types)
+  - Ensure complex generics don't silently accept invalid code
 - [x] Change Solver default fallback from Any to Unknown
   - Located and changed all fallback logic from Any to Unknown in:
     * src/solver/subtype.rs (this parameter compatibility)
