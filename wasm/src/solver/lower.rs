@@ -442,9 +442,10 @@ impl<'a> TypeLowering<'a> {
             }
 
             // =========================================================================
-            // Unknown/unsupported - return ANY for now
+            // Unknown/unsupported - return ERROR to propagate type checking errors
+            // This aligns with PROJECT_DIRECTION.md: errors should not be silently accepted
             // =========================================================================
-            _ => TypeId::ANY,
+            _ => TypeId::ERROR,
         }
     }
 
