@@ -1254,3 +1254,151 @@ mod error_detection_tests {
         assert!(!checker.is_assignable(tuple_two, tuple_one));
     }
 }
+
+/// Test suite for Unknown fallback strictness
+/// Verifies that the solver uses Unknown instead of Any for stricter type checking
+#[cfg(test)]
+mod unknown_fallback_tests {
+    use super::*;
+
+    #[test]
+    fn test_function_this_parameter_fallback_to_unknown() {
+        let interner = TypeInterner::new();
+        let mut checker = CompatChecker::new(&interner);
+
+        // Function with this parameter (explicit type)
+        let func_with_this = interner.function(FunctionShape {
+            type_params: vec![],
+            params: vec![ParamInfo {
+                name: Some(interner.intern_string("x")),
+                type_id: TypeId::NUMBER,
+                optional: false,
+                rest: false,
+            }],
+            this_type: Some(TypeId::STRING), // explicit this: string
+            return_type: TypeId::VOID,
+            type_predicate: None,
+            is_constructor: false,
+            is_method: false,
+        });
+
+        // Function without this parameter (should fall back to Unknown, not Any)
+        let func_without_this = interner.function(FunctionShape {
+            type_params: vec![],
+            params: vec![ParamInfo {
+                name: Some(interner.intern_string("x")),
+                type_id: TypeId::NUMBER,
+                optional: false,
+                rest: false,
+            }],
+            this_type: None, // No this parameter - should fallback to Unknown
+            return_type: TypeId::VOID,
+            type_predicate: None,
+            is_constructor: false,
+            is_method: false,
+        });
+
+        // With Unknown fallback, functions should NOT be compatible
+        // when one has explicit this type and the other has None
+        // (Unknown is not assignable to any specific type)
+        assert!(!checker.is_assignable(func_without_this, func_with_this));
+    }
+
+    #[test]
+    fn test_generic_parameter_without_constraint_fallback_to_unknown() {
+        let interner = TypeInterner::new();
+        let mut checker = CompatChecker::new(&interner);
+
+        // Generic parameter without constraint should fallback to Unknown
+        let t_param_unconstrained = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+            name: interner.intern_string("T"),
+            constraint: None, // No constraint - should use Unknown
+            default: None,
+        }));
+
+        // Create an object with number type
+        let obj_type = interner.object(vec![PropertyInfo {
+            name: interner.intern_string("value"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }]);
+
+        // With Unknown fallback, object should NOT be assignable to unconstrained generic
+        // (Unknown doesn't automatically accept all types like Any does)
+        assert!(!checker.is_assignable(obj_type, t_param_unconstrained));
+    }
+
+    #[test]
+    fn test_array_without_type_argument_fallback_to_unknown() {
+        let interner = TypeInterner::new();
+        let mut checker = CompatChecker::new(&interner);
+
+        // Array<unknown> (what Array without type args should default to)
+        let array_unknown = interner.array(TypeId::UNKNOWN);
+
+        // Array<number>
+        let array_number = interner.array(TypeId::NUMBER);
+
+        // number[] should NOT be assignable to unknown[]
+        // (Unknown is stricter than Any)
+        assert!(!checker.is_assignable(array_number, array_unknown));
+    }
+
+    #[test]
+    fn test_unknown_fallback_prevents_silent_acceptance() {
+        let interner = TypeInterner::new();
+        let mut checker = CompatChecker::new(&interner);
+
+        // Type A: { value: number; }
+        let type_a = interner.object(vec![PropertyInfo {
+            name: interner.intern_string("value"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }]);
+
+        // Unknown type (what fallbacks should use)
+        let unknown_type = TypeId::UNKNOWN;
+
+        // Unknown should NOT be assignable to a specific type
+        // (prevents silent acceptance of invalid code)
+        assert!(!checker.is_assignable(unknown_type, type_a));
+
+        // But specific type should NOT be assignable to Unknown either
+        // (Unknown is not a bottom type)
+        assert!(!checker.is_assignable(type_a, unknown_type));
+    }
+
+    #[test]
+    fn test_unknown_vs_any_behavior() {
+        let interner = TypeInterner::new();
+        let mut checker = CompatChecker::new(&interner);
+
+        // Type A: { value: number; }
+        let type_a = interner.object(vec![PropertyInfo {
+            name: interner.intern_string("value"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }]);
+
+        // Any is assignable to anything (permissive)
+        assert!(checker.is_assignable(TypeId::ANY, type_a));
+
+        // Unknown is NOT assignable to specific type (strict)
+        assert!(!checker.is_assignable(TypeId::UNKNOWN, type_a));
+
+        // Everything is assignable to Any
+        assert!(checker.is_assignable(type_a, TypeId::ANY));
+
+        // Specific type is NOT assignable to Unknown
+        assert!(!checker.is_assignable(type_a, TypeId::UNKNOWN));
+    }
+}

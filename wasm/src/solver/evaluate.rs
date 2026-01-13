@@ -3257,7 +3257,9 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                                                bindings: &mut FxHashMap<Atom, TypeId>|
                  -> bool {
                     let source_fn = self.interner.function_shape(source_fn_id);
-                    let source_this = source_fn.this_type.unwrap_or(TypeId::ANY);
+                    // Use Unknown instead of Any for stricter type checking
+                    // When this parameter type is not specified, use Unknown
+                    let source_this = source_fn.this_type.unwrap_or(TypeId::UNKNOWN);
                     let mut local_visited = FxHashSet::default();
                     if !self.match_infer_pattern(
                         source_this,
