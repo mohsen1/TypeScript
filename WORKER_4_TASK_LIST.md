@@ -16,6 +16,10 @@
   - Ensure correct scope chain: local -> module -> global
   - Handle `import { x }` vs `let x` shadowing correctly
   - Test scope chain traversal
+- [ ] **BIND-15: Fix window and DOM symbol resolution**
+  - Ensure DOM types from lib.d.ts are accessible
+  - Test: `window.alert("hi")` should not produce TS2304
+  - Verify `document`, `navigator`, etc. resolve correctly
 
 ## Completed
 - [x] **BIND-1: Audit current global scope implementation**

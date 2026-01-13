@@ -6,6 +6,17 @@
   - Test variable tracking across branches
   - Test edge cases (empty blocks, nested structures)
 
+## Queue
+- [ ] **CFA-15: Test async/await flow analysis**
+  - Add FlowGraphBuilder support for async functions
+  - Test variable state across await boundaries
+  - Ensure promise rejection paths are tracked
+  - Verify definite assignment with async control flow
+- [ ] **CFA-16: Add generator function flow tracking**
+  - Implement yield expression handling in FlowGraph
+  - Track variable state across yield points
+  - Test generator function definite assignment
+
 ## Completed
 - [x] **CFA-8: Check property initialization (TS2564)**
   - Added `check_property_init` in Checker

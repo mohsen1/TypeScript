@@ -16,6 +16,10 @@
   - Verify namespace member resolution works correctly
   - Test enum accessibility across imports
   - Ensure `namespace.subsymbol` resolution works
+- [ ] **BIND-17: Fix value namespace vs type namespace collision**
+  - Handle cases where same name is used as value and type
+  - Test: `interface X { } const X: number;`
+  - Ensure proper namespace separation during binding
 
 ## Completed
 - [x] **BIND-3: Trace TS2304 false positives**

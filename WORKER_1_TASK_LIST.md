@@ -1,19 +1,22 @@
 # Worker 1 Task List - CFA Squad (Lead)
 
 ## Current Task
-- [ ] **CFA-11: Merge and coordinate CFA Squad work**
-  - Review Workers 2-3 implementations for consistency
-  - Merge completed FlowGraph components into main branch
-  - Ensure FlowGraph API is stable across all CFA components
-  - Coordinate integration testing with Worker 3
-
-## Queue
 - [ ] **CFA-12: Verify TS2454/TS2564 reduction goal**
   - Run conformance tests targeting 573 TS2454 and 443 TS2564 missing errors
   - Measure improvement toward 90% reduction goal
   - Document remaining gaps
 
+## Queue
+- [ ] **CFA-17: Write comprehensive CFA integration test**
+  - Test end-to-end CFA pipeline: binding -> FlowGraph -> analysis -> errors
+  - Verify all control flow structures produce correct errors
+  - Test edge cases: nested functions, closures, callbacks
+
 ## Completed
+- [x] **CFA-11: Merge and coordinate CFA Squad work**
+  - Reviewed Workers 2-3 implementations - branches in sync with rust
+  - No merge conflicts detected
+  - FlowGraph API is stable across CFA components
 - [x] **CFA-7: Check for use-before-definite-assignment (TS2454)**
   - Added `check_variable_usage` in Checker context
   - Implemented FlowGraph queries for variable state at usage point

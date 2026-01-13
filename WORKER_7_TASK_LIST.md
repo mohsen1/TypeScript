@@ -5,6 +5,21 @@
   - Don't bail to Any when generic parameters are complex
   - Add proper constraint checking in solve_subtype
   - Handle generic instantiation with unknown type arguments
+  - Coordinate with Worker 8 on generic parameter checking
+
+## Queue
+- [ ] **SOLV-18: Fix tuple type subtyping**
+  - Implement covariant tuple subtyping
+  - Handle tuple length differences correctly
+  - Test: `[number, string]` vs `[number, string, boolean]`
+- [ ] **SOLV-19: Strengthen function type variance**
+  - Implement proper contravariance for parameter types
+  - Handle function type assignability correctly
+  - Test: `(x: number) => void` vs `(x: string | number) => void`
+- [ ] **SOLV-20: Add solver integration tests**
+  - Create comprehensive test suite for solver strictness
+  - Verify TS2322 and TS7006 error counts improve
+  - Goal: Convert missing TS2322 errors to exact matches
 
 ## Completed
 - [x] **SOLV-14: Integrate Lawyer layer into CompatChecker**

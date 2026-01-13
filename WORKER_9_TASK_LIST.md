@@ -11,6 +11,14 @@
   - Create tests for bounded generics: `<T extends number>`
   - Ensure `f<string>(123)` errors when string doesn't extend number
   - Test default type parameter inference behavior
+- [ ] **SOLV-21: Add conditional type handling**
+  - Implement conditional type evaluation in solver
+  - Handle `T extends U ? X : Y` correctly
+  - Test conditional type distributivity
+- [ ] **SOLV-22: Fix template literal type checking**
+  - Implement template literal type inference
+  - Handle string literal unions in template literals
+  - Test: `` `hello-${T}` `` type resolution
 
 ## Completed
 - [x] **SOLV-3: Strengthen union type checking**

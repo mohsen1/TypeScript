@@ -18,6 +18,10 @@
   - Test full binder pipeline: lib loading -> binding -> symbol resolution
   - Verify all global symbols resolve correctly
   - Goal: TS2304 errors < 50
+- [ ] **BIND-16: Fix module namespace symbol access**
+  - Ensure `import * as ns` creates proper namespace object
+  - Test: `ns.function()` access patterns
+  - Handle namespace member lookup correctly
 
 ## Completed
 - [x] **BIND-2: Implement lib.d.ts parsing and loading**
