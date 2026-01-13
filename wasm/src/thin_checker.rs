@@ -7999,7 +7999,7 @@ impl<'a> ThinCheckerState<'a> {
     /// Get type of property access expression.
     fn get_type_of_property_access(&mut self, idx: NodeIndex) -> TypeId {
         if *self.ctx.instantiation_depth.borrow() >= MAX_INSTANTIATION_DEPTH {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Max instantiation depth exceeded - propagate error
         }
 
         *self.ctx.instantiation_depth.borrow_mut() += 1;
@@ -20441,7 +20441,7 @@ impl<'a> ThinCheckerState<'a> {
         is_generator: bool,
     ) -> TypeId {
         if is_generator {
-            return TypeId::ANY;
+            return TypeId::UNKNOWN; // Generator support not implemented - use UNKNOWN
         }
 
         if is_async {

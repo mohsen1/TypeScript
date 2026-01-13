@@ -7,6 +7,10 @@
 (none yet)
 
 ## Completed
+- [x] **SOLV-48: Fix edge-case ANY fallbacks in thin_checker.rs**
+  - Changed MAX_INSTANTIATION_DEPTH limit from ANY to ERROR (line 8002)
+  - Changed generator return type from ANY to UNKNOWN (line 20444)
+  - Note: Remaining ANY returns are legitimate TypeScript semantics (ANY propagation)
 - [x] **SOLV-46: Fix type expression and literal ANY fallbacks in thin_checker.rs**
   - Changed get_type_from_type_literal fallbacks from ANY to ERROR (lines 2640, 2644)
   - Changed get_type_from_interface fallbacks from ANY to ERROR (lines 3070, 3074)
