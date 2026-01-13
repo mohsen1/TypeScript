@@ -1,15 +1,18 @@
 # Worker 15 Task List - CFA Edge Cases
 
 ## Current Task
-- [ ] **CFA-26: Add computed property name CFA**
-  - Track side effects in computed property name evaluation
-  - Handle variable access within computed property expressions
-  - Test class declarations with computed property names
+All CFA edge case tasks completed!
 
 ## Queue
 (none yet)
 
 ## Completed
+- [x] **CFA-26: Add computed property name CFA**
+  - Added `find_enclosing_computed_property` helper to detect if code is inside a computed property expression
+  - Added `find_class_for_computed_property` helper to get the enclosing class
+  - Added `is_variable_used_before_declaration_in_computed_property` for TDZ checking
+  - Integrated computed property TDZ check into `get_type_of_identifier`
+  - Emits TS2454 when a variable is used in a computed property name before its declaration
 - [x] **CFA-25: Implement static block definite assignment analysis**
   - Added `find_enclosing_static_block` helper to detect if code is inside a static block
   - Added `find_class_for_static_block` helper to get the enclosing class
