@@ -5,6 +5,8 @@
   - Handle cases where same name is used as value and type
   - Test: `interface X { } const X: number;`
   - Ensure proper namespace separation during binding
+
+## Queue
 - [ ] **BIND-24: Test enum member resolution across imports**
   - Verify `import { Enum }` resolves enum members correctly
   - Test: `Enum.Value` access patterns
