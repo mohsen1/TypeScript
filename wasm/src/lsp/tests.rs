@@ -106,11 +106,13 @@ fn test_lsp_diagnostic_conversion() {
     binder.bind_source_file(arena, root);
 
     let types = crate::solver::TypeInterner::new();
+    let strict = false;  // default for tests
     let mut checker = crate::thin_checker::ThinCheckerState::new(
         arena,
         &binder,
         &types,
         "test.ts".to_string(),
+        strict,
     );
     checker.check_source_file(root);
 

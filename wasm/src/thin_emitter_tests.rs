@@ -1349,7 +1349,7 @@ fn test_thin_pipeline_integration() {
 
     // Step 3: Check (type inference)
     let types = TypeInterner::new();
-    let checker = ThinCheckerState::new(&parser.arena, &binder, &types, "test.ts".to_string());
+    let checker = ThinCheckerState::new(&parser.arena, &binder, &types, "test.ts".to_string(), false);
     // Basic check - the checker exists and can be created
     let _ = &checker.ctx.types; // Access types arena to verify it exists
 

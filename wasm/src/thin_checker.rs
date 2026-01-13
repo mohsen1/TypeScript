@@ -108,14 +108,16 @@ impl<'a> ThinCheckerState<'a> {
     /// * `binder` - The binder state with symbols
     /// * `types` - The shared type interner (for thread-safe type deduplication)
     /// * `file_name` - The source file name
+    /// * `strict` - Whether strict mode is enabled (controls noImplicitAny, etc.)
     pub fn new(
         arena: &'a ThinNodeArena,
         binder: &'a ThinBinderState,
         types: &'a TypeInterner,
         file_name: String,
+        strict: bool,
     ) -> Self {
         ThinCheckerState {
-            ctx: CheckerContext::new(arena, binder, types, file_name),
+            ctx: CheckerContext::new(arena, binder, types, file_name, strict),
         }
     }
 
@@ -128,15 +130,17 @@ impl<'a> ThinCheckerState<'a> {
     /// * `types` - The shared type interner
     /// * `file_name` - The source file name
     /// * `cache` - The persistent type cache from previous queries
+    /// * `strict` - Whether strict mode is enabled (controls noImplicitAny, etc.)
     pub fn with_cache(
         arena: &'a ThinNodeArena,
         binder: &'a ThinBinderState,
         types: &'a TypeInterner,
         file_name: String,
         cache: crate::checker::TypeCache,
+        strict: bool,
     ) -> Self {
         ThinCheckerState {
-            ctx: CheckerContext::with_cache(arena, binder, types, file_name, cache),
+            ctx: CheckerContext::with_cache(arena, binder, types, file_name, cache, strict),
         }
     }
 
@@ -11180,6 +11184,7 @@ impl<'a> ThinCheckerState<'a> {
                     self.ctx.binder,
                     self.ctx.types,
                     self.ctx.file_name.clone(),
+                    self.ctx.no_implicit_any,  // use current strict mode setting
                 );
                 return checker.get_type_params_for_symbol(sym_id);
             }
@@ -12114,7 +12119,7 @@ impl<'a> ThinCheckerState<'a> {
         if let Some(strict) = Self::parse_test_option_bool(text, "@strict") {
             return strict;
         }
-        true
+        self.ctx.no_implicit_any  // Use the value from the strict flag
     }
 
     fn resolve_no_implicit_returns_from_source(&self, text: &str) -> bool {
@@ -12132,7 +12137,7 @@ impl<'a> ThinCheckerState<'a> {
         if let Some(strict) = Self::parse_test_option_bool(text, "@strict") {
             return strict;
         }
-        true
+        self.ctx.use_unknown_in_catch_variables  // Use the value from the strict flag
     }
 
     fn parse_test_option_bool(text: &str, key: &str) -> Option<bool> {

@@ -11,7 +11,7 @@ fn test_thin_checker_creation() {
     let arena = ThinNodeArena::new();
     let binder = ThinBinderState::new();
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(&arena, &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(&arena, &binder, &types, "test.ts".to_string(), false);
 
     // Basic sanity check
     assert!(checker.ctx.diagnostics.is_empty());
@@ -22,7 +22,7 @@ fn test_thin_checker_basic_types() {
     let arena = ThinNodeArena::new();
     let binder = ThinBinderState::new();
     let types = TypeInterner::new();
-    let _checker = ThinCheckerState::new(&arena, &binder, &types, "test.ts".to_string());
+    let _checker = ThinCheckerState::new(&area, &binder, &types, "test.ts".to_string(), false);
 
     // Verify intrinsic TypeIds are constants (compile-time values)
     assert_eq!(TypeId::NUMBER.0, 9);
@@ -37,7 +37,7 @@ fn test_thin_checker_type_interner() {
     let arena = ThinNodeArena::new();
     let binder = ThinBinderState::new();
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(&arena, &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(&arena, &binder, &types, "test.ts".to_string(), false);
 
     // Test that TypeInterner is properly initialized
     // Intrinsics should be pre-registered
@@ -51,7 +51,7 @@ fn test_thin_checker_structural_equality() {
     let arena = ThinNodeArena::new();
     let binder = ThinBinderState::new();
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(&arena, &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(&arena, &binder, &types, "test.ts".to_string(), false);
 
     // Test structural equality via TypeInterner
     // Same string literal should get same TypeId
@@ -68,7 +68,7 @@ fn test_thin_checker_union_normalization() {
     let arena = ThinNodeArena::new();
     let binder = ThinBinderState::new();
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(&arena, &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(&arena, &binder, &types, "test.ts".to_string(), false);
 
     // Test union normalization
     // Union with `any` should be `any`
@@ -112,7 +112,7 @@ async function foo() {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -176,7 +176,7 @@ const bad: Foo = { x: 1, y: 2 };
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -203,7 +203,7 @@ const ok: Foo = obj;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
@@ -226,7 +226,7 @@ let bad: object = "hi";
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -251,7 +251,7 @@ const mk = (e: number) => ({ e });
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -283,7 +283,7 @@ declare module "*!text" {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -312,7 +312,7 @@ var v: await;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -343,7 +343,7 @@ class C {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
@@ -370,7 +370,7 @@ class C {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
@@ -395,7 +395,7 @@ const bad: Tup = arr;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -422,7 +422,7 @@ const log2: Logger = (id: number, extra: string) => {};
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 }
@@ -450,7 +450,7 @@ const badAssign: Weak = bad;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -481,7 +481,7 @@ b.valueOf();
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 }
@@ -503,7 +503,7 @@ const ok: VoidFn = () => "value";
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 }
@@ -525,7 +525,7 @@ const y = true;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -557,7 +557,7 @@ takesFoo(obj);
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -738,7 +738,7 @@ function makeFoo(): Foo {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -752,7 +752,7 @@ fn test_thin_checker_subtype_intrinsics() {
     let arena = ThinNodeArena::new();
     let binder = ThinBinderState::new();
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(&arena, &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(&arena, &binder, &types, "test.ts".to_string(), false);
 
     // Test intrinsic subtype relations
     // Any is assignable to everything
@@ -782,7 +782,7 @@ fn test_thin_checker_subtype_literals() {
     let arena = ThinNodeArena::new();
     let binder = ThinBinderState::new();
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(&arena, &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(&arena, &binder, &types, "test.ts".to_string(), false);
 
     // String literal is subtype of string
     let hello = checker.ctx.types.literal_string("hello");
@@ -805,7 +805,7 @@ fn test_thin_checker_subtype_unions() {
     let arena = ThinNodeArena::new();
     let binder = ThinBinderState::new();
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(&arena, &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(&arena, &binder, &types, "test.ts".to_string(), false);
 
     // Create string | number union
     let string_or_number = checker.get_union_type(vec![TypeId::STRING, TypeId::NUMBER]);
@@ -856,7 +856,7 @@ fn test_function_overload_missing_implementation_2391() {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -879,7 +879,7 @@ function foo() {}
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -902,7 +902,7 @@ function bar() {}
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -928,7 +928,7 @@ function foo() {}
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let duplicate_count = checker
@@ -963,7 +963,7 @@ let foo = 2;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let duplicate_count = checker
@@ -1001,7 +1001,7 @@ interface Bar { y: number; }
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let duplicate_count = checker
@@ -1042,7 +1042,7 @@ enum Color {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -1071,7 +1071,7 @@ function Foo() {}
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let duplicate_count = checker
@@ -1115,7 +1115,7 @@ class Rectangle {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -1151,7 +1151,7 @@ class Rectangle {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let duplicate_count = checker
@@ -1187,7 +1187,7 @@ f(true);
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -1217,7 +1217,7 @@ fn(42);
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     assert!(
@@ -1246,7 +1246,7 @@ opt("x", 1);
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     assert!(
@@ -1275,7 +1275,7 @@ rest("a", "b");
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     assert!(
@@ -1306,7 +1306,7 @@ function foo2<T extends [number, string]>(t1: T, t2: [boolean], a1: number[]) {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     assert!(
@@ -1335,7 +1335,7 @@ ft4(["hello", 42]);
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     assert!(
@@ -1364,7 +1364,7 @@ id(123);
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     assert!(
@@ -1392,7 +1392,7 @@ arr.reduce((a, b) => a + b, 0);
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     assert!(
@@ -1425,7 +1425,7 @@ c.foo("ok");
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -1463,7 +1463,7 @@ const f = new Foo();
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -1530,7 +1530,7 @@ const f = new Foo(1, "x", 2);
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -1592,7 +1592,7 @@ const d = new Derived();
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -1642,7 +1642,7 @@ const b = new Box("hi");
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -1683,7 +1683,7 @@ d.name;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -1712,7 +1712,7 @@ b.value;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -1741,7 +1741,7 @@ function f(obj: B) { return obj.x + obj.y; }
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -1771,7 +1771,7 @@ doc.print();
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -1803,7 +1803,7 @@ new Foo(true);
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -1835,7 +1835,7 @@ new Foo(42);
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     assert!(
@@ -1866,7 +1866,7 @@ new Foo("a", "b");
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     assert!(
@@ -1890,7 +1890,7 @@ fn test_parameter_property_in_function_2369() {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -1910,7 +1910,7 @@ fn test_parameter_property_in_arrow_2369() {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -1936,7 +1936,7 @@ class C {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -1963,7 +1963,7 @@ class C {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -1984,7 +1984,7 @@ fn test_class_name_any_error_2414() {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -2011,7 +2011,7 @@ fn test_local_variable_scope_resolution() {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     // Should have no "Cannot find name" errors (2304)
@@ -2039,7 +2039,7 @@ fn test_for_loop_variable_scope() {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     // Should have no "Cannot find name" errors (2304) for loop variable 'i'
@@ -2067,7 +2067,7 @@ function test() {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -2096,7 +2096,7 @@ declare module "foo" {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -2122,7 +2122,7 @@ let x = MissingName;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -2148,7 +2148,7 @@ let x: MissingType;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -2182,7 +2182,7 @@ value;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -2231,7 +2231,7 @@ type Fn = (value: MissingType) => void;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -2258,7 +2258,7 @@ obj.missing;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -2297,7 +2297,7 @@ class C {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -2326,7 +2326,7 @@ interface BaseConstructor {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -2352,7 +2352,7 @@ class C extends undefined {}
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -2379,7 +2379,7 @@ class D extends (null) {}
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -2420,7 +2420,7 @@ var x: number;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -2474,7 +2474,7 @@ fn test_abstract_class_in_local_scope_2511() {
     }
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     // Debug: Check diagnostics
@@ -2520,7 +2520,7 @@ class C {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     // Debug: show all diagnostics
@@ -2558,7 +2558,7 @@ let ctor: typeof A = B;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -2590,7 +2590,7 @@ const a: A = new B();
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -2623,7 +2623,7 @@ f.y;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -2664,7 +2664,7 @@ class Baz {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     assert!(
@@ -2699,7 +2699,7 @@ class Derived extends Base {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -2739,7 +2739,7 @@ class Derived extends Base {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -2776,7 +2776,7 @@ abstract class AbstractClass {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -2797,7 +2797,7 @@ fn test_interface_name_cannot_be_reserved_2427() {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     // Debug: show all diagnostics
@@ -2824,7 +2824,7 @@ fn test_const_modifier_on_class_property_1248() {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     // Debug: show all diagnostics
@@ -2855,7 +2855,7 @@ fn test_accessor_type_compatibility_2322() {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     // Debug: show all diagnostics
@@ -2890,7 +2890,7 @@ class C {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -2917,7 +2917,7 @@ new cls2();
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
 
     checker.check_source_file(root);
 
@@ -2959,7 +2959,7 @@ new cls1();
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
 
     checker.check_source_file(root);
 
@@ -3002,7 +3002,7 @@ class NoError {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
 
     checker.check_source_file(root);
 
@@ -3086,7 +3086,7 @@ class Derived extends Base<string> {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -3505,7 +3505,7 @@ const handler: (x: string) => void = (x) => {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -3535,7 +3535,7 @@ register((x) => {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -3587,7 +3587,7 @@ const h: Handler = { cb: x => x.toUpperCase() };
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -3613,7 +3613,7 @@ value.bar();
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -3643,7 +3643,7 @@ obj.foo;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2339).count();
@@ -3675,7 +3675,7 @@ function f() {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2339).count();
@@ -3707,7 +3707,7 @@ function read(value: A | B) {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -3740,7 +3740,7 @@ Derived.foo;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -3773,7 +3773,7 @@ c.hasOwnProperty("x");
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -3804,7 +3804,7 @@ class C {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -3839,7 +3839,7 @@ c.bar;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -3868,7 +3868,7 @@ class C {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -3901,7 +3901,7 @@ class C {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -3936,7 +3936,7 @@ class A {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -3971,7 +3971,7 @@ class Foo {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -4010,7 +4010,7 @@ c.y;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -4185,7 +4185,7 @@ const s3 = Symbol(42);"#;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     // Should have no errors - all calls are valid
@@ -4206,7 +4206,7 @@ fn test_symbol_constructor_too_many_args() {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     // Should have an error for too many arguments
@@ -4233,7 +4233,7 @@ fn test_variable_redeclaration_same_type() {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     // Should have no errors - same type is allowed
@@ -4258,7 +4258,7 @@ fn test_variable_redeclaration_different_type_2403() {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     // Should have error 2403: Subsequent variable declarations must have the same type
@@ -4285,7 +4285,7 @@ fn test_variable_self_reference_no_2403() {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -4387,7 +4387,7 @@ const val = obj.someProperty;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -4414,7 +4414,7 @@ const val = obj.explicitProp;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -4438,7 +4438,7 @@ const val = obj.x;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -4464,7 +4464,7 @@ type Qux = { [key: string]: Foo };
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -4552,7 +4552,7 @@ const derived_value = obj.derived;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -4587,7 +4587,7 @@ const value = obj.value;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -4616,7 +4616,7 @@ const value = obj.value;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -4647,7 +4647,7 @@ const value = obj.value;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -4676,7 +4676,7 @@ interface Derived extends Base {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -4703,7 +4703,7 @@ interface Derived extends Base {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -4730,7 +4730,7 @@ const ok3: Foo = { x: undefined };
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 }
@@ -4755,7 +4755,7 @@ interface Derived extends Base {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -4782,7 +4782,7 @@ interface Derived extends Base<string> {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -4809,7 +4809,7 @@ interface Derived extends Base<string> {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
@@ -4837,7 +4837,7 @@ interface Derived extends NS.Base {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -4864,7 +4864,7 @@ interface Derived extends Base {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
@@ -4889,7 +4889,7 @@ type Alias = Outer.Inner;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -4931,7 +4931,7 @@ namespace A {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
@@ -4958,7 +4958,7 @@ namespace A {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -4986,7 +4986,7 @@ class C1 extends null {}
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -5014,7 +5014,7 @@ exports.foo = 1;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -5048,7 +5048,7 @@ namespace Models {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
@@ -5077,7 +5077,7 @@ type AliasB = Outer.B;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -5133,7 +5133,7 @@ type Alias = Box<string>;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -5179,7 +5179,7 @@ const f: <T>(value: T) => T = (value) => value;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -5231,7 +5231,7 @@ interface Callable {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -5285,7 +5285,7 @@ interface Factory {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -5339,7 +5339,7 @@ function id<T>(value: T): T {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -5391,7 +5391,7 @@ function id(x: string) {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -5428,7 +5428,7 @@ const f = (flag: boolean) => {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -5494,7 +5494,7 @@ const anon = () => { return null; };
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -5534,7 +5534,7 @@ const obj = { baz() { return undefined; } };
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -5572,7 +5572,7 @@ class C {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -5608,7 +5608,7 @@ const arrowReturnsAny = () => anyValue;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -5639,7 +5639,7 @@ function returnsNullOrUndefined(flag: boolean) {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -5673,7 +5673,7 @@ function createClass() {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let ts7010_errors: Vec<_> = checker.ctx.diagnostics.iter().filter(|d| d.code == 7010).collect();
@@ -5732,7 +5732,7 @@ function loopWithNestedSwitchBreak(flag: boolean) {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
 
     let arena = parser.get_arena();
     let root_node = arena.get(root).expect("root node");
@@ -5798,7 +5798,7 @@ function fallsThrough(): number {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -5841,7 +5841,7 @@ function loopWithBreak(): number {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -5882,7 +5882,7 @@ class C {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -5911,7 +5911,7 @@ async function f(): Promise<number> { }
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -5945,7 +5945,7 @@ async function* g4(): {} { yield 1; }
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -5980,7 +5980,7 @@ async function f(): PromiseAlias<void> {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -6033,7 +6033,7 @@ function usesFailInList(): number {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -6099,7 +6099,7 @@ function tryCatchFallsThrough(): number {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -6135,7 +6135,7 @@ function implicitAnyParam(x) {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
@@ -6160,7 +6160,7 @@ function implicitAnyParam(x) {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
@@ -6205,7 +6205,7 @@ type PropAlias = { handler: (g) => void; };
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -6230,7 +6230,7 @@ const value = arr[0];
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -6255,7 +6255,7 @@ const arr = [{ a: "x" }, { a: "y", b: 1 }];
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -6295,7 +6295,7 @@ const second = tup[1];
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -6325,7 +6325,7 @@ const value = arr[0];
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -6351,7 +6351,7 @@ const first = tup[0];
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -6384,7 +6384,7 @@ const value = obj["x"];
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -6409,7 +6409,7 @@ const length = arr["length"];
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -6434,7 +6434,7 @@ const value = arr["0"];
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -6462,7 +6462,7 @@ const value = map["foo"];
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -6490,7 +6490,7 @@ const value = map[1];
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -6517,7 +6517,7 @@ const value = obj[key];
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -6542,7 +6542,7 @@ const value = obj[key];
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -6567,7 +6567,7 @@ const value = obj[key];
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -6593,7 +6593,7 @@ const value = obj[key];
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -6629,7 +6629,7 @@ const value = obj[key];
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -6670,7 +6670,7 @@ const value = obj[key];
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -6697,7 +6697,7 @@ const value = tup[idx];
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -6733,7 +6733,7 @@ const value = arr[key];
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -6768,7 +6768,7 @@ const value = obj["a"];
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -6797,7 +6797,7 @@ const value = obj?.["a"];
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -6832,7 +6832,7 @@ const value = obj?.a;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -6867,7 +6867,7 @@ const value = obj.a;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -6904,7 +6904,7 @@ type Alias = Foo.Bar;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -6945,7 +6945,7 @@ type Alias = Foo.Bar;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -6985,7 +6985,7 @@ const direct = Foo.value;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -7012,7 +7012,7 @@ const direct = Foo.value;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -7041,7 +7041,7 @@ const sum = Merge.a + Merge.b;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -7072,7 +7072,7 @@ const value: Merge.B = { y: 1 };
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -7112,7 +7112,7 @@ const direct = Merge.extra;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -7139,7 +7139,7 @@ const direct = Merge.extra;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -7167,7 +7167,7 @@ type Alias = Merge.Extra;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -7208,7 +7208,7 @@ type Alias = Merge.Extra;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -7250,7 +7250,7 @@ const direct = Merge.extra;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -7279,7 +7279,7 @@ const direct = Merge.extra;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -7309,7 +7309,7 @@ type Alias = Merge.Extra;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -7352,7 +7352,7 @@ type Alias = Merge.Extra;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -7392,7 +7392,7 @@ const direct = Foo["value"];
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -7423,7 +7423,7 @@ interface Bar {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -7490,7 +7490,7 @@ type T = typeof Alias.value;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -7526,7 +7526,7 @@ type Alias = typeof Foo<string>;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -7564,7 +7564,7 @@ type B = A;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let a_sym = binder.file_locals.get("A").expect("A should exist");
@@ -7634,7 +7634,7 @@ declare module "." {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -7666,7 +7666,7 @@ declare module "@scoped/package" {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -7700,7 +7700,7 @@ declare class AmbientClass {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -7738,7 +7738,7 @@ class RegularClass {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -7769,7 +7769,7 @@ class A {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -7801,7 +7801,7 @@ let x = A.quux;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -7836,7 +7836,7 @@ class A {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -7871,7 +7871,7 @@ class A {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -7905,7 +7905,7 @@ namespace MyNamespace {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -7934,7 +7934,7 @@ var x: number;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -7959,7 +7959,7 @@ var x: string;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -7990,7 +7990,7 @@ var e: typeof E;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -8029,7 +8029,7 @@ var e: typeof E1;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -8058,7 +8058,7 @@ function f1() {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -8086,7 +8086,7 @@ var n: number;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -8114,7 +8114,7 @@ var p: foo.NotExist;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let diags = &checker.ctx.diagnostics;
@@ -8144,7 +8144,7 @@ const badAlias = Alias.missing;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -8178,7 +8178,7 @@ var y: NS.Exported;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let diags = &checker.ctx.diagnostics;
@@ -8208,7 +8208,7 @@ var x: Alias;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let diags = &checker.ctx.diagnostics;
@@ -8235,7 +8235,7 @@ Foo;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -8267,7 +8267,7 @@ let b: B = a;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -8296,7 +8296,7 @@ let s: S = "a";
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -8325,7 +8325,7 @@ let missing: Outer.Inner.Missing;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -8355,7 +8355,7 @@ let missing: Alias.Missing;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -8383,7 +8383,7 @@ const bad = NS.Foo;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -8412,7 +8412,7 @@ const bad = NS["Foo"];
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -8444,7 +8444,7 @@ const bad = Outer.Inner.Foo;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -8481,7 +8481,7 @@ const bad = Alias;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -8512,7 +8512,7 @@ const bad = Alias.Foo;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -8552,7 +8552,7 @@ const bad = Alias.Inner.Foo;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -8587,7 +8587,7 @@ const bad = Foo;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -8615,7 +8615,7 @@ const bad = Foo;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -8643,7 +8643,7 @@ let useIt: T;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -8671,7 +8671,7 @@ let useIt: T;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -8698,7 +8698,7 @@ let useIt: T;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -8725,7 +8725,7 @@ let useIt: T;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -8755,7 +8755,7 @@ let useIt: T;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -8783,7 +8783,7 @@ let useIt: T;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -8811,7 +8811,7 @@ let useIt: T;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -8841,7 +8841,7 @@ let useIt: T;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -8872,7 +8872,7 @@ let useIt: T;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -8902,7 +8902,7 @@ let useIt: T;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -8933,7 +8933,7 @@ let useIt: T;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -8968,7 +8968,7 @@ const viaAlias = Alias.value;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -9004,7 +9004,7 @@ const viaAlias = Alias["value"];
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
@@ -9039,7 +9039,7 @@ const bad = Alias.missing;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -9078,7 +9078,7 @@ const badValue = Outer.Inner.missing;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -9116,7 +9116,7 @@ const bad = NS.hidden;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -9155,7 +9155,7 @@ fn test_deep_binary_expression_type_check() {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     assert!(checker.ctx.diagnostics.is_empty());
@@ -9278,7 +9278,7 @@ if (typeof x === "string") {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -9485,7 +9485,7 @@ do {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -9728,7 +9728,7 @@ if (typeof Alias.value === "string") {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -9759,7 +9759,7 @@ if (typeof obj.prop === "string") {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -9792,7 +9792,7 @@ if (typeof obj["prop"] === "string") {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -9823,7 +9823,7 @@ if (typeof obj["prop"] === "string") {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -9852,7 +9852,7 @@ if (typeof obj.prop === "string") {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -9883,7 +9883,7 @@ if (typeof obj["prop"] === "string") {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -9916,7 +9916,7 @@ if (typeof obj.prop === "string") {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -10051,7 +10051,7 @@ if (typeof obj[key] === "string") {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -10135,7 +10135,7 @@ if (typeof arr[idx] === "string") {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -10368,7 +10368,7 @@ if (typeof obj.prop === "string") {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -10401,7 +10401,7 @@ if (typeof obj["prop"] === "string") {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -10633,7 +10633,7 @@ declare const p: MyPick<Person, "name">;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     // No diagnostics expected for type declarations
@@ -10681,7 +10681,7 @@ const ctor2: DefaultCtor = AnotherClass;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     // No diagnostics expected - void constructor should accept any class
@@ -10719,7 +10719,7 @@ declare const y: NonDistributive<string>;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     // No diagnostics expected for type declarations
@@ -10758,7 +10758,7 @@ declare const t: TupleCheck;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     // No diagnostics expected for well-formed declarations
@@ -10805,7 +10805,7 @@ declare const end: ExtractElementNonDist<string[]>;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     // No diagnostics expected for well-formed declarations
@@ -10849,7 +10849,7 @@ const n: number = s;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     // Print diagnostics for debugging
@@ -10902,7 +10902,7 @@ const m: string = state.message;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     if !checker.ctx.diagnostics.is_empty() {
@@ -10951,7 +10951,7 @@ const partial: PartialState = { nested: { value: 42 } };
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     if !checker.ctx.diagnostics.is_empty() {
@@ -11002,7 +11002,7 @@ const n: number = state;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     if !checker.ctx.diagnostics.is_empty() {
@@ -11052,7 +11052,7 @@ declare const action: AllActions;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     if !checker.ctx.diagnostics.is_empty() {
@@ -11109,7 +11109,7 @@ const reducers: RootReducers = {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     if !checker.ctx.diagnostics.is_empty() {
@@ -11175,7 +11175,7 @@ function i<T extends string, U extends number>(x: T, y: U): string | number {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     if !checker.ctx.diagnostics.is_empty() {
@@ -11220,7 +11220,7 @@ function reject2<T extends { name: string }>(obj: { name: string }): T {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     // Should have exactly 2 errors (one for each return statement)
@@ -11282,7 +11282,7 @@ function chain<A extends string, B extends A, C extends B>(x: C): string {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     if !checker.ctx.diagnostics.is_empty() {
@@ -11349,7 +11349,7 @@ function extractId<T extends { id: number }>(item: T): ExtractId<T> {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     if !checker.ctx.diagnostics.is_empty() {
@@ -11407,7 +11407,7 @@ box.value = 42; // OK: setter accepts number
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     if !checker.ctx.diagnostics.is_empty() {
@@ -11449,7 +11449,7 @@ const n: number = box.value; // ERROR: string not assignable to number
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let error_count = checker.ctx.diagnostics.len();
@@ -11497,7 +11497,7 @@ box.value = true; // Should ERROR: boolean not assignable to string
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let error_count = checker.ctx.diagnostics.len();
@@ -11550,7 +11550,7 @@ const animal = new Animal(); // ERROR: Cannot create instance of abstract class
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let error_count = checker.ctx.diagnostics.len();
@@ -11617,7 +11617,7 @@ const animal = createAnimal(Animal); // Passing abstract class as value should b
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let error_count = checker.ctx.diagnostics.len();
@@ -11691,7 +11691,7 @@ const shapes: Shape[] = [new Circle(1), new Square(2)]; // Should be OK
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let error_count = checker.ctx.diagnostics.len();
@@ -11756,7 +11756,7 @@ const c3: AnyCallable = named; // OK
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     if !checker.ctx.diagnostics.is_empty() {
@@ -11803,7 +11803,7 @@ const specific: SpecificFn = untyped; // This is actually allowed in TS due to a
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     // In TypeScript, (...args: any[]) => any IS assignable to specific functions
@@ -11866,7 +11866,7 @@ declare const obj: NotCallable;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     if !checker.ctx.diagnostics.is_empty() {
@@ -11920,7 +11920,7 @@ const s: string = strings[0]; // OK
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     if !checker.ctx.diagnostics.is_empty() {
@@ -11982,7 +11982,7 @@ const name = pet.name; // OK: both Dog and Cat have name
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let error_count = checker.ctx.diagnostics.len();
@@ -12036,7 +12036,7 @@ const b: boolean = bools[0]; // OK
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     if !checker.ctx.diagnostics.is_empty() {
@@ -12097,7 +12097,7 @@ const l: string = box.label;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     if !checker.ctx.diagnostics.is_empty() {
@@ -12147,7 +12147,7 @@ const product: number = calc.multiply(3, 4);
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     if !checker.ctx.diagnostics.is_empty() {
@@ -12206,7 +12206,7 @@ const e: string = person.email;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     if !checker.ctx.diagnostics.is_empty() {
@@ -12263,7 +12263,7 @@ const fromString: Color = Color.fromHex("#FF0000");
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let error_count = checker.ctx.diagnostics.len();
@@ -12326,7 +12326,7 @@ const created: Album = Album.create("New Album");
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     if !checker.ctx.diagnostics.is_empty() {
@@ -12382,7 +12382,7 @@ const vertical: boolean = Direction.isVertical(Direction.Up);
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let error_count = checker.ctx.diagnostics.len();
@@ -12446,7 +12446,7 @@ const animalHandler: HandlerWithAnimal = dogHandler;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let error_count = checker.ctx.diagnostics.len();
@@ -12508,7 +12508,7 @@ const dogHandler: HandlerWithDog = animalHandler;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let error_count = checker.ctx.diagnostics.len();
@@ -12568,7 +12568,7 @@ const dogHandler: HandlerWithDogProp = animalHandler;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let error_count = checker.ctx.diagnostics.len();
@@ -12623,7 +12623,7 @@ const animalHandler: HandlerWithAnimalProp = dogHandler;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let error_count = checker.ctx.diagnostics.len();
@@ -12682,7 +12682,7 @@ elem.addEventListener(handleMouse);
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let error_count = checker.ctx.diagnostics.len();
@@ -12744,7 +12744,7 @@ processor.process(dogs, handleDog);
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let error_count = checker.ctx.diagnostics.len();
@@ -12794,7 +12794,7 @@ const arr: number[] = anyVal;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     if !checker.ctx.diagnostics.is_empty() {
@@ -12847,7 +12847,7 @@ anyTarget = arr;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     if !checker.ctx.diagnostics.is_empty() {
@@ -12894,7 +12894,7 @@ expectObject(anyVal);
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     if !checker.ctx.diagnostics.is_empty() {
@@ -12942,7 +12942,7 @@ const obj: { x: number } = call;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     if !checker.ctx.diagnostics.is_empty() {
@@ -12991,7 +12991,7 @@ function returnNever(): never {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     if !checker.ctx.diagnostics.is_empty() {
@@ -13040,7 +13040,7 @@ const config: Config = {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let excess_errors: Vec<_> = checker.ctx.diagnostics.iter()
@@ -13094,7 +13094,7 @@ const config: Config = obj;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     if !checker.ctx.diagnostics.is_empty() {
@@ -13138,7 +13138,7 @@ configure({ timeout: 5000, retries: 3 });
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let excess_errors: Vec<_> = checker.ctx.diagnostics.iter()
@@ -13184,7 +13184,7 @@ function getResult(): Result {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let excess_errors: Vec<_> = checker.ctx.diagnostics.iter()
@@ -13222,7 +13222,7 @@ const u: U = { a: 1, c: 2 };
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let excess_errors: Vec<_> = checker.ctx.diagnostics.iter()
@@ -13267,7 +13267,7 @@ const u: U = { c: 1 };
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let excess_errors: Vec<_> = checker.ctx.diagnostics.iter()
@@ -13313,7 +13313,7 @@ f({ c: 1 });
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let excess_errors: Vec<_> = checker.ctx.diagnostics.iter()
@@ -13359,7 +13359,7 @@ const u: U = obj;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<_> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -13401,7 +13401,7 @@ const config: Config = { ...base };
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let error_count = checker.ctx.diagnostics.len();
@@ -13466,7 +13466,7 @@ const animal: Animal = new Dog();
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let error_count = checker.ctx.diagnostics.len();
@@ -13533,7 +13533,7 @@ const result = new AdvancedBuilder()
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let error_count = checker.ctx.diagnostics.len();
@@ -13590,7 +13590,7 @@ const p2 = p1.clone();
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     if !checker.ctx.diagnostics.is_empty() {
@@ -13656,7 +13656,7 @@ const b: Box = new NumberBox();
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let error_count = checker.ctx.diagnostics.len();
@@ -13710,7 +13710,7 @@ const maybeNum: number | undefined = undefined;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     if !checker.ctx.diagnostics.is_empty() {
@@ -13748,7 +13748,7 @@ const str: string = null;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     // Should produce an error
@@ -13778,7 +13778,7 @@ const num: number = undefined;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     // Should produce an error
@@ -13813,7 +13813,7 @@ const num: number | undefined = 42;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     if !checker.ctx.diagnostics.is_empty() {
@@ -13859,7 +13859,7 @@ function test(obj: AB) {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     if !checker.ctx.diagnostics.is_empty() {
@@ -13908,7 +13908,7 @@ function test(obj: AB) {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let error_count = checker.ctx.diagnostics.len();
@@ -13953,7 +13953,7 @@ function getArray(data: Data, key: 'numbers' | 'strings') {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     if !checker.ctx.diagnostics.is_empty() {
@@ -13997,7 +13997,7 @@ function getKind(shape: Shape): string {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     if !checker.ctx.diagnostics.is_empty() {
@@ -14046,7 +14046,7 @@ if (typeof x === "string") {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     // Just check it doesn't crash - narrowing behavior depends on CFA implementation
@@ -14089,7 +14089,7 @@ if (typeof x === "string") {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     // Currently doesn't maintain narrowing in closures
@@ -14133,7 +14133,7 @@ if (value !== null) {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     // Just check it doesn't crash
@@ -14177,7 +14177,7 @@ if (data !== undefined) {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     // Just check it doesn't crash
@@ -14377,7 +14377,7 @@ function getUser(): Models.User {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     assert!(
@@ -14412,7 +14412,7 @@ const pair: Types.Pair<number> = [1, 2];
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     assert!(
@@ -14451,7 +14451,7 @@ const value: Outer.Inner.Deep.Value = "test";
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     assert!(
@@ -14490,7 +14490,7 @@ const optString: Collections.Optional<string> = null;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     assert!(
@@ -14532,7 +14532,7 @@ const makeRequest: (req: API.Request) => API.Response = handleRequest;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     assert!(
@@ -14580,7 +14580,7 @@ function qux() {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let count = checker
@@ -14621,7 +14621,7 @@ function foo() {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let count = checker
@@ -14660,7 +14660,7 @@ function foo(items: number[]) {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let count = checker
@@ -14700,7 +14700,7 @@ class Foo {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let count = checker.ctx.diagnostics.iter().filter(|d| d.code == 2564).count();
@@ -14731,7 +14731,7 @@ class Foo {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let has_2564 = checker.ctx.diagnostics.iter().any(|d| d.code == 2564);
@@ -14762,7 +14762,7 @@ class Foo {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     // Optional properties should not have TS2564 errors
@@ -14794,7 +14794,7 @@ class Foo {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     // Definite assignment assertion should not have TS2564 errors
@@ -14826,7 +14826,7 @@ class Foo {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     // Properties with initializers should not have TS2564 errors
@@ -14858,7 +14858,7 @@ class Foo {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     // Static properties should not have TS2564 errors (different initialization semantics)
@@ -14894,7 +14894,7 @@ class Foo {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     // Properties assigned in constructor should not have TS2564 errors
@@ -14925,7 +14925,7 @@ foo.a;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 }
 
@@ -14959,7 +14959,7 @@ x.type;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 }
 
@@ -14989,7 +14989,7 @@ type AbstractConstructor<T> = abstract new (...args: any[]) => T;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 }
 
@@ -15051,7 +15051,7 @@ augmented;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -15081,7 +15081,7 @@ const z = Utils.y;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -15114,7 +15114,7 @@ declare module "pkg" {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -15148,7 +15148,7 @@ declare let x: Recurse;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     // Should have TS2456 error for circular type alias
@@ -15215,7 +15215,7 @@ interface MyError extends Error {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     // Filter for TS2304 errors (Cannot find name)
@@ -15256,7 +15256,7 @@ type Foo = {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let ts2304_errors: Vec<_> = checker.ctx.diagnostics
@@ -15296,7 +15296,7 @@ function area(s: { kind: "square"; size: number } | { kind: "circle"; radius: nu
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -15326,7 +15326,7 @@ class Wat {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -15356,7 +15356,7 @@ const assertFn: (value: unknown) => asserts value = value => {};
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -15391,7 +15391,7 @@ const obj = {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -15418,7 +15418,7 @@ exports.foo = 1;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -15447,7 +15447,7 @@ type Properties<T extends { [key: string]: Types }> = {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -15479,7 +15479,7 @@ accessor export default V1;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -15513,7 +15513,7 @@ namespace Utils {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -15547,7 +15547,7 @@ namespace A {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -15583,7 +15583,7 @@ namespace C {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -15618,7 +15618,7 @@ const x = globalValue;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -15651,7 +15651,7 @@ const opts: Options = { value: 1 };
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -15708,7 +15708,7 @@ class D3 extends getBase() <string, number> {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -15743,7 +15743,7 @@ const r: Base[] = [d1, d2];
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -15777,7 +15777,7 @@ class C {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -15810,7 +15810,7 @@ const willErrorSomeDay: typeof A = class {};
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -15843,7 +15843,7 @@ if ((o = fn()).done) {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -16014,7 +16014,7 @@ class Derived extends Base {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -16062,7 +16062,7 @@ d.mixinMethod();
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -16127,7 +16127,7 @@ class Thing3 extends Thing2 {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -16223,7 +16223,7 @@ function f(obj: B) {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -16259,7 +16259,7 @@ class C extends B {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -16291,7 +16291,7 @@ function f(i: I) { return i.x; }
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -16324,7 +16324,7 @@ function f(obj: C) {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -16357,7 +16357,7 @@ class Derived extends Base {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -16402,7 +16402,7 @@ function f() {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -16452,7 +16452,7 @@ function f() {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -16498,7 +16498,7 @@ class C2 extends Mixed1 {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -16546,7 +16546,7 @@ wasConcrete.mixinMethod();
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -16590,7 +16590,7 @@ class Derived extends getBase() {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -16625,7 +16625,7 @@ class Foo {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -16663,7 +16663,7 @@ function func(x: I) {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
 
     // This should not crash with stack overflow
     checker.check_source_file(root);
@@ -16695,7 +16695,7 @@ function maybeReturn(x: boolean) {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let ts7030_errors: Vec<_> = checker.ctx.diagnostics.iter()
@@ -16728,7 +16728,7 @@ function maybeReturn(x: boolean) {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let ts7030_errors: Vec<_> = checker.ctx.diagnostics.iter()
@@ -16762,7 +16762,7 @@ class Example {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let ts7030_errors: Vec<_> = checker.ctx.diagnostics.iter()
@@ -16798,7 +16798,7 @@ class Example {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let ts7030_errors: Vec<_> = checker.ctx.diagnostics.iter()
@@ -16831,7 +16831,7 @@ aFn(), b;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let ts2695_errors: Vec<_> = checker
@@ -16882,7 +16882,7 @@ void a, b;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let ts2695_errors: Vec<_> = checker
@@ -16933,7 +16933,7 @@ fn test_variadic_tuple_rest_param_no_ts2769() {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let ts2769_errors: Vec<_> = checker.ctx.diagnostics.iter().filter(|d| d.code == 2769).collect();
@@ -16980,7 +16980,7 @@ fn test_variadic_tuple_optional_tail_inference_no_ts2769() {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let ts2769_errors: Vec<_> = checker.ctx.diagnostics.iter().filter(|d| d.code == 2769).collect();
@@ -17027,7 +17027,7 @@ declare var x: Circular<tup>;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
 
     // Should complete without crashing or hanging
     checker.check_source_file(root);
@@ -17060,7 +17060,7 @@ product.users;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
 
     // Should complete without crashing or hanging
     checker.check_source_file(root);
@@ -17086,7 +17086,7 @@ let { x, y }: { x: string, y: string } = obj;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let ts2322_errors: Vec<_> = checker.ctx.diagnostics.iter()
@@ -17119,7 +17119,7 @@ let [a, b]: [number, number] = arr;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let ts2322_errors: Vec<_> = checker.ctx.diagnostics.iter()
@@ -17153,7 +17153,7 @@ let { x = 42 }: { x: string } = obj;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let ts2322_errors: Vec<_> = checker.ctx.diagnostics.iter()
@@ -17186,7 +17186,7 @@ let { a: { b } }: { a: { b: string } } = obj;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let ts2322_errors: Vec<_> = checker.ctx.diagnostics.iter()
@@ -17218,7 +17218,7 @@ let { x = 42 }: { x: string } = obj;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     eprintln!("[BINDING_DEFAULT] All diagnostics: {:?}", checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>());
@@ -17251,7 +17251,7 @@ let { x = "hello" }: { x?: number } = {};
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     eprintln!("[ISOLATED_DEFAULT] All diagnostics: {:?}", checker.ctx.diagnostics.iter().map(|d| (d.code, &d.message_text)).collect::<Vec<_>>());
@@ -17324,7 +17324,7 @@ type t1 = DeepMap<tpl, number>;
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
 
     // This should NOT crash even with recursive types
     checker.check_source_file(root);
@@ -17370,7 +17370,7 @@ function identity<T>(x: T): T {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -17406,7 +17406,7 @@ class C {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     // Should have NO TS2339 errors for C.#x access
@@ -17445,7 +17445,7 @@ class A {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
 
     checker.check_source_file(root);
 
@@ -17489,7 +17489,7 @@ function extract<T>(x: Extract<T, typeof identity>): T {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     // Check that we don't have TS2304 for type parameter names (T, etc.)
@@ -17523,7 +17523,7 @@ function f1<T extends string | undefined>(x: T, y: { a: T }, z: [T]): string {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -17564,7 +17564,7 @@ function g1<T extends Box<T> | undefined>(x: T) {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -17640,7 +17640,7 @@ class A2 {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     // TS2339 = "Property 'X' does not exist on type 'Y'"
@@ -17688,7 +17688,7 @@ var instance = MyClass();
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let ts2348_errors: Vec<_> = checker.ctx.diagnostics.iter().filter(|d| d.code == 2348).collect();
@@ -18165,7 +18165,7 @@ mixed(42, 99, 100);
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let ts2554_errors: Vec<_> = checker.ctx.diagnostics.iter().filter(|d| d.code == 2554).collect();
@@ -18234,7 +18234,7 @@ const noAnnotation = () => {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -18279,7 +18279,7 @@ const noAnnotation = function() {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -18313,7 +18313,7 @@ function outer(): (x: number) => string {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -18358,7 +18358,7 @@ const switchWithDefault = (value: number): string => {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -18407,7 +18407,7 @@ const tryFinallyFallthrough = (): number => {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -18450,7 +18450,7 @@ function test3(): string {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -18485,7 +18485,7 @@ function test2(): number {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -18522,7 +18522,7 @@ function test2(): void {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -18576,7 +18576,7 @@ function test3(x: number): number {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -18618,7 +18618,7 @@ function test2(x: number): number {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -18664,7 +18664,7 @@ function test3(x: number): number {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -18703,7 +18703,7 @@ class MyClass {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -18747,7 +18747,7 @@ const arrowPromise = async (): Promise<string> => "test";
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -18778,7 +18778,7 @@ class DuplicateProperties {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -18811,7 +18811,7 @@ const obj = {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
@@ -18851,7 +18851,7 @@ const obj2 = {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();

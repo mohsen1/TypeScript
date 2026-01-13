@@ -347,6 +347,7 @@ impl<'a> Completions<'a> {
         let file_name = self.file_name.as_ref()?;
 
         let mut cache_ref = type_cache;
+        let strict = false;  // TODO: get from tsconfig
         let mut checker = if let Some(cache) = cache_ref.as_deref_mut() {
             if let Some(cache_value) = cache.take() {
                 ThinCheckerState::with_cache(
@@ -355,6 +356,7 @@ impl<'a> Completions<'a> {
                     interner,
                     file_name.clone(),
                     cache_value,
+                    strict,
                 )
             } else {
                 ThinCheckerState::new(
@@ -362,6 +364,7 @@ impl<'a> Completions<'a> {
                     self.binder,
                     interner,
                     file_name.clone(),
+                    strict,
                 )
             }
         } else {
@@ -370,6 +373,7 @@ impl<'a> Completions<'a> {
                 self.binder,
                 interner,
                 file_name.clone(),
+                strict,
             )
         };
 
@@ -523,6 +527,7 @@ impl<'a> Completions<'a> {
 
         // 2. Determine the contextual type (expected type)
         let mut cache_ref = type_cache;
+        let strict = false;  // TODO: get from tsconfig
         let mut checker = if let Some(cache) = cache_ref.as_deref_mut() {
             if let Some(cache_value) = cache.take() {
                 ThinCheckerState::with_cache(
@@ -531,6 +536,7 @@ impl<'a> Completions<'a> {
                     interner,
                     file_name.clone(),
                     cache_value,
+                    strict,
                 )
             } else {
                 ThinCheckerState::new(
@@ -538,6 +544,7 @@ impl<'a> Completions<'a> {
                     self.binder,
                     interner,
                     file_name.clone(),
+                    strict,
                 )
             }
         } else {
@@ -546,6 +553,7 @@ impl<'a> Completions<'a> {
                 self.binder,
                 interner,
                 file_name.clone(),
+                strict,
             )
         };
 

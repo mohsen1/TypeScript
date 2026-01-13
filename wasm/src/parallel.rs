@@ -596,6 +596,7 @@ pub fn check_functions_parallel(program: &MergedProgram) -> CheckResult {
                 &binder,
                 &program.type_interner,
                 file.file_name.clone(),
+                false,  // strict mode not applicable for internal operations
             );
 
             let mut function_results = Vec::new();

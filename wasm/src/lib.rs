@@ -355,6 +355,7 @@ impl ThinParser {
 
         if let (Some(root_idx), Some(binder)) = (self.source_file_idx, &self.binder) {
             let file_name = self.parser.get_file_name().to_string();
+            let strict = false;  // TODO: get from tsconfig
             let mut checker = if let Some(cache) = self.type_cache.take() {
                 ThinCheckerState::with_cache(
                     self.parser.get_arena(),
@@ -362,6 +363,7 @@ impl ThinParser {
                     &self.type_interner,
                     file_name,
                     cache,
+                    strict,
                 )
             } else {
                 ThinCheckerState::new(
@@ -369,6 +371,7 @@ impl ThinParser {
                     binder,
                     &self.type_interner,
                     file_name,
+                    strict,
                 )
             };
 
@@ -414,6 +417,7 @@ impl ThinParser {
     pub fn get_type_of_node(&mut self, node_idx: u32) -> String {
         if let (Some(_), Some(binder)) = (self.source_file_idx, &self.binder) {
             let file_name = self.parser.get_file_name().to_string();
+            let strict = false;  // TODO: get from tsconfig
             let mut checker = if let Some(cache) = self.type_cache.take() {
                 ThinCheckerState::with_cache(
                     self.parser.get_arena(),
@@ -421,6 +425,7 @@ impl ThinParser {
                     &self.type_interner,
                     file_name,
                     cache,
+                    strict,
                 )
             } else {
                 ThinCheckerState::new(
@@ -428,6 +433,7 @@ impl ThinParser {
                     binder,
                     &self.type_interner,
                     file_name,
+                    strict,
                 )
             };
 
@@ -1183,6 +1189,7 @@ impl ThinParser {
         let line_map = self.line_map.as_ref().unwrap();
         let file_name = self.parser.get_file_name().to_string();
         let source_text = self.parser.get_source_text();
+        let strict = false;  // TODO: get from tsconfig
 
         let mut checker = if let Some(cache) = self.type_cache.take() {
             ThinCheckerState::with_cache(
@@ -1191,6 +1198,7 @@ impl ThinParser {
                 &self.type_interner,
                 file_name.clone(),
                 cache,
+                strict,
             )
         } else {
             ThinCheckerState::new(
@@ -1198,6 +1206,7 @@ impl ThinParser {
                 binder,
                 &self.type_interner,
                 file_name.clone(),
+                strict,
             )
         };
 

@@ -440,7 +440,7 @@ if (isString(x)) {
 
     let arena = parser.get_arena();
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let analyzer = FlowAnalyzer::with_node_types(arena, &binder, &types, &checker.ctx.node_types);
@@ -483,7 +483,7 @@ if (guard(x)) {
 
     let arena = parser.get_arena();
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let analyzer = FlowAnalyzer::with_node_types(arena, &binder, &types, &checker.ctx.node_types);
@@ -553,7 +553,7 @@ if (assertString(x)) {
 
     let arena = parser.get_arena();
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let analyzer = FlowAnalyzer::with_node_types(arena, &binder, &types, &checker.ctx.node_types);
@@ -592,7 +592,7 @@ x;
 
     let arena = parser.get_arena();
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let analyzer = FlowAnalyzer::with_node_types(arena, &binder, &types, &checker.ctx.node_types);
@@ -669,7 +669,7 @@ x;
 
     let arena = parser.get_arena();
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let analyzer = FlowAnalyzer::with_node_types(arena, &binder, &types, &checker.ctx.node_types);
@@ -717,7 +717,7 @@ class Foo {
 
     let arena = parser.get_arena();
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let analyzer = FlowAnalyzer::with_node_types(arena, &binder, &types, &checker.ctx.node_types);
@@ -1162,7 +1162,7 @@ if (isStringArray(x)) {
 
     let arena = parser.get_arena();
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     let analyzer = FlowAnalyzer::with_node_types(arena, &binder, &types, &checker.ctx.node_types);
