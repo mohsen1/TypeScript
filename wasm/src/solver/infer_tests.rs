@@ -14527,7 +14527,7 @@ fn test_variance_computation_contravariant() {
         type_params: Vec::new(),
         params: vec![ParamInfo {
             type_id: t_type,
-            name: interner.intern_string("x"),
+            name: Some(interner.intern_string("x")),
             optional: false,
             rest: false,
         }],
@@ -14574,7 +14574,7 @@ fn test_variance_computation_invariant() {
         type_params: Vec::new(),
         params: vec![ParamInfo {
             type_id: t_type,
-            name: interner.intern_string("x"),
+            name: Some(interner.intern_string("x")),
             optional: false,
             rest: false,
         }],
