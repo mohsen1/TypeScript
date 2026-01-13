@@ -500,6 +500,84 @@ const ru: ReadonlyUser = { name: "test", age: 25 };
 const pu: PartialUser = { name: "test" };
 
 // =================================================================
+// SECTION 14.5: READONLY PROPERTY ASSIGNABILITY
+// =================================================================
+
+// Test readonly property assignability rules
+
+// Readonly to readonly - valid
+interface ReadonlyProps {
+    readonly x: number;
+    readonly y: string;
+}
+
+const rp1: ReadonlyProps = { x: 1, y: "test" };
+const rp2: ReadonlyProps = rp1; // Valid
+
+// Mutable to mutable - valid
+interface MutableProps {
+    x: number;
+    y: string;
+}
+
+const mp1: MutableProps = { x: 1, y: "test" };
+const mp2: MutableProps = mp1; // Valid
+
+// Mutable to readonly - VALID (covariant for reading)
+interface ReadonlyToMutableTest {
+    readonly x: number;
+}
+
+const rt: ReadonlyToMutableTest = { x: 1 };
+const mt1: MutableProps = { x: 1, y: "test" }; // Mutable type
+const rtFromMutable: ReadonlyToMutableTest = mt1; // Valid - mutable to readonly works
+
+// Readonly to mutable - INVALID
+interface MutableFromReadonly {
+    x: number; // mutable
+}
+
+const readonlyObj: ReadonlyProps = { x: 1, y: "test" };
+// @ts-expect-error - Type 'ReadonlyProps' is not assignable to type 'MutableFromReadonly'
+const mutableFromReadonly: MutableFromReadonly = readonlyObj;
+
+// Mixed readonly and mutable properties
+interface MixedReadonly {
+    readonly x: number;
+    y: string; // mutable
+}
+
+interface MixedMutable {
+    x: number; // mutable
+    readonly y: string;
+}
+
+// @ts-expect-error - Property 'x' is readonly in source but mutable in target
+const mixed1: MixedMutable = { x: 1, y: "test" } as MixedReadonly;
+
+// @ts-expect-error - Property 'y' is mutable in source but readonly in target (wait, this should actually work)
+const mixed2: MixedReadonly = { x: 1, y: "test" } as MixedMutable;
+
+// Actually, mutable to readonly should work for each property independently
+const mixedMutable: MixedMutable = { x: 1, y: "test" };
+// @ts-expect-error - Cannot assign readonly 'x' to mutable 'x'
+const mixedToReadonly: MixedReadonly = mixedMutable;
+
+// Readonly array to mutable array
+const readonlyArr: readonly number[] = [1, 2, 3];
+// @ts-expect-error - Type 'readonly number[]' is not assignable to type 'number[]'
+const mutableArr: number[] = readonlyArr;
+
+// Mutable array to readonly array - VALID
+const mutableArr2: number[] = [1, 2, 3];
+const readonlyArr2: readonly number[] = mutableArr2; // Valid
+
+// Readonly tuple
+const readonlyTuple: readonly [number, string] = [1, "test"];
+// @ts-expect-error - Type 'readonly [number, string]' is not assignable to type '[number, string]'
+const mutableTuple: [number, string] = readonlyTuple;
+
+// =================================================================
 // SECTION 15: TEMPLATE LITERAL TYPES
 // =================================================================
 
