@@ -486,16 +486,42 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
             (TypeKey::TypeParameter(s_info), target_key) | (TypeKey::Infer(s_info), target_key) => {
                 if let TypeKey::TypeParameter(t_info) | TypeKey::Infer(t_info) = target_key {
+                    // Same type parameter by name - reflexive
                     if s_info.name == t_info.name {
                         return SubtypeResult::True;
                     }
+
+                    // Different type parameters - check constraint compatibility
+                    match (s_info.constraint, t_info.constraint) {
+                        // Source has constraint, target has constraint - check if source's constraint is a subtype of target's constraint
+                        (Some(s_constraint), Some(t_constraint)) => {
+                            return self.check_subtype(s_constraint, t_constraint);
+                        }
+                        // Only source has constraint - check if it satisfies the target type parameter
+                        (Some(s_constraint), None) => {
+                            return self.check_subtype(s_constraint, target);
+                        }
+                        // Only target has constraint - source (unconstrained) acts like unknown, which is not a subtype of constrained
+                        (None, Some(_)) => {
+                            return SubtypeResult::False;
+                        }
+                        // Both unconstrained - they both act like unknown, so they're compatible
+                        (None, None) => {
+                            return SubtypeResult::True;
+                        }
+                    }
                 }
 
+                // Type parameter vs concrete type
                 if let Some(constraint) = s_info.constraint {
+                    // Check if the constraint is a subtype of the target
                     return self.check_subtype(constraint, target);
                 }
 
-                SubtypeResult::False
+                // Unconstrained type parameter acts like `unknown` (top type)
+                // It is assignable to any type (but not vice versa)
+                // Since we're checking `source <: target`, unknown <: anything is TRUE
+                SubtypeResult::True
             }
 
             // object keyword accepts any non-primitive type
