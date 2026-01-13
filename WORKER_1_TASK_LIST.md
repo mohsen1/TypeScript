@@ -1,19 +1,24 @@
 # Worker 1 Task List - CFA Squad (Lead)
 
 ## Current Task
-- [ ] **CFA-18: Verify conformance test results**
-  - Run full conformance test suite
-  - Analyze TS2454/TS2564 error counts
-  - Measure actual reduction percentage
-  - Document remaining gaps and next steps
-
-## Queue
 - [ ] **CFA-21: Coordinate final CFA integration**
   - Work with Workers 2-3 to finalize CFA components
   - Ensure all CFA errors are properly emitted
   - Verify conformance test results meet 90% reduction goal
 
+## Queue
+- [ ] **CFA-22: Document CFA implementation**
+  - Write comprehensive documentation for CFA system
+  - Document FlowGraph API and usage
+  - Create examples for using CFA in type checking
+  - Document performance characteristics
+
 ## Completed
+- [x] **CFA-18: Verify conformance test results**
+  - Ran full conformance test suite
+  - Analyzed TS2454/TS2564 error counts
+  - Measured actual reduction percentage
+  - Documented remaining gaps and next steps
 - [x] **CFA-17: Write comprehensive CFA integration test**
   - Created CFA_CONFORMANCE_REPORT.md documenting test results
   - Added differential-test/find-ts2564.mjs for automated testing
