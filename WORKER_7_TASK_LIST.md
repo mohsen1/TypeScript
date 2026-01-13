@@ -1,15 +1,16 @@
 # Worker 7 Task List
 
 ## Current Task
-- [ ] Add Unknown type propagation rules
-  - Unknown should force explicit type annotations
-  - Unknown should trigger errors in unsafe operations
-  - Verify Unknown doesn't spread too aggressively
+All tasks completed!
 
 ## Queue
 (none)
 
 ## Completed
+- [x] Add Unknown type propagation rules
+  - Unknown should force explicit type annotations
+  - Unknown should trigger errors in unsafe operations
+  - Verify Unknown doesn't spread too aggressively
 - [x] Audit all bail-out points in solve_subtype
   - Search for early returns that default to permissive results
   - Replace with conservative assumptions (Unknown, error types)
