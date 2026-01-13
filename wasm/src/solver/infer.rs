@@ -1460,8 +1460,10 @@ impl<'a> InferenceContext<'a> {
         if source.is_none() && target.is_none() {
             return true;
         }
-        let source = source.unwrap_or(TypeId::ANY);
-        let target = target.unwrap_or(TypeId::ANY);
+        // Use Unknown instead of Any for stricter type checking
+        // When this parameter type is not specified, we should not allow any value
+        let source = source.unwrap_or(TypeId::UNKNOWN);
+        let target = target.unwrap_or(TypeId::UNKNOWN);
         self.are_parameters_compatible(source, target, bivariant)
     }
 

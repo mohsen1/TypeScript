@@ -1636,7 +1636,10 @@ impl<'a> TypeLowering<'a> {
                 None
             };
 
-            let constraint_type = constraint.unwrap_or(TypeId::ANY);
+            // Use Unknown instead of Any for stricter type checking
+            // When a generic parameter has no constraint, use Unknown to prevent
+            // invalid values from being accepted
+            let constraint_type = constraint.unwrap_or(TypeId::UNKNOWN);
 
             (
                 TypeParamInfo {
@@ -1981,12 +1984,15 @@ impl<'a> TypeLowering<'a> {
                         && self.lookup_type_param(name).is_none()
                         && self.resolve_type_symbol(data.type_name).is_none()
                     {
+                        // Use Unknown instead of Any for stricter type checking
+                        // Array/ReadonlyArray without type arguments defaults to unknown[]
+                        // instead of any[] to prevent implicit any
                         let elem_type = data
                             .type_arguments
                             .as_ref()
                             .and_then(|args| args.nodes.first().copied())
                             .map(|idx| self.lower_type(idx))
-                            .unwrap_or(TypeId::ANY);
+                            .unwrap_or(TypeId::UNKNOWN);
                         let array_type = self.interner.array(elem_type);
                         if name == "ReadonlyArray" {
                             return self.interner.intern(TypeKey::ReadonlyType(array_type));

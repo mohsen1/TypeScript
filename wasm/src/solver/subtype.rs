@@ -2046,8 +2046,10 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         if source_type.is_none() && target_type.is_none() {
             return true;
         }
-        let source_type = source_type.unwrap_or(TypeId::ANY);
-        let target_type = target_type.unwrap_or(TypeId::ANY);
+        // Use Unknown instead of Any for stricter type checking
+        // When this parameter type is not specified, we should not allow any value
+        let source_type = source_type.unwrap_or(TypeId::UNKNOWN);
+        let target_type = target_type.unwrap_or(TypeId::UNKNOWN);
         self.are_parameters_compatible(source_type, target_type)
     }
 
