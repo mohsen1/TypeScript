@@ -13,6 +13,7 @@ All CFA edge case tasks completed!
   - Added `is_variable_used_before_declaration_in_computed_property` for TDZ checking
   - Integrated computed property TDZ check into `get_type_of_identifier`
   - Emits TS2454 when a variable is used in a computed property name before its declaration
+  - Also fixed duplicate ValidationError enum definition in thin_binder.rs
 - [x] **CFA-25: Implement static block definite assignment analysis**
   - Added `find_enclosing_static_block` helper to detect if code is inside a static block
   - Added `find_class_for_static_block` helper to get the enclosing class
