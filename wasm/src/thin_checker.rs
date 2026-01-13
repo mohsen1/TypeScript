@@ -3248,6 +3248,8 @@ impl<'a> ThinCheckerState<'a> {
         let mut properties: FxHashMap<Atom, PropertyInfo> = FxHashMap::default();
         let mut methods: FxHashMap<Atom, MethodAggregate> = FxHashMap::default();
         let mut accessors: FxHashMap<Atom, AccessorAggregate> = FxHashMap::default();
+        let mut static_string_index: Option<crate::solver::IndexSignature> = None;
+        let mut static_number_index: Option<crate::solver::IndexSignature> = None;
 
         for &member_idx in &class.members.nodes {
             let Some(member_node) = self.ctx.arena.get(member_idx) else {
@@ -3345,6 +3347,48 @@ impl<'a> ThinCheckerState<'a> {
                             })
                             .unwrap_or(TypeId::ANY);
                         entry.setter = Some(setter_type);
+                    }
+                }
+                k if k == syntax_kind_ext::INDEX_SIGNATURE => {
+                    // Handle static index signatures
+                    let Some(index_sig) = self.ctx.arena.get_index_signature(member_node) else {
+                        continue;
+                    };
+                    // Only process static index signatures here
+                    if !self.has_static_modifier(&index_sig.modifiers) {
+                        continue;
+                    }
+
+                    let param_idx = index_sig.parameters.nodes.first().copied().unwrap_or(NodeIndex::NONE);
+                    let Some(param_node) = self.ctx.arena.get(param_idx) else {
+                        continue;
+                    };
+                    let Some(param) = self.ctx.arena.get_parameter(param_node) else {
+                        continue;
+                    };
+
+                    let key_type = if param.type_annotation.is_none() {
+                        TypeId::ANY
+                    } else {
+                        self.get_type_from_type_node(param.type_annotation)
+                    };
+                    let value_type = if index_sig.type_annotation.is_none() {
+                        TypeId::ANY
+                    } else {
+                        self.get_type_from_type_node(index_sig.type_annotation)
+                    };
+                    let readonly = self.has_readonly_modifier(&index_sig.modifiers);
+
+                    let index = crate::solver::IndexSignature {
+                        key_type,
+                        value_type,
+                        readonly,
+                    };
+
+                    if key_type == TypeId::NUMBER {
+                        Self::merge_index_signature(&mut static_number_index, index);
+                    } else {
+                        Self::merge_index_signature(&mut static_string_index, index);
                     }
                 }
                 _ => {}
@@ -3558,7 +3602,8 @@ impl<'a> ThinCheckerState<'a> {
             call_signatures: Vec::new(),
             construct_signatures,
             properties,
-            ..Default::default()
+            string_index: static_string_index,
+            number_index: static_number_index,
         });
 
         if let Some(level) = constructor_access {
