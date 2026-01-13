@@ -80,3 +80,5 @@ mod index_signature_tests;
 mod lawyer_tests;
 #[cfg(test)]
 mod union_tests;
+#[cfg(test)]
+mod integration_tests;
