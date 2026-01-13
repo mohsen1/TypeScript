@@ -1,13 +1,13 @@
 # Worker 10 Task List - Solver Squad
 
 ## Current Task
-- [ ] **SOLV-25: Test discriminated union type checking**
-  - Ensure discriminated unions narrow correctly
-  - Test: `type Shape = { kind: "circle", radius: number } | { kind: "square", side: number }`
-  - Verify type narrowing on discriminant property
+- [ ] **SOLV-26: Add readonly modifier handling**
+  - Implement readonly property type checking
+  - Ensure readonly is covariant (can assign readonly to mutable)
+  - Test: `readonly x: number` vs `x: number` assignability
+  - Coordinate with Worker 9 on intersection types
 
 ## Queue
-- [ ] **SOLV-26: Add readonly modifier handling**
   - Implement readonly property type checking
   - Ensure readonly is covariant (can assign readonly to mutable)
   - Test: `readonly x: number` vs `x: number` assignability
@@ -28,6 +28,11 @@
   - Test end-to-end type checking with all improvements integrated
 
 ## Completed
+- [x] **SOLV-25: Test discriminated union type checking**
+  - Ensured discriminated unions narrow correctly
+  - Tested: `type Shape = { kind: "circle", radius: number } | { kind: "square", side: number }`
+  - Verified type narrowing on discriminant property
+  - Added tests to solver_tests.ts
 - [x] **SOLV-24: Write conformance tests for Solver**
   - Created test file: `tests/conformance/solver_tests.ts`
   - Added cases for TS2322 (type not assignable) errors
