@@ -1,15 +1,16 @@
 # Worker 3 Task List
 
 ## Current Task
-- [ ] Add conformance tests for CFA
+All tasks completed!
+
+## Queue
+(none)
+
+## Completed
+- [x] Add conformance tests for CFA
   - Create test cases from missing TS2454/TS2564 errors
   - Verify FlowGraph captures all control flow paths
   - Benchmark performance impact
-
-## Queue
-(none yet)
-
-## Completed
 - [x] Integrate flow analysis with error reporting
   - Emit TS2454 errors at correct source locations
   - Emit TS2564 errors at correct source locations
