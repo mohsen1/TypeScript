@@ -1,15 +1,16 @@
 # Worker 9 Task List
 
 ## Current Task
-- [ ] Add subtyping conformance tests
+All tasks completed!
+
+## Queue
+(none)
+
+## Completed
+- [x] Add subtyping conformance tests
   - Create tests from the 310 missing TS2322 cases
   - Verify each now emits an error
   - Check for false positives
-
-## Queue
-(none yet)
-
-## Completed
 - [x] Fix missing TS7006 (Implicit Any) errors - 357 cases
   - Track where type inference defaults to Any without error
   - Ensure missing type annotations trigger errors in strict mode
