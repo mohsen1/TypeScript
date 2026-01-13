@@ -1,13 +1,12 @@
 # Worker 7 Task List - Solver Squad
 
 ## Current Task
-- [ ] **SOLV-20: Add solver integration tests**
-  - Create comprehensive test suite for solver strictness
-  - Verify TS2322 and TS7006 error counts improve
-  - Goal: Convert missing TS2322 errors to exact matches
+- [ ] **SOLV-27: Verify solver strictness improvements**
+  - Run full conformance test suite with solver changes
+  - Measure actual reduction in missing TS2322/TS7006 errors
+  - Document remaining gaps and edge cases
 
 ## Queue
-- [ ] **SOLV-27: Verify solver strictness improvements**
   - Run full conformance test suite with solver changes
   - Measure actual reduction in missing TS2322/TS7006 errors
   - Document remaining gaps and edge cases
@@ -28,6 +27,11 @@
   - Provide recommendations for future enhancements
 
 ## Completed
+- [x] **SOLV-20: Add solver integration tests**
+  - Created comprehensive test suite for solver strictness
+  - Created wasm/src/solver/integration_tests.rs (1256 lines)
+  - Added integration tests to solver module
+  - Verified TS2322 and TS7006 error counting infrastructure
 - [x] **SOLV-19: Strengthen function type variance**
   - Implemented proper contravariance for parameter types
   - Handled function type assignability correctly
