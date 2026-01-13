@@ -1331,9 +1331,13 @@ arr.forEach((item) => {
     let root_node = arena.get(root).expect("root node");
     let source_file = arena.get_source_file(root_node).expect("source file");
 
-    // Get the forEach call statement (index 3)
-    let foreach_call_idx = *source_file.statements.nodes.get(3).expect("forEach call");
-    let foreach_call_node = arena.get(foreach_call_idx).expect("forEach call node");
+    // Get the forEach expression statement (index 3)
+    let foreach_stmt_idx = *source_file.statements.nodes.get(3).expect("forEach statement");
+    let foreach_stmt_node = arena.get(foreach_stmt_idx).expect("forEach stmt node");
+    let foreach_stmt_data = arena.get_expression_statement(foreach_stmt_node).expect("forEach stmt data");
+
+    // Get the call expression from the expression statement
+    let foreach_call_node = arena.get(foreach_stmt_data.expression).expect("forEach call node");
     let foreach_call = arena.get_call_expr(foreach_call_node).expect("forEach call data");
 
     // Get the arrow function argument
@@ -1347,8 +1351,18 @@ arr.forEach((item) => {
     let body_block = arena.get_block(body_node).expect("body block");
 
     // Get the variable reference x inside the closure (in the initializer of y)
-    let y_decl_stmt = *body_block.statements.nodes.first().expect("y declaration");
-    let y_decl_node = arena.get(y_decl_stmt).expect("y decl node");
+    let y_var_stmt_idx = *body_block.statements.nodes.first().expect("y variable statement");
+    let y_var_stmt_node = arena.get(y_var_stmt_idx).expect("y var stmt node");
+    let y_var_stmt_data = arena.get_variable(y_var_stmt_node).expect("y var stmt data");
+
+    // Get the declaration list
+    let y_decl_list_idx = *y_var_stmt_data.declarations.nodes.first().expect("y declaration list");
+    let y_decl_list_node = arena.get(y_decl_list_idx).expect("y decl list node");
+    let y_decl_list_data = arena.get_variable(y_decl_list_node).expect("y decl list data");
+
+    // Get the declaration
+    let y_decl_idx = *y_decl_list_data.declarations.nodes.first().expect("y declaration");
+    let y_decl_node = arena.get(y_decl_idx).expect("y decl node");
     let y_decl = arena.get_variable_declaration(y_decl_node).expect("y decl data");
     let x_ref_in_closure = y_decl.initializer;
 
