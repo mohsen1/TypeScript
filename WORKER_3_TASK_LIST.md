@@ -12,6 +12,21 @@
   - Work with Worker 1 to merge FlowGraph integration
   - Ensure Checker integration is complete
   - Verify all CFA components work together
+- [ ] **CFA-29: Add loop-induced definite assignment tests**
+  - Test `for (let x of arr) { }` definite assignment in loop body
+  - Verify `for (const x of arr)` is always definitely assigned
+  - Handle `for (;;)` with break statements: `let x; for (;;) { if (cond) { x = 1; break; } } console.log(x);`
+  - Test while/do-while loop exit analysis
+- [ ] **CFA-30: Implement class property definite assignment in derived classes**
+  - Verify derived class properties are initialized
+  - Handle super() calls in relation to property initialization
+  - Test: `class Derived extends Base { prop: number; }` should error
+  - Ensure `this` is used after super() in property initializers
+- [ ] **CFA-31: Write final CFA conformance report**
+  - Document all TS2454/TS2564 improvements
+  - Create before/after comparison with tsc
+  - List any remaining edge cases or known limitations
+  - Provide recommendations for future enhancements
 
 ## Completed
 - [x] **CFA-9: Write conformance tests for CFA**

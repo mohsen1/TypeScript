@@ -11,6 +11,19 @@
   - Handle cases where same name is used as value and type
   - Test: `interface X { } const X: number;`
   - Ensure proper namespace separation during binding
+- [ ] **BIND-24: Test enum member resolution across imports**
+  - Verify `import { Enum }` resolves enum members correctly
+  - Test: `Enum.Value` access patterns
+  - Handle const enum vs regular enum differences
+- [ ] **BIND-25: Write final Binder conformance report**
+  - Document all TS2304 improvements
+  - Create before/after comparison with tsc
+  - List any remaining edge cases or known limitations
+  - Provide recommendations for future enhancements
+- [ ] **BIND-26: Coordinate with CFA and Solver squads on cross-cutting issues**
+  - Ensure global symbols work correctly with CFA
+  - Verify fixed binding enables proper solver strictness
+  - Test end-to-end type checking with all improvements integrated
 
 ## Completed
 - [x] **BIND-9: Write conformance tests for Binder**

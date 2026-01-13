@@ -11,6 +11,19 @@
   - Ensure DOM types from lib.d.ts are accessible
   - Test: `window.alert("hi")` should not produce TS2304
   - Verify `document`, `navigator`, etc. resolve correctly
+- [ ] **BIND-18: Fix symbol lookup order for module imports**
+  - Ensure module locals shadow globals correctly
+  - Test: `import { console } from "other";` should use imported console
+  - Handle re-exported symbols correctly
+- [ ] **BIND-19: Verify TS2304 < 50 goal achieved**
+  - Run full conformance test suite
+  - Count TS2304 extra errors (was 702)
+  - Document final reduction percentage
+  - Goal: <50 extra TS2304 errors
+- [ ] **BIND-20: Fix ambient module and namespace symbol merging**
+  - Handle `declare module` merging with global scope
+  - Ensure namespace symbols don't leak incorrectly
+  - Test: `declare global { interface Window { custom: any; } }`
 
 ## Completed
 - [x] **BIND-7: Test TS2304 fixes**

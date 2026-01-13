@@ -12,6 +12,18 @@
   - Ensure `import * as ns` creates proper namespace object
   - Test: `ns.function()` access patterns
   - Handle namespace member lookup correctly
+- [ ] **BIND-21: Test dynamic import() resolution**
+  - Verify `import("module")` type resolution works
+  - Handle dynamic import type inference
+  - Test promise-based import types
+- [ ] **BIND-22: Fix export default symbol binding**
+  - Ensure `export default class {}` binds correctly
+  - Test `import X from "module"` resolution
+  - Handle `export { X as default }` correctly
+- [ ] **BIND-23: Verify all global symbols resolve**
+  - Create comprehensive test for all ECMAScript globals
+  - Test: `Object`, `Array`, `String`, `Number`, `Boolean`, `Symbol`, `Promise`, `Map`, `Set`, etc.
+  - Ensure DOM types from lib.d.ts work: `window`, `document`, `navigator`
 
 ## Completed
 - [x] **BIND-13: Fix import/export symbol resolution**

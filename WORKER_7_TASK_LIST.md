@@ -11,6 +11,21 @@
   - Run full conformance test suite with solver changes
   - Measure actual reduction in missing TS2322/TS7006 errors
   - Document remaining gaps and edge cases
+- [ ] **SOLV-28: Convert missing TS2322 to exact matches**
+  - Was 310 missing TS2322 errors
+  - Goal: Convert to exact match or extra error (better to be strict)
+  - Fix subtype checking for function types, generics, intersections
+  - Ensure Unknown fallback produces errors, not silent acceptance
+- [ ] **SOLV-29: Convert missing TS7006 to exact matches**
+  - Was 357 missing TS7006 errors
+  - Ensure implicit any parameters are detected
+  - Verify all function parameters without annotations produce TS7006 in strict mode
+  - Test generic function parameter inference
+- [ ] **SOLV-30: Write final Solver conformance report**
+  - Document all TS2322/TS7006 improvements
+  - Create before/after comparison with tsc
+  - List any remaining edge cases or known limitations
+  - Provide recommendations for future enhancements
 
 ## Completed
 - [x] **SOLV-19: Strengthen function type variance**

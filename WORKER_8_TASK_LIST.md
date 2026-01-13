@@ -12,6 +12,18 @@
   - Work with Worker 7 to merge Lawyer layer changes
   - Ensure generic checking works with Unknown fallback
   - Verify all solver components integrate correctly
+- [ ] **SOLV-31: Fix generic type inference from call sites**
+  - Handle `function f<T>(x: T): T` with `f(123)` inferring T=number
+  - Test generic inference with union types
+  - Verify generic constraints are enforced during inference
+- [ ] **SOLV-32: Strengthen generic constraint checking**
+  - Ensure `<T extends U>` constraints are enforced
+  - Test: `function f<T extends number>(x: T) {} f<string>("hi")` should error
+  - Handle complex constraints with extends conditions
+- [ ] **SOLV-33: Test generic variance with function types**
+  - Verify contravariant function parameter types
+  - Test: `(x: number) => void` vs `(x: string | number) => void`
+  - Handle function types in generic contexts
 
 ## Completed
 - [x] **SOLV-8: Handle implicit any parameters (TS7006)**

@@ -11,6 +11,18 @@
   - Implement template literal type inference
   - Handle string literal unions in template literals
   - Test: `` `hello-${T}` `` type resolution
+- [ ] **SOLV-34: Implement conditional type evaluation**
+  - Evaluate `T extends U ? X : Y` correctly
+  - Handle distributive conditional types over unions
+  - Test conditional type inference
+- [ ] **SOLV-35: Add mapped type handling**
+  - Implement `[K in keyof T]: U` mapped types
+  - Handle readonly and optional modifiers in mapped types
+  - Test: `{ readonly [P in keyof T]: T[P] }`
+- [ ] **SOLV-36: Fix infer keyword in conditional types**
+  - Handle `infer R` in conditional type constraints
+  - Test type inference with `infer` in return types
+  - Verify `ReturnType<T>` utility type works correctly
 
 ## Completed
 - [x] **SOLV-9: Test generic constraint violations**

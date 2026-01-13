@@ -11,6 +11,20 @@
   - Handle async generator functions with yield/await
   - Track variable state through async generator control flow
   - Test complex async generator scenarios
+- [ ] **CFA-26: Fix destructuring pattern definite assignment**
+  - Analyze nested destructuring: `const { a: { b } } = obj;`
+  - Handle array destructuring with defaults: `const [x = 1] = arr;`
+  - Track assignment through complex object patterns
+  - Test with flow analysis: `let x; if (cond) { ({ x } = obj); } console.log(x);`
+- [ ] **CFA-27: Implement catch clause variable binding analysis**
+  - Catch clause variables should be definitely assigned in catch block
+  - Verify `try {} catch (e) { console.log(e); }` works correctly
+  - Handle nested try/catch blocks with same variable names
+- [ ] **CFA-28: Add temporal dead zone (TDZ) detection**
+  - Detect usage of let/const before declaration (TDZ)
+  - Emit TS2448 error for TDZ violations
+  - Test: `console.log(x); let x;` should error
+  - Verify TDZ works with block scoping and loops
 
 ## Completed
 - [x] **CFA-16: Add generator function flow tracking**

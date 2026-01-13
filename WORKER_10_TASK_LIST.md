@@ -12,6 +12,20 @@
   - Ensure readonly is covariant (can assign readonly to mutable)
   - Test: `readonly x: number` vs `x: number` assignability
   - Coordinate with Worker 9 on intersection types
+- [ ] **SOLV-37: Implement discriminated union narrowing**
+  - Narrow union types based on discriminant property
+  - Test: `type Shape = { kind: "circle", radius: number } | { kind: "square", side: number }`
+  - Verify `if (shape.kind === "circle")` narrows to circle type
+  - Handle user-defined type guards with discriminants
+- [ ] **SOLV-38: Add optional chaining type checking**
+  - Implement `obj?.prop` type checking
+  - Handle `obj?.method()` return types
+  - Test optional chaining with null/undefined
+  - Verify `obj?.[key]` indexed access types
+- [ ] **SOLV-39: Coordinate with CFA and Binder squads on cross-cutting issues**
+  - Ensure solver strictness works with CFA improvements
+  - Verify Unknown fallback doesn't conflict with fixed global scope
+  - Test end-to-end type checking with all improvements integrated
 
 ## Completed
 - [x] **SOLV-24: Write conformance tests for Solver**
