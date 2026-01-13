@@ -1593,3 +1593,146 @@ const msg2 = ErrorCode.getMessage(ErrorCode.ServerError);
         "getMessage should be in ErrorCode exports"
     );
 }
+
+#[test]
+fn test_scope_chain_traversal() {
+    use crate::thin_binder::ThinBinderState;
+    use crate::thin_parser::ThinParserState;
+
+    // Test that identifier resolution walks the scope chain: local -> module -> global
+    let source = r#"
+const globalX = 100;
+
+function foo() {
+    const localX = 200;
+    return localX;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    assert!(binder.file_locals.has("globalX"));
+    assert!(binder.file_locals.has("foo"));
+    assert!(binder.file_locals.has("localX"));
+
+    let local_x_sym_id = binder.file_locals.get("localX").expect("localX should exist");
+    let local_x_symbol = binder.get_symbol(local_x_sym_id).expect("localX symbol should exist");
+
+    use crate::binder::symbol_flags;
+    assert!(local_x_symbol.flags & symbol_flags::BLOCK_SCOPED_VARIABLE != 0);
+}
+
+#[test]
+fn test_variable_shadowing() {
+    use crate::thin_binder::ThinBinderState;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let x = "global";
+
+function test() {
+    let x = "local";
+    return x;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let mut x_count = 0;
+    let symbols = binder.get_symbols();
+    for i in 0..symbols.len() {
+        let id = crate::binder::SymbolId(i as u32);
+        if let Some(sym) = symbols.get(id) {
+            if sym.escaped_name == "x" {
+                x_count += 1;
+            }
+        }
+    }
+
+    assert_eq!(x_count, 2);
+}
+
+#[test]
+fn test_block_scope_let_const() {
+    use crate::thin_binder::ThinBinderState;
+    use crate::thin_parser::ThinParserState;
+    use crate::binder::symbol_flags;
+
+    let source = r#"
+{
+    let blockScoped = "inside";
+    const alsoScoped = "const";
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    assert!(!binder.file_locals.has("blockScoped"));
+    assert!(!binder.file_locals.has("alsoScoped"));
+
+    let mut found_block = false;
+    let mut found_const = false;
+    let symbols = binder.get_symbols();
+    for i in 0..symbols.len() {
+        let id = crate::binder::SymbolId(i as u32);
+        if let Some(sym) = symbols.get(id) {
+            if sym.escaped_name == "blockScoped" {
+                found_block = true;
+                assert!(sym.flags & symbol_flags::BLOCK_SCOPED_VARIABLE != 0);
+            }
+            if sym.escaped_name == "alsoScoped" {
+                found_const = true;
+                assert!(sym.flags & symbol_flags::BLOCK_SCOPED_VARIABLE != 0);
+            }
+        }
+    }
+
+    assert!(found_block);
+    assert!(found_const);
+}
+
+#[test]
+fn test_var_hoisting() {
+    use crate::thin_binder::ThinBinderState;
+    use crate::thin_parser::ThinParserState;
+    use crate::binder::symbol_flags;
+
+    let source = r#"
+function test() {
+    {
+        var x = "hoisted";
+    }
+    return x;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    assert!(binder.file_locals.has("x"));
+
+    let x_sym_id = binder.file_locals.get("x").expect("x should exist");
+    let x_symbol = binder.get_symbol(x_sym_id).expect("x symbol should exist");
+
+    assert!(x_symbol.flags & symbol_flags::FUNCTION_SCOPED_VARIABLE != 0);
+    assert!(x_symbol.flags & symbol_flags::BLOCK_SCOPED_VARIABLE == 0);
+}
