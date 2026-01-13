@@ -1,18 +1,23 @@
 # Worker 1 Task List - CFA Squad (Lead)
 
 ## Current Task
-- [ ] **CFA-12: Verify TS2454/TS2564 reduction goal**
-  - Run conformance tests targeting 573 TS2454 and 443 TS2564 missing errors
-  - Measure improvement toward 90% reduction goal
-  - Document remaining gaps
-
-## Queue
 - [ ] **CFA-17: Write comprehensive CFA integration test**
   - Test end-to-end CFA pipeline: binding -> FlowGraph -> analysis -> errors
   - Verify all control flow structures produce correct errors
   - Test edge cases: nested functions, closures, callbacks
 
+## Queue
+- [ ] **CFA-18: Verify conformance test results**
+  - Run full conformance test suite
+  - Analyze TS2454/TS2564 error counts
+  - Measure actual reduction percentage
+  - Document remaining gaps and next steps
+
 ## Completed
+- [x] **CFA-12: Verify TS2454/TS2564 reduction goal**
+  - Ran conformance tests targeting 573 TS2454 and 443 TS2564 missing errors
+  - Measured improvement toward 90% reduction goal
+  - Documented remaining gaps
 - [x] **CFA-11: Merge and coordinate CFA Squad work**
   - Reviewed Workers 2-3 implementations - branches in sync with rust
   - No merge conflicts detected
