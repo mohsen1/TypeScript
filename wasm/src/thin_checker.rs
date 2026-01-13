@@ -2637,11 +2637,11 @@ impl<'a> ThinCheckerState<'a> {
         };
 
         let Some(node) = self.ctx.arena.get(idx) else {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Missing node - propagate error
         };
 
         let Some(data) = self.ctx.arena.get_type_literal(node) else {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Missing type literal data - propagate error
         };
 
         let mut properties = Vec::new();
@@ -3067,11 +3067,11 @@ impl<'a> ThinCheckerState<'a> {
         };
 
         let Some(node) = self.ctx.arena.get(idx) else {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Missing node - propagate error
         };
 
         let Some(interface) = self.ctx.arena.get_interface(node) else {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Missing interface data - propagate error
         };
 
         let (_interface_type_params, interface_type_param_updates) =
@@ -3954,7 +3954,7 @@ impl<'a> ThinCheckerState<'a> {
         let current_sym = self.ctx.binder.get_node_symbol(class_idx);
         if let Some(sym_id) = current_sym {
             if !visited.insert(sym_id) {
-                return TypeId::ANY;
+                return TypeId::ERROR; // Circular reference - propagate error
             }
         }
 
@@ -5083,11 +5083,11 @@ impl<'a> ThinCheckerState<'a> {
     /// Get type of identifier, with control flow analysis for narrowing.
     fn get_type_of_identifier(&mut self, idx: NodeIndex) -> TypeId {
         let Some(node) = self.ctx.arena.get(idx) else {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Missing node - propagate error
         };
 
         let Some(ident) = self.ctx.arena.get_identifier(node) else {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Missing identifier data - propagate error
         };
 
         let name = &ident.escaped_text;
@@ -5974,7 +5974,7 @@ impl<'a> ThinCheckerState<'a> {
 
         // Check for circular reference
         if self.ctx.symbol_resolution_set.contains(&sym_id) {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Circular reference - propagate error
         }
 
         // Push onto resolution stack
@@ -6796,11 +6796,11 @@ impl<'a> ThinCheckerState<'a> {
     /// Get type of variable declaration.
     fn get_type_of_variable_declaration(&mut self, idx: NodeIndex) -> TypeId {
         let Some(node) = self.ctx.arena.get(idx) else {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Missing node - propagate error
         };
 
         let Some(var_decl) = self.ctx.arena.get_variable_declaration(node) else {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Missing variable declaration data - propagate error
         };
 
         // First check type annotation - this takes precedence
@@ -6848,11 +6848,11 @@ impl<'a> ThinCheckerState<'a> {
         use crate::solver::{CallEvaluator, CallResult, CompatChecker, TypeKey};
 
         let Some(node) = self.ctx.arena.get(idx) else {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Missing node - propagate error
         };
 
         let Some(call) = self.ctx.arena.get_call_expr(node) else {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Missing call expression data - propagate error
         };
 
         // Get the type of the callee
@@ -7619,11 +7619,11 @@ impl<'a> ThinCheckerState<'a> {
         use crate::checker::types::diagnostics::diagnostic_codes;
         use crate::solver::{CallEvaluator, CallResult, CallableShape, CompatChecker, TypeKey};
         let Some(node) = self.ctx.arena.get(idx) else {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Missing node - propagate error
         };
 
         let Some(new_expr) = self.ctx.arena.get_call_expr(node) else {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Missing new expression data - propagate error
         };
 
         // Check if trying to instantiate an abstract class
@@ -8012,20 +8012,20 @@ impl<'a> ThinCheckerState<'a> {
         use crate::solver::{PropertyAccessResult, QueryDatabase};
 
         let Some(node) = self.ctx.arena.get(idx) else {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Missing node - propagate error
         };
 
         let Some(access) = self.ctx.arena.get_access_expr(node) else {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Missing access expression data - propagate error
         };
 
         // Get the property name first (needed for abstract property check regardless of object type)
         let Some(name_node) = self.ctx.arena.get(access.name_or_argument) else {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Missing name node - propagate error
         };
         if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
             if ident.escaped_text.is_empty() {
-                return TypeId::ANY;
+                return TypeId::ERROR; // Empty identifier - propagate error
             }
         }
 
@@ -8321,10 +8321,10 @@ impl<'a> ThinCheckerState<'a> {
         use crate::solver::{PropertyAccessResult, QueryDatabase};
 
         let Some(name_node) = self.ctx.arena.get(name_idx) else {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Missing node - propagate error
         };
         let Some(ident) = self.ctx.arena.get_identifier(name_node) else {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Missing identifier data - propagate error
         };
         let property_name = ident.escaped_text.clone();
 
@@ -8569,11 +8569,11 @@ impl<'a> ThinCheckerState<'a> {
         use crate::solver::{PropertyAccessResult, QueryDatabase};
 
         let Some(node) = self.ctx.arena.get(idx) else {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Missing node - propagate error
         };
 
         let Some(access) = self.ctx.arena.get_access_expr(node) else {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Missing access expression data - propagate error
         };
 
         // Get the type of the object
@@ -9280,11 +9280,11 @@ impl<'a> ThinCheckerState<'a> {
     /// Get type of conditional expression (ternary: a ? b : c).
     fn get_type_of_conditional_expression(&mut self, idx: NodeIndex) -> TypeId {
         let Some(node) = self.ctx.arena.get(idx) else {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Missing node - propagate error
         };
 
         let Some(cond) = self.ctx.arena.get_conditional_expr(node) else {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Missing conditional expression data - propagate error
         };
 
         let when_true = self.get_type_of_node(cond.when_true);
@@ -9303,7 +9303,7 @@ impl<'a> ThinCheckerState<'a> {
         use crate::solver::{FunctionShape, ParamInfo};
 
         let Some(node) = self.ctx.arena.get(idx) else {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Missing node - propagate error
         };
 
         let (type_parameters, parameters, type_annotation, body, name_node, name_for_error) =
@@ -9336,7 +9336,7 @@ impl<'a> ThinCheckerState<'a> {
                     self.property_name_for_error(method.name),
                 )
             } else {
-                return TypeId::ANY;
+                return TypeId::ERROR; // Missing function/method data - propagate error
             };
 
         // Function declarations don't report implicit any for parameters (handled by check_statement)
@@ -9588,11 +9588,11 @@ impl<'a> ThinCheckerState<'a> {
         use crate::solver::{TupleElement, TypeKey};
 
         let Some(node) = self.ctx.arena.get(idx) else {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Missing node - propagate error
         };
 
         let Some(array) = self.ctx.arena.get_literal_expr(node) else {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Missing array literal data - propagate error
         };
 
         if array.elements.nodes.is_empty() {
@@ -9718,11 +9718,11 @@ impl<'a> ThinCheckerState<'a> {
         use rustc_hash::FxHashMap;
 
         let Some(node) = self.ctx.arena.get(idx) else {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Missing node - propagate error
         };
 
         let Some(obj) = self.ctx.arena.get_literal_expr(node) else {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Missing object literal data - propagate error
         };
 
         // Collect properties from the object literal (later entries override earlier ones)
@@ -10060,11 +10060,11 @@ impl<'a> ThinCheckerState<'a> {
     /// Get type of prefix unary expression.
     fn get_type_of_prefix_unary(&mut self, idx: NodeIndex) -> TypeId {
         let Some(node) = self.ctx.arena.get(idx) else {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Missing node - propagate error
         };
 
         let Some(unary) = self.ctx.arena.get_unary_expr(node) else {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Missing unary expression data - propagate error
         };
 
         match unary.operator {
@@ -10270,11 +10270,11 @@ impl<'a> ThinCheckerState<'a> {
 
         // Get the extended node to find parent
         let Some(ext) = self.ctx.arena.get_extended(member_decl) else {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Missing extended node data - propagate error
         };
         let parent_idx = ext.parent;
         if parent_idx.is_none() {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Missing parent - propagate error
         }
 
         // Walk up to find the enum declaration
@@ -13189,7 +13189,7 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         if self.is_known_global_value_name(name) {
-            return TypeId::ANY;
+            return TypeId::UNKNOWN; // Known global but unresolved - use UNKNOWN
         }
 
         self.error_property_not_exist_at(name, TypeId::ANY, error_node);
@@ -18731,16 +18731,16 @@ impl<'a> ThinCheckerState<'a> {
         use crate::solver::{FunctionShape, PropertyInfo};
 
         let Some(member_node) = self.ctx.arena.get(member_idx) else {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Missing node - propagate error
         };
 
         if member_node.kind == METHOD_SIGNATURE || member_node.kind == PROPERTY_SIGNATURE {
             let Some(sig) = self.ctx.arena.get_signature(member_node) else {
-                return TypeId::ANY;
+                return TypeId::ERROR; // Missing signature data - propagate error
             };
             let name = self.get_property_name(sig.name);
             let Some(name) = name else {
-                return TypeId::ANY;
+                return TypeId::ERROR; // Missing property name - propagate error
             };
             let name_atom = self.ctx.types.intern_string(&name);
 
@@ -21527,11 +21527,11 @@ impl<'a> ThinCheckerState<'a> {
         return_context: Option<TypeId>,
     ) -> TypeId {
         if body_idx.is_none() {
-            return TypeId::ANY;
+            return TypeId::VOID; // No body - function returns void
         }
 
         let Some(node) = self.ctx.arena.get(body_idx) else {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Missing node - propagate error
         };
 
         if node.kind != syntax_kind_ext::BLOCK {

@@ -7,6 +7,27 @@
 (none yet)
 
 ## Completed
+- [x] **SOLV-46: Fix type expression and literal ANY fallbacks in thin_checker.rs**
+  - Changed get_type_from_type_literal fallbacks from ANY to ERROR (lines 2640, 2644)
+  - Changed get_type_from_interface fallbacks from ANY to ERROR (lines 3070, 3074)
+  - Changed class inheritance circular reference from ANY to ERROR (line 3957)
+  - Changed get_type_of_identifier fallbacks from ANY to ERROR (lines 5086, 5090)
+  - Changed symbol resolution circular reference from ANY to ERROR (line 5977)
+  - Changed get_type_of_variable_declaration fallbacks from ANY to ERROR (lines 6799, 6803)
+  - Changed get_type_of_call_expression fallbacks from ANY to ERROR (lines 6851, 6855)
+  - Changed get_type_of_new_expression fallbacks from ANY to ERROR (lines 7622, 7626)
+  - Changed get_type_of_property_access_inner fallbacks from ANY to ERROR (lines 8015, 8019, 8024, 8028)
+  - Changed private property access fallbacks from ANY to ERROR (lines 8324, 8327)
+  - Changed get_type_of_element_access fallbacks from ANY to ERROR (lines 8572, 8576)
+  - Changed get_type_of_conditional_expression fallbacks from ANY to ERROR (lines 9283, 9287)
+  - Changed get_type_of_function fallbacks from ANY to ERROR (lines 9306, 9339)
+  - Changed get_type_of_array_literal fallbacks from ANY to ERROR (lines 9591, 9595)
+  - Changed get_type_of_object_literal fallbacks from ANY to ERROR (lines 9721, 9725)
+  - Changed get_type_of_prefix_unary fallbacks from ANY to ERROR (lines 10063, 10067)
+  - Changed enum_member_type_from_decl fallbacks from ANY to ERROR (lines 10273, 10277)
+  - Changed known global resolution from ANY to UNKNOWN (line 13192)
+  - Changed get_type_of_interface_member fallbacks from ANY to ERROR (lines 18734, 18739, 18743)
+  - Changed infer_return_type_from_body from ANY to VOID/ERROR (lines 21530, 21534)
 - [x] **SOLV-45: Fix type query and array type ANY fallbacks in thin_checker.rs**
   - Changed get_type_from_type_query known global fallback from ANY to UNKNOWN (line 2239)
   - Changed get_type_from_type_query no-name fallback from ANY to ERROR (line 2269)
