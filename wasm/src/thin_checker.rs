@@ -301,112 +301,249 @@ impl<'a> ThinCheckerState<'a> {
         let lib_binders: Vec<Arc<crate::thin_binder::ThinBinderState>> =
             self.ctx.lib_contexts.iter().map(|lc| Arc::clone(&lc.binder)).collect();
 
-        // Debug logging for symbol resolution (enabled via BIND_DEBUG env var)
-        if std::env::var("BIND_DEBUG").is_ok() {
-            eprintln!(
-                "[BIND_RESOLVE] Looking up identifier '{}' at node {:?}",
-                name, idx
-            );
+        let debug = std::env::var("BIND_DEBUG").is_ok();
+
+        // === PHASE 1: Initial logging ===
+        if debug {
+            eprintln!("\n[BIND_RESOLVE] ========================================");
+            eprintln!("[BIND_RESOLVE] Looking up identifier '{}'", name);
+            eprintln!("[BIND_RESOLVE]   Node index: {:?}", idx);
+            eprintln!("[BIND_RESOLVE]   Lib contexts available: {}", self.ctx.lib_contexts.len());
+            eprintln!("[BIND_RESOLVE]   Lib binders collected: {}", lib_binders.len());
+            eprintln!("[BIND_RESOLVE]   Total scopes in binder: {}", self.ctx.binder.scopes.len());
+            eprintln!("[BIND_RESOLVE]   file_locals size: {}", self.ctx.binder.file_locals.len());
         }
 
+        // === PHASE 2: Scope chain traversal (local -> parent -> ... -> module) ===
         if let Some(mut scope_id) = self.find_enclosing_scope(idx) {
+            if debug {
+                eprintln!("[BIND_RESOLVE] Starting scope chain from: {:?}", scope_id);
+            }
             let require_export = false;
+            let mut scope_depth = 0;
             while !scope_id.is_none() {
+                scope_depth += 1;
                 if let Some(scope) = self.ctx.binder.scopes.get(scope_id.0 as usize) {
+                    if debug {
+                        eprintln!("[BIND_RESOLVE]   [Scope {}] id={:?}, kind={:?}, parent={:?}, table_size={}",
+                            scope_depth, scope_id, scope.kind, scope.parent, scope.table.len());
+                    }
+
+                    // Check scope's local symbol table
                     if let Some(sym_id) = scope.table.get(name) {
+                        if debug {
+                            eprintln!("[BIND_RESOLVE]     -> Found '{}' in scope table as {:?}", name, sym_id);
+                        }
                         // Use get_symbol_with_libs to check lib binders
                         if let Some(symbol) = self.ctx.binder.get_symbol_with_libs(sym_id, &lib_binders) {
                             let export_ok = !require_export
                                 || scope.kind != ContainerKind::Module
                                 || symbol.is_exported
                                 || (symbol.flags & symbol_flags::EXPORT_VALUE) != 0;
-                            if export_ok && !Self::is_class_member_symbol(symbol.flags) {
-                                if std::env::var("BIND_DEBUG").is_ok() {
-                                    eprintln!("[BIND_RESOLVE] Found '{}' in scope {:?}", name, scope_id);
+                            let is_class_member = Self::is_class_member_symbol(symbol.flags);
+                            if debug {
+                                eprintln!("[BIND_RESOLVE]        Symbol flags: 0x{:x}", symbol.flags);
+                                eprintln!("[BIND_RESOLVE]        is_exported: {}, export_ok: {}, is_class_member: {}",
+                                    symbol.is_exported, export_ok, is_class_member);
+                            }
+                            if export_ok && !is_class_member {
+                                if debug {
+                                    eprintln!("[BIND_RESOLVE]     -> SUCCESS: Returning {:?} from scope {:?}", sym_id, scope_id);
                                 }
                                 return Some(sym_id);
+                            } else if debug {
+                                eprintln!("[BIND_RESOLVE]        SKIPPED: export_ok={}, is_class_member={}", export_ok, is_class_member);
                             }
                         } else if !require_export || scope.kind != ContainerKind::Module {
-                            if std::env::var("BIND_DEBUG").is_ok() {
-                                eprintln!("[BIND_RESOLVE] Found '{}' in scope {:?} (no symbol data)", name, scope_id);
+                            if debug {
+                                eprintln!("[BIND_RESOLVE]     -> SUCCESS: Found '{}' in scope {:?} (no symbol data, returning anyway)", name, scope_id);
                             }
                             return Some(sym_id);
+                        } else if debug {
+                            eprintln!("[BIND_RESOLVE]        SKIPPED: No symbol data and require_export or module scope");
                         }
                     }
+
+                    // Check module exports
                     if scope.kind == ContainerKind::Module {
+                        if debug {
+                            eprintln!("[BIND_RESOLVE]     Checking module exports (container_node: {:?})", scope.container_node);
+                        }
                         if let Some(container_sym_id) =
                             self.ctx.binder.get_node_symbol(scope.container_node)
                         {
+                            if debug {
+                                eprintln!("[BIND_RESOLVE]       Container symbol: {:?}", container_sym_id);
+                            }
                             if let Some(container_symbol) =
                                 self.ctx.binder.get_symbol_with_libs(container_sym_id, &lib_binders)
                             {
                                 if let Some(exports) = container_symbol.exports.as_ref() {
+                                    if debug {
+                                        eprintln!("[BIND_RESOLVE]       Module has {} exports", exports.len());
+                                    }
                                     if let Some(member_id) = exports.get(name) {
+                                        if debug {
+                                            eprintln!("[BIND_RESOLVE]       -> Found '{}' in exports as {:?}", name, member_id);
+                                        }
                                         if let Some(member_symbol) =
                                             self.ctx.binder.get_symbol_with_libs(member_id, &lib_binders)
                                         {
-                                            if !Self::is_class_member_symbol(member_symbol.flags) {
-                                                if std::env::var("BIND_DEBUG").is_ok() {
-                                                    eprintln!("[BIND_RESOLVE] Found '{}' in module exports", name);
+                                            let is_class_member = Self::is_class_member_symbol(member_symbol.flags);
+                                            if debug {
+                                                eprintln!("[BIND_RESOLVE]          Member flags: 0x{:x}, is_class_member: {}",
+                                                    member_symbol.flags, is_class_member);
+                                            }
+                                            if !is_class_member {
+                                                if debug {
+                                                    eprintln!("[BIND_RESOLVE]       -> SUCCESS: Returning {:?} from module exports", member_id);
                                                 }
                                                 return Some(member_id);
                                             }
                                         } else {
-                                            if std::env::var("BIND_DEBUG").is_ok() {
-                                                eprintln!("[BIND_RESOLVE] Found '{}' in module exports (no symbol data)", name);
+                                            if debug {
+                                                eprintln!("[BIND_RESOLVE]       -> SUCCESS: Found '{}' in module exports (no symbol data)", name);
                                             }
                                             return Some(member_id);
                                         }
                                     }
+                                } else if debug {
+                                    eprintln!("[BIND_RESOLVE]       Container has no exports");
                                 }
+                            } else if debug {
+                                eprintln!("[BIND_RESOLVE]       Could not get container symbol data");
                             }
+                        } else if debug {
+                            eprintln!("[BIND_RESOLVE]       No container symbol for module");
                         }
                     }
+
                     let parent_id = scope.parent;
                     // Nested namespaces can reference non-exported parent members (TSC behavior).
                     scope_id = parent_id;
                 } else {
+                    if debug {
+                        eprintln!("[BIND_RESOLVE]   [Scope {}] INVALID scope_id={:?} - breaking", scope_depth, scope_id);
+                    }
                     break;
                 }
             }
+            if debug {
+                eprintln!("[BIND_RESOLVE] Exhausted scope chain after {} scopes", scope_depth);
+            }
+        } else if debug {
+            eprintln!("[BIND_RESOLVE] No enclosing scope found for node {:?}", idx);
         }
 
-        // Check file_locals (global scope from lib.d.ts)
-        if std::env::var("BIND_DEBUG").is_ok() {
-            eprintln!(
-                "[BIND_RESOLVE] '{}' not found in scope chain, checking file_locals ({} symbols)",
-                name,
-                self.ctx.binder.file_locals.len()
-            );
+        // === PHASE 3: Check file_locals (global scope from lib.d.ts) ===
+        if debug {
+            eprintln!("[BIND_RESOLVE] Checking file_locals ({} symbols)", self.ctx.binder.file_locals.len());
         }
 
         if let Some(sym_id) = self.ctx.binder.file_locals.get(name) {
+            if debug {
+                eprintln!("[BIND_RESOLVE]   -> Found '{}' in file_locals as {:?}", name, sym_id);
+            }
             // Use get_symbol_with_libs to check lib binders
             if let Some(symbol) = self.ctx.binder.get_symbol_with_libs(sym_id, &lib_binders) {
-                if !Self::is_class_member_symbol(symbol.flags) {
-                    if std::env::var("BIND_DEBUG").is_ok() {
-                        eprintln!("[BIND_RESOLVE] Found '{}' in file_locals", name);
+                let is_class_member = Self::is_class_member_symbol(symbol.flags);
+                if debug {
+                    eprintln!("[BIND_RESOLVE]      Symbol flags: 0x{:x}, is_class_member: {}", symbol.flags, is_class_member);
+                }
+                if !is_class_member {
+                    if debug {
+                        eprintln!("[BIND_RESOLVE]   -> SUCCESS: Returning {:?} from file_locals", sym_id);
                     }
                     return Some(sym_id);
+                } else if debug {
+                    eprintln!("[BIND_RESOLVE]      SKIPPED: is_class_member");
                 }
             } else {
-                if std::env::var("BIND_DEBUG").is_ok() {
-                    eprintln!("[BIND_RESOLVE] Found '{}' in file_locals (no symbol data)", name);
+                if debug {
+                    eprintln!("[BIND_RESOLVE]   -> SUCCESS: Found '{}' in file_locals (no symbol data)", name);
                 }
                 return Some(sym_id);
             }
         }
 
-        // Symbol not found - log diagnostic info
-        if std::env::var("BIND_DEBUG").is_ok() {
-            eprintln!("[BIND_RESOLVE] '{}' NOT FOUND - returning None", name);
-            // Dump file_locals for debugging (if not too large)
-            if self.ctx.binder.file_locals.len() < 50 {
-                eprintln!("[BIND_RESOLVE] file_locals contents:");
-                for (n, _) in self.ctx.binder.file_locals.iter() {
-                    eprintln!("  - {}", n);
+        // === PHASE 4: Check lib binders' file_locals directly ===
+        if debug {
+            eprintln!("[BIND_RESOLVE] Checking {} lib binders' file_locals...", lib_binders.len());
+        }
+        for (i, lib_binder) in lib_binders.iter().enumerate() {
+            if debug {
+                eprintln!("[BIND_RESOLVE]   [Lib {}] file_locals size: {}", i, lib_binder.file_locals.len());
+            }
+            if let Some(sym_id) = lib_binder.file_locals.get(name) {
+                if debug {
+                    eprintln!("[BIND_RESOLVE]     -> Found '{}' in lib binder {} as {:?}", name, i, sym_id);
+                }
+                if let Some(symbol) = lib_binder.get_symbol(sym_id) {
+                    let is_class_member = Self::is_class_member_symbol(symbol.flags);
+                    if debug {
+                        eprintln!("[BIND_RESOLVE]        Symbol flags: 0x{:x}, is_class_member: {}", symbol.flags, is_class_member);
+                    }
+                    if !is_class_member {
+                        if debug {
+                            eprintln!("[BIND_RESOLVE]     -> SUCCESS: Returning {:?} from lib binder {}", sym_id, i);
+                        }
+                        return Some(sym_id);
+                    }
+                } else {
+                    if debug {
+                        eprintln!("[BIND_RESOLVE]     -> SUCCESS: Found '{}' in lib binder {} (no symbol data)", name, i);
+                    }
+                    return Some(sym_id);
                 }
             }
+        }
+
+        // === PHASE 5: Symbol not found - diagnostic dump ===
+        if debug {
+            eprintln!("[BIND_RESOLVE] FAILED: '{}' NOT FOUND in any location", name);
+            eprintln!("[BIND_RESOLVE] Diagnostic dump:");
+            eprintln!("[BIND_RESOLVE]   - Searched {} scope chain levels",
+                self.find_enclosing_scope(idx).map_or(0, |s| {
+                    let mut count = 0;
+                    let mut sid = s;
+                    while !sid.is_none() {
+                        if let Some(scope) = self.ctx.binder.scopes.get(sid.0 as usize) {
+                            count += 1;
+                            sid = scope.parent;
+                        } else {
+                            break;
+                        }
+                    }
+                    count
+                }));
+            eprintln!("[BIND_RESOLVE]   - Searched file_locals ({} entries)", self.ctx.binder.file_locals.len());
+            eprintln!("[BIND_RESOLVE]   - Searched {} lib binders", lib_binders.len());
+
+            // Dump file_locals for debugging (if not too large)
+            if self.ctx.binder.file_locals.len() < 50 {
+                eprintln!("[BIND_RESOLVE]   Main binder file_locals:");
+                for (n, id) in self.ctx.binder.file_locals.iter() {
+                    eprintln!("     - {} -> {:?}", n, id);
+                }
+            } else {
+                eprintln!("[BIND_RESOLVE]   (file_locals too large to dump: {} entries)", self.ctx.binder.file_locals.len());
+            }
+
+            // Sample lib binder file_locals
+            for (i, lib_binder) in lib_binders.iter().enumerate() {
+                if lib_binder.file_locals.len() < 30 {
+                    eprintln!("[BIND_RESOLVE]   Lib binder {} file_locals:", i);
+                    for (n, id) in lib_binder.file_locals.iter() {
+                        eprintln!("     - {} -> {:?}", n, id);
+                    }
+                } else {
+                    eprintln!("[BIND_RESOLVE]   Lib binder {} has {} file_locals (sampling first 10):", i, lib_binder.file_locals.len());
+                    for (n, id) in lib_binder.file_locals.iter().take(10) {
+                        eprintln!("     - {} -> {:?}", n, id);
+                    }
+                }
+            }
+            eprintln!("[BIND_RESOLVE] ========================================\n");
         }
 
         None
