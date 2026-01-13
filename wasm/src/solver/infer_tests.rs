@@ -11681,6 +11681,7 @@ fn test_constraint_cycle_mixin_pattern() {
         return_type: TypeId::OBJECT,
         type_predicate: None,
         is_constructor: true,
+    is_method: false,
     });
 
     // Add lower bound only - this is common for mixin patterns
@@ -12858,6 +12859,7 @@ fn test_constructor_parameters_inference() {
         return_type: TypeId::OBJECT,
         type_predicate: None,
         is_constructor: true,
+    is_method: false,
     });
 
     ctx.add_lower_bound(var_t, ctor);
