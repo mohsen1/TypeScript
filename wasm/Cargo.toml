@@ -47,3 +47,11 @@ harness = false
 [[bench]]
 name = "real_world_bench"
 harness = false
+
+[[bench]]
+name = "solver_bench"
+harness = false
+
+[[bench]]
+name = "cfa_bench"
+harness = false

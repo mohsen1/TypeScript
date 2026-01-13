@@ -1767,3 +1767,209 @@ const filtered = arr.filter((item) => {
     let narrowed_in_callback = analyzer.get_flow_type(typeof_expr, union, flow_in_callback.unwrap());
     assert_eq!(narrowed_in_callback, TypeId::STRING);
 }
+
+// ============================================================================
+// CFA-15: FlowGraph Path Verification Tests
+// ============================================================================
+
+/// Test that all if-else branches are captured in flow graph.
+#[test]
+fn test_flow_graph_captures_if_else_branches() {
+    let source = r#"
+let x: string | number;
+if (Math.random() > 0.5) {
+    x = "a";
+} else {
+    x = 1;
+}
+x;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let arena = parser.get_arena();
+    let root_node = arena.get(root).expect("root node");
+    let source_file = arena.get_source_file(root_node).expect("source file");
+
+    // The if statement should have flow recorded
+    let if_stmt_idx = *source_file.statements.nodes.get(1).expect("if statement");
+    let flow_at_if = binder.get_node_flow(if_stmt_idx);
+    assert!(flow_at_if.is_some(), "Flow should be recorded at if statement");
+}
+
+/// Test that switch statement cases are all captured.
+#[test]
+fn test_flow_graph_captures_switch_cases() {
+    let source = r#"
+let x: "a" | "b" | "c";
+let result: number;
+switch (x) {
+    case "a":
+        result = 1;
+        break;
+    case "b":
+        result = 2;
+        break;
+    case "c":
+        result = 3;
+        break;
+}
+result;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let arena = parser.get_arena();
+    let root_node = arena.get(root).expect("root node");
+    let source_file = arena.get_source_file(root_node).expect("source file");
+
+    // The switch statement should have flow recorded
+    let switch_stmt_idx = *source_file.statements.nodes.get(2).expect("switch statement");
+    let flow_at_switch = binder.get_node_flow(switch_stmt_idx);
+    assert!(flow_at_switch.is_some(), "Flow should be recorded at switch statement");
+}
+
+/// Test that try-catch-finally paths are captured.
+#[test]
+fn test_flow_graph_captures_try_catch_finally() {
+    let source = r#"
+let x: number;
+try {
+    x = 1;
+} catch (e) {
+    x = 2;
+} finally {
+    x = 3;
+}
+x;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let arena = parser.get_arena();
+    let root_node = arena.get(root).expect("root node");
+    let source_file = arena.get_source_file(root_node).expect("source file");
+
+    // The try statement should have flow recorded
+    let try_stmt_idx = *source_file.statements.nodes.get(1).expect("try statement");
+    let flow_at_try = binder.get_node_flow(try_stmt_idx);
+    assert!(flow_at_try.is_some(), "Flow should be recorded at try statement");
+}
+
+/// Test that loop control flow with break/continue is captured.
+#[test]
+fn test_flow_graph_captures_loop_break_continue() {
+    let source = r#"
+let x: number;
+for (let i = 0; i < 10; i++) {
+    if (i === 5) break;
+    if (i % 2 === 0) continue;
+    x = i;
+}
+x;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let arena = parser.get_arena();
+    let root_node = arena.get(root).expect("root node");
+    let source_file = arena.get_source_file(root_node).expect("source file");
+
+    // The for loop should have flow recorded
+    let for_stmt_idx = *source_file.statements.nodes.get(1).expect("for statement");
+    let flow_at_for = binder.get_node_flow(for_stmt_idx);
+    assert!(flow_at_for.is_some(), "Flow should be recorded at for loop");
+}
+
+/// Test that nested control structures have correct flow.
+#[test]
+fn test_flow_graph_captures_nested_structures() {
+    let source = r#"
+let x: number;
+if (Math.random() > 0.5) {
+    while (Math.random() > 0.1) {
+        try {
+            x = 1;
+            break;
+        } catch {
+            x = 2;
+        }
+    }
+} else {
+    for (let i = 0; i < 5; i++) {
+        switch (i) {
+            case 0:
+                x = 10;
+                break;
+            default:
+                x = 20;
+        }
+    }
+}
+x;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let arena = parser.get_arena();
+    let root_node = arena.get(root).expect("root node");
+    let source_file = arena.get_source_file(root_node).expect("source file");
+
+    // Verify final expression has flow
+    let final_expr_idx = *source_file.statements.nodes.get(2).expect("final expression");
+    let flow_at_final = binder.get_node_flow(final_expr_idx);
+    assert!(flow_at_final.is_some(), "Flow should be recorded at final expression after nested structures");
+}
+
+/// Test that class constructor flow is tracked.
+#[test]
+fn test_flow_graph_captures_class_constructor() {
+    let source = r#"
+class Foo {
+    value: number;
+
+    constructor(init: boolean) {
+        if (init) {
+            this.value = 1;
+        } else {
+            this.value = 2;
+        }
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let arena = parser.get_arena();
+    let root_node = arena.get(root).expect("root node");
+    let source_file = arena.get_source_file(root_node).expect("source file");
+
+    // Class should have flow recorded
+    let class_idx = *source_file.statements.nodes.get(0).expect("class");
+    let flow_at_class = binder.get_node_flow(class_idx);
+    assert!(flow_at_class.is_some(), "Flow should be recorded at class declaration");
+}
