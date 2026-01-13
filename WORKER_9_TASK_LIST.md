@@ -1,23 +1,20 @@
 # Worker 9 Task List
 
+## Squad: Binder Squad (Symbol Lookup)
+
 ## Current Task
-All tasks completed!
+- [ ] Audit symbol table lookup chain in `wasm/src/thin_binder.rs` for breaks in scope traversal
 
 ## Queue
-(none)
+- [ ] Fix cases where block-scoped declarations (let/const) shadow incorrectly
+- [ ] Verify import/export symbol visibility in importing modules
+- [ ] Test with circular imports to ensure no infinite loops or missing symbols
+- [ ] Add validation to detect orphaned symbols or broken links
 
 ## Completed
-- [x] Add subtyping conformance tests
-  - Create tests from the 310 missing TS2322 cases
-  - Verify each now emits an error
-  - Check for false positives
-- [x] Fix missing TS7006 (Implicit Any) errors - 357 cases
-  - Track where type inference defaults to Any without error
-  - Ensure missing type annotations trigger errors in strict mode
-  - Add tests for implicit any in function parameters
-  - Verify error messages match tsc output
-- [x] Fix missing TS2322 (Type not assignable) errors - 310 cases
-  - Add logging to `solve_subtype` to see where errors are dropped
-  - Find cases where structural mismatches are incorrectly accepted
-  - Force errors on all type mismatches, even edge cases
-  - Goal: Convert "Missing" to "Extra" is better than unsound
+(Previous phase work archived)
+
+## Context
+- **Goal:** Symbol lookup must correctly traverse: local -> module -> global
+- **Key files:** `wasm/src/thin_binder.rs`, `wasm/src/thin_checker.rs`
+- **Impact:** Broken lookup chain causes TS2304 errors

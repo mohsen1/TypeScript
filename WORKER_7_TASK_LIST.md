@@ -1,31 +1,20 @@
 # Worker 7 Task List
 
+## Squad: Binder Squad (Builtins)
+
 ## Current Task
-All tasks completed!
+- [ ] Debug why basic globals like `console`, `Array`, `Promise` still fail to resolve in some cases
 
 ## Queue
-(none)
+- [ ] Add detailed logging to `resolve_identifier_symbol` in thin_checker.rs
+- [ ] Trace symbol table lookup chain: local -> module -> global
+- [ ] Verify lib.d.ts injection populates correct symbol IDs for builtins
+- [ ] Test with minimal examples that should resolve to global types
 
 ## Completed
-- [x] Add Unknown type propagation rules
-  - Unknown should force explicit type annotations
-  - Unknown should trigger errors in unsafe operations
-  - Verify Unknown doesn't spread too aggressively
-- [x] Audit all bail-out points in solve_subtype
-  - Search for early returns that default to permissive results
-  - Replace with conservative assumptions (Unknown, error types)
-  - Ensure complex generics don't silently accept invalid code
-- [x] Change Solver default fallback from Any to Unknown
-  - Located and changed all fallback logic from Any to Unknown in:
-    * src/solver/subtype.rs (this parameter compatibility)
-    * src/solver/infer.rs (this parameter compatibility)
-    * src/solver/lower.rs (generic type parameter constraints)
-    * src/solver/lower.rs (Array/ReadonlyArray element types)
-    * src/solver/evaluate.rs (function this types)
-  - Added comprehensive tests in src/solver/integration_tests.rs:
-    * test_function_this_parameter_fallback_to_unknown
-    * test_generic_parameter_without_constraint_fallback_to_unknown
-    * test_array_without_type_argument_fallback_to_unknown
-    * test_unknown_fallback_prevents_silent_acceptance
-    * test_unknown_vs_any_behavior
-  - Build succeeded with no errors
+(Previous phase work archived)
+
+## Context
+- **Goal:** Ensure all standard library globals resolve correctly
+- **Key files:** `wasm/src/thin_binder.rs`, `wasm/src/thin_checker.rs`, `wasm/src/lib_loader.rs`
+- **Impact:** Unresolved globals cause Any fallback which suppresses downstream errors

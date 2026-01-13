@@ -1,22 +1,20 @@
 # Worker 8 Task List
 
+## Squad: Binder Squad (Module Augmentation)
+
 ## Current Task
-All tasks completed!
+- [ ] Fix module augmentation resolution - merging `interface Window` across files
 
 ## Queue
-(none)
+- [ ] Ensure module augmentations update existing declarations correctly
+- [ ] Test with multiple files augmenting same global interface
+- [ ] Fix namespace merging behavior for nested namespaces
+- [ ] Verify exported symbols are visible to augmentations
 
 ## Completed
-- [x] Add subtype strictness flags
-  - Allow strict mode that rejects borderline cases
-  - Use this for lib.d.ts type checking
-  - Verify no regressions in valid code
-- [x] Harden generic subtype checking
-  - Fix cases where generic type parameters are incorrectly unified
-  - Handle covariant/contravariant variance correctly
-  - Test with complex generic constraints
-- [x] Implement "Lawyer" layer for Any propagation (referenced in specs/SOLVER.md)
-  - Read `specs/SOLVER.md` to understand requirements
-  - Create `wasm/crates/swc_typescript/src/solver/lawyer.rs`
-  - Implement rules for when Any can silence errors
-  - Any should NOT silence structural mismatches unless explicitly required
+(Previous phase work archived)
+
+## Context
+- **Goal:** Module augmentation is critical for lib.d.ts to work correctly
+- **Key files:** `wasm/src/thin_binder.rs`, `wasm/src/binder.rs`
+- **Impact:** Incorrect augmentation leads to TS2304 and error poisoning

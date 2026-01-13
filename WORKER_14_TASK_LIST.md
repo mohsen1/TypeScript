@@ -1,34 +1,20 @@
-# Worker 14 Task List - Solver Squad
+# Worker 14 Task List
+
+## Squad: Solver Squad (Generic Inference)
 
 ## Current Task
-(All solver tasks complete - awaiting new assignments)
+- [ ] Review generic type inference in `wasm/src/solver/infer.rs` for edge cases
+
+## Queue
+- [ ] Fix complex generic constraint inference
+- [ ] Test conditional type inference (T extends U ? X : Y)
+- [ ] Improve mapped type inference accuracy
+- [ ] Add conformance tests for generic function calls with partial inference
 
 ## Completed
-- [x] **SOLV-45: Add function bivariance configuration** (already implemented)
-  - Lawyer layer in lawyer.rs for function parameter checking
-  - strict_function_types in compat.rs and subtype.rs
-  - is_method distinguishes methods (bivariant) from functions (contravariant)
-  - 39 bivariance tests passing
+(Previous phase work archived)
 
-- [x] **SOLV-44: Implement mapped type evaluation** (already implemented)
-  - evaluate_mapped handles `{ [K in Keys]: Transform<K> }` lowering
-  - readonly/optional modifiers and key remapping (as clause) supported
-  - 136 mapped type tests passing
-
-- [x] **SOLV-43: Add index access type evaluation** (already implemented)
-  - evaluate_index_access handles T[K] type resolution
-  - evaluate_object_index handles literal key access
-  - Union key access returns union of property types
-  - Union distribution (A | B)[K] -> A[K] | B[K] implemented
-  - 63 index access tests passing
-
-- [x] **SOLV-42: Implement tuple type checking** (already implemented)
-  - TypeKey::Tuple exists with TupleElement support
-  - check_tuple_subtype handles length/type mismatches
-  - evaluate_tuple_index handles numeric literal access
-  - Rest elements and optional elements supported
-
-## Notes
-- Focus on improving exactness from 30.8% toward 40% target
-- Prioritize features that affect the most conformance tests
-- Follow the "Lawyer vs Judge" pattern from specs/SOLVER.md
+## Context
+- **Goal:** Generic inference must match tsc behavior for type parameter constraints
+- **Key files:** `wasm/src/solver/infer.rs`, `wasm/src/solver/instantiate.rs`
+- **Note:** Previous phase completed mapped types and index access types

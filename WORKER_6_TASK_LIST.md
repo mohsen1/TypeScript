@@ -1,25 +1,20 @@
 # Worker 6 Task List
 
+## Squad: Binder Squad (Global Scope)
+
 ## Current Task
-All tasks completed!
+- [ ] Debug why TS2304 is BOTH missing (116) AND extra (343) - analyze binder symbol resolution
 
 ## Queue
-(none)
+- [ ] Review `wasm/src/thin_binder.rs` global scope initialization
+- [ ] Verify `lib.d.ts` symbols are correctly merged into root SymbolTable
+- [ ] Add logging to symbol resolution path to track where lookups fail
+- [ ] Fix scope chain to properly reach global scope for built-in types
 
 ## Completed
-- [x] Integrate with Solver to prevent Error Poisoning
-  - When TS2304 occurs, don't default to `Any`
-  - Propagate error type instead of silencing downstream errors
-  - This should reveal missing TS2322/TS7006 errors
-- [x] Add symbol table validation
-  - Run post-binding validation checks
-  - Detect orphaned symbols or broken links
-  - Ensure all referenced symbols have valid declarations
-- [x] Fix import/export symbol visibility
-  - Ensure imported symbols are visible in importing module
-  - Handle re-exports correctly
-  - Test with circular imports
-- [x] Implement scope chain traversal for symbol resolution
-  - Ensure Binder walks scope chain correctly: local -> module -> global
-  - Add tests for shadowing scenarios
-  - Verify block-scoped declarations (let/const) are handled
+(Previous phase work archived)
+
+## Context
+- **Goal:** Reduce TS2304 extra errors from 343 to <50
+- **Key files:** `wasm/src/thin_binder.rs`, `wasm/src/lib_loader.rs`
+- **Critical:** TS2304 causes error poisoning - Solver defaults to Any when Binder fails

@@ -1,23 +1,20 @@
 # Worker 4 Task List
 
+## Squad: CFA Squad (TS2564 Focus)
+
 ## Current Task
-All tasks completed!
+- [ ] Analyze TS2564 missing errors (Property has no initializer) - 413 occurrences still missing
 
 ## Queue
-(none)
+- [ ] Review `wasm/src/checker/control_flow.rs` and `flow_analyzer.rs` for definite assignment tracking gaps
+- [ ] Identify class property initialization patterns not being detected
+- [ ] Fix constructor flow analysis to track property assignments through method calls
+- [ ] Add test cases for complex initialization patterns (conditional, super calls, helper methods)
 
 ## Completed
-- [x] Fix global symbol type binding
-  - Ensure global types (PromiseConstructor, ArrayConstructor) are correctly typed
-  - Verify type parameters are bound
-  - Test with generic global types
-- [x] Debug why global symbols show as "Cannot find name" (TS2304)
-  - Add logging to symbol resolution path
-  - Verify SymbolTable lookup chain reaches global scope
-  - Check for scope chain breaks
-  - Target: Reduce TS2304 extra errors to <50
-- [x] Fix Global Scope and lib.d.ts injection
-  - Locate `wasm/crates/swc_typescript/src/binder/global_scope.rs`
-  - Ensure `lib.d.ts` symbols are merged into root SymbolTable
-  - Verify console, Promise, Array, Object are resolvable
-  - Add tests for global symbol resolution
+(Previous phase work archived)
+
+## Context
+- **Goal:** TS2564 is #1 missing error (413 occurrences) - fix edge cases
+- **Key files:** `wasm/src/checker/control_flow.rs`, `wasm/src/checker/flow_analyzer.rs`, `wasm/src/thin_checker.rs`
+- **Status:** Flow Graph Side-Table is implemented - edge cases need work

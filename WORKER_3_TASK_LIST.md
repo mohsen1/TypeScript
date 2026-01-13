@@ -1,25 +1,20 @@
 # Worker 3 Task List
 
+## Squad: Parser Squad (Error Recovery)
+
 ## Current Task
-All tasks completed!
+- [ ] Review parser error recovery mechanisms in `wasm/src/thin_parser.rs` for cascading false positive patterns
 
 ## Queue
-(none)
+- [ ] Identify cases where error recovery causes cascading TS1005/TS1109 false positives
+- [ ] Audit scanner token classification for edge cases (JSX, template literals, regex) in `wasm/src/scanner_impl.rs`
+- [ ] Fix scanner-level issues that propagate into parser errors
+- [ ] Test parser robustness with malformed input (ensure no crashes)
 
 ## Completed
-- [x] Add conformance tests for CFA
-  - Create test cases from missing TS2454/TS2564 errors
-  - Verify FlowGraph captures all control flow paths
-  - Benchmark performance impact
-- [x] Integrate flow analysis with error reporting
-  - Emit TS2454 errors at correct source locations
-  - Emit TS2564 errors at correct source locations
-  - Ensure error messages match tsc output format
-- [x] Implement loop flow analysis
-  - Track variable state across loop iterations
-  - Handle break/continue statements
-  - Detect unreachable code after returns/throws
-- [x] Add try/catch/finally flow tracking
-  - Model control flow through exception paths
-  - Track variable state in catch blocks
-  - Handle finally block side effects
+(Previous phase work archived)
+
+## Context
+- **Goal:** Support Parser Squad in reducing false positives to <100
+- **Key files:** `wasm/src/thin_parser.rs`, `wasm/src/scanner.rs`, `wasm/src/scanner_impl.rs`
+- **Note:** Error recovery is working well - focus on preventing false positive cascades
