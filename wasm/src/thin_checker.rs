@@ -5110,7 +5110,10 @@ impl<'a> ThinCheckerState<'a> {
                 return TypeId::ERROR;
             }
             let declared_type = self.get_type_of_symbol(sym_id);
-            if self.should_check_definite_assignment(sym_id, idx)
+            // Check for static block TDZ violation (variable used before declaration in source order)
+            if self.is_variable_used_before_declaration_in_static_block(sym_id, idx) {
+                self.error_variable_used_before_assigned_at(name, idx);
+            } else if self.should_check_definite_assignment(sym_id, idx)
                 && !self.is_definitely_assigned_at(idx)
             {
                 self.error_variable_used_before_assigned_at(name, idx);
@@ -5611,6 +5614,119 @@ impl<'a> ThinCheckerState<'a> {
             }
             current = parent;
         }
+    }
+
+    /// Find the enclosing static block for a node, if any.
+    ///
+    /// Returns the NodeIndex of the CLASS_STATIC_BLOCK_DECLARATION if the node is inside one.
+    fn find_enclosing_static_block(&self, idx: NodeIndex) -> Option<NodeIndex> {
+        let mut current = idx;
+        while !current.is_none() {
+            if let Some(node) = self.ctx.arena.get(current) {
+                if node.kind == syntax_kind_ext::CLASS_STATIC_BLOCK_DECLARATION {
+                    return Some(current);
+                }
+                // Stop at function boundaries (don't consider outer static blocks)
+                if node.kind == syntax_kind_ext::FUNCTION_DECLARATION
+                    || node.kind == syntax_kind_ext::FUNCTION_EXPRESSION
+                    || node.kind == syntax_kind_ext::ARROW_FUNCTION
+                    || node.kind == syntax_kind_ext::METHOD_DECLARATION
+                    || node.kind == syntax_kind_ext::CONSTRUCTOR
+                {
+                    return None;
+                }
+            }
+            let ext = self.ctx.arena.get_extended(current)?;
+            if ext.parent.is_none() {
+                return None;
+            }
+            current = ext.parent;
+        }
+        None
+    }
+
+    /// Find the class declaration containing a static block.
+    ///
+    /// Given a static block node, returns the parent CLASS_DECLARATION or CLASS_EXPRESSION.
+    fn find_class_for_static_block(&self, static_block_idx: NodeIndex) -> Option<NodeIndex> {
+        let ext = self.ctx.arena.get_extended(static_block_idx)?;
+        let parent = ext.parent;
+        if parent.is_none() {
+            return None;
+        }
+        let parent_node = self.ctx.arena.get(parent)?;
+        if parent_node.kind == syntax_kind_ext::CLASS_DECLARATION
+            || parent_node.kind == syntax_kind_ext::CLASS_EXPRESSION
+        {
+            Some(parent)
+        } else {
+            None
+        }
+    }
+
+    /// Check if a variable is used in a static block before its declaration (TDZ check).
+    ///
+    /// In TypeScript, if a variable is declared at module level AFTER a class declaration,
+    /// using that variable inside the class's static block should emit TS2454.
+    ///
+    /// Example:
+    /// ```typescript
+    /// class Baz {
+    ///     static {
+    ///         console.log(FOO);  // Error: Variable 'FOO' is used before being assigned
+    ///     }
+    /// }
+    /// const FOO = "FOO";  // Declared after the class
+    /// ```
+    fn is_variable_used_before_declaration_in_static_block(
+        &self,
+        sym_id: SymbolId,
+        usage_idx: NodeIndex,
+    ) -> bool {
+        // Check if we're inside a static block
+        let Some(static_block_idx) = self.find_enclosing_static_block(usage_idx) else {
+            return false;
+        };
+
+        // Get the class containing the static block
+        let Some(class_idx) = self.find_class_for_static_block(static_block_idx) else {
+            return false;
+        };
+
+        // Get the class position
+        let Some(class_node) = self.ctx.arena.get(class_idx) else {
+            return false;
+        };
+        let class_pos = class_node.pos;
+
+        // Get the symbol's declaration
+        let Some(symbol) = self.ctx.binder.get_symbol(sym_id) else {
+            return false;
+        };
+
+        // Check if the symbol is a module-level variable (not a class member)
+        // We're looking for variables declared outside the class
+        if (symbol.flags & symbol_flags::VARIABLE) == 0 {
+            return false;
+        }
+
+        // Get the position of the variable's declaration
+        for &decl_idx in &symbol.declarations {
+            // Check if this is a variable declaration
+            let Some(var_stmt_idx) = self.find_enclosing_variable_statement(decl_idx) else {
+                continue;
+            };
+            let Some(var_stmt_node) = self.ctx.arena.get(var_stmt_idx) else {
+                continue;
+            };
+
+            // Variable is declared AFTER the class - this is TDZ error
+            if var_stmt_node.pos > class_pos {
+                return true;
+            }
+        }
+
+        false
     }
 
     /// Get type of a symbol.
