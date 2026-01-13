@@ -1,12 +1,6 @@
 # Worker 10 Task List - Solver Squad
 
 ## Current Task
-- [ ] **SOLV-25: Test discriminated union type checking**
-  - Ensure discriminated unions narrow correctly
-  - Test: `type Shape = { kind: "circle", radius: number } | { kind: "square", side: number }`
-  - Verify type narrowing on discriminant property
-
-## Queue
 - [ ] **SOLV-26: Add readonly modifier handling**
   - Implement readonly property type checking
   - Ensure readonly is covariant (can assign readonly to mutable)
@@ -28,6 +22,14 @@
   - Test end-to-end type checking with all improvements integrated
 
 ## Completed
+- [x] **SOLV-25: Test discriminated union type checking**
+  - Expanded Section 20 with comprehensive discriminated union tests
+  - Added if statement narrowing tests
+  - Added multiple discriminant property tests (Success/Loading/Error)
+  - Added nested discriminated union tests (ExtendedShape with Rectangle)
+  - Added exhaustive switch statement tests
+  - Added property access error cases without narrowing
+  - Verified type narrowing on discriminant property
 - [x] **SOLV-24: Write conformance tests for Solver**
   - Created test file: `tests/conformance/solver_tests.ts`
   - Added cases for TS2322 (type not assignable) errors
