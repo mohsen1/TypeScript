@@ -2361,7 +2361,7 @@ impl<'a> ThinCheckerState<'a> {
         };
 
         let Some(type_ref) = self.ctx.arena.get_type_ref(node) else {
-            return TypeId::ERROR; // Missing type ref data - propagate error
+            return TypeId::ERROR; // Missing type reference data - propagate error
         };
 
         let type_name_idx = type_ref.type_name;
