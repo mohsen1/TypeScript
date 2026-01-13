@@ -655,6 +655,85 @@ const circle: Shape = { kind: "circle", radius: 5 };
 // @ts-expect-error - Type '"triangle"' is not assignable to type '"circle" | "square"'
 const triangle: Shape = { kind: "triangle", side: 3 } as any;
 
+// Discriminated union narrowing with if statements
+function getDimensions(shape: Shape): number {
+    if (shape.kind === "circle") {
+        // shape is narrowed to Circle here
+        return shape.radius * 2;
+    } else {
+        // shape is narrowed to Square here
+        return shape.side * 4;
+    }
+}
+
+// Test that narrowing works correctly
+const testCircle: Shape = { kind: "circle", radius: 10 };
+const diameter: number = getDimensions(testCircle);
+
+const testSquare: Shape = { kind: "square", side: 5 };
+const perimeter: number = getDimensions(testSquare);
+
+// Multiple discriminant properties
+interface Success { status: "success"; data: string }
+interface Loading { status: "loading"; progress: number }
+interface Error { status: "error"; message: string }
+
+type Result = Success | Loading | Error;
+
+function handleResult(result: Result): string {
+    if (result.status === "success") {
+        return result.data;
+    } else if (result.status === "loading") {
+        return `Loading: ${result.progress}%`;
+    } else {
+        return result.message;
+    }
+}
+
+// Test with multiple discriminants
+const successResult: Result = { status: "success", data: "Done" };
+const successOutput: string = handleResult(successResult);
+
+// Discriminated union with exhaustive switch
+function getCircumference(shape: Shape): number {
+    switch (shape.kind) {
+        case "circle":
+            return 2 * Math.PI * shape.radius;
+        case "square":
+            return shape.side * 4;
+    }
+}
+
+// Nested discriminated unions
+interface Rectangle { kind: "rectangle"; width: number; height: number }
+type ExtendedShape = Circle | Square | Rectangle;
+
+function calculateAll(shape: ExtendedShape): number {
+    switch (shape.kind) {
+        case "circle":
+            return Math.PI * shape.radius ** 2;
+        case "square":
+            return shape.side ** 2;
+        case "rectangle":
+            return shape.width * shape.height;
+    }
+}
+
+// Test that property access fails without narrowing
+function invalidAccess(shape: Shape): number {
+    // @ts-expect-error - Property 'side' does not exist on type 'Circle'
+    return shape.side;
+}
+
+// Test narrowing with assignment
+function processShape(shape: Shape): void {
+    const currentKind = shape.kind;
+    if (currentKind === "circle") {
+        // shape is narrowed to Circle
+        const r: number = shape.radius;
+    }
+}
+
 // =================================================================
 // SECTION 21: OPTIONAL CHAINING AND NULLISH COALESCING
 // =================================================================
