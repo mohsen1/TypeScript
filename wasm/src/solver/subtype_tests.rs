@@ -3459,6 +3459,8 @@ fn test_callable_rest_parameter_contravariance() {
         }],
         construct_signatures: vec![],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     let target = interner.callable(CallableShape {
@@ -3484,6 +3486,8 @@ fn test_callable_rest_parameter_contravariance() {
         }],
         construct_signatures: vec![],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     assert!(!checker.is_subtype_of(source, target));
@@ -4059,6 +4063,7 @@ fn test_variance_optional_rest_constructor_optional_contravariant() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: true,
+    is_method: false,
     });
 
     let narrow_ctor = interner.function(FunctionShape {
@@ -4073,6 +4078,7 @@ fn test_variance_optional_rest_constructor_optional_contravariant() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: true,
+    is_method: false,
     });
 
     assert!(checker.is_subtype_of(wide_ctor, narrow_ctor));
@@ -4101,6 +4107,7 @@ fn test_variance_optional_rest_constructor_rest_contravariant() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: true,
+    is_method: false,
     });
 
     let narrow_ctor = interner.function(FunctionShape {
@@ -4115,6 +4122,7 @@ fn test_variance_optional_rest_constructor_rest_contravariant() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: true,
+    is_method: false,
     });
 
     assert!(checker.is_subtype_of(wide_ctor, narrow_ctor));
@@ -4453,6 +4461,7 @@ fn test_constructor_void_exception_subtype() {
         return_type: instance,
         type_predicate: None,
         is_constructor: true,
+    is_method: false,
     });
 
     let returns_void = interner.function(FunctionShape {
@@ -4462,6 +4471,7 @@ fn test_constructor_void_exception_subtype() {
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: true,
+    is_method: false,
     });
 
     assert!(!checker.is_subtype_of(returns_instance, returns_void));
@@ -18708,6 +18718,8 @@ fn test_variance_method_bivariant_params() {
             readonly: false,
             is_method: true,
         }],
+        string_index: None,
+        number_index: None,
     });
 
     // Object with method taking wide param
@@ -18736,6 +18748,8 @@ fn test_variance_method_bivariant_params() {
             readonly: false,
             is_method: true,
         }],
+        string_index: None,
+        number_index: None,
     });
 
     // Methods are bivariant - both directions should work
@@ -19031,6 +19045,8 @@ fn test_variance_constructor_param_contravariant() {
             type_predicate: None,
         }],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     let ctor_wide = interner.callable(CallableShape {
@@ -19048,6 +19064,8 @@ fn test_variance_constructor_param_contravariant() {
             type_predicate: None,
         }],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     // Wide param constructor <: narrow param constructor (contravariant)
@@ -19180,6 +19198,8 @@ fn test_overload_single_signature_subtype() {
         }],
         construct_signatures: vec![],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     // Function <: callable with same signature
@@ -19221,6 +19241,8 @@ fn test_overload_multiple_to_single() {
         ],
         construct_signatures: vec![],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     let single_overload = interner.callable(CallableShape {
@@ -19238,6 +19260,8 @@ fn test_overload_multiple_to_single() {
         }],
         construct_signatures: vec![],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     // Multi-overload <: single overload (has matching signature)
@@ -19279,6 +19303,8 @@ fn test_overload_order_independent_matching() {
         ],
         construct_signatures: vec![],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     let overloads_ba = interner.callable(CallableShape {
@@ -19310,6 +19336,8 @@ fn test_overload_order_independent_matching() {
         ],
         construct_signatures: vec![],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     // Order shouldn't matter for subtype relationship
@@ -19338,6 +19366,8 @@ fn test_overload_missing_signature_not_subtype() {
         }],
         construct_signatures: vec![],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     let two_overloads = interner.callable(CallableShape {
@@ -19369,6 +19399,8 @@ fn test_overload_missing_signature_not_subtype() {
         ],
         construct_signatures: vec![],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     // Single overload should not be subtype of callable requiring two overloads
@@ -19398,6 +19430,8 @@ fn test_overload_wider_param_satisfies_target() {
         }],
         construct_signatures: vec![],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     let narrow_overload = interner.callable(CallableShape {
@@ -19415,6 +19449,8 @@ fn test_overload_wider_param_satisfies_target() {
         }],
         construct_signatures: vec![],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     // Wide param <: narrow param (contravariance)
@@ -19460,6 +19496,8 @@ fn test_overload_constructor_subtype() {
             },
         ],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     let single_ctor = interner.callable(CallableShape {
@@ -19477,6 +19515,8 @@ fn test_overload_constructor_subtype() {
             type_predicate: None,
         }],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     // Multi-constructor <: single constructor (has matching)
@@ -19533,6 +19573,8 @@ fn test_overload_with_different_arity() {
         ],
         construct_signatures: vec![],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     let no_args = interner.callable(CallableShape {
@@ -19545,6 +19587,8 @@ fn test_overload_with_different_arity() {
         }],
         construct_signatures: vec![],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     // Multi-arity should satisfy no-args target
@@ -19747,6 +19791,8 @@ fn test_this_parameter_in_callable_method() {
             is_method: true,
             ..Default::default()
         }],
+        string_index: None,
+        number_index: None,
     });
 
     // Plain method without this
@@ -19772,6 +19818,8 @@ fn test_this_parameter_in_callable_method() {
             is_method: true,
             ..Default::default()
         }],
+        string_index: None,
+        number_index: None,
     });
 
     // Both should be compatible (methods are bivariant)
@@ -19921,6 +19969,8 @@ fn test_overload_with_call_and_construct() {
             type_predicate: None,
         }],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     let call_only = interner.callable(CallableShape {
@@ -19938,6 +19988,8 @@ fn test_overload_with_call_and_construct() {
         }],
         construct_signatures: vec![],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     // Dual callable <: call-only (has matching call signature)
@@ -19967,6 +20019,8 @@ fn test_overload_rest_vs_multiple_params() {
         }],
         construct_signatures: vec![],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     let two_params = interner.callable(CallableShape {
@@ -19992,6 +20046,8 @@ fn test_overload_rest_vs_multiple_params() {
         }],
         construct_signatures: vec![],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     // Rest params can satisfy fixed params
@@ -20023,6 +20079,8 @@ fn test_this_in_overload_signature() {
         }],
         construct_signatures: vec![],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     let overload_no_this = interner.callable(CallableShape {
@@ -20035,6 +20093,8 @@ fn test_this_in_overload_signature() {
         }],
         construct_signatures: vec![],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     // No-this is compatible with with-this (no-this is more general)
@@ -22498,6 +22558,7 @@ fn test_constructor_basic_new_signature() {
         return_type: instance,
         type_predicate: None,
         is_constructor: true,
+    is_method: false,
     });
 
     // Constructor type should be valid
@@ -22549,6 +22610,7 @@ fn test_constructor_with_parameters() {
         return_type: instance,
         type_predicate: None,
         is_constructor: true,
+    is_method: false,
     });
 
     assert!(constructor != TypeId::ERROR);
@@ -22576,6 +22638,7 @@ fn test_constructor_vs_regular_function() {
         return_type: instance,
         type_predicate: None,
         is_constructor: true,
+    is_method: false,
     });
 
     let regular_fn = interner.function(FunctionShape {
@@ -22618,6 +22681,8 @@ fn test_constructor_callable_with_construct_signature() {
             type_predicate: None,
         }],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     assert!(callable_with_new != TypeId::ERROR);
@@ -22653,6 +22718,8 @@ fn test_constructor_with_call_and_construct() {
             type_predicate: None,
         }],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     assert!(callable_both != TypeId::ERROR);
@@ -22699,6 +22766,7 @@ fn test_constructor_subtype_by_return_type() {
         return_type: base,
         type_predicate: None,
         is_constructor: true,
+    is_method: false,
     });
 
     let ctor_derived = interner.function(FunctionShape {
@@ -22708,6 +22776,7 @@ fn test_constructor_subtype_by_return_type() {
         return_type: derived,
         type_predicate: None,
         is_constructor: true,
+    is_method: false,
     });
 
     // Constructor returning derived is subtype of constructor returning base
@@ -22745,6 +22814,7 @@ fn test_constructor_contravariant_parameters() {
         return_type: instance,
         type_predicate: None,
         is_constructor: true,
+    is_method: false,
     });
 
     let ctor_narrow_param = interner.function(FunctionShape {
@@ -22759,6 +22829,7 @@ fn test_constructor_contravariant_parameters() {
         return_type: instance,
         type_predicate: None,
         is_constructor: true,
+    is_method: false,
     });
 
     // Constructor with wider param type is subtype (contravariance)
@@ -22785,6 +22856,7 @@ fn test_constructor_optional_parameter() {
         return_type: instance,
         type_predicate: None,
         is_constructor: true,
+    is_method: false,
     });
 
     let ctor_required = interner.function(FunctionShape {
@@ -22799,6 +22871,7 @@ fn test_constructor_optional_parameter() {
         return_type: instance,
         type_predicate: None,
         is_constructor: true,
+    is_method: false,
     });
 
     // Optional param constructor is wider (accepts more call patterns)
@@ -22825,6 +22898,7 @@ fn test_constructor_rest_parameter() {
         return_type: instance,
         type_predicate: None,
         is_constructor: true,
+    is_method: false,
     });
 
     assert!(ctor_rest != TypeId::ERROR);
@@ -22877,6 +22951,8 @@ fn test_constructor_overload_signatures() {
             },
         ],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     assert!(overloaded_ctor != TypeId::ERROR);
@@ -22902,6 +22978,7 @@ fn test_constructor_generic_type_param() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: true,
+    is_method: false,
     });
 
     assert!(generic_ctor != TypeId::ERROR);
@@ -22927,6 +23004,7 @@ fn test_constructor_generic_with_constraint() {
         return_type: t_type,
         type_predicate: None,
         is_constructor: true,
+    is_method: false,
     });
 
     assert!(constrained_ctor != TypeId::ERROR);
@@ -22959,6 +23037,8 @@ fn test_constructor_abstract_pattern() {
             type_predicate: None,
         }],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     // Concrete constructor
@@ -22969,6 +23049,7 @@ fn test_constructor_abstract_pattern() {
         return_type: instance,
         type_predicate: None,
         is_constructor: true,
+    is_method: false,
     });
 
     // Both should be valid
@@ -23015,6 +23096,8 @@ fn test_constructor_with_static_properties() {
             readonly: true,
             is_method: true,
         }],
+        string_index: None,
+        number_index: None,
     });
 
     assert!(ctor_with_static != TypeId::ERROR);
@@ -23052,6 +23135,7 @@ fn test_constructor_instance_type_extraction() {
         return_type: instance,
         type_predicate: None,
         is_constructor: true,
+    is_method: false,
     });
 
     // The return type of the constructor IS the instance type
@@ -23087,6 +23171,7 @@ fn test_constructor_parameters_extraction() {
         return_type: instance,
         type_predicate: None,
         is_constructor: true,
+    is_method: false,
     });
 
     // Constructor parameters would be [string, number]
@@ -23136,6 +23221,7 @@ fn test_constructor_reflexive() {
         return_type: instance,
         type_predicate: None,
         is_constructor: true,
+    is_method: false,
     });
 
     assert!(checker.is_subtype_of(ctor, ctor));
@@ -23153,6 +23239,7 @@ fn test_constructor_never_return() {
         return_type: TypeId::NEVER,
         type_predicate: None,
         is_constructor: true,
+    is_method: false,
     });
 
     assert!(throwing_ctor != TypeId::ERROR);
@@ -23171,6 +23258,7 @@ fn test_constructor_any_return() {
         return_type: TypeId::ANY,
         type_predicate: None,
         is_constructor: true,
+    is_method: false,
     });
 
     let instance = interner.object(vec![PropertyInfo {
@@ -23189,6 +23277,7 @@ fn test_constructor_any_return() {
         return_type: instance,
         type_predicate: None,
         is_constructor: true,
+    is_method: false,
     });
 
     // any return is assignable to/from specific (any is bivariant)
@@ -23220,6 +23309,8 @@ fn test_constructor_multiple_construct_signatures_subtype() {
             type_predicate: None,
         }],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     let double_sig = interner.callable(CallableShape {
@@ -23246,6 +23337,8 @@ fn test_constructor_multiple_construct_signatures_subtype() {
             },
         ],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     // Double signature is more specific (has additional overload)
@@ -23276,6 +23369,7 @@ fn test_constructor_with_this_type() {
         return_type: instance,
         type_predicate: None,
         is_constructor: true,
+    is_method: false,
     });
 
     assert!(ctor_with_this != TypeId::ERROR);
@@ -23304,6 +23398,7 @@ fn test_constructor_empty_vs_nonempty() {
         return_type: empty_instance,
         type_predicate: None,
         is_constructor: true,
+    is_method: false,
     });
 
     let ctor_nonempty = interner.function(FunctionShape {
@@ -23313,6 +23408,7 @@ fn test_constructor_empty_vs_nonempty() {
         return_type: nonempty_instance,
         type_predicate: None,
         is_constructor: true,
+    is_method: false,
     });
 
     // nonempty is subtype of empty (structural typing)
@@ -24986,6 +25082,8 @@ fn test_overload_basic_two_signatures() {
         ],
         construct_signatures: vec![],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     assert!(callable != TypeId::ERROR);
@@ -25044,6 +25142,8 @@ fn test_overload_by_argument_count() {
         ],
         construct_signatures: vec![],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     assert!(callable != TypeId::ERROR);
@@ -25085,6 +25185,8 @@ fn test_overload_subtype_more_signatures_to_fewer() {
         ],
         construct_signatures: vec![],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     // One signature: (string) => number
@@ -25103,6 +25205,8 @@ fn test_overload_subtype_more_signatures_to_fewer() {
         }],
         construct_signatures: vec![],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     // More overloads should be subtype of fewer (can be used anywhere fewer is expected)
@@ -25145,6 +25249,8 @@ fn test_overload_subtype_fewer_not_subtype_of_more() {
         ],
         construct_signatures: vec![],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     // One signature only
@@ -25163,6 +25269,8 @@ fn test_overload_subtype_fewer_not_subtype_of_more() {
         }],
         construct_signatures: vec![],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     // Fewer cannot substitute for more - missing the (number) => string overload
@@ -25216,6 +25324,8 @@ fn test_overload_generic_identity() {
         ],
         construct_signatures: vec![],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     assert!(callable != TypeId::ERROR);
@@ -25278,6 +25388,8 @@ fn test_overload_generic_with_constraint() {
         ],
         construct_signatures: vec![],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     assert!(callable != TypeId::ERROR);
@@ -25322,6 +25434,8 @@ fn test_overload_with_rest_parameter() {
         ],
         construct_signatures: vec![],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     assert!(callable != TypeId::ERROR);
@@ -25372,6 +25486,8 @@ fn test_overload_with_optional_parameters() {
         ],
         construct_signatures: vec![],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     assert!(callable != TypeId::ERROR);
@@ -25411,6 +25527,8 @@ fn test_overload_mixed_call_and_construct() {
             type_predicate: None,
         }],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     assert!(callable != TypeId::ERROR);
@@ -25470,6 +25588,8 @@ fn test_overload_return_type_union() {
         ],
         construct_signatures: vec![],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     assert!(callable != TypeId::ERROR);
@@ -25512,6 +25632,8 @@ fn test_overload_subtype_signature_order_matters() {
         ],
         construct_signatures: vec![],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     // Order: general first, then specific
@@ -25544,6 +25666,8 @@ fn test_overload_subtype_signature_order_matters() {
         ],
         construct_signatures: vec![],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     // These should be different types due to signature order
@@ -25637,6 +25761,8 @@ fn test_overload_generic_multiple_type_params() {
         ],
         construct_signatures: vec![],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     assert!(callable != TypeId::ERROR);
@@ -25677,6 +25803,8 @@ fn test_overload_reflexivity() {
         ],
         construct_signatures: vec![],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     assert!(checker.is_subtype_of(callable, callable));
@@ -25706,6 +25834,8 @@ fn test_overload_covariant_return_types() {
         }],
         construct_signatures: vec![],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     // Returns string
@@ -25724,6 +25854,8 @@ fn test_overload_covariant_return_types() {
         }],
         construct_signatures: vec![],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     // More specific return is subtype (covariance)
@@ -25755,6 +25887,8 @@ fn test_overload_contravariant_parameters() {
         }],
         construct_signatures: vec![],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     // Accepts only "hello"
@@ -25773,6 +25907,8 @@ fn test_overload_contravariant_parameters() {
         }],
         construct_signatures: vec![],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     // More general param is subtype (contravariance)
@@ -25825,6 +25961,8 @@ fn test_overload_construct_signature_subtyping() {
             type_predicate: None,
         }],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     // Returns {x}
@@ -25838,6 +25976,8 @@ fn test_overload_construct_signature_subtyping() {
             type_predicate: None,
         }],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     // More specific instance type is subtype
@@ -25899,6 +26039,8 @@ fn test_overload_with_this_type() {
         ],
         construct_signatures: vec![],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     assert!(callable != TypeId::ERROR);
@@ -25960,6 +26102,8 @@ fn test_overload_with_properties() {
                 is_method: false,
             },
         ],
+        string_index: None,
+        number_index: None,
     });
 
     assert!(callable != TypeId::ERROR);
@@ -25997,6 +26141,8 @@ fn test_overload_generic_default_type() {
         }],
         construct_signatures: vec![],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     assert!(callable != TypeId::ERROR);
@@ -26366,6 +26512,8 @@ fn test_overload_event_handler_pattern() {
         ],
         construct_signatures: vec![],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     let event_target = interner.object(vec![PropertyInfo {
@@ -26497,6 +26645,8 @@ fn test_overload_promise_then_pattern() {
         ],
         construct_signatures: vec![],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     assert!(then_method != TypeId::ERROR);
@@ -26613,6 +26763,8 @@ fn test_overload_constructor_overloads() {
             },
         ],
         properties: vec![],
+    string_index: None,
+    number_index: None,
     });
 
     assert!(date_constructor != TypeId::ERROR);
