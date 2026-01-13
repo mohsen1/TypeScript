@@ -18705,7 +18705,6 @@ fn test_variance_method_bivariant_params() {
                     type_id: TypeId::STRING,
                     optional: false,
                     rest: false,
-                    ..Default::default()
                 }],
                 this_type: None,
                 return_type: TypeId::VOID,
@@ -18735,7 +18734,6 @@ fn test_variance_method_bivariant_params() {
                     type_id: wide_type,
                     optional: false,
                     rest: false,
-                    ..Default::default()
                 }],
                 this_type: None,
                 return_type: TypeId::VOID,
@@ -19789,7 +19787,6 @@ fn test_this_parameter_in_callable_method() {
             optional: false,
             readonly: false,
             is_method: true,
-            ..Default::default()
         }],
         string_index: None,
         number_index: None,
@@ -19816,7 +19813,6 @@ fn test_this_parameter_in_callable_method() {
             optional: false,
             readonly: false,
             is_method: true,
-            ..Default::default()
         }],
         string_index: None,
         number_index: None,
@@ -21407,15 +21403,15 @@ fn test_intersection_index_signature_with_properties() {
 
     let x_name = interner.intern_string("x");
 
-    let index_sig = interner.object_with_index(
-        vec![],
-        Some(IndexSignature {
+    let index_sig = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
             key_type: TypeId::STRING,
             value_type: TypeId::NUMBER,
             readonly: false,
         }),
-        None,
-    );
+        number_index: None,
+    });
 
     let prop_obj = interner.object(vec![PropertyInfo {
         name: x_name,
@@ -21442,25 +21438,25 @@ fn test_intersection_two_index_signatures() {
     let two = interner.literal_number(2.0);
     let one_or_two = interner.union(vec![one, two]);
 
-    let index_number = interner.object_with_index(
-        vec![],
-        Some(IndexSignature {
+    let index_number = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
             key_type: TypeId::STRING,
             value_type: TypeId::NUMBER,
             readonly: false,
         }),
-        None,
-    );
+        number_index: None,
+    });
 
-    let index_literal = interner.object_with_index(
-        vec![],
-        Some(IndexSignature {
+    let index_literal = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
             key_type: TypeId::STRING,
             value_type: one_or_two,
             readonly: false,
         }),
-        None,
-    );
+        number_index: None,
+    });
 
     let intersection = interner.intersection(vec![index_number, index_literal]);
 
@@ -22288,15 +22284,15 @@ fn test_keyof_with_index_signature_includes_string() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
 
-    let indexed_obj = interner.object_with_index(
-        vec![],
-        Some(IndexSignature {
+    let indexed_obj = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
             key_type: TypeId::STRING,
             value_type: TypeId::NUMBER,
             readonly: false,
         }),
-        None,
-    );
+        number_index: None,
+    });
 
     let keyof_indexed = interner.intern(TypeKey::KeyOf(indexed_obj));
 
@@ -22310,15 +22306,15 @@ fn test_keyof_with_number_index_signature() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
 
-    let indexed_obj = interner.object_with_index(
-        vec![],
-        None,
-        Some(IndexSignature {
+    let indexed_obj = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: None,
+        number_index: Some(IndexSignature {
             key_type: TypeId::NUMBER,
             value_type: TypeId::STRING,
             readonly: false,
         }),
-    );
+    });
 
     let keyof_indexed = interner.intern(TypeKey::KeyOf(indexed_obj));
 
@@ -23576,7 +23572,11 @@ fn test_this_type_with_this_constraint() {
     }));
 
     let constrained_method = interner.function(FunctionShape {
-        type_params: vec![SymbolRef(50)],
+        type_params: vec![TypeParamInfo {
+            name: interner.intern_string("T"),
+            constraint: Some(interner.reference(SymbolRef(1))),
+            default: None,
+        }],
         params: vec![],
         this_type: Some(t_param),
         return_type: t_param,
@@ -23673,7 +23673,11 @@ fn test_this_type_with_generic_method() {
     let t_ref = interner.reference(SymbolRef(50));
 
     let generic_fluent = interner.function(FunctionShape {
-        type_params: vec![SymbolRef(50)],
+        type_params: vec![TypeParamInfo {
+            name: interner.intern_string("T"),
+            constraint: None,
+            default: None,
+        }],
         params: vec![ParamInfo {
             name: Some(interner.intern_string("value")),
             type_id: t_ref,
@@ -23830,7 +23834,20 @@ fn test_this_type_in_tuple() {
     let interner = TypeInterner::new();
 
     let this_type = interner.intern(TypeKey::ThisType);
-    let tuple_with_this = interner.tuple(vec![this_type, TypeId::NUMBER]);
+    let tuple_with_this = interner.tuple(vec![
+        TupleElement {
+            type_id: this_type,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
 
     assert!(tuple_with_this != TypeId::ERROR);
 }
@@ -23859,7 +23876,11 @@ fn test_this_type_map_method() {
     });
 
     let map_method = interner.function(FunctionShape {
-        type_params: vec![SymbolRef(50)],
+        type_params: vec![TypeParamInfo {
+            name: interner.intern_string("U"),
+            constraint: None,
+            default: None,
+        }],
         params: vec![ParamInfo {
             name: Some(interner.intern_string("fn")),
             type_id: mapper_fn,
@@ -24428,7 +24449,20 @@ fn test_readonly_tuple_basic() {
     // readonly [string, number]
     let interner = TypeInterner::new();
 
-    let readonly_tuple = interner.readonly_tuple(vec![TypeId::STRING, TypeId::NUMBER]);
+    let readonly_tuple = interner.readonly_tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
 
     assert!(readonly_tuple != TypeId::ERROR);
 }
@@ -24439,8 +24473,34 @@ fn test_readonly_tuple_vs_mutable() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
 
-    let readonly_tuple = interner.readonly_tuple(vec![TypeId::STRING, TypeId::NUMBER]);
-    let mutable_tuple = interner.tuple(vec![TypeId::STRING, TypeId::NUMBER]);
+    let readonly_tuple = interner.readonly_tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+    let mutable_tuple = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
 
     // Mutable tuple is subtype of readonly tuple
     assert!(checker.is_subtype_of(mutable_tuple, readonly_tuple));
@@ -24508,14 +24568,15 @@ fn test_readonly_index_signature() {
     // { readonly [key: string]: number }
     let interner = TypeInterner::new();
 
-    let readonly_index = interner.object_with_index(
-        vec![],
-        Some(IndexSignature {
+    let readonly_index = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
             key_type: TypeId::STRING,
             value_type: TypeId::NUMBER,
             readonly: true,
         }),
-    );
+        number_index: None,
+    });
 
     assert!(readonly_index != TypeId::ERROR);
 }
@@ -24526,23 +24587,25 @@ fn test_readonly_index_vs_mutable() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
 
-    let readonly_index = interner.object_with_index(
-        vec![],
-        Some(IndexSignature {
+    let readonly_index = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
             key_type: TypeId::STRING,
             value_type: TypeId::NUMBER,
             readonly: true,
         }),
-    );
+        number_index: None,
+    });
 
-    let mutable_index = interner.object_with_index(
-        vec![],
-        Some(IndexSignature {
+    let mutable_index = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
             key_type: TypeId::STRING,
             value_type: TypeId::NUMBER,
             readonly: false,
         }),
-    );
+        number_index: None,
+    });
 
     // Mutable index is subtype of readonly index
     assert!(checker.is_subtype_of(mutable_index, readonly_index));
@@ -24731,14 +24794,15 @@ fn test_readonly_with_number_index() {
     // { readonly [index: number]: string }
     let interner = TypeInterner::new();
 
-    let readonly_number_index = interner.object_with_index(
-        vec![],
-        Some(IndexSignature {
+    let readonly_number_index = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: None,
+        number_index: Some(IndexSignature {
             key_type: TypeId::NUMBER,
             value_type: TypeId::STRING,
             readonly: true,
         }),
-    );
+    });
 
     assert!(readonly_number_index != TypeId::ERROR);
 }
@@ -24844,7 +24908,20 @@ fn test_readonly_with_tuple_property() {
     // { readonly coords: [number, number] }
     let interner = TypeInterner::new();
 
-    let coords = interner.tuple(vec![TypeId::NUMBER, TypeId::NUMBER]);
+    let coords = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
 
     let obj = interner.object(vec![PropertyInfo {
         name: interner.intern_string("coords"),
@@ -24863,7 +24940,20 @@ fn test_readonly_with_readonly_tuple_property() {
     // { readonly coords: readonly [number, number] }
     let interner = TypeInterner::new();
 
-    let readonly_coords = interner.readonly_tuple(vec![TypeId::NUMBER, TypeId::NUMBER]);
+    let readonly_coords = interner.readonly_tuple(vec![
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
 
     let obj = interner.object(vec![PropertyInfo {
         name: interner.intern_string("coords"),
