@@ -1973,7 +1973,7 @@ impl<'a> InferenceContext<'a> {
     }
 
     /// Check if a type contains an inference variable.
-    fn contains_inference_var(&mut self, ty: TypeId, var: InferenceVar) -> bool {
+    pub(crate) fn contains_inference_var(&mut self, ty: TypeId, var: InferenceVar) -> bool {
         let root = self.table.find(var);
 
         match self.interner.lookup(ty) {

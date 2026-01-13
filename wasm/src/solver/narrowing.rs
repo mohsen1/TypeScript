@@ -585,7 +585,7 @@ impl<'a> NarrowingContext<'a> {
         Some(self.interner.intersection2(source, narrowed_constraint))
     }
 
-    fn function_type(&self) -> TypeId {
+    pub(crate) fn function_type(&self) -> TypeId {
         let rest_array = self.interner.array(TypeId::ANY);
         let rest_param = ParamInfo {
             name: None,

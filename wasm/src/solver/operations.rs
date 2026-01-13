@@ -2633,7 +2633,7 @@ impl<'a> PropertyAccessEvaluator<'a> {
         }
     }
 
-    fn array_element_type(&self, array_type: TypeId) -> TypeId {
+    pub(crate) fn array_element_type(&self, array_type: TypeId) -> TypeId {
         match self.interner.lookup(array_type) {
             Some(TypeKey::Array(elem)) => elem,
             Some(TypeKey::Tuple(elements)) => {
