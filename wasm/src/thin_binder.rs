@@ -3130,6 +3130,28 @@ impl ThinBinderState {
         self.symbols.get(id)
     }
 
+    /// Get a symbol, checking lib binders if not found locally.
+    /// This is used by the checker to resolve symbols that come from lib.d.ts.
+    pub fn get_symbol_with_libs<'a>(
+        &'a self,
+        id: SymbolId,
+        lib_binders: &'a [Arc<ThinBinderState>],
+) -> Option<&'a Symbol> {
+    // First try local symbols
+    if let Some(sym) = self.symbols.get(id) {
+        return Some(sym);
+    }
+
+    // Then try lib binders
+    for lib_binder in lib_binders {
+        if let Some(sym) = lib_binder.symbols.get(id) {
+            return Some(sym);
+        }
+    }
+
+    None
+    }
+
     pub fn get_node_symbol(&self, node: NodeIndex) -> Option<SymbolId> {
         self.node_symbols.get(&node.0).copied()
     }

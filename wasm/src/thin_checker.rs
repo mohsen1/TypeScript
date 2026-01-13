@@ -27,6 +27,7 @@ use crate::scanner::SyntaxKind;
 use crate::solver::{ContextualTypeContext, TypeId, TypeInterner};
 use crate::thin_binder::ThinBinderState;
 use rustc_hash::FxHashSet;
+use std::sync::Arc;
 
 // =============================================================================
 // ThinCheckerState
@@ -296,12 +297,17 @@ impl<'a> ThinCheckerState<'a> {
         let node = self.ctx.arena.get(idx)?;
         let name = self.ctx.arena.get_identifier(node)?.escaped_text.as_str();
 
+        // Collect lib binders for cross-arena symbol lookup
+        let lib_binders: Vec<Arc<crate::thin_binder::ThinBinderState>> =
+            self.ctx.lib_contexts.iter().map(|lc| Arc::clone(&lc.binder)).collect();
+
         if let Some(mut scope_id) = self.find_enclosing_scope(idx) {
             let require_export = false;
             while !scope_id.is_none() {
                 if let Some(scope) = self.ctx.binder.scopes.get(scope_id.0 as usize) {
                     if let Some(sym_id) = scope.table.get(name) {
-                        if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
+                        // Use get_symbol_with_libs to check lib binders
+                        if let Some(symbol) = self.ctx.binder.get_symbol_with_libs(sym_id, &lib_binders) {
                             let export_ok = !require_export
                                 || scope.kind != ContainerKind::Module
                                 || symbol.is_exported
@@ -318,12 +324,12 @@ impl<'a> ThinCheckerState<'a> {
                             self.ctx.binder.get_node_symbol(scope.container_node)
                         {
                             if let Some(container_symbol) =
-                                self.ctx.binder.get_symbol(container_sym_id)
+                                self.ctx.binder.get_symbol_with_libs(container_sym_id, &lib_binders)
                             {
                                 if let Some(exports) = container_symbol.exports.as_ref() {
                                     if let Some(member_id) = exports.get(name) {
                                         if let Some(member_symbol) =
-                                            self.ctx.binder.get_symbol(member_id)
+                                            self.ctx.binder.get_symbol_with_libs(member_id, &lib_binders)
                                         {
                                             if !Self::is_class_member_symbol(member_symbol.flags) {
                                                 return Some(member_id);
@@ -346,7 +352,8 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         if let Some(sym_id) = self.ctx.binder.file_locals.get(name) {
-            if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
+            // Use get_symbol_with_libs to check lib binders
+            if let Some(symbol) = self.ctx.binder.get_symbol_with_libs(sym_id, &lib_binders) {
                 if !Self::is_class_member_symbol(symbol.flags) {
                     return Some(sym_id);
                 }
