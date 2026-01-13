@@ -8,7 +8,7 @@ use serde::Serialize;
 
 /// A lightweight handle to an interned type.
 /// Equality check is O(1) - just compare the u32 values.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Serialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Serialize, Default)]
 pub struct TypeId(pub u32);
 
 impl TypeId {
@@ -242,7 +242,7 @@ impl std::hash::Hash for OrderedFloat {
 }
 
 /// Property information for object types
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
 pub struct PropertyInfo {
     pub name: Atom,
     /// Read type (getter/lookup).
@@ -354,7 +354,7 @@ pub struct CallableShape {
 }
 
 /// Parameter information
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
 pub struct ParamInfo {
     pub name: Option<Atom>,
     pub type_id: TypeId,
