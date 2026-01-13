@@ -1230,9 +1230,21 @@ const callback = () => {
     let root_node = arena.get(root).expect("root node");
     let source_file = arena.get_source_file(root_node).expect("source file");
 
-    // Get the arrow function (statement at index 2)
-    let arrow_func_idx = *source_file.statements.nodes.get(2).expect("arrow function");
-    let arrow_func_node = arena.get(arrow_func_idx).expect("arrow func node");
+    // Get the variable statement at index 2 (const callback = ...)
+    let var_stmt_idx = *source_file.statements.nodes.get(2).expect("variable statement");
+    let var_stmt_node = arena.get(var_stmt_idx).expect("var stmt node");
+    let var_stmt_data = arena.get_variable(var_stmt_node).expect("var stmt data");
+
+    // Get the declaration list
+    let decl_list_idx = *var_stmt_data.declarations.nodes.first().expect("declaration list");
+    let decl_list_node = arena.get(decl_list_idx).expect("decl list node");
+    let decl_list_data = arena.get_variable(decl_list_node).expect("decl list data");
+
+    // Get the first declaration and its initializer (the arrow function)
+    let decl_idx = *decl_list_data.declarations.nodes.first().expect("declaration");
+    let decl_node = arena.get(decl_idx).expect("decl node");
+    let decl = arena.get_variable_declaration(decl_node).expect("decl data");
+    let arrow_func_node = arena.get(decl.initializer).expect("arrow func node");
     let arrow_func = arena.get_function(arrow_func_node).expect("arrow func data");
 
     // Get the body block
@@ -1735,9 +1747,21 @@ const filtered = arr.filter((item) => {
     let root_node = arena.get(root).expect("root node");
     let source_file = arena.get_source_file(root_node).expect("source file");
 
-    // Get the filter call statement (index 3)
-    let filter_call_idx = *source_file.statements.nodes.get(3).expect("filter call");
-    let filter_call_node = arena.get(filter_call_idx).expect("filter call node");
+    // Get the variable statement at index 3 (const filtered = ...)
+    let var_stmt_idx = *source_file.statements.nodes.get(3).expect("variable statement");
+    let var_stmt_node = arena.get(var_stmt_idx).expect("var stmt node");
+    let var_stmt_data = arena.get_variable(var_stmt_node).expect("var stmt data");
+
+    // Get the declaration list
+    let decl_list_idx = *var_stmt_data.declarations.nodes.first().expect("declaration list");
+    let decl_list_node = arena.get(decl_list_idx).expect("decl list node");
+    let decl_list_data = arena.get_variable(decl_list_node).expect("decl list data");
+
+    // Get the first declaration and its initializer (the filter call)
+    let decl_idx = *decl_list_data.declarations.nodes.first().expect("declaration");
+    let decl_node = arena.get(decl_idx).expect("decl node");
+    let decl = arena.get_variable_declaration(decl_node).expect("decl data");
+    let filter_call_node = arena.get(decl.initializer).expect("filter call node");
     let filter_call = arena.get_call_expr(filter_call_node).expect("filter call data");
 
     // Get the arrow function argument
