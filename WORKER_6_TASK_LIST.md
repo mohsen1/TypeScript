@@ -3,16 +3,15 @@
 ## Squad: Binder Squad (Global Scope)
 
 ## Current Task
-- [ ] Debug why TS2304 is BOTH missing (116) AND extra (343) - analyze binder symbol resolution
+- [ ] Review `wasm/src/thin_binder.rs` global scope initialization
 
 ## Queue
-- [ ] Review `wasm/src/thin_binder.rs` global scope initialization
 - [ ] Verify `lib.d.ts` symbols are correctly merged into root SymbolTable
 - [ ] Add logging to symbol resolution path to track where lookups fail
 - [ ] Fix scope chain to properly reach global scope for built-in types
 
 ## Completed
-(Previous phase work archived)
+- [x] Debug why TS2304 is BOTH missing (116) AND extra (343) - analyze binder symbol resolution
 
 ## Context
 - **Goal:** Reduce TS2304 extra errors from 343 to <50
