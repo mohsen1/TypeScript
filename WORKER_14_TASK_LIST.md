@@ -1,20 +1,13 @@
 # Worker 14 Task List - Solver Squad
 
 ## Current Task
-- [ ] **SOLV-42: Implement tuple type checking**
-  - Add tuple type representation in TypeKey
-  - Implement tuple length checking (TS2322 for length mismatches)
-  - Handle tuple element access with numeric literals
-  - Support rest elements in tuples
-  - Test: `[string, number]` vs `[string, number, boolean]`
-
-## Queue
 - [ ] **SOLV-43: Add index access type evaluation**
   - Implement `T[K]` type resolution
   - Handle literal key access: `Person["age"]`
   - Handle union key access: `Person["age" | "name"]`
   - Distribute over union types: `(A | B)[K]` -> `A[K] | B[K]`
 
+## Queue
 - [ ] **SOLV-44: Implement mapped type evaluation**
   - Add `{ [K in Keys]: Transform<K> }` lowering
   - Handle readonly/optional modifiers
@@ -28,7 +21,11 @@
   - Test: callback assignment compatibility
 
 ## Completed
-(none yet)
+- [x] **SOLV-42: Implement tuple type checking** (already implemented)
+  - TypeKey::Tuple exists with TupleElement support
+  - check_tuple_subtype handles length/type mismatches
+  - evaluate_tuple_index handles numeric literal access
+  - Rest elements and optional elements supported
 
 ## Notes
 - Focus on improving exactness from 30.8% toward 40% target
