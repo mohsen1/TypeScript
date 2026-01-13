@@ -5227,6 +5227,71 @@ impl<'a> ThinCheckerState<'a> {
         analyzer.get_flow_type(idx, declared_type, flow_node)
     }
 
+    /// Check flow-based usage of an identifier.
+    ///
+    /// This method combines:
+    /// - Definite assignment checking (TS2454 errors)
+    /// - Type narrowing based on control flow
+    ///
+    /// # Arguments
+    /// * `idx` - The AST node index of the identifier reference
+    /// * `declared_type` - The declared type of the identifier
+    /// * `sym_id` - The symbol ID of the identifier
+    ///
+    /// # Returns
+    /// The narrowed type if the identifier is definitely assigned, otherwise
+    /// the declared type (errors are reported separately).
+    ///
+    /// # Errors
+    /// Emits TS2454 error if the variable is used before being definitely assigned.
+    pub fn check_flow_usage(
+        &mut self,
+        idx: NodeIndex,
+        declared_type: TypeId,
+        sym_id: SymbolId,
+    ) -> TypeId {
+        // Check definite assignment for block-scoped variables without initializers
+        if self.should_check_definite_assignment(sym_id, idx) {
+            if !self.is_definitely_assigned_at(idx) {
+                // Report TS2454 error: Variable used before assignment
+                self.emit_definite_assignment_error(idx, sym_id);
+                // Return declared type to avoid cascading errors
+                return declared_type;
+            }
+        }
+
+        // Apply type narrowing based on control flow
+        self.apply_flow_narrowing(idx, declared_type)
+    }
+
+    /// Emit TS2454 error for variable used before definite assignment.
+    ///
+    /// # Arguments
+    /// * `idx` - The AST node where the variable is used
+    /// * `sym_id` - The symbol ID of the variable
+    fn emit_definite_assignment_error(&mut self, idx: NodeIndex, sym_id: SymbolId) {
+        // Get the variable name for the error message
+        let name = self
+            .ctx
+            .binder
+            .get_symbol(sym_id)
+            .map(|s| s.escaped_name.clone())
+            .unwrap_or_else(|| "<unknown>".to_string());
+
+        // Get the location for error reporting
+        let node = self.ctx.arena.get(idx).unwrap();
+        let start = node.pos;
+        let length = node.end - node.pos;
+
+        self.ctx.diagnostics.push(Diagnostic::error(
+            "file".to_string(), // TODO: Get actual file name
+            start,
+            length,
+            format!("Variable '{}' is used before being assigned", name),
+            2454, // TS2454
+        ));
+    }
+
     /// Check if a type can be narrowed (unions, nullable types, etc.)
     fn is_narrowable_type(&self, type_id: TypeId) -> bool {
         use crate::solver::TypeKey;
