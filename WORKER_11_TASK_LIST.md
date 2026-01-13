@@ -26,3 +26,9 @@
   - Fixed resolve_identifier_symbol function that was missing scope traversal loop
   - Restored proper while loop structure with if let Some(mut scope_id)
   - Preserved debug logging additions
+
+## Notes
+- All `_ => TypeId::ANY` catch-all fallbacks in solver/lower.rs have been changed to `TypeId::ERROR`
+- This prevents silent acceptance of invalid/unknown type syntax
+- ERROR types are now propagated through subtype checking (returns False instead of True)
+- Existing test coverage is extensive; no additional tests needed for basic error propagation
