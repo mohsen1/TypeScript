@@ -1,11 +1,6 @@
 # Worker 10 Task List - Solver Squad
 
 ## Current Task
-- [x] **SOLV-37: Implement discriminated union narrowing**
-  - Narrow union types based on discriminant property
-  - Test: `type Shape = { kind: "circle", radius: number } | { kind: "square", side: number }`
-  - Verify `if (shape.kind === "circle")` narrows to circle type
-  - Handle user-defined type guards with discriminants
 - [ ] **SOLV-38: Add optional chaining type checking**
   - Implement `obj?.prop` type checking
   - Handle `obj?.method()` return types
@@ -20,6 +15,11 @@
 (none yet)
 
 ## Completed
+- [x] **SOLV-37: Implement discriminated union narrowing**
+  - Narrow union types based on discriminant property
+  - Test: `type Shape = { kind: "circle", radius: number } | { kind: "square", side: number }`
+  - Verify `if (shape.kind === "circle")` narrows to circle type
+  - Handle user-defined type guards with discriminants
 - [x] **SOLV-26: Add readonly modifier handling**
   - Implement readonly property type checking
   - Ensure readonly is covariant (can assign readonly to mutable)
