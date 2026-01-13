@@ -289,6 +289,8 @@ function parseArgs(args) {
     stream: true,
     review: false,
     reviewFiles: [],
+    treeOnly: false,
+    excludeTests: true,
   };
 
   for (const arg of args) {
@@ -307,6 +309,10 @@ function parseArgs(args) {
       config.review = true;
       config.tokens = REVIEW_TOKENS;
       config.dirs = REVIEW_DIRS;
+    } else if (arg === "--tree-only") {
+      config.treeOnly = true;
+    } else if (arg === "--exclude-tests") {
+      config.excludeTests = true;
     } else if (arg === "--help" || arg === "-h") {
       printUsage();
       process.exit(0);
@@ -338,6 +344,7 @@ ${colors.cyan}OPTIONS:${colors.reset}
   --no-stream         Disable streaming output
   -i, --interactive   Interactive mode - ask multiple questions
   -r, --review        Code review mode for Rust migration (uses maximum context)
+  --tree-only         Print yek's tree output and exit (no API call, excludes test files)
   -h, --help          Show this help message
 
 ${colors.cyan}EXAMPLES:${colors.reset}
@@ -347,6 +354,7 @@ ${colors.cyan}EXAMPLES:${colors.reset}
   ./scripts/ask-gemini.js --review wasm/src/scanner.rs
   ./scripts/ask-gemini.js --review wasm/src/emitter.rs wasm/src/types.rs
   ./scripts/ask-gemini.js -i
+  ./scripts/ask-gemini.js --tree-only
 
 ${colors.cyan}CODE REVIEW MODE:${colors.reset}
   The --review flag activates Rust migration code review mode:
@@ -361,8 +369,13 @@ ${colors.cyan}ENVIRONMENT:${colors.reset}
 `);
 }
 
-function runYek(tokens, dirs) {
+function runYek(tokens, dirs, treeOnly = false) {
   const yekArgs = [`--tokens=${tokens}`, ...dirs];
+  if (treeOnly) {
+    yekArgs.push("--tree-only");
+  }
+  // Always exclude test files - we don't want to send tests to Gemini
+  yekArgs.push("--ignore-patterns", "*_tests.rs", "--ignore-patterns", "tests.rs", "--ignore-patterns", "*_test.rs", "--ignore-patterns", "tests/");
   const cmd = `yek ${yekArgs.join(" ")}`;
 
   log(`\n${colors.dim}Running: ${cmd}${colors.reset}`, colors.dim);
@@ -396,11 +409,36 @@ async function askGeminiStream(apiKey, codebaseContext, question, systemPrompt =
   // Read architecture doc dynamically
   const architectureDoc = fs.readFileSync(path.join(REPO_ROOT, "wasm/specs/WASM_ARCHITECTURE.md"), "utf8");
 
+  // Read project direction and worker task lists
+  const projectDirection = fs.existsSync(path.join(REPO_ROOT, "PROJECT_DIRECTION.md"))
+    ? fs.readFileSync(path.join(REPO_ROOT, "PROJECT_DIRECTION.md"), "utf8")
+    : "# Project Direction\n\nNo project direction file found.";
+
+  // Read all worker task lists
+  const workerTaskLists = [];
+  for (let i = 1; i <= 10; i++) {
+    const taskListPath = path.join(REPO_ROOT, `WORKER_${i}_TASK_LIST.md`);
+    if (fs.existsSync(taskListPath)) {
+      const content = fs.readFileSync(taskListPath, "utf8");
+      workerTaskLists.push(`\n### Worker ${i}\n${content}`);
+    }
+  }
+
+  const workerTasksSection = workerTaskLists.length > 0
+    ? `\n## Worker Task Lists\n${workerTaskLists.join("\n")}`
+    : "\n## Worker Task Lists\n\nNo worker task lists found.";
+
   const defaultSystemPrompt = `You are an expert systems engineer working on **tsc-rust**: a high-performance Rust/WASM port of the TypeScript compiler designed to beat TypeScript-Go in speed.
 
 ## Project Architecture
 
 ${architectureDoc}
+
+## Project Direction
+
+${projectDirection}
+
+${workerTasksSection}
 
 ## When Answering
 
@@ -501,11 +539,36 @@ async function askGemini(apiKey, codebaseContext, question, systemPrompt = null)
   // Read architecture doc dynamically
   const architectureDoc = fs.readFileSync(path.join(REPO_ROOT, "wasm/specs/WASM_ARCHITECTURE.md"), "utf8");
 
+  // Read project direction and worker task lists
+  const projectDirection = fs.existsSync(path.join(REPO_ROOT, "PROJECT_DIRECTION.md"))
+    ? fs.readFileSync(path.join(REPO_ROOT, "PROJECT_DIRECTION.md"), "utf8")
+    : "# Project Direction\n\nNo project direction file found.";
+
+  // Read all worker task lists
+  const workerTaskLists = [];
+  for (let i = 1; i <= 10; i++) {
+    const taskListPath = path.join(REPO_ROOT, `WORKER_${i}_TASK_LIST.md`);
+    if (fs.existsSync(taskListPath)) {
+      const content = fs.readFileSync(taskListPath, "utf8");
+      workerTaskLists.push(`\n### Worker ${i}\n${content}`);
+    }
+  }
+
+  const workerTasksSection = workerTaskLists.length > 0
+    ? `\n## Worker Task Lists\n${workerTaskLists.join("\n")}`
+    : "\n## Worker Task Lists\n\nNo worker task lists found.";
+
   const defaultSystemPrompt = `You are an expert systems engineer working on **tsc-rust**: a high-performance Rust/WASM port of the TypeScript compiler designed to beat TypeScript-Go in speed.
 
 ## Project Architecture
 
 ${architectureDoc}
+
+## Project Direction
+
+${projectDirection}
+
+${workerTasksSection}
 
 ## When Answering
 
@@ -697,6 +760,16 @@ async function interactiveMode(apiKey, config) {
 async function main() {
   const args = process.argv.slice(2);
   const config = parseArgs(args);
+
+  // Tree-only mode - print yek output and exit
+  if (config.treeOnly) {
+    log(`${colors.cyan}${colors.bright}Tree-only mode${colors.reset}`, colors.cyan);
+    log(`${colors.dim}Generating codebase tree...${colors.reset}`, colors.dim);
+
+    const codebaseContext = runYek(config.tokens, config.dirs, true);
+    console.log(codebaseContext);
+    return;
+  }
 
   // Check for API key
   const apiKey = getApiKey();
