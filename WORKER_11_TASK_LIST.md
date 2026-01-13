@@ -77,7 +77,13 @@
   - Preserved debug logging additions
 
 ## Notes
-- All `_ => TypeId::ANY` catch-all fallbacks in solver/lower.rs have been changed to `TypeId::ERROR`
-- This prevents silent acceptance of invalid/unknown type syntax
-- ERROR types are now propagated through subtype checking (returns False instead of True)
+- **ANY Fallback Work Complete**: All error-case `TypeId::ANY` fallbacks have been changed to `TypeId::ERROR`
+  - lower.rs: catch-all fallbacks, IndexSignatureResolver, array/mapped type fallbacks
+  - thin_checker.rs: 60+ fallbacks across type construction, expression resolution, circular references
+- Remaining `TypeId::ANY` usages are **legitimate TypeScript semantics**:
+  - `"any" => TypeId::ANY` - handling the `any` keyword literal
+  - ANY propagation - when operand is ANY, result is ANY (standard TS behavior)
+  - Built-in method types (e.g., Object.valueOf returns any)
+- ERROR types propagate through subtype checking (returns False instead of True)
+- Method bivariance is working correctly (verified via test_method_bivariance_wider_argument)
 - Existing test coverage is extensive; no additional tests needed for basic error propagation
