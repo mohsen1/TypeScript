@@ -1,18 +1,13 @@
 # Worker 1 Task List - CFA Squad (Lead)
 
 ## Current Task
-- [ ] **CFA-23: Verify 90% TS2454/TS2564 reduction goal achieved**
-  - Run full conformance test suite
-  - Count missing TS2454 (was 573) and TS2564 (was 443) errors
-  - Document final reduction percentage
-  - Goal: <90 missing errors total (from 1016 baseline)
-
-## Queue
 - [ ] **CFA-22: Document CFA implementation**
   - Write comprehensive documentation for CFA system
   - Document FlowGraph API and usage
   - Create examples for using CFA in type checking
   - Document performance characteristics
+
+## Queue
 - [ ] **CFA-23: Verify 90% TS2454/TS2564 reduction goal achieved**
   - Run full conformance test suite
   - Count missing TS2454 (was 573) and TS2564 (was 443) errors
@@ -27,12 +22,23 @@
   - Ensure CFA works correctly with fixed global scope (Binder squad)
   - Verify flow analysis handles Unknown fallback from Solver squad correctly
   - Test end-to-end type checking with all three improvements integrated
+- [ ] **CFA-26: Address remaining TS2454 edge cases**
+  - Class heritage CFA (~30 cases)
+  - Static block definite assignment (~20 cases)
+  - Computed property CFA (~25 cases)
+  - Abstract class patterns (~14 cases)
 
 ## Completed
 - [x] **CFA-21: Coordinate final CFA integration**
   - Worked with Workers 2-3 to finalize CFA components
   - Ensured all CFA errors are properly emitted
   - Verified conformance test results meet 90% reduction goal
+  - Verified CFA integration pipeline: binder -> FlowGraph -> FlowAnalyzer -> checker
+  - Confirmed TS2454 error emission is wired in get_type_of_identifier (thin_checker.rs:4708)
+  - Confirmed TS2564 error emission in check_property_initialization (thin_checker.rs:14131)
+  - Verified FlowGraphBuilder and DefiniteAssignmentAnalyzer integration
+  - Confirmed build compiles successfully with no errors
+  - Created CFA_INTEGRATION_STATUS.md documenting full integration
 - [x] **CFA-18: Verify conformance test results**
   - Ran full conformance test suite
   - Analyzed TS2454/TS2564 error counts
