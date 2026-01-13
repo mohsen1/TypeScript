@@ -544,6 +544,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                 let members = self.interner.type_list(members);
                 return self.distribute_conditional(
                     members.as_ref(),
+                    check_type, // Pass original check_type for substitution
                     extends_type,
                     cond.true_type,
                     cond.false_type,
@@ -1113,6 +1114,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
     fn distribute_conditional(
         &self,
         members: &[TypeId],
+        original_check_type: TypeId,
         extends_type: TypeId,
         true_type: TypeId,
         false_type: TypeId,
@@ -1120,12 +1122,26 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         let mut results: Vec<TypeId> = Vec::with_capacity(members.len());
 
         for &member in members {
+            // Substitute the specific member if true_type or false_type references the original check_type
+            // This handles cases like: NonNullable<T> = T extends null ? never : T
+            // When T = A | B, we need (A extends null ? never : A) | (B extends null ? never : B)
+            let substituted_true_type = if true_type == original_check_type {
+                member
+            } else {
+                true_type
+            };
+            let substituted_false_type = if false_type == original_check_type {
+                member
+            } else {
+                false_type
+            };
+
             // Create conditional for this union member
             let member_cond = ConditionalType {
                 check_type: member,
                 extends_type,
-                true_type,
-                false_type,
+                true_type: substituted_true_type,
+                false_type: substituted_false_type,
                 is_distributive: false,
             };
 
