@@ -1597,6 +1597,63 @@ pub fn infer_generic_function<C: AssignabilityChecker>(
 }
 
 // =============================================================================
+// Generic Type Instantiation
+// =============================================================================
+
+/// Result of validating type arguments against their type parameter constraints.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum GenericInstantiationResult {
+    /// All type arguments satisfy their constraints
+    Success,
+    /// A type argument doesn't satisfy its type parameter constraint
+    ConstraintViolation {
+        /// Index of the type parameter that failed
+        param_index: usize,
+        /// Name of the type parameter that failed
+        param_name: Atom,
+        /// The constraint type
+        constraint: TypeId,
+        /// The provided type argument that doesn't satisfy the constraint
+        type_arg: TypeId,
+    },
+}
+
+/// Validate type arguments against their type parameter constraints.
+///
+/// This function is used when explicit type arguments are provided to a generic.
+/// It ensures that each type argument satisfies its corresponding type parameter's
+/// constraint, emitting errors instead of silently falling back to `Any`.
+///
+/// # Arguments
+/// * `type_params` - The declared type parameters (e.g., `<T extends string, U>`)
+/// * `type_args` - The provided type arguments (e.g., `<number, boolean>`)
+/// * `checker` - The assignability checker to use for constraint validation
+///
+/// # Returns
+/// * `GenericInstantiationResult::Success` if all constraints are satisfied
+/// * `GenericInstantiationResult::ConstraintViolation` if any constraint is violated
+pub fn solve_generic_instantiation<C: AssignabilityChecker>(
+    type_params: &[TypeParamInfo],
+    type_args: &[TypeId],
+    checker: &mut C,
+) -> GenericInstantiationResult {
+    for (i, (param, &type_arg)) in type_params.iter().zip(type_args.iter()).enumerate() {
+        if let Some(constraint) = param.constraint {
+            // Validate that the type argument satisfies the constraint
+            if !checker.is_assignable_to(type_arg, constraint) {
+                return GenericInstantiationResult::ConstraintViolation {
+                    param_index: i,
+                    param_name: param.name,
+                    constraint,
+                    type_arg,
+                };
+            }
+        }
+    }
+    GenericInstantiationResult::Success
+}
+
+// =============================================================================
 // Property Access Resolution
 // =============================================================================
 

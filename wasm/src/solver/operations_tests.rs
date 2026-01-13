@@ -5699,3 +5699,291 @@ fn test_array_element_type_non_array_returns_error() {
             matches!(interner.lookup(result), Some(TypeKey::Union(_))),
         "array_element_type should return union of tuple element types");
 }
+
+// =============================================================================
+// Tests for solve_generic_instantiation
+// =============================================================================
+
+/// Test that type arguments satisfying constraints return Success
+#[test]
+fn test_solve_generic_instantiation_success() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    // <T extends string>
+    let type_params = vec![
+        TypeParamInfo {
+            name: interner.intern_string("T"),
+            constraint: Some(TypeId::STRING),
+            default: None,
+        },
+    ];
+
+    // <string> - satisfies the constraint
+    let type_args = vec![TypeId::STRING];
+
+    let result = solve_generic_instantiation(&type_params, &type_args, &mut checker);
+    assert_eq!(result, GenericInstantiationResult::Success);
+}
+
+/// Test that type arguments violating constraints return ConstraintViolation
+#[test]
+fn test_solve_generic_instantiation_constraint_violation() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    // <T extends string>
+    let type_params = vec![
+        TypeParamInfo {
+            name: interner.intern_string("T"),
+            constraint: Some(TypeId::STRING),
+            default: None,
+        },
+    ];
+
+    // <number> - does NOT satisfy the constraint
+    let type_args = vec![TypeId::NUMBER];
+
+    let result = solve_generic_instantiation(&type_params, &type_args, &mut checker);
+    match result {
+        GenericInstantiationResult::ConstraintViolation {
+            param_index,
+            param_name,
+            constraint,
+            type_arg,
+        } => {
+            assert_eq!(param_index, 0);
+            assert_eq!(param_name, interner.intern_string("T"));
+            assert_eq!(constraint, TypeId::STRING);
+            assert_eq!(type_arg, TypeId::NUMBER);
+        }
+        _ => panic!("Expected ConstraintViolation, got {:?}", result),
+    }
+}
+
+/// Test that unconstrained type parameters always succeed
+#[test]
+fn test_solve_generic_instantiation_unconstrained_success() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    // <T> (no constraint)
+    let type_params = vec![
+        TypeParamInfo {
+            name: interner.intern_string("T"),
+            constraint: None,
+            default: None,
+        },
+    ];
+
+    // <any type> - should always succeed when unconstrained
+    let type_args = vec![TypeId::NUMBER];
+
+    let result = solve_generic_instantiation(&type_params, &type_args, &mut checker);
+    assert_eq!(result, GenericInstantiationResult::Success);
+}
+
+/// Test that multiple type parameters are all validated
+#[test]
+fn test_solve_generic_instantiation_multiple_params() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    // <T extends string, U extends number>
+    let type_params = vec![
+        TypeParamInfo {
+            name: interner.intern_string("T"),
+            constraint: Some(TypeId::STRING),
+            default: None,
+        },
+        TypeParamInfo {
+            name: interner.intern_string("U"),
+            constraint: Some(TypeId::NUMBER),
+            default: None,
+        },
+    ];
+
+    // Both constraints satisfied
+    let type_args = vec![TypeId::STRING, TypeId::NUMBER];
+    let result = solve_generic_instantiation(&type_params, &type_args, &mut checker);
+    assert_eq!(result, GenericInstantiationResult::Success);
+
+    // First constraint violated
+    let type_args = vec![TypeId::BOOLEAN, TypeId::NUMBER];
+    let result = solve_generic_instantiation(&type_params, &type_args, &mut checker);
+    match result {
+        GenericInstantiationResult::ConstraintViolation { param_index, .. } => {
+            assert_eq!(param_index, 0);
+        }
+        _ => panic!("Expected ConstraintViolation for first param"),
+    }
+
+    // Second constraint violated
+    let type_args = vec![TypeId::STRING, TypeId::BOOLEAN];
+    let result = solve_generic_instantiation(&type_params, &type_args, &mut checker);
+    match result {
+        GenericInstantiationResult::ConstraintViolation { param_index, .. } => {
+            assert_eq!(param_index, 1);
+        }
+        _ => panic!("Expected ConstraintViolation for second param"),
+    }
+}
+
+/// Test that literals satisfy constraints when assignable
+#[test]
+fn test_solve_generic_instantiation_literal_satisfies_constraint() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    // <T extends string>
+    let type_params = vec![
+        TypeParamInfo {
+            name: interner.intern_string("T"),
+            constraint: Some(TypeId::STRING),
+            default: None,
+        },
+    ];
+
+    // "hello" literal should satisfy string constraint
+    let hello_lit = interner.literal_string("hello");
+    let type_args = vec![hello_lit];
+
+    let result = solve_generic_instantiation(&type_params, &type_args, &mut checker);
+    assert_eq!(result, GenericInstantiationResult::Success);
+}
+
+/// Test that union types can satisfy constraints when all members satisfy it
+#[test]
+fn test_solve_generic_instantiation_union_satisfies_constraint() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    // <T extends string | number>
+    let union_constraint = interner.union2(TypeId::STRING, TypeId::NUMBER);
+    let type_params = vec![
+        TypeParamInfo {
+            name: interner.intern_string("T"),
+            constraint: Some(union_constraint),
+            default: None,
+        },
+    ];
+
+    // string should satisfy string | number constraint
+    let type_args = vec![TypeId::STRING];
+    let result = solve_generic_instantiation(&type_params, &type_args, &mut checker);
+    assert_eq!(result, GenericInstantiationResult::Success);
+
+    // "hello" literal should satisfy string | number constraint
+    let hello_lit = interner.literal_string("hello");
+    let type_args = vec![hello_lit];
+    let result = solve_generic_instantiation(&type_params, &type_args, &mut checker);
+    assert_eq!(result, GenericInstantiationResult::Success);
+}
+
+/// Test the task example: function f<T>(x: T): number { return x; } f<string>("hi")
+/// The type argument string should be validated against T's constraint (none in this case)
+#[test]
+fn test_solve_generic_instantiation_task_example() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    // <T> (unconstrained)
+    let type_params = vec![
+        TypeParamInfo {
+            name: interner.intern_string("T"),
+            constraint: None,
+            default: None,
+        },
+    ];
+
+    // Explicit type argument <string>
+    let type_args = vec![TypeId::STRING];
+
+    let result = solve_generic_instantiation(&type_params, &type_args, &mut checker);
+    // Should succeed because T has no constraint
+    assert_eq!(result, GenericInstantiationResult::Success);
+}
+
+/// Test that constraints are properly checked (number doesn't extend string)
+#[test]
+fn test_solve_generic_instantiation_number_not_string() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    // <T extends string>
+    let type_params = vec![
+        TypeParamInfo {
+            name: interner.intern_string("T"),
+            constraint: Some(TypeId::STRING),
+            default: None,
+        },
+    ];
+
+    // number does NOT extend string
+    let type_args = vec![TypeId::NUMBER];
+
+    let result = solve_generic_instantiation(&type_params, &type_args, &mut checker);
+    match result {
+        GenericInstantiationResult::ConstraintViolation {
+            constraint,
+            type_arg,
+            ..
+        } => {
+            assert_eq!(constraint, TypeId::STRING);
+            assert_eq!(type_arg, TypeId::NUMBER);
+        }
+        _ => panic!("Expected ConstraintViolation: number does not extend string"),
+    }
+}
+
+/// Test object type constraints
+#[test]
+fn test_solve_generic_instantiation_object_constraint() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    // Create an object type { x: number }
+    let object_type = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("x"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // <T extends { x: number }>
+    let type_params = vec![
+        TypeParamInfo {
+            name: interner.intern_string("T"),
+            constraint: Some(object_type),
+            default: None,
+        },
+    ];
+
+    // { x: number; y: string; } should satisfy constraint (has at least x: number)
+    let wider_object = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("x"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("y"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let type_args = vec![wider_object];
+    let result = solve_generic_instantiation(&type_params, &type_args, &mut checker);
+    assert_eq!(result, GenericInstantiationResult::Success);
+}
