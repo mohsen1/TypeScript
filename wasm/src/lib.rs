@@ -37,6 +37,9 @@ pub mod thin_binder;
 #[cfg(test)]
 mod thin_binder_tests;
 
+// Module Resolution Debugging - Logging for symbol table operations and scope lookups
+pub mod module_resolution_debug;
+
 // Lib Loader - Load and merge lib.d.ts symbols into the binder (BIND-10)
 pub mod lib_loader;
 

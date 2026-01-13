@@ -11,6 +11,7 @@ use crate::binder::{
     SymbolId, SymbolTable, flow_flags, symbol_flags,
 };
 use crate::lib_loader;
+use crate::module_resolution_debug::ModuleResolutionDebugger;
 use crate::parser::node_flags;
 use crate::parser::thin_node::{ThinNode, ThinNodeArena};
 use crate::parser::{NodeIndex, NodeList, syntax_kind_ext};
@@ -75,6 +76,10 @@ pub struct ThinBinderState {
     pub node_scope_ids: FxHashMap<u32, ScopeId>,
     /// Current active ScopeId during binding
     current_scope_id: ScopeId,
+
+    // ===== Module Resolution Debugging =====
+    /// Debugger for tracking symbol table operations and scope lookups
+    pub debugger: ModuleResolutionDebugger,
 }
 
 /// Validation result describing issues found in the symbol table
@@ -115,6 +120,7 @@ impl ThinBinderState {
             scopes: Vec::new(),
             node_scope_ids: FxHashMap::default(),
             current_scope_id: ScopeId::NONE,
+            debugger: ModuleResolutionDebugger::new(),
         }
     }
 
@@ -140,6 +146,19 @@ impl ThinBinderState {
         self.scopes.clear();
         self.node_scope_ids.clear();
         self.current_scope_id = ScopeId::NONE;
+        self.debugger.clear();
+    }
+
+    /// Set the current file name for debugging purposes.
+    /// This should be called before binding a source file.
+    pub fn set_debug_file(&mut self, file_name: &str) {
+        self.debugger.set_current_file(file_name);
+    }
+
+    /// Get the module resolution debug summary.
+    /// Returns a human-readable summary of all recorded debug events.
+    pub fn get_debug_summary(&self) -> String {
+        self.debugger.get_summary()
     }
 
     /// Create a ThinBinderState from existing bound state.
@@ -176,6 +195,7 @@ impl ThinBinderState {
             scopes: Vec::new(),
             node_scope_ids: FxHashMap::default(),
             current_scope_id: ScopeId::NONE,
+            debugger: ModuleResolutionDebugger::new(),
         }
     }
 
@@ -212,6 +232,7 @@ impl ThinBinderState {
             scopes,
             node_scope_ids,
             current_scope_id: ScopeId::NONE,
+            debugger: ModuleResolutionDebugger::new(),
         }
     }
 
@@ -1882,6 +1903,15 @@ impl ThinBinderState {
             let existing_flags = self.symbols.get(existing_id).map(|s| s.flags).unwrap_or(0);
             let can_merge = Self::can_merge_flags(existing_flags, flags);
 
+            let combined_flags = if can_merge {
+                existing_flags | flags
+            } else {
+                existing_flags
+            };
+
+            // Record merge event for debugging
+            self.debugger.record_merge(name, existing_id, existing_flags, flags, combined_flags);
+
             if let Some(sym) = self.symbols.get_mut(existing_id) {
                 if can_merge {
                     sym.flags |= flags;
@@ -1896,6 +1926,9 @@ impl ThinBinderState {
                 if is_exported {
                     sym.is_exported = true;
                 }
+
+                // Record declaration event (merge)
+                self.debugger.record_declaration(name, existing_id, combined_flags, sym.declarations.len(), true);
             }
 
             self.node_symbols.insert(declaration.0, existing_id);
@@ -1914,6 +1947,10 @@ impl ThinBinderState {
         self.current_scope.set(name.to_string(), sym_id);
         self.node_symbols.insert(declaration.0, sym_id);
         self.declare_in_persistent_scope(name.to_string(), sym_id);
+
+        // Record declaration event (new symbol)
+        self.debugger.record_declaration(name, sym_id, flags, 1, false);
+
         sym_id
     }
 
