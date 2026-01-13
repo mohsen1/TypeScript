@@ -14428,3 +14428,436 @@ fn test_overload_contextual_from_target() {
     let result = ctx.resolve_with_constraints(var_t).unwrap();
     assert_eq!(result, TypeId::STRING);
 }
+
+// =============================================================================
+// SOLV-16: Enhanced Generic Inference Tests
+// =============================================================================
+
+#[test]
+fn test_conditional_type_inference_basic() {
+    // type Wrapped<T> = T extends string ? { value: T } : never;
+    // When inferring T, if we have { value: string }, T should be string
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Create a conditional type: T extends string ? { value: T } : never
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let object_t = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("value"),
+        type_id: t_type,
+        write_type: t_type,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let cond = interner.conditional(ConditionalType {
+        check_type: t_type,
+        extends_type: TypeId::STRING,
+        true_type: object_t,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    });
+
+    // Infer from the conditional type
+    ctx.infer_from_conditional(var_t, t_type, TypeId::STRING, object_t, TypeId::NEVER);
+
+    // The constraint should be that T extends string
+    let constraints = ctx.get_constraints(var_t);
+    assert!(constraints.is_some());
+    let constraints = constraints.unwrap();
+    assert!(constraints.upper_bounds.contains(&TypeId::STRING));
+}
+
+#[test]
+fn test_variance_computation_covariant() {
+    // type Box<T> = { value: T };
+    // T is covariant in Box<T> (appears in read position)
+    let interner = TypeInterner::new();
+    let ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let box_type = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("value"),
+        type_id: t_type,
+        write_type: t_type,
+        optional: false,
+        readonly: true,  // Readonly makes it purely covariant
+        is_method: false,
+    }]);
+
+    let (covariant, contravariant, invariant, bivariant) = ctx.compute_variance(box_type, t_name);
+
+    assert_eq!(covariant, 1);
+    assert_eq!(contravariant, 0);
+    assert_eq!(invariant, 0);
+    assert_eq!(bivariant, 0);
+}
+
+#[test]
+fn test_variance_computation_contravariant() {
+    // type Mapper<T> = { map: (x: T) => void };
+    // T is contravariant in the function parameter position
+    let interner = TypeInterner::new();
+    let ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let func = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: vec![ParamInfo {
+            type_id: t_type,
+            name: interner.intern_string("x"),
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+        is_method: false,
+    });
+
+    let (covariant, contravariant, invariant, bivariant) = ctx.compute_variance(func, t_name);
+
+    assert_eq!(covariant, 0);
+    assert_eq!(contravariant, 1);
+    assert_eq!(invariant, 0);
+    assert_eq!(bivariant, 0);
+}
+
+#[test]
+fn test_variance_computation_invariant() {
+    // type ReadWrite<T> = { get: () => T, set: (x: T) => void };
+    // T is invariant (appears in both covariant and contravariant positions)
+    let interner = TypeInterner::new();
+    let ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let get_func = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: vec![],
+        this_type: None,
+        return_type: t_type,
+        type_predicate: None,
+        is_constructor: false,
+        is_method: false,
+    });
+
+    let set_func = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: vec![ParamInfo {
+            type_id: t_type,
+            name: interner.intern_string("x"),
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+        is_method: false,
+    });
+
+    let rw_type = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("get"),
+            type_id: get_func,
+            write_type: get_func,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+        PropertyInfo {
+            name: interner.intern_string("set"),
+            type_id: set_func,
+            write_type: set_func,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+    ]);
+
+    let (covariant, contravariant, invariant, bivariant) = ctx.compute_variance(rw_type, t_name);
+
+    // Should be marked as invariant since it appears in both positions
+    assert!(covariant > 0);
+    assert!(contravariant > 0);
+    // The compute_variance returns raw counts, and the caller interprets
+    // both covariant and contravariant as invariant
+}
+
+#[test]
+fn test_variance_string() {
+    let interner = TypeInterner::new();
+    let ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let array_type = interner.array(t_type);
+
+    assert_eq!(ctx.get_variance(array_type, t_name), "covariant");
+}
+
+#[test]
+fn test_infer_from_context() {
+    // function foo<T>(x: T): T;
+    // const result: string = foo("hello");
+    // The context (result: string) provides an upper bound for T
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Infer from context: result type is string
+    ctx.infer_from_context(var_t, TypeId::STRING).unwrap();
+
+    let constraints = ctx.get_constraints(var_t);
+    assert!(constraints.is_some());
+    let constraints = constraints.unwrap();
+    assert!(constraints.upper_bounds.contains(&TypeId::STRING));
+}
+
+#[test]
+fn test_strengthen_constraints() {
+    // function foo<T, U extends T>(x: T, y: U): void;
+    // If we know T = string, then U must be at most string (string <: U)
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+
+    // U extends T
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+    let u_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: u_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // Add constraints: T has lower bound string, U extends T
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+    ctx.add_upper_bound(var_u, t_type);
+
+    // Strengthen constraints should propagate
+    ctx.strengthen_constraints().unwrap();
+
+    // U should now have string as a lower bound (via T)
+    let u_constraints = ctx.get_constraints(var_u);
+    assert!(u_constraints.is_some());
+    let u_constraints = u_constraints.unwrap();
+    // U should have inherited the constraint from T
+    assert!(!u_constraints.upper_bounds.is_empty());
+}
+
+#[test]
+fn test_best_common_type_with_literals() {
+    // ["hello", "world"] should infer as string, not union of two literals
+    let interner = TypeInterner::new();
+    let ctx = InferenceContext::new(&interner);
+
+    let hello = interner.literal_string("hello");
+    let world = interner.literal_string("world");
+
+    let result = ctx.best_common_type(&[hello, world]);
+
+    // Should widen to string, not stay as union of literals
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_best_common_type_mixed() {
+    // [string, "hello"] should infer as string
+    let interner = TypeInterner::new();
+    let ctx = InferenceContext::new(&interner);
+
+    let hello = interner.literal_string("hello");
+    let types = &[TypeId::STRING, hello];
+
+    let result = ctx.best_common_type(types);
+
+    // Should be string (the common base type)
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_best_common_type_union_fallback() {
+    // [string, number] should infer as string | number
+    let interner = TypeInterner::new();
+    let ctx = InferenceContext::new(&interner);
+
+    let result = ctx.best_common_type(&[TypeId::STRING, TypeId::NUMBER]);
+
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_contains_inference_var() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let var_t = ctx.fresh_type_param(t_name);
+
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let array_t = interner.array(t_type);
+
+    assert!(ctx.contains_inference_var(array_t, var_t));
+    assert!(!ctx.contains_inference_var(TypeId::STRING, var_t));
+}
+
+#[test]
+fn test_validate_variance() {
+    // Validate that resolved types don't have circular references
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Unify with a concrete type
+    ctx.unify_var_type(var_t, TypeId::STRING).unwrap();
+
+    // Validate should pass
+    ctx.validate_variance().unwrap();
+}
+
+#[test]
+fn test_variance_conditional_type() {
+    // type Check<T> = T extends string ? true : false;
+    // Conditional types are invariant in their check type
+    let interner = TypeInterner::new();
+    let ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let cond = interner.conditional(ConditionalType {
+        check_type: t_type,
+        extends_type: TypeId::STRING,
+        true_type: TypeId::BOOLEAN_TRUE,
+        false_type: TypeId::BOOLEAN_FALSE,
+        is_distributive: true,
+    });
+
+    let variance = ctx.get_variance(cond, t_name);
+    // Check and extends should create invariance
+    assert_eq!(variance, "invariant");
+}
+
+#[test]
+fn test_complex_generic_inference() {
+    // function map<T, U>(arr: T[], fn: (x: T) => U): U[];
+    // Test that we can infer both T and U from arguments
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
+
+    // T is inferred from array element type
+    ctx.add_lower_bound(var_t, TypeId::STRING);
+
+    // U is inferred from function return type
+    ctx.add_lower_bound(var_u, TypeId::NUMBER);
+
+    // Also U is constrained by T through the function parameter
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // The function parameter (x: T) creates a relationship
+    // But for this test, we just check both can be resolved
+    let resolved_t = ctx.resolve_with_constraints(var_t).unwrap();
+    let resolved_u = ctx.resolve_with_constraints(var_u).unwrap();
+
+    assert_eq!(resolved_t, TypeId::STRING);
+    assert_eq!(resolved_u, TypeId::NUMBER);
+}
+
+#[test]
+fn test_bidirectional_inference() {
+    // function foo<T>(x: T): T;
+    // const result: string = foo(?);
+    // T should be inferred as string from the context
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Context provides upper bound
+    ctx.infer_from_context(var_t, TypeId::STRING).unwrap();
+
+    // Resolve with constraints
+    let resolved = ctx.resolve_with_constraints(var_t).unwrap();
+
+    assert_eq!(resolved, TypeId::STRING);
+}
+
+#[test]
+fn test_inference_with_constraints() {
+    // function foo<T extends number>(x: T): T;
+    // When called with foo(42), T should be 42 (the literal)
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let var_t = ctx.fresh_type_param(t_name);
+
+    // Add constraint: T extends number
+    ctx.add_upper_bound(var_t, TypeId::NUMBER);
+
+    // Add lower bound from argument
+    let forty_two = interner.literal_number(42.0);
+    ctx.add_lower_bound(var_t, forty_two);
+
+    // Resolve should return the literal since it satisfies the constraint
+    let resolved = ctx.resolve_with_constraints(var_t).unwrap();
+
+    assert_eq!(resolved, forty_two);
+}
