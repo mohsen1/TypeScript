@@ -1,7 +1,10 @@
 # Worker 7 Task List - Solver Squad
 
 ## Current Task
-(empty - all assigned tasks completed)
+- [ ] **SOLV-15: Implement strict subtyping for generic types**
+  - Don't bail to Any when generic parameters are complex
+  - Add proper constraint checking in solve_subtype
+  - Handle generic instantiation with unknown type arguments
 
 ## Completed
 - [x] **SOLV-14: Integrate Lawyer layer into CompatChecker**
