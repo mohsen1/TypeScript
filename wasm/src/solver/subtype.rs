@@ -290,9 +290,10 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         // =========================================================================
 
         if self.depth > 100 {
-            // Recursion too deep - return provisional true to prevent stack overflow
-            // This is a safety measure for deeply nested or expanding recursive types
-            return SubtypeResult::Provisional;
+            // Recursion too deep - return false to be conservative and prevent stack overflow
+            // This ensures complex generics don't silently accept invalid code
+            // Note: This differs from coinductive cycle detection which returns Provisional
+            return SubtypeResult::False;
         }
 
         // =========================================================================
@@ -510,9 +511,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                         (None, Some(_)) => {
                             return SubtypeResult::False;
                         }
-                        // Both unconstrained - they both act like unknown, so they're compatible
+                        // Both unconstrained - different type parameters are not guaranteed compatible
+                        // T <: U is only sound if we know T = U (handled above by name check)
+                        // Two different unconstrained parameters could be instantiated to incompatible types
                         (None, None) => {
-                            return SubtypeResult::True;
+                            return SubtypeResult::False;
                         }
                     }
                 }
@@ -524,9 +527,10 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 }
 
                 // Unconstrained type parameter acts like `unknown` (top type)
-                // It is assignable to any type (but not vice versa)
-                // Since we're checking `source <: target`, unknown <: anything is TRUE
-                SubtypeResult::True
+                // Since unknown is a TOP type: T <: unknown is TRUE, but unknown <: T is FALSE
+                // An unconstrained type param as source cannot be assigned to a concrete target
+                // because the param could be instantiated to an incompatible type
+                SubtypeResult::False
             }
 
             // object keyword accepts any non-primitive type
