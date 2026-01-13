@@ -297,7 +297,6 @@ impl<'a> ThinCheckerState<'a> {
         let node = self.ctx.arena.get(idx)?;
         let name = self.ctx.arena.get_identifier(node)?.escaped_text.as_str();
 
-
         // Collect lib binders for cross-arena symbol lookup
         let lib_binders: Vec<Arc<crate::thin_binder::ThinBinderState>> =
             self.ctx.lib_contexts.iter().map(|lc| Arc::clone(&lc.binder)).collect();
@@ -309,6 +308,18 @@ impl<'a> ThinCheckerState<'a> {
                 name, idx
             );
         }
+
+        if let Some(mut scope_id) = self.find_enclosing_scope(idx) {
+            let require_export = false;
+            while !scope_id.is_none() {
+                if let Some(scope) = self.ctx.binder.scopes.get(scope_id.0 as usize) {
+                    if let Some(sym_id) = scope.table.get(name) {
+                        if let Some(symbol) = self.ctx.binder.get_symbol_with_libs(sym_id, &lib_binders) {
+                            let export_ok = !require_export
+                                || scope.kind != ContainerKind::Module
+                                || symbol.is_exported
+                                || (symbol.flags & symbol_flags::EXPORT_VALUE) != 0;
+                            if export_ok && !Self::is_class_member_symbol(symbol.flags) {
                                 if std::env::var("BIND_DEBUG").is_ok() {
                                     eprintln!("[BIND_RESOLVE] Found '{}' in scope {:?}", name, scope_id);
                                 }
