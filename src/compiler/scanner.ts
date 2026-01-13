@@ -1031,11 +1031,11 @@ export function createScanner(
     start?: number,
     length?: number,
 ): Scanner {
-    // Check if Rust scanner should be used (Phase 2.5)
+    // Check if Rust scanner should be used
     if (sys?.useRustScanner) {
         return createRustScanner(languageVersion, skipTrivia, languageVariant, textInitial, onError, start, length);
     }
-    
+
     // Why var? It avoids TDZ checks in the runtime which can be costly.
     // See: https://github.com/microsoft/TypeScript/issues/52924
     /* eslint-disable no-var */
@@ -4109,16 +4109,16 @@ const valuesOfNonBinaryUnicodeProperties = {
 valuesOfNonBinaryUnicodeProperties.Script_Extensions = valuesOfNonBinaryUnicodeProperties.Script;
 
 // =============================================================================
-// Rust Scanner Adapter (Phase 2.5)
+// Rust Scanner Adapter
 // =============================================================================
 
 /**
  * Creates a scanner backed by the Rust/WASM implementation.
  * This is an adapter that implements the Scanner interface using the Rust scanner.
- * 
+ *
  * Note: Not all methods are implemented. Unimplemented methods will throw Debug.fail().
  * Currently unsupported: JSX scanning, JSDoc scanning, rescan methods.
- * 
+ *
  * @internal
  */
 export function createRustScanner(
@@ -4136,26 +4136,26 @@ export function createRustScanner(
     // Offset to add to positions returned by the Rust scanner
     // (since it receives a substring, not the full text)
     let textOffset = 0;
-    
+
     // State that we track on the TS side (not yet in Rust)
     let commentDirectives: CommentDirective[] | undefined;
     let savedOnError = onError;
-    
+
     // Initialize the scanner
     initializeScanner();
-    
+
     function initializeScanner() {
         textOffset = start ?? 0;
         // When length is not provided, scan from start to end of text
         const actualLength = length ?? (text.length - textOffset);
         const scanText = text.substring(textOffset, textOffset + actualLength);
-        
+
         wasmScanner = wasmCreateScanner(scanText, skipTrivia);
         if (!wasmScanner) {
             Debug.fail("Rust scanner unavailable - wasmCreateScanner returned undefined");
         }
     }
-    
+
     // Helper that returns non-null scanner or throws
     function getScanner(): WasmScanner {
         if (!wasmScanner) {
@@ -4163,12 +4163,12 @@ export function createRustScanner(
         }
         return wasmScanner;
     }
-    
+
     // Helper to throw for unimplemented methods
     function notImplemented(methodName: string): never {
         return Debug.fail(`RustScanner: ${methodName} not yet implemented`);
     }
-    
+
     // Scanner interface implementation
     // Note: All position accessors add textOffset to convert from substring to original text positions
     const scanner: Scanner = {
@@ -4181,21 +4181,21 @@ export function createRustScanner(
         getTokenPos: () => getScanner().getTokenStart() + textOffset,
         getTokenText: () => getScanner().getTokenText(),
         getTokenValue: () => getScanner().getTokenValue(),
-        
+
         hasUnicodeEscape: () => (getScanner().getTokenFlags() & TokenFlags.UnicodeEscape) !== 0,
         hasExtendedUnicodeEscape: () => (getScanner().getTokenFlags() & TokenFlags.ExtendedUnicodeEscape) !== 0,
         hasPrecedingLineBreak: () => getScanner().hasPrecedingLineBreak(),
         hasPrecedingJSDocComment: () => (getScanner().getTokenFlags() & TokenFlags.PrecedingJSDocComment) !== 0,
         hasPrecedingJSDocLeadingAsterisks: () => (getScanner().getTokenFlags() & TokenFlags.PrecedingJSDocLeadingAsterisks) !== 0,
-        
+
         isIdentifier: () => getScanner().isIdentifier(),
         isReservedWord: () => getScanner().isReservedWord(),
         isUnterminated: () => getScanner().isUnterminated(),
-        
+
         getNumericLiteralFlags: () => getScanner().getTokenFlags() & TokenFlags.NumericLiteralFlags,
         getCommentDirectives: () => commentDirectives,
         getTokenFlags: () => getScanner().getTokenFlags() as TokenFlags,
-        
+
         // Rescan methods - implemented in Rust
         reScanGreaterToken: () => getScanner().reScanGreaterToken() as SyntaxKind,
         reScanSlashToken: () => getScanner().reScanSlashToken() as SyntaxKind,
@@ -4209,19 +4209,19 @@ export function createRustScanner(
         reScanHashToken: () => notImplemented("reScanHashToken"),
         reScanQuestionToken: () => notImplemented("reScanQuestionToken"),
         reScanInvalidIdentifier: () => notImplemented("reScanInvalidIdentifier"),
-        
+
         // JSX methods - not yet implemented in Rust
         scanJsxIdentifier: () => notImplemented("scanJsxIdentifier"),
         scanJsxAttributeValue: () => notImplemented("scanJsxAttributeValue"),
         scanJsxToken: () => notImplemented("scanJsxToken"),
-        
+
         // JSDoc methods - not yet implemented in Rust
         scanJsDocToken: () => notImplemented("scanJsDocToken"),
         scanJSDocCommentTextToken: () => notImplemented("scanJSDocCommentTextToken"),
-        
+
         // Core scanning
         scan: () => getScanner().scan() as SyntaxKind,
-        
+
         // Text management
         getText: () => getScanner().getText(),
         clearCommentDirectives: () => { commentDirectives = undefined; },
@@ -4230,7 +4230,7 @@ export function createRustScanner(
             textOffset = newStart ?? 0;
             // When length is not provided, scan from start to end of text
             const actualLength = newLength ?? (text.length - textOffset);
-            
+
             // Free the old scanner and create a new one
             if (wasmScanner) {
                 wasmScanner.free();
@@ -4259,59 +4259,59 @@ export function createRustScanner(
         setSkipJsDocLeadingAsterisks: (_skip: boolean) => {
             // Rust scanner doesn't support JSDoc asterisks yet
         },
-        
+
         // State save/restore - critical for parser
         lookAhead: <T>(callback: () => T): T => {
             const s = getScanner();
             // Save state
             const saveTokenStart = s.getTokenStart();
-            
+
             // Execute callback
             const result = callback();
-            
+
             // Restore state
             s.resetTokenState(saveTokenStart);
             // Note: We can't fully restore token/tokenValue/tokenFlags in Rust scanner yet
             // This may cause issues with complex lookAhead scenarios
-            
+
             return result;
         },
-        
+
         scanRange: <T>(scanStart: number, scanLength: number, callback: () => T): T => {
             // Save current state
             const savedText = text;
             const savedTextOffset = textOffset;
-            
+
             // Set the range
             scanner.setText(text, scanStart, scanLength);
-            
+
             // Execute callback
             const result = callback();
-            
+
             // Restore
             text = savedText;
             textOffset = savedTextOffset;
             scanner.setText(savedText, savedTextOffset);
-            
+
             return result;
         },
-        
+
         tryScan: <T>(callback: () => T): T => {
             const s = getScanner();
             // Save state
             const saveTokenStart = s.getTokenStart();
-            
+
             // Execute callback
             const result = callback();
-            
+
             // Only restore if callback returned falsy
             if (!result) {
                 s.resetTokenState(saveTokenStart);
             }
-            
+
             return result;
         },
     };
-    
+
     return scanner;
 }

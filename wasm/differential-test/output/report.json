@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-01-12T09:35:32.919Z",
+  "timestamp": "2026-01-13T12:50:49.705Z",
   "summary": {
     "total": 15,
     "passed": 12,
@@ -21,7 +21,7 @@
       "wasmErrors": 1,
       "missingInWasm": [],
       "extraInWasm": [],
-      "duration": 518
+      "duration": 420
     },
     {
       "id": "unsoundness-16-inline-1",
@@ -31,19 +31,20 @@
       "wasmErrors": 0,
       "missingInWasm": [],
       "extraInWasm": [],
-      "duration": 232
+      "duration": 177
     },
     {
       "id": "unsoundness-19-inline-1",
       "passed": false,
       "severity": "medium",
       "tscErrors": 0,
-      "wasmErrors": 1,
+      "wasmErrors": 2,
       "missingInWasm": [],
       "extraInWasm": [
-        2345
+        2322,
+        2339
       ],
-      "duration": 221
+      "duration": 172
     },
     {
       "id": "unsoundness-31-inline-1",
@@ -53,7 +54,7 @@
       "wasmErrors": 1,
       "missingInWasm": [],
       "extraInWasm": [],
-      "duration": 222
+      "duration": 170
     },
     {
       "id": "custom-basic-types",
@@ -63,7 +64,7 @@
       "wasmErrors": 0,
       "missingInWasm": [],
       "extraInWasm": [],
-      "duration": 212
+      "duration": 160
     },
     {
       "id": "custom-phase1-critical-AnyTypeTests",
@@ -73,7 +74,7 @@
       "wasmErrors": 1,
       "missingInWasm": [],
       "extraInWasm": [],
-      "duration": 213
+      "duration": 152
     },
     {
       "id": "custom-phase1-critical-ObjectTrifectaTests",
@@ -83,7 +84,7 @@
       "wasmErrors": 1,
       "missingInWasm": [],
       "extraInWasm": [],
-      "duration": 202
+      "duration": 161
     },
     {
       "id": "custom-phase1-critical-VoidReturnTests",
@@ -93,7 +94,7 @@
       "wasmErrors": 1,
       "missingInWasm": [],
       "extraInWasm": [],
-      "duration": 207
+      "duration": 153
     },
     {
       "id": "custom-phase1-critical-ErrorPoisoningTests",
@@ -103,7 +104,7 @@
       "wasmErrors": 1,
       "missingInWasm": [],
       "extraInWasm": [],
-      "duration": 221
+      "duration": 151
     },
     {
       "id": "custom-phase1-critical-CovariantArrayTests",
@@ -113,7 +114,7 @@
       "wasmErrors": 1,
       "missingInWasm": [],
       "extraInWasm": [],
-      "duration": 217
+      "duration": 186
     },
     {
       "id": "custom-phase1-critical-FunctionBivarianceTests",
@@ -123,7 +124,7 @@
       "wasmErrors": 1,
       "missingInWasm": [],
       "extraInWasm": [],
-      "duration": 206
+      "duration": 205
     },
     {
       "id": "custom-phase1-critical-NullUndefinedTests",
@@ -133,7 +134,7 @@
       "wasmErrors": 1,
       "missingInWasm": [],
       "extraInWasm": [],
-      "duration": 217
+      "duration": 191
     },
     {
       "id": "custom-phase1-critical-LiteralWideningTests",
@@ -143,7 +144,7 @@
       "wasmErrors": 1,
       "missingInWasm": [],
       "extraInWasm": [],
-      "duration": 228
+      "duration": 168
     },
     {
       "id": "custom-phase1-critical-OptionalityTests",
@@ -153,7 +154,7 @@
       "wasmErrors": 1,
       "missingInWasm": [],
       "extraInWasm": [],
-      "duration": 204
+      "duration": 154
     },
     {
       "id": "custom-phase1-critical-ExcessPropertyTests",
@@ -163,7 +164,7 @@
       "wasmErrors": 0,
       "missingInWasm": [],
       "extraInWasm": [],
-      "duration": 207
+      "duration": 162
     }
   ]
 }

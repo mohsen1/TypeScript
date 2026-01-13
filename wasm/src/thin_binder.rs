@@ -93,6 +93,17 @@ pub enum ValidationError {
     InvalidValueDeclaration { symbol_id: u32, name: String },
 }
 
+/// Validation result describing issues found in the symbol table
+#[derive(Debug, Clone, PartialEq)]
+pub enum ValidationError {
+    /// A node->symbol mapping points to a non-existent symbol
+    BrokenSymbolLink { node_index: u32, symbol_id: u32 },
+    /// A symbol exists but has no declarations (orphaned)
+    OrphanedSymbol { symbol_id: u32, name: String },
+    /// A symbol's value_declaration points to a non-existent node
+    InvalidValueDeclaration { symbol_id: u32, name: String },
+}
+
 impl ThinBinderState {
     pub fn new() -> Self {
         let mut flow_nodes = FlowNodeArena::new();
