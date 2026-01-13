@@ -26,7 +26,6 @@
   - check_tuple_subtype handles length/type mismatches
   - evaluate_tuple_index handles numeric literal access
   - Rest elements and optional elements supported
-  - Fixed build errors and test API compatibility
 
 ## Notes
 - Focus on improving exactness from 30.8% toward 40% target
