@@ -19009,10 +19009,7 @@ impl<'a> ThinCheckerState<'a> {
         if !self.ctx.no_implicit_any || has_contextual_type {
             return;
         }
-        if !param.type_annotation.is_none()
-            || !param.initializer.is_none()
-            || param.dot_dot_dot_token
-        {
+        if !param.type_annotation.is_none() || param.dot_dot_dot_token {
             return;
         }
         if self.is_this_parameter_name(param.name) {
