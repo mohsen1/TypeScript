@@ -2236,7 +2236,7 @@ impl<'a> ThinCheckerState<'a> {
             } else if let Some(name) = name_text {
                 if is_identifier {
                     if self.is_known_global_value_name(&name) {
-                        return TypeId::ANY;
+                        return TypeId::UNKNOWN; // Known global but not resolved - use UNKNOWN
                     }
                     self.error_cannot_find_name_at(&name, type_query.expr_name);
                     return TypeId::ERROR;
@@ -2266,7 +2266,7 @@ impl<'a> ThinCheckerState<'a> {
                     .types
                     .intern(TypeKey::TypeQuery(SymbolRef(symbol_id)))
             } else {
-                return TypeId::ANY;
+                return TypeId::ERROR; // No name text - propagate error
             };
 
         if let Some(args) = &type_query.type_arguments {
@@ -2286,7 +2286,7 @@ impl<'a> ThinCheckerState<'a> {
     /// Get type from an array type node (T[]).
     fn get_type_from_array_type(&mut self, idx: NodeIndex) -> TypeId {
         let Some(node) = self.ctx.arena.get(idx) else {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Missing node - propagate error
         };
 
         if let Some(array_type) = self.ctx.arena.get_array_type(node) {
@@ -2294,7 +2294,7 @@ impl<'a> ThinCheckerState<'a> {
             return self.ctx.types.array(elem_type);
         }
 
-        self.ctx.types.array(TypeId::ANY)
+        TypeId::ERROR // Missing array type data - propagate error
     }
 
     /// Get type from a function type node (e.g., () => number, (x: string) => void).
@@ -2317,7 +2317,7 @@ impl<'a> ThinCheckerState<'a> {
 
     fn get_type_from_type_node_in_type_literal(&mut self, idx: NodeIndex) -> TypeId {
         let Some(node) = self.ctx.arena.get(idx) else {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Missing node - propagate error
         };
 
         if node.kind == syntax_kind_ext::TYPE_REFERENCE {
@@ -2344,7 +2344,7 @@ impl<'a> ThinCheckerState<'a> {
                     self.get_type_from_type_node_in_type_literal(array_type.element_type);
                 return self.ctx.types.array(elem_type);
             }
-            return self.ctx.types.array(TypeId::ANY);
+            return TypeId::ERROR; // Missing array type data - propagate error
         }
         if node.kind == syntax_kind_ext::TYPE_LITERAL {
             return self.get_type_from_type_literal(idx);
@@ -2357,11 +2357,11 @@ impl<'a> ThinCheckerState<'a> {
         use crate::solver::{SymbolRef, TypeKey};
 
         let Some(node) = self.ctx.arena.get(idx) else {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Missing node - propagate error
         };
 
         let Some(type_ref) = self.ctx.arena.get_type_ref(node) else {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Missing type ref data - propagate error
         };
 
         let type_name_idx = type_ref.type_name;
