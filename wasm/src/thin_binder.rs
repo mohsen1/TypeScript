@@ -14,6 +14,7 @@ use crate::binder::{
     FlowNodeArena, FlowNodeId, flow_flags,
     ContainerKind, ScopeContext, Scope, ScopeId,
 };
+use crate::lib_loader;
 use crate::parser::node_flags;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::Arc;
@@ -443,6 +444,74 @@ impl ThinBinderState {
 
         // Store file locals
         self.file_locals = std::mem::take(&mut self.current_scope);
+    }
+
+    /// Merge lib file symbols into the current scope.
+    ///
+    /// This is called during binder initialization to ensure global symbols
+    /// from lib.d.ts (like `Object`, `Function`, `console`, etc.) are available
+    /// during type checking.
+    ///
+    /// # Parameters
+    /// - `lib_files`: Slice of Arc<LibFile> containing parsed and bound lib files
+    ///
+    /// # Example
+    /// ```ignore
+    /// let mut binder = ThinBinderState::new();
+    /// binder.bind_source_file(arena, root);
+    /// binder.merge_lib_symbols(&lib_files);
+    /// ```
+    pub fn merge_lib_symbols(&mut self, lib_files: &[Arc<lib_loader::LibFile>]) {
+        // Merge lib symbols into file_locals (global scope)
+        lib_loader::merge_lib_symbols(&mut self.file_locals, lib_files);
+
+        // Also merge into the current scope if we're at the root level
+        if self.scope_chain.len() <= 1 {
+            for (name, sym_id) in self.file_locals.iter() {
+                if !self.current_scope.has(name) {
+                    self.current_scope.set(name.clone(), *sym_id);
+                }
+            }
+        }
+
+        // Merge into the root persistent scope
+        if let Some(root_scope) = self.scopes.first_mut() {
+            for (name, sym_id) in self.file_locals.iter() {
+                if !root_scope.table.has(name) {
+                    root_scope.table.set(name.clone(), *sym_id);
+                }
+            }
+        }
+
+        // Track lib arenas for cross-file symbol resolution
+        for lib in lib_files {
+            // Store symbol arena mappings for all lib symbols
+            for (name, sym_id) in lib.binder.file_locals.iter() {
+                if !self.symbol_arenas.contains_key(sym_id) {
+                    self.symbol_arenas.insert(*sym_id, Arc::clone(&lib.arena));
+                }
+            }
+        }
+    }
+
+    /// Bind a source file with lib symbols merged in.
+    ///
+    /// This is a convenience method that combines `bind_source_file` and `merge_lib_symbols`.
+    ///
+    /// # Parameters
+    /// - `arena`: The ThinNodeArena containing the AST
+    /// - `root`: The root node index of the source file
+    /// - `lib_files`: Optional slice of Arc<LibFile> containing lib files
+    pub fn bind_source_file_with_libs(
+        &mut self,
+        arena: &ThinNodeArena,
+        root: NodeIndex,
+        lib_files: &[Arc<lib_loader::LibFile>],
+    ) {
+        self.bind_source_file(arena, root);
+        if !lib_files.is_empty() {
+            self.merge_lib_symbols(lib_files);
+        }
     }
 
     /// Incrementally bind new statements after a prefix without rebinding the entire file.
