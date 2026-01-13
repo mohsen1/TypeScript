@@ -31,6 +31,7 @@ pub use ast::*;
 
 // Re-export arena
 pub use arena::NodeArena;
+pub use thin_node::ThinNodeArena;
 
 /// Extended SyntaxKind values for AST nodes that are not tokens.
 /// These match TypeScript's SyntaxKind enum values exactly.

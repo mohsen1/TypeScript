@@ -232,7 +232,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
     }
 
     /// Internal subtype check with cycle detection
-    fn check_subtype(&mut self, source: TypeId, target: TypeId) -> SubtypeResult {
+    pub fn check_subtype(&mut self, source: TypeId, target: TypeId) -> SubtypeResult {
         // =========================================================================
         // Fast paths
         // =========================================================================

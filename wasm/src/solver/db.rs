@@ -323,12 +323,12 @@ impl<'a> QueryCache<'a> {
     }
 
     #[cfg(test)]
-    fn eval_cache_len(&self) -> usize {
+    pub fn eval_cache_len(&self) -> usize {
         self.eval_cache.read().expect("eval cache lock").len()
     }
 
     #[cfg(test)]
-    fn subtype_cache_len(&self) -> usize {
+    pub fn subtype_cache_len(&self) -> usize {
         self.subtype_cache
             .read()
             .expect("subtype cache lock")
