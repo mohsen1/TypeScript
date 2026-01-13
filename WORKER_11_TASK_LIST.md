@@ -1,20 +1,17 @@
 # Worker 11 Task List
 
-## Squad: Solver Squad (TS2322 Focus)
+## Squad: Solver (Semantics)
 
 ## Current Task
-- [ ] Analyze remaining TS2322 (Type not assignable) missing errors - improve detection
+- [ ] Improve TS2322 (Type not assignable) detection in wasm/src/solver
 
 ## Queue
-- [ ] Review `wasm/src/solver/subtype.rs` for cases where mismatches are incorrectly accepted
-- [ ] Audit structural type checking in `wasm/src/solver/compat.rs`
-- [ ] Add stricter checks for object literal excess property detection
-- [ ] Test complex union/intersection assignability edge cases
+- [ ] Audit solve_subtype logic for missing strictness
+- [ ] Find patterns where TS2322 should fire but doesn't
+- [ ] Implement stricter type compatibility checks
 
 ## Completed
-(Previous phase work archived - ANY fallback work complete)
+(none yet)
 
 ## Context
-- **Goal:** Convert "Missing TS2322" into "Exact Match" or "Extra TS2322" (better to be too strict than unsound)
-- **Key files:** `wasm/src/solver/subtype.rs`, `wasm/src/solver/compat.rs`, `wasm/src/thin_checker.rs`
-- **Note:** Previous phase completed ANY->ERROR fallback changes
+TS2322 is being missed. The solver needs to be meaner (stricter) to match tsc. Better to be too strict than unsound.

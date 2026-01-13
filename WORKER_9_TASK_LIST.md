@@ -1,20 +1,17 @@
 # Worker 9 Task List
 
-## Squad: Binder Squad (Symbol Lookup)
+## Squad: Binder (CRITICAL)
 
 ## Current Task
-- [ ] Audit symbol table lookup chain in `wasm/src/thin_binder.rs` for breaks in scope traversal
+- [ ] Fix type-only imports and exports handling in wasm/src/binder
 
 ## Queue
-- [ ] Fix cases where block-scoped declarations (let/const) shadow incorrectly
-- [ ] Verify import/export symbol visibility in importing modules
-- [ ] Test with circular imports to ensure no infinite loops or missing symbols
-- [ ] Add validation to detect orphaned symbols or broken links
+- [ ] Audit how import type and export type are processed
+- [ ] Ensure type-only imports create proper symbol bindings
+- [ ] Fix re-export chains for type declarations
 
 ## Completed
-(Previous phase work archived)
+(none yet)
 
 ## Context
-- **Goal:** Symbol lookup must correctly traverse: local -> module -> global
-- **Key files:** `wasm/src/thin_binder.rs`, `wasm/src/thin_checker.rs`
-- **Impact:** Broken lookup chain causes TS2304 errors
+Type imports and exports may not be creating proper bindings, leading to TS2304 errors when referencing imported types.

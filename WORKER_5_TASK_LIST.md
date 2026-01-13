@@ -1,19 +1,17 @@
 # Worker 5 Task List
 
-## Squad: CFA Squad (TS2454 Focus)
+## Squad: Binder (CRITICAL)
 
 ## Current Task
-- [ ] Review narrowing logic in `wasm/src/solver/narrowing.rs` for over-aggressive unassigned detection
+- [ ] Debug why basic globals like console fail to resolve in wasm/src/binder
 
 ## Queue
-- [ ] Identify patterns where our CFA thinks variable is unassigned but tsc accepts it
-- [ ] Fix flow analysis for loops, try/catch, and conditional assignments
-- [ ] Add test cases for patterns that cause false positive TS2454
+- [ ] Trace resolution path for console in a simple test case
+- [ ] Fix global scope chain to include browser/node globals
+- [ ] Verify fix with console.log resolution test
 
 ## Completed
-- [x] Analyze TS2454 extra errors (Variable used before being assigned) - 225 false positives
+(none yet)
 
 ## Context
-- **Goal:** Reduce TS2454 extra errors (225 false positives)
-- **Key files:** `wasm/src/checker/control_flow.rs`, `wasm/src/solver/narrowing.rs`, `wasm/src/checker/reachability_analyzer.rs`
-- **Status:** CFA framework is in place - need to fix over-triggering
+Basic globals like console and Array fail to resolve. This is a critical bug causing massive error poisoning.

@@ -1,20 +1,17 @@
 # Worker 14 Task List
 
-## Squad: Solver Squad (Generic Inference)
+## Squad: CFA (Control Flow Analysis)
 
 ## Current Task
-- [ ] Review generic type inference in `wasm/src/solver/infer.rs` for edge cases
+- [ ] Fix TS2564 (Property not definitely assigned) edge cases in wasm/src/cfa - still #1 missing error (413)
 
 ## Queue
-- [ ] Fix complex generic constraint inference
-- [ ] Test conditional type inference (T extends U ? X : Y)
-- [ ] Improve mapped type inference accuracy
-- [ ] Add conformance tests for generic function calls with partial inference
+- [ ] Analyze patterns where TS2564 should fire but doesn't
+- [ ] Fix property initialization tracking in constructors
+- [ ] Handle async/callback patterns correctly
 
 ## Completed
-(Previous phase work archived)
+(none yet)
 
 ## Context
-- **Goal:** Generic inference must match tsc behavior for type parameter constraints
-- **Key files:** `wasm/src/solver/infer.rs`, `wasm/src/solver/instantiate.rs`
-- **Note:** Previous phase completed mapped types and index access types
+TS2564 is the #1 missing error with 413 occurrences. The CFA framework is in place but edge cases need work. Focus on class property initialization.

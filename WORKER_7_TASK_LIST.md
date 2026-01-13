@@ -1,19 +1,17 @@
 # Worker 7 Task List
 
-## Squad: Binder Squad (Builtins)
+## Squad: Binder (CRITICAL)
 
 ## Current Task
-- [ ] Add detailed logging to `resolve_identifier_symbol` in thin_checker.rs
+- [ ] Investigate TS2304 extra errors (343 occurrences) - find patterns in false positives
 
 ## Queue
-- [ ] Trace symbol table lookup chain: local -> module -> global
-- [ ] Verify lib.d.ts injection populates correct symbol IDs for builtins
-- [ ] Test with minimal examples that should resolve to global types
+- [ ] Categorize TS2304 extra errors by type (globals, imports, locals, etc.)
+- [ ] Fix the most common category of false positives
+- [ ] Target reduction from 343 to <150
 
 ## Completed
-- [x] Debug why basic globals like `console`, `Array`, `Promise` still fail to resolve in some cases
+(none yet)
 
 ## Context
-- **Goal:** Ensure all standard library globals resolve correctly
-- **Key files:** `wasm/src/thin_binder.rs`, `wasm/src/thin_checker.rs`, `wasm/src/lib_loader.rs`
-- **Impact:** Unresolved globals cause Any fallback which suppresses downstream errors
+TS2304 is both missing (116) AND extra (343). The extra errors indicate the binder is incorrectly failing to find symbols that should be in scope.

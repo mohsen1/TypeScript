@@ -1,20 +1,17 @@
 # Worker 13 Task List
 
-## Squad: Solver Squad (Subtyping Edge Cases)
+## Squad: Solver (Semantics)
 
 ## Current Task
-- [ ] Audit `wasm/src/solver/subtype.rs` for edge cases that deviate from tsc behavior
+- [ ] Implement the "Lawyer" layer from specs/SOLVER.md for TypeScript quirks in wasm/src/solver
 
 ## Queue
-- [ ] Fix nullable type subtyping (`T | null` vs `T | undefined` vs `T | null | undefined`)
-- [ ] Review literal type widening rules
-- [ ] Test readonly array vs mutable array assignability
-- [ ] Add conformance tests for complex subtyping scenarios
+- [ ] Implement function parameter bivariance handling
+- [ ] Implement void return type exceptions
+- [ ] Handle other TypeScript-specific subtyping quirks
 
 ## Completed
 (none yet)
 
 ## Context
-- **Goal:** Match tsc subtyping semantics exactly
-- **Key files:** `wasm/src/solver/subtype.rs`, `wasm/src/solver/compat.rs`
-- **Impact:** Incorrect subtyping leads to both missing and extra errors
+TypeScript has semantic quirks like function bivariance and void return exceptions. These need special handling in the solver to match tsc behavior.

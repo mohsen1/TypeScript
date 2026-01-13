@@ -1,19 +1,17 @@
 # Worker 6 Task List
 
-## Squad: Binder Squad (Global Scope)
+## Squad: Binder (CRITICAL)
 
 ## Current Task
-- [ ] Review `wasm/src/thin_binder.rs` global scope initialization
+- [ ] Fix module augmentation resolution in wasm/src/binder - merging interface Window across files
 
 ## Queue
-- [ ] Verify `lib.d.ts` symbols are correctly merged into root SymbolTable
-- [ ] Add logging to symbol resolution path to track where lookups fail
-- [ ] Fix scope chain to properly reach global scope for built-in types
+- [ ] Trace how declaration merging should work for interfaces
+- [ ] Implement or fix interface merging across module boundaries
+- [ ] Add tests for module augmentation patterns
 
 ## Completed
-- [x] Debug why TS2304 is BOTH missing (116) AND extra (343) - analyze binder symbol resolution
+(none yet)
 
 ## Context
-- **Goal:** Reduce TS2304 extra errors from 343 to <50
-- **Key files:** `wasm/src/thin_binder.rs`, `wasm/src/lib_loader.rs`
-- **Critical:** TS2304 causes error poisoning - Solver defaults to Any when Binder fails
+Module augmentation (like extending Window interface) doesn't work correctly. This breaks many real-world TypeScript patterns.

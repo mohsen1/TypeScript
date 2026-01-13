@@ -1,20 +1,17 @@
 # Worker 8 Task List
 
-## Squad: Binder Squad (Module Augmentation)
+## Squad: Binder (CRITICAL)
 
 ## Current Task
-- [ ] Fix module augmentation resolution - merging `interface Window` across files
+- [ ] Implement proper scope chain traversal for nested declarations in wasm/src/binder
 
 ## Queue
-- [ ] Ensure module augmentations update existing declarations correctly
-- [ ] Test with multiple files augmenting same global interface
-- [ ] Fix namespace merging behavior for nested namespaces
-- [ ] Verify exported symbols are visible to augmentations
+- [ ] Audit how nested scopes (functions inside functions, class methods) resolve outer variables
+- [ ] Fix scope chain to correctly walk up to parent scopes
+- [ ] Add tests for nested scope resolution
 
 ## Completed
-(Previous phase work archived)
+(none yet)
 
 ## Context
-- **Goal:** Module augmentation is critical for lib.d.ts to work correctly
-- **Key files:** `wasm/src/thin_binder.rs`, `wasm/src/binder.rs`
-- **Impact:** Incorrect augmentation leads to TS2304 and error poisoning
+Scope resolution bugs are causing TS2304 errors. The binder needs to correctly traverse the scope chain from inner to outer scopes.

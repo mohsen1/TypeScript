@@ -1,19 +1,17 @@
 # Worker 3 Task List
 
-## Squad: Parser Squad (Error Recovery)
+## Squad: Parser (Syntax)
 
 ## Current Task
-- [ ] Identify cases where error recovery causes cascading TS1005/TS1109 false positives
+- [ ] Review parser error recovery logic in wasm/src/parser - ensure it doesn't emit spurious errors after recovery
 
 ## Queue
-- [ ] Audit scanner token classification for edge cases (JSX, template literals, regex) in `wasm/src/scanner_impl.rs`
-- [ ] Fix scanner-level issues that propagate into parser errors
-- [ ] Test parser robustness with malformed input (ensure no crashes)
+- [ ] Identify patterns where parser emits multiple errors for single syntax issue
+- [ ] Fix cascading error emission to stop after first meaningful error
+- [ ] Coordinate with Workers 1 & 2 on remaining parser false positives
 
 ## Completed
-- [x] Review parser error recovery mechanisms in `wasm/src/thin_parser.rs` for cascading false positive patterns
+(none yet)
 
 ## Context
-- **Goal:** Support Parser Squad in reducing false positives to <100
-- **Key files:** `wasm/src/thin_parser.rs`, `wasm/src/scanner.rs`, `wasm/src/scanner_impl.rs`
-- **Note:** Error recovery is working well - focus on preventing false positive cascades
+Goal is to reduce parser false positives from 701 to <100. Focus on error recovery and cascading error prevention.

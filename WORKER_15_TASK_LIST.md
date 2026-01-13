@@ -1,20 +1,17 @@
 # Worker 15 Task List
 
-## Squad: Solver Squad (Lawyer Layer)
+## Squad: CFA (Control Flow Analysis)
 
 ## Current Task
-- [ ] Review `wasm/src/solver/lawyer.rs` for TypeScript quirks handling (function bivariance, void return exceptions)
+- [ ] Fix TS2454 (Variable used before assignment) extra errors (225) in wasm/src/cfa
 
 ## Queue
-- [ ] Audit function bivariance rules - methods should be bivariant, functions contravariant in strict mode
-- [ ] Fix void return type exceptions (functions returning anything can be assigned to void-returning type)
-- [ ] Test "this" parameter type checking
-- [ ] Verify excess property checking is properly strict for object literals
+- [ ] Analyze patterns where TS2454 fires incorrectly (false positives)
+- [ ] Fix flow graph to correctly track assignments through control flow
+- [ ] Handle try/catch/finally assignment tracking
 
 ## Completed
-(Previous phase work archived)
+(none yet)
 
 ## Context
-- **Goal:** The "Lawyer" layer handles TypeScript's intentional deviation from sound type theory
-- **Key files:** `wasm/src/solver/lawyer.rs`, `wasm/src/solver/subtype.rs`
-- **Reference:** specs/SOLVER.md describes the Lawyer vs Judge pattern
+TS2454 has 225 extra errors (false positives). The CFA is being too strict in some cases. Need to fix flow analysis to match tsc behavior.

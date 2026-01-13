@@ -1,20 +1,17 @@
 # Worker 10 Task List
 
-## Squad: Binder Squad (Error Propagation)
+## Squad: Solver (Semantics)
 
 ## Current Task
-- [ ] Ensure Binder propagates Error type instead of Any when symbols cannot be resolved
+- [ ] Switch solver default fallback from Any to Unknown in wasm/src/solver - expose hidden bugs
 
 ## Queue
-- [ ] Audit all remaining `TypeId::ANY` fallbacks in binder code paths
-- [ ] Change remaining error-case fallbacks to `TypeId::ERROR` or `TypeId::UNKNOWN`
-- [ ] Verify error propagation doesn't cause cascading false positives
-- [ ] Test that downstream errors are revealed when Any poisoning is stopped
+- [ ] Find all places where solver returns Any as fallback
+- [ ] Change fallback to Unknown or Error type
+- [ ] Document new errors exposed by this change
 
 ## Completed
-(Previous phase work archived)
+(none yet)
 
 ## Context
-- **Goal:** Stop Any poisoning - propagate errors instead of silencing them
-- **Key files:** `wasm/src/thin_binder.rs`, `wasm/src/thin_checker.rs`
-- **Impact:** Error propagation should reveal missing TS2322/TS7006 errors
+The biggest enemy is Error Poisoning. When resolution fails, the Solver says "it's Any" which silences all downstream errors. We need to be strict.
