@@ -301,7 +301,7 @@ impl<'a> ThinCheckerState<'a> {
         let lib_binders: Vec<Arc<crate::thin_binder::ThinBinderState>> =
             self.ctx.lib_contexts.iter().map(|lc| Arc::clone(&lc.binder)).collect();
 
-        // Debug logging for symbol resolution (enabled via BINDER_DEBUG env var)
+        // Debug logging for symbol resolution (enabled via BIND_DEBUG env var)
         if std::env::var("BIND_DEBUG").is_ok() {
             eprintln!(
                 "[BIND_RESOLVE] Looking up identifier '{}' at node {:?}",
@@ -314,6 +314,7 @@ impl<'a> ThinCheckerState<'a> {
             while !scope_id.is_none() {
                 if let Some(scope) = self.ctx.binder.scopes.get(scope_id.0 as usize) {
                     if let Some(sym_id) = scope.table.get(name) {
+                        // Use get_symbol_with_libs to check lib binders
                         if let Some(symbol) = self.ctx.binder.get_symbol_with_libs(sym_id, &lib_binders) {
                             let export_ok = !require_export
                                 || scope.kind != ContainerKind::Module
