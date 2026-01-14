@@ -3,57 +3,75 @@
 ## Squad: Solver Strictness
 
 ## Current Task
-- [x] **Phases 1-5 COMPLETE** - Array element type fallback is latest
-
-## Completed
-- [x] Phase 1: Type parameter defaults (7 locations)
-- [x] Phase 2: Property access patterns (5 locations)
-- [x] Phase 3: Contextual type patterns (3 locations)
-- [x] Phase 4: This-type patterns (1 location)
-- [x] Phase 5: Array element type patterns (3 locations)
-- [x] Verify compilation - Code compiles successfully
-- [x] Test - Pre-existing failures only (unrelated to changes)
+- [ ] Reduce "Any" fallback in accessor patterns (Phase 6)
 
 ## Context
 
-**Incremental Strategy - MAJOR PROGRESS**
+**Previous Work Completed**
 Worker 12 has systematically reduced "Any" fallback usage across 5 phases:
+1. ✅ Type parameter defaults (7 locations)
+2. ✅ Property access patterns (5 locations)
+3. ✅ Contextual type patterns (3 locations)
+4. ✅ This-type patterns (1 location)
+5. ✅ Array element type patterns (3 locations)
 
-### Phase 1: Type Parameter Defaults (MERGED)
-Changed 7 locations in `thin_checker.rs`.
+**Total: 19 locations changed from Any→Unknown - All merged to rust**
 
-### Phase 2: Property Access Patterns (MERGED)
-Changed 5 locations in `thin_checker.rs`.
+**New Focus: Accessor Fallbacks**
+Accessors are used for property getters/setters:
+- When reading or writing object properties
+- The checker resolves the accessor's type
+- When the accessor type is unknown, it currently falls back to `Any`
 
-### Phase 3: Contextual Type Patterns (MERGED)
-Changed 3 locations in `thin_checker.rs`.
+**Targeted Changes**
+Change accessor fallbacks in `thin_checker.rs`:
 
-### Phase 4: This-Type Patterns (MERGED)
-Changed 1 location in `thin_checker.rs`.
+1. Line ~4357: `accessor.getter.or(accessor.setter).unwrap_or(TypeId::ANY)`
+2. Line ~4979: `accessor.getter.or(accessor.setter).unwrap_or(TypeId::ANY)`
 
-### Phase 5: Array Element Type Patterns (JUST COMPLETED)
-Changed 3 locations in `thin_checker.rs`:
-- Line ~965: Array type element type inference
-- Line ~2583: Array type element type in type literals
-- Line ~2657: Additional array element type handling
+These are in:
+- Property accessor type resolution for interface merging
+- Combined accessor type resolution (getter or setter)
 
-**Total: 19 locations changed from Any→Unknown**
+**Why This Matters**
+When property accessors have no explicit type:
+- **Current**: Returns `Any` (loses type safety for the property)
+- **New**: Returns `Unknown` (maintains strictness, emits errors)
+
+This will expose bugs in:
+- Properties with only getter or setter (no accessor type)
+- Interface property merging without type annotations
+- Incomplete accessor definitions
 
 ## Queue
-- [ ] After merge, measure conformance impact
-- [ ] Tackle remaining accessor fallbacks
+- [ ] After accessor fix, measure conformance impact
 - [ ] Tackle argument type fallbacks
+- [ ] Tackle remaining type_stack patterns
 - [ ] Coordinate with Solver Squad on type inference improvements
 
-## Files Modified
-- `wasm/src/thin_checker.rs` - 19 total locations changed across 5 phases
+## Implementation Steps
+
+1. **Make targeted changes**
+   - Change accessor fallbacks from `TypeId::ANY` to `TypeId::UNKNOWN`
+   - Focus on: getter/setter accessor resolution
+   - Found ~2 locations in thin_checker.rs
+
+2. **Test incrementally**
+   - Run `./wasm/test.sh` after changes
+   - Verify compilation succeeds
+   - Check for new test failures
+
+3. **Document findings**
+   - Note which error codes increase
+   - Identify patterns in exposed bugs
+
+## Files to Modify
+- `wasm/src/thin_checker.rs` - Accessor fallbacks (~2 locations)
 
 ## Success Criteria
-- ✅ Code compiles without errors
-- ✅ No new test crashes
-- ⏳ Measurable increase in detected type errors (to be verified in conformance)
+- Code compiles without errors
+- No critical test crashes (pre-existing test_closure_capture_with_array_filter failure is OK)
+- Measurable increase in detected type errors related to properties
 
-## Merge Status
-- **Date**: 2026-01-14
-- **Phases 1-5**: All complete and ready for merge
-- **Total changes**: 19 Any→Unknown conversions
+## Ready for Merge
+No (task in progress)
