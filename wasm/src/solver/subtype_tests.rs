@@ -26870,3 +26870,118 @@ fn test_overload_constructor_overloads() {
 
     assert!(date_constructor != TypeId::ERROR);
 }
+
+// =============================================================================
+// TS2322 Detection Improvement Tests
+// =============================================================================
+
+#[test]
+fn test_explain_failure_intrinsic_mismatch() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    // string vs number should produce IntrinsicTypeMismatch
+    let reason = checker.explain_failure(TypeId::STRING, TypeId::NUMBER);
+    assert!(reason.is_some());
+    match reason.unwrap() {
+        SubtypeFailureReason::IntrinsicTypeMismatch { source_type, target_type } => {
+            assert_eq!(source_type, TypeId::STRING);
+            assert_eq!(target_type, TypeId::NUMBER);
+        }
+        other => panic!("Expected IntrinsicTypeMismatch, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_explain_failure_literal_mismatch() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let hello = interner.literal_string("hello");
+    let world = interner.literal_string("world");
+
+    // "hello" vs "world" should produce LiteralTypeMismatch
+    let reason = checker.explain_failure(hello, world);
+    assert!(reason.is_some());
+    match reason.unwrap() {
+        SubtypeFailureReason::LiteralTypeMismatch { source_type, target_type } => {
+            assert_eq!(source_type, hello);
+            assert_eq!(target_type, world);
+        }
+        other => panic!("Expected LiteralTypeMismatch, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_explain_failure_literal_to_incompatible_intrinsic() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let hello = interner.literal_string("hello");
+
+    // "hello" vs number should produce LiteralTypeMismatch
+    let reason = checker.explain_failure(hello, TypeId::NUMBER);
+    assert!(reason.is_some());
+    match reason.unwrap() {
+        SubtypeFailureReason::LiteralTypeMismatch { source_type, target_type } => {
+            assert_eq!(source_type, hello);
+            assert_eq!(target_type, TypeId::NUMBER);
+        }
+        other => panic!("Expected LiteralTypeMismatch, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_explain_failure_error_type() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    // ERROR type should produce ErrorType failure reason, not None
+    let reason = checker.explain_failure(TypeId::ERROR, TypeId::NUMBER);
+    assert!(reason.is_some(), "ERROR type should produce a failure reason");
+    match reason.unwrap() {
+        SubtypeFailureReason::ErrorType { source_type, target_type } => {
+            assert_eq!(source_type, TypeId::ERROR);
+            assert_eq!(target_type, TypeId::NUMBER);
+        }
+        other => panic!("Expected ErrorType, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_literal_number_to_string_fails() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let forty_two = interner.literal_number(42.0);
+
+    // 42 vs string should fail
+    assert!(!checker.is_subtype_of(forty_two, TypeId::STRING));
+
+    // And produce a proper failure reason
+    let reason = checker.explain_failure(forty_two, TypeId::STRING);
+    assert!(reason.is_some());
+    match reason.unwrap() {
+        SubtypeFailureReason::LiteralTypeMismatch { .. } => {}
+        other => panic!("Expected LiteralTypeMismatch, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_intrinsic_to_literal_fails() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let hello = interner.literal_string("hello");
+
+    // string vs "hello" should fail (widening is not allowed)
+    assert!(!checker.is_subtype_of(TypeId::STRING, hello));
+
+    // And produce a proper failure reason
+    let reason = checker.explain_failure(TypeId::STRING, hello);
+    assert!(reason.is_some());
+    match reason.unwrap() {
+        SubtypeFailureReason::TypeMismatch { .. } => {}
+        other => panic!("Expected TypeMismatch, got {:?}", other),
+    }
+}

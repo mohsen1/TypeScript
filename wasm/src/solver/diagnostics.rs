@@ -1209,6 +1209,33 @@ impl SubtypeFailureReason {
                 codes::TYPE_NOT_ASSIGNABLE,
                 vec![(*source_type).into(), (*target_type).into()],
             ),
+
+            SubtypeFailureReason::IntrinsicTypeMismatch {
+                source_type,
+                target_type,
+            } => PendingDiagnostic::error(
+                codes::TYPE_NOT_ASSIGNABLE,
+                vec![(*source_type).into(), (*target_type).into()],
+            ),
+
+            SubtypeFailureReason::LiteralTypeMismatch {
+                source_type,
+                target_type,
+            } => PendingDiagnostic::error(
+                codes::TYPE_NOT_ASSIGNABLE,
+                vec![(*source_type).into(), (*target_type).into()],
+            ),
+
+            SubtypeFailureReason::ErrorType {
+                source_type,
+                target_type,
+            } => {
+                // Error types indicate unresolved types that should trigger TS2322.
+                PendingDiagnostic::error(
+                    codes::TYPE_NOT_ASSIGNABLE,
+                    vec![(*source_type).into(), (*target_type).into()],
+                )
+            }
         }
     }
 }
