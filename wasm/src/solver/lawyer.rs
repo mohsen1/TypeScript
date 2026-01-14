@@ -249,6 +249,187 @@ impl Default for AnyPropagationRules {
 }
 
 // =============================================================================
+// Function Parameter Bivariance Handling
+// =============================================================================
+
+/// Configuration for function parameter bivariance rules.
+///
+/// TypeScript has a complicated relationship with function parameter variance:
+///
+/// ## Sound Behavior (Contravariance)
+/// In a sound type system, function parameters should be contravariant:
+/// ```typescript
+/// // (x: Animal) => void should NOT be assignable to (x: Dog) => void
+/// // because the latter might be called with any Dog, but the former
+/// // only handles general Animals
+/// type Handler = (x: Dog) => void;
+/// const animalHandler: (x: Animal) => void = (a) => { /* ... */ };
+/// const handler: Handler = animalHandler; // UNSOUND if allowed!
+/// ```
+///
+/// ## TypeScript's Legacy Behavior (Bivariance)
+/// For backward compatibility, TypeScript defaults to bivariant function
+/// parameters (both covariant AND contravariant), which is unsound but
+/// allows more programs to compile.
+///
+/// ## strictFunctionTypes Flag
+/// When `strictFunctionTypes` is enabled, TypeScript uses contravariance
+/// for function type parameters, but NOT for method parameters.
+///
+/// ## Method Exception
+/// Methods are ALWAYS bivariant regardless of `strictFunctionTypes`:
+/// ```typescript
+/// interface Animal {
+///   speak(): void;
+/// }
+/// interface Dog extends Animal {
+///   speak(): void;  // Method - always bivariant
+/// }
+/// ```
+///
+/// This is because methods are often used polymorphically in class hierarchies,
+/// and strict contravariance would break too many existing patterns.
+#[derive(Debug, Clone)]
+pub struct FunctionBivarianceConfig {
+    /// When true, use contravariance for function parameters (sound).
+    /// When false, use bivariance (legacy TypeScript behavior).
+    pub strict_function_types: bool,
+
+    /// When true, methods use bivariance even when strict_function_types is enabled.
+    /// This matches TypeScript's behavior where methods are always bivariant.
+    /// Default: true (matches TypeScript semantics).
+    pub methods_are_bivariant: bool,
+
+    /// When true, callback parameters in method signatures also use bivariance.
+    /// This handles cases like:
+    /// ```typescript
+    /// interface Array<T> {
+    ///   forEach(callback: (item: T) => void): void;
+    /// }
+    /// ```
+    /// The `callback` parameter is bivariant because `forEach` is a method.
+    /// Default: true (matches TypeScript semantics).
+    pub method_callbacks_are_bivariant: bool,
+}
+
+impl FunctionBivarianceConfig {
+    /// Create a new config with TypeScript's default settings.
+    /// - strict_function_types: false (legacy bivariance)
+    /// - methods_are_bivariant: true
+    /// - method_callbacks_are_bivariant: true
+    pub fn new() -> Self {
+        FunctionBivarianceConfig {
+            strict_function_types: false,
+            methods_are_bivariant: true,
+            method_callbacks_are_bivariant: true,
+        }
+    }
+
+    /// Create a config that matches TypeScript with `strictFunctionTypes: true`.
+    /// - strict_function_types: true (contravariance for functions)
+    /// - methods_are_bivariant: true (methods still bivariant)
+    /// - method_callbacks_are_bivariant: true
+    pub fn strict() -> Self {
+        FunctionBivarianceConfig {
+            strict_function_types: true,
+            methods_are_bivariant: true,
+            method_callbacks_are_bivariant: true,
+        }
+    }
+
+    /// Create a fully sound config (not TypeScript compatible).
+    /// - strict_function_types: true
+    /// - methods_are_bivariant: false (methods are contravariant too)
+    /// - method_callbacks_are_bivariant: false
+    ///
+    /// Warning: This mode will reject many valid TypeScript programs.
+    pub fn fully_sound() -> Self {
+        FunctionBivarianceConfig {
+            strict_function_types: true,
+            methods_are_bivariant: false,
+            method_callbacks_are_bivariant: false,
+        }
+    }
+
+    /// Determine if bivariance should be used for comparing parameter types.
+    ///
+    /// # Arguments
+    /// * `is_method` - Whether the function being compared is a method
+    /// * `is_callback_in_method` - Whether this is a callback parameter in a method signature
+    ///
+    /// # Returns
+    /// `true` if bivariance should be used, `false` if contravariance should be used.
+    pub fn should_use_bivariance(&self, is_method: bool, is_callback_in_method: bool) -> bool {
+        // Legacy mode: always use bivariance
+        if !self.strict_function_types {
+            return true;
+        }
+
+        // In strict mode, check method exceptions
+        if is_method && self.methods_are_bivariant {
+            return true;
+        }
+
+        // Check callback-in-method exception
+        if is_callback_in_method && self.method_callbacks_are_bivariant {
+            return true;
+        }
+
+        // Strict mode for regular functions: use contravariance
+        false
+    }
+
+    /// Check if a source parameter type is compatible with a target parameter type.
+    ///
+    /// This implements the variance check based on current configuration:
+    /// - Bivariant: source <: target OR target <: source
+    /// - Contravariant: target <: source
+    ///
+    /// # Arguments
+    /// * `is_method` - Whether this is a method comparison
+    /// * `source_subtype_of_target` - Result of checking source <: target
+    /// * `target_subtype_of_source` - Result of checking target <: source
+    ///
+    /// # Returns
+    /// `true` if the parameter types are compatible.
+    pub fn are_parameters_compatible(
+        &self,
+        is_method: bool,
+        source_subtype_of_target: bool,
+        target_subtype_of_source: bool,
+    ) -> bool {
+        let use_bivariance = self.should_use_bivariance(is_method, false);
+
+        if use_bivariance {
+            // Bivariant: either direction works
+            source_subtype_of_target || target_subtype_of_source
+        } else {
+            // Contravariant: target must be subtype of source
+            // (x: Animal) => void <: (x: Dog) => void
+            // requires Dog <: Animal (target <: source)
+            target_subtype_of_source
+        }
+    }
+
+    /// Get a human-readable description of the current variance mode.
+    pub fn describe_mode(&self) -> &'static str {
+        if !self.strict_function_types {
+            "bivariant (legacy TypeScript)"
+        } else if self.methods_are_bivariant {
+            "contravariant for functions, bivariant for methods (strictFunctionTypes)"
+        } else {
+            "fully contravariant (sound, non-TypeScript-compatible)"
+        }
+    }
+}
+
+impl Default for FunctionBivarianceConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// =============================================================================
 // Freshness Tracking for Excess Property Checking
 // =============================================================================
 

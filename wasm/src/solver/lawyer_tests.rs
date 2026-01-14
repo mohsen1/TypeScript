@@ -348,3 +348,167 @@ fn test_typescript_quirks_list() {
     assert!(quirk_names.contains(&"weak-types"));
     assert!(quirk_names.contains(&"freshness"));
 }
+
+// =============================================================================
+// FunctionBivarianceConfig Tests
+// =============================================================================
+
+#[test]
+fn test_function_bivariance_config_new() {
+    let config = FunctionBivarianceConfig::new();
+    // Default config matches TypeScript's legacy behavior
+    assert!(!config.strict_function_types);
+    assert!(config.methods_are_bivariant);
+    assert!(config.method_callbacks_are_bivariant);
+}
+
+#[test]
+fn test_function_bivariance_config_default() {
+    let config = FunctionBivarianceConfig::default();
+    // Default trait should match new()
+    assert!(!config.strict_function_types);
+    assert!(config.methods_are_bivariant);
+    assert!(config.method_callbacks_are_bivariant);
+}
+
+#[test]
+fn test_function_bivariance_config_strict() {
+    let config = FunctionBivarianceConfig::strict();
+    // Strict mode: contravariance for functions, bivariance for methods
+    assert!(config.strict_function_types);
+    assert!(config.methods_are_bivariant);
+    assert!(config.method_callbacks_are_bivariant);
+}
+
+#[test]
+fn test_function_bivariance_config_fully_sound() {
+    let config = FunctionBivarianceConfig::fully_sound();
+    // Fully sound: contravariance everywhere
+    assert!(config.strict_function_types);
+    assert!(!config.methods_are_bivariant);
+    assert!(!config.method_callbacks_are_bivariant);
+}
+
+#[test]
+fn test_should_use_bivariance_legacy_mode() {
+    let config = FunctionBivarianceConfig::new();
+    // In legacy mode, always use bivariance
+    assert!(config.should_use_bivariance(false, false)); // regular function
+    assert!(config.should_use_bivariance(true, false));  // method
+    assert!(config.should_use_bivariance(false, true));  // callback in method
+    assert!(config.should_use_bivariance(true, true));   // method callback in method
+}
+
+#[test]
+fn test_should_use_bivariance_strict_mode() {
+    let config = FunctionBivarianceConfig::strict();
+    // In strict mode, regular functions use contravariance
+    assert!(!config.should_use_bivariance(false, false)); // regular function - contravariant
+    assert!(config.should_use_bivariance(true, false));   // method - bivariant
+    assert!(config.should_use_bivariance(false, true));   // callback in method - bivariant
+    assert!(config.should_use_bivariance(true, true));    // method callback - bivariant
+}
+
+#[test]
+fn test_should_use_bivariance_fully_sound() {
+    let config = FunctionBivarianceConfig::fully_sound();
+    // In fully sound mode, everything uses contravariance
+    assert!(!config.should_use_bivariance(false, false)); // regular function
+    assert!(!config.should_use_bivariance(true, false));  // method - still contravariant
+    assert!(!config.should_use_bivariance(false, true));  // callback - contravariant
+    assert!(!config.should_use_bivariance(true, true));   // method callback - contravariant
+}
+
+#[test]
+fn test_are_parameters_compatible_bivariant() {
+    let config = FunctionBivarianceConfig::new(); // Legacy bivariant mode
+
+    // In bivariant mode, either direction works
+    // source <: target
+    assert!(config.are_parameters_compatible(false, true, false));
+    // target <: source (contravariant direction)
+    assert!(config.are_parameters_compatible(false, false, true));
+    // Both directions
+    assert!(config.are_parameters_compatible(false, true, true));
+    // Neither direction - incompatible
+    assert!(!config.are_parameters_compatible(false, false, false));
+}
+
+#[test]
+fn test_are_parameters_compatible_contravariant() {
+    let config = FunctionBivarianceConfig::strict(); // Strict mode for functions
+
+    // For regular functions in strict mode, only contravariant direction works
+    // source <: target is NOT enough
+    assert!(!config.are_parameters_compatible(false, true, false));
+    // target <: source (contravariant direction) IS what we need
+    assert!(config.are_parameters_compatible(false, false, true));
+    // Both directions - OK
+    assert!(config.are_parameters_compatible(false, true, true));
+    // Neither direction - incompatible
+    assert!(!config.are_parameters_compatible(false, false, false));
+
+    // For methods, still bivariant
+    assert!(config.are_parameters_compatible(true, true, false)); // covariant OK for methods
+    assert!(config.are_parameters_compatible(true, false, true)); // contravariant OK for methods
+}
+
+#[test]
+fn test_describe_mode() {
+    let legacy = FunctionBivarianceConfig::new();
+    assert_eq!(legacy.describe_mode(), "bivariant (legacy TypeScript)");
+
+    let strict = FunctionBivarianceConfig::strict();
+    assert_eq!(strict.describe_mode(), "contravariant for functions, bivariant for methods (strictFunctionTypes)");
+
+    let sound = FunctionBivarianceConfig::fully_sound();
+    assert_eq!(sound.describe_mode(), "fully contravariant (sound, non-TypeScript-compatible)");
+}
+
+#[test]
+fn test_function_bivariance_config_clone() {
+    let config = FunctionBivarianceConfig::strict();
+    let cloned = config.clone();
+    assert_eq!(config.strict_function_types, cloned.strict_function_types);
+    assert_eq!(config.methods_are_bivariant, cloned.methods_are_bivariant);
+    assert_eq!(config.method_callbacks_are_bivariant, cloned.method_callbacks_are_bivariant);
+}
+
+#[test]
+fn test_function_bivariance_config_custom() {
+    // Test custom configuration: strict functions, but no method bivariance
+    let custom = FunctionBivarianceConfig {
+        strict_function_types: true,
+        methods_are_bivariant: false,
+        method_callbacks_are_bivariant: true, // but keep callback bivariance
+    };
+
+    // Regular functions: contravariant
+    assert!(!custom.should_use_bivariance(false, false));
+    // Methods: also contravariant (custom)
+    assert!(!custom.should_use_bivariance(true, false));
+    // Callbacks in methods: still bivariant
+    assert!(custom.should_use_bivariance(false, true));
+}
+
+#[test]
+fn test_function_bivariance_edge_case_both_flags() {
+    // Edge case: is_method AND is_callback_in_method are both true
+    // Should still use bivariance if any exception applies
+    let strict = FunctionBivarianceConfig::strict();
+    assert!(strict.should_use_bivariance(true, true));
+
+    // With method bivariance disabled but callback bivariance enabled
+    let custom = FunctionBivarianceConfig {
+        strict_function_types: true,
+        methods_are_bivariant: false,
+        method_callbacks_are_bivariant: true,
+    };
+    // Even though is_method=true wouldn't grant bivariance,
+    // is_callback_in_method=true does
+    assert!(custom.should_use_bivariance(true, true));
+
+    // With both disabled
+    let sound = FunctionBivarianceConfig::fully_sound();
+    assert!(!sound.should_use_bivariance(true, true));
+}
