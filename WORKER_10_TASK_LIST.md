@@ -24,6 +24,7 @@
 - **Result**: Already in sync (no new commits)
 - **Action Taken**: Verified worker-10 branch is fully merged into em-team-3
 - **Next**: Continue work on TS1109 expression expected errors
+- **Team Update**: Worker 12 re-added to EM-3 (now 4 workers: 9-12)
 
 ## Context
 TS1109 ("expression expected") has 262 false positive occurrences. These occur when the parser expects an expression but encounters a valid construct it doesn't recognize.
