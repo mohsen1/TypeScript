@@ -2,10 +2,12 @@
 
 ## Squad: Parser (Syntax)
 
-## Current Task
-- [ ] Run conformance tests to measure TS1109 baseline after definite assignment assertion fix
+## Current Task (Assigned by EM-1)
+- [ ] **IMMEDIATE:** Run conformance tests to measure TS1109 baseline after definite assignment assertion fix
+- [ ] Document exact TS1109 count before and after your fixes
+- [ ] Report metrics to EM-1 for validation before proceeding
 
-## Queue
+## Queue (On Hold - Awaiting Baseline)
 - [ ] Fix new.target context validation (7 cases identified)
 - [ ] Fix template strings in type positions (2 cases)
 - [ ] Fix private names in `in` expressions (2 cases)

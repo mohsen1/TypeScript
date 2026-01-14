@@ -2,10 +2,12 @@
 
 ## Squad: Parser (Syntax) - TS1005 Focus
 
-## Current Task
-- [ ] Test and verify all TS1005 fixes impact - run conformance to measure false positive reduction
+## Current Task (Assigned by EM-1)
+- [ ] **IMMEDIATE:** Run conformance tests to measure TS1005 reduction impact from patterns 1-5
+- [ ] Document exact TS1005 count before and after your fixes
+- [ ] Report metrics to EM-1 for validation before proceeding
 
-## Queue
+## Queue (On Hold - Awaiting Baseline)
 - [ ] Continue fixing remaining TS1005 false positive patterns (target: <100 total)
 - [ ] Fix object literal comma handling edge cases
 - [ ] Fix array literal missing element handling

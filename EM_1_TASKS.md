@@ -1,91 +1,119 @@
-# EM_1 Tasks - Binder Squad (CRITICAL)
+# EM_1 Tasks - Hybrid Squad (Parser + Binder)
 
 **Branch:** `em-team-1`
 **Priority:** 🔴 HIGHEST
 **Assigned Workers:** workers 1-4
-**Last Updated:** 2026-01-14
+**Last Updated:** 2026-01-14 (Director merge)
 
 ---
 
-## Squad Mission
+## Director's Note
 
-Fix the **"Any" Poisoning** problem. When the Binder fails to find basic symbols like `console`, `Promise`, or `Array`, the Solver defaults to `Any`, which silences ALL downstream type errors. This is the #1 blocker preventing conformance improvements.
+**This is a HYBRID squad due to worker progress made before formal squad structure.**
 
----
+- Workers 1-3: Parser work (TS1005/TS1109) - will transfer to EM_2 after validation
+- Worker 4: Binder work (TS2304) - core EM_1 responsibility
 
-## Problem Statement
-
-**Error Code:** TS2304 (Cannot find name 'X')
-
-**Current State:**
-- **116 Missing Errors:** We're not catching TS2304 when we should
-- **343 Extra Errors:** We're reporting TS2304 when we shouldn't
-- **Root Cause:** Global Scope and `lib.d.ts` integration is broken
-
-**Impact:**
-When `Promise` fails to resolve, it becomes `Any`. Code like `new Promise((resolve) => resolve(5))` should error if the generic doesn't match, but `Any` silences the error.
+**After current validation cycle, workers 1-3 will formally transfer to EM_2.**
 
 ---
 
-## Immediate Goals
+## Overall Mission: Phase 8 - Stop the "Any" Poisoning
 
-1. **Debug Global Scope Binding**
-   - Verify `lib_loader.rs` correctly merges `lib.d.ts` symbols into root `SymbolTable`
-   - Ensure `console.log` resolves in test cases
-   - Check `Array`, `Promise`, `Object` basic type resolution
+### Current Status (from PROJECT_DIRECTION.md)
+| Metric | Current | Target |
+|--------|---------|--------|
+| **Exact Match** | 30.1% | **40%** |
+| **Missing Errors** | 60.0% | **<50%** |
+| **Parser false positives** | 701 | **<100** |
+| **TS2304 extra errors** | 343 | **<50** |
 
-2. **Fix Module Augmentation**
-   - Interface merging across files (e.g., `interface Window` in multiple files)
-   - Global declaration merging
-   - Namespace augmentation
-
-3. **Target Metric:** Reduce TS2304 extra errors to **<50**
-
----
-
-## Key Files to Investigate
-
-| File | Purpose | Action |
-|------|---------|--------|
-| `src/lib_loader.rs` | Loads lib.d.ts | Verify symbol merging |
-| `src/thin_binder.rs` | Binds symbols to AST | Check `file_locals` population |
-| `src/symbol_table.rs` | Symbol storage | Debug global scope lookups |
+### Squad Allocation (4 workers)
+| Squad | Workers | Focus Area | Status |
+|-------|---------|------------|--------|
+| **Parser (Syntax)** | worker-1, worker-2, worker-3 | TS1005/TS1109 false positives | 🟠 Active |
+| **Binder (CRITICAL)** | worker-4 | TS2304 error poisoning | 🔴 Critical Path |
 
 ---
 
-## Worker Assignment Strategy
+## EM-1 Responsibilities
 
-Assign workers based on expertise:
+### 1. Branch Hygiene
+- [x] Sync em-team-1 with rust (merged via origin/rust)
+- [ ] Merge worker branches locally only after validation
+- [ ] Run full conformance suite before any merge to rust
+- [ ] Escalate to Director only when metrics show stable improvement
 
-| Worker | Focus Area |
-|--------|-----------|
-| worker-1 | `lib_loader.rs` - library file loading and symbol injection |
-| worker-2 | `thin_binder.rs` - global scope binding |
-| worker-3 | `symbol_table.rs` - symbol lookup and merging |
-| worker-4 | Test case triage and regression tracking |
+### 2. Task Assignment Strategy
+
+#### Priority 1: Fix TS2304 (Binder) - Error Poisoning Root Cause
+- Worker 4 is on the critical path
+- TS2304 causes `Any` fallback which silences all downstream errors
+- Must fix before solver work can be accurately validated
+
+#### Priority 2: Fix Parser False Positives (TS1005/TS1109)
+- Workers 1-3 working in parallel on different patterns
+- 701 parser errors inflate "Extra Errors" by 14%
+- Cascading errors compound the problem
+
+### 3. Validation Protocol
+Before merging any worker branch:
+1. Worker must run conformance tests and report metrics
+2. Verify no regressions in other error codes
+3. Ensure build passes (`cargo build --release`)
+4. Check that the specific metric improved (e.g., TS1005 count decreased)
 
 ---
 
-## Escalation Triggers
+## Current Worker Assignments
 
-Escalate to Director if:
-- TS2304 extra errors drop below 50 (ready for new mission)
-- Need architectural changes to SymbolTable (may require EM coordination)
-- Team size exceeds 4 (need team split)
+### Worker 1 (Parser - TS1005)
+**Status:** Implemented patterns 1-5, needs validation
+**Next:** Run conformance to measure impact
+**Blocker:** Waiting for metrics validation before continuing
+
+### Worker 2 (Parser - TS1109)
+**Status:** Fixed definite assignment assertions, needs baseline
+**Next:** Run conformance to measure impact
+**Blocker:** Need baseline before prioritizing next patterns
+
+### Worker 3 (Parser - Cascading Errors)
+**Status:** Implemented `last_error_pos` tracking, needs validation
+**Next:** Run conformance to measure impact
+**Blocker:** Waiting for metrics validation
+
+### Worker 4 (Binder - CRITICAL)
+**Status:** Fixed lib.d.ts symbol merging, working on ambient modules
+**Next:** Complete ambient module fix, then module augmentation
+**Blocker:** None - this is the critical path
+
+---
+
+## Next Actions for EM-1
+
+1. **IMMEDIATE:** Have all workers run conformance tests to establish baselines
+2. **TODAY:** Review Worker 4's ambient module fix (critical path)
+3. **THIS WEEK:** Merge validated fixes in order: Worker 4 → Worker 3 → Worker 1 → Worker 2
+4. **CONTINUOUS:** Monitor metrics - target is <100 parser false positives and <50 TS2304 errors
+5. **AFTER VALIDATION:** Transfer workers 1-3 to EM_2 (Parser Squad)
 
 ---
 
 ## Success Criteria
 
-- [ ] TS2304 extra errors < 50
-- [ ] `console.log` resolves in >95% of test cases
-- [ ] `Promise`, `Array`, `Object` resolve globally
-- [ ] No regression in TS2304 missing errors
+- Exact Match increases from 30.1% to 40%
+- Missing Errors decreases from 60% to <50%
+- Parser false positives (TS1005 + TS1109) reduced from 701 to <100
+- TS2304 extra errors reduced from 343 to <50
+- All worker branches validated and merged locally
+- Ready to escalate to Director with stable metrics improvement
+- Workers 1-3 transferred to EM_2 after validation cycle
 
 ---
 
-## Notes
+## Key Files for Reference
 
-- **Do NOT** modify worker task lists directly
-- Workers should create their own task breakdown
-- Track all blocking issues for team resizing decisions
+| Focus Area | File |
+|------------|------|
+| **Parser** | `src/compiler/parser.ts` |
+| **Binder** | `src/lib_loader.rs`, `src/thin_binder.rs`, `src/symbol_table.rs` |

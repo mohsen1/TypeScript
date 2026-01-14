@@ -2,10 +2,12 @@
 
 ## Squad: Parser (Syntax)
 
-## Current Task
-- [ ] Test and verify cascading error fix impact - run conformance to measure TS1005 reduction
+## Current Task (Assigned by EM-1)
+- [ ] **IMMEDIATE:** Run conformance tests to measure TS1005/TS1109 reduction from cascading error fix
+- [ ] Document exact error counts before and after `last_error_pos` implementation
+- [ ] Report metrics to EM-1 for validation before proceeding
 
-## Queue
+## Queue (On Hold - Awaiting Baseline)
 - [ ] Coordinate with Workers 1 & 2 on remaining parser false positives
 - [ ] Address any remaining cascading error patterns not covered by the fix
 - [ ] Review and fix parser error emission in edge cases (e.g., ASI failures, type parameters)
