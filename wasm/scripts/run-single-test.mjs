@@ -1,14 +1,21 @@
 #!/usr/bin/env node
 /**
- * Test runner for Rust/WASM TypeScript compiler against tests/cases
+ * Single Test Runner - Run individual TypeScript test cases against WASM compiler
+ * 
+ * This script allows you to run a single test file against the Rust/WASM implementation
+ * of the TypeScript compiler and see detailed output and diagnostics.
  *
  * Usage:
- *   node scripts/test-rust-compiler.mjs [test-file]
- *   node scripts/test-rust-compiler.mjs tests/cases/compiler/2dArrays.ts
+ *   node wasm/scripts/run-single-test.mjs [test-file]
+ *   node wasm/scripts/run-single-test.mjs tests/cases/compiler/2dArrays.ts
  *
  * Flags:
  *   --thin    Use ThinParser (high-performance, 16-byte nodes)
  *   --legacy  Use legacy ParserState (208-byte nodes)
+ *   --verbose Show detailed parsing/checking output
+ *
+ * Example:
+ *   node wasm/scripts/run-single-test.mjs tests/cases/conformance/types/typeParameters/typeArgumentLists/wrappedAndRecursiveConstraints.ts --thin --verbose
  */
 
 import { readFileSync, existsSync } from 'fs';

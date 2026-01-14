@@ -1,13 +1,21 @@
 #!/usr/bin/env node
 /**
- * Baseline comparison test runner for Rust/WASM TypeScript compiler
- * Compares Rust compiler output against TypeScript baselines
+ * Baseline Comparison Tool - Compare WASM compiler output against TypeScript baselines
+ * 
+ * This script runs TypeScript test cases through the WASM compiler and compares
+ * the output (diagnostics, types, etc.) against the expected baseline files.
+ * Useful for regression testing and understanding differences.
  *
  * Usage:
- *   node scripts/baseline-test-rust.mjs [limit] [category]
- *   node scripts/baseline-test-rust.mjs 100 compiler      # Test first 100 compiler tests
- *   node scripts/baseline-test-rust.mjs 100 conformance   # Test first 100 conformance tests
- *   node scripts/baseline-test-rust.mjs --summary         # Just show summary
+ *   node wasm/scripts/compare-baselines.mjs [limit] [category]
+ *   node wasm/scripts/compare-baselines.mjs 100 compiler      # Test first 100 compiler tests
+ *   node wasm/scripts/compare-baselines.mjs 100 conformance   # Test first 100 conformance tests
+ *   node wasm/scripts/compare-baselines.mjs --summary         # Just show summary
+ *   
+ * Output:
+ *   - Shows pass/fail for each test
+ *   - Highlights differences in error messages
+ *   - Provides overall statistics
  */
 
 import { readFileSync, existsSync, readdirSync } from 'fs';

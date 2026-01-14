@@ -174,6 +174,81 @@ This project is not ready for general use yet. The interface and distribution ar
 - compat package `@tsz/tsc` that exposes a `tsc` executable so tooling can swap without noticing
 - Playground
 
+## Testing Infrastructure
+
+Project Zang has a comprehensive testing system to ensure conformance with TypeScript behavior while maintaining performance. The testing is organized into several levels:
+
+### 1. Rust Unit Tests (`./wasm/test.sh`)
+
+Core Rust compiler logic tests using Docker for consistent environments:
+
+```bash
+./wasm/test.sh                    # Run all Rust unit tests
+./wasm/test.sh test_name          # Run specific test 
+./wasm/test.sh --rebuild          # Force rebuild Docker image
+./wasm/test.sh --clean            # Clean cached volumes
+./wasm/test.sh --bench            # Run benchmarks
+```
+
+### 2. TypeScript Conformance Tests (`./wasm/differential-test/`)
+
+The primary conformance system that tests against the full TypeScript test suite:
+
+```bash
+# Main conformance test runner
+./wasm/differential-test/run-conformance.sh --max=10000  # Test up to 10K files
+./wasm/differential-test/run-conformance.sh --all       # Test entire suite (~45K files)
+./wasm/differential-test/run-conformance.sh --category=compiler  # Test specific category
+
+# Analyze specific error types  
+node wasm/differential-test/find-ts2454.mjs    # Find TS2454 "used before assigned" issues
+node wasm/differential-test/find-ts2322.mjs    # Find TS2322 "not assignable" issues
+node wasm/differential-test/find-ts2339.mjs    # Find TS2339 "property doesn't exist" issues
+```
+
+**Conformance Metrics** (updated in header):
+- **Exact Match**: 30.8% (target: 50%+)  
+- **Missing Errors**: 57.8% (target: <30%) - WASM too permissive
+- **Extra Errors**: 28.9% (target: <20%) - WASM too strict
+- **Parser Errors**: ~85 (target: <100) ✅
+
+### 3. Individual Test Scripts (`./wasm/scripts/`)
+
+Tools for debugging and development:
+
+```bash
+# Run single test with detailed output
+node wasm/scripts/run-single-test.mjs tests/cases/compiler/2dArrays.ts --verbose
+
+# Compare WASM output against TypeScript baselines  
+node wasm/scripts/compare-baselines.mjs 100 compiler     # Test first 100 compiler tests
+node wasm/scripts/compare-baselines.mjs --summary        # Show summary only
+
+# Run batch of tests
+node wasm/scripts/run-batch-tests.mjs
+
+# Validate WASM module loads properly
+node wasm/scripts/validate-wasm.mjs
+```
+
+### 4. Development Tests (`./wasm/dev-tests/`)
+
+One-off test files for debugging specific issues:
+- `test_debug.js` - General debugging
+- `test_isolated.js` - Isolated test cases
+- `test_promise_type.js` - Promise type checking
+- Various `.ts` files for specific TypeScript features
+
+### Test Organization Strategy
+
+**Priority testing focuses on the highest-impact conformance gaps:**
+
+1. **Control Flow Analysis (TS2454/TS2564)** - Variable/property initialization checking
+2. **Type Assignability (TS2322)** - Core type checking logic  
+3. **Property Access (TS2339)** - Object property resolution
+
+Use `./wasm/differential-test/run-conformance.sh --max=1000` for quick iteration cycles, and `--all` for comprehensive validation before releases.
+
 ## Guiding principles
 - Make tsz boringly correct before it is fast. Parity with `tsc` output, errors, and edge cases is the trust anchor.
 - Measure everything: benchmark real repos, gate regressions, and only optimize hot paths that move real workloads.

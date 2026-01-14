@@ -1,14 +1,22 @@
 #!/bin/bash
-# Fast Rust test runner with Docker caching
+# WASM Rust Test Runner - Docker-based testing with caching
+#
+# This is the main test runner for the Rust/WASM TypeScript implementation.
+# It uses Docker to ensure consistent testing environment and caches builds
+# for fast iteration.
 #
 # Usage:
-#   ./test.sh              # Run all tests
-#   ./test.sh test_name    # Run specific test
-#   ./test.sh --rebuild    # Force rebuild base image
-#   ./test.sh --clean      # Clean cached volumes
+#   ./wasm/test.sh              # Run all Rust unit tests
+#   ./wasm/test.sh test_name    # Run specific test
+#   ./wasm/test.sh --rebuild    # Force rebuild Docker image
+#   ./wasm/test.sh --clean      # Clean cached volumes
+#   ./wasm/test.sh --bench      # Run benchmarks
+#
+# For TypeScript test suite conformance testing, use:
+#   ./wasm/differential-test/run-conformance.sh
 #
 # Source code is always mounted fresh (not baked into image), so file changes
-# are immediately visible without needing to rebuild.
+# are immediately visible without needing to rebuild the Docker image.
 
 set -e
 
